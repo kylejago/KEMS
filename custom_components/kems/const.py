@@ -1,5 +1,7 @@
-"""Constants for the KEMS integration."""
+"""Constants for KEMS."""
 
 DOMAIN = "kems"
-NAME = "KEMS"
-VERSION = "0.1.0-alpha1"
+
+SCAN_INTERVAL_SECONDS = 300
+
+VERSION = "0.2.0-alpha1"
