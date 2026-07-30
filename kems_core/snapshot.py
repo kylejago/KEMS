@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 
 
@@ -10,7 +10,7 @@ from datetime import datetime
 class Snapshot:
     """One observation of the home."""
 
-    timestamp: datetime
+    timestamp: datetime = field(default_factory=datetime.now)
 
     electricity_rate: float | None = None
     cheap_rate: bool | None = None
