@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from abc import abstractmethod
 
-from kems_core.drivers.base import Driver
-from kems_core.models import BatteryState
+from ..models import BatteryState
+from .base import Driver
 
 
 class BatteryDriver(Driver):

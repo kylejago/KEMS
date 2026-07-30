@@ -23,5 +23,6 @@ select = [
 ]
 
 [tool.pytest.ini_options]
+pythonpath = ["custom_components/kems"]
 testpaths = ["tests"]
 python_files = ["test_*.py"]

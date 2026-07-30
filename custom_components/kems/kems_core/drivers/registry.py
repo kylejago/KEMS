@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from kems_core.drivers.battery import BatteryDriver
+from .battery import BatteryDriver
 
 
 class DriverRegistry:

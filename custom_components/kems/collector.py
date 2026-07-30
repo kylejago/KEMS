@@ -2,8 +2,7 @@
 
 from __future__ import annotations
 
-from kems_core.snapshot import Snapshot
-
+from .kems_core.snapshot import Snapshot
 from .providers.octopus import OctopusProvider
 from .providers.ohme import OhmeProvider
 

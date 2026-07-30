@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from homeassistant.core import HomeAssistant
 
-from kems_core.ohme import OhmeState
+from ..kems_core.ohme import OhmeState
 
 
 class OhmeProvider:

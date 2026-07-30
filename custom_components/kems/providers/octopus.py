@@ -6,8 +6,7 @@ from datetime import datetime
 
 from homeassistant.core import HomeAssistant
 
-from kems_core.octopus import OctopusState
-
+from ..kems_core.octopus import OctopusState
 from .entity_map import OctopusEntities
 
 

@@ -8,9 +8,8 @@ from datetime import timedelta
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
-from kems_core.snapshot import Snapshot
-
 from .collector import Collector
+from .kems_core.snapshot import Snapshot
 
 LOGGER = logging.getLogger(__name__)
 
