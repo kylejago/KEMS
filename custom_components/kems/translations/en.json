@@ -5,6 +5,10 @@
       "reconfigure_successful": "KEMS source entities were updated."
     },
     "step": {
+      "user": {
+        "description": "KEMS will scan Home Assistant for compatible Octopus Energy, Ohme, and FoxESS Modbus entities.",
+        "title": "Set up KEMS"
+      },
       "confirm": {
         "data": {
           "review_entities": "Review or change detected entities"
