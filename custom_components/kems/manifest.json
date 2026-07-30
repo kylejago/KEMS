@@ -1,15 +1,15 @@
 {
   "domain": "kems",
   "name": "KEMS",
-  "version": "0.2.0-alpha1",
+  "version": "0.2.0-alpha2",
   "documentation": "https://github.com/kylejago/KEMS",
   "issue_tracker": "https://github.com/kylejago/KEMS/issues",
   "codeowners": [
     "@kylejago"
   ],
   "config_flow": true,
-  "iot_class": "local_polling",
+  "iot_class": "calculated",
+  "integration_type": "service",
   "requirements": [],
-  "dependencies": [],
-  "integration_type": "hub"
+  "single_config_entry": true
 }

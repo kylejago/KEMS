@@ -1,13 +1,11 @@
 # Changelog
 
-All notable changes to this project will be documented in this file.
+## 0.2.0-alpha2
 
-The format follows Keep a Changelog and Semantic Versioning.
-
-## [Unreleased]
-
-## [0.1.0-alpha1] - In Development
-
-### Added
-
-- Initial repository structure.
+- Rebuilt the Observe integration from a clean package layout.
+- Moved all runtime core models inside `custom_components/kems/kems_core`.
+- Replaced all absolute `kems_core` imports with package-relative imports.
+- Added a config flow for selecting Octopus and optional Ohme source entities.
+- Added coordinator-backed rate, timestamp, EV, off-peak and Intelligent-slot entities.
+- Added regression tests that prevent the original HACS packaging/import failure.
+- Added HACS and hassfest GitHub validation workflows.

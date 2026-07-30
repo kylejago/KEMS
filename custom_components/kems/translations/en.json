@@ -2,8 +2,32 @@
   "config": {
     "step": {
       "user": {
-        "title": "KEMS",
-        "description": "Set up the KEMS Energy Management System."
+        "title": "Set up KEMS",
+        "description": "Choose the Home Assistant entities KEMS should observe. KEMS is read-only in this version.",
+        "data": {
+          "current_import_rate": "Current import rate",
+          "next_import_rate": "Next import rate",
+          "off_peak": "Off-peak status",
+          "intelligent_slot": "Intelligent slot status",
+          "next_offpeak_start": "Next off-peak start",
+          "offpeak_end": "Off-peak end",
+          "ev_connected": "EV connected (optional)",
+          "ev_charging": "EV charging (optional)",
+          "ev_power": "EV charging power (optional)",
+          "ev_soc": "EV state of charge (optional)"
+        },
+        "data_description": {
+          "current_import_rate": "Octopus sensor containing the current import price.",
+          "next_import_rate": "Octopus sensor containing the next import price.",
+          "off_peak": "Octopus binary sensor that is on during off-peak periods.",
+          "intelligent_slot": "Octopus binary sensor that is on during an Intelligent dispatch slot.",
+          "next_offpeak_start": "Octopus timestamp sensor for the next off-peak start.",
+          "offpeak_end": "Octopus timestamp sensor for the off-peak end.",
+          "ev_connected": "Ohme binary sensor showing whether the vehicle is connected.",
+          "ev_charging": "Ohme binary sensor showing whether charging is active.",
+          "ev_power": "Ohme sensor showing charging power in kW.",
+          "ev_soc": "Ohme sensor showing vehicle state of charge as a percentage."
+        }
       }
     },
     "abort": {

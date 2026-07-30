@@ -1,36 +1,51 @@
-"""Known Home Assistant entity IDs."""
+"""Configured Home Assistant entity mapping."""
+
+from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Any
+
+from ..const import (
+    CONF_CURRENT_IMPORT_RATE,
+    CONF_EV_CHARGING,
+    CONF_EV_CONNECTED,
+    CONF_EV_POWER,
+    CONF_EV_SOC,
+    CONF_INTELLIGENT_SLOT,
+    CONF_NEXT_IMPORT_RATE,
+    CONF_NEXT_OFFPEAK_START,
+    CONF_OFF_PEAK,
+    CONF_OFFPEAK_END,
+)
 
 
 @dataclass(frozen=True, slots=True)
-class OctopusEntities:
-    """Default Octopus Intelligent entity IDs."""
+class KEMSEntities:
+    """Entity IDs selected in the KEMS config flow."""
 
-    current_rate: str = (
-        "sensor.octopus_energy_electricity_20e5126162_2200019564326_current_rate"
-    )
+    current_import_rate: str
+    next_import_rate: str
+    off_peak: str
+    intelligent_slot: str
+    next_offpeak_start: str
+    offpeak_end: str
+    ev_connected: str | None = None
+    ev_charging: str | None = None
+    ev_power: str | None = None
+    ev_soc: str | None = None
 
-    next_rate: str = (
-        "sensor.octopus_energy_electricity_20e5126162_2200019564326_next_rate"
-    )
-
-    off_peak: str = (
-        "binary_sensor.octopus_energy_electricity_20e5126162_2200019564326_off_peak"
-    )
-
-    intelligent_slot: str = (
-        "binary_sensor.octopus_intelligent_tariff_octopus_intelligent_slot"
-    )
-
-    planned_dispatch: str = (
-        "binary_sensor.octopus_intelligent_tariff_octopus_intelligent_planned_dispatch_slot"
-    )
-
-    next_offpeak_start: str = (
-        "sensor.octopus_intelligent_tariff_octopus_intelligent_next_offpeak_start"
-    )
-
-    offpeak_end: str = (
-        "sensor.octopus_intelligent_tariff_octopus_intelligent_offpeak_end"
-    )
+    @classmethod
+    def from_entry_data(cls, data: dict[str, Any]) -> KEMSEntities:
+        """Build an entity map from config-entry data."""
+        return cls(
+            current_import_rate=data[CONF_CURRENT_IMPORT_RATE],
+            next_import_rate=data[CONF_NEXT_IMPORT_RATE],
+            off_peak=data[CONF_OFF_PEAK],
+            intelligent_slot=data[CONF_INTELLIGENT_SLOT],
+            next_offpeak_start=data[CONF_NEXT_OFFPEAK_START],
+            offpeak_end=data[CONF_OFFPEAK_END],
+            ev_connected=data.get(CONF_EV_CONNECTED),
+            ev_charging=data.get(CONF_EV_CHARGING),
+            ev_power=data.get(CONF_EV_POWER),
+            ev_soc=data.get(CONF_EV_SOC),
+        )

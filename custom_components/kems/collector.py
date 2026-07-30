@@ -1,4 +1,4 @@
-"""Collect data from providers."""
+"""Collect observations from KEMS providers."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from .providers.ohme import OhmeProvider
 
 
 class Collector:
-    """Collect data from all providers."""
+    """Collect read-only data from all configured providers."""
 
     def __init__(
         self,
@@ -20,28 +20,19 @@ class Collector:
         self._ohme = ohme
 
     def collect(self) -> Snapshot:
-        """Create a monitoring snapshot."""
-
-        snapshot = Snapshot()
-
-        # Octopus
+        """Create a complete monitoring snapshot."""
         octopus = self._octopus.get_state()
-
-        snapshot.current_import_rate = octopus.current_rate
-        snapshot.next_import_rate = octopus.next_rate
-
-        snapshot.off_peak = octopus.off_peak
-        snapshot.intelligent_slot = octopus.intelligent_slot
-
-        snapshot.next_offpeak_start = octopus.next_offpeak_start
-        snapshot.offpeak_end = octopus.offpeak_end
-
-        # Ohme
         ohme = self._ohme.get_state()
 
-        snapshot.ev_connected = ohme.connected
-        snapshot.ev_charging = ohme.charging
-        snapshot.ev_power_kw = ohme.power_kw
-        snapshot.ev_soc = ohme.vehicle_soc
-
-        return snapshot
+        return Snapshot(
+            current_import_rate=octopus.current_rate_pence,
+            next_import_rate=octopus.next_rate_pence,
+            off_peak=octopus.off_peak,
+            intelligent_slot=octopus.intelligent_slot,
+            next_offpeak_start=octopus.next_offpeak_start,
+            offpeak_end=octopus.offpeak_end,
+            ev_connected=ohme.connected,
+            ev_charging=ohme.charging,
+            ev_power_kw=ohme.power_kw,
+            ev_soc=ohme.vehicle_soc,
+        )

@@ -1,4 +1,4 @@
-"""Octopus Intelligent models."""
+"""Octopus Energy observation model."""
 
 from __future__ import annotations
 
@@ -8,15 +8,11 @@ from datetime import datetime
 
 @dataclass(slots=True)
 class OctopusState:
-    """Current state of the Octopus integration."""
+    """Current state read from Octopus Energy entities."""
 
-    current_rate: float | None = None
-    next_rate: float | None = None
-
-    off_peak: bool = False
-
-    intelligent_slot: bool = False
-    planned_dispatch: bool = False
-
+    current_rate_pence: float | None = None
+    next_rate_pence: float | None = None
+    off_peak: bool | None = None
+    intelligent_slot: bool | None = None
     next_offpeak_start: datetime | None = None
     offpeak_end: datetime | None = None

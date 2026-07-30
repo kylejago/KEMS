@@ -1,4 +1,4 @@
 black
-ruff
-pytest
 pre-commit
+pytest
+ruff
