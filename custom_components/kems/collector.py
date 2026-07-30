@@ -16,6 +16,7 @@ class Collector:
         octopus: OctopusProvider,
         ohme: OhmeProvider,
     ) -> None:
+        """Initialise the collector."""
         self._octopus = octopus
         self._ohme = ohme
 
@@ -24,11 +25,20 @@ class Collector:
 
         snapshot = Snapshot()
 
+        # Octopus
         octopus = self._octopus.get_state()
-        ohme = self._ohme.get_state()
 
-        snapshot.electricity_rate = octopus.current_rate
-        snapshot.cheap_rate = octopus.off_peak
+        snapshot.current_import_rate = octopus.current_rate
+        snapshot.next_import_rate = octopus.next_rate
+
+        snapshot.off_peak = octopus.off_peak
+        snapshot.intelligent_slot = octopus.intelligent_slot
+
+        snapshot.next_offpeak_start = octopus.next_offpeak_start
+        snapshot.offpeak_end = octopus.offpeak_end
+
+        # Ohme
+        ohme = self._ohme.get_state()
 
         snapshot.ev_connected = ohme.connected
         snapshot.ev_charging = ohme.charging
