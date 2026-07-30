@@ -1,0 +1,13 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "KEMS",
+        "description": "Set up the KEMS Energy Management System."
+      }
+    },
+    "abort": {
+      "already_configured": "KEMS is already configured."
+    }
+  }
+}
