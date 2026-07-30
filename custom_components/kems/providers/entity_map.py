@@ -1,19 +1,36 @@
 """Known Home Assistant entity IDs."""
 
-CURRENT_RATE = "sensor.octopus_energy_electricity_20e5126162_2200019564326_current_rate"
+from dataclasses import dataclass
 
-NEXT_RATE = "sensor.octopus_energy_electricity_20e5126162_2200019564326_next_rate"
 
-OFF_PEAK = "binary_sensor.octopus_energy_electricity_20e5126162_2200019564326_off_peak"
+@dataclass(frozen=True, slots=True)
+class OctopusEntities:
+    """Default Octopus Intelligent entity IDs."""
 
-INTELLIGENT_SLOT = "binary_sensor.octopus_intelligent_tariff_octopus_intelligent_slot"
+    current_rate: str = (
+        "sensor.octopus_energy_electricity_20e5126162_2200019564326_current_rate"
+    )
 
-PLANNED_DISPATCH = (
-    "binary_sensor.octopus_intelligent_tariff_octopus_intelligent_planned_dispatch_slot"
-)
+    next_rate: str = (
+        "sensor.octopus_energy_electricity_20e5126162_2200019564326_next_rate"
+    )
 
-NEXT_OFFPEAK_START = (
-    "sensor.octopus_intelligent_tariff_octopus_intelligent_next_offpeak_start"
-)
+    off_peak: str = (
+        "binary_sensor.octopus_energy_electricity_20e5126162_2200019564326_off_peak"
+    )
 
-OFFPEAK_END = "sensor.octopus_intelligent_tariff_octopus_intelligent_offpeak_end"
+    intelligent_slot: str = (
+        "binary_sensor.octopus_intelligent_tariff_octopus_intelligent_slot"
+    )
+
+    planned_dispatch: str = (
+        "binary_sensor.octopus_intelligent_tariff_octopus_intelligent_planned_dispatch_slot"
+    )
+
+    next_offpeak_start: str = (
+        "sensor.octopus_intelligent_tariff_octopus_intelligent_next_offpeak_start"
+    )
+
+    offpeak_end: str = (
+        "sensor.octopus_intelligent_tariff_octopus_intelligent_offpeak_end"
+    )
