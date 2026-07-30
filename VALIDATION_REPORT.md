@@ -1,38 +1,38 @@
-# KEMS clean rebuild validation report
+# KEMS validation report
 
-## Completed checks
+Build: `0.3.0-alpha1`  
+Scope: read-only **Observe → Learn → Advise → Simulate**  
+Providers: Octopus Energy, Ohme, FoxESS Modbus
 
-- All Home Assistant runtime source is inside `custom_components/kems`.
-- `kems_core` is packaged at `custom_components/kems/kems_core`.
-- Runtime source contains no absolute `from kems_core ...` or `import kems_core` statements.
-- Every package-relative runtime import was resolved to a source file included in the package.
-- Python AST parsing passed for every Python file.
-- Python bytecode compilation passed for `custom_components` and `tests`.
-- JSON parsing passed for `manifest.json`, `hacs.json`, and `translations/en.json`.
-- The repository contains no `__pycache__` folders or `.pyc` files at packaging time.
-- Seven pytest tests passed.
-- HACS and hassfest GitHub Actions are included.
-- A HACS brand icon and logo are included.
+## Automated checks completed in the build environment
 
-## Deliberate architecture changes
+- 15 Pytest tests passed.
+- Every Python source file parsed successfully with Python's AST parser.
+- Every JSON file parsed successfully.
+- Every YAML workflow/example parsed successfully.
+- Python bytecode compilation completed successfully.
+- Package-layout tests confirmed that all runtime code is inside `custom_components/kems`.
+- Relative-import resolution tests confirmed that shipped relative imports point to shipped source modules.
+- No runtime code contains an absolute `kems_core` import.
+- No `__pycache__` directories or `.pyc` files are included.
+- All Python source lines are no longer than 88 characters before Black is run.
+- Synthetic entity-discovery tests cover current Ohme status/power/battery names and FoxESS Load Power, Battery SoC, Battery Voltage, Battery Current, PV Power, Grid Consumption, and Feed-in names.
+- Ohme charger-status interpretation and FoxESS battery-power derivation are unit tested.
+- Extra Octopus Intelligent slots are treated as confirmed cheap only when Ohme also reports active charging.
 
-- The old top-level `kems_core` package has been removed.
-- User-specific hard-coded Home Assistant entity IDs have been removed.
-- The config flow now asks the user to select Octopus entities and optional Ohme entities.
-- The integration is observe-only and does not call any control action.
-- Custom-integration English text is provided in `translations/en.json`; no core-only `strings.json` is shipped.
+## Checks to run after copying into the new branch
 
-## Checks to run after copying to the new branch
-
-The sandbox used to build this ZIP did not have Black, Ruff, or a complete Home Assistant runtime installed. Run these locally before committing:
+Black, Ruff, HACS validation, and Hassfest are not installed in this build container. Run the repository's normal checks locally and allow GitHub Actions to run before merging:
 
 ```powershell
-python -m pip install -r requirements-dev.txt
 python -m black .
-python -m ruff check .
+python -m ruff check . --fix
 python -m pytest
-python -m compileall -q custom_components tests
 python -m pre_commit run --all-files
 ```
 
-After pushing, confirm the **Validate**, **Validate with HACS**, and **Validate with hassfest** workflows pass on GitHub before installing the branch in Home Assistant.
+Do not merge until the Validate, HACS, and Hassfest checks are green.
+
+## Control boundary
+
+This build contains no Home Assistant service calls for Octopus, Ohme, or FoxESS Modbus and does not write inverter registers or charger settings. Control is intentionally deferred to a later, explicitly enabled phase.

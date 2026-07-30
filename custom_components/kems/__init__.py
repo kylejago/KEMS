@@ -9,10 +9,14 @@ from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 
 from .collector import Collector
+from .const import CONF_EV_POWER
 from .coordinator import KEMSCoordinator
+from .entity_discovery import async_discover_entities
 from .providers.entity_map import KEMSEntities
+from .providers.foxess import FoxESSProvider
 from .providers.octopus import OctopusProvider
 from .providers.ohme import OhmeProvider
+from .settings import KEMSSettings
 
 LOGGER = logging.getLogger(__name__)
 
@@ -21,22 +25,53 @@ PLATFORMS: list[Platform] = [Platform.SENSOR, Platform.BINARY_SENSOR]
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up KEMS from a config entry."""
-    entities = KEMSEntities.from_entry_data(dict(entry.data))
+    discovery = await async_discover_entities(hass)
+    enriched = dict(entry.data)
+    changed = False
+    for key, entity_id in discovery.mappings.items():
+        if not enriched.get(key):
+            enriched[key] = entity_id
+            changed = True
+    if changed:
+        hass.config_entries.async_update_entry(entry, data=enriched)
 
+    entities = KEMSEntities.from_entry_data(enriched)
+    settings = KEMSSettings.from_options(entry.options)
     collector = Collector(
         octopus=OctopusProvider(hass, entities),
         ohme=OhmeProvider(hass, entities),
+        foxess=FoxESSProvider(hass, entities),
     )
-    coordinator = KEMSCoordinator(hass, entry, collector)
+    coordinator = KEMSCoordinator(hass, entry, collector, entities, settings)
 
     await coordinator.async_config_entry_first_refresh()
     entry.runtime_data = coordinator
-
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
-    LOGGER.info("KEMS initialised in observe-only mode")
+    LOGGER.info("KEMS initialised in read-only Observe/Learn/Advise/Simulate mode")
     return True
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a KEMS config entry."""
+    coordinator: KEMSCoordinator = entry.runtime_data
+    await coordinator.async_shutdown()
     return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+
+
+async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    """Migrate earlier KEMS config entries to the current schema."""
+    if entry.version > 3:
+        return False
+
+    data = dict(entry.data)
+    old_ev_power = data.pop("ev_power", None)
+    if old_ev_power and not data.get(CONF_EV_POWER):
+        data[CONF_EV_POWER] = old_ev_power
+
+    hass.config_entries.async_update_entry(
+        entry,
+        data=data,
+        version=3,
+        minor_version=0,
+    )
+    return True

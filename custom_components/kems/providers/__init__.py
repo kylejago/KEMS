@@ -1,1 +1,1 @@
-"""Data providers for KEMS."""
+"""Read-only source providers for KEMS."""

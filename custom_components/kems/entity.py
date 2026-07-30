@@ -22,6 +22,6 @@ class KEMSEntity(CoordinatorEntity[KEMSCoordinator]):
             identifiers={(DOMAIN, coordinator.entry.entry_id)},
             name=NAME,
             manufacturer="KEMS",
-            model="Energy Management System",
+            model="Observe / Learn / Advise / Simulate",
             sw_version=VERSION,
         )

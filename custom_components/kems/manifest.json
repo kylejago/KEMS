@@ -6,8 +6,9 @@
   ],
   "config_flow": true,
   "documentation": "https://github.com/kylejago/KEMS",
-  "integration_type": "hub",
-  "iot_class": "local_polling",
+  "integration_type": "helper",
+  "iot_class": "calculated",
   "issue_tracker": "https://github.com/kylejago/KEMS/issues",
-  "version": "0.2.0-alpha1"
+  "single_config_entry": true,
+  "version": "0.3.0-alpha1"
 }

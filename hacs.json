@@ -1,6 +1,4 @@
 {
   "name": "KEMS",
-  "content_in_root": false,
-  "render_readme": true,
-  "homeassistant": "2025.1.0"
+  "render_readme": true
 }
