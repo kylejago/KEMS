@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from datetime import timedelta
 
 from homeassistant.core import HomeAssistant
@@ -10,6 +11,8 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from kems_core.snapshot import Snapshot
 
 from .collector import Collector
+
+LOGGER = logging.getLogger(__name__)
 
 
 class KEMSCoordinator(DataUpdateCoordinator[Snapshot]):
@@ -26,7 +29,7 @@ class KEMSCoordinator(DataUpdateCoordinator[Snapshot]):
 
         super().__init__(
             hass,
-            logger=None,
+            logger=LOGGER,
             name="KEMS",
             update_interval=timedelta(minutes=5),
         )
