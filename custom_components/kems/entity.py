@@ -16,5 +16,5 @@ class KEMSEntity(CoordinatorEntity[KEMSCoordinator]):
         self,
         coordinator: KEMSCoordinator,
     ) -> None:
-        """Initialise the base entity."""
+        """Initialise the entity."""
         super().__init__(coordinator)
