@@ -1,15 +1,26 @@
-"""Ohme observation model."""
+"""Home Assistant-independent Ohme status interpretation."""
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 
+def interpret_charger_status(status: str | None) -> tuple[bool | None, bool | None]:
+    """Return connected and charging flags from an Ohme charger status."""
+    if status is None:
+        return None, None
 
-@dataclass(slots=True)
-class OhmeState:
-    """Current state read from Ohme entities."""
+    normalised = status.strip().casefold().replace("-", "_").replace(" ", "_")
+    if normalised in {"", "unknown", "unavailable"}:
+        return None, None
+    if normalised == "unplugged":
+        return False, False
 
-    connected: bool | None = None
-    charging: bool | None = None
-    power_kw: float | None = None
-    vehicle_soc: float | None = None
+    connected_states = {
+        "charging",
+        "finished",
+        "paused",
+        "pending_approval",
+        "plugged_in",
+    }
+    if normalised in connected_states:
+        return True, normalised == "charging"
+    return None, None

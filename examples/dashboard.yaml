@@ -1,0 +1,53 @@
+title: KEMS
+views:
+  - title: Overview
+    path: kems
+    icon: mdi:home-lightning-bolt
+    cards:
+      - type: entities
+        title: KEMS status
+        entities:
+          - sensor.kems_phase
+          - sensor.kems_data_quality
+          - sensor.kems_history_samples
+          - sensor.kems_learning_confidence
+          - binary_sensor.kems_learning_ready
+          - binary_sensor.kems_simulation_ready
+
+      - type: entities
+        title: Live observe
+        entities:
+          - sensor.kems_current_import_rate
+          - sensor.kems_next_import_rate
+          - binary_sensor.kems_off_peak
+          - binary_sensor.kems_intelligent_slot
+          - binary_sensor.kems_cheap_period_confirmed
+          - sensor.kems_house_load
+          - sensor.kems_solar_power
+          - sensor.kems_battery_state_of_charge
+          - sensor.kems_battery_power
+          - sensor.kems_grid_import
+          - sensor.kems_grid_export
+          - binary_sensor.kems_ev_connected
+          - binary_sensor.kems_ev_charging
+          - sensor.kems_ev_charging_power
+          - sensor.kems_ev_state_of_charge
+
+      - type: entities
+        title: Learn and advise
+        entities:
+          - sensor.kems_typical_house_load_now
+          - sensor.kems_typical_solar_power_now
+          - sensor.kems_predicted_energy_until_off_peak
+          - sensor.kems_advice
+          - binary_sensor.kems_grid_import_outside_cheap_period
+
+      - type: entities
+        title: Simulation today
+        entities:
+          - sensor.kems_observed_cost_today
+          - sensor.kems_simulated_kems_cost_today
+          - sensor.kems_simulated_saving_today
+          - sensor.kems_simulated_grid_import_today
+          - sensor.kems_simulated_battery_state_of_charge
+          - binary_sensor.kems_simulation_shows_a_saving

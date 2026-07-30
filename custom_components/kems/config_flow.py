@@ -1,4 +1,4 @@
-"""Config flow for KEMS."""
+"""Config and options flows for KEMS."""
 
 from __future__ import annotations
 
@@ -6,58 +6,264 @@ from typing import Any
 
 import voluptuous as vol
 from homeassistant import config_entries
+from homeassistant.config_entries import ConfigEntry, OptionsFlowWithReload
+from homeassistant.core import callback
 from homeassistant.helpers.selector import EntitySelector, EntitySelectorConfig
 
 from .const import (
+    CONF_BATTERY_CAPACITY,
+    CONF_BATTERY_CURRENT,
+    CONF_BATTERY_INITIAL,
+    CONF_BATTERY_POWER,
+    CONF_BATTERY_RESERVE,
+    CONF_BATTERY_SOC,
+    CONF_BATTERY_VOLTAGE,
+    CONF_CHARGE_EFFICIENCY,
+    CONF_CURRENT_EXPORT_RATE,
     CONF_CURRENT_IMPORT_RATE,
+    CONF_DISCHARGE_EFFICIENCY,
     CONF_EV_CHARGING,
     CONF_EV_CONNECTED,
     CONF_EV_POWER,
     CONF_EV_SOC,
+    CONF_EV_STATUS,
+    CONF_EXPORT_RATE,
+    CONF_GRID_EXPORT,
+    CONF_GRID_IMPORT,
+    CONF_HISTORY_DAYS,
+    CONF_HOUSE_LOAD,
     CONF_INTELLIGENT_SLOT,
+    CONF_MAX_CHARGE,
+    CONF_MAX_DISCHARGE,
     CONF_NEXT_IMPORT_RATE,
     CONF_NEXT_OFFPEAK_START,
     CONF_OFF_PEAK,
     CONF_OFFPEAK_END,
+    CONF_SCAN_INTERVAL,
+    CONF_SIMULATION_STRATEGY,
+    CONF_SOLAR_POWER,
+    DEFAULT_OPTIONS,
     DOMAIN,
+    ENTITY_MAPPING_KEYS,
     NAME,
 )
+from .entity_discovery import DiscoveryResult, async_discover_entities
 
 SENSOR_SELECTOR = EntitySelector(EntitySelectorConfig(domain="sensor"))
 BINARY_SENSOR_SELECTOR = EntitySelector(EntitySelectorConfig(domain="binary_sensor"))
 
-STEP_USER_DATA_SCHEMA = vol.Schema(
+BINARY_KEYS = {
+    CONF_OFF_PEAK,
+    CONF_INTELLIGENT_SLOT,
+    CONF_EV_CONNECTED,
+    CONF_EV_CHARGING,
+}
+
+
+def _entity_schema(suggested: dict[str, Any]) -> vol.Schema:
+    """Build the manual entity-review form with discovered suggestions."""
+    schema: dict[vol.Marker, Any] = {}
+    for key in ENTITY_MAPPING_KEYS:
+        selector = BINARY_SENSOR_SELECTOR if key in BINARY_KEYS else SENSOR_SELECTOR
+        default = suggested.get(key)
+        if key == CONF_CURRENT_IMPORT_RATE:
+            marker = (
+                vol.Required(key, default=default) if default else vol.Required(key)
+            )
+        else:
+            marker = (
+                vol.Optional(key, default=default) if default else vol.Optional(key)
+            )
+        schema[marker] = selector
+    return vol.Schema(schema)
+
+
+OPTIONS_SCHEMA = vol.Schema(
     {
-        vol.Required(CONF_CURRENT_IMPORT_RATE): SENSOR_SELECTOR,
-        vol.Required(CONF_NEXT_IMPORT_RATE): SENSOR_SELECTOR,
-        vol.Required(CONF_OFF_PEAK): BINARY_SENSOR_SELECTOR,
-        vol.Required(CONF_INTELLIGENT_SLOT): BINARY_SENSOR_SELECTOR,
-        vol.Required(CONF_NEXT_OFFPEAK_START): SENSOR_SELECTOR,
-        vol.Required(CONF_OFFPEAK_END): SENSOR_SELECTOR,
-        vol.Optional(CONF_EV_CONNECTED): BINARY_SENSOR_SELECTOR,
-        vol.Optional(CONF_EV_CHARGING): BINARY_SENSOR_SELECTOR,
-        vol.Optional(CONF_EV_POWER): SENSOR_SELECTOR,
-        vol.Optional(CONF_EV_SOC): SENSOR_SELECTOR,
+        vol.Required(CONF_SCAN_INTERVAL): vol.All(
+            vol.Coerce(int), vol.Range(min=30, max=3600)
+        ),
+        vol.Required(CONF_HISTORY_DAYS): vol.All(
+            vol.Coerce(int), vol.Range(min=1, max=365)
+        ),
+        vol.Required(CONF_BATTERY_CAPACITY): vol.All(
+            vol.Coerce(float), vol.Range(min=0.1, max=500)
+        ),
+        vol.Required(CONF_BATTERY_RESERVE): vol.All(
+            vol.Coerce(float), vol.Range(min=0, max=95)
+        ),
+        vol.Required(CONF_BATTERY_INITIAL): vol.All(
+            vol.Coerce(float), vol.Range(min=0, max=100)
+        ),
+        vol.Required(CONF_MAX_CHARGE): vol.All(
+            vol.Coerce(float), vol.Range(min=0.1, max=100)
+        ),
+        vol.Required(CONF_MAX_DISCHARGE): vol.All(
+            vol.Coerce(float), vol.Range(min=0.1, max=100)
+        ),
+        vol.Required(CONF_CHARGE_EFFICIENCY): vol.All(
+            vol.Coerce(float), vol.Range(min=0.5, max=1.0)
+        ),
+        vol.Required(CONF_DISCHARGE_EFFICIENCY): vol.All(
+            vol.Coerce(float), vol.Range(min=0.5, max=1.0)
+        ),
+        vol.Required(CONF_EXPORT_RATE): vol.All(
+            vol.Coerce(float), vol.Range(min=0, max=200)
+        ),
+        vol.Required(CONF_SIMULATION_STRATEGY): vol.In(
+            {"export_first": "Export solar first", "self_use": "Solar self-use first"}
+        ),
     }
 )
 
 
 class KEMSConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
-    """Handle the KEMS config flow."""
+    """Handle automatic and manual KEMS setup."""
 
-    VERSION = 1
+    VERSION = 3
+    MINOR_VERSION = 0
+
+    def __init__(self) -> None:
+        """Initialise the flow state."""
+        self._discovery = DiscoveryResult({}, {}, ())
+        self._suggested: dict[str, Any] = {}
 
     async def async_step_user(
         self,
         user_input: dict[str, Any] | None = None,
     ):
-        """Configure KEMS source entities."""
+        """Automatically scan for supported source entities."""
+        await self.async_set_unique_id(DOMAIN)
+        self._abort_if_unique_id_configured()
+        self._discovery = await async_discover_entities(self.hass)
+        self._suggested = dict(self._discovery.mappings)
+        return await self.async_step_confirm(user_input)
+
+    async def async_step_confirm(
+        self,
+        user_input: dict[str, Any] | None = None,
+    ):
+        """Confirm automatic discovery or open manual review."""
         if user_input is not None:
-            await self.async_set_unique_id(DOMAIN)
-            self._abort_if_unique_id_configured()
-            return self.async_create_entry(title=NAME, data=user_input)
+            if user_input.get("review_entities"):
+                return await self.async_step_entities()
+            if CONF_CURRENT_IMPORT_RATE not in self._suggested:
+                return await self.async_step_entities()
+            return self.async_create_entry(title=NAME, data=self._suggested)
+
+        provider_counts = {
+            "octopus": sum(
+                key
+                in {
+                    CONF_CURRENT_IMPORT_RATE,
+                    CONF_NEXT_IMPORT_RATE,
+                    CONF_CURRENT_EXPORT_RATE,
+                    CONF_OFF_PEAK,
+                    CONF_INTELLIGENT_SLOT,
+                    CONF_NEXT_OFFPEAK_START,
+                    CONF_OFFPEAK_END,
+                }
+                for key in self._suggested
+            ),
+            "ohme": sum(
+                key
+                in {
+                    CONF_EV_STATUS,
+                    CONF_EV_CONNECTED,
+                    CONF_EV_CHARGING,
+                    CONF_EV_POWER,
+                    CONF_EV_SOC,
+                }
+                for key in self._suggested
+            ),
+            "foxess": sum(
+                key
+                in {
+                    CONF_HOUSE_LOAD,
+                    CONF_BATTERY_SOC,
+                    CONF_BATTERY_POWER,
+                    CONF_BATTERY_VOLTAGE,
+                    CONF_BATTERY_CURRENT,
+                    CONF_SOLAR_POWER,
+                    CONF_GRID_IMPORT,
+                    CONF_GRID_EXPORT,
+                }
+                for key in self._suggested
+            ),
+        }
+        return self.async_show_form(
+            step_id="confirm",
+            data_schema=vol.Schema(
+                {vol.Optional("review_entities", default=False): bool}
+            ),
+            description_placeholders={
+                "octopus_count": str(provider_counts["octopus"]),
+                "ohme_count": str(provider_counts["ohme"]),
+                "foxess_count": str(provider_counts["foxess"]),
+                "detected_entities": self._discovery.summary(),
+                "ambiguous": ", ".join(self._discovery.ambiguous) or "None",
+            },
+        )
+
+    async def async_step_entities(
+        self,
+        user_input: dict[str, Any] | None = None,
+    ):
+        """Review or manually select source entities."""
+        if user_input is not None:
+            cleaned = {key: value for key, value in user_input.items() if value}
+            return self.async_create_entry(title=NAME, data=cleaned)
+        return self.async_show_form(
+            step_id="entities",
+            data_schema=_entity_schema(self._suggested),
+        )
+
+    async def async_step_reconfigure(
+        self,
+        user_input: dict[str, Any] | None = None,
+    ):
+        """Rescan and update source entity mappings."""
+        entry = self._get_reconfigure_entry()
+        if not self._suggested:
+            discovery = await async_discover_entities(self.hass)
+            self._suggested = {**dict(entry.data), **discovery.mappings}
+
+        if user_input is not None:
+            cleaned = {key: value for key, value in user_input.items() if value}
+            return self.async_update_reload_and_abort(
+                entry,
+                data_updates=cleaned,
+                reload_even_if_entry_is_unchanged=False,
+            )
 
         return self.async_show_form(
-            step_id="user",
-            data_schema=STEP_USER_DATA_SCHEMA,
+            step_id="reconfigure",
+            data_schema=_entity_schema(self._suggested),
+        )
+
+    @staticmethod
+    @callback
+    def async_get_options_flow(config_entry: ConfigEntry):
+        """Return the KEMS options flow."""
+        return KEMSOptionsFlow()
+
+
+class KEMSOptionsFlow(OptionsFlowWithReload):
+    """Configure learning retention and simulation assumptions."""
+
+    async def async_step_init(
+        self,
+        user_input: dict[str, Any] | None = None,
+    ):
+        """Manage KEMS options."""
+        if user_input is not None:
+            return self.async_create_entry(data=user_input)
+
+        suggested = {**DEFAULT_OPTIONS, **dict(self.config_entry.options)}
+        return self.async_show_form(
+            step_id="init",
+            data_schema=self.add_suggested_values_to_schema(
+                OPTIONS_SCHEMA,
+                suggested,
+            ),
         )

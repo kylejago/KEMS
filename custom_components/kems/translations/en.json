@@ -1,37 +1,132 @@
 {
   "config": {
+    "abort": {
+      "already_configured": "KEMS is already configured.",
+      "reconfigure_successful": "KEMS source entities were updated."
+    },
     "step": {
       "user": {
-        "title": "Set up KEMS",
-        "description": "Choose the Home Assistant entities KEMS should observe. KEMS is read-only in this version.",
+        "description": "KEMS will scan Home Assistant for compatible Octopus Energy, Ohme, and FoxESS Modbus entities.",
+        "title": "Set up KEMS"
+      },
+      "confirm": {
         "data": {
-          "current_import_rate": "Current import rate",
-          "next_import_rate": "Next import rate",
-          "off_peak": "Off-peak status",
-          "intelligent_slot": "Intelligent slot status",
-          "next_offpeak_start": "Next off-peak start",
-          "offpeak_end": "Off-peak end",
-          "ev_connected": "EV connected (optional)",
-          "ev_charging": "EV charging (optional)",
-          "ev_power": "EV charging power (optional)",
-          "ev_soc": "EV state of charge (optional)"
+          "review_entities": "Review or change detected entities"
         },
         "data_description": {
-          "current_import_rate": "Octopus sensor containing the current import price.",
-          "next_import_rate": "Octopus sensor containing the next import price.",
+          "review_entities": "Open the full mapping screen before KEMS is created."
+        },
+        "description": "KEMS scanned Home Assistant and found {octopus_count} Octopus, {ohme_count} Ohme, and {foxess_count} FoxESS Modbus source entities.\n\nDetected mappings:\n{detected_entities}\n\nAmbiguous fields: {ambiguous}\n\nLeave review disabled to accept high-confidence matches. KEMS remains completely read-only.",
+        "title": "Set up KEMS automatically"
+      },
+      "entities": {
+        "data": {
+          "battery_current": "Battery current (optional)",
+          "battery_power_kw": "Battery power (optional)",
+          "battery_soc": "Battery state of charge (optional)",
+          "battery_voltage": "Battery voltage (optional)",
+          "current_export_rate": "Current export rate (optional)",
+          "current_import_rate": "Current import rate",
+          "ev_charging": "EV charging (optional)",
+          "ev_connected": "EV connected (optional)",
+          "ev_power_kw": "EV charging power (optional)",
+          "ev_soc": "EV state of charge (optional)",
+          "ev_status": "EV charger status (optional)",
+          "grid_export_kw": "Grid export power (optional)",
+          "grid_import_kw": "Grid import power (optional)",
+          "house_load_kw": "House load power (optional)",
+          "intelligent_slot": "Intelligent slot status (optional)",
+          "next_import_rate": "Next import rate (optional)",
+          "next_offpeak_start": "Next off-peak start (optional)",
+          "off_peak": "Off-peak status (optional)",
+          "offpeak_end": "Off-peak end (optional)",
+          "solar_power_kw": "Solar power (optional)"
+        },
+        "data_description": {
+          "battery_current": "FoxESS Modbus Battery Current sensor, used with Battery Voltage to derive battery power.",
+          "battery_power_kw": "Optional direct battery power sensor. If absent, KEMS derives power from FoxESS voltage and current.",
+          "battery_soc": "FoxESS Modbus battery state of charge percentage.",
+          "battery_voltage": "FoxESS Modbus Battery Voltage sensor, used with Battery Current to derive battery power.",
+          "current_export_rate": "Octopus current export price.",
+          "current_import_rate": "Octopus current electricity import price.",
+          "ev_charging": "Optional legacy/custom Ohme binary sensor; the Ohme status sensor is preferred.",
+          "ev_connected": "Optional legacy/custom Ohme binary sensor; the Ohme status sensor is preferred.",
+          "ev_power_kw": "Ohme charging power sensor.",
+          "ev_soc": "Ohme vehicle state of charge percentage.",
+          "ev_status": "Ohme charger status sensor; KEMS derives connected and charging states from it.",
+          "grid_export_kw": "FoxESS Modbus power currently exported to the grid.",
+          "grid_import_kw": "FoxESS Modbus power currently imported from the grid.",
+          "house_load_kw": "FoxESS Modbus total house load power.",
+          "intelligent_slot": "Octopus binary sensor for an active Intelligent dispatch slot.",
+          "next_import_rate": "Octopus next electricity import price.",
+          "next_offpeak_start": "Octopus timestamp for the next cheap period start.",
           "off_peak": "Octopus binary sensor that is on during off-peak periods.",
-          "intelligent_slot": "Octopus binary sensor that is on during an Intelligent dispatch slot.",
-          "next_offpeak_start": "Octopus timestamp sensor for the next off-peak start.",
-          "offpeak_end": "Octopus timestamp sensor for the off-peak end.",
-          "ev_connected": "Ohme binary sensor showing whether the vehicle is connected.",
-          "ev_charging": "Ohme binary sensor showing whether charging is active.",
-          "ev_power": "Ohme sensor showing charging power in kW.",
-          "ev_soc": "Ohme sensor showing vehicle state of charge as a percentage."
-        }
+          "offpeak_end": "Octopus timestamp for the current or next cheap period end.",
+          "solar_power_kw": "FoxESS Modbus total PV/solar power."
+        },
+        "description": "Choose the entities KEMS observes. Only the current import rate is required; Ohme and FoxESS Modbus can be added later through Reconfigure.",
+        "title": "Review KEMS source entities"
+      },
+      "reconfigure": {
+        "data": {
+          "battery_current": "Battery current (optional)",
+          "battery_power_kw": "Battery power (optional)",
+          "battery_soc": "Battery state of charge (optional)",
+          "battery_voltage": "Battery voltage (optional)",
+          "current_export_rate": "Current export rate (optional)",
+          "current_import_rate": "Current import rate",
+          "ev_charging": "EV charging (optional)",
+          "ev_connected": "EV connected (optional)",
+          "ev_power_kw": "EV charging power (optional)",
+          "ev_soc": "EV state of charge (optional)",
+          "ev_status": "EV charger status (optional)",
+          "grid_export_kw": "Grid export power (optional)",
+          "grid_import_kw": "Grid import power (optional)",
+          "house_load_kw": "House load power (optional)",
+          "intelligent_slot": "Intelligent slot status (optional)",
+          "next_import_rate": "Next import rate (optional)",
+          "next_offpeak_start": "Next off-peak start (optional)",
+          "off_peak": "Off-peak status (optional)",
+          "offpeak_end": "Off-peak end (optional)",
+          "solar_power_kw": "Solar power (optional)"
+        },
+        "description": "KEMS has rescanned Home Assistant. Review the mappings below, including any newly installed Ohme or FoxESS Modbus entities.",
+        "title": "Rescan and reconfigure KEMS"
       }
-    },
-    "abort": {
-      "already_configured": "KEMS is already configured."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "data": {
+          "battery_capacity_kwh": "Simulated battery capacity (kWh)",
+          "battery_initial_percent": "Simulation starting battery (%)",
+          "battery_reserve_percent": "Battery reserve (%)",
+          "charge_efficiency": "Charge efficiency (0.50–1.00)",
+          "discharge_efficiency": "Discharge efficiency (0.50–1.00)",
+          "export_rate_pence": "Fallback export rate (p/kWh)",
+          "history_days": "Learning history retention (days)",
+          "max_charge_kw": "Maximum battery charge power (kW)",
+          "max_discharge_kw": "Maximum battery discharge power (kW)",
+          "scan_interval_seconds": "Observation interval (seconds)",
+          "simulation_strategy": "Simulation strategy"
+        },
+        "data_description": {
+          "battery_capacity_kwh": "Defaults to Kyle's planned 56.42 kWh FoxESS battery stack and can be changed.",
+          "battery_initial_percent": "Used when no real FoxESS battery SOC is available.",
+          "battery_reserve_percent": "The simulation will not discharge below this level.",
+          "charge_efficiency": "Fraction of imported charging energy retained in the battery.",
+          "discharge_efficiency": "Fraction of stored energy delivered to the home.",
+          "export_rate_pence": "Used only when no live Octopus export-rate entity is detected.",
+          "history_days": "KEMS stores compact observations locally in Home Assistant storage.",
+          "max_charge_kw": "Defaults to the planned FoxESS KH10 power limit.",
+          "max_discharge_kw": "Defaults to the planned FoxESS KH10 power limit.",
+          "scan_interval_seconds": "KEMS reads Home Assistant state only; minimum 30 seconds.",
+          "simulation_strategy": "Export first follows Kyle's tariff-arbitrage plan; self-use supplies the house from solar first."
+        },
+        "description": "These settings affect only KEMS analysis and simulation. KEMS never writes to Octopus, Ohme, or FoxESS Modbus in this version.",
+        "title": "KEMS learning and simulation settings"
+      }
     }
   }
 }

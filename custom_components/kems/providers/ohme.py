@@ -1,12 +1,25 @@
-"""Ohme provider."""
+"""Ohme state provider."""
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 from homeassistant.core import HomeAssistant
 
-from ..kems_core.ohme import OhmeState
+from ..kems_core import interpret_charger_status
 from .base import HomeAssistantStateReader
 from .entity_map import KEMSEntities
+
+
+@dataclass(frozen=True, slots=True)
+class OhmeState:
+    """Current Ohme observation."""
+
+    status: str | None = None
+    connected: bool | None = None
+    charging: bool | None = None
+    power_kw: float | None = None
+    vehicle_soc: float | None = None
 
 
 class OhmeProvider(HomeAssistantStateReader):
@@ -19,9 +32,20 @@ class OhmeProvider(HomeAssistantStateReader):
 
     def get_state(self) -> OhmeState:
         """Return the current Ohme observation."""
+        status = self._text(self._entities.ev_status)
+        status_connected, status_charging = interpret_charger_status(status)
+        explicit_connected = self._bool(self._entities.ev_connected)
+        explicit_charging = self._bool(self._entities.ev_charging)
         return OhmeState(
-            connected=self._bool(self._entities.ev_connected),
-            charging=self._bool(self._entities.ev_charging),
-            power_kw=self._float(self._entities.ev_power),
+            status=status,
+            connected=(
+                explicit_connected
+                if explicit_connected is not None
+                else status_connected
+            ),
+            charging=(
+                explicit_charging if explicit_charging is not None else status_charging
+            ),
+            power_kw=self._power_kw(self._entities.ev_power_kw),
             vehicle_soc=self._float(self._entities.ev_soc),
         )

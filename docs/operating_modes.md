@@ -1,33 +1,17 @@
-# KEMS Operating Modes
+# Analysis strategies
 
-## Monitor
+KEMS 0.3 contains analysis strategies, not control modes.
 
-Reads all data.
+## Export first
 
-Creates a mission plan.
+During cheap periods, the simulation powers the house from the grid and charges the battery. Outside cheap periods, it exports solar and uses the simulated battery for house load before allowing residual grid import. This reflects Kyle's planned tariff-arbitrage policy.
 
-Never controls hardware.
+## Solar self-use first
 
----
+Outside cheap periods, solar supplies house load first. Surplus solar is exported, and the battery supplies remaining load before residual grid import.
 
-## Advisor
+Both strategies are simulations only.
 
-Creates a mission plan.
+## Confirmed cheap periods
 
-Compares recommendations with reality.
-
-Shows expected savings.
-
-Never controls hardware.
-
----
-
-## Autonomous
-
-Creates a mission plan.
-
-Controls supported devices.
-
-Continuously validates execution.
-
-Automatically falls back to Advisor Mode if confidence drops below configured thresholds.
+KEMS treats normal Octopus off-peak as cheap. An extra Intelligent dispatch slot is confirmed only when the Octopus slot is active and Ohme reports that the EV is charging.
