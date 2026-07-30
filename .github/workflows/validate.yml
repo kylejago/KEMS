@@ -1,10 +1,12 @@
-name: Validate KEMS
+name: Validate
 
 on:
   push:
     branches:
       - develop
       - main
+      - "feature/**"
+
   pull_request:
 
 jobs:
@@ -12,10 +14,22 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Validate JSON files
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install dependencies
         run: |
-          python -m json.tool custom_components/kems/manifest.json > /dev/null
-          python -m json.tool hacs.json > /dev/null
+          python -m pip install --upgrade pip
+          pip install black ruff pytest
+
+      - name: Black
+        run: black --check .
+
+      - name: Ruff
+        run: ruff check .
+
+      - name: Pytest
+        run: pytest
