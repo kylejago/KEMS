@@ -1,4 +1,4 @@
-"""Octopus Energy state provider."""
+"""Octopus Energy electricity state provider."""
 
 from __future__ import annotations
 
@@ -13,11 +13,12 @@ from .entity_map import KEMSEntities
 
 @dataclass(frozen=True, slots=True)
 class OctopusState:
-    """Current Octopus tariff observation."""
+    """Current Octopus electricity tariff observation."""
 
     current_import_rate: float | None = None
     next_import_rate: float | None = None
     current_export_rate: float | None = None
+    electricity_standing_charge: float | None = None
     off_peak: bool | None = None
     intelligent_slot: bool | None = None
     next_offpeak_start: datetime | None = None
@@ -25,7 +26,7 @@ class OctopusState:
 
 
 class OctopusProvider(HomeAssistantStateReader):
-    """Read data from configured Octopus Energy entities."""
+    """Read data from configured Octopus Energy electricity entities."""
 
     def __init__(self, hass: HomeAssistant, entities: KEMSEntities) -> None:
         """Initialise the provider."""
@@ -33,11 +34,14 @@ class OctopusProvider(HomeAssistantStateReader):
         self._entities = entities
 
     def get_state(self) -> OctopusState:
-        """Return the current Octopus observation."""
+        """Return the current Octopus electricity observation."""
         return OctopusState(
             current_import_rate=self._rate_pence(self._entities.current_import_rate),
             next_import_rate=self._rate_pence(self._entities.next_import_rate),
             current_export_rate=self._rate_pence(self._entities.current_export_rate),
+            electricity_standing_charge=self._money_pence(
+                self._entities.electricity_standing_charge
+            ),
             off_peak=self._bool(self._entities.off_peak),
             intelligent_slot=self._bool(self._entities.intelligent_slot),
             next_offpeak_start=self._datetime(self._entities.next_offpeak_start),

@@ -15,9 +15,11 @@ from .const import NAME
 from .history import HistoryRecorder
 from .kems_core import (
     AdviceEngine,
+    GasEngine,
     KEMSData,
     LearningEngine,
     SimulationEngine,
+    WholeHomeEngine,
     assess_quality,
 )
 from .providers.entity_map import KEMSEntities
@@ -48,8 +50,10 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
             settings.history_days,
         )
         self._learning = LearningEngine()
+        self._gas = GasEngine()
         self._advice = AdviceEngine()
         self._simulation = SimulationEngine()
+        self._whole_home = WholeHomeEngine()
 
         super().__init__(
             hass,
@@ -72,16 +76,20 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
             now = dt_util.now()
             records = self._history.records
             learned = self._learning.analyse(records, now)
+            gas = self._gas.summarise(records, now)
             advice = self._advice.evaluate(
                 snapshot,
                 learned,
                 self.settings.simulation,
+                gas,
             )
             simulation = self._simulation.simulate_today(
                 records,
                 now,
                 self.settings.simulation,
+                learned.predicted_energy_until_offpeak_kwh,
             )
+            whole_home = self._whole_home.summarise(snapshot, simulation, gas)
             quality = assess_quality(
                 snapshot,
                 self.entities.configured_snapshot_fields(),
@@ -90,8 +98,10 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
             return KEMSData(
                 snapshot=snapshot,
                 learned=learned,
+                gas=gas,
                 advice=advice,
                 simulation=simulation,
+                whole_home=whole_home,
                 quality=quality,
                 history_samples=len(records),
                 phase=phase,

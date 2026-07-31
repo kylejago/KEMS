@@ -5,6 +5,7 @@ from __future__ import annotations
 from .models import (
     AdviceItem,
     AdviceState,
+    GasSummary,
     LearnedState,
     SimulationConfig,
     Snapshot,
@@ -38,6 +39,7 @@ class AdviceEngine:
         snapshot: Snapshot,
         learned: LearnedState,
         config: SimulationConfig,
+        gas: GasSummary | None = None,
     ) -> AdviceState:
         """Return ordered advice without calling any device service."""
         items: list[AdviceItem] = []
@@ -74,7 +76,7 @@ class AdviceEngine:
                         "charge_battery_cheap",
                         "Cheap period: battery headroom available",
                         "The tariff is cheap and the battery is below 95%. "
-                        "A future control phase could charge it now.",
+                        "The proposed strategy would charge it now.",
                         80,
                         confidence,
                     )
@@ -154,6 +156,35 @@ class AdviceEngine:
                         f"Solar exceeds house load by about {surplus:.2f} kW.",
                         60,
                         confidence,
+                    )
+                )
+
+        if gas and gas.available:
+            if (
+                gas.usage_today_kwh is not None
+                and gas.typical_daily_usage_kwh is not None
+                and gas.typical_daily_usage_kwh > 0
+                and gas.usage_today_kwh > gas.typical_daily_usage_kwh * 1.25
+            ):
+                items.append(
+                    _item(
+                        "high_gas_usage",
+                        "Gas usage above the learned daily level",
+                        f"Gas use is {gas.usage_today_kwh:.1f} kWh today versus a "
+                        f"typical {gas.typical_daily_usage_kwh:.1f} kWh.",
+                        70,
+                        max(min(gas.data_coverage, 100.0), 20.0),
+                    )
+                )
+            elif gas.cost_today_pence is not None:
+                items.append(
+                    _item(
+                        "gas_tracking",
+                        "Whole-home gas tracking active",
+                        f"Gas has contributed {gas.cost_today_pence:.1f}p to today's "
+                        "whole-home energy cost.",
+                        25,
+                        max(min(gas.data_coverage, 100.0), 20.0),
                     )
                 )
 

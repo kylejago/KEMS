@@ -24,11 +24,13 @@ async def async_get_config_entry_diagnostics(
         "phase": data.phase,
         "snapshot": data.snapshot.to_dict(),
         "learning": asdict(data.learned),
+        "gas": asdict(data.gas),
         "advice": {
             "primary": data.advice.primary.to_dict(),
             "items": [item.to_dict() for item in data.advice.items],
         },
         "simulation": asdict(data.simulation),
+        "whole_home": asdict(data.whole_home),
         "quality": asdict(data.quality),
         "history_samples": data.history_samples,
         "last_update_success": coordinator.last_update_success,

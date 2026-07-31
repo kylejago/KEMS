@@ -18,6 +18,11 @@ from .const import (
     CONF_EV_CHARGING,
     CONF_EV_CONNECTED,
     CONF_EV_STATUS,
+    CONF_GAS_COST_TODAY,
+    CONF_GAS_CURRENT_RATE,
+    CONF_GAS_METER_TOTAL,
+    CONF_GAS_STANDING_CHARGE,
+    CONF_GAS_USAGE_TODAY,
     CONF_INTELLIGENT_SLOT,
     CONF_OFF_PEAK,
 )
@@ -25,6 +30,13 @@ from .entity import KEMSEntity
 from .kems_core import KEMSData
 
 IsOnFn = Callable[[KEMSData], bool | None]
+GAS_SOURCE_KEYS = (
+    CONF_GAS_CURRENT_RATE,
+    CONF_GAS_STANDING_CHARGE,
+    CONF_GAS_METER_TOTAL,
+    CONF_GAS_USAGE_TODAY,
+    CONF_GAS_COST_TODAY,
+)
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -77,6 +89,25 @@ BINARY_SENSORS: tuple[KEMSBinarySensorEntityDescription, ...] = (
         icon="mdi:home-battery-outline",
         source_key=CONF_BATTERY_SOC,
         is_on_fn=lambda data: data.snapshot.battery_soc is not None,
+    ),
+    KEMSBinarySensorEntityDescription(
+        key="gas_data_available",
+        name="Gas data available",
+        icon="mdi:fire-check",
+        source_any_keys=GAS_SOURCE_KEYS,
+        is_on_fn=lambda data: data.gas.available,
+    ),
+    KEMSBinarySensorEntityDescription(
+        key="proposal_solar_active",
+        name="Proposal solar model active",
+        icon="mdi:solar-power-variant-outline",
+        is_on_fn=lambda data: data.simulation.proposal_solar_active,
+    ),
+    KEMSBinarySensorEntityDescription(
+        key="battery_export_simulated",
+        name="Battery export enabled in simulation",
+        icon="mdi:battery-arrow-down-outline",
+        is_on_fn=lambda data: data.simulation.battery_export_enabled,
     ),
     KEMSBinarySensorEntityDescription(
         key="learning_ready",

@@ -1,75 +1,119 @@
 # KEMS — Kyle Energy Management System
 
-KEMS is a read-only Home Assistant custom integration that turns existing energy entities into one explainable pipeline:
+KEMS is a read-only Home Assistant custom integration that turns existing whole-home energy entities into one explainable pipeline:
 
 **Observe → Learn → Advise → Simulate**
 
-Device control is deliberately excluded from this release. KEMS never calls an Octopus, Ohme, or FoxESS service and never writes inverter or charger settings.
+The Control phase remains deliberately excluded. This build does not call Octopus, Ohme, or FoxESS services and does not write inverter or charger settings.
+
+## Feature branch purpose
+
+This package is prepared for:
+
+```text
+feature/proposal-system-simulation
+```
+
+It adds the proposed solar and battery system, fixed Octopus export accounting, gas tracking, and Live-versus-Simulated dashboards. It is safe to upload to GitHub now while the currently installed KEMS version continues collecting its first uninterrupted 24 hours of data.
 
 ## Supported sources
 
-KEMS starts with automatic discovery for:
+KEMS automatically discovers and can manually map:
 
-- **Octopus Energy**: import/export prices, off-peak state, Intelligent dispatch slots, and off-peak timestamps.
-- **Ohme**: charger status, EV connected/charging state, charging power, and vehicle state of charge. KEMS understands the current Ohme enum status sensor and also supports older/custom binary sensors.
-- **FoxESS Modbus**: house load, battery state of charge, PV power, grid import, and grid export. Battery power is read directly when available or derived from the FoxESS Battery Voltage and Battery Current sensors.
+- **Octopus Energy electricity** — current/next import rates, current export rate, standing charge, off-peak state, Intelligent dispatch slots, and off-peak timestamps.
+- **Octopus Energy gas** — gas rate, standing charge, cumulative consumption, daily consumption, and daily cost.
+- **Ohme** — EV connected/charging state, charger power, and vehicle state of charge.
+- **FoxESS Modbus** — house load, solar power, battery SOC/power, grid import, and grid export.
 
-KEMS scores entity-registry metadata, original names, unique IDs, device class, units, and source integration. High-confidence matches are preselected automatically, while the setup and reconfigure flows provide a manual fallback.
+## Proposal system simulation
 
-## What each phase does
+The supplied proposal is represented as:
 
-### Observe
+- 21 × DMEGC 460 W panels
+- 9.66 kWp total PV
+- Fox ESS KH10 10 kW hybrid inverter
+- 2 × Fox ESS ECS4100-H7 battery stacks
+- 56.42 kWh nominal battery capacity
+- 50.77 kWh proposal usable capacity / 10% operating reserve
+- three roof groups: East 4.14 kWp, West 4.14 kWp, South 1.38 kWp
+- 8,016 kWh quoted annual solar generation
+- proposal monthly generation targets and 0.938 shading factor
 
-KEMS reads Home Assistant's state machine through provider adapters. Values are normalised to pence/kWh, kW, percentages, booleans, and timestamps. Standard off-peak is accepted directly; an extra Intelligent slot is treated as confirmed cheap only when Ohme also reports active charging. Compact five-minute observations are retained locally in Home Assistant storage for up to 90 days by default.
+When live FoxESS solar data is unavailable, the simulation uses a three-array proposal solar curve. Once FoxESS Modbus is available, live solar replaces the proposal estimate automatically.
 
-### Learn
+## Current tariff model
 
-KEMS builds weekday/weekend quarter-hour profiles for house load, solar production, grid import, and tariff rates. It reports days observed, sample count, current-slot typical load/solar, a confidence score, and predicted energy demand before the next off-peak period.
+This feature is configured for:
 
-### Advise
+- **Intelligent Octopus Go** import pricing read live from Home Assistant
+- normal off-peak periods reported by Octopus
+- extra Intelligent dispatch slots accepted as cheap only when Octopus reports a slot **and Ohme reports active charging**
+- **Octopus fixed export at 12 p/kWh all day** as the simulation fallback
+- a live Octopus export-rate entity takes priority when one is available
 
-The explainable rules engine highlights cheap charging opportunities, EV opportunities, day-rate grid import, predicted battery shortfall, solar surplus, missing tariff data, and learning progress. Advice includes a code, message, priority, confidence, and optional estimated saving.
+The default simulated export power limit is 10 kW. This is an editable modelling assumption, not a confirmed DNO export permission. Change it when the approved export limit is known.
 
-### Simulate
+## Whole-home gas tracking
 
-KEMS replays the current day's observations through a read-only battery model. It compares observed cost and grid import with a hypothetical tariff-arbitrage strategy. Default assumptions match Kyle's planned system:
+KEMS records gas separately and combines it with electricity for whole-home reporting. It supports direct daily Octopus gas totals or positive deltas from a cumulative kWh/m³ meter. It adds:
 
-- 56.42 kWh battery capacity
-- 10% reserve
-- 10 kW charge/discharge power
-- 95% charge and discharge efficiency
-- export-first strategy outside cheap periods
+- gas use and cost today
+- gas use and cost this month
+- typical daily gas use
+- gas share of whole-home energy
+- observed and simulated whole-home cost
 
-All assumptions are editable in **Settings → Devices & services → KEMS → Configure**.
+Gas is observed rather than optimised. The simulated whole-home comparison changes electricity operation while holding the observed gas cost constant.
 
-## Installation
+## Key new entities
 
-1. Add `https://github.com/kylejago/KEMS` to HACS as an Integration custom repository.
-2. Download KEMS and restart Home Assistant.
-3. Add **KEMS** under **Settings → Devices & services**.
-4. Review the automatically detected source entities and submit.
+### Live and simulated power
 
-When Ohme or FoxESS Modbus is installed later, open KEMS and choose **Reconfigure**. KEMS also fills previously missing high-confidence mappings automatically at startup without replacing user choices.
+- `sensor.kems_grid_net_power`
+- `sensor.kems_simulated_grid_net_power`
+- `sensor.kems_simulated_solar_power`
+- `sensor.kems_simulated_battery_power`
+- `sensor.kems_simulated_house_load_power`
 
-## Main entities
+### Import, export, battery and solar
 
-KEMS creates source mirrors only when their source is configured, plus analysis entities such as:
+- `sensor.kems_observed_grid_import_today`
+- `sensor.kems_observed_grid_export_today`
+- `sensor.kems_observed_export_income_today`
+- `sensor.kems_simulated_grid_import_today`
+- `sensor.kems_simulated_grid_export_today`
+- `sensor.kems_simulated_export_income_today`
+- `sensor.kems_simulated_solar_generation_today`
+- `sensor.kems_simulated_solar_curtailed_today`
+- `sensor.kems_simulated_battery_charged_today`
+- `sensor.kems_simulated_battery_to_home_today`
+- `sensor.kems_simulated_battery_export_today`
+- `sensor.kems_avoided_day_rate_import_today`
 
-- `sensor.kems_phase`
-- `sensor.kems_data_quality`
-- `sensor.kems_learning_confidence`
-- `sensor.kems_typical_house_load_now`
-- `sensor.kems_predicted_energy_until_off_peak`
-- `sensor.kems_advice`
-- `sensor.kems_observed_cost_today`
-- `sensor.kems_simulated_kems_cost_today`
-- `sensor.kems_simulated_saving_today`
-- `binary_sensor.kems_cheap_period_confirmed`
-- `binary_sensor.kems_learning_ready`
-- `binary_sensor.kems_simulation_ready`
-- `binary_sensor.kems_grid_import_outside_cheap_period`
+### Gas and whole-home energy
 
-## Development
+- `sensor.kems_gas_usage_today`
+- `sensor.kems_gas_cost_today`
+- `sensor.kems_gas_usage_this_month`
+- `sensor.kems_gas_cost_this_month`
+- `sensor.kems_typical_daily_gas_usage`
+- `sensor.kems_whole_home_energy_today`
+- `sensor.kems_whole_home_observed_cost_today`
+- `sensor.kems_whole_home_simulated_cost_today`
+- `sensor.kems_whole_home_simulated_saving_today`
+
+## Dashboards
+
+The `dashboards/` directory contains four complete dashboards:
+
+- advanced desktop mission control, styled like the supplied reference
+- built-in Live-versus-Simulated comparison
+- portrait always-on wall display
+- multi-tab whole-home analytics
+
+See `dashboards/README.md` for installation and frontend-card requirements.
+
+## Development validation
 
 ```powershell
 python -m venv .venv
@@ -77,13 +121,9 @@ python -m venv .venv
 python -m pip install -r requirements-dev.txt
 python -m pre_commit install
 python -m black .
-python -m ruff check .
+python -m ruff check . --fix
 python -m pytest
 python -m pre_commit run --all-files
 ```
 
-See `START_HERE.md`, `docs/architecture.md`, and `docs/testing-in-home-assistant.md`.
-
-## Example dashboard
-
-`examples/dashboard.yaml` contains a starting Lovelace dashboard. Entity IDs can differ if Home Assistant resolves a name collision, so verify them under Developer Tools → States before pasting the example.
+See `START_HERE.md` for the exact GitHub Desktop workflow.

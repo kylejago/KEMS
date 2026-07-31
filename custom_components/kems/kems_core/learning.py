@@ -50,11 +50,18 @@ class LearningEngine:
         )
         days = {record.timestamp.date() for record in records}
         import_rates: list[float] = []
+        all_loads: list[float] = []
 
         for record in records:
             slot = profiles[_slot_key(record.timestamp)]
             if record.house_load_kw is not None:
-                slot.house_load.append(max(record.house_load_kw, 0.0))
+                load = max(record.house_load_kw, 0.0)
+                slot.house_load.append(load)
+                all_loads.append(load)
+            elif record.grid_import_kw is not None:
+                load = max(record.grid_import_kw, 0.0)
+                slot.house_load.append(load)
+                all_loads.append(load)
             if record.solar_power_kw is not None:
                 slot.solar_power.append(max(record.solar_power_kw, 0.0))
             if record.grid_import_kw is not None:
@@ -66,12 +73,14 @@ class LearningEngine:
         typical_load = _mean(current.house_load) if current else None
         typical_solar = _mean(current.solar_power) if current else None
         typical_grid = _mean(current.grid_import) if current else None
+        fallback_load = typical_load or _mean(all_loads)
 
         latest = records[-1]
         predicted_until_offpeak = self._predict_energy_until_offpeak(
             profiles,
             now,
             latest.next_offpeak_start,
+            fallback_load,
         )
 
         useful_records = sum(
@@ -103,8 +112,9 @@ class LearningEngine:
         profiles: dict[tuple[str, int], _SlotValues],
         now: datetime,
         next_offpeak_start: datetime | None,
+        fallback_load_kw: float | None,
     ) -> float | None:
-        """Predict house energy required before the next cheap period."""
+        """Predict all remaining house energy before the next cheap period."""
         if next_offpeak_start is None or next_offpeak_start <= now:
             return None
         if next_offpeak_start - now > timedelta(hours=24):
@@ -116,11 +126,15 @@ class LearningEngine:
         while cursor < next_offpeak_start:
             values = profiles.get(_slot_key(cursor))
             load = _mean(values.house_load) if values else None
+            if load is None:
+                load = fallback_load_kw
             if load is not None:
-                predicted += load * SLOT_MINUTES / 60
+                interval_minutes = min(
+                    SLOT_MINUTES,
+                    max((next_offpeak_start - cursor).total_seconds() / 60, 0.0),
+                )
+                predicted += load * interval_minutes / 60
                 seen += 1
             cursor += timedelta(minutes=SLOT_MINUTES)
 
-        if seen == 0:
-            return None
-        return round(predicted, 3)
+        return round(predicted, 3) if seen else None

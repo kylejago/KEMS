@@ -12,11 +12,17 @@ from ..const import (
     CONF_BATTERY_VOLTAGE,
     CONF_CURRENT_EXPORT_RATE,
     CONF_CURRENT_IMPORT_RATE,
+    CONF_ELECTRICITY_STANDING_CHARGE,
     CONF_EV_CHARGING,
     CONF_EV_CONNECTED,
     CONF_EV_POWER,
     CONF_EV_SOC,
     CONF_EV_STATUS,
+    CONF_GAS_COST_TODAY,
+    CONF_GAS_CURRENT_RATE,
+    CONF_GAS_METER_TOTAL,
+    CONF_GAS_STANDING_CHARGE,
+    CONF_GAS_USAGE_TODAY,
     CONF_GRID_EXPORT,
     CONF_GRID_IMPORT,
     CONF_HOUSE_LOAD,
@@ -37,10 +43,16 @@ class KEMSEntities:
     current_import_rate: str | None = None
     next_import_rate: str | None = None
     current_export_rate: str | None = None
+    electricity_standing_charge: str | None = None
     off_peak: str | None = None
     intelligent_slot: str | None = None
     next_offpeak_start: str | None = None
     offpeak_end: str | None = None
+    gas_current_rate: str | None = None
+    gas_standing_charge: str | None = None
+    gas_meter_total: str | None = None
+    gas_usage_today: str | None = None
+    gas_cost_today: str | None = None
     ev_status: str | None = None
     ev_connected: str | None = None
     ev_charging: str | None = None
@@ -62,10 +74,16 @@ class KEMSEntities:
             current_import_rate=data.get(CONF_CURRENT_IMPORT_RATE),
             next_import_rate=data.get(CONF_NEXT_IMPORT_RATE),
             current_export_rate=data.get(CONF_CURRENT_EXPORT_RATE),
+            electricity_standing_charge=data.get(CONF_ELECTRICITY_STANDING_CHARGE),
             off_peak=data.get(CONF_OFF_PEAK),
             intelligent_slot=data.get(CONF_INTELLIGENT_SLOT),
             next_offpeak_start=data.get(CONF_NEXT_OFFPEAK_START),
             offpeak_end=data.get(CONF_OFFPEAK_END),
+            gas_current_rate=data.get(CONF_GAS_CURRENT_RATE),
+            gas_standing_charge=data.get(CONF_GAS_STANDING_CHARGE),
+            gas_meter_total=data.get(CONF_GAS_METER_TOTAL),
+            gas_usage_today=data.get(CONF_GAS_USAGE_TODAY),
+            gas_cost_today=data.get(CONF_GAS_COST_TODAY),
             ev_status=data.get(CONF_EV_STATUS),
             ev_connected=data.get(CONF_EV_CONNECTED),
             ev_charging=data.get(CONF_EV_CHARGING),
@@ -83,15 +101,20 @@ class KEMSEntities:
 
     def configured_snapshot_fields(self) -> set[str]:
         """Return logical snapshot fields with configured source data."""
-        fields: set[str] = set()
         direct = {
             "current_import_rate": self.current_import_rate,
             "next_import_rate": self.next_import_rate,
             "current_export_rate": self.current_export_rate,
+            "electricity_standing_charge": self.electricity_standing_charge,
             "off_peak": self.off_peak,
             "intelligent_slot": self.intelligent_slot,
             "next_offpeak_start": self.next_offpeak_start,
             "offpeak_end": self.offpeak_end,
+            "gas_current_rate": self.gas_current_rate,
+            "gas_standing_charge": self.gas_standing_charge,
+            "gas_meter_total_kwh": self.gas_meter_total,
+            "gas_usage_today_kwh": self.gas_usage_today,
+            "gas_cost_today_pence": self.gas_cost_today,
             "ev_power_kw": self.ev_power_kw,
             "ev_soc": self.ev_soc,
             "house_load_kw": self.house_load_kw,
@@ -100,8 +123,7 @@ class KEMSEntities:
             "grid_import_kw": self.grid_import_kw,
             "grid_export_kw": self.grid_export_kw,
         }
-        fields.update(key for key, value in direct.items() if value is not None)
-
+        fields = {key for key, value in direct.items() if value is not None}
         if self.ev_status or self.ev_connected:
             fields.add("ev_connected")
         if self.ev_status or self.ev_charging:

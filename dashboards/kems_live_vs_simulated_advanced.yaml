@@ -1,0 +1,445 @@
+title: KEMS Mission Control
+views:
+  - title: Live vs Simulated
+    path: live-vs-simulated
+    icon: mdi:compare
+    type: masonry
+    cards:
+      - type: custom:mushroom-title-card
+        title: KEMS Mission Control
+        subtitle: Live home energy compared with the 9.66 kWp / 56.42 kWh proposal simulation
+
+      - type: grid
+        columns: 4
+        square: false
+        cards:
+          - type: custom:mushroom-template-card
+            primary: KEMS {{ states('sensor.kems_status') }}
+            secondary: "{{ states('sensor.kems_phase') }} • {{ states('sensor.kems_learning_confidence') }}% confidence"
+            icon: mdi:home-lightning-bolt
+            icon_color: green
+          - type: custom:mushroom-template-card
+            primary: "{{ states('sensor.kems_current_import_rate') }} p/kWh import"
+            secondary: "Next {{ states('sensor.kems_next_import_rate') }} p/kWh"
+            icon: mdi:cash-clock
+            icon_color: "{{ 'green' if is_state('binary_sensor.kems_cheap_period_confirmed', 'on') else 'orange' }}"
+          - type: custom:mushroom-template-card
+            primary: "{{ states('sensor.kems_simulation_export_rate') }} p/kWh export"
+            secondary: Octopus fixed export fallback
+            icon: mdi:transmission-tower-export
+            icon_color: blue
+          - type: custom:mushroom-template-card
+            primary: "{{ states('sensor.kems_whole_home_simulated_saving_today') }} p"
+            secondary: Whole-home simulated saving today
+            icon: mdi:piggy-bank-outline
+            icon_color: "{{ 'green' if states('sensor.kems_whole_home_simulated_saving_today')|float(0) >= 0 else 'red' }}"
+
+      - type: grid
+        columns: 2
+        square: false
+        cards:
+          - type: vertical-stack
+            cards:
+              - type: custom:mushroom-title-card
+                title: Live system
+                subtitle: Actual Home Assistant / FoxESS / Octopus / Ohme readings
+              - type: custom:power-flow-card-plus
+                entities:
+                  grid:
+                    entity: sensor.kems_grid_net_power
+                    name: Grid
+                  solar:
+                    entity: sensor.kems_solar_power
+                    name: Solar
+                  battery:
+                    entity: sensor.kems_battery_power
+                    state_of_charge: sensor.kems_battery_state_of_charge
+                    name: Battery
+                  home:
+                    entity: sensor.kems_house_load
+                    name: Home
+                clickable_entities: true
+                display_zero_lines:
+                  mode: transparency
+                use_new_flow_rate_model: true
+                w_decimals: 2
+                kw_decimals: 2
+          - type: vertical-stack
+            cards:
+              - type: custom:mushroom-title-card
+                title: Simulated proposal system
+                subtitle: KH10 + 56.42 kWh battery + proposal solar profile
+              - type: custom:power-flow-card-plus
+                entities:
+                  grid:
+                    entity: sensor.kems_simulated_grid_net_power
+                    name: Grid
+                  solar:
+                    entity: sensor.kems_simulated_solar_power
+                    name: Solar
+                  battery:
+                    entity: sensor.kems_simulated_battery_power
+                    state_of_charge: sensor.kems_simulated_battery_state_of_charge
+                    name: Battery
+                  home:
+                    entity: sensor.kems_simulated_house_load_power
+                    name: Home
+                clickable_entities: true
+                display_zero_lines:
+                  mode: transparency
+                use_new_flow_rate_model: true
+                w_decimals: 2
+                kw_decimals: 2
+
+      - type: grid
+        columns: 2
+        square: false
+        cards:
+          - type: custom:apexcharts-card
+            header:
+              show: true
+              title: Live load, solar, grid and battery
+              show_states: true
+              colorize_states: true
+            graph_span: 24h
+            update_interval: 5min
+            yaxis:
+              - min: ~-10
+                max: ~10
+                decimals: 1
+            series:
+              - entity: sensor.kems_house_load
+                name: Home load
+                stroke_width: 2
+              - entity: sensor.kems_solar_power
+                name: Solar
+                stroke_width: 2
+              - entity: sensor.kems_grid_net_power
+                name: Grid (+import / -export)
+                stroke_width: 2
+              - entity: sensor.kems_battery_power
+                name: Battery
+                stroke_width: 2
+          - type: custom:apexcharts-card
+            header:
+              show: true
+              title: Simulated load, solar, grid and battery
+              show_states: true
+              colorize_states: true
+            graph_span: 24h
+            update_interval: 5min
+            yaxis:
+              - min: ~-10
+                max: ~10
+                decimals: 1
+            series:
+              - entity: sensor.kems_simulated_house_load_power
+                name: Home load
+                stroke_width: 2
+              - entity: sensor.kems_simulated_solar_power
+                name: Solar
+                stroke_width: 2
+              - entity: sensor.kems_simulated_grid_net_power
+                name: Grid (+import / -export)
+                stroke_width: 2
+              - entity: sensor.kems_simulated_battery_power
+                name: Battery
+                stroke_width: 2
+
+      - type: grid
+        columns: 2
+        square: false
+        cards:
+          - type: custom:apexcharts-card
+            header:
+              show: true
+              title: Live and simulated battery charge
+              show_states: true
+              colorize_states: true
+            graph_span: 24h
+            yaxis:
+              - min: 0
+                max: 100
+                decimals: 0
+            series:
+              - entity: sensor.kems_battery_state_of_charge
+                name: Live battery SOC
+                stroke_width: 3
+              - entity: sensor.kems_simulated_battery_state_of_charge
+                name: Simulated battery SOC
+                stroke_width: 3
+          - type: custom:apexcharts-card
+            header:
+              show: true
+              title: Solar actual and proposal target
+              show_states: true
+              colorize_states: true
+            graph_span: 7d
+            span:
+              end: day
+            series:
+              - entity: sensor.kems_simulated_solar_generation_today
+                name: Simulated generation today
+                type: column
+                group_by:
+                  duration: 1d
+                  func: max
+              - entity: sensor.kems_proposal_solar_target_today
+                name: Proposal daily target
+                type: column
+                group_by:
+                  duration: 1d
+                  func: max
+
+      - type: grid
+        columns: 2
+        square: false
+        cards:
+          - type: custom:apexcharts-card
+            header:
+              show: true
+              title: Electricity import and export today
+              show_states: true
+              colorize_states: true
+            graph_span: 7d
+            span:
+              end: day
+            series:
+              - entity: sensor.kems_observed_grid_import_today
+                name: Live import
+                type: column
+                group_by:
+                  duration: 1d
+                  func: max
+              - entity: sensor.kems_observed_grid_export_today
+                name: Live export
+                type: column
+                group_by:
+                  duration: 1d
+                  func: max
+              - entity: sensor.kems_simulated_grid_import_today
+                name: Simulated import
+                type: column
+                group_by:
+                  duration: 1d
+                  func: max
+              - entity: sensor.kems_simulated_grid_export_today
+                name: Simulated export
+                type: column
+                group_by:
+                  duration: 1d
+                  func: max
+          - type: custom:apexcharts-card
+            header:
+              show: true
+              title: Live vs simulated electricity cost
+              show_states: true
+              colorize_states: true
+            graph_span: 7d
+            span:
+              end: day
+            series:
+              - entity: sensor.kems_observed_cost_today
+                name: Observed net cost
+                type: column
+                group_by:
+                  duration: 1d
+                  func: max
+              - entity: sensor.kems_simulated_kems_cost_today
+                name: Simulated net cost
+                type: column
+                group_by:
+                  duration: 1d
+                  func: max
+              - entity: sensor.kems_simulated_saving_today
+                name: Saving
+                type: column
+                group_by:
+                  duration: 1d
+                  func: max
+
+      - type: grid
+        columns: 4
+        square: false
+        cards:
+          - type: custom:mushroom-template-card
+            primary: "{{ states('sensor.kems_observed_grid_import_today') }} kWh"
+            secondary: Live grid import today
+            icon: mdi:transmission-tower-import
+            icon_color: orange
+          - type: custom:mushroom-template-card
+            primary: "{{ states('sensor.kems_simulated_grid_import_today') }} kWh"
+            secondary: Simulated grid import today
+            icon: mdi:transmission-tower-import
+            icon_color: blue
+          - type: custom:mushroom-template-card
+            primary: "{{ states('sensor.kems_observed_grid_export_today') }} kWh"
+            secondary: Live export today
+            icon: mdi:transmission-tower-export
+            icon_color: green
+          - type: custom:mushroom-template-card
+            primary: "{{ states('sensor.kems_simulated_grid_export_today') }} kWh"
+            secondary: Simulated export today
+            icon: mdi:transmission-tower-export
+            icon_color: teal
+
+      - type: grid
+        columns: 2
+        square: false
+        cards:
+          - type: entities
+            title: Battery simulation detail
+            show_header_toggle: false
+            entities:
+              - sensor.kems_simulated_battery_charged_today
+              - sensor.kems_simulated_battery_to_home_today
+              - sensor.kems_simulated_battery_export_today
+              - sensor.kems_avoided_day_rate_import_today
+              - sensor.kems_simulated_solar_curtailed_today
+              - binary_sensor.kems_battery_export_simulated
+              - binary_sensor.kems_proposal_solar_active
+          - type: markdown
+            title: Current KEMS advice
+            content: |
+              ## 💡 {{ states('sensor.kems_advice') }}
+
+              {{ state_attr('sensor.kems_advice', 'message') or 'KEMS is collecting observations.' }}
+
+              **Confidence:** {{ state_attr('sensor.kems_advice', 'confidence') or '—' }}%  
+              **Learning:** {{ states('sensor.kems_learning_confidence') }}%  
+              **History samples:** {{ states('sensor.kems_history_samples') }}
+
+  - title: Whole Home
+    path: whole-home
+    icon: mdi:home-analytics
+    type: masonry
+    cards:
+      - type: custom:mushroom-title-card
+        title: Whole-home energy
+        subtitle: Electricity, export, battery simulation and gas in one view
+
+      - type: grid
+        columns: 4
+        square: false
+        cards:
+          - type: custom:mushroom-template-card
+            primary: "{{ states('sensor.kems_whole_home_energy_today') }} kWh"
+            secondary: Whole-home energy today
+            icon: mdi:home-lightning-bolt
+            icon_color: blue
+          - type: custom:mushroom-template-card
+            primary: "{{ states('sensor.kems_gas_usage_today') }} kWh"
+            secondary: Gas today
+            icon: mdi:fire
+            icon_color: orange
+          - type: custom:mushroom-template-card
+            primary: "{{ states('sensor.kems_whole_home_observed_cost_today') }} p"
+            secondary: Observed whole-home cost
+            icon: mdi:home-currency-gbp
+            icon_color: red
+          - type: custom:mushroom-template-card
+            primary: "{{ states('sensor.kems_whole_home_simulated_cost_today') }} p"
+            secondary: Simulated whole-home cost
+            icon: mdi:home-plus-outline
+            icon_color: green
+
+      - type: grid
+        columns: 2
+        square: false
+        cards:
+          - type: custom:apexcharts-card
+            header:
+              show: true
+              title: Electricity and gas cost
+              show_states: true
+              colorize_states: true
+            graph_span: 7d
+            span:
+              end: day
+            series:
+              - entity: sensor.kems_observed_cost_today
+                name: Electricity net cost
+                type: column
+                group_by:
+                  duration: 1d
+                  func: max
+              - entity: sensor.kems_gas_cost_today
+                name: Gas cost
+                type: column
+                group_by:
+                  duration: 1d
+                  func: max
+              - entity: sensor.kems_whole_home_observed_cost_today
+                name: Whole-home observed
+                type: line
+                group_by:
+                  duration: 1d
+                  func: max
+          - type: custom:apexcharts-card
+            header:
+              show: true
+              title: Whole-home observed vs simulated
+              show_states: true
+              colorize_states: true
+            graph_span: 7d
+            span:
+              end: day
+            series:
+              - entity: sensor.kems_whole_home_observed_cost_today
+                name: Observed
+                type: column
+                group_by:
+                  duration: 1d
+                  func: max
+              - entity: sensor.kems_whole_home_simulated_cost_today
+                name: Simulated
+                type: column
+                group_by:
+                  duration: 1d
+                  func: max
+              - entity: sensor.kems_whole_home_simulated_saving_today
+                name: Saving
+                type: line
+                group_by:
+                  duration: 1d
+                  func: max
+
+      - type: grid
+        columns: 2
+        square: false
+        cards:
+          - type: entities
+            title: Gas tracking
+            show_header_toggle: false
+            entities:
+              - binary_sensor.kems_gas_data_available
+              - sensor.kems_gas_current_rate
+              - sensor.kems_gas_standing_charge
+              - sensor.kems_gas_usage_today
+              - sensor.kems_gas_cost_today
+              - sensor.kems_gas_usage_this_month
+              - sensor.kems_gas_cost_this_month
+              - sensor.kems_typical_daily_gas_usage
+              - sensor.kems_gas_share_of_whole_home_energy
+          - type: custom:apexcharts-card
+            header:
+              show: true
+              title: Gas usage and typical day
+              show_states: true
+              colorize_states: true
+            graph_span: 30d
+            span:
+              end: day
+            series:
+              - entity: sensor.kems_gas_usage_today
+                name: Gas usage
+                type: column
+                group_by:
+                  duration: 1d
+                  func: max
+              - entity: sensor.kems_typical_daily_gas_usage
+                name: Typical daily gas
+                type: line
+                group_by:
+                  duration: 1d
+                  func: avg

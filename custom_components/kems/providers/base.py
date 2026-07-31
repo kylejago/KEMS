@@ -50,16 +50,44 @@ class HomeAssistantStateReader:
     def _power_kw(self, entity_id: str | None) -> float | None:
         """Read power and normalise it to kW."""
         state = self._state(entity_id)
-        if state is None or state.state.casefold() in _INVALID_STATES:
+        value = self._numeric_state(state)
+        if value is None:
             return None
-        try:
-            value = float(state.state)
-        except (TypeError, ValueError):
-            return None
-
-        unit = str(state.attributes.get(ATTR_UNIT_OF_MEASUREMENT, "")).casefold()
+        unit = self._unit(state)
         if unit in {"w", "watt", "watts"}:
             return value / 1000
+        return value
+
+    def _energy_kwh(
+        self,
+        entity_id: str | None,
+        gas_kwh_per_m3: float = 11.1868,
+    ) -> float | None:
+        """Read energy or gas volume and normalise it to kWh."""
+        state = self._state(entity_id)
+        value = self._numeric_state(state)
+        if value is None:
+            return None
+        unit = self._unit(state)
+        if unit in {"wh", "watt hour", "watt hours"}:
+            return value / 1000
+        if unit in {"m3", "m³", "cubic metre", "cubic metres"}:
+            return value * gas_kwh_per_m3
+        return value
+
+    def _money_pence(self, entity_id: str | None) -> float | None:
+        """Read currency and normalise it to pence."""
+        state = self._state(entity_id)
+        value = self._numeric_state(state)
+        if value is None:
+            return None
+        unit = self._unit(state)
+        if (
+            unit.startswith("gbp")
+            or unit.startswith("£")
+            or unit in {"pounds", "pound"}
+        ):
+            return value * 100
         return value
 
     def _bool(self, entity_id: str | None) -> bool | None:
@@ -88,15 +116,27 @@ class HomeAssistantStateReader:
     def _rate_pence(self, entity_id: str | None) -> float | None:
         """Read an energy rate and normalise it to pence per kWh."""
         state = self._state(entity_id)
+        value = self._numeric_state(state)
+        if value is None:
+            return None
+        unit = self._unit(state).replace(" ", "")
+        if unit in {"gbp/kwh", "£/kwh"}:
+            return value * 100
+        return value
+
+    @staticmethod
+    def _numeric_state(state: State | None) -> float | None:
+        """Return a state's numeric value."""
         if state is None or state.state.casefold() in _INVALID_STATES:
             return None
         try:
-            value = float(state.state)
+            return float(state.state)
         except (TypeError, ValueError):
             return None
 
-        unit = str(state.attributes.get(ATTR_UNIT_OF_MEASUREMENT, ""))
-        normalised = unit.casefold().replace(" ", "")
-        if normalised in {"gbp/kwh", "£/kwh"}:
-            return value * 100
-        return value
+    @staticmethod
+    def _unit(state: State | None) -> str:
+        """Return a normalised unit string."""
+        if state is None:
+            return ""
+        return str(state.attributes.get(ATTR_UNIT_OF_MEASUREMENT, "")).casefold()

@@ -67,6 +67,30 @@ def test_supported_entities_are_discovered_without_false_rate_matches() -> None:
             "monetary",
         ),
         candidate(
+            "sensor.octopus_gas_current_rate",
+            "octopus_energy",
+            "sensor",
+            "octopus gas current rate",
+            "gbp/kwh",
+            "monetary",
+        ),
+        candidate(
+            "sensor.octopus_gas_current_accumulative_consumption",
+            "octopus_energy",
+            "sensor",
+            "octopus gas current accumulative consumption",
+            "kwh",
+            "energy",
+        ),
+        candidate(
+            "sensor.octopus_gas_current_accumulative_cost",
+            "octopus_energy",
+            "sensor",
+            "octopus gas current accumulative cost",
+            "gbp",
+            "monetary",
+        ),
+        candidate(
             "sensor.ohme_status",
             "ohme",
             "sensor",
@@ -155,6 +179,15 @@ def test_supported_entities_are_discovered_without_false_rate_matches() -> None:
     )
     assert constants.CONF_NEXT_IMPORT_RATE not in result.mappings
     assert constants.CONF_CURRENT_EXPORT_RATE not in result.mappings
+    assert result.mappings[constants.CONF_GAS_CURRENT_RATE] == (
+        "sensor.octopus_gas_current_rate"
+    )
+    assert result.mappings[constants.CONF_GAS_USAGE_TODAY] == (
+        "sensor.octopus_gas_current_accumulative_consumption"
+    )
+    assert result.mappings[constants.CONF_GAS_COST_TODAY] == (
+        "sensor.octopus_gas_current_accumulative_cost"
+    )
     assert result.mappings[constants.CONF_EV_STATUS] == "sensor.ohme_status"
     assert result.mappings[constants.CONF_EV_POWER] == "sensor.ohme_power"
     assert result.mappings[constants.CONF_EV_SOC] == "sensor.ohme_battery"
