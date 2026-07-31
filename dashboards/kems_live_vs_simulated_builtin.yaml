@@ -1,0 +1,217 @@
+title: KEMS Live vs Simulated
+views:
+  - title: Comparison
+    path: comparison
+    icon: mdi:compare
+    type: masonry
+    cards:
+      - type: markdown
+        content: |
+          # ⚡ KEMS — Live vs Simulated
+          **System:** {{ states('sensor.kems_system_profile') }}  
+          **Phase:** {{ states('sensor.kems_phase') }}  
+          **Advice:** {{ states('sensor.kems_advice') }}
+
+          Live values are shown beside the 9.66 kWp solar / 56.42 kWh battery proposal simulation.
+
+      - type: grid
+        columns: 4
+        square: false
+        cards:
+          - type: tile
+            entity: sensor.kems_current_import_rate
+            name: Import rate
+            color: orange
+          - type: tile
+            entity: sensor.kems_simulation_export_rate
+            name: Export rate
+            color: green
+          - type: tile
+            entity: binary_sensor.kems_cheap_period_confirmed
+            name: Cheap period
+            color: green
+          - type: tile
+            entity: sensor.kems_learning_confidence
+            name: Learning confidence
+            color: blue
+
+      - type: grid
+        columns: 2
+        square: false
+        cards:
+          - type: entities
+            title: LIVE — current power
+            show_header_toggle: false
+            entities:
+              - sensor.kems_house_load
+              - sensor.kems_solar_power
+              - sensor.kems_grid_import
+              - sensor.kems_grid_export
+              - sensor.kems_grid_net_power
+              - sensor.kems_battery_power
+              - sensor.kems_battery_state_of_charge
+          - type: entities
+            title: SIMULATED — current power
+            show_header_toggle: false
+            entities:
+              - sensor.kems_simulated_house_load_power
+              - sensor.kems_simulated_solar_power
+              - sensor.kems_simulated_grid_import_power
+              - sensor.kems_simulated_grid_export_power
+              - sensor.kems_simulated_grid_net_power
+              - sensor.kems_simulated_battery_power
+              - sensor.kems_simulated_battery_state_of_charge
+
+      - type: grid
+        columns: 2
+        square: false
+        cards:
+          - type: history-graph
+            title: LIVE power — 24 hours
+            hours_to_show: 24
+            entities:
+              - sensor.kems_house_load
+              - sensor.kems_solar_power
+              - sensor.kems_grid_net_power
+              - sensor.kems_battery_power
+          - type: history-graph
+            title: SIMULATED power — 24 hours
+            hours_to_show: 24
+            entities:
+              - sensor.kems_simulated_house_load_power
+              - sensor.kems_simulated_solar_power
+              - sensor.kems_simulated_grid_net_power
+              - sensor.kems_simulated_battery_power
+
+      - type: grid
+        columns: 2
+        square: false
+        cards:
+          - type: gauge
+            entity: sensor.kems_battery_state_of_charge
+            name: Live battery SOC
+            min: 0
+            max: 100
+            needle: true
+            segments:
+              - from: 0
+                color: var(--error-color)
+              - from: 10
+                color: var(--warning-color)
+              - from: 30
+                color: var(--success-color)
+          - type: gauge
+            entity: sensor.kems_simulated_battery_state_of_charge
+            name: Simulated battery SOC
+            min: 0
+            max: 100
+            needle: true
+            segments:
+              - from: 0
+                color: var(--error-color)
+              - from: 10
+                color: var(--warning-color)
+              - from: 30
+                color: var(--success-color)
+
+      - type: grid
+        columns: 2
+        square: false
+        cards:
+          - type: entities
+            title: LIVE — energy and cost today
+            show_header_toggle: false
+            entities:
+              - sensor.kems_observed_grid_import_today
+              - sensor.kems_observed_grid_export_today
+              - sensor.kems_observed_export_income_today
+              - sensor.kems_observed_cost_today
+          - type: entities
+            title: SIMULATED — energy and cost today
+            show_header_toggle: false
+            entities:
+              - sensor.kems_simulated_grid_import_today
+              - sensor.kems_simulated_grid_export_today
+              - sensor.kems_simulated_export_income_today
+              - sensor.kems_simulated_kems_cost_today
+              - sensor.kems_simulated_saving_today
+
+      - type: entities
+        title: Proposal system detail
+        show_header_toggle: false
+        entities:
+          - sensor.kems_system_profile
+          - sensor.kems_proposal_solar_target_today
+          - binary_sensor.kems_proposal_solar_active
+          - binary_sensor.kems_battery_export_simulated
+          - sensor.kems_simulated_solar_generation_today
+          - sensor.kems_simulated_solar_curtailed_today
+          - sensor.kems_simulated_battery_charged_today
+          - sensor.kems_simulated_battery_to_home_today
+          - sensor.kems_simulated_battery_export_today
+          - sensor.kems_avoided_day_rate_import_today
+
+  - title: Whole Home
+    path: whole-home
+    icon: mdi:home-analytics
+    type: masonry
+    cards:
+      - type: grid
+        columns: 4
+        square: false
+        cards:
+          - type: tile
+            entity: sensor.kems_whole_home_energy_today
+            name: Total energy today
+          - type: tile
+            entity: sensor.kems_gas_usage_today
+            name: Gas today
+          - type: tile
+            entity: sensor.kems_whole_home_observed_cost_today
+            name: Observed cost
+          - type: tile
+            entity: sensor.kems_whole_home_simulated_cost_today
+            name: Simulated cost
+
+      - type: grid
+        columns: 2
+        square: false
+        cards:
+          - type: entities
+            title: Gas
+            show_header_toggle: false
+            entities:
+              - binary_sensor.kems_gas_data_available
+              - sensor.kems_gas_current_rate
+              - sensor.kems_gas_standing_charge
+              - sensor.kems_gas_usage_today
+              - sensor.kems_gas_cost_today
+              - sensor.kems_gas_usage_this_month
+              - sensor.kems_gas_cost_this_month
+              - sensor.kems_typical_daily_gas_usage
+          - type: entities
+            title: Whole-home comparison
+            show_header_toggle: false
+            entities:
+              - sensor.kems_observed_cost_today
+              - sensor.kems_gas_cost_today
+              - sensor.kems_whole_home_observed_cost_today
+              - sensor.kems_whole_home_simulated_cost_today
+              - sensor.kems_whole_home_simulated_saving_today
+              - sensor.kems_gas_share_of_whole_home_energy
+
+      - type: history-graph
+        title: Whole-home cost — 7 days
+        hours_to_show: 168
+        entities:
+          - sensor.kems_whole_home_observed_cost_today
+          - sensor.kems_whole_home_simulated_cost_today
+          - sensor.kems_whole_home_simulated_saving_today
+          - sensor.kems_gas_cost_today
+
+      - type: history-graph
+        title: Gas usage — 30 days
+        hours_to_show: 720
+        entities:
+          - sensor.kems_gas_usage_today
+          - sensor.kems_typical_daily_gas_usage

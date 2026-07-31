@@ -13,6 +13,7 @@ from homeassistant.helpers.selector import EntitySelector, EntitySelectorConfig
 from .const import (
     CONF_BATTERY_CAPACITY,
     CONF_BATTERY_CURRENT,
+    CONF_BATTERY_EXPORT_ENABLED,
     CONF_BATTERY_INITIAL,
     CONF_BATTERY_POWER,
     CONF_BATTERY_RESERVE,
@@ -22,12 +23,20 @@ from .const import (
     CONF_CURRENT_EXPORT_RATE,
     CONF_CURRENT_IMPORT_RATE,
     CONF_DISCHARGE_EFFICIENCY,
+    CONF_ELECTRICITY_STANDING_CHARGE,
     CONF_EV_CHARGING,
     CONF_EV_CONNECTED,
     CONF_EV_POWER,
     CONF_EV_SOC,
     CONF_EV_STATUS,
+    CONF_EXPORT_LIMIT,
     CONF_EXPORT_RATE,
+    CONF_GAS_COST_TODAY,
+    CONF_GAS_CURRENT_RATE,
+    CONF_GAS_KWH_PER_M3,
+    CONF_GAS_METER_TOTAL,
+    CONF_GAS_STANDING_CHARGE,
+    CONF_GAS_USAGE_TODAY,
     CONF_GRID_EXPORT,
     CONF_GRID_IMPORT,
     CONF_HISTORY_DAYS,
@@ -39,6 +48,8 @@ from .const import (
     CONF_NEXT_OFFPEAK_START,
     CONF_OFF_PEAK,
     CONF_OFFPEAK_END,
+    CONF_PROPOSAL_SOLAR_ENABLED,
+    CONF_PROPOSAL_SOLAR_FACTOR,
     CONF_SCAN_INTERVAL,
     CONF_SIMULATION_STRATEGY,
     CONF_SOLAR_POWER,
@@ -110,8 +121,22 @@ OPTIONS_SCHEMA = vol.Schema(
         vol.Required(CONF_EXPORT_RATE): vol.All(
             vol.Coerce(float), vol.Range(min=0, max=200)
         ),
+        vol.Required(CONF_EXPORT_LIMIT): vol.All(
+            vol.Coerce(float), vol.Range(min=0, max=100)
+        ),
+        vol.Required(CONF_BATTERY_EXPORT_ENABLED): bool,
+        vol.Required(CONF_PROPOSAL_SOLAR_ENABLED): bool,
+        vol.Required(CONF_PROPOSAL_SOLAR_FACTOR): vol.All(
+            vol.Coerce(float), vol.Range(min=0, max=2)
+        ),
+        vol.Required(CONF_GAS_KWH_PER_M3): vol.All(
+            vol.Coerce(float), vol.Range(min=1, max=20)
+        ),
         vol.Required(CONF_SIMULATION_STRATEGY): vol.In(
-            {"export_first": "Export solar first", "self_use": "Solar self-use first"}
+            {
+                "export_first": "Export solar first",
+                "self_use": "Solar self-use first",
+            }
         ),
     }
 )
@@ -120,7 +145,7 @@ OPTIONS_SCHEMA = vol.Schema(
 class KEMSConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Handle automatic and manual KEMS setup."""
 
-    VERSION = 3
+    VERSION = 4
     MINOR_VERSION = 0
 
     def __init__(self) -> None:
@@ -152,16 +177,28 @@ class KEMSConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             return self.async_create_entry(title=NAME, data=self._suggested)
 
         provider_counts = {
-            "octopus": sum(
+            "electricity": sum(
                 key
                 in {
                     CONF_CURRENT_IMPORT_RATE,
                     CONF_NEXT_IMPORT_RATE,
                     CONF_CURRENT_EXPORT_RATE,
+                    CONF_ELECTRICITY_STANDING_CHARGE,
                     CONF_OFF_PEAK,
                     CONF_INTELLIGENT_SLOT,
                     CONF_NEXT_OFFPEAK_START,
                     CONF_OFFPEAK_END,
+                }
+                for key in self._suggested
+            ),
+            "gas": sum(
+                key
+                in {
+                    CONF_GAS_CURRENT_RATE,
+                    CONF_GAS_STANDING_CHARGE,
+                    CONF_GAS_METER_TOTAL,
+                    CONF_GAS_USAGE_TODAY,
+                    CONF_GAS_COST_TODAY,
                 }
                 for key in self._suggested
             ),
@@ -197,7 +234,8 @@ class KEMSConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 {vol.Optional("review_entities", default=False): bool}
             ),
             description_placeholders={
-                "octopus_count": str(provider_counts["octopus"]),
+                "electricity_count": str(provider_counts["electricity"]),
+                "gas_count": str(provider_counts["gas"]),
                 "ohme_count": str(provider_counts["ohme"]),
                 "foxess_count": str(provider_counts["foxess"]),
                 "detected_entities": self._discovery.summary(),

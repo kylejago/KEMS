@@ -1,32 +1,50 @@
-# Architecture
+# KEMS architecture
+
+KEMS remains a Home Assistant custom integration with a Home Assistant-independent analysis core packaged inside `custom_components/kems/kems_core`.
 
 ```text
-Home Assistant entity registry and state machine
+Home Assistant entities
         │
-        ├── OctopusProvider
-        ├── OhmeProvider
-        └── FoxESSProvider
-                │
-             Collector
-                │
-             Snapshot
-                │
-        persistent rolling history
-                │
-        ┌───────┼────────┐
-        │       │        │
-      Learn   Advise  Simulate
-        └───────┼────────┘
-                │
-             KEMSData
-                │
-      DataUpdateCoordinator
-                │
-      sensors and binary sensors
+        ▼
+Entity discovery and configured mapping
+        │
+        ▼
+Octopus electricity ─┐
+Octopus gas ─────────┤
+Ohme ────────────────┼─► Collector ─► Snapshot
+FoxESS Modbus ───────┘                     │
+                                           ▼
+                                  Persistent history
+                                           │
+                    ┌──────────────────────┼──────────────────────┐
+                    ▼                      ▼                      ▼
+                 Learn                  Advise                 Simulate
+                    │                      │                      │
+                    └──────────────┬───────┴──────────────┬──────┘
+                                   ▼                      ▼
+                              Gas summary          Whole-home summary
+                                   │                      │
+                                   └──────────┬───────────┘
+                                              ▼
+                                      Coordinator data
+                                              │
+                                              ▼
+                                   Sensors, binary sensors,
+                                   diagnostics and dashboards
 ```
 
-All runtime files are inside `custom_components/kems`, because HACS installs only that directory. The analysis core is inside `custom_components/kems/kems_core` and has no Home Assistant imports, which keeps it testable and reusable.
+## Provider boundary
 
-## Extensibility
+Providers read only from Home Assistant's state machine and normalise values. No provider calls services or writes settings.
 
-New energy sources should be added as provider adapters that return normalised values. A future provider can be introduced without changing the learning, advice, or simulation engines. Control must be implemented as a separate, explicitly enabled phase and must never be added to the current providers.
+## Proposal simulation boundary
+
+The simulation uses observed household demand and tariff history. Live FoxESS solar is preferred when available; otherwise the fixed proposal system profile generates an orientation-weighted solar estimate. Simulation results never command physical equipment.
+
+## Gas boundary
+
+Gas remains observed rather than optimised. It contributes to learning, whole-home energy, and whole-home cost. Simulated whole-home cost combines simulated electricity with observed gas.
+
+## Future Control phase
+
+Control will require a separate opt-in design, safety limits, explicit device capabilities, dry-run comparison, audit history, and manual override. Nothing in this branch implements Control.

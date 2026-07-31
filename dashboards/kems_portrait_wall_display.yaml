@@ -1,0 +1,117 @@
+title: KEMS Wall Display
+views:
+  - title: KEMS
+    path: kems
+    icon: mdi:home-lightning-bolt
+    type: masonry
+    cards:
+      - type: markdown
+        content: |
+          # ⚡ KEMS
+          **{{ states('sensor.kems_phase') }}** · {{ states('sensor.kems_advice') }}
+
+          {% if is_state('binary_sensor.kems_cheap_period_confirmed', 'on') %}
+          ✅ Cheap electricity confirmed
+          {% else %}
+          ⏳ Day-rate period
+          {% endif %}
+
+      - type: grid
+        columns: 2
+        square: false
+        cards:
+          - type: tile
+            entity: sensor.kems_current_import_rate
+            name: Import rate
+          - type: tile
+            entity: sensor.kems_simulation_export_rate
+            name: Export rate
+          - type: tile
+            entity: sensor.kems_house_load
+            name: Live load
+          - type: tile
+            entity: sensor.kems_simulated_house_load_power
+            name: Simulated load
+          - type: tile
+            entity: sensor.kems_grid_net_power
+            name: Live grid
+          - type: tile
+            entity: sensor.kems_simulated_grid_net_power
+            name: Simulated grid
+
+      - type: grid
+        columns: 2
+        square: false
+        cards:
+          - type: gauge
+            entity: sensor.kems_battery_state_of_charge
+            name: Live battery
+            min: 0
+            max: 100
+            needle: true
+            segments:
+              - from: 0
+                color: var(--error-color)
+              - from: 10
+                color: var(--warning-color)
+              - from: 30
+                color: var(--success-color)
+          - type: gauge
+            entity: sensor.kems_simulated_battery_state_of_charge
+            name: Simulated battery
+            min: 0
+            max: 100
+            needle: true
+            segments:
+              - from: 0
+                color: var(--error-color)
+              - from: 10
+                color: var(--warning-color)
+              - from: 30
+                color: var(--success-color)
+
+      - type: history-graph
+        title: Live and simulated grid — 12 hours
+        hours_to_show: 12
+        entities:
+          - sensor.kems_grid_net_power
+          - sensor.kems_simulated_grid_net_power
+
+      - type: history-graph
+        title: Live and simulated solar — 12 hours
+        hours_to_show: 12
+        entities:
+          - sensor.kems_solar_power
+          - sensor.kems_simulated_solar_power
+
+      - type: grid
+        columns: 2
+        square: false
+        cards:
+          - type: entities
+            title: Today — live
+            show_header_toggle: false
+            entities:
+              - sensor.kems_observed_grid_import_today
+              - sensor.kems_observed_grid_export_today
+              - sensor.kems_observed_cost_today
+              - sensor.kems_gas_usage_today
+              - sensor.kems_gas_cost_today
+          - type: entities
+            title: Today — simulated
+            show_header_toggle: false
+            entities:
+              - sensor.kems_simulated_grid_import_today
+              - sensor.kems_simulated_grid_export_today
+              - sensor.kems_simulated_kems_cost_today
+              - sensor.kems_simulated_saving_today
+              - sensor.kems_whole_home_simulated_saving_today
+
+      - type: markdown
+        title: Advice
+        content: |
+          ## 💡 {{ states('sensor.kems_advice') }}
+          {{ state_attr('sensor.kems_advice', 'message') or 'KEMS is observing your home.' }}
+
+          Learning confidence: **{{ states('sensor.kems_learning_confidence') }}%**  
+          History samples: **{{ states('sensor.kems_history_samples') }}**

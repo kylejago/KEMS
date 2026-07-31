@@ -1,0 +1,138 @@
+title: KEMS Analytics
+views:
+  - title: Energy Flow
+    path: flow
+    icon: mdi:transit-connection-variant
+    type: masonry
+    cards:
+      - type: grid
+        columns: 2
+        square: false
+        cards:
+          - type: history-graph
+            title: Live power flow — 48 hours
+            hours_to_show: 48
+            entities:
+              - sensor.kems_house_load
+              - sensor.kems_solar_power
+              - sensor.kems_grid_net_power
+              - sensor.kems_battery_power
+          - type: history-graph
+            title: Simulated power flow — 48 hours
+            hours_to_show: 48
+            entities:
+              - sensor.kems_simulated_house_load_power
+              - sensor.kems_simulated_solar_power
+              - sensor.kems_simulated_grid_net_power
+              - sensor.kems_simulated_battery_power
+      - type: history-graph
+        title: Battery SOC — 7 days
+        hours_to_show: 168
+        entities:
+          - sensor.kems_battery_state_of_charge
+          - sensor.kems_simulated_battery_state_of_charge
+
+  - title: Financial
+    path: financial
+    icon: mdi:finance
+    type: masonry
+    cards:
+      - type: grid
+        columns: 3
+        square: false
+        cards:
+          - type: tile
+            entity: sensor.kems_observed_cost_today
+            name: Observed electricity
+          - type: tile
+            entity: sensor.kems_simulated_kems_cost_today
+            name: Simulated electricity
+          - type: tile
+            entity: sensor.kems_simulated_saving_today
+            name: Electricity saving
+          - type: tile
+            entity: sensor.kems_gas_cost_today
+            name: Gas cost
+          - type: tile
+            entity: sensor.kems_whole_home_observed_cost_today
+            name: Whole-home observed
+          - type: tile
+            entity: sensor.kems_whole_home_simulated_cost_today
+            name: Whole-home simulated
+      - type: history-graph
+        title: Cost comparison — 30 days
+        hours_to_show: 720
+        entities:
+          - sensor.kems_observed_cost_today
+          - sensor.kems_simulated_kems_cost_today
+          - sensor.kems_gas_cost_today
+          - sensor.kems_whole_home_observed_cost_today
+          - sensor.kems_whole_home_simulated_cost_today
+
+  - title: Solar & Export
+    path: solar-export
+    icon: mdi:solar-power-variant-outline
+    type: masonry
+    cards:
+      - type: grid
+        columns: 3
+        square: false
+        cards:
+          - type: tile
+            entity: sensor.kems_proposal_solar_target_today
+            name: Proposal solar target
+          - type: tile
+            entity: sensor.kems_simulated_solar_generation_today
+            name: Simulated solar
+          - type: tile
+            entity: sensor.kems_simulated_solar_curtailed_today
+            name: Curtailed solar
+          - type: tile
+            entity: sensor.kems_observed_grid_export_today
+            name: Live export
+          - type: tile
+            entity: sensor.kems_simulated_grid_export_today
+            name: Simulated export
+          - type: tile
+            entity: sensor.kems_simulated_export_income_today
+            name: Simulated export income
+      - type: history-graph
+        title: Solar and export — 30 days
+        hours_to_show: 720
+        entities:
+          - sensor.kems_simulated_solar_generation_today
+          - sensor.kems_proposal_solar_target_today
+          - sensor.kems_observed_grid_export_today
+          - sensor.kems_simulated_grid_export_today
+
+  - title: Gas
+    path: gas
+    icon: mdi:fire
+    type: masonry
+    cards:
+      - type: entities
+        title: Gas tracking
+        show_header_toggle: false
+        entities:
+          - binary_sensor.kems_gas_data_available
+          - sensor.kems_gas_current_rate
+          - sensor.kems_gas_standing_charge
+          - sensor.kems_gas_usage_today
+          - sensor.kems_gas_cost_today
+          - sensor.kems_gas_usage_this_month
+          - sensor.kems_gas_cost_this_month
+          - sensor.kems_typical_daily_gas_usage
+          - sensor.kems_gas_share_of_whole_home_energy
+      - type: history-graph
+        title: Gas usage — 30 days
+        hours_to_show: 720
+        entities:
+          - sensor.kems_gas_usage_today
+          - sensor.kems_typical_daily_gas_usage
+      - type: history-graph
+        title: Gas and whole-home cost — 30 days
+        hours_to_show: 720
+        entities:
+          - sensor.kems_gas_cost_today
+          - sensor.kems_whole_home_observed_cost_today
+          - sensor.kems_whole_home_simulated_cost_today
