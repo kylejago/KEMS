@@ -48,3 +48,23 @@ Gas remains observed rather than optimised. It contributes to learning, whole-ho
 ## Future Control phase
 
 Control will require a separate opt-in design, safety limits, explicit device capabilities, dry-run comparison, audit history, and manual override. Nothing in this branch implements Control.
+
+## ROI and lifetime pipeline
+
+After the normal Observe/Learn/Advise/Simulate pipeline, KEMS updates a separate permanent lifetime ledger and calculates ROI:
+
+```text
+Snapshot + retained history
+        ↓
+Daily observed/simulated cumulative totals
+        ↓
+Persistent lifetime delta ledger
+        ↓
+Predicted ROI before commissioning
+        ↓
+Actual payback after commissioning
+        ↓
+Profit Mode after the investment is recovered
+```
+
+The lifetime store is intentionally separate from Home Assistant Recorder so long-term totals are not lost when Recorder history is purged.

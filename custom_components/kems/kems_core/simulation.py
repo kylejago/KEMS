@@ -55,8 +55,13 @@ class SimulationEngine:
         simulated_import_cost = 0.0
         simulated_export_income = 0.0
         actual_house = 0.0
+        actual_ev = 0.0
+        actual_solar = 0.0
+        actual_battery_charge = 0.0
+        actual_battery_discharge = 0.0
         actual_import = 0.0
         actual_export = 0.0
+        baseline_import_cost = 0.0
         simulated_import = 0.0
         simulated_export = 0.0
         simulated_solar = 0.0
@@ -101,8 +106,18 @@ class SimulationEngine:
             actual_import_kwh = actual_import_kw * hours
             actual_export_kwh = actual_export_kw * hours
             actual_house += actual_house_kwh
+            actual_ev += max(current.ev_power_kw or 0.0, 0.0) * hours
+            actual_solar += max(current.solar_power_kw or 0.0, 0.0) * hours
+            battery_power_kw = current.battery_power_kw or 0.0
+            if config.battery_power_positive_is_discharge:
+                actual_battery_discharge += max(battery_power_kw, 0.0) * hours
+                actual_battery_charge += max(-battery_power_kw, 0.0) * hours
+            else:
+                actual_battery_charge += max(battery_power_kw, 0.0) * hours
+                actual_battery_discharge += max(-battery_power_kw, 0.0) * hours
             actual_import += actual_import_kwh
             actual_export += actual_export_kwh
+            baseline_import_cost += actual_house_kwh * rate
             actual_import_cost += actual_import_kwh * rate
             actual_export_income += actual_export_kwh * export_rate
 
@@ -204,6 +219,12 @@ class SimulationEngine:
         )
         actual_cost = actual_import_cost - actual_export_income
         simulated_cost = simulated_import_cost - simulated_export_income
+        actual_avoided_import_value = baseline_import_cost - actual_import_cost
+        simulated_avoided_import_value = baseline_import_cost - simulated_import_cost
+        actual_system_value = actual_avoided_import_value + actual_export_income
+        simulated_system_value = (
+            simulated_avoided_import_value + simulated_export_income
+        )
 
         return SimulationState(
             ready=covered >= 3,
@@ -216,6 +237,10 @@ class SimulationEngine:
             simulated_import_cost_pence=round(simulated_import_cost, 2),
             simulated_export_income_pence=round(simulated_export_income, 2),
             actual_house_consumption_kwh=round(actual_house, 3),
+            actual_ev_energy_kwh=round(actual_ev, 3),
+            actual_solar_generation_kwh=round(actual_solar, 3),
+            actual_battery_charge_kwh=round(actual_battery_charge, 3),
+            actual_battery_discharge_kwh=round(actual_battery_discharge, 3),
             actual_grid_import_kwh=round(actual_import, 3),
             actual_grid_export_kwh=round(actual_export, 3),
             simulated_grid_import_kwh=round(simulated_import, 3),
@@ -227,6 +252,14 @@ class SimulationEngine:
             simulated_battery_export_kwh=round(battery_export, 3),
             simulated_battery_soc=round(100 * battery_kwh / capacity, 1),
             avoided_day_rate_import_kwh=round(avoided_day_import, 3),
+            baseline_no_system_cost_pence=round(baseline_import_cost, 2),
+            actual_avoided_import_value_pence=round(actual_avoided_import_value, 2),
+            simulated_avoided_import_value_pence=round(
+                simulated_avoided_import_value,
+                2,
+            ),
+            actual_system_value_pence=round(actual_system_value, 2),
+            simulated_system_value_pence=round(simulated_system_value, 2),
             current_simulated_house_load_kw=current_plan["house"],
             current_simulated_solar_power_kw=current_plan["solar"],
             current_simulated_grid_import_kw=current_plan["grid_import"],

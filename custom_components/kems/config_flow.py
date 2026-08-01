@@ -11,18 +11,25 @@ from homeassistant.core import callback
 from homeassistant.helpers.selector import EntitySelector, EntitySelectorConfig
 
 from .const import (
+    CONF_ADDITIONAL_COSTS,
+    CONF_ANNUAL_MAINTENANCE,
     CONF_BATTERY_CAPACITY,
     CONF_BATTERY_CURRENT,
+    CONF_BATTERY_DEGRADATION,
     CONF_BATTERY_EXPORT_ENABLED,
     CONF_BATTERY_INITIAL,
     CONF_BATTERY_POWER,
+    CONF_BATTERY_POWER_POSITIVE_IS_DISCHARGE,
     CONF_BATTERY_RESERVE,
     CONF_BATTERY_SOC,
     CONF_BATTERY_VOLTAGE,
     CONF_CHARGE_EFFICIENCY,
+    CONF_COMMISSIONING_DATE,
     CONF_CURRENT_EXPORT_RATE,
     CONF_CURRENT_IMPORT_RATE,
     CONF_DISCHARGE_EFFICIENCY,
+    CONF_DISCOUNT_RATE,
+    CONF_ELECTRICITY_INFLATION,
     CONF_ELECTRICITY_STANDING_CHARGE,
     CONF_EV_CHARGING,
     CONF_EV_CONNECTED,
@@ -37,11 +44,13 @@ from .const import (
     CONF_GAS_METER_TOTAL,
     CONF_GAS_STANDING_CHARGE,
     CONF_GAS_USAGE_TODAY,
+    CONF_GRANTS_REBATES,
     CONF_GRID_EXPORT,
     CONF_GRID_IMPORT,
     CONF_HISTORY_DAYS,
     CONF_HOUSE_LOAD,
     CONF_INTELLIGENT_SLOT,
+    CONF_MANUAL_SYSTEM_COSTS,
     CONF_MAX_CHARGE,
     CONF_MAX_DISCHARGE,
     CONF_NEXT_IMPORT_RATE,
@@ -50,9 +59,11 @@ from .const import (
     CONF_OFFPEAK_END,
     CONF_PROPOSAL_SOLAR_ENABLED,
     CONF_PROPOSAL_SOLAR_FACTOR,
+    CONF_ROI_FORECAST_YEARS,
     CONF_SCAN_INTERVAL,
     CONF_SIMULATION_STRATEGY,
     CONF_SOLAR_POWER,
+    CONF_SYSTEM_COST,
     DEFAULT_OPTIONS,
     DOMAIN,
     ENTITY_MAPPING_KEYS,
@@ -132,6 +143,38 @@ OPTIONS_SCHEMA = vol.Schema(
         vol.Required(CONF_GAS_KWH_PER_M3): vol.All(
             vol.Coerce(float), vol.Range(min=1, max=20)
         ),
+        vol.Required(CONF_BATTERY_POWER_POSITIVE_IS_DISCHARGE): bool,
+        vol.Required(CONF_SYSTEM_COST): vol.All(
+            vol.Coerce(float), vol.Range(min=0, max=1000000)
+        ),
+        vol.Required(CONF_ADDITIONAL_COSTS): vol.All(
+            vol.Coerce(float), vol.Range(min=0, max=1000000)
+        ),
+        vol.Required(CONF_GRANTS_REBATES): vol.All(
+            vol.Coerce(float), vol.Range(min=0, max=1000000)
+        ),
+        vol.Required(CONF_COMMISSIONING_DATE): vol.All(
+            str,
+            vol.Match(r"^$|^\d{4}-\d{2}-\d{2}$"),
+        ),
+        vol.Required(CONF_ANNUAL_MAINTENANCE): vol.All(
+            vol.Coerce(float), vol.Range(min=0, max=100000)
+        ),
+        vol.Required(CONF_MANUAL_SYSTEM_COSTS): vol.All(
+            vol.Coerce(float), vol.Range(min=0, max=1000000)
+        ),
+        vol.Required(CONF_ELECTRICITY_INFLATION): vol.All(
+            vol.Coerce(float), vol.Range(min=-50, max=100)
+        ),
+        vol.Required(CONF_BATTERY_DEGRADATION): vol.All(
+            vol.Coerce(float), vol.Range(min=0, max=20)
+        ),
+        vol.Required(CONF_DISCOUNT_RATE): vol.All(
+            vol.Coerce(float), vol.Range(min=0, max=100)
+        ),
+        vol.Required(CONF_ROI_FORECAST_YEARS): vol.All(
+            vol.Coerce(int), vol.Range(min=1, max=40)
+        ),
         vol.Required(CONF_SIMULATION_STRATEGY): vol.In(
             {
                 "export_first": "Export solar first",
@@ -145,7 +188,7 @@ OPTIONS_SCHEMA = vol.Schema(
 class KEMSConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Handle automatic and manual KEMS setup."""
 
-    VERSION = 4
+    VERSION = 5
     MINOR_VERSION = 0
 
     def __init__(self) -> None:

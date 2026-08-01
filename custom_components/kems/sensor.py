@@ -86,6 +86,11 @@ def _simulation_attributes(data: KEMSData) -> Mapping[str, Any]:
         "actual_export_income_pence": simulation.actual_export_income_pence,
         "simulated_import_cost_pence": simulation.simulated_import_cost_pence,
         "simulated_export_income_pence": simulation.simulated_export_income_pence,
+        "actual_house_consumption_kwh": simulation.actual_house_consumption_kwh,
+        "actual_ev_energy_kwh": simulation.actual_ev_energy_kwh,
+        "actual_solar_generation_kwh": simulation.actual_solar_generation_kwh,
+        "actual_battery_charge_kwh": simulation.actual_battery_charge_kwh,
+        "actual_battery_discharge_kwh": simulation.actual_battery_discharge_kwh,
         "actual_grid_import_kwh": simulation.actual_grid_import_kwh,
         "actual_grid_export_kwh": simulation.actual_grid_export_kwh,
         "simulated_grid_import_kwh": simulation.simulated_grid_import_kwh,
@@ -97,6 +102,15 @@ def _simulation_attributes(data: KEMSData) -> Mapping[str, Any]:
         "simulated_battery_export_kwh": simulation.simulated_battery_export_kwh,
         "simulated_battery_soc": simulation.simulated_battery_soc,
         "avoided_day_rate_import_kwh": simulation.avoided_day_rate_import_kwh,
+        "baseline_no_system_cost_pence": simulation.baseline_no_system_cost_pence,
+        "actual_avoided_import_value_pence": (
+            simulation.actual_avoided_import_value_pence
+        ),
+        "simulated_avoided_import_value_pence": (
+            simulation.simulated_avoided_import_value_pence
+        ),
+        "actual_system_value_pence": simulation.actual_system_value_pence,
+        "simulated_system_value_pence": simulation.simulated_system_value_pence,
         "effective_export_rate_pence": simulation.effective_export_rate_pence,
         "export_limit_kw": simulation.export_limit_kw,
         "proposal_solar_active": simulation.proposal_solar_active,
@@ -115,6 +129,94 @@ def _gas_attributes(data: KEMSData) -> Mapping[str, Any]:
         "data_coverage": data.gas.data_coverage,
         "typical_daily_usage_kwh": data.gas.typical_daily_usage_kwh,
     }
+
+
+def _roi_attributes(data: KEMSData) -> Mapping[str, Any]:
+    """Expose transparent ROI assumptions and proposal benchmarks."""
+    roi = data.roi
+    return {
+        "ready": roi.ready,
+        "system_installed": roi.system_installed,
+        "system_paid_back": roi.system_paid_back,
+        "net_investment_gbp": roi.net_investment_gbp,
+        "proposal_annual_saving_gbp": roi.proposal_annual_saving_gbp,
+        "proposal_payback_years": roi.proposal_payback_years,
+        "proposal_lifetime_savings_gbp": roi.proposal_lifetime_savings_gbp,
+        "proposal_net_savings_gbp": roi.proposal_net_savings_gbp,
+        "observed_days": roi.observed_days,
+        "operating_days": roi.operating_days,
+        "confidence": roi.confidence,
+    }
+
+
+def _lifetime_attributes(data: KEMSData) -> Mapping[str, Any]:
+    """Expose best-day and permanent-ledger metadata."""
+    ledger = data.lifetime
+    return {
+        "first_observation": (
+            ledger.first_observation.isoformat() if ledger.first_observation else None
+        ),
+        "last_updated": (
+            ledger.last_updated.isoformat() if ledger.last_updated else None
+        ),
+        "commissioning_date": (
+            ledger.commissioning_date.isoformat() if ledger.commissioning_date else None
+        ),
+        "paid_back_date": (
+            ledger.paid_back_date.isoformat() if ledger.paid_back_date else None
+        ),
+        "best_system_value_day": (
+            ledger.best_system_value_day.isoformat()
+            if ledger.best_system_value_day
+            else None
+        ),
+        "best_system_value_day_gbp": round(
+            ledger.best_system_value_day_pence / 100,
+            2,
+        ),
+        "best_solar_day": (
+            ledger.best_solar_day.isoformat() if ledger.best_solar_day else None
+        ),
+        "best_solar_day_kwh": round(ledger.best_solar_day_kwh, 3),
+        "best_export_day": (
+            ledger.best_export_day.isoformat() if ledger.best_export_day else None
+        ),
+        "best_export_day_kwh": round(ledger.best_export_day_kwh, 3),
+    }
+
+
+def _lifetime_total_cost_gbp(data: KEMSData) -> float:
+    """Return imported electricity plus gas minus export earnings."""
+    ledger = data.lifetime
+    return round(
+        (ledger.import_cost_pence + ledger.gas_cost_pence - ledger.export_income_pence)
+        / 100,
+        2,
+    )
+
+
+def _lifetime_total_energy_kwh(data: KEMSData) -> float:
+    """Return all observed household electricity and gas energy."""
+    return round(
+        data.lifetime.house_consumption_kwh + data.lifetime.gas_consumption_kwh,
+        3,
+    )
+
+
+def _lifetime_grid_independence(data: KEMSData) -> float | None:
+    """Return the share of household electricity not supplied by grid import."""
+    house = data.lifetime.house_consumption_kwh
+    if house <= 0:
+        return None
+    return round(100 * max(house - data.lifetime.grid_import_kwh, 0.0) / house, 1)
+
+
+def _estimated_battery_cycles(data: KEMSData) -> float | None:
+    """Estimate equivalent full cycles from recorded battery discharge."""
+    usable = FOXHOLE_PROPOSAL_PROFILE.usable_battery_capacity_kwh
+    if usable <= 0:
+        return None
+    return round(data.lifetime.battery_discharge_kwh / usable, 2)
 
 
 def _profile_attributes(data: KEMSData) -> Mapping[str, Any]:
@@ -713,6 +815,352 @@ SENSORS: tuple[KEMSSensorEntityDescription, ...] = (
         suggested_display_precision=1,
         source_any_keys=GAS_SOURCE_KEYS,
         value_fn=lambda data: data.whole_home.gas_energy_share_percent,
+    ),
+    KEMSSensorEntityDescription(
+        key="roi_status",
+        name="ROI status",
+        icon="mdi:finance",
+        value_fn=lambda data: data.roi.status,
+        attributes_fn=_roi_attributes,
+    ),
+    KEMSSensorEntityDescription(
+        key="system_investment",
+        name="System investment",
+        icon="mdi:cash-multiple",
+        device_class=SensorDeviceClass.MONETARY,
+        native_unit_of_measurement="GBP",
+        suggested_display_precision=2,
+        value_fn=lambda data: data.roi.net_investment_gbp,
+    ),
+    KEMSSensorEntityDescription(
+        key="predicted_annual_saving",
+        name="Predicted annual saving",
+        icon="mdi:chart-line",
+        native_unit_of_measurement="GBP/year",
+        suggested_display_precision=2,
+        value_fn=lambda data: data.roi.predicted_annual_saving_gbp,
+        attributes_fn=_roi_attributes,
+    ),
+    KEMSSensorEntityDescription(
+        key="predicted_payback_years",
+        name="Predicted payback",
+        icon="mdi:calendar-clock",
+        native_unit_of_measurement="years",
+        suggested_display_precision=2,
+        value_fn=lambda data: data.roi.predicted_payback_years,
+    ),
+    KEMSSensorEntityDescription(
+        key="predicted_payback_date",
+        name="Predicted payback date",
+        icon="mdi:calendar-check",
+        device_class=SensorDeviceClass.TIMESTAMP,
+        value_fn=lambda data: data.roi.predicted_payback_date,
+    ),
+    KEMSSensorEntityDescription(
+        key="predicted_net_value",
+        name="Predicted net value",
+        icon="mdi:cash-fast",
+        device_class=SensorDeviceClass.MONETARY,
+        native_unit_of_measurement="GBP",
+        suggested_display_precision=2,
+        value_fn=lambda data: data.roi.predicted_net_value_gbp,
+    ),
+    KEMSSensorEntityDescription(
+        key="proposal_annual_saving_benchmark",
+        name="Proposal annual saving benchmark",
+        icon="mdi:file-chart-outline",
+        native_unit_of_measurement="GBP/year",
+        suggested_display_precision=2,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda data: data.roi.proposal_annual_saving_gbp,
+    ),
+    KEMSSensorEntityDescription(
+        key="proposal_payback_benchmark",
+        name="Proposal payback benchmark",
+        icon="mdi:file-clock-outline",
+        native_unit_of_measurement="years",
+        suggested_display_precision=2,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda data: data.roi.proposal_payback_years,
+    ),
+    KEMSSensorEntityDescription(
+        key="proposal_net_savings_benchmark",
+        name="Proposal net savings benchmark",
+        icon="mdi:file-cash-outline",
+        device_class=SensorDeviceClass.MONETARY,
+        native_unit_of_measurement="GBP",
+        suggested_display_precision=2,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda data: data.roi.proposal_net_savings_gbp,
+    ),
+    KEMSSensorEntityDescription(
+        key="roi_confidence",
+        name="ROI confidence",
+        icon="mdi:shield-check-outline",
+        native_unit_of_measurement=PERCENTAGE,
+        suggested_display_precision=0,
+        value_fn=lambda data: data.roi.confidence,
+    ),
+    KEMSSensorEntityDescription(
+        key="actual_value_created_today",
+        name="Actual system value today",
+        icon="mdi:cash-plus",
+        device_class=SensorDeviceClass.MONETARY,
+        native_unit_of_measurement="GBP",
+        suggested_display_precision=2,
+        value_fn=lambda data: data.roi.actual_value_created_today_gbp,
+    ),
+    KEMSSensorEntityDescription(
+        key="actual_value_created_total",
+        name="Actual system value total",
+        icon="mdi:piggy-bank",
+        device_class=SensorDeviceClass.MONETARY,
+        native_unit_of_measurement="GBP",
+        state_class=SensorStateClass.TOTAL,
+        suggested_display_precision=2,
+        value_fn=lambda data: data.roi.actual_value_created_total_gbp,
+        attributes_fn=_lifetime_attributes,
+    ),
+    KEMSSensorEntityDescription(
+        key="actual_roi_percentage",
+        name="Actual ROI",
+        icon="mdi:battery-charging-100",
+        native_unit_of_measurement=PERCENTAGE,
+        suggested_display_precision=1,
+        value_fn=lambda data: data.roi.actual_roi_percent,
+    ),
+    KEMSSensorEntityDescription(
+        key="actual_payback_remaining",
+        name="Actual payback remaining",
+        icon="mdi:cash-clock",
+        device_class=SensorDeviceClass.MONETARY,
+        native_unit_of_measurement="GBP",
+        suggested_display_precision=2,
+        value_fn=lambda data: data.roi.actual_payback_remaining_gbp,
+    ),
+    KEMSSensorEntityDescription(
+        key="actual_payback_date",
+        name="Actual payback date",
+        icon="mdi:calendar-star",
+        device_class=SensorDeviceClass.TIMESTAMP,
+        value_fn=lambda data: data.roi.actual_payback_date,
+    ),
+    KEMSSensorEntityDescription(
+        key="actual_net_profit",
+        name="Profit after payback",
+        icon="mdi:trending-up",
+        device_class=SensorDeviceClass.MONETARY,
+        native_unit_of_measurement="GBP",
+        state_class=SensorStateClass.TOTAL,
+        suggested_display_precision=2,
+        value_fn=lambda data: data.roi.actual_net_profit_gbp,
+    ),
+    KEMSSensorEntityDescription(
+        key="system_operating_costs",
+        name="System operating costs",
+        icon="mdi:tools",
+        device_class=SensorDeviceClass.MONETARY,
+        native_unit_of_measurement="GBP",
+        state_class=SensorStateClass.TOTAL,
+        suggested_display_precision=2,
+        value_fn=lambda data: data.roi.operating_costs_gbp,
+    ),
+    KEMSSensorEntityDescription(
+        key="lifetime_observed_days",
+        name="Lifetime observed days",
+        icon="mdi:calendar-range",
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        value_fn=lambda data: data.lifetime.observed_days,
+        attributes_fn=_lifetime_attributes,
+    ),
+    KEMSSensorEntityDescription(
+        key="system_operating_days",
+        name="System operating days",
+        icon="mdi:calendar-heart",
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        value_fn=lambda data: data.lifetime.system_operating_days,
+    ),
+    KEMSSensorEntityDescription(
+        key="lifetime_house_consumption",
+        name="Lifetime house electricity",
+        icon="mdi:home-lightning-bolt",
+        device_class=SensorDeviceClass.ENERGY,
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        suggested_display_precision=2,
+        value_fn=lambda data: data.lifetime.house_consumption_kwh,
+    ),
+    KEMSSensorEntityDescription(
+        key="lifetime_ev_energy",
+        name="Lifetime EV charging",
+        icon="mdi:ev-station",
+        device_class=SensorDeviceClass.ENERGY,
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        suggested_display_precision=2,
+        value_fn=lambda data: data.lifetime.ev_energy_kwh,
+    ),
+    KEMSSensorEntityDescription(
+        key="lifetime_grid_import",
+        name="Lifetime grid import",
+        icon="mdi:transmission-tower-import",
+        device_class=SensorDeviceClass.ENERGY,
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        suggested_display_precision=2,
+        value_fn=lambda data: data.lifetime.grid_import_kwh,
+    ),
+    KEMSSensorEntityDescription(
+        key="lifetime_grid_export",
+        name="Lifetime grid export",
+        icon="mdi:transmission-tower-export",
+        device_class=SensorDeviceClass.ENERGY,
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        suggested_display_precision=2,
+        value_fn=lambda data: data.lifetime.grid_export_kwh,
+    ),
+    KEMSSensorEntityDescription(
+        key="lifetime_solar_generation",
+        name="Lifetime solar generation",
+        icon="mdi:solar-power",
+        device_class=SensorDeviceClass.ENERGY,
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        suggested_display_precision=2,
+        value_fn=lambda data: data.lifetime.solar_generation_kwh,
+    ),
+    KEMSSensorEntityDescription(
+        key="lifetime_battery_charge",
+        name="Lifetime battery charge",
+        icon="mdi:battery-arrow-up-outline",
+        device_class=SensorDeviceClass.ENERGY,
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        suggested_display_precision=2,
+        value_fn=lambda data: data.lifetime.battery_charge_kwh,
+    ),
+    KEMSSensorEntityDescription(
+        key="lifetime_battery_discharge",
+        name="Lifetime battery discharge",
+        icon="mdi:battery-arrow-down-outline",
+        device_class=SensorDeviceClass.ENERGY,
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        suggested_display_precision=2,
+        value_fn=lambda data: data.lifetime.battery_discharge_kwh,
+    ),
+    KEMSSensorEntityDescription(
+        key="lifetime_gas_consumption",
+        name="Lifetime gas consumption",
+        icon="mdi:fire",
+        device_class=SensorDeviceClass.ENERGY,
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        suggested_display_precision=2,
+        value_fn=lambda data: data.lifetime.gas_consumption_kwh,
+    ),
+    KEMSSensorEntityDescription(
+        key="lifetime_total_home_energy",
+        name="Lifetime whole-home energy",
+        icon="mdi:home-lightning-bolt",
+        device_class=SensorDeviceClass.ENERGY,
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        suggested_display_precision=2,
+        value_fn=_lifetime_total_energy_kwh,
+    ),
+    KEMSSensorEntityDescription(
+        key="lifetime_import_cost",
+        name="Lifetime import cost",
+        icon="mdi:cash-minus",
+        device_class=SensorDeviceClass.MONETARY,
+        native_unit_of_measurement="GBP",
+        state_class=SensorStateClass.TOTAL,
+        suggested_display_precision=2,
+        value_fn=lambda data: round(data.lifetime.import_cost_pence / 100, 2),
+    ),
+    KEMSSensorEntityDescription(
+        key="lifetime_export_income",
+        name="Lifetime export income",
+        icon="mdi:cash-plus",
+        device_class=SensorDeviceClass.MONETARY,
+        native_unit_of_measurement="GBP",
+        state_class=SensorStateClass.TOTAL,
+        suggested_display_precision=2,
+        value_fn=lambda data: round(data.lifetime.export_income_pence / 100, 2),
+    ),
+    KEMSSensorEntityDescription(
+        key="lifetime_gas_cost",
+        name="Lifetime gas cost",
+        icon="mdi:fire-circle",
+        device_class=SensorDeviceClass.MONETARY,
+        native_unit_of_measurement="GBP",
+        state_class=SensorStateClass.TOTAL,
+        suggested_display_precision=2,
+        value_fn=lambda data: round(data.lifetime.gas_cost_pence / 100, 2),
+    ),
+    KEMSSensorEntityDescription(
+        key="lifetime_avoided_import_value",
+        name="Lifetime avoided import value",
+        icon="mdi:transmission-tower-off",
+        device_class=SensorDeviceClass.MONETARY,
+        native_unit_of_measurement="GBP",
+        state_class=SensorStateClass.TOTAL,
+        suggested_display_precision=2,
+        value_fn=lambda data: round(
+            data.lifetime.actual_avoided_import_value_pence / 100,
+            2,
+        ),
+    ),
+    KEMSSensorEntityDescription(
+        key="lifetime_system_value",
+        name="Lifetime system value",
+        icon="mdi:piggy-bank",
+        device_class=SensorDeviceClass.MONETARY,
+        native_unit_of_measurement="GBP",
+        state_class=SensorStateClass.TOTAL,
+        suggested_display_precision=2,
+        value_fn=lambda data: round(data.lifetime.actual_system_value_pence / 100, 2),
+    ),
+    KEMSSensorEntityDescription(
+        key="lifetime_simulated_system_value",
+        name="Lifetime simulated system value",
+        icon="mdi:calculator-variant-outline",
+        device_class=SensorDeviceClass.MONETARY,
+        native_unit_of_measurement="GBP",
+        state_class=SensorStateClass.TOTAL,
+        suggested_display_precision=2,
+        value_fn=lambda data: round(
+            data.lifetime.simulated_system_value_pence / 100,
+            2,
+        ),
+    ),
+    KEMSSensorEntityDescription(
+        key="lifetime_total_energy_cost",
+        name="Lifetime net energy cost",
+        icon="mdi:home-currency-gbp",
+        device_class=SensorDeviceClass.MONETARY,
+        native_unit_of_measurement="GBP",
+        state_class=SensorStateClass.TOTAL,
+        suggested_display_precision=2,
+        value_fn=_lifetime_total_cost_gbp,
+    ),
+    KEMSSensorEntityDescription(
+        key="lifetime_grid_independence",
+        name="Lifetime grid independence",
+        icon="mdi:home-percent-outline",
+        native_unit_of_measurement=PERCENTAGE,
+        suggested_display_precision=1,
+        value_fn=_lifetime_grid_independence,
+    ),
+    KEMSSensorEntityDescription(
+        key="lifetime_battery_cycles",
+        name="Estimated lifetime battery cycles",
+        icon="mdi:battery-sync",
+        native_unit_of_measurement="cycles",
+        suggested_display_precision=2,
+        value_fn=_estimated_battery_cycles,
     ),
 )
 

@@ -18,7 +18,7 @@ Install these frontend cards through HACS before using the advanced dashboard:
 - ApexCharts Card
 - Power Flow Card Plus
 
-The other three dashboards use only built-in cards.
+The built-in comparison, portrait, pre-install, whole-home analytics, and built-in ROI dashboards use only standard Home Assistant cards.
 
 ## Installation
 
@@ -30,8 +30,21 @@ The other three dashboards use only built-in cards.
 
 ## Entity IDs
 
-These files target the entity IDs created by KEMS v0.4.0-alpha1. Home Assistant may append `_2` if old entity-registry entries already use an ID. Verify any missing entity under **Developer Tools → States** and adjust the YAML if required.
+These files target the entity IDs created by KEMS v0.5.0-alpha1. Home Assistant may append `_2` if old entity-registry entries already use an ID. Verify any missing entity under **Developer Tools → States** and adjust the YAML if required.
 
 ## Live hardware not installed yet
 
 Until FoxESS Modbus is providing solar and battery data, Live PV/battery cards may be `unknown`. The Simulated column remains populated from the proposal system model.
+
+## ROI and lifetime dashboards
+
+- `kems_roi_lifetime_builtin.yaml` uses only built-in Home Assistant cards.
+- `kems_roi_lifetime_advanced.yaml` adds a filling financial battery, predicted versus actual ROI, automatic Profit Mode after payback, all-time energy totals, and all-time costs/earnings.
+
+The advanced ROI dashboard requires:
+
+- Button Card
+- Mushroom
+- ApexCharts Card
+
+Before commissioning, the financial battery uses the accumulated simulated system value. After a commissioning date is entered in KEMS options, it automatically changes to actual payback tracking. When the investment is fully recovered, it changes to `SYSTEM PAID BACK — PROFIT MODE` and shows lifetime profit.

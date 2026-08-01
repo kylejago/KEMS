@@ -1,4 +1,4 @@
-# Entity inventory — v0.4.0-alpha1
+# Entity inventory — v0.5.0-alpha1
 
 KEMS creates source-mirror entities only when the matching source is configured. Derived analysis and proposal-simulation entities are created automatically and may be `unknown` until enough observations exist.
 
@@ -69,3 +69,22 @@ KEMS creates source-mirror entities only when the matching source is configured.
 - system profile and array attributes
 - simulation export rate and full simulation attributes
 - data quality, learning coverage, and history samples
+
+## ROI and lifetime ledger
+
+- `sensor.kems_roi_status`
+- `sensor.kems_system_investment`
+- `sensor.kems_predicted_annual_saving`
+- `sensor.kems_predicted_payback_years`
+- `sensor.kems_predicted_payback_date`
+- `sensor.kems_predicted_net_value`
+- `sensor.kems_actual_value_created_today`
+- `sensor.kems_actual_value_created_total`
+- `sensor.kems_actual_roi_percentage`
+- `sensor.kems_actual_payback_remaining`
+- `sensor.kems_actual_payback_date`
+- `sensor.kems_actual_net_profit`
+- `binary_sensor.kems_roi_ready`
+- `binary_sensor.kems_system_installed`
+- `binary_sensor.kems_system_paid_back`
+- lifetime electricity, gas, solar, grid, EV, battery, cost, earnings, system-value, and operating-day sensors
