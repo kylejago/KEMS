@@ -8,7 +8,11 @@ import voluptuous as vol
 from homeassistant import config_entries
 from homeassistant.config_entries import ConfigEntry, OptionsFlowWithReload
 from homeassistant.core import callback
-from homeassistant.helpers.selector import EntitySelector, EntitySelectorConfig
+from homeassistant.helpers.selector import (
+    DateSelector,
+    EntitySelector,
+    EntitySelectorConfig,
+)
 
 from .const import (
     CONF_ADDITIONAL_COSTS,
@@ -153,10 +157,7 @@ OPTIONS_SCHEMA = vol.Schema(
         vol.Required(CONF_GRANTS_REBATES): vol.All(
             vol.Coerce(float), vol.Range(min=0, max=1000000)
         ),
-        vol.Required(CONF_COMMISSIONING_DATE): vol.All(
-            str,
-            vol.Match(r"^$|^\d{4}-\d{2}-\d{2}$"),
-        ),
+        vol.Optional(CONF_COMMISSIONING_DATE): DateSelector(),
         vol.Required(CONF_ANNUAL_MAINTENANCE): vol.All(
             vol.Coerce(float), vol.Range(min=0, max=100000)
         ),
@@ -341,6 +342,9 @@ class KEMSOptionsFlow(OptionsFlowWithReload):
             return self.async_create_entry(data=user_input)
 
         suggested = {**DEFAULT_OPTIONS, **dict(self.config_entry.options)}
+        if not suggested.get(CONF_COMMISSIONING_DATE):
+            suggested.pop(CONF_COMMISSIONING_DATE, None)
+
         return self.async_show_form(
             step_id="init",
             data_schema=self.add_suggested_values_to_schema(

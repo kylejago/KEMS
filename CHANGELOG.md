@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.5.0-alpha3
+
+- Fixed the KEMS options/settings flow failing with a 500 error.
+- Replaced the non-serializable regular-expression validator with Home Assistant's DateSelector.
+- Kept the commissioning date optional before the physical system is installed.
+- Added regression tests for the options-flow schema and Hub classification.
+
+
 ## 0.5.0-alpha2 — ROI and lifetime ledger
 
 - Corrected `integration_type` from `helper` to `hub`, returning KEMS to Home Assistant Integrations.

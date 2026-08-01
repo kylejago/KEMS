@@ -26,3 +26,7 @@ Recommended branch name:
 ```text
 feature/roi-lifetime-ledger-fix
 ```
+
+## Alpha 3 settings-flow repair
+
+The commissioning date now uses Home Assistant's serializable `DateSelector` instead of `vol.Match`, preventing the settings/options flow from returning HTTP 500 while preserving an optional blank pre-install date.
