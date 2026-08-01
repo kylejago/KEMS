@@ -1,7 +1,7 @@
 # KEMS validation report
 
-Build: `0.5.0-alpha1`  
-Feature branch: `feature/roi-lifetime-ledger`  
+Build: `0.5.0-alpha2`  
+Feature branch: `feature/roi-lifetime-ledger-fix`  
 Scope: read-only **Observe → Learn → Advise → Simulate**
 
 ## Automated checks completed in the build environment
@@ -39,7 +39,7 @@ Do not merge until local validation and the GitHub Validate, HACS, and Hassfest 
 
 ## Deployment note
 
-The feature can be uploaded and reviewed now. The history storage key is unchanged, so retained observations remain available. A new separate lifetime-ledger store is bootstrapped from retained history on first load. The manifest now classifies KEMS as a hub integration.
+The feature can be uploaded and reviewed now. The history storage key is unchanged, so retained observations remain available. A new separate lifetime-ledger store is bootstrapped from retained history on first load. The manifest classifies KEMS as a hub integration and a regression test prevents it reverting to Helper classification.
 
 ## Control boundary
 

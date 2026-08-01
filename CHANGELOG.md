@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.5.0-alpha1 — ROI and lifetime ledger
+## 0.5.0-alpha2 — ROI and lifetime ledger
 
 - Corrected `integration_type` from `helper` to `hub`, returning KEMS to Home Assistant Integrations.
 - Added a permanent all-time energy, cost, earnings, and system-value ledger independent of Recorder retention.
