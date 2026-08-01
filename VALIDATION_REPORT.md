@@ -1,6 +1,6 @@
 # KEMS validation report
 
-Build: `0.5.0-alpha2`  
+Build: `0.5.0-alpha3`  
 Feature branch: `feature/roi-lifetime-ledger-fix`  
 Scope: read-only **Observe → Learn → Advise → Simulate**
 

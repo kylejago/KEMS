@@ -4,7 +4,7 @@ from __future__ import annotations
 
 DOMAIN = "kems"
 NAME = "KEMS"
-VERSION = "0.5.0-alpha2"
+VERSION = "0.5.0-alpha3"
 
 DEFAULT_SCAN_INTERVAL_SECONDS = 60
 DEFAULT_HISTORY_DAYS = 90
