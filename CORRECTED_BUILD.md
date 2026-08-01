@@ -1,20 +1,21 @@
-# KEMS 0.6.0-alpha1 clean build
+# KEMS 0.6.0-alpha2 source-isolation correction
 
-This build keeps KEMS classified as a Home Assistant hub integration and adds:
+This build keeps KEMS classified as a Home Assistant hub integration and fixes
+the false observed export-income feedback loop.
 
-- a fresh KEMS storage namespace;
-- exact matching for the three installed Octopus/Ohme integrations;
-- automatic use of Octopus current demand before FoxESS is installed;
-- non-negative grid import and export magnitudes;
-- signed grid net power with an explicit direction and sign convention;
-- raw grid source diagnostics;
-- a dynamic dashboard listing every current KEMS entity;
-- expanded downloadable diagnostics;
-- one-click rescanning with optional manual review.
+Key protections:
 
-The manifest must contain:
+- strict integration-platform ownership for every source mapping;
+- rejection of all KEMS-generated output entities as inputs;
+- no observed grid export until a real FoxESS Modbus source exists;
+- official Ohme status drives EV connected and charging state;
+- Octopus cumulative total gas consumption drives the lifetime gas ledger;
+- rejected mappings are visible in diagnostics and on the diagnostic dashboard;
+- fresh history and lifetime storage under `clean_v6_alpha2`.
+
+The manifest contains:
 
 ```json
 "integration_type": "hub",
-"version": "0.6.0-alpha1"
+"version": "0.6.0-alpha2"
 ```

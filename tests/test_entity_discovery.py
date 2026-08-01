@@ -362,6 +362,9 @@ def test_kyles_octopus_intelligent_and_ohme_inventory_auto_maps() -> None:
     assert expected <= result.mappings.keys()
     assert result.mappings[constants.CONF_HOUSE_LOAD].endswith("_current_demand")
     assert result.mappings[constants.CONF_GRID_IMPORT].endswith("_current_demand")
+    assert result.mappings[constants.CONF_GAS_METER_TOTAL].endswith(
+        "_current_total_consumption_kwh"
+    )
     assert constants.CONF_GRID_EXPORT not in result.mappings
     assert constants.CONF_CURRENT_EXPORT_RATE not in result.mappings
     assert result.ambiguous == ()
@@ -387,3 +390,124 @@ def test_octopus_current_demand_runtime_text_maps_to_grid_import() -> None:
     )
     assert result.mappings[constants.CONF_GRID_IMPORT] == entity_id
     assert result.mappings[constants.CONF_HOUSE_LOAD] == entity_id
+
+
+def test_unsupported_integrations_and_kems_outputs_are_never_discovered() -> None:
+    """Only supported provider-owned entities may become KEMS inputs."""
+    constants, discovery = _load_discovery()
+    candidate = discovery.Candidate
+    candidates = [
+        candidate(
+            "sensor.kems_simulated_grid_export_power",
+            "kems",
+            "sensor",
+            "kems simulated grid export power",
+            "kw",
+            "power",
+        ),
+        candidate(
+            "sensor.kems_battery_state_of_charge",
+            "kems",
+            "sensor",
+            "kems battery state of charge",
+            "%",
+            "battery",
+        ),
+        candidate(
+            "binary_sensor.vehicle_battery_plugged",
+            "stellantis_vehicles",
+            "binary_sensor",
+            "vehicle battery plugged",
+            "",
+            "plug",
+        ),
+        candidate(
+            "binary_sensor.vehicle_battery_charging",
+            "stellantis_vehicles",
+            "binary_sensor",
+            "vehicle battery charging",
+            "",
+            "battery_charging",
+        ),
+    ]
+
+    result = discovery.discover_from_candidates(candidates)
+
+    assert constants.CONF_GRID_EXPORT not in result.mappings
+    assert constants.CONF_BATTERY_SOC not in result.mappings
+    assert constants.CONF_BATTERY_POWER not in result.mappings
+    assert constants.CONF_EV_CONNECTED not in result.mappings
+    assert constants.CONF_EV_CHARGING not in result.mappings
+
+
+def test_configured_kems_outputs_and_vehicle_entities_are_rejected() -> None:
+    """Validation must remove circular and unrelated configured mappings."""
+    constants, discovery = _load_discovery()
+    candidate = discovery.Candidate
+    kems_export = "sensor.kems_simulated_grid_export_power"
+    vehicle_plugged = "binary_sensor.vehicle_battery_plugged"
+    validation = discovery.validate_from_candidates(
+        {
+            constants.CONF_GRID_EXPORT: kems_export,
+            constants.CONF_EV_CONNECTED: vehicle_plugged,
+        },
+        [
+            candidate(
+                kems_export,
+                "kems",
+                "sensor",
+                "kems simulated grid export power",
+                "kw",
+                "power",
+            ),
+            candidate(
+                vehicle_plugged,
+                "stellantis_vehicles",
+                "binary_sensor",
+                "vehicle battery plugged",
+                "",
+                "plug",
+            ),
+        ],
+    )
+
+    assert validation.accepted == {}
+    assert set(validation.rejected) == {
+        constants.CONF_GRID_EXPORT,
+        constants.CONF_EV_CONNECTED,
+    }
+    assert "cannot be used" in validation.rejected[constants.CONF_GRID_EXPORT]["reason"]
+    assert "expected ohme" in validation.rejected[constants.CONF_EV_CONNECTED]["reason"]
+
+
+def test_daily_gas_accumulator_is_rejected_as_lifetime_meter() -> None:
+    """The lifetime gas meter must use total consumption, not today's total."""
+    constants, discovery = _load_discovery()
+    daily = "sensor.octopus_energy_gas_meter_current_accumulative_consumption_kwh"
+    validation = discovery.validate_from_candidates(
+        {constants.CONF_GAS_METER_TOTAL: daily},
+        [
+            discovery.Candidate(
+                daily,
+                "octopus_energy",
+                "sensor",
+                "gas meter current accumulative consumption kwh gas",
+                "kwh",
+                "energy",
+            )
+        ],
+    )
+
+    assert constants.CONF_GAS_METER_TOTAL in validation.rejected
+    assert (
+        "expected source role"
+        in validation.rejected[constants.CONF_GAS_METER_TOTAL]["reason"]
+    )
+
+
+def test_platform_normalisation_preserves_integration_domain() -> None:
+    """Platform ownership checks must preserve underscores in HA domains."""
+    _, discovery = _load_discovery()
+
+    assert discovery._normalise_platform("octopus_energy") == "octopus_energy"
+    assert discovery._normalise_platform("foxess_modbus") == "foxess_modbus"

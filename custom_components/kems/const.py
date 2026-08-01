@@ -4,12 +4,12 @@ from __future__ import annotations
 
 DOMAIN = "kems"
 NAME = "KEMS"
-VERSION = "0.6.0-alpha1"
+VERSION = "0.6.0-alpha2"
 
 DEFAULT_SCAN_INTERVAL_SECONDS = 60
 DEFAULT_HISTORY_DAYS = 90
 DEFAULT_RECORD_INTERVAL_SECONDS = 300
-STORAGE_NAMESPACE = "clean_v6"
+STORAGE_NAMESPACE = "clean_v6_alpha2"
 
 CONF_CURRENT_IMPORT_RATE = "current_import_rate"
 CONF_NEXT_IMPORT_RATE = "next_import_rate"

@@ -19,7 +19,24 @@ views:
           **Status:** {{ states('sensor.kems_status') }}  
           **Phase:** {{ states('sensor.kems_phase') }}  
           **Data quality:** {{ states('sensor.kems_data_quality') }}%  
-          **History samples:** {{ states('sensor.kems_history_samples') }}
+          **History samples:** {{ states('sensor.kems_history_samples') }}  
+          **Source validation:** {{ states('sensor.kems_source_validation') }}
+
+      - type: markdown
+        title: Source isolation
+        content: |
+          {% set validation = states('sensor.kems_source_validation') %}
+          {% if validation == 'OK' %}
+          ✅ All configured inputs belong to supported source integrations.
+          {% else %}
+          ⚠️ **{{ validation }}**
+
+          KEMS rejected and removed these mappings during startup:
+
+          {{ state_attr('sensor.kems_source_validation', 'summary') }}
+          {% endif %}
+
+          Observed data can never use `sensor.kems_*` simulation outputs as inputs.
 
       - type: markdown
         title: Grid calculation detail

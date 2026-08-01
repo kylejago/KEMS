@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.6.0-alpha2
+
+- Prevented every `sensor.kems_*` and `binary_sensor.kems_*` entity from being used as an observed input source.
+- Added strict source ownership validation for Octopus Energy, Octopus Intelligent, Ohme, and FoxESS Modbus.
+- Removed circular mappings to simulated grid export, simulated battery power, and KEMS battery outputs.
+- Rejected unrelated Stellantis EV connected, charging, and service-battery entities.
+- Made official Ohme status authoritative for connected/charging state, with charging power as a safety fallback.
+- Corrected the lifetime gas meter to use Octopus `current_total_consumption_kwh`.
+- Added source-validation diagnostics and a dashboard warning card.
+- Added regression tests proving proposal solar export cannot become observed export income.
+- Started a fresh `clean_v6_alpha2` history and lifetime namespace.
+
 ## 0.6.0-alpha1
 
 - Added clean v6 history and lifetime storage namespaces.

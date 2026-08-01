@@ -73,7 +73,11 @@ from .const import (
     ENTITY_MAPPING_KEYS,
     NAME,
 )
-from .entity_discovery import DiscoveryResult, async_discover_entities
+from .entity_discovery import (
+    DiscoveryResult,
+    async_discover_entities,
+    async_validate_entity_mappings,
+)
 
 SENSOR_SELECTOR = EntitySelector(EntitySelectorConfig(domain="sensor"))
 BINARY_SENSOR_SELECTOR = EntitySelector(EntitySelectorConfig(domain="binary_sensor"))
@@ -189,7 +193,7 @@ OPTIONS_SCHEMA = vol.Schema(
 class KEMSConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Handle automatic and manual KEMS setup."""
 
-    VERSION = 6
+    VERSION = 7
     MINOR_VERSION = 0
 
     def __init__(self) -> None:
@@ -292,12 +296,25 @@ class KEMSConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         user_input: dict[str, Any] | None = None,
     ):
         """Review or manually select source entities."""
+        errors: dict[str, str] = {}
         if user_input is not None:
             cleaned = {key: value for key, value in user_input.items() if value}
-            return self.async_create_entry(title=NAME, data=cleaned)
+            validation = await async_validate_entity_mappings(self.hass, cleaned)
+            if (
+                validation.rejected
+                or CONF_CURRENT_IMPORT_RATE not in validation.accepted
+            ):
+                errors["base"] = "invalid_source_mapping"
+                self._suggested = cleaned
+            else:
+                return self.async_create_entry(
+                    title=NAME,
+                    data=validation.accepted,
+                )
         return self.async_show_form(
             step_id="entities",
             data_schema=_entity_schema(self._suggested),
+            errors=errors,
         )
 
     async def async_step_reconfigure(
@@ -307,8 +324,15 @@ class KEMSConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         """Rescan supported integrations before optional manual review."""
         entry = self._get_reconfigure_entry()
         if not self._suggested:
+            validation = await async_validate_entity_mappings(
+                self.hass,
+                dict(entry.data),
+            )
             self._discovery = await async_discover_entities(self.hass)
-            self._suggested = {**dict(entry.data), **self._discovery.mappings}
+            self._suggested = {
+                **validation.accepted,
+                **self._discovery.mappings,
+            }
 
         if user_input is not None:
             if user_input.get("review_entities"):
@@ -336,16 +360,26 @@ class KEMSConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     ):
         """Manually review source entities only when requested."""
         entry = self._get_reconfigure_entry()
+        errors: dict[str, str] = {}
         if user_input is not None:
             cleaned = {key: value for key, value in user_input.items() if value}
-            return self.async_update_reload_and_abort(
-                entry,
-                data_updates=cleaned,
-                reload_even_if_entry_is_unchanged=False,
-            )
+            validation = await async_validate_entity_mappings(self.hass, cleaned)
+            if (
+                validation.rejected
+                or CONF_CURRENT_IMPORT_RATE not in validation.accepted
+            ):
+                errors["base"] = "invalid_source_mapping"
+                self._suggested = cleaned
+            else:
+                return self.async_update_reload_and_abort(
+                    entry,
+                    data_updates=validation.accepted,
+                    reload_even_if_entry_is_unchanged=False,
+                )
         return self.async_show_form(
             step_id="reconfigure_entities",
             data_schema=_entity_schema(self._suggested),
+            errors=errors,
         )
 
     @staticmethod

@@ -109,6 +109,8 @@ def test_proposal_solar_and_fixed_export_rate_are_accounted_for() -> None:
     assert result.simulated_grid_export_kwh > 0
     assert result.simulated_export_income_pence is not None
     assert result.simulated_export_income_pence > 0
+    assert result.actual_grid_export_kwh == 0.0
+    assert result.actual_export_income_pence == 0.0
     assert result.effective_export_rate_pence == 12.0
 
 

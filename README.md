@@ -11,10 +11,10 @@ The Control phase remains deliberately excluded. This build does not call Octopu
 This package is prepared for:
 
 ```text
-feature/clean-install-diagnostics-autodiscovery
+feature/source-isolation-and-observed-export-fix
 ```
 
-It keeps the proposal, gas, ROI and lifetime features, but introduces a clean storage namespace, deterministic matching for the installed Octopus and Ohme integrations, safer grid-flow normalisation, expanded diagnostics and an all-entities diagnostic dashboard.
+It keeps the proposal, gas, ROI and lifetime features, but introduces a a fresh source-isolated storage namespace, strict provider ownership, corrected observed export accounting, expanded diagnostics and an all-entities diagnostic dashboard.
 
 ## Supported sources
 

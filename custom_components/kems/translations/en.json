@@ -149,6 +149,9 @@
           "grid_export_kw": "FoxESS Modbus power currently exported to the grid."
         }
       }
+    },
+    "error": {
+      "invalid_source_mapping": "One or more selected entities do not belong to the supported Octopus Energy, Octopus Intelligent, Ohme, or FoxESS Modbus integration. KEMS output entities cannot be selected as inputs."
     }
   },
   "options": {

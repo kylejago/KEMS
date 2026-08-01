@@ -36,6 +36,16 @@ from ..const import (
 )
 
 
+def _safe_source(data: dict[str, Any], key: str) -> str | None:
+    """Return a configured source unless it is a KEMS-generated entity."""
+    value = data.get(key)
+    if not isinstance(value, str) or not value:
+        return None
+    if value.startswith(("sensor.kems_", "binary_sensor.kems_")):
+        return None
+    return value
+
+
 @dataclass(frozen=True, slots=True)
 class KEMSEntities:
     """Entity IDs observed by KEMS."""
@@ -71,32 +81,35 @@ class KEMSEntities:
     def from_entry_data(cls, data: dict[str, Any]) -> KEMSEntities:
         """Build an entity map from config-entry data."""
         return cls(
-            current_import_rate=data.get(CONF_CURRENT_IMPORT_RATE),
-            next_import_rate=data.get(CONF_NEXT_IMPORT_RATE),
-            current_export_rate=data.get(CONF_CURRENT_EXPORT_RATE),
-            electricity_standing_charge=data.get(CONF_ELECTRICITY_STANDING_CHARGE),
-            off_peak=data.get(CONF_OFF_PEAK),
-            intelligent_slot=data.get(CONF_INTELLIGENT_SLOT),
-            next_offpeak_start=data.get(CONF_NEXT_OFFPEAK_START),
-            offpeak_end=data.get(CONF_OFFPEAK_END),
-            gas_current_rate=data.get(CONF_GAS_CURRENT_RATE),
-            gas_standing_charge=data.get(CONF_GAS_STANDING_CHARGE),
-            gas_meter_total=data.get(CONF_GAS_METER_TOTAL),
-            gas_usage_today=data.get(CONF_GAS_USAGE_TODAY),
-            gas_cost_today=data.get(CONF_GAS_COST_TODAY),
-            ev_status=data.get(CONF_EV_STATUS),
-            ev_connected=data.get(CONF_EV_CONNECTED),
-            ev_charging=data.get(CONF_EV_CHARGING),
-            ev_power_kw=data.get(CONF_EV_POWER),
-            ev_soc=data.get(CONF_EV_SOC),
-            house_load_kw=data.get(CONF_HOUSE_LOAD),
-            battery_soc=data.get(CONF_BATTERY_SOC),
-            battery_power_kw=data.get(CONF_BATTERY_POWER),
-            battery_voltage=data.get(CONF_BATTERY_VOLTAGE),
-            battery_current=data.get(CONF_BATTERY_CURRENT),
-            solar_power_kw=data.get(CONF_SOLAR_POWER),
-            grid_import_kw=data.get(CONF_GRID_IMPORT),
-            grid_export_kw=data.get(CONF_GRID_EXPORT),
+            current_import_rate=_safe_source(data, CONF_CURRENT_IMPORT_RATE),
+            next_import_rate=_safe_source(data, CONF_NEXT_IMPORT_RATE),
+            current_export_rate=_safe_source(data, CONF_CURRENT_EXPORT_RATE),
+            electricity_standing_charge=_safe_source(
+                data,
+                CONF_ELECTRICITY_STANDING_CHARGE,
+            ),
+            off_peak=_safe_source(data, CONF_OFF_PEAK),
+            intelligent_slot=_safe_source(data, CONF_INTELLIGENT_SLOT),
+            next_offpeak_start=_safe_source(data, CONF_NEXT_OFFPEAK_START),
+            offpeak_end=_safe_source(data, CONF_OFFPEAK_END),
+            gas_current_rate=_safe_source(data, CONF_GAS_CURRENT_RATE),
+            gas_standing_charge=_safe_source(data, CONF_GAS_STANDING_CHARGE),
+            gas_meter_total=_safe_source(data, CONF_GAS_METER_TOTAL),
+            gas_usage_today=_safe_source(data, CONF_GAS_USAGE_TODAY),
+            gas_cost_today=_safe_source(data, CONF_GAS_COST_TODAY),
+            ev_status=_safe_source(data, CONF_EV_STATUS),
+            ev_connected=_safe_source(data, CONF_EV_CONNECTED),
+            ev_charging=_safe_source(data, CONF_EV_CHARGING),
+            ev_power_kw=_safe_source(data, CONF_EV_POWER),
+            ev_soc=_safe_source(data, CONF_EV_SOC),
+            house_load_kw=_safe_source(data, CONF_HOUSE_LOAD),
+            battery_soc=_safe_source(data, CONF_BATTERY_SOC),
+            battery_power_kw=_safe_source(data, CONF_BATTERY_POWER),
+            battery_voltage=_safe_source(data, CONF_BATTERY_VOLTAGE),
+            battery_current=_safe_source(data, CONF_BATTERY_CURRENT),
+            solar_power_kw=_safe_source(data, CONF_SOLAR_POWER),
+            grid_import_kw=_safe_source(data, CONF_GRID_IMPORT),
+            grid_export_kw=_safe_source(data, CONF_GRID_EXPORT),
         )
 
     def configured_snapshot_fields(self) -> set[str]:

@@ -23,4 +23,4 @@ def test_manifest_stays_a_hub() -> None:
     source = MANIFEST.read_text(encoding="utf-8")
 
     assert '"integration_type": "hub"' in source
-    assert '"version": "0.6.0-alpha1"' in source
+    assert '"version": "0.6.0-alpha2"' in source
