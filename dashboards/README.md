@@ -30,7 +30,7 @@ The built-in comparison, portrait, pre-install, whole-home analytics, and built-
 
 ## Entity IDs
 
-These files target the entity IDs created by KEMS v0.5.0-alpha1. Home Assistant may append `_2` if old entity-registry entries already use an ID. Verify any missing entity under **Developer Tools → States** and adjust the YAML if required.
+These files target the entity IDs created by KEMS v0.5.0-alpha2. Home Assistant may append `_2` if old entity-registry entries already use an ID. Verify any missing entity under **Developer Tools → States** and adjust the YAML if required.
 
 ## Live hardware not installed yet
 
