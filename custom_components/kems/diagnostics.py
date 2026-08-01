@@ -31,6 +31,8 @@ async def async_get_config_entry_diagnostics(
         },
         "simulation": asdict(data.simulation),
         "whole_home": asdict(data.whole_home),
+        "lifetime": data.lifetime.to_dict(),
+        "roi": asdict(data.roi),
         "quality": asdict(data.quality),
         "history_samples": data.history_samples,
         "last_update_success": coordinator.last_update_success,

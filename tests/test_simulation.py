@@ -145,3 +145,53 @@ def test_live_export_rate_overrides_fixed_fallback() -> None:
     )
 
     assert result.effective_export_rate_pence == 15.0
+
+
+def test_simulation_exposes_system_value_and_live_energy_totals() -> None:
+    """ROI inputs should separate avoided import, export, solar, EV, and battery."""
+    start = datetime(2026, 8, 1, 12, 0, tzinfo=UTC)
+    records = [
+        Snapshot(
+            timestamp=start,
+            current_import_rate=30.0,
+            current_export_rate=12.0,
+            house_load_kw=2.0,
+            ev_power_kw=1.0,
+            solar_power_kw=3.0,
+            battery_power_kw=1.0,
+            grid_import_kw=0.0,
+            grid_export_kw=1.0,
+            off_peak=False,
+        ),
+        Snapshot(
+            timestamp=start + timedelta(minutes=30),
+            current_import_rate=30.0,
+            current_export_rate=12.0,
+            house_load_kw=2.0,
+            ev_power_kw=0.0,
+            solar_power_kw=3.0,
+            battery_power_kw=0.0,
+            grid_import_kw=0.0,
+            grid_export_kw=1.0,
+            off_peak=False,
+        ),
+    ]
+
+    result = SimulationEngine().simulate_today(
+        records,
+        start + timedelta(minutes=31),
+        SimulationConfig(
+            proposal_solar_enabled=False,
+            battery_export_enabled=False,
+            battery_power_positive_is_discharge=True,
+        ),
+    )
+
+    assert result.actual_house_consumption_kwh == 1.0
+    assert result.actual_ev_energy_kwh == 0.5
+    assert result.actual_solar_generation_kwh == 1.5
+    assert result.actual_battery_discharge_kwh == 0.5
+    assert result.baseline_no_system_cost_pence == 30.0
+    assert result.actual_export_income_pence == 6.0
+    assert result.actual_avoided_import_value_pence == 30.0
+    assert result.actual_system_value_pence == 36.0

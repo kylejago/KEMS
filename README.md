@@ -11,10 +11,10 @@ The Control phase remains deliberately excluded. This build does not call Octopu
 This package is prepared for:
 
 ```text
-feature/proposal-system-simulation
+feature/roi-lifetime-ledger
 ```
 
-It adds the proposed solar and battery system, fixed Octopus export accounting, gas tracking, and Live-versus-Simulated dashboards. It is safe to upload to GitHub now while the currently installed KEMS version continues collecting its first uninterrupted 24 hours of data.
+It builds on the proposal-system simulation and adds predicted ROI, live post-install payback, automatic Profit Mode after payback, a permanent all-time energy and financial ledger, and dedicated ROI/lifetime dashboards. It also corrects the Home Assistant manifest classification from helper to hub.
 
 ## Supported sources
 
@@ -102,14 +102,24 @@ Gas is observed rather than optimised. The simulated whole-home comparison chang
 - `sensor.kems_whole_home_simulated_cost_today`
 - `sensor.kems_whole_home_simulated_saving_today`
 
+## ROI and lifetime tracking
+
+KEMS now keeps a permanent local ledger, separate from Home Assistant Recorder retention. Before installation it annualises the accumulated proposal simulation value to estimate payback and discounted net value. After a commissioning date is entered in KEMS options, it switches to actual value-created tracking.
+
+When recovered value reaches the net investment, KEMS permanently records the payback date and changes to **SYSTEM PAID BACK — PROFIT MODE**. Profit is calculated after the investment and recorded operating costs have been deducted.
+
+The default investment is the quoted £20,995. Grants, extra installation costs, annual maintenance, and recorded repair/replacement costs are editable. Gas remains part of whole-home energy and cost reporting but is not falsely counted as a solar/battery ROI saving.
+
 ## Dashboards
 
-The `dashboards/` directory contains four complete dashboards:
+The `dashboards/` directory contains seven complete dashboards:
 
 - advanced desktop mission control, styled like the supplied reference
 - built-in Live-versus-Simulated comparison
 - portrait always-on wall display
 - multi-tab whole-home analytics
+- built-in ROI and lifetime dashboard
+- advanced ROI dashboard with a filling financial battery and Profit Mode
 
 See `dashboards/README.md` for installation and frontend-card requirements.
 

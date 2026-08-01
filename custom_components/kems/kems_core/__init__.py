@@ -11,6 +11,9 @@ from .models import (
     GasSummary,
     KEMSData,
     LearnedState,
+    LifetimeLedger,
+    ROIConfig,
+    ROIState,
     SimulationConfig,
     SimulationState,
     Snapshot,
@@ -18,6 +21,7 @@ from .models import (
 )
 from .ohme import interpret_charger_status
 from .quality import assess_quality
+from .roi import ROIEngine
 from .simulation import SimulationEngine
 from .system_profile import FOXHOLE_PROPOSAL_PROFILE, ProposalSystemProfile, SolarArray
 from .whole_home import WholeHomeEngine
@@ -33,7 +37,11 @@ __all__ = [
     "KEMSData",
     "LearnedState",
     "LearningEngine",
+    "LifetimeLedger",
     "ProposalSystemProfile",
+    "ROIConfig",
+    "ROIEngine",
+    "ROIState",
     "SimulationConfig",
     "SimulationEngine",
     "SimulationState",

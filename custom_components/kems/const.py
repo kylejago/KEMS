@@ -4,7 +4,7 @@ from __future__ import annotations
 
 DOMAIN = "kems"
 NAME = "KEMS"
-VERSION = "0.4.0-alpha1"
+VERSION = "0.5.0-alpha1"
 
 DEFAULT_SCAN_INTERVAL_SECONDS = 60
 DEFAULT_HISTORY_DAYS = 90
@@ -86,7 +86,19 @@ CONF_BATTERY_EXPORT_ENABLED = "battery_export_enabled"
 CONF_PROPOSAL_SOLAR_ENABLED = "proposal_solar_enabled"
 CONF_PROPOSAL_SOLAR_FACTOR = "proposal_solar_factor"
 CONF_GAS_KWH_PER_M3 = "gas_kwh_per_m3"
+CONF_BATTERY_POWER_POSITIVE_IS_DISCHARGE = "battery_power_positive_is_discharge"
 CONF_SIMULATION_STRATEGY = "simulation_strategy"
+
+CONF_SYSTEM_COST = "system_cost_gbp"
+CONF_ADDITIONAL_COSTS = "additional_costs_gbp"
+CONF_GRANTS_REBATES = "grants_rebates_gbp"
+CONF_COMMISSIONING_DATE = "commissioning_date"
+CONF_ANNUAL_MAINTENANCE = "annual_maintenance_gbp"
+CONF_MANUAL_SYSTEM_COSTS = "manual_system_costs_gbp"
+CONF_ELECTRICITY_INFLATION = "electricity_inflation_percent"
+CONF_BATTERY_DEGRADATION = "battery_degradation_percent"
+CONF_DISCOUNT_RATE = "discount_rate_percent"
+CONF_ROI_FORECAST_YEARS = "roi_forecast_years"
 
 DEFAULT_OPTIONS = {
     CONF_SCAN_INTERVAL: DEFAULT_SCAN_INTERVAL_SECONDS,
@@ -104,5 +116,16 @@ DEFAULT_OPTIONS = {
     CONF_PROPOSAL_SOLAR_ENABLED: True,
     CONF_PROPOSAL_SOLAR_FACTOR: 1.0,
     CONF_GAS_KWH_PER_M3: 11.1868,
+    CONF_BATTERY_POWER_POSITIVE_IS_DISCHARGE: True,
     CONF_SIMULATION_STRATEGY: "export_first",
+    CONF_SYSTEM_COST: 20995.0,
+    CONF_ADDITIONAL_COSTS: 0.0,
+    CONF_GRANTS_REBATES: 0.0,
+    CONF_COMMISSIONING_DATE: "",
+    CONF_ANNUAL_MAINTENANCE: 0.0,
+    CONF_MANUAL_SYSTEM_COSTS: 0.0,
+    CONF_ELECTRICITY_INFLATION: 3.0,
+    CONF_BATTERY_DEGRADATION: 2.0,
+    CONF_DISCOUNT_RATE: 6.75,
+    CONF_ROI_FORECAST_YEARS: 20,
 }

@@ -1,6 +1,6 @@
-# Start here — feature/proposal-system-simulation
+# Start here — feature/roi-lifetime-ledger
 
-This package is designed to be copied into a new feature branch while the existing Home Assistant installation continues collecting at least 24 hours of uninterrupted KEMS history.
+This package is designed to replace the proposal-system feature branch with ROI, lifetime tracking, and the Home Assistant hub-classification correction. The existing KEMS history storage key remains unchanged.
 
 ## GitHub Desktop
 
@@ -10,7 +10,7 @@ This package is designed to be copied into a new feature branch while the existi
 4. Create a branch named:
 
 ```text
-feature/proposal-system-simulation
+feature/roi-lifetime-ledger
 ```
 
 5. Choose **Repository → Show in Explorer**.
@@ -43,11 +43,11 @@ Pre-commit may change files on its first pass. Repeat the validation commands un
 ## Commit
 
 ```text
-feat: add proposal simulation gas tracking and energy dashboards
+feat: add ROI lifetime ledger and profit tracking
 ```
 
-Publish the branch and open a pull request into `develop`. It can be merged once GitHub checks are green, but leave the current Home Assistant version installed until the first 24-hour observation period is complete.
+Publish the branch and open a pull request into `develop`. Merge only after all GitHub checks are green.
 
 ## Later Home Assistant installation
 
-After the soak test, pull the merged `develop`, obtain its full SHA with `git rev-parse HEAD`, install that SHA through `update.install`, restart Home Assistant, and use KEMS **Reconfigure** to add the newly detected gas/export/FoxESS entities.
+Pull the merged `develop`, obtain its full SHA with `git rev-parse HEAD`, install that SHA through `update.install`, and restart Home Assistant. KEMS should then appear under **Integrations**, not Helpers. Open KEMS options to review ROI assumptions; leave the commissioning date blank until the real system is installed.

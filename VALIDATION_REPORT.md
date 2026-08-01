@@ -1,12 +1,12 @@
 # KEMS validation report
 
-Build: `0.4.0-alpha1`  
-Feature branch: `feature/proposal-system-simulation`  
+Build: `0.5.0-alpha1`  
+Feature branch: `feature/roi-lifetime-ledger`  
 Scope: read-only **Observe → Learn → Advise → Simulate**
 
 ## Automated checks completed in the build environment
 
-- 26 Pytest tests passed.
+- 31 Pytest tests passed.
 - All Python files parsed and compiled in memory successfully.
 - All JSON files parsed successfully.
 - All dashboard, example, and GitHub Actions YAML parsed successfully.
@@ -17,10 +17,11 @@ Scope: read-only **Observe → Learn → Advise → Simulate**
 - No `__pycache__` directories or `.pyc` files are included.
 - All Python source lines are 88 characters or fewer before Black is run.
 - Entity-discovery tests cover Octopus electricity/gas, Ohme, and FoxESS Modbus patterns.
-- Simulation tests cover cheap-rate battery arbitrage, proposal solar, fixed 12 p/kWh export, live export-rate override, and export income.
+- Simulation tests cover cheap-rate battery arbitrage, proposal solar, fixed 12 p/kWh export, live export-rate override, export income, baseline cost, avoided import, and system value.
 - Gas tests cover direct daily totals and cumulative-meter deltas.
 - Whole-home tests cover electricity-plus-gas cost and energy totals.
-- Dashboard tests confirm five valid dashboards and Live-versus-Simulated / gas coverage.
+- ROI tests cover pre-install annualisation, actual payback, Profit Mode, operating costs, and lifetime-ledger persistence.
+- Dashboard tests confirm seven valid dashboards and Live-versus-Simulated, gas, ROI, and lifetime coverage.
 - The final ZIP was extracted to a clean directory and retested.
 
 ## Checks still required locally and on GitHub
@@ -38,7 +39,7 @@ Do not merge until local validation and the GitHub Validate, HACS, and Hassfest 
 
 ## Deployment note
 
-The feature can be uploaded and reviewed now. Keep the currently installed Home Assistant build running until it has collected at least 24 uninterrupted hours of observations. The history storage key is unchanged, so the retained observations should be available after the later update.
+The feature can be uploaded and reviewed now. The history storage key is unchanged, so retained observations remain available. A new separate lifetime-ledger store is bootstrapped from retained history on first load. The manifest now classifies KEMS as a hub integration.
 
 ## Control boundary
 

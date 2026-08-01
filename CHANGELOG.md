@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.5.0-alpha1 — ROI and lifetime ledger
+
+- Corrected `integration_type` from `helper` to `hub`, returning KEMS to Home Assistant Integrations.
+- Added a permanent all-time energy, cost, earnings, and system-value ledger independent of Recorder retention.
+- Added pre-install ROI prediction using accumulated proposal-system simulation value.
+- Added configurable system cost, extra costs, grants, commissioning date, maintenance, recorded repairs, inflation, degradation, discount rate, and forecast horizon.
+- Added live post-install payback tracking and permanent payback-date recording.
+- Added automatic **SYSTEM PAID BACK — PROFIT MODE** with net profit after investment and operating costs.
+- Added lifetime electricity, gas, solar, grid, EV, battery, import-cost, export-income, and whole-home totals.
+- Added baseline-without-system, avoided-import-value, and actual/simulated system-value calculations.
+- Added built-in and advanced ROI/lifetime dashboards, including a filling financial battery.
+- Added ROI and lifetime diagnostics and regression tests.
+- Control remains excluded.
+
 ## 0.4.0-alpha1 — Proposal system simulation
 
 - Added the 9.66 kWp, 21-panel proposal solar model with East, West, and South roof groups.

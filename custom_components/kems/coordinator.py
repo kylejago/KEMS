@@ -18,10 +18,13 @@ from .kems_core import (
     GasEngine,
     KEMSData,
     LearningEngine,
+    LifetimeLedger,
+    ROIEngine,
     SimulationEngine,
     WholeHomeEngine,
     assess_quality,
 )
+from .lifetime import LifetimeLedgerRecorder
 from .providers.entity_map import KEMSEntities
 from .settings import KEMSSettings
 
@@ -54,6 +57,8 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
         self._advice = AdviceEngine()
         self._simulation = SimulationEngine()
         self._whole_home = WholeHomeEngine()
+        self._lifetime = LifetimeLedgerRecorder(hass, entry.entry_id)
+        self._roi = ROIEngine()
 
         super().__init__(
             hass,
@@ -65,8 +70,16 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
         )
 
     async def _async_setup(self) -> None:
-        """Load retained learning history once before the first refresh."""
+        """Load retained learning history and the permanent lifetime ledger."""
         await self._history.async_load()
+        await self._lifetime.async_load()
+        await self._lifetime.async_bootstrap(
+            self._history.records,
+            self._simulation,
+            self._gas,
+            self.settings.simulation,
+            self.settings.roi,
+        )
 
     async def _async_update_data(self) -> KEMSData:
         """Run the complete read-only KEMS analysis pipeline."""
@@ -90,6 +103,19 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                 learned.predicted_energy_until_offpeak_kwh,
             )
             whole_home = self._whole_home.summarise(snapshot, simulation, gas)
+            stored_lifetime = await self._lifetime.async_update(
+                simulation,
+                gas,
+                now,
+                self.settings.roi,
+            )
+            lifetime = LifetimeLedger.from_dict(stored_lifetime.to_dict())
+            roi = self._roi.evaluate(
+                lifetime,
+                simulation,
+                now,
+                self.settings.roi,
+            )
             quality = assess_quality(
                 snapshot,
                 self.entities.configured_snapshot_fields(),
@@ -102,6 +128,8 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                 advice=advice,
                 simulation=simulation,
                 whole_home=whole_home,
+                lifetime=lifetime,
+                roi=roi,
                 quality=quality,
                 history_samples=len(records),
                 phase=phase,
@@ -112,6 +140,7 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
     async def async_shutdown(self) -> None:
         """Flush learning history before unloading."""
         await self._history.async_save()
+        await self._lifetime.async_save()
 
     @staticmethod
     def _phase(learning_ready: bool, simulation_ready: bool) -> str:

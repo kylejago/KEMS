@@ -131,6 +131,24 @@ BINARY_SENSORS: tuple[KEMSBinarySensorEntityDescription, ...] = (
         ),
     ),
     KEMSBinarySensorEntityDescription(
+        key="roi_ready",
+        name="ROI prediction ready",
+        icon="mdi:finance",
+        is_on_fn=lambda data: data.roi.ready,
+    ),
+    KEMSBinarySensorEntityDescription(
+        key="system_installed",
+        name="System installed",
+        icon="mdi:solar-panel-large",
+        is_on_fn=lambda data: data.roi.system_installed,
+    ),
+    KEMSBinarySensorEntityDescription(
+        key="system_paid_back",
+        name="System paid back",
+        icon="mdi:trophy-award",
+        is_on_fn=lambda data: data.roi.system_paid_back,
+    ),
+    KEMSBinarySensorEntityDescription(
         key="day_rate_grid_import",
         name="Grid import outside cheap period",
         icon="mdi:alert-outline",

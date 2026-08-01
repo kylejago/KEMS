@@ -80,3 +80,12 @@ def test_all_relative_runtime_imports_resolve_to_source_files() -> None:
                 missing.append(f"{path}:{node.lineno} missing target: {target}")
 
     assert missing == []
+
+
+def test_manifest_classifies_kems_as_hub() -> None:
+    """KEMS must appear under Integrations rather than Helpers."""
+    import json
+
+    manifest = json.loads((INTEGRATION / "manifest.json").read_text(encoding="utf-8"))
+    assert manifest["integration_type"] == "hub"
+    assert manifest["version"] == "0.5.0-alpha1"
