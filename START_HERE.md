@@ -1,25 +1,25 @@
-# Start here — feature/roi-lifetime-ledger
+# Start here — clean install, diagnostics and automatic discovery
 
-This package is designed to replace the proposal-system feature branch with ROI, lifetime tracking, and the Home Assistant hub-classification correction. The existing KEMS history storage key remains unchanged.
-
-## GitHub Desktop
-
-1. Open the KEMS repository in GitHub Desktop.
-2. Switch to `develop`.
-3. Fetch and pull the latest `develop`.
-4. Create a branch named:
+This package is prepared for:
 
 ```text
-feature/roi-lifetime-ledger
+feature/clean-install-diagnostics-autodiscovery
 ```
 
-5. Choose **Repository → Show in Explorer**.
-6. Delete the repository contents except the hidden `.git` directory.
-7. Extract this ZIP elsewhere.
-8. Copy everything from inside the extracted folder into the repository root.
-9. Open the repository in VS Code.
+It is KEMS `0.6.0-alpha1` and intentionally starts a fresh KEMS learning and
+lifetime-ledger database.
 
-## Local environment
+## Upload with GitHub Desktop
+
+1. Switch to `develop` and pull the latest changes.
+2. Create `feature/clean-install-diagnostics-autodiscovery`.
+3. Open the repository folder.
+4. Delete everything except the hidden `.git` directory.
+5. Extract this ZIP elsewhere and copy everything inside its top-level folder
+   into the repository root.
+6. Open the repository in VS Code.
+
+## Local validation
 
 ```powershell
 python -m venv .venv
@@ -27,27 +27,35 @@ python -m venv .venv
 python -m pip install --upgrade pip
 python -m pip install -r requirements-dev.txt
 python -m pre_commit install
-```
 
-## Validation
-
-```powershell
 python -m black .
 python -m ruff check . --fix
 python -m pytest
 python -m pre_commit run --all-files
 ```
 
-Pre-commit may change files on its first pass. Repeat the validation commands until all checks pass.
+Repeat the checks if Black, Ruff or pre-commit modifies files.
 
 ## Commit
 
 ```text
-feat: add ROI lifetime ledger and profit tracking
+feat: add clean install diagnostics and exact entity discovery
 ```
 
-Publish the branch and open a pull request into `develop`. Merge only after all GitHub checks are green.
+Merge into `develop` only after Validate, HACS and Hassfest are green.
 
-## Later Home Assistant installation
+## Clean Home Assistant installation
 
-Pull the merged `develop`, obtain its full SHA with `git rev-parse HEAD`, install that SHA through `update.install`, and restart Home Assistant. KEMS should then appear under **Integrations**, not Helpers. Open KEMS options to review ROI assumptions; leave the commissioning date blank until the real system is installed.
+After the new branch is merged and you have copied the full `develop` SHA:
+
+1. Remove the existing KEMS config entry from **Settings → Devices & services**.
+2. Uninstall KEMS from HACS.
+3. Restart Home Assistant.
+4. Reinstall KEMS from HACS, then install the exact `develop` SHA if required.
+5. Restart Home Assistant again.
+6. Add KEMS. The first screen should show the automatically detected Octopus,
+   Octopus Intelligent and Ohme mappings. Leave manual review off and confirm.
+7. Import `dashboards/kems_diagnostics_all_entities.yaml` into a new dashboard.
+
+Old KEMS storage files may remain orphaned in Home Assistant, but this build uses
+a new internal `clean_v6` namespace and will not load them.

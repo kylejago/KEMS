@@ -1,32 +1,20 @@
-# Corrected KEMS ROI build
+# KEMS 0.6.0-alpha1 clean build
 
-This package is **KEMS 0.5.0-alpha2**.
+This build keeps KEMS classified as a Home Assistant hub integration and adds:
 
-The Home Assistant manifest is deliberately configured as:
+- a fresh KEMS storage namespace;
+- exact matching for the three installed Octopus/Ohme integrations;
+- automatic use of Octopus current demand before FoxESS is installed;
+- non-negative grid import and export magnitudes;
+- signed grid net power with an explicit direction and sign convention;
+- raw grid source diagnostics;
+- a dynamic dashboard listing every current KEMS entity;
+- expanded downloadable diagnostics;
+- one-click rescanning with optional manual review.
 
-```json
-"integration_type": "hub"
-```
-
-After copying the package into a new GitHub feature branch, verify:
-
-```text
-custom_components/kems/manifest.json
-```
-
-contains both:
+The manifest must contain:
 
 ```json
 "integration_type": "hub",
-"version": "0.5.0-alpha2"
+"version": "0.6.0-alpha1"
 ```
-
-Recommended branch name:
-
-```text
-feature/roi-lifetime-ledger-fix
-```
-
-## Alpha 3 settings-flow repair
-
-The commissioning date now uses Home Assistant's serializable `DateSelector` instead of `vol.Match`, preventing the settings/options flow from returning HTTP 500 while preserving an optional blank pre-install date.

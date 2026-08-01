@@ -250,6 +250,35 @@ def _grid_net(import_kw: float | None, export_kw: float | None) -> float | None:
     return round((import_kw or 0.0) - (export_kw or 0.0), 3)
 
 
+def _grid_direction(import_kw: float | None, export_kw: float | None) -> str:
+    """Return a clear text direction for the normalised grid flow."""
+    net = _grid_net(import_kw, export_kw)
+    if net is None:
+        return "Unknown"
+    if net > 0.01:
+        return "Importing"
+    if net < -0.01:
+        return "Exporting"
+    return "Neutral"
+
+
+def _grid_attributes(data: KEMSData) -> Mapping[str, Any]:
+    """Explain raw and normalised grid values."""
+    snapshot = data.snapshot
+    return {
+        "sign_convention": "positive = import, negative = export",
+        "direction": _grid_direction(
+            snapshot.grid_import_kw,
+            snapshot.grid_export_kw,
+        ),
+        "normalisation_mode": snapshot.grid_flow_mode,
+        "raw_import_source_kw": snapshot.raw_grid_import_kw,
+        "raw_export_source_kw": snapshot.raw_grid_export_kw,
+        "normalised_import_kw": snapshot.grid_import_kw,
+        "normalised_export_kw": snapshot.grid_export_kw,
+    }
+
+
 SENSORS: tuple[KEMSSensorEntityDescription, ...] = (
     KEMSSensorEntityDescription(
         key="status",
@@ -441,6 +470,52 @@ SENSORS: tuple[KEMSSensorEntityDescription, ...] = (
             data.snapshot.grid_import_kw,
             data.snapshot.grid_export_kw,
         ),
+        attributes_fn=_grid_attributes,
+    ),
+    KEMSSensorEntityDescription(
+        key="grid_flow_direction",
+        name="Grid flow direction",
+        icon="mdi:swap-horizontal",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        source_any_keys=(CONF_GRID_IMPORT, CONF_GRID_EXPORT),
+        value_fn=lambda data: _grid_direction(
+            data.snapshot.grid_import_kw,
+            data.snapshot.grid_export_kw,
+        ),
+        attributes_fn=_grid_attributes,
+    ),
+    KEMSSensorEntityDescription(
+        key="grid_normalisation_mode",
+        name="Grid normalisation mode",
+        icon="mdi:tune-variant",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        source_any_keys=(CONF_GRID_IMPORT, CONF_GRID_EXPORT),
+        value_fn=lambda data: data.snapshot.grid_flow_mode,
+        attributes_fn=_grid_attributes,
+    ),
+    KEMSSensorEntityDescription(
+        key="raw_grid_import_source",
+        name="Raw grid import source",
+        icon="mdi:code-tags",
+        device_class=SensorDeviceClass.POWER,
+        native_unit_of_measurement=UnitOfPower.KILO_WATT,
+        state_class=SensorStateClass.MEASUREMENT,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        suggested_display_precision=3,
+        source_key=CONF_GRID_IMPORT,
+        value_fn=lambda data: data.snapshot.raw_grid_import_kw,
+    ),
+    KEMSSensorEntityDescription(
+        key="raw_grid_export_source",
+        name="Raw grid export source",
+        icon="mdi:code-tags",
+        device_class=SensorDeviceClass.POWER,
+        native_unit_of_measurement=UnitOfPower.KILO_WATT,
+        state_class=SensorStateClass.MEASUREMENT,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        suggested_display_precision=3,
+        source_key=CONF_GRID_EXPORT,
+        value_fn=lambda data: data.snapshot.raw_grid_export_kw,
     ),
     KEMSSensorEntityDescription(
         key="learning_confidence",

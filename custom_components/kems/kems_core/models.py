@@ -44,6 +44,9 @@ class Snapshot:
     solar_power_kw: float | None = None
     grid_import_kw: float | None = None
     grid_export_kw: float | None = None
+    raw_grid_import_kw: float | None = None
+    raw_grid_export_kw: float | None = None
+    grid_flow_mode: str = "no_grid_source"
 
     @property
     def cheap_period_confirmed(self) -> bool:

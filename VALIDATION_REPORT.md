@@ -1,32 +1,36 @@
 # KEMS validation report
 
-Build: `0.5.0-alpha3`  
-Feature branch: `feature/roi-lifetime-ledger-fix`  
-Scope: read-only **Observe → Learn → Advise → Simulate**
+Build: `0.6.0-alpha1`  
+Feature branch: `feature/clean-install-diagnostics-autodiscovery`  
+Scope: read-only **Observe → Learn → Advise → Simulate** plus ROI and lifetime accounting
 
 ## Automated checks completed in the build environment
 
-- 31 Pytest tests passed.
-- All Python files parsed and compiled in memory successfully.
+- 38 Pytest tests passed.
+- Python syntax was parsed for all runtime and test files without writing cache files.
 - All JSON files parsed successfully.
-- All dashboard, example, and GitHub Actions YAML parsed successfully.
-- Package-layout tests confirmed all runtime code is inside `custom_components/kems`.
-- Relative-import tests confirmed package-relative imports resolve to shipped modules.
-- No runtime source contains an absolute `kems_core` import.
-- No merge-conflict markers were found.
-- No `__pycache__` directories or `.pyc` files are included.
-- All Python source lines are 88 characters or fewer before Black is run.
-- Entity-discovery tests cover Octopus electricity/gas, Ohme, and FoxESS Modbus patterns.
-- Simulation tests cover cheap-rate battery arbitrage, proposal solar, fixed 12 p/kWh export, live export-rate override, export income, baseline cost, avoided import, and system value.
-- Gas tests cover direct daily totals and cumulative-meter deltas.
-- Whole-home tests cover electricity-plus-gas cost and energy totals.
-- ROI tests cover pre-install annualisation, actual payback, Profit Mode, operating costs, and lifetime-ledger persistence.
-- Dashboard tests confirm seven valid dashboards and Live-versus-Simulated, gas, ROI, and lifetime coverage.
-- The final ZIP was extracted to a clean directory and retested.
+- All dashboard, example and workflow YAML parsed successfully.
+- The supplied Octopus Energy, Octopus Intelligent and Ohme inventory produced
+  17 automatic mappings with no ambiguous fields.
+- Exact discovery tests cover tariff, off-peak, Intelligent slots, gas, Ohme,
+  house load and pre-install grid import.
+- Grid tests cover positive import, signed export, duplicate signed sources and
+  separate positive import/export sources.
+- Grid import and export are always non-negative magnitudes; net power is import
+  minus export.
+- The package uses the fresh `clean_v6` history and lifetime storage namespace.
+- The all-entities diagnostic dashboard dynamically lists current KEMS sensors,
+  binary sensors and update entities.
+- Downloadable diagnostics include configured mappings, raw source states, all
+  KEMS entity states, grid normalisation details and calculation outputs.
+- Package-layout tests confirm KEMS remains a hub and no absolute `kems_core`
+  imports are present.
+- No `__pycache__` or `.pyc` files are included in the final package.
 
-## Checks still required locally and on GitHub
+## Checks required locally and on GitHub
 
-Black, Ruff, HACS validation, and Hassfest were not available in this build environment. Run:
+Black, Ruff, HACS validation and Hassfest must still be run locally and through
+GitHub Actions:
 
 ```powershell
 python -m black .
@@ -35,12 +39,4 @@ python -m pytest
 python -m pre_commit run --all-files
 ```
 
-Do not merge until local validation and the GitHub Validate, HACS, and Hassfest checks are green.
-
-## Deployment note
-
-The feature can be uploaded and reviewed now. The history storage key is unchanged, so retained observations remain available. A new separate lifetime-ledger store is bootstrapped from retained history on first load. The manifest classifies KEMS as a hub integration and a regression test prevents it reverting to Helper classification.
-
-## Control boundary
-
-This build contains no Home Assistant service calls for Octopus, Ohme, or FoxESS Modbus and does not write inverter registers or charger settings. Control remains deferred.
+Do not merge until all checks are green.

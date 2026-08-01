@@ -9,6 +9,9 @@ These dashboards visualise the whole energy system with **Live** and **Simulated
 - `kems_live_vs_simulated_builtin.yaml` — side-by-side dashboard using only built-in Home Assistant cards.
 - `kems_portrait_wall_display.yaml` — compact always-on portrait/tablet view.
 - `kems_whole_home_analytics.yaml` — multi-tab analysis for power flow, finance, solar/export, and gas.
+- `kems_roi_lifetime_builtin.yaml` — built-in ROI, payback and lifetime ledger view.
+- `kems_roi_lifetime_advanced.yaml` — advanced ROI view with financial battery and Profit Mode.
+- `kems_diagnostics_all_entities.yaml` — dynamic built-in diagnostic page listing every current KEMS entity.
 
 ## Advanced dashboard requirements
 
@@ -30,7 +33,7 @@ The built-in comparison, portrait, pre-install, whole-home analytics, and built-
 
 ## Entity IDs
 
-These files target the entity IDs created by KEMS v0.5.0-alpha2. Home Assistant may append `_2` if old entity-registry entries already use an ID. Verify any missing entity under **Developer Tools → States** and adjust the YAML if required.
+These files target KEMS 0.6.0-alpha1. Home Assistant may append `_2` if old entity-registry entries still use an ID. The diagnostic dashboard discovers KEMS entities dynamically and is not affected by suffixes.
 
 ## Live hardware not installed yet
 
@@ -48,3 +51,9 @@ The advanced ROI dashboard requires:
 - ApexCharts Card
 
 Before commissioning, the financial battery uses the accumulated simulated system value. After a commissioning date is entered in KEMS options, it automatically changes to actual payback tracking. When the investment is fully recovered, it changes to `SYSTEM PAID BACK — PROFIT MODE` and shows lifetime profit.
+
+## Complete diagnostic dashboard
+
+`kems_diagnostics_all_entities.yaml` uses only built-in Home Assistant cards and
+lists every entity shipped by KEMS 0.6.0-alpha1. Use it for screenshots and pair
+it with Home Assistant's Download diagnostics action when reporting an issue.

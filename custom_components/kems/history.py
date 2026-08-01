@@ -8,7 +8,7 @@ from typing import Any
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.storage import Store
 
-from .const import DEFAULT_RECORD_INTERVAL_SECONDS, DOMAIN
+from .const import DEFAULT_RECORD_INTERVAL_SECONDS, DOMAIN, STORAGE_NAMESPACE
 from .kems_core import Snapshot
 
 STORAGE_VERSION = 1
@@ -28,7 +28,7 @@ class HistoryRecorder:
         self._store: Store[dict[str, Any]] = Store(
             hass,
             STORAGE_VERSION,
-            f"{DOMAIN}.{entry_id}.history",
+            f"{DOMAIN}.{entry_id}.{STORAGE_NAMESPACE}.history",
         )
         self._history_days = max(history_days, 1)
         self._records: list[Snapshot] = []

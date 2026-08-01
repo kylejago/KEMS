@@ -11,7 +11,7 @@
       },
       "confirm": {
         "title": "Set up KEMS automatically",
-        "description": "KEMS found {electricity_count} Octopus electricity, {gas_count} gas, {ohme_count} Ohme, and {foxess_count} FoxESS Modbus source entities.\n\nDetected mappings:\n{detected_entities}\n\nAmbiguous fields: {ambiguous}\n\nLeave review disabled to accept high-confidence matches.",
+        "description": "KEMS found {electricity_count} Octopus electricity, {gas_count} gas, {ohme_count} Ohme, and {foxess_count} live power/battery/solar source entities.\n\nDetected mappings:\n{detected_entities}\n\nAmbiguous fields: {ambiguous}\n\nLeave review disabled to accept high-confidence matches.",
         "data": {
           "review_entities": "Review or change detected entities"
         },
@@ -61,7 +61,7 @@
           "offpeak_end": "Octopus timestamp for the current or next cheap-period end.",
           "gas_current_rate": "Octopus gas unit rate in p/kWh or GBP/kWh.",
           "gas_standing_charge": "Octopus gas standing charge in p/day or GBP/day.",
-          "gas_meter_total": "Cumulative gas meter in kWh or m\u00b3. KEMS converts m\u00b3 using the options conversion factor.",
+          "gas_meter_total": "Cumulative gas meter in kWh or m³. KEMS converts m³ using the options conversion factor.",
           "gas_usage_today": "Octopus current accumulated gas consumption for today.",
           "gas_cost_today": "Octopus current accumulated gas cost for today.",
           "ev_status": "Ohme charger status sensor; KEMS derives connected and charging states from it.",
@@ -69,19 +69,29 @@
           "ev_charging": "Optional legacy/custom Ohme charging binary sensor.",
           "ev_power_kw": "Ohme charging power sensor.",
           "ev_soc": "Ohme vehicle state of charge percentage.",
-          "house_load_kw": "FoxESS Modbus total house-load power.",
+          "house_load_kw": "FoxESS total house-load power when installed. Before installation KEMS can use the Octopus current-demand sensor.",
           "battery_soc": "FoxESS Modbus battery state of charge percentage.",
           "battery_power_kw": "Optional direct FoxESS battery-power sensor.",
           "battery_voltage": "FoxESS Battery Voltage, used with Battery Current to derive power.",
           "battery_current": "FoxESS Battery Current, used with Battery Voltage to derive power.",
           "solar_power_kw": "FoxESS Modbus total PV/solar power.",
-          "grid_import_kw": "FoxESS Modbus power currently imported from the grid.",
+          "grid_import_kw": "FoxESS grid-import power when installed. Before installation KEMS can use the Octopus current-demand sensor.",
           "grid_export_kw": "FoxESS Modbus power currently exported to the grid."
         }
       },
       "reconfigure": {
-        "title": "Rescan and reconfigure KEMS",
-        "description": "KEMS has rescanned Home Assistant. Review electricity, gas, Ohme, and FoxESS Modbus mappings.",
+        "title": "Rescan KEMS source entities",
+        "description": "KEMS rescanned Octopus Energy, Octopus Intelligent, Ohme, and FoxESS Modbus.\n\nDetected mappings:\n{detected_entities}\n\nAmbiguous fields: {ambiguous}",
+        "data": {
+          "review_entities": "Review or change detected entities"
+        },
+        "data_description": {
+          "review_entities": "Leave this off to accept the automatic mappings and reload KEMS."
+        }
+      },
+      "reconfigure_entities": {
+        "title": "Review KEMS source entities",
+        "description": "Only change a detected entity when KEMS selected the wrong source.",
         "data": {
           "current_import_rate": "Current import rate",
           "next_import_rate": "Next import rate (optional)",
@@ -121,7 +131,7 @@
           "offpeak_end": "Octopus timestamp for the current or next cheap-period end.",
           "gas_current_rate": "Octopus gas unit rate in p/kWh or GBP/kWh.",
           "gas_standing_charge": "Octopus gas standing charge in p/day or GBP/day.",
-          "gas_meter_total": "Cumulative gas meter in kWh or m\u00b3. KEMS converts m\u00b3 using the options conversion factor.",
+          "gas_meter_total": "Cumulative gas meter in kWh or m³. KEMS converts m³ using the options conversion factor.",
           "gas_usage_today": "Octopus current accumulated gas consumption for today.",
           "gas_cost_today": "Octopus current accumulated gas cost for today.",
           "ev_status": "Ohme charger status sensor; KEMS derives connected and charging states from it.",
@@ -161,7 +171,7 @@
           "battery_export_enabled": "Simulate exporting surplus battery energy",
           "proposal_solar_enabled": "Use proposal solar model when live PV is unavailable",
           "proposal_solar_factor": "Proposal solar/weather factor (0.0-2.0)",
-          "gas_kwh_per_m3": "Gas conversion factor (kWh per m\u00b3)",
+          "gas_kwh_per_m3": "Gas conversion factor (kWh per m³)",
           "simulation_strategy": "Simulation strategy",
           "battery_power_positive_is_discharge": "Positive battery power means discharge",
           "system_cost_gbp": "Quoted system cost (GBP)",
@@ -193,7 +203,7 @@
           "gas_kwh_per_m3": "Used only when the configured gas source reports cubic metres rather than kWh.",
           "simulation_strategy": "Export first follows Kyle's Intelligent Go plus 12p export plan; self-use supplies the home from solar first.",
           "battery_power_positive_is_discharge": "Controls how KEMS separates FoxESS battery charge and discharge totals. Leave enabled when positive power means battery discharge.",
-          "system_cost_gbp": "Defaults to the quoted system price of \u00a320,995.",
+          "system_cost_gbp": "Defaults to the quoted system price of £20,995.",
           "additional_costs_gbp": "Add DNO fees, structural work, smart-meter work, or later installation additions.",
           "grants_rebates_gbp": "Deduct grants, rebates, or discounts from the investment KEMS must recover.",
           "commissioning_date": "Leave blank before installation. Set this once the system is commissioned to begin actual ROI and payback tracking.",

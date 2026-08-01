@@ -59,4 +59,7 @@ class Collector:
             solar_power_kw=foxess.solar_power_kw,
             grid_import_kw=foxess.grid_import_kw,
             grid_export_kw=foxess.grid_export_kw,
+            raw_grid_import_kw=foxess.raw_grid_import_kw,
+            raw_grid_export_kw=foxess.raw_grid_export_kw,
+            grid_flow_mode=foxess.grid_flow_mode,
         )

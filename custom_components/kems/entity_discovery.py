@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from dataclasses import dataclass
+from fnmatch import fnmatch
 
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_registry as er
@@ -61,6 +62,7 @@ class DiscoveryRule:
     excluded_tokens: tuple[str, ...] = ()
     units: tuple[str, ...] = ()
     device_classes: tuple[str, ...] = ()
+    exact_patterns: tuple[str, ...] = ()
     minimum_score: int = 45
 
 
@@ -90,6 +92,7 @@ class DiscoveryResult:
 
 
 OCTOPUS_PLATFORMS = ("octopus_energy",)
+OCTOPUS_INTELLIGENT_PLATFORMS = ("octopus_intelligent",)
 OHME_PLATFORMS = ("ohme",)
 FOXESS_PLATFORMS = ("foxess_modbus",)
 
@@ -101,6 +104,7 @@ RULES = (
         (("current",), ("rate", "price"), ("import", "electricity")),
         excluded_tokens=("next", "export", "gas", "standing"),
         units=("gbp/kwh", "£/kwh", "p/kwh"),
+        exact_patterns=("sensor.octopus_energy_electricity_*_current_rate",),
     ),
     DiscoveryRule(
         CONF_NEXT_IMPORT_RATE,
@@ -109,6 +113,7 @@ RULES = (
         (("next",), ("rate", "price"), ("import", "electricity")),
         excluded_tokens=("export", "gas", "standing"),
         units=("gbp/kwh", "£/kwh", "p/kwh"),
+        exact_patterns=("sensor.octopus_energy_electricity_*_next_rate",),
     ),
     DiscoveryRule(
         CONF_CURRENT_EXPORT_RATE,
@@ -125,6 +130,7 @@ RULES = (
         (("standing",), ("charge",), ("electricity", "electric")),
         excluded_tokens=("gas",),
         units=("gbp", "£", "p"),
+        exact_patterns=("sensor.octopus_energy_electricity_*_current_standing_charge",),
     ),
     DiscoveryRule(
         CONF_OFF_PEAK,
@@ -132,27 +138,39 @@ RULES = (
         ("binary_sensor",),
         (("off peak", "offpeak"),),
         excluded_tokens=("next", "start", "end"),
+        exact_patterns=("binary_sensor.octopus_energy_electricity_*_off_peak",),
     ),
     DiscoveryRule(
         CONF_INTELLIGENT_SLOT,
-        OCTOPUS_PLATFORMS,
+        OCTOPUS_INTELLIGENT_PLATFORMS + OCTOPUS_PLATFORMS,
         ("binary_sensor",),
         (("intelligent",), ("slot", "dispatch")),
+        excluded_tokens=("next 1", "next 2", "next 3", "planned"),
+        exact_patterns=(
+            "binary_sensor.octopus_intelligent_*_octopus_intelligent_slot",
+            "binary_sensor.octopus_energy_*_intelligent_dispatching",
+        ),
     ),
     DiscoveryRule(
         CONF_NEXT_OFFPEAK_START,
-        OCTOPUS_PLATFORMS,
+        OCTOPUS_INTELLIGENT_PLATFORMS + OCTOPUS_PLATFORMS,
         ("sensor",),
         (("next",), ("off peak", "offpeak"), ("start",)),
         device_classes=("timestamp",),
+        exact_patterns=(
+            "sensor.octopus_intelligent_*_octopus_intelligent_next_offpeak_start",
+        ),
     ),
     DiscoveryRule(
         CONF_OFFPEAK_END,
-        OCTOPUS_PLATFORMS,
+        OCTOPUS_INTELLIGENT_PLATFORMS + OCTOPUS_PLATFORMS,
         ("sensor",),
         (("off peak", "offpeak"), ("end",)),
         excluded_tokens=("next rate",),
         device_classes=("timestamp",),
+        exact_patterns=(
+            "sensor.octopus_intelligent_*_octopus_intelligent_offpeak_end",
+        ),
     ),
     DiscoveryRule(
         CONF_GAS_CURRENT_RATE,
@@ -161,6 +179,7 @@ RULES = (
         (("gas",), ("current",), ("rate", "price")),
         excluded_tokens=("next", "electricity", "export", "standing"),
         units=("gbp/kwh", "£/kwh", "p/kwh"),
+        exact_patterns=("sensor.octopus_energy_gas_*_current_rate",),
     ),
     DiscoveryRule(
         CONF_GAS_STANDING_CHARGE,
@@ -169,6 +188,7 @@ RULES = (
         (("gas",), ("standing",), ("charge",)),
         excluded_tokens=("electricity", "electric"),
         units=("gbp", "£", "p"),
+        exact_patterns=("sensor.octopus_energy_gas_*_current_standing_charge",),
     ),
     DiscoveryRule(
         CONF_GAS_USAGE_TODAY,
@@ -178,6 +198,10 @@ RULES = (
         excluded_tokens=("cost", "rate", "standing"),
         units=("kwh", "m3", "m³"),
         device_classes=("energy", "gas"),
+        exact_patterns=(
+            "sensor.octopus_energy_gas_*_current_accumulative_consumption_kwh",
+            "sensor.octopus_energy_gas_*_current_accumulative_consumption_m3",
+        ),
     ),
     DiscoveryRule(
         CONF_GAS_COST_TODAY,
@@ -187,6 +211,7 @@ RULES = (
         excluded_tokens=("rate", "standing"),
         units=("gbp", "£", "p"),
         device_classes=("monetary",),
+        exact_patterns=("sensor.octopus_energy_gas_*_current_accumulative_cost",),
     ),
     DiscoveryRule(
         CONF_GAS_METER_TOTAL,
@@ -196,6 +221,10 @@ RULES = (
         excluded_tokens=("cost", "rate", "standing", "current accumulative", "today"),
         units=("kwh", "m3", "m³"),
         device_classes=("energy", "gas"),
+        exact_patterns=(
+            "sensor.octopus_energy_gas_*_current_total_consumption_kwh",
+            "sensor.octopus_energy_gas_*_current_total_consumption_m3",
+        ),
     ),
     DiscoveryRule(
         CONF_EV_STATUS,
@@ -204,6 +233,7 @@ RULES = (
         (("status",),),
         excluded_tokens=("schedule", "slot"),
         device_classes=("enum",),
+        exact_patterns=("sensor.ohme_*_status",),
     ),
     DiscoveryRule(
         CONF_EV_CONNECTED,
@@ -227,6 +257,7 @@ RULES = (
         excluded_tokens=("energy", "target"),
         units=("kw", "w"),
         device_classes=("power",),
+        exact_patterns=("sensor.ohme_*_power",),
     ),
     DiscoveryRule(
         CONF_EV_SOC,
@@ -236,15 +267,20 @@ RULES = (
         excluded_tokens=("target", "charger"),
         units=("%",),
         device_classes=("battery",),
+        exact_patterns=("sensor.ohme_*_vehicle_battery",),
     ),
     DiscoveryRule(
         CONF_HOUSE_LOAD,
-        FOXESS_PLATFORMS,
+        FOXESS_PLATFORMS + OCTOPUS_PLATFORMS,
         ("sensor",),
-        (("load power", "house load", "consumption power"),),
+        (("load power", "house load", "consumption power", "current demand"),),
         excluded_tokens=("phase", "r phase", "s phase", "t phase"),
         units=("kw", "w"),
         device_classes=("power",),
+        exact_patterns=(
+            "sensor.foxess_*load*power*",
+            "sensor.octopus_energy_electricity_*_current_demand",
+        ),
     ),
     DiscoveryRule(
         CONF_BATTERY_SOC,
@@ -293,12 +329,16 @@ RULES = (
     ),
     DiscoveryRule(
         CONF_GRID_IMPORT,
-        FOXESS_PLATFORMS,
+        FOXESS_PLATFORMS + OCTOPUS_PLATFORMS,
         ("sensor",),
-        (("grid consumption", "grid import", "from grid"),),
-        excluded_tokens=("energy", "total", "daily", "export", "feed"),
+        (("grid consumption", "grid import", "from grid", "current demand"),),
+        excluded_tokens=("total", "daily", "export", "feed"),
         units=("kw", "w"),
         device_classes=("power",),
+        exact_patterns=(
+            "sensor.foxess_*grid*consumption*",
+            "sensor.octopus_energy_electricity_*_current_demand",
+        ),
     ),
     DiscoveryRule(
         CONF_GRID_EXPORT,
@@ -325,6 +365,10 @@ def score_candidate(candidate: Candidate, rule: DiscoveryRule) -> int:
         return -1000
     if any(token in candidate.text for token in rule.excluded_tokens):
         return -1000
+
+    for index, pattern in enumerate(rule.exact_patterns):
+        if fnmatch(candidate.entity_id.casefold(), pattern.casefold()):
+            return 300 - (index * 20)
 
     score = 15
     if candidate.platform in rule.platforms:

@@ -1,4 +1,4 @@
-# Entity inventory — v0.5.0-alpha2
+# Entity inventory — v0.6.0-alpha1
 
 KEMS creates source-mirror entities only when the matching source is configured. Derived analysis and proposal-simulation entities are created automatically and may be `unknown` until enough observations exist.
 
@@ -15,7 +15,8 @@ KEMS creates source-mirror entities only when the matching source is configured.
 
 - house load
 - solar power
-- grid import, export, and signed net grid power
+- non-negative grid import and export magnitudes
+- signed net grid power, grid direction, raw source readings, and the normalisation mode
 - battery SOC and power
 - EV connected, charging, power, and last reported SOC
 

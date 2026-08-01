@@ -189,7 +189,7 @@ OPTIONS_SCHEMA = vol.Schema(
 class KEMSConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Handle automatic and manual KEMS setup."""
 
-    VERSION = 5
+    VERSION = 6
     MINOR_VERSION = 0
 
     def __init__(self) -> None:
@@ -304,12 +304,38 @@ class KEMSConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self,
         user_input: dict[str, Any] | None = None,
     ):
-        """Rescan and update source entity mappings."""
+        """Rescan supported integrations before optional manual review."""
         entry = self._get_reconfigure_entry()
         if not self._suggested:
-            discovery = await async_discover_entities(self.hass)
-            self._suggested = {**dict(entry.data), **discovery.mappings}
+            self._discovery = await async_discover_entities(self.hass)
+            self._suggested = {**dict(entry.data), **self._discovery.mappings}
 
+        if user_input is not None:
+            if user_input.get("review_entities"):
+                return await self.async_step_reconfigure_entities()
+            return self.async_update_reload_and_abort(
+                entry,
+                data_updates=self._suggested,
+                reload_even_if_entry_is_unchanged=False,
+            )
+
+        return self.async_show_form(
+            step_id="reconfigure",
+            data_schema=vol.Schema(
+                {vol.Optional("review_entities", default=False): bool}
+            ),
+            description_placeholders={
+                "detected_entities": self._discovery.summary(),
+                "ambiguous": ", ".join(self._discovery.ambiguous) or "None",
+            },
+        )
+
+    async def async_step_reconfigure_entities(
+        self,
+        user_input: dict[str, Any] | None = None,
+    ):
+        """Manually review source entities only when requested."""
+        entry = self._get_reconfigure_entry()
         if user_input is not None:
             cleaned = {key: value for key, value in user_input.items() if value}
             return self.async_update_reload_and_abort(
@@ -317,9 +343,8 @@ class KEMSConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 data_updates=cleaned,
                 reload_even_if_entry_is_unchanged=False,
             )
-
         return self.async_show_form(
-            step_id="reconfigure",
+            step_id="reconfigure_entities",
             data_schema=_entity_schema(self._suggested),
         )
 

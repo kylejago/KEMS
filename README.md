@@ -11,10 +11,10 @@ The Control phase remains deliberately excluded. This build does not call Octopu
 This package is prepared for:
 
 ```text
-feature/roi-lifetime-ledger
+feature/clean-install-diagnostics-autodiscovery
 ```
 
-It builds on the proposal-system simulation and adds predicted ROI, live post-install payback, automatic Profit Mode after payback, a permanent all-time energy and financial ledger, and dedicated ROI/lifetime dashboards. It also corrects the Home Assistant manifest classification from helper to hub.
+It keeps the proposal, gas, ROI and lifetime features, but introduces a clean storage namespace, deterministic matching for the installed Octopus and Ohme integrations, safer grid-flow normalisation, expanded diagnostics and an all-entities diagnostic dashboard.
 
 ## Supported sources
 
@@ -24,6 +24,8 @@ KEMS automatically discovers and can manually map:
 - **Octopus Energy gas** — gas rate, standing charge, cumulative consumption, daily consumption, and daily cost.
 - **Ohme** — EV connected/charging state, charger power, and vehicle state of charge.
 - **FoxESS Modbus** — house load, solar power, battery SOC/power, grid import, and grid export.
+
+Before FoxESS is installed, KEMS automatically uses the Octopus electricity current-demand sensor for both house load and grid import. FoxESS sources take priority automatically when they become available.
 
 ## Proposal system simulation
 
@@ -112,14 +114,16 @@ The default investment is the quoted £20,995. Grants, extra installation costs,
 
 ## Dashboards
 
-The `dashboards/` directory contains seven complete dashboards:
+The `dashboards/` directory contains eight complete dashboards:
 
+- pre-install proposal comparison
 - advanced desktop mission control, styled like the supplied reference
 - built-in Live-versus-Simulated comparison
 - portrait always-on wall display
 - multi-tab whole-home analytics
 - built-in ROI and lifetime dashboard
 - advanced ROI dashboard with a filling financial battery and Profit Mode
+- complete dynamic diagnostics dashboard listing every KEMS entity
 
 See `dashboards/README.md` for installation and frontend-card requirements.
 

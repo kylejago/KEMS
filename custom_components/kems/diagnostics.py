@@ -7,22 +7,83 @@ from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers import entity_registry as er
 
 from .coordinator import KEMSCoordinator
+
+
+def _state_payload(hass: HomeAssistant, entity_id: str) -> dict[str, Any]:
+    """Return compact state metadata for diagnostics."""
+    state = hass.states.get(entity_id)
+    if state is None:
+        return {"state": None, "available": False}
+    return {
+        "state": state.state,
+        "available": state.state not in {"unknown", "unavailable"},
+        "unit": state.attributes.get("unit_of_measurement"),
+        "device_class": state.attributes.get("device_class"),
+        "state_class": state.attributes.get("state_class"),
+        "friendly_name": state.attributes.get("friendly_name"),
+    }
 
 
 async def async_get_config_entry_diagnostics(
     hass: HomeAssistant,
     entry: ConfigEntry,
 ) -> dict[str, Any]:
-    """Return non-secret KEMS diagnostics."""
+    """Return a complete non-secret KEMS diagnostic snapshot."""
     coordinator: KEMSCoordinator = entry.runtime_data
     data = coordinator.data
+    configured = coordinator.entities.as_dict()
+    source_states = {
+        logical_name: {
+            "entity_id": entity_id,
+            **_state_payload(hass, entity_id),
+        }
+        for logical_name, entity_id in sorted(configured.items())
+    }
+
+    registry = er.async_get(hass)
+    kems_entities: dict[str, Any] = {}
+    for registry_entry in registry.entities.values():
+        if registry_entry.config_entry_id != entry.entry_id:
+            continue
+        kems_entities[registry_entry.entity_id] = _state_payload(
+            hass,
+            registry_entry.entity_id,
+        )
+
     return {
-        "configured_entities": coordinator.entities.as_dict(),
+        "integration": {
+            "entry_id": entry.entry_id,
+            "title": entry.title,
+            "version": entry.version,
+            "minor_version": entry.minor_version,
+        },
+        "configured_entities": configured,
+        "source_entity_states": source_states,
+        "kems_entity_states": dict(sorted(kems_entities.items())),
         "options": dict(entry.options),
         "phase": data.phase,
         "snapshot": data.snapshot.to_dict(),
+        "grid_diagnostics": {
+            "raw_import_kw": data.snapshot.raw_grid_import_kw,
+            "raw_export_kw": data.snapshot.raw_grid_export_kw,
+            "normalised_import_kw": data.snapshot.grid_import_kw,
+            "normalised_export_kw": data.snapshot.grid_export_kw,
+            "normalisation_mode": data.snapshot.grid_flow_mode,
+            "signed_net_kw": (
+                None
+                if data.snapshot.grid_import_kw is None
+                and data.snapshot.grid_export_kw is None
+                else round(
+                    (data.snapshot.grid_import_kw or 0.0)
+                    - (data.snapshot.grid_export_kw or 0.0),
+                    3,
+                )
+            ),
+            "sign_convention": "positive = import, negative = export",
+        },
         "learning": asdict(data.learned),
         "gas": asdict(data.gas),
         "advice": {
@@ -36,4 +97,10 @@ async def async_get_config_entry_diagnostics(
         "quality": asdict(data.quality),
         "history_samples": data.history_samples,
         "last_update_success": coordinator.last_update_success,
+        "last_exception": (
+            str(last_exception)
+            if (last_exception := getattr(coordinator, "last_exception", None))
+            is not None
+            else None
+        ),
     }
