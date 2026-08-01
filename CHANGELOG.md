@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.6.0-alpha1
+
+- Added clean v6 history and lifetime storage namespaces.
+- Added exact automatic matching for BottlecapDave Octopus Energy, MegaKid Octopus Intelligent, and official Ohme entities.
+- Added pre-install mapping of Octopus current demand to house load and grid import.
+- Added safe grid import/export normalisation and raw grid diagnostics.
+- Added one-click reconfiguration with optional manual review.
+- Added a complete all-entities diagnostic dashboard and expanded downloadable diagnostics.
+
 ## 0.5.0-alpha3
 
 - Fixed the KEMS options/settings flow failing with a 500 error.

@@ -1,7 +1,7 @@
 """Home Assistant-independent KEMS Observe/Learn/Advise/Simulate core."""
 
 from .advice import AdviceEngine
-from .foxess import calculate_battery_power_kw
+from .foxess import GridPower, calculate_battery_power_kw, normalise_grid_power
 from .gas import GasEngine
 from .learning import LearningEngine
 from .models import (
@@ -34,6 +34,7 @@ __all__ = [
     "FOXHOLE_PROPOSAL_PROFILE",
     "GasEngine",
     "GasSummary",
+    "GridPower",
     "KEMSData",
     "LearnedState",
     "LearningEngine",
@@ -51,5 +52,6 @@ __all__ = [
     "WholeHomeSummary",
     "assess_quality",
     "calculate_battery_power_kw",
+    "normalise_grid_power",
     "interpret_charger_status",
 ]

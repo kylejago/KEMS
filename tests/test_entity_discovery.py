@@ -201,3 +201,189 @@ def test_supported_entities_are_discovered_without_false_rate_matches() -> None:
         "sensor.foxess_grid_consumption"
     )
     assert result.mappings[constants.CONF_GRID_EXPORT] == "sensor.foxess_feed_in"
+
+
+def test_kyles_octopus_intelligent_and_ohme_inventory_auto_maps() -> None:
+    """The observed integration naming patterns should configure in one click."""
+    constants, discovery = _load_discovery()
+    candidate = discovery.Candidate
+    candidates = [
+        candidate(
+            "sensor.octopus_energy_electricity_meter_current_rate",
+            "octopus_energy",
+            "sensor",
+            "electricity meter current rate electricity",
+            "gbp/kwh",
+            "monetary",
+        ),
+        candidate(
+            "sensor.octopus_energy_electricity_meter_next_rate",
+            "octopus_energy",
+            "sensor",
+            "electricity meter next rate electricity",
+            "gbp/kwh",
+            "monetary",
+        ),
+        candidate(
+            "sensor.octopus_energy_electricity_meter_current_standing_charge",
+            "octopus_energy",
+            "sensor",
+            "electricity meter current standing charge electricity",
+            "gbp",
+            "monetary",
+        ),
+        candidate(
+            "binary_sensor.octopus_energy_electricity_meter_off_peak",
+            "octopus_energy",
+            "binary_sensor",
+            "electricity meter off peak electricity",
+            "",
+            "",
+        ),
+        candidate(
+            "sensor.octopus_energy_electricity_meter_current_demand",
+            "octopus_energy",
+            "sensor",
+            "electricity meter current demand electricity",
+            "w",
+            "power",
+        ),
+        candidate(
+            "binary_sensor.octopus_intelligent_tariff_octopus_intelligent_slot",
+            "octopus_intelligent",
+            "binary_sensor",
+            "octopus intelligent tariff octopus intelligent slot",
+            "",
+            "",
+        ),
+        candidate(
+            "sensor.octopus_intelligent_tariff_octopus_intelligent_next_offpeak_start",
+            "octopus_intelligent",
+            "sensor",
+            "octopus intelligent next offpeak start",
+            "",
+            "timestamp",
+        ),
+        candidate(
+            "sensor.octopus_intelligent_tariff_octopus_intelligent_offpeak_end",
+            "octopus_intelligent",
+            "sensor",
+            "octopus intelligent offpeak end",
+            "",
+            "timestamp",
+        ),
+        candidate(
+            "sensor.octopus_energy_gas_meter_current_rate",
+            "octopus_energy",
+            "sensor",
+            "gas meter current rate gas",
+            "gbp/kwh",
+            "monetary",
+        ),
+        candidate(
+            "sensor.octopus_energy_gas_meter_current_standing_charge",
+            "octopus_energy",
+            "sensor",
+            "gas meter current standing charge gas",
+            "gbp",
+            "monetary",
+        ),
+        candidate(
+            "sensor.octopus_energy_gas_meter_current_accumulative_consumption_kwh",
+            "octopus_energy",
+            "sensor",
+            "gas meter current accumulative consumption kwh gas",
+            "kwh",
+            "energy",
+        ),
+        candidate(
+            "sensor.octopus_energy_gas_meter_current_accumulative_cost",
+            "octopus_energy",
+            "sensor",
+            "gas meter current accumulative cost gas",
+            "gbp",
+            "monetary",
+        ),
+        candidate(
+            "sensor.octopus_energy_gas_meter_current_total_consumption_kwh",
+            "octopus_energy",
+            "sensor",
+            "gas meter current total consumption kwh gas",
+            "kwh",
+            "energy",
+        ),
+        candidate(
+            "sensor.ohme_epod_status",
+            "ohme",
+            "sensor",
+            "ohme epod status",
+            "",
+            "enum",
+        ),
+        candidate(
+            "sensor.ohme_epod_power",
+            "ohme",
+            "sensor",
+            "ohme epod power",
+            "kw",
+            "power",
+        ),
+        candidate(
+            "sensor.ohme_epod_vehicle_battery",
+            "ohme",
+            "sensor",
+            "ohme epod vehicle battery",
+            "%",
+            "battery",
+        ),
+    ]
+
+    result = discovery.discover_from_candidates(candidates)
+
+    expected = {
+        constants.CONF_CURRENT_IMPORT_RATE,
+        constants.CONF_NEXT_IMPORT_RATE,
+        constants.CONF_ELECTRICITY_STANDING_CHARGE,
+        constants.CONF_OFF_PEAK,
+        constants.CONF_INTELLIGENT_SLOT,
+        constants.CONF_NEXT_OFFPEAK_START,
+        constants.CONF_OFFPEAK_END,
+        constants.CONF_GAS_CURRENT_RATE,
+        constants.CONF_GAS_STANDING_CHARGE,
+        constants.CONF_GAS_USAGE_TODAY,
+        constants.CONF_GAS_COST_TODAY,
+        constants.CONF_GAS_METER_TOTAL,
+        constants.CONF_EV_STATUS,
+        constants.CONF_EV_POWER,
+        constants.CONF_EV_SOC,
+        constants.CONF_HOUSE_LOAD,
+        constants.CONF_GRID_IMPORT,
+    }
+    assert expected <= result.mappings.keys()
+    assert result.mappings[constants.CONF_HOUSE_LOAD].endswith("_current_demand")
+    assert result.mappings[constants.CONF_GRID_IMPORT].endswith("_current_demand")
+    assert constants.CONF_GRID_EXPORT not in result.mappings
+    assert constants.CONF_CURRENT_EXPORT_RATE not in result.mappings
+    assert result.ambiguous == ()
+
+
+def test_octopus_current_demand_runtime_text_maps_to_grid_import() -> None:
+    """The octopus_energy token in the entity ID must not block demand mapping."""
+    constants, discovery = _load_discovery()
+    entity_id = "sensor.octopus_energy_electricity_meter_current_demand"
+    result = discovery.discover_from_candidates(
+        [
+            discovery.Candidate(
+                entity_id,
+                "octopus_energy",
+                "sensor",
+                discovery._normalise(
+                    f"{entity_id} Electricity Meter Current Demand Electricity"
+                ),
+                "w",
+                "power",
+            )
+        ]
+    )
+    assert result.mappings[constants.CONF_GRID_IMPORT] == entity_id
+    assert result.mappings[constants.CONF_HOUSE_LOAD] == entity_id

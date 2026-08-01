@@ -9,7 +9,7 @@ from typing import Any
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.storage import Store
 
-from .const import DOMAIN
+from .const import DOMAIN, STORAGE_NAMESPACE
 from .kems_core import (
     GasEngine,
     GasSummary,
@@ -38,7 +38,7 @@ class LifetimeLedgerRecorder:
         self._store: Store[dict[str, Any]] = Store(
             hass,
             STORAGE_VERSION,
-            f"{DOMAIN}.{entry_id}.lifetime",
+            f"{DOMAIN}.{entry_id}.{STORAGE_NAMESPACE}.lifetime",
         )
         self._ledger = LifetimeLedger()
         self._tracking_date: date | None = None

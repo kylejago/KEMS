@@ -13,7 +13,7 @@ DASHBOARDS = ROOT / "dashboards"
 def test_all_dashboard_yaml_is_valid() -> None:
     """Every shipped dashboard should parse as YAML."""
     files = sorted(DASHBOARDS.glob("*.yaml"))
-    assert len(files) == 7
+    assert len(files) == 8
     for path in files:
         content = yaml.safe_load(path.read_text(encoding="utf-8"))
         assert isinstance(content, dict)
@@ -41,3 +41,16 @@ def test_whole_home_dashboards_include_gas() -> None:
     assert "sensor.kems_gas_usage_today" in text
     assert "sensor.kems_whole_home_observed_cost_today" in text
     assert "sensor.kems_whole_home_simulated_cost_today" in text
+
+
+def test_diagnostic_dashboard_lists_current_kems_entities_dynamically() -> None:
+    """Diagnostics must survive entity-ID suffixes and future KEMS additions."""
+    text = (DASHBOARDS / "kems_diagnostics_all_entities.yaml").read_text(
+        encoding="utf-8"
+    )
+    assert "states.sensor" in text
+    assert "states.binary_sensor" in text
+    assert "states.update" in text
+    assert "startswith('sensor.kems_')" in text
+    assert "startswith('binary_sensor.kems_')" in text
+    assert "startswith('update.kems_')" in text

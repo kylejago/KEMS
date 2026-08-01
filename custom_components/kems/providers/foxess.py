@@ -6,7 +6,7 @@ from dataclasses import dataclass
 
 from homeassistant.core import HomeAssistant
 
-from ..kems_core import calculate_battery_power_kw
+from ..kems_core import calculate_battery_power_kw, normalise_grid_power
 from .base import HomeAssistantStateReader
 from .entity_map import KEMSEntities
 
@@ -21,6 +21,9 @@ class FoxESSState:
     solar_power_kw: float | None = None
     grid_import_kw: float | None = None
     grid_export_kw: float | None = None
+    raw_grid_import_kw: float | None = None
+    raw_grid_export_kw: float | None = None
+    grid_flow_mode: str = "no_grid_source"
 
 
 class FoxESSProvider(HomeAssistantStateReader):
@@ -39,11 +42,18 @@ class FoxESSProvider(HomeAssistantStateReader):
                 self._float(self._entities.battery_voltage),
                 self._float(self._entities.battery_current),
             )
+        grid = normalise_grid_power(
+            self._power_kw(self._entities.grid_import_kw),
+            self._power_kw(self._entities.grid_export_kw),
+        )
         return FoxESSState(
             house_load_kw=self._power_kw(self._entities.house_load_kw),
             battery_soc=self._float(self._entities.battery_soc),
             battery_power_kw=battery_power,
             solar_power_kw=self._power_kw(self._entities.solar_power_kw),
-            grid_import_kw=self._power_kw(self._entities.grid_import_kw),
-            grid_export_kw=self._power_kw(self._entities.grid_export_kw),
+            grid_import_kw=grid.import_kw,
+            grid_export_kw=grid.export_kw,
+            raw_grid_import_kw=grid.raw_import_kw,
+            raw_grid_export_kw=grid.raw_export_kw,
+            grid_flow_mode=grid.mode,
         )
