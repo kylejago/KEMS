@@ -12,6 +12,7 @@ from homeassistant.util import dt as dt_util
 
 from .collector import Collector
 from .const import NAME
+from .entity_discovery import SourceValidationResult
 from .history import HistoryRecorder
 from .kems_core import (
     AdviceEngine,
@@ -41,11 +42,13 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
         collector: Collector,
         entities: KEMSEntities,
         settings: KEMSSettings,
+        source_validation: SourceValidationResult,
     ) -> None:
         """Initialise the coordinator."""
         self.entry = entry
         self.entities = entities
         self.settings = settings
+        self.source_validation = source_validation
         self._collector = collector
         self._history = HistoryRecorder(
             hass,

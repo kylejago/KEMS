@@ -61,6 +61,12 @@ async def async_get_config_entry_diagnostics(
             "minor_version": entry.minor_version,
         },
         "configured_entities": configured,
+        "source_validation": {
+            "valid": coordinator.source_validation.valid,
+            "accepted": dict(sorted(coordinator.source_validation.accepted.items())),
+            "rejected": dict(sorted(coordinator.source_validation.rejected.items())),
+            "summary": coordinator.source_validation.summary(),
+        },
         "source_entity_states": source_states,
         "kems_entity_states": dict(sorted(kems_entities.items())),
         "options": dict(entry.options),

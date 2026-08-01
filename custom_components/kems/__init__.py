@@ -11,7 +11,11 @@ from homeassistant.core import HomeAssistant
 from .collector import Collector
 from .const import CONF_EV_POWER
 from .coordinator import KEMSCoordinator
-from .entity_discovery import async_discover_entities
+from .entity_discovery import (
+    SourceValidationResult,
+    async_discover_entities,
+    async_validate_entity_mappings,
+)
 from .providers.entity_map import KEMSEntities
 from .providers.foxess import FoxESSProvider
 from .providers.gas import GasProvider
@@ -26,16 +30,25 @@ PLATFORMS: list[Platform] = [Platform.SENSOR, Platform.BINARY_SENSOR]
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up KEMS from a config entry."""
+    validation = await async_validate_entity_mappings(hass, dict(entry.data))
     discovery = await async_discover_entities(hass)
-    enriched = dict(entry.data)
-    changed = False
-    for key, entity_id in discovery.mappings.items():
-        if not enriched.get(key):
-            enriched[key] = entity_id
-            changed = True
-    if changed:
-        hass.config_entries.async_update_entry(entry, data=enriched)
+    enriched = {
+        **validation.accepted,
+        **discovery.mappings,
+    }
 
+    if enriched != dict(entry.data):
+        hass.config_entries.async_update_entry(entry, data=enriched)
+    if validation.rejected:
+        LOGGER.warning(
+            "KEMS rejected unsafe source mappings: %s",
+            validation.summary(),
+        )
+
+    source_validation = SourceValidationResult(
+        accepted=enriched,
+        rejected=validation.rejected,
+    )
     entities = KEMSEntities.from_entry_data(enriched)
     settings = KEMSSettings.from_options(entry.options)
     collector = Collector(
@@ -44,7 +57,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         ohme=OhmeProvider(hass, entities),
         foxess=FoxESSProvider(hass, entities),
     )
-    coordinator = KEMSCoordinator(hass, entry, collector, entities, settings)
+    coordinator = KEMSCoordinator(
+        hass,
+        entry,
+        collector,
+        entities,
+        settings,
+        source_validation=source_validation,
+    )
 
     await coordinator.async_config_entry_first_refresh()
     entry.runtime_data = coordinator
@@ -62,7 +82,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
 async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Migrate earlier KEMS config entries to the current schema."""
-    if entry.version > 5:
+    if entry.version > 7:
         return False
 
     data = dict(entry.data)
@@ -73,7 +93,7 @@ async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     hass.config_entries.async_update_entry(
         entry,
         data=data,
-        version=5,
+        version=7,
         minor_version=0,
     )
     return True

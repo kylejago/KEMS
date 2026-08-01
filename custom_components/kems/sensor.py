@@ -1271,11 +1271,44 @@ async def async_setup_entry(
     """Set up KEMS sensors."""
     coordinator = entry.runtime_data
     mappings = coordinator.entities.as_dict()
-    async_add_entities(
+    entities = [
         KEMSSensor(coordinator, description)
         for description in SENSORS
         if _source_is_configured(description, mappings)
-    )
+    ]
+    entities.append(KEMSSourceValidationSensor(coordinator))
+    async_add_entities(entities)
+
+
+class KEMSSourceValidationSensor(KEMSEntity, SensorEntity):
+    """Expose rejected or circular source mappings."""
+
+    _attr_name = "Source validation"
+    _attr_icon = "mdi:source-branch-check"
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+
+    def __init__(self, coordinator) -> None:
+        """Initialise source validation diagnostics."""
+        super().__init__(coordinator, "source_validation")
+
+    @property
+    def native_value(self) -> str:
+        """Return a compact validation result."""
+        rejected = self.coordinator.source_validation.rejected
+        if not rejected:
+            return "OK"
+        return f"Rejected {len(rejected)} unsafe mapping(s)"
+
+    @property
+    def extra_state_attributes(self) -> Mapping[str, Any]:
+        """Return accepted and rejected mapping details."""
+        validation = self.coordinator.source_validation
+        return {
+            "valid": validation.valid,
+            "summary": validation.summary(),
+            "accepted": dict(sorted(validation.accepted.items())),
+            "rejected": dict(sorted(validation.rejected.items())),
+        }
 
 
 class KEMSSensor(KEMSEntity, SensorEntity):

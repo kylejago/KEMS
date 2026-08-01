@@ -36,6 +36,8 @@ from .const import (
     CONF_OFF_PEAK,
     CONF_OFFPEAK_END,
     CONF_SOLAR_POWER,
+    DOMAIN,
+    ENTITY_MAPPING_KEYS,
 )
 
 
@@ -88,6 +90,28 @@ class DiscoveryResult:
             return "No high-confidence source entities were detected."
         return "\n".join(
             f"• {key}: {entity_id}" for key, entity_id in sorted(self.mappings.items())
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class SourceValidationResult:
+    """Accepted source mappings and rejected unsafe mappings."""
+
+    accepted: dict[str, str]
+    rejected: dict[str, dict[str, str]]
+
+    @property
+    def valid(self) -> bool:
+        """Return whether every configured mapping was accepted."""
+        return not self.rejected
+
+    def summary(self) -> str:
+        """Return a compact diagnostic summary."""
+        if not self.rejected:
+            return "All configured source mappings are valid."
+        return "; ".join(
+            f"{key}: {details['reason']}"
+            for key, details in sorted(self.rejected.items())
         )
 
 
@@ -359,8 +383,19 @@ def _normalise(value: str | None) -> str:
     )
 
 
+def _normalise_platform(value: str | None) -> str:
+    """Normalise an integration platform without changing its domain name."""
+    return (value or "").casefold().strip()
+
+
 def score_candidate(candidate: Candidate, rule: DiscoveryRule) -> int:
     """Score one candidate against one discovery rule."""
+    if candidate.platform == DOMAIN or candidate.entity_id.startswith(
+        (f"sensor.{DOMAIN}_", f"binary_sensor.{DOMAIN}_")
+    ):
+        return -1000
+    if candidate.platform not in rule.platforms:
+        return -1000
     if candidate.domain not in rule.domains:
         return -1000
     if any(token in candidate.text for token in rule.excluded_tokens):
@@ -370,9 +405,7 @@ def score_candidate(candidate: Candidate, rule: DiscoveryRule) -> int:
         if fnmatch(candidate.entity_id.casefold(), pattern.casefold()):
             return 300 - (index * 20)
 
-    score = 15
-    if candidate.platform in rule.platforms:
-        score += 45
+    score = 60
 
     for group in rule.token_groups:
         if not any(token in candidate.text for token in group):
@@ -413,29 +446,115 @@ def discover_from_candidates(candidates: Iterable[Candidate]) -> DiscoveryResult
     return DiscoveryResult(mappings, scores, tuple(sorted(ambiguous)))
 
 
+def _candidate_from_registry_entry(hass: HomeAssistant, entry) -> Candidate:
+    """Build a normalised candidate from an entity-registry entry."""
+    state = hass.states.get(entry.entity_id)
+    attributes = state.attributes if state is not None else {}
+    friendly_name = str(attributes.get("friendly_name", ""))
+    original_name = str(entry.original_name or "")
+    unique_id = str(entry.unique_id or "")
+    text = _normalise(
+        " ".join((entry.entity_id, friendly_name, original_name, unique_id))
+    )
+    return Candidate(
+        entity_id=entry.entity_id,
+        platform=_normalise_platform(entry.platform),
+        domain=entry.entity_id.split(".", 1)[0],
+        text=text,
+        unit=_normalise(str(attributes.get("unit_of_measurement", ""))),
+        device_class=_normalise(str(attributes.get("device_class", ""))),
+    )
+
+
+def _source_rejection_reason(
+    candidate: Candidate,
+    rule: DiscoveryRule,
+) -> str | None:
+    """Return why a configured source is unsafe, or None when accepted."""
+    if candidate.platform == DOMAIN or candidate.entity_id.startswith(
+        (f"sensor.{DOMAIN}_", f"binary_sensor.{DOMAIN}_")
+    ):
+        return "KEMS output entities cannot be used as KEMS input sources"
+    if candidate.platform not in rule.platforms:
+        expected = ", ".join(rule.platforms)
+        return (
+            f"entity belongs to {candidate.platform or 'an unknown integration'}; "
+            f"expected {expected}"
+        )
+    if candidate.domain not in rule.domains:
+        expected = ", ".join(rule.domains)
+        return f"entity domain is {candidate.domain}; expected {expected}"
+    if rule.units and candidate.unit and candidate.unit not in rule.units:
+        expected = ", ".join(rule.units)
+        return f"entity unit is {candidate.unit}; expected one of {expected}"
+    if (
+        rule.device_classes
+        and candidate.device_class
+        and candidate.device_class not in rule.device_classes
+    ):
+        expected = ", ".join(rule.device_classes)
+        return (
+            f"entity device class is {candidate.device_class}; "
+            f"expected one of {expected}"
+        )
+    if score_candidate(candidate, rule) < rule.minimum_score:
+        return "entity metadata does not match the expected source role"
+    return None
+
+
+def validate_from_candidates(
+    mappings: dict[str, str],
+    candidates: Iterable[Candidate],
+) -> SourceValidationResult:
+    """Validate configured mappings against supported integration ownership."""
+    candidate_by_id = {candidate.entity_id: candidate for candidate in candidates}
+    rule_by_key = {rule.key: rule for rule in RULES}
+    accepted: dict[str, str] = {}
+    rejected: dict[str, dict[str, str]] = {}
+
+    for key, entity_id in mappings.items():
+        if key not in ENTITY_MAPPING_KEYS or not entity_id:
+            continue
+        rule = rule_by_key.get(key)
+        candidate = candidate_by_id.get(entity_id)
+        if rule is None:
+            rejected[key] = {
+                "entity_id": entity_id,
+                "reason": "no source-validation rule exists for this field",
+            }
+            continue
+        if candidate is None:
+            rejected[key] = {
+                "entity_id": entity_id,
+                "reason": "entity is not present in the Home Assistant registry",
+            }
+            continue
+        reason = _source_rejection_reason(candidate, rule)
+        if reason is not None:
+            rejected[key] = {"entity_id": entity_id, "reason": reason}
+            continue
+        accepted[key] = entity_id
+
+    return SourceValidationResult(accepted=accepted, rejected=rejected)
+
+
+def _registry_candidates(hass: HomeAssistant) -> list[Candidate]:
+    """Return all current entity-registry candidates."""
+    registry = er.async_get(hass)
+    return [
+        _candidate_from_registry_entry(hass, entry)
+        for entry in registry.entities.values()
+    ]
+
+
+async def async_validate_entity_mappings(
+    hass: HomeAssistant,
+    mappings: dict[str, str],
+) -> SourceValidationResult:
+    """Validate configured mappings using live entity-registry metadata."""
+    return validate_from_candidates(mappings, _registry_candidates(hass))
+
+
 async def async_discover_entities(hass: HomeAssistant) -> DiscoveryResult:
     """Inspect entity-registry metadata and current states."""
-    registry = er.async_get(hass)
-    candidates: list[Candidate] = []
-
-    for entry in registry.entities.values():
-        state = hass.states.get(entry.entity_id)
-        attributes = state.attributes if state is not None else {}
-        friendly_name = str(attributes.get("friendly_name", ""))
-        original_name = str(entry.original_name or "")
-        unique_id = str(entry.unique_id or "")
-        text = _normalise(
-            " ".join((entry.entity_id, friendly_name, original_name, unique_id))
-        )
-        candidates.append(
-            Candidate(
-                entity_id=entry.entity_id,
-                platform=_normalise(entry.platform),
-                domain=entry.entity_id.split(".", 1)[0],
-                text=text,
-                unit=_normalise(str(attributes.get("unit_of_measurement", ""))),
-                device_class=_normalise(str(attributes.get("device_class", ""))),
-            )
-        )
-
-    return discover_from_candidates(candidates)
+    return discover_from_candidates(_registry_candidates(hass))

@@ -33,19 +33,24 @@ class OhmeProvider(HomeAssistantStateReader):
     def get_state(self) -> OhmeState:
         """Return the current Ohme observation."""
         status = self._text(self._entities.ev_status)
+        power_kw = self._power_kw(self._entities.ev_power_kw)
         status_connected, status_charging = interpret_charger_status(status)
-        explicit_connected = self._bool(self._entities.ev_connected)
-        explicit_charging = self._bool(self._entities.ev_charging)
+
+        if status is not None:
+            connected = status_connected
+            charging = status_charging
+        else:
+            connected = self._bool(self._entities.ev_connected)
+            charging = self._bool(self._entities.ev_charging)
+
+        if power_kw is not None and power_kw > 0.1:
+            connected = True
+            charging = True
+
         return OhmeState(
             status=status,
-            connected=(
-                explicit_connected
-                if explicit_connected is not None
-                else status_connected
-            ),
-            charging=(
-                explicit_charging if explicit_charging is not None else status_charging
-            ),
-            power_kw=self._power_kw(self._entities.ev_power_kw),
+            connected=connected,
+            charging=charging,
+            power_kw=power_kw,
             vehicle_soc=self._float(self._entities.ev_soc),
         )

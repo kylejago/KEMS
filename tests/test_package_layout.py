@@ -88,7 +88,7 @@ def test_manifest_classifies_kems_as_hub() -> None:
 
     manifest = json.loads((INTEGRATION / "manifest.json").read_text(encoding="utf-8"))
     assert manifest["integration_type"] == "hub"
-    assert manifest["version"] == "0.6.0-alpha1"
+    assert manifest["version"] == "0.6.0-alpha2"
 
 
 def test_clean_build_uses_fresh_storage_namespace() -> None:
@@ -97,6 +97,6 @@ def test_clean_build_uses_fresh_storage_namespace() -> None:
     history_source = (INTEGRATION / "history.py").read_text(encoding="utf-8")
     lifetime_source = (INTEGRATION / "lifetime.py").read_text(encoding="utf-8")
 
-    assert 'STORAGE_NAMESPACE = "clean_v6"' in const_source
+    assert 'STORAGE_NAMESPACE = "clean_v6_alpha2"' in const_source
     assert "STORAGE_NAMESPACE" in history_source
     assert "STORAGE_NAMESPACE" in lifetime_source
