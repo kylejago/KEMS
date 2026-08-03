@@ -77,8 +77,8 @@ class LifetimeLedgerRecorder:
         if stored_simulation_version < SIMULATION_LEDGER_VERSION:
             # Keep all observed history and actual post-install totals, but
             # discard simulated financial value produced by the superseded
-            # 10kW export-first model. The current day is recalculated using
-            # the KH7 paced-export model on the first coordinator refresh.
+            # alpha3 reserve calculation. The current day is recalculated with
+            # the protected home-reserve fallback on the first refresh.
             self._ledger.simulated_system_value_pence = 0.0
             self._tracking_values["simulated_system_value_pence"] = 0.0
         self._simulation_ledger_version = SIMULATION_LEDGER_VERSION

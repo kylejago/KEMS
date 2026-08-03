@@ -417,3 +417,95 @@ def test_kh7_six_hour_cheap_window_does_not_assume_full_charge() -> None:
     # Today's counter begins at local midnight, so the 23:30-00:00 portion is
     # represented in starting SOC rather than counted again today.
     assert 36.4 <= result.simulated_battery_charge_kwh <= 36.7
+
+
+def test_missing_learning_forecast_reserves_recent_load_and_pauses_export() -> None:
+    """A missing forecast must never be treated as zero home demand."""
+    start = datetime(2026, 8, 3, 21, 10, tzinfo=UTC)
+    cheap_start = datetime(2026, 8, 3, 22, 30, tzinfo=UTC)
+    records = [
+        Snapshot(
+            timestamp=start,
+            current_import_rate=28.3036,
+            house_load_kw=1.404,
+            grid_import_kw=1.404,
+            battery_soc=12.8,
+            off_peak=False,
+            next_offpeak_start=cheap_start,
+        ),
+        Snapshot(
+            timestamp=start + timedelta(minutes=5),
+            current_import_rate=28.3036,
+            house_load_kw=1.404,
+            grid_import_kw=1.404,
+            off_peak=False,
+            next_offpeak_start=cheap_start,
+        ),
+    ]
+
+    result = SimulationEngine().simulate_today(
+        records,
+        records[-1].timestamp,
+        SimulationConfig(
+            battery_capacity_kwh=56.42,
+            battery_initial_percent=10.0,
+            battery_reserve_percent=10.0,
+            max_charge_kw=7.0,
+            max_discharge_kw=7.0,
+            inverter_limit_kw=7.0,
+            export_limit_kw=7.0,
+            discharge_efficiency=0.95,
+            proposal_solar_enabled=False,
+            strategy="paced_export",
+        ),
+        forecast_energy_until_offpeak_kwh=None,
+        current_snapshot=records[-1],
+    )
+
+    assert result.home_reserve_forecast_source == "recent_average"
+    assert result.reserved_for_home_kwh is not None
+    assert result.reserved_for_home_kwh > 1.3
+    assert result.exportable_battery_energy_kwh == 0.0
+    assert result.target_battery_export_power_kw == 0.0
+    assert result.current_simulated_battery_export_power_kw == 0.0
+    assert result.simulated_battery_export_kwh == 0.0
+    assert result.battery_export_paused_for_home_reserve is True
+    assert result.projected_grid_import_before_cheap_kwh is not None
+    assert result.projected_grid_import_before_cheap_kwh > 0.0
+    assert result.projected_soc_at_cheap_period_percent == 10.0
+
+
+def test_current_load_is_final_home_reserve_fallback() -> None:
+    """The live load protects the home when no learned or recent load exists."""
+    now = datetime(2026, 8, 3, 21, 20, tzinfo=UTC)
+    snapshot = Snapshot(
+        timestamp=now,
+        current_import_rate=28.3036,
+        house_load_kw=1.5,
+        grid_import_kw=1.5,
+        next_offpeak_start=now + timedelta(hours=1),
+    )
+    config = SimulationConfig(
+        battery_capacity_kwh=10.0,
+        battery_reserve_percent=10.0,
+        max_discharge_kw=7.0,
+        inverter_limit_kw=7.0,
+        export_limit_kw=7.0,
+        proposal_solar_enabled=False,
+        strategy="paced_export",
+    )
+
+    plan = SimulationEngine()._current_plan(
+        snapshot,
+        [],
+        battery_kwh=2.0,
+        reserve_kwh=1.0,
+        capacity=10.0,
+        config=config,
+        forecast_energy_until_offpeak_kwh=None,
+    )
+
+    assert plan["reserve_source"] == "current_load"
+    assert plan["target_battery_export"] == 0.0
+    assert plan["battery_export"] == 0.0
+    assert plan["export_paused_for_home"] is True

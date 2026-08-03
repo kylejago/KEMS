@@ -2,13 +2,16 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta
+from statistics import fmean
 
 from .models import SimulationConfig, SimulationState, Snapshot
 from .system_profile import FOXHOLE_PROPOSAL_PROFILE
 
 MAX_INTERVAL_HOURS = 0.5
 MAX_CHEAP_PERIOD_LOOKAHEAD_HOURS = 24.0
+RECENT_LOAD_WINDOW_HOURS = 1.0
+HOME_RESERVE_SAFETY_FACTOR = 1.10
 
 
 def _interval_hours(current: datetime, following: datetime) -> float:
@@ -253,6 +256,7 @@ class SimulationEngine:
 
         current_plan = self._current_plan(
             live_snapshot or today[-1],
+            today,
             battery_kwh,
             reserve_kwh,
             capacity,
@@ -315,6 +319,13 @@ class SimulationEngine:
             hours_until_next_cheap_period=current_plan["hours_until_cheap"],
             projected_soc_at_cheap_period_percent=current_plan[
                 "projected_soc_at_cheap"
+            ],
+            home_reserve_forecast_source=current_plan["reserve_source"],
+            projected_grid_import_before_cheap_kwh=current_plan[
+                "projected_grid_import"
+            ],
+            battery_export_paused_for_home_reserve=current_plan[
+                "export_paused_for_home"
             ],
             effective_export_rate_pence=round(effective_export_rate, 4),
             inverter_limit_kw=config.inverter_limit_kw,
@@ -455,11 +466,18 @@ class SimulationEngine:
                 load = max(load - solar, 0.0)
             known += load * hours
 
-        # The learning forecast covers the period after the last retained
-        # observation. Earlier replay intervals also include the known observed
-        # load between that interval and the latest record.
-        if not reached_cheap_period:
-            known += max(forecast_energy_until_offpeak_kwh or 0.0, 0.0)
+        # The learned forecast covers the unobserved tail after the latest
+        # retained snapshot. When it is unavailable, never assume zero demand:
+        # preserve a conservative recent/current-load estimate instead.
+        if not reached_cheap_period and today:
+            latest = today[-1]
+            tail_required, _ = self._home_energy_requirement(
+                latest,
+                today,
+                config,
+                forecast_energy_until_offpeak_kwh,
+            )
+            known += tail_required
         return known
 
     @staticmethod
@@ -472,6 +490,58 @@ class SimulationEngine:
         if hours > MAX_CHEAP_PERIOD_LOOKAHEAD_HOURS:
             return None
         return max(hours, 0.0)
+
+    @staticmethod
+    def _recent_average_load_kw(
+        records: list[Snapshot],
+        reference: Snapshot,
+    ) -> float | None:
+        """Return the recent average load ending at the reference snapshot."""
+        cutoff = reference.timestamp - timedelta(hours=RECENT_LOAD_WINDOW_HOURS)
+        values = [
+            load
+            for item in records
+            if cutoff <= item.timestamp <= reference.timestamp
+            if (load := _load_kw(item)) is not None
+        ]
+        if not values:
+            return None
+        return max(fmean(values), 0.0)
+
+    def _home_energy_requirement(
+        self,
+        snapshot: Snapshot,
+        records: list[Snapshot],
+        config: SimulationConfig,
+        forecast_energy_until_offpeak_kwh: float | None,
+    ) -> tuple[float, str]:
+        """Return conservative AC home energy needed before cheap power."""
+        remaining_hours = self._hours_until_next_cheap(snapshot)
+        if remaining_hours is None:
+            return 0.0, "unavailable"
+
+        if forecast_energy_until_offpeak_kwh is not None:
+            required = max(forecast_energy_until_offpeak_kwh, 0.0)
+            source = "learned_profile"
+        else:
+            recent_load = self._recent_average_load_kw(records, snapshot)
+            if recent_load is not None:
+                required = recent_load * remaining_hours
+                source = "recent_average"
+            else:
+                current_load = _load_kw(snapshot)
+                if current_load is None:
+                    return 0.0, "unavailable"
+                required = current_load * remaining_hours
+                source = "current_load"
+
+        if config.strategy == "self_use":
+            # This is deliberately conservative: only subtract current modelled
+            # solar from the fallback, never future solar that may not arrive.
+            current_solar = self._simulated_solar_power(snapshot, config)
+            required = max(required - current_solar * remaining_hours, 0.0)
+
+        return required * HOME_RESERVE_SAFETY_FACTOR, source
 
     @staticmethod
     def _paced_export_target_kw(
@@ -490,12 +560,13 @@ class SimulationEngine:
     def _current_plan(
         self,
         snapshot: Snapshot,
+        today: list[Snapshot],
         battery_kwh: float,
         reserve_kwh: float,
         capacity: float,
         config: SimulationConfig,
         forecast_energy_until_offpeak_kwh: float | None,
-    ) -> dict[str, float | None]:
+    ) -> dict[str, float | str | bool | None]:
         """Return the current simulated power flow for dashboard comparison."""
         load = _load_kw(snapshot)
         if load is None:
@@ -512,6 +583,9 @@ class SimulationEngine:
                 "reserved_for_home": None,
                 "hours_until_cheap": None,
                 "projected_soc_at_cheap": None,
+                "reserve_source": "unavailable",
+                "projected_grid_import": None,
+                "export_paused_for_home": False,
             }
         solar = self._simulated_solar_power(snapshot, config)
         inverter_limit = max(config.inverter_limit_kw, 0.0)
@@ -536,6 +610,9 @@ class SimulationEngine:
                 "reserved_for_home": 0.0,
                 "hours_until_cheap": 0.0,
                 "projected_soc_at_cheap": round(100 * battery_kwh / capacity, 1),
+                "reserve_source": "cheap_period",
+                "projected_grid_import": 0.0,
+                "export_paused_for_home": False,
             }
 
         if config.strategy == "self_use":
@@ -566,13 +643,19 @@ class SimulationEngine:
         )
         inverter_used += solar_export
 
-        reserved_for_home = max(forecast_energy_until_offpeak_kwh or 0.0, 0.0)
-        required_stored = reserved_for_home / max(config.discharge_efficiency, 0.01)
-        surplus_stored = max(
-            battery_kwh - reserve_kwh - required_stored,
-            0.0,
+        required_home_energy, reserve_source = self._home_energy_requirement(
+            snapshot,
+            today,
+            config,
+            forecast_energy_until_offpeak_kwh,
         )
-        exportable_battery = surplus_stored * config.discharge_efficiency
+        reserved_for_home = min(required_home_energy, available_ac)
+        projected_grid_import = max(required_home_energy - available_ac, 0.0)
+        exportable_battery = max(available_ac - required_home_energy, 0.0)
+        surplus_stored = exportable_battery / max(
+            config.discharge_efficiency,
+            0.01,
+        )
         remaining_hours = self._hours_until_next_cheap(snapshot)
         target_export_kw = 0.0
         if config.battery_export_enabled:
@@ -592,6 +675,12 @@ class SimulationEngine:
             config.discharge_efficiency, 0.01
         )
         projected_soc = 100 * max(projected_stored, reserve_kwh) / capacity
+        export_paused = bool(
+            config.battery_export_enabled
+            and remaining_hours is not None
+            and required_home_energy > 0
+            and exportable_battery <= 0.001
+        )
 
         return {
             "house": round(load, 3),
@@ -608,4 +697,7 @@ class SimulationEngine:
                 round(remaining_hours, 2) if remaining_hours is not None else None
             ),
             "projected_soc_at_cheap": round(projected_soc, 1),
+            "reserve_source": reserve_source,
+            "projected_grid_import": round(projected_grid_import, 3),
+            "export_paused_for_home": export_paused,
         }

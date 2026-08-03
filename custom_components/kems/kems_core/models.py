@@ -202,6 +202,9 @@ class SimulationState:
     reserved_for_home_kwh: float | None = None
     hours_until_next_cheap_period: float | None = None
     projected_soc_at_cheap_period_percent: float | None = None
+    home_reserve_forecast_source: str = "unavailable"
+    projected_grid_import_before_cheap_kwh: float | None = None
+    battery_export_paused_for_home_reserve: bool = False
     effective_export_rate_pence: float | None = None
     inverter_limit_kw: float | None = None
     export_limit_kw: float | None = None

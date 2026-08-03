@@ -1,12 +1,12 @@
 # KEMS validation report
 
-Build: `0.6.0-alpha3`  
-Feature branch: `feature/kh7-paced-export-simulation`  
+Build: `0.6.0-alpha4`  
+Feature branch: `fix/home-reserve-fallback`  
 Scope: read-only **Observe → Learn → Advise → Simulate** plus ROI and lifetime accounting
 
 ## Automated checks completed in the build environment
 
-- 52 Pytest tests passed.
+- 55 Pytest tests passed.
 - All 50 Python source/test files parsed successfully.
 - All 3 JSON files parsed successfully.
 - All 14 dashboard/example YAML files parsed successfully.
@@ -17,6 +17,11 @@ Scope: read-only **Observe → Learn → Advise → Simulate** plus ROI and life
 - Battery export is paced across the time remaining until the next cheap period.
 - Live diagnostics distinguish battery-to-home power, actual battery-export power, and the unconstrained paced-export target.
 - Forecast house demand is reserved before battery export is permitted.
+- Missing learned forecasts fall back to the recent one-hour average and then
+  the current house load, with a 10% safety margin.
+- Battery export pauses when the remaining battery is required by the home.
+- Diagnostics expose the reserve source and any projected grid shortfall before
+  the next cheap period.
 - The 23:30-to-midnight portion of overnight charging carries into the next
   calendar day's simulated SOC.
 - A six-hour 7kW cheap window at 95% efficiency is verified to reach roughly
@@ -28,7 +33,7 @@ Scope: read-only **Observe → Learn → Advise → Simulate** plus ROI and life
 - Learning confidence uses elapsed time and data coverage.
 - ROI annualisation remains unavailable until seven complete 24-hour periods.
 - Existing alpha2 observed history is preserved.
-- The superseded simulated financial ledger resets once through a separate
+- The superseded alpha3 simulated financial ledger resets once through a separate
   simulation-ledger migration version.
 - Source isolation continues to reject KEMS outputs as observed inputs.
 - No `__pycache__` or `.pyc` files are included in the final package.

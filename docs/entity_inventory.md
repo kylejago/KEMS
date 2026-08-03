@@ -1,4 +1,4 @@
-# Entity inventory — v0.6.0-alpha3
+# Entity inventory — v0.6.0-alpha4
 
 KEMS creates source-mirror entities only when the matching source is configured. Derived analysis and proposal-simulation entities are created automatically and may be `unknown` until enough observations exist.
 
@@ -46,6 +46,7 @@ KEMS creates source-mirror entities only when the matching source is configured.
 - simulated battery power and SOC
 - proposal-solar-active and battery-export-enabled statuses
 - paced battery export target, exportable energy, home reserve, hours to cheap period, and projected SOC
+- home-reserve forecast source, projected pre-cheap grid import, and export-paused status
 
 ## Simulate — daily totals
 

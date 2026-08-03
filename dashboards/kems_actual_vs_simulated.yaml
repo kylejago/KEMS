@@ -123,6 +123,15 @@ views:
                   - entity: sensor.kems_battery_energy_reserved_for_home
                     name: Reserved for home
                     icon: mdi:home-battery-outline
+                  - entity: sensor.kems_home_reserve_forecast_source
+                    name: Reserve forecast source
+                    icon: mdi:home-clock-outline
+                  - entity: sensor.kems_projected_grid_import_before_cheap_period
+                    name: Projected import before cheap
+                    icon: mdi:transmission-tower-import
+                  - entity: binary_sensor.kems_battery_export_paused_for_home_reserve
+                    name: Export paused for home reserve
+                    icon: mdi:home-battery-outline
                   - entity: sensor.kems_hours_until_next_cheap_period
                     name: Hours until cheap period
                     icon: mdi:clock-fast
