@@ -53,7 +53,7 @@
         "data_description": {
           "current_import_rate": "Octopus current electricity import price.",
           "next_import_rate": "Octopus next electricity import price.",
-          "current_export_rate": "Octopus Export current price. KEMS falls back to 12p/kWh when this is absent.",
+          "current_export_rate": "Optional observed export-rate entity. The proposal simulation uses the fixed export rate from KEMS settings.",
           "electricity_standing_charge": "Octopus electricity standing charge, used in whole-home cost totals.",
           "off_peak": "Octopus binary sensor that is on during the normal Intelligent Go cheap period.",
           "intelligent_slot": "Octopus binary sensor for an active Intelligent dispatch slot.",
@@ -123,7 +123,7 @@
         "data_description": {
           "current_import_rate": "Octopus current electricity import price.",
           "next_import_rate": "Octopus next electricity import price.",
-          "current_export_rate": "Octopus Export current price. KEMS falls back to 12p/kWh when this is absent.",
+          "current_export_rate": "Optional observed export-rate entity. The proposal simulation uses the fixed export rate from KEMS settings.",
           "electricity_standing_charge": "Octopus electricity standing charge, used in whole-home cost totals.",
           "off_peak": "Octopus binary sensor that is on during the normal Intelligent Go cheap period.",
           "intelligent_slot": "Octopus binary sensor for an active Intelligent dispatch slot.",
@@ -157,7 +157,7 @@
   "options": {
     "step": {
       "init": {
-        "title": "KEMS proposal, gas, ROI, and lifetime settings",
+        "title": "KEMS KH7 proposal, paced export, gas, ROI, and lifetime settings",
         "description": "These settings affect read-only analysis, simulation, ROI, and the permanent lifetime ledger. KEMS never writes to Octopus, Ohme, or FoxESS Modbus.",
         "data": {
           "scan_interval_seconds": "Observation interval (seconds)",
@@ -169,7 +169,8 @@
           "max_discharge_kw": "Maximum battery discharge power (kW)",
           "charge_efficiency": "Charge efficiency (0.50-1.00)",
           "discharge_efficiency": "Discharge efficiency (0.50-1.00)",
-          "export_rate_pence": "Fallback export rate (p/kWh)",
+          "export_rate_pence": "Fixed export rate (p/kWh)",
+          "inverter_ac_limit_kw": "Inverter AC limit (kW)",
           "export_limit_kw": "Assumed export limit (kW)",
           "battery_export_enabled": "Simulate exporting surplus battery energy",
           "proposal_solar_enabled": "Use proposal solar model when live PV is unavailable",
@@ -194,17 +195,17 @@
           "battery_capacity_kwh": "Defaults to the quoted 56.42kWh FoxESS battery storage.",
           "battery_reserve_percent": "Defaults to 10%, matching the proposal's 50.77kWh usable capacity.",
           "battery_initial_percent": "Used when no real FoxESS battery SOC is available.",
-          "max_charge_kw": "Defaults to the quoted FoxESS KH10 10kW inverter limit.",
-          "max_discharge_kw": "Defaults to the quoted FoxESS KH10 10kW inverter limit.",
+          "max_charge_kw": "Maximum battery charging power. Defaults to the revised Fox ESS KH7 7kW inverter limit.",
+          "max_discharge_kw": "Maximum battery discharge power. Defaults to the revised Fox ESS KH7 7kW inverter limit.",
           "charge_efficiency": "Simulation assumption; the proposal does not guarantee conversion efficiency.",
           "discharge_efficiency": "Simulation assumption; the proposal does not guarantee conversion efficiency.",
-          "export_rate_pence": "Defaults to Octopus Export at 12p/kWh all day.",
-          "export_limit_kw": "Simulation-only assumption. Confirm the final DNO-approved export limit before Control is added.",
-          "battery_export_enabled": "Outside cheap periods, preserve forecast house demand and simulate exporting remaining battery energy toward the 10% reserve.",
+          "export_rate_pence": "Fixed 12p/kWh export rate used for every simulated export interval. Intelligent Octopus Flux rates are intentionally ignored.",
+          "export_limit_kw": "Separate DNO/grid export limit. Runtime export is also capped by the 7kW inverter limit.",
+          "battery_export_enabled": "Preserve forecast house demand, then spread remaining battery export across the hours until the next cheap period.",
           "proposal_solar_enabled": "Models 21 x 460W panels, 9.66kWp, three roof orientations, and the proposal monthly generation baseline.",
           "proposal_solar_factor": "Scale the proposal baseline for cloud/weather sensitivity; 1.0 uses the proposal average.",
           "gas_kwh_per_m3": "Used only when the configured gas source reports cubic metres rather than kWh.",
-          "simulation_strategy": "Export first follows Kyle's Intelligent Go plus 12p export plan; self-use supplies the home from solar first.",
+          "simulation_strategy": "Paced export targets the configured reserve at the next cheap-period start instead of exporting the battery early in the day.",
           "battery_power_positive_is_discharge": "Controls how KEMS separates FoxESS battery charge and discharge totals. Leave enabled when positive power means battery discharge.",
           "system_cost_gbp": "Defaults to the quoted system price of £20,995.",
           "additional_costs_gbp": "Add DNO fees, structural work, smart-meter work, or later installation additions.",
@@ -215,7 +216,8 @@
           "electricity_inflation_percent": "Used only in future ROI projections. KEMS still uses actual Octopus rates for current simulations.",
           "battery_degradation_percent": "Reduces projected future annual value over time.",
           "discount_rate_percent": "Used to calculate discounted net value. The proposal benchmark used 6.75%.",
-          "roi_forecast_years": "Number of years included in the predicted net-value calculation."
+          "roi_forecast_years": "Number of years included in the predicted net-value calculation.",
+          "inverter_ac_limit_kw": "Combined simulated solar and battery AC output cannot exceed the revised Fox ESS KH7 7kW limit."
         }
       }
     }

@@ -12,6 +12,7 @@ from .models import LearnedState, Snapshot
 SLOT_MINUTES = 15
 MIN_READY_DAYS = 7
 TARGET_CONFIDENCE_DAYS = 30
+EXPECTED_RECORDS_PER_DAY = 288
 
 
 @dataclass(slots=True)
@@ -90,15 +91,23 @@ class LearningEngine:
             or record.grid_import_kw is not None
             or record.solar_power_kw is not None
         )
-        day_confidence = min(len(days) / TARGET_CONFIDENCE_DAYS, 1.0)
-        sample_confidence = min(useful_records / (len(days) * 48 or 1), 1.0)
-        confidence = round(100 * day_confidence * (0.5 + 0.5 * sample_confidence), 1)
+        first_timestamp = min(record.timestamp for record in records)
+        elapsed_days = max((now - first_timestamp).total_seconds() / 86400, 0.0)
+        expected_records = max(elapsed_days * EXPECTED_RECORDS_PER_DAY, 1.0)
+        sample_confidence = min(useful_records / expected_records, 1.0)
+        time_confidence = min(elapsed_days / TARGET_CONFIDENCE_DAYS, 1.0)
+        confidence = round(
+            100 * time_confidence * (0.5 + 0.5 * sample_confidence),
+            1,
+        )
 
         return LearnedState(
             days_observed=len(days),
+            elapsed_observation_days=round(elapsed_days, 2),
             samples=len(records),
+            data_coverage=round(100 * sample_confidence, 1),
             confidence=confidence,
-            ready=len(days) >= MIN_READY_DAYS and useful_records >= 96,
+            ready=(elapsed_days >= MIN_READY_DAYS and useful_records >= 96),
             typical_house_load_kw=typical_load,
             typical_solar_power_kw=typical_solar,
             typical_grid_import_kw=typical_grid,

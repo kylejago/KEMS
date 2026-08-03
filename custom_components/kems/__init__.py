@@ -9,7 +9,15 @@ from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 
 from .collector import Collector
-from .const import CONF_EV_POWER
+from .const import (
+    CONF_EV_POWER,
+    CONF_EXPORT_LIMIT,
+    CONF_EXPORT_RATE,
+    CONF_INVERTER_LIMIT,
+    CONF_MAX_CHARGE,
+    CONF_MAX_DISCHARGE,
+    CONF_SIMULATION_STRATEGY,
+)
 from .coordinator import KEMSCoordinator
 from .entity_discovery import (
     SourceValidationResult,
@@ -82,18 +90,35 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
 async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Migrate earlier KEMS config entries to the current schema."""
-    if entry.version > 7:
+    if entry.version > 8:
         return False
 
     data = dict(entry.data)
+    options = dict(entry.options)
+
     old_ev_power = data.pop("ev_power", None)
     if old_ev_power and not data.get(CONF_EV_POWER):
         data[CONF_EV_POWER] = old_ev_power
 
+    if entry.version < 8:
+        # The accepted proposal changed from a KH10 to a KH7. Migrate the
+        # simulation automatically while preserving all observed history.
+        options[CONF_INVERTER_LIMIT] = 7.0
+        options[CONF_MAX_CHARGE] = 7.0
+        options[CONF_MAX_DISCHARGE] = 7.0
+        try:
+            previous_export_limit = float(options.get(CONF_EXPORT_LIMIT, 7.0))
+        except (TypeError, ValueError):
+            previous_export_limit = 7.0
+        options[CONF_EXPORT_LIMIT] = min(max(previous_export_limit, 0.0), 7.0)
+        options[CONF_EXPORT_RATE] = 12.0
+        options[CONF_SIMULATION_STRATEGY] = "paced_export"
+
     hass.config_entries.async_update_entry(
         entry,
         data=data,
-        version=7,
+        options=options,
+        version=8,
         minor_version=0,
     )
     return True

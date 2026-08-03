@@ -1,21 +1,24 @@
-# KEMS 0.6.0-alpha2 source-isolation correction
+# KEMS 0.6.0-alpha3 KH7 paced-export correction
 
-This build keeps KEMS classified as a Home Assistant hub integration and fixes
-the false observed export-income feedback loop.
+This build retains the alpha2 source-isolation protections and changes only the
+proposal simulation and presentation layers.
 
-Key protections:
+Key changes:
 
-- strict integration-platform ownership for every source mapping;
-- rejection of all KEMS-generated output entities as inputs;
-- no observed grid export until a real FoxESS Modbus source exists;
-- official Ohme status drives EV connected and charging state;
-- Octopus cumulative total gas consumption drives the lifetime gas ledger;
-- rejected mappings are visible in diagnostics and on the diagnostic dashboard;
-- fresh history and lifetime storage under `clean_v6_alpha2`.
+- Fox ESS KH7 7kW inverter profile;
+- 7kW charge and discharge limits;
+- combined solar plus battery AC output capped at 7kW;
+- fixed 12p/kWh simulated export tariff;
+- paced battery export toward the next cheap period;
+- forecast house-energy reserve before battery export;
+- projected SOC target close to 10% at the next cheap-period start;
+- preserved observed learning history;
+- one-time reset of superseded simulated financial value;
+- smoother learning confidence and seven-complete-day ROI gate.
 
 The manifest contains:
 
 ```json
 "integration_type": "hub",
-"version": "0.6.0-alpha2"
+"version": "0.6.0-alpha3"
 ```

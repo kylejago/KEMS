@@ -82,7 +82,9 @@ class LearnedState:
     """What KEMS has learned from recorded observations."""
 
     days_observed: int = 0
+    elapsed_observation_days: float = 0.0
     samples: int = 0
+    data_coverage: float = 0.0
     confidence: float = 0.0
     ready: bool = False
     typical_house_load_kw: float | None = None
@@ -140,17 +142,18 @@ class SimulationConfig:
     battery_capacity_kwh: float = 56.42
     battery_reserve_percent: float = 10.0
     battery_initial_percent: float = 10.0
-    max_charge_kw: float = 10.0
-    max_discharge_kw: float = 10.0
+    max_charge_kw: float = 7.0
+    max_discharge_kw: float = 7.0
     charge_efficiency: float = 0.95
     discharge_efficiency: float = 0.95
     export_rate_pence: float = 12.0
-    export_limit_kw: float = 10.0
+    inverter_limit_kw: float = 7.0
+    export_limit_kw: float = 7.0
     battery_export_enabled: bool = True
     proposal_solar_enabled: bool = True
     proposal_solar_factor: float = 1.0
     battery_power_positive_is_discharge: bool = True
-    strategy: str = "export_first"
+    strategy: str = "paced_export"
 
 
 @dataclass(frozen=True, slots=True)
@@ -192,8 +195,17 @@ class SimulationState:
     current_simulated_grid_import_kw: float | None = None
     current_simulated_grid_export_kw: float | None = None
     current_simulated_battery_power_kw: float | None = None
+    current_simulated_battery_to_home_power_kw: float | None = None
+    current_simulated_battery_export_power_kw: float | None = None
+    target_battery_export_power_kw: float | None = None
+    exportable_battery_energy_kwh: float | None = None
+    reserved_for_home_kwh: float | None = None
+    hours_until_next_cheap_period: float | None = None
+    projected_soc_at_cheap_period_percent: float | None = None
     effective_export_rate_pence: float | None = None
+    inverter_limit_kw: float | None = None
     export_limit_kw: float | None = None
+    strategy: str = "paced_export"
     proposal_solar_active: bool = False
     battery_export_enabled: bool = False
     data_coverage: float = 0.0

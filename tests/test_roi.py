@@ -25,7 +25,7 @@ def test_pre_install_roi_annualises_simulated_value() -> None:
     assert result.ready is True
     assert result.status == "Pre-install ROI simulation"
     assert result.system_installed is False
-    assert result.predicted_annual_saving_gbp == 1216.67
+    assert result.predicted_annual_saving_gbp == 1258.62
     assert result.predicted_payback_years is not None
     assert result.predicted_payback_date is not None
     assert result.predicted_net_value_gbp is not None
@@ -86,3 +86,26 @@ def test_lifetime_ledger_round_trip() -> None:
     assert restored.paid_back_date == date(2034, 9, 18)
     assert restored.grid_import_kwh == 123.4
     assert restored.export_income_pence == 567.8
+
+
+def test_pre_install_roi_waits_for_seven_complete_days() -> None:
+    """Partial early observations must not be annualised into a payback claim."""
+    now = datetime(2026, 8, 3, 12, 0, tzinfo=UTC)
+    ledger = LifetimeLedger(
+        first_observation=now - timedelta(days=2, hours=12),
+        last_updated=now,
+        observed_days=3,
+        simulated_system_value_pence=1500.0,
+    )
+
+    result = ROIEngine().evaluate(
+        ledger,
+        SimulationState(simulated_system_value_pence=500.0),
+        now,
+        ROIConfig(system_cost_gbp=1000.0),
+    )
+
+    assert result.ready is False
+    assert result.status == "Learning financial baseline"
+    assert result.predicted_annual_saving_gbp is None
+    assert result.predicted_payback_years is None

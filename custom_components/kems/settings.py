@@ -26,6 +26,7 @@ from .const import (
     CONF_GAS_KWH_PER_M3,
     CONF_GRANTS_REBATES,
     CONF_HISTORY_DAYS,
+    CONF_INVERTER_LIMIT,
     CONF_MANUAL_SYSTEM_COSTS,
     CONF_MAX_CHARGE,
     CONF_MAX_DISCHARGE,
@@ -63,19 +64,36 @@ class KEMSSettings:
                 battery_capacity_kwh=float(values[CONF_BATTERY_CAPACITY]),
                 battery_reserve_percent=float(values[CONF_BATTERY_RESERVE]),
                 battery_initial_percent=float(values[CONF_BATTERY_INITIAL]),
-                max_charge_kw=float(values[CONF_MAX_CHARGE]),
-                max_discharge_kw=float(values[CONF_MAX_DISCHARGE]),
+                max_charge_kw=min(
+                    float(values[CONF_MAX_CHARGE]),
+                    max(float(values[CONF_INVERTER_LIMIT]), 0.1),
+                ),
+                max_discharge_kw=min(
+                    float(values[CONF_MAX_DISCHARGE]),
+                    max(float(values[CONF_INVERTER_LIMIT]), 0.1),
+                ),
                 charge_efficiency=float(values[CONF_CHARGE_EFFICIENCY]),
                 discharge_efficiency=float(values[CONF_DISCHARGE_EFFICIENCY]),
                 export_rate_pence=float(values[CONF_EXPORT_RATE]),
-                export_limit_kw=float(values[CONF_EXPORT_LIMIT]),
+                inverter_limit_kw=max(
+                    float(values[CONF_INVERTER_LIMIT]),
+                    0.1,
+                ),
+                export_limit_kw=min(
+                    float(values[CONF_EXPORT_LIMIT]),
+                    max(float(values[CONF_INVERTER_LIMIT]), 0.1),
+                ),
                 battery_export_enabled=bool(values[CONF_BATTERY_EXPORT_ENABLED]),
                 proposal_solar_enabled=bool(values[CONF_PROPOSAL_SOLAR_ENABLED]),
                 proposal_solar_factor=float(values[CONF_PROPOSAL_SOLAR_FACTOR]),
                 battery_power_positive_is_discharge=bool(
                     values[CONF_BATTERY_POWER_POSITIVE_IS_DISCHARGE]
                 ),
-                strategy=str(values[CONF_SIMULATION_STRATEGY]),
+                strategy=(
+                    "self_use"
+                    if str(values[CONF_SIMULATION_STRATEGY]) == "self_use"
+                    else "paced_export"
+                ),
             ),
             roi=ROIConfig(
                 system_cost_gbp=max(float(values[CONF_SYSTEM_COST]), 0.0),

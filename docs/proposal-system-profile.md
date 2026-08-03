@@ -1,6 +1,7 @@
 # Proposal system profile
 
-KEMS v0.6.0-alpha2 includes a fixed proposal profile for simulation before the physical solar/battery system is commissioned.
+KEMS v0.6.0-alpha3 uses the revised proposal profile for simulation before the
+physical solar/battery system is commissioned.
 
 ## Hardware assumptions
 
@@ -8,8 +9,8 @@ KEMS v0.6.0-alpha2 includes a fixed proposal profile for simulation before the p
 |---|---:|
 | PV modules | 21 × DMEGC 460 W |
 | Total PV capacity | 9.66 kWp |
-| Inverter | Fox ESS KH10 |
-| Inverter / battery power limit | 10 kW |
+| Inverter | Fox ESS KH7 |
+| Inverter AC limit | 7 kW |
 | Battery | 2 × Fox ESS ECS4100-H7 |
 | Nominal capacity | 56.42 kWh |
 | Proposal usable capacity | 50.77 kWh |
@@ -25,31 +26,21 @@ KEMS v0.6.0-alpha2 includes a fixed proposal profile for simulation before the p
 | West | 9 | 4.14 kWp | 271° | 39° |
 | South | 3 | 1.38 kWp | 181° | 44° |
 
-The proposal reports a 0.938 shade factor and 8,016 kWh annual output. Its monthly table is rounded and totals 8,017 kWh; KEMS preserves the quoted monthly values and the separate 8,016 kWh annual headline.
-
-## Monthly generation baseline
-
-| Month | kWh |
-|---|---:|
-| January | 258 |
-| February | 351 |
-| March | 643 |
-| April | 778 |
-| May | 1,027 |
-| June | 1,195 |
-| July | 1,192 |
-| August | 930 |
-| September | 665 |
-| October | 475 |
-| November | 289 |
-| December | 214 |
-
-The deterministic curve is only a proposal baseline. Live FoxESS PV data takes priority once available.
+The proposal reports a 0.938 shade factor and 8,016 kWh annual output. Its
+monthly table is rounded and totals 8,017 kWh; KEMS preserves the quoted monthly
+values and the separate 8,016 kWh annual headline.
 
 ## Tariff and operating assumptions
 
 - Import rates come from the current Intelligent Octopus Go entities.
-- The 12 p/kWh fixed export rate is used only when no live export-rate entity is available.
-- Cheap periods are normal Octopus off-peak or an Intelligent slot confirmed by active Ohme charging.
-- The default strategy exports solar first, powers the home from battery outside cheap periods, preserves forecast demand, and can export surplus battery energy while retaining the reserve.
-- The 10 kW export limit is a user-editable simulation value, not proof of DNO approval.
+- Simulated export is always valued at the configured fixed 12p/kWh rate.
+- Intelligent Octopus Flux export rates are not used.
+- Cheap periods are normal Octopus off-peak or an Intelligent slot confirmed by
+  active Ohme charging.
+- Outside cheap periods, the home is supplied from battery where possible and
+  proposal solar is exported.
+- Battery energy above the 10% reserve and forecast home requirement is spread
+  across the remaining hours until the next cheap period.
+- Combined solar and battery AC output cannot exceed 7kW.
+- The separate grid-export limit remains editable for the final DNO approval.
+- A standard six-hour cheap window at 7kW and 95% efficiency adds about 39.9kWh, so a battery starting at the 10% reserve reaches roughly 80.7% unless confirmed extra Intelligent slots extend charging.

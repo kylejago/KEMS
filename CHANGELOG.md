@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.6.0-alpha3
+
+- Updated the proposal profile to the Fox ESS KH7 7kW inverter.
+- Added paced battery export that spreads surplus energy until the next cheap period instead of discharging early in the day.
+- Added a dynamic reserve for forecast house demand and a projected 10% SOC target at the next cheap-period start.
+- Enforced a combined 7kW solar/battery AC output limit and a separate configurable grid-export limit.
+- Corrected overnight charging so the KH7 no longer assumes a 56.42kWh battery can rise from 10% to 100% during a standard six-hour 7kW cheap window.
+- Locked proposal export income to the configured fixed 12p/kWh tariff; Flux/time-of-use export rates are ignored.
+- Added separate live battery-to-home and actual battery-export power entities, plus target export power, exportable energy, home reserve, hours-to-cheap, and projected-SOC entities.
+- Updated live simulated flow to use the current snapshot rather than the most recent retained five-minute sample.
+- Changed learning confidence to increase smoothly with elapsed observation time and data coverage.
+- Withheld annualised ROI and payback until seven complete 24-hour observation periods are available.
+- Preserved alpha2 observed history while resetting only the superseded simulated financial ledger.
+- Added the full-width `kems_actual_vs_simulated.yaml` dashboard.
+
 ## 0.6.0-alpha2
 
 - Prevented every `sensor.kems_*` and `binary_sensor.kems_*` entity from being used as an observed input source.

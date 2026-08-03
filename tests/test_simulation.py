@@ -1,6 +1,7 @@
 """Tests for the KEMS read-only simulation engine."""
 
 from datetime import UTC, datetime, timedelta
+from zoneinfo import ZoneInfo
 
 from kems_core import SimulationConfig, SimulationEngine, Snapshot
 
@@ -114,8 +115,8 @@ def test_proposal_solar_and_fixed_export_rate_are_accounted_for() -> None:
     assert result.effective_export_rate_pence == 12.0
 
 
-def test_live_export_rate_overrides_fixed_fallback() -> None:
-    """A configured Octopus export entity should override the 12p fallback."""
+def test_fixed_export_rate_ignores_live_flux_rate() -> None:
+    """The proposal simulation must remain on Kyle's fixed 12p export rate."""
     start = datetime(2026, 7, 31, 11, 0, tzinfo=UTC)
     records = [
         Snapshot(
@@ -146,7 +147,7 @@ def test_live_export_rate_overrides_fixed_fallback() -> None:
         ),
     )
 
-    assert result.effective_export_rate_pence == 15.0
+    assert result.effective_export_rate_pence == 12.0
 
 
 def test_simulation_exposes_system_value_and_live_energy_totals() -> None:
@@ -197,3 +198,222 @@ def test_simulation_exposes_system_value_and_live_energy_totals() -> None:
     assert result.actual_export_income_pence == 6.0
     assert result.actual_avoided_import_value_pence == 30.0
     assert result.actual_system_value_pence == 36.0
+
+
+def test_paced_export_spreads_surplus_across_remaining_hours() -> None:
+    """Battery export should be paced instead of dumped after cheap charging."""
+    start = datetime(2026, 8, 3, 8, 0, tzinfo=UTC)
+    cheap_start = start + timedelta(hours=10)
+    records = [
+        Snapshot(
+            timestamp=start + timedelta(minutes=30 * index),
+            current_import_rate=28.3,
+            house_load_kw=0.0,
+            grid_import_kw=0.0,
+            off_peak=False,
+            next_offpeak_start=cheap_start,
+        )
+        for index in range(3)
+    ]
+
+    result = SimulationEngine().simulate_today(
+        records,
+        start + timedelta(hours=1),
+        SimulationConfig(
+            battery_capacity_kwh=10.0,
+            battery_initial_percent=100.0,
+            battery_reserve_percent=10.0,
+            max_charge_kw=7.0,
+            max_discharge_kw=7.0,
+            inverter_limit_kw=7.0,
+            export_limit_kw=7.0,
+            proposal_solar_enabled=False,
+            strategy="paced_export",
+        ),
+        forecast_energy_until_offpeak_kwh=2.0,
+        current_snapshot=records[-1],
+    )
+
+    assert result.simulated_battery_export_kwh is not None
+    assert result.simulated_battery_export_kwh < 1.0
+    assert result.target_battery_export_power_kw is not None
+    assert 0.4 < result.target_battery_export_power_kw < 1.0
+    assert result.simulated_battery_soc is not None
+    assert result.simulated_battery_soc > 90.0
+    assert result.projected_soc_at_cheap_period_percent == 10.0
+
+
+def test_combined_solar_and_battery_output_respects_kh7_limit() -> None:
+    """Solar plus battery AC output must never exceed the KH7 7kW limit."""
+    start = datetime(2026, 8, 3, 12, 0, tzinfo=UTC)
+    cheap_start = start + timedelta(hours=10)
+    records = [
+        Snapshot(
+            timestamp=start,
+            current_import_rate=28.3,
+            house_load_kw=2.0,
+            grid_import_kw=2.0,
+            solar_power_kw=6.0,
+            off_peak=False,
+            next_offpeak_start=cheap_start,
+        ),
+        Snapshot(
+            timestamp=start + timedelta(minutes=5),
+            current_import_rate=28.3,
+            house_load_kw=2.0,
+            grid_import_kw=2.0,
+            solar_power_kw=6.0,
+            off_peak=False,
+            next_offpeak_start=cheap_start,
+        ),
+    ]
+
+    result = SimulationEngine().simulate_today(
+        records,
+        start + timedelta(minutes=5),
+        SimulationConfig(
+            battery_capacity_kwh=10.0,
+            battery_initial_percent=100.0,
+            battery_reserve_percent=10.0,
+            max_discharge_kw=7.0,
+            inverter_limit_kw=7.0,
+            export_limit_kw=7.0,
+            proposal_solar_enabled=False,
+            strategy="paced_export",
+        ),
+        forecast_energy_until_offpeak_kwh=0.0,
+        current_snapshot=records[-1],
+    )
+
+    assert result.current_simulated_battery_power_kw == 2.0
+    assert result.current_simulated_battery_to_home_power_kw == 2.0
+    assert result.current_simulated_battery_export_power_kw == 0.0
+    assert result.current_simulated_grid_export_kw == 5.0
+    assert (
+        result.current_simulated_battery_power_kw
+        + result.current_simulated_grid_export_kw
+        <= 7.0
+    )
+
+
+def test_live_plan_uses_current_snapshot_not_stale_history_sample() -> None:
+    """The comparison dashboard should show the current observed house load."""
+    start = datetime(2026, 8, 3, 12, 0, tzinfo=UTC)
+    records = [
+        Snapshot(
+            timestamp=start,
+            current_import_rate=28.3,
+            house_load_kw=0.5,
+            grid_import_kw=0.5,
+        ),
+        Snapshot(
+            timestamp=start + timedelta(minutes=5),
+            current_import_rate=28.3,
+            house_load_kw=0.5,
+            grid_import_kw=0.5,
+        ),
+    ]
+    live = Snapshot(
+        timestamp=start + timedelta(minutes=6),
+        current_import_rate=28.3,
+        house_load_kw=2.5,
+        grid_import_kw=2.5,
+    )
+
+    result = SimulationEngine().simulate_today(
+        records,
+        live.timestamp,
+        SimulationConfig(proposal_solar_enabled=False),
+        current_snapshot=live,
+    )
+
+    assert result.current_simulated_house_load_kw == 2.5
+
+
+def test_charge_before_midnight_carries_into_new_day_soc() -> None:
+    """The 23:30-00:00 charge must not be lost at the calendar-day reset."""
+    previous = datetime(2026, 8, 2, 22, 30, tzinfo=UTC)
+    midnight = datetime(2026, 8, 3, 0, 0, tzinfo=UTC)
+    records: list[Snapshot] = []
+    cursor = previous
+    while cursor <= midnight + timedelta(minutes=10):
+        records.append(
+            Snapshot(
+                timestamp=cursor,
+                current_import_rate=3.4933,
+                off_peak=True,
+                house_load_kw=1.0,
+                grid_import_kw=1.0,
+            )
+        )
+        cursor += timedelta(minutes=5)
+
+    result = SimulationEngine().simulate_today(
+        records,
+        midnight + timedelta(minutes=10),
+        SimulationConfig(
+            battery_capacity_kwh=56.42,
+            battery_initial_percent=10.0,
+            battery_reserve_percent=10.0,
+            max_charge_kw=7.0,
+            max_discharge_kw=7.0,
+            inverter_limit_kw=7.0,
+            export_limit_kw=7.0,
+            proposal_solar_enabled=False,
+        ),
+        current_snapshot=records[-1],
+    )
+
+    # Ninety minutes of pre-midnight charging plus ten minutes after midnight
+    # must be reflected in SOC, while today's charge counter includes only the
+    # post-midnight intervals.
+    assert result.simulated_battery_soc is not None
+    assert result.simulated_battery_soc > 28.0
+    assert result.simulated_battery_charge_kwh is not None
+    assert result.simulated_battery_charge_kwh < 2.0
+
+
+def test_kh7_six_hour_cheap_window_does_not_assume_full_charge() -> None:
+    """A KH7 cannot lift 56.42kWh from 10% to 100% in six hours at 7kW."""
+    local = ZoneInfo("Europe/London")
+    cheap_start = datetime(2026, 8, 3, 23, 30, tzinfo=local)
+    cheap_end = datetime(2026, 8, 4, 5, 30, tzinfo=local)
+    records: list[Snapshot] = []
+    cursor = cheap_start
+    while cursor <= cheap_end:
+        records.append(
+            Snapshot(
+                timestamp=cursor,
+                current_import_rate=3.4933,
+                off_peak=cursor < cheap_end,
+                house_load_kw=1.0,
+                grid_import_kw=1.0,
+            )
+        )
+        cursor += timedelta(minutes=5)
+
+    result = SimulationEngine().simulate_today(
+        records,
+        cheap_end + timedelta(minutes=1),
+        SimulationConfig(
+            battery_capacity_kwh=56.42,
+            battery_initial_percent=10.0,
+            battery_reserve_percent=10.0,
+            max_charge_kw=7.0,
+            max_discharge_kw=7.0,
+            inverter_limit_kw=7.0,
+            export_limit_kw=7.0,
+            charge_efficiency=0.95,
+            proposal_solar_enabled=False,
+        ),
+        current_snapshot=records[-1],
+    )
+
+    # Six hours at 7kW and 95% efficiency stores 39.9kWh. Added to the
+    # 5.642kWh held at the 10% reserve, this reaches roughly 80.7% SOC.
+    assert result.simulated_battery_soc is not None
+    assert 80.6 <= result.simulated_battery_soc <= 80.8
+    assert result.simulated_battery_charge_kwh is not None
+    # Today's counter begins at local midnight, so the 23:30-00:00 portion is
+    # represented in starting SOC rather than counted again today.
+    assert 36.4 <= result.simulated_battery_charge_kwh <= 36.7

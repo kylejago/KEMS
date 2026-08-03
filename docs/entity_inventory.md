@@ -1,11 +1,11 @@
-# Entity inventory — v0.6.0-alpha2
+# Entity inventory — v0.6.0-alpha3
 
 KEMS creates source-mirror entities only when the matching source is configured. Derived analysis and proposal-simulation entities are created automatically and may be `unknown` until enough observations exist.
 
 ## Observe — electricity and tariff
 
 - current and next Intelligent Octopus Go import rates
-- live or fallback export rate
+- optional observed export rate plus fixed 12p/kWh simulation export rate
 - normal off-peak and Intelligent slot status
 - confirmed-cheap status
 - electricity standing charge
@@ -45,6 +45,7 @@ KEMS creates source-mirror entities only when the matching source is configured.
 - simulated grid import, export, and signed net grid power
 - simulated battery power and SOC
 - proposal-solar-active and battery-export-enabled statuses
+- paced battery export target, exportable energy, home reserve, hours to cheap period, and projected SOC
 
 ## Simulate — daily totals
 

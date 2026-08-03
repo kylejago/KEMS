@@ -3,10 +3,13 @@
 The dashboard collection is designed around two parallel systems:
 
 - **Live** — actual Octopus, Ohme and FoxESS Modbus readings.
-- **Simulated** — the proposed 9.66 kWp PV, KH10 inverter and 56.42 kWh battery operating against the same household demand and tariff timeline.
+- **Simulated** — the proposed 9.66kWp PV, KH7 7kW inverter and 56.42kWh battery
+  operating against the same household demand and tariff timeline.
 
-The advanced dashboard uses Power Flow Card Plus for two side-by-side flow diagrams and ApexCharts for 24-hour and multi-day comparisons. It is closest to the supplied reference image.
+`kems_actual_vs_simulated.yaml` is the simplest built-in dashboard. It places
+KEMS status across the full width, then shows actual and simulated columns,
+power graphs, financial differences, and the paced battery-export diagnostics.
 
-The built-in dashboard contains the same core data without custom cards. The portrait version is suitable for an always-on screen. The analytics version separates flow, financial, solar/export, and gas views.
-
-See `dashboards/README.md` for installation.
+The advanced dashboard uses Power Flow Card Plus and ApexCharts. The built-in
+comparison, portrait, analytics and diagnostic dashboards require no custom
+cards.

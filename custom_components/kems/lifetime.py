@@ -9,7 +9,7 @@ from typing import Any
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.storage import Store
 
-from .const import DOMAIN, STORAGE_NAMESPACE
+from .const import DOMAIN, SIMULATION_LEDGER_VERSION, STORAGE_NAMESPACE
 from .kems_core import (
     GasEngine,
     GasSummary,
@@ -46,6 +46,7 @@ class LifetimeLedgerRecorder:
         self._maintenance_date: date | None = None
         self._updates_since_save = 0
         self._loaded_existing = False
+        self._simulation_ledger_version = SIMULATION_LEDGER_VERSION
 
     @property
     def ledger(self) -> LifetimeLedger:
@@ -72,6 +73,15 @@ class LifetimeLedgerRecorder:
             for key, value in data.get("tracking_values", {}).items()
             if isinstance(value, (int, float))
         }
+        stored_simulation_version = int(data.get("simulation_ledger_version", 1))
+        if stored_simulation_version < SIMULATION_LEDGER_VERSION:
+            # Keep all observed history and actual post-install totals, but
+            # discard simulated financial value produced by the superseded
+            # 10kW export-first model. The current day is recalculated using
+            # the KH7 paced-export model on the first coordinator refresh.
+            self._ledger.simulated_system_value_pence = 0.0
+            self._tracking_values["simulated_system_value_pence"] = 0.0
+        self._simulation_ledger_version = SIMULATION_LEDGER_VERSION
         maintenance_date = data.get("maintenance_date")
         if isinstance(maintenance_date, str):
             self._maintenance_date = date.fromisoformat(maintenance_date)
@@ -171,6 +181,7 @@ class LifetimeLedgerRecorder:
                     if self._maintenance_date
                     else None
                 ),
+                "simulation_ledger_version": self._simulation_ledger_version,
             }
         )
         self._updates_since_save = 0

@@ -13,7 +13,7 @@ DASHBOARDS = ROOT / "dashboards"
 def test_all_dashboard_yaml_is_valid() -> None:
     """Every shipped dashboard should parse as YAML."""
     files = sorted(DASHBOARDS.glob("*.yaml"))
-    assert len(files) == 8
+    assert len(files) == 9
     for path in files:
         content = yaml.safe_load(path.read_text(encoding="utf-8"))
         assert isinstance(content, dict)
@@ -54,3 +54,15 @@ def test_diagnostic_dashboard_lists_current_kems_entities_dynamically() -> None:
     assert "startswith('sensor.kems_')" in text
     assert "startswith('binary_sensor.kems_')" in text
     assert "startswith('update.kems_')" in text
+
+
+def test_actual_vs_simulated_dashboard_includes_paced_export_diagnostics() -> None:
+    """The simple comparison view must expose the new KH7 pacing plan."""
+    text = (DASHBOARDS / "kems_actual_vs_simulated.yaml").read_text(encoding="utf-8")
+    assert "panel: true" in text
+    assert "sensor.kems_learning_confidence" in text
+    assert "sensor.kems_simulated_battery_to_home_power" in text
+    assert "sensor.kems_simulated_battery_export_power" in text
+    assert "sensor.kems_target_battery_export_power" in text
+    assert "sensor.kems_exportable_battery_energy_remaining" in text
+    assert "sensor.kems_projected_soc_at_cheap_period_start" in text
