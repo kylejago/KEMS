@@ -88,17 +88,17 @@ def test_manifest_classifies_kems_as_hub() -> None:
 
     manifest = json.loads((INTEGRATION / "manifest.json").read_text(encoding="utf-8"))
     assert manifest["integration_type"] == "hub"
-    assert manifest["version"] == "0.6.0-alpha3"
+    assert manifest["version"] == "0.6.0-alpha4"
 
 
-def test_alpha3_preserves_alpha2_history_and_versions_simulation_ledger() -> None:
-    """Observed history must survive while simulated financial value can reset."""
+def test_alpha4_preserves_history_and_versions_simulation_ledger() -> None:
+    """Observed history must survive while alpha3 simulation value can reset."""
     const_source = (INTEGRATION / "const.py").read_text(encoding="utf-8")
     history_source = (INTEGRATION / "history.py").read_text(encoding="utf-8")
     lifetime_source = (INTEGRATION / "lifetime.py").read_text(encoding="utf-8")
 
     assert 'STORAGE_NAMESPACE = "clean_v6_alpha2"' in const_source
-    assert "SIMULATION_LEDGER_VERSION = 2" in const_source
+    assert "SIMULATION_LEDGER_VERSION = 3" in const_source
     assert "STORAGE_NAMESPACE" in history_source
     assert "simulation_ledger_version" in lifetime_source
 

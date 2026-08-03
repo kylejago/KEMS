@@ -66,3 +66,6 @@ def test_actual_vs_simulated_dashboard_includes_paced_export_diagnostics() -> No
     assert "sensor.kems_target_battery_export_power" in text
     assert "sensor.kems_exportable_battery_energy_remaining" in text
     assert "sensor.kems_projected_soc_at_cheap_period_start" in text
+    assert "sensor.kems_home_reserve_forecast_source" in text
+    assert "sensor.kems_projected_grid_import_before_cheap_period" in text
+    assert "binary_sensor.kems_battery_export_paused_for_home_reserve" in text

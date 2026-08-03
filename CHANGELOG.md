@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.6.0-alpha4
+
+- Prevented paced battery export whenever learned demand forecasts are unavailable and the remaining battery is needed by the home.
+- Added recent-load/current-load reserve fallbacks with a 10% safety margin.
+- Added reserve-source, projected pre-cheap grid import, and export-paused diagnostics.
+- Reset only the simulated financial ledger; observed learning history remains preserved.
+
 ## 0.6.0-alpha3
 
 - Updated the proposal profile to the Fox ESS KH7 7kW inverter.

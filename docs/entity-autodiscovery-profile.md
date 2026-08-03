@@ -1,6 +1,6 @@
 # Automatic source matching profile
 
-KEMS 0.6.0-alpha3 includes deterministic matching before fuzzy discovery for:
+KEMS 0.6.0-alpha4 includes deterministic matching before fuzzy discovery for:
 
 - BottlecapDave Octopus Energy (`octopus_energy`)
 - MegaKid Octopus Intelligent (`octopus_intelligent`)

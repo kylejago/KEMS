@@ -114,6 +114,13 @@ def _simulation_attributes(data: KEMSData) -> Mapping[str, Any]:
         "projected_soc_at_cheap_period_percent": (
             simulation.projected_soc_at_cheap_period_percent
         ),
+        "home_reserve_forecast_source": (simulation.home_reserve_forecast_source),
+        "projected_grid_import_before_cheap_kwh": (
+            simulation.projected_grid_import_before_cheap_kwh
+        ),
+        "battery_export_paused_for_home_reserve": (
+            simulation.battery_export_paused_for_home_reserve
+        ),
         "avoided_day_rate_import_kwh": simulation.avoided_day_rate_import_kwh,
         "baseline_no_system_cost_pence": simulation.baseline_no_system_cost_pence,
         "actual_avoided_import_value_pence": (
@@ -781,6 +788,23 @@ SENSORS: tuple[KEMSSensorEntityDescription, ...] = (
         native_unit_of_measurement=PERCENTAGE,
         suggested_display_precision=0,
         value_fn=lambda data: (data.simulation.projected_soc_at_cheap_period_percent),
+    ),
+    KEMSSensorEntityDescription(
+        key="home_reserve_forecast_source",
+        name="Home reserve forecast source",
+        icon="mdi:home-clock-outline",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda data: data.simulation.home_reserve_forecast_source,
+    ),
+    KEMSSensorEntityDescription(
+        key="projected_grid_import_before_cheap",
+        name="Projected grid import before cheap period",
+        icon="mdi:transmission-tower-import",
+        device_class=SensorDeviceClass.ENERGY,
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        suggested_display_precision=2,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda data: (data.simulation.projected_grid_import_before_cheap_kwh),
     ),
     KEMSSensorEntityDescription(
         key="simulation_strategy",

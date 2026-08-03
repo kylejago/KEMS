@@ -68,6 +68,9 @@ views:
           | Target battery export | {{ states('sensor.kems_target_battery_export_power') }} kW |
           | Exportable battery energy | {{ states('sensor.kems_exportable_battery_energy_remaining') }} kWh |
           | Reserved for home | {{ states('sensor.kems_battery_energy_reserved_for_home') }} kWh |
+          | Home reserve source | {{ states('sensor.kems_home_reserve_forecast_source') }} |
+          | Projected grid import before cheap | {{ states('sensor.kems_projected_grid_import_before_cheap_period') }} kWh |
+          | Export paused for home reserve | {{ states('binary_sensor.kems_battery_export_paused_for_home_reserve') }} |
           | Hours until cheap period | {{ states('sensor.kems_hours_until_next_cheap_period') }} h |
           | Projected SOC at cheap start | {{ states('sensor.kems_projected_soc_at_cheap_period_start') }}% |
           | Inverter limit | {{ state_attr('sensor.kems_simulated_kems_cost_today', 'inverter_limit_kw') }} kW |

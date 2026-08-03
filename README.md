@@ -11,10 +11,10 @@ The Control phase remains deliberately excluded. This build does not call Octopu
 This package is prepared for:
 
 ```text
-feature/kh7-paced-export-simulation
+fix/home-reserve-fallback
 ```
 
-It keeps the alpha2 source-isolation protections and observed history, updates the proposal to the KH7 7kW inverter, and adds paced battery export, smoother learning confidence, a seven-complete-day ROI gate, expanded diagnostics, and a full-width actual-versus-simulated dashboard.
+It keeps the alpha2 source-isolation protections and observed history, retains the KH7 7kW paced-export model, and fixes the home reserve so missing learned forecasts fall back to recent or current household demand instead of zero.
 
 ## Supported sources
 
@@ -88,6 +88,9 @@ Gas is observed rather than optimised. The simulated whole-home comparison chang
 - `sensor.kems_battery_energy_reserved_for_home`
 - `sensor.kems_hours_until_next_cheap_period`
 - `sensor.kems_projected_soc_at_cheap_period_start`
+- `sensor.kems_home_reserve_forecast_source`
+- `sensor.kems_projected_grid_import_before_cheap_period`
+- `binary_sensor.kems_battery_export_paused_for_home_reserve`
 - `sensor.kems_simulation_strategy`
 
 ### Import, export, battery and solar

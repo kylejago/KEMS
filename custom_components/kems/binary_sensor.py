@@ -110,6 +110,12 @@ BINARY_SENSORS: tuple[KEMSBinarySensorEntityDescription, ...] = (
         is_on_fn=lambda data: data.simulation.battery_export_enabled,
     ),
     KEMSBinarySensorEntityDescription(
+        key="battery_export_paused_for_home_reserve",
+        name="Battery export paused for home reserve",
+        icon="mdi:home-battery-outline",
+        is_on_fn=lambda data: (data.simulation.battery_export_paused_for_home_reserve),
+    ),
+    KEMSBinarySensorEntityDescription(
         key="learning_ready",
         name="Learning ready",
         icon="mdi:brain",
