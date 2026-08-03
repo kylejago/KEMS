@@ -4,6 +4,7 @@ These dashboards visualise the whole energy system with **Live** and **Simulated
 
 ## Files
 
+- `kems_actual_vs_simulated.yaml` — full-width built-in comparison with KH7 paced-export diagnostics.
 - `kems_pre_install_comparison.yaml` — recommended before FoxESS hardware is commissioned; avoids missing live PV/battery entities.
 - `kems_live_vs_simulated_advanced.yaml` — closest to the supplied mission-control screenshot. It uses custom frontend cards.
 - `kems_live_vs_simulated_builtin.yaml` — side-by-side dashboard using only built-in Home Assistant cards.
@@ -33,7 +34,7 @@ The built-in comparison, portrait, pre-install, whole-home analytics, and built-
 
 ## Entity IDs
 
-These files target KEMS 0.6.0-alpha2. Home Assistant may append `_2` if old entity-registry entries still use an ID. The diagnostic dashboard discovers KEMS entities dynamically and is not affected by suffixes.
+These files target KEMS 0.6.0-alpha3. Home Assistant may append `_2` if old entity-registry entries still use an ID. The diagnostic dashboard discovers KEMS entities dynamically and is not affected by suffixes.
 
 ## Live hardware not installed yet
 
@@ -55,5 +56,5 @@ Before commissioning, the financial battery uses the accumulated simulated syste
 ## Complete diagnostic dashboard
 
 `kems_diagnostics_all_entities.yaml` uses only built-in Home Assistant cards and
-lists every entity shipped by KEMS 0.6.0-alpha2. Use it for screenshots and pair
+lists every entity shipped by KEMS 0.6.0-alpha3. Use it for screenshots and pair
 it with Home Assistant's Download diagnostics action when reporting an issue.

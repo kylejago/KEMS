@@ -1,26 +1,36 @@
 # KEMS validation report
 
-Build: `0.6.0-alpha2`  
-Feature branch: `feature/source-isolation-and-observed-export-fix`  
+Build: `0.6.0-alpha3`  
+Feature branch: `feature/kh7-paced-export-simulation`  
 Scope: read-only **Observe → Learn → Advise → Simulate** plus ROI and lifetime accounting
 
 ## Automated checks completed in the build environment
 
-- 43 Pytest tests passed.
-- Python compilation completed successfully for runtime and tests.
-- All JSON files parsed successfully.
-- All dashboard and example YAML files parsed successfully.
-- Discovery accepts only provider-owned Octopus Energy, Octopus Intelligent,
-  Ohme, and FoxESS Modbus entities.
-- KEMS-generated entities and unrelated vehicle entities are rejected as inputs.
-- The supplied entity inventory still produces the expected automatic source
-  mappings, including the cumulative Octopus gas meter.
-- Regression coverage proves proposal solar export remains simulated and cannot
-  become observed export energy or income.
-- Grid import and export remain non-negative magnitudes; signed net power is
-  import minus export.
-- The package uses the fresh `clean_v6_alpha2` history and lifetime namespace.
-- Diagnostics expose accepted and rejected source mappings.
+- 52 Pytest tests passed.
+- All 50 Python source/test files parsed successfully.
+- All 3 JSON files parsed successfully.
+- All 14 dashboard/example YAML files parsed successfully.
+- The proposal profile uses the Fox ESS KH7 7kW inverter, 56.42kWh battery,
+  10% reserve, and 12p/kWh fixed export rate.
+- Charge and discharge are capped at 7kW.
+- Combined solar and battery AC output is capped at 7kW.
+- Battery export is paced across the time remaining until the next cheap period.
+- Live diagnostics distinguish battery-to-home power, actual battery-export power, and the unconstrained paced-export target.
+- Forecast house demand is reserved before battery export is permitted.
+- The 23:30-to-midnight portion of overnight charging carries into the next
+  calendar day's simulated SOC.
+- A six-hour 7kW cheap window at 95% efficiency is verified to reach roughly
+  80.7% SOC from a 10% start rather than incorrectly forcing a full charge.
+- Proposal export rates remain fixed at 12p/kWh even if another export-rate
+  entity exists.
+- Current simulated flow uses the current snapshot rather than a stale retained
+  history sample.
+- Learning confidence uses elapsed time and data coverage.
+- ROI annualisation remains unavailable until seven complete 24-hour periods.
+- Existing alpha2 observed history is preserved.
+- The superseded simulated financial ledger resets once through a separate
+  simulation-ledger migration version.
+- Source isolation continues to reject KEMS outputs as observed inputs.
 - No `__pycache__` or `.pyc` files are included in the final package.
 
 ## Checks required locally and on GitHub
@@ -34,5 +44,3 @@ python -m ruff check . --fix
 python -m pytest
 python -m pre_commit run --all-files
 ```
-
-Do not merge until all checks are green.

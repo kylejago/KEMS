@@ -7,6 +7,7 @@ from datetime import date, datetime, time, timedelta
 from .models import LifetimeLedger, ROIConfig, ROIState, SimulationState
 
 MAX_PAYBACK_MONTHS = 50 * 12
+MIN_PREDICTION_DAYS = 7.0
 
 
 def _midnight(value: date, reference: datetime) -> datetime:
@@ -19,6 +20,13 @@ def _observation_days(ledger: LifetimeLedger, now: datetime) -> int:
     if ledger.first_observation is None:
         return 0
     return max((now.date() - ledger.first_observation.date()).days + 1, 1)
+
+
+def _elapsed_observation_days(ledger: LifetimeLedger, now: datetime) -> float:
+    """Return complete elapsed observation time in fractional days."""
+    if ledger.first_observation is None:
+        return 0.0
+    return max((now - ledger.first_observation).total_seconds() / 86400, 0.0)
 
 
 def _projected_payback_months(
@@ -81,11 +89,12 @@ class ROIEngine:
     ) -> ROIState:
         """Return current ROI and lifetime financial state."""
         observed_days = _observation_days(ledger, now)
+        elapsed_days = _elapsed_observation_days(ledger, now)
         investment = config.net_investment_gbp
         simulated_value_gbp = ledger.simulated_system_value_pence / 100
         predicted_annual = None
-        if observed_days > 0 and simulated_value_gbp != 0:
-            predicted_annual = simulated_value_gbp / observed_days * 365
+        if elapsed_days >= MIN_PREDICTION_DAYS and simulated_value_gbp != 0:
+            predicted_annual = simulated_value_gbp / elapsed_days * 365
 
         payback_months = None
         predicted_payback_years = None
@@ -135,9 +144,16 @@ class ROIEngine:
         else:
             status = "Learning financial baseline"
 
-        confidence_days = ledger.system_operating_days if installed else observed_days
+        if installed and config.commissioning_date is not None:
+            operating_elapsed_days = max(
+                (now.date() - config.commissioning_date).days,
+                0,
+            )
+            confidence_days = float(operating_elapsed_days)
+        else:
+            confidence_days = elapsed_days
         confidence = min(max(confidence_days / 30 * 100, 0.0), 100.0)
-        ready = predicted_annual is not None and observed_days >= 1
+        ready = predicted_annual is not None and elapsed_days >= MIN_PREDICTION_DAYS
 
         return ROIState(
             ready=ready,

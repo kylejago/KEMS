@@ -68,7 +68,7 @@ views:
             cards:
               - type: custom:mushroom-title-card
                 title: Simulated proposal system
-                subtitle: KH10 + 56.42 kWh battery + proposal solar profile
+                subtitle: KH7 7kW + 56.42 kWh battery + proposal solar profile
               - type: custom:power-flow-card-plus
                 entities:
                   grid:

@@ -11,10 +11,10 @@ The Control phase remains deliberately excluded. This build does not call Octopu
 This package is prepared for:
 
 ```text
-feature/source-isolation-and-observed-export-fix
+feature/kh7-paced-export-simulation
 ```
 
-It keeps the proposal, gas, ROI and lifetime features, but introduces a a fresh source-isolated storage namespace, strict provider ownership, corrected observed export accounting, expanded diagnostics and an all-entities diagnostic dashboard.
+It keeps the alpha2 source-isolation protections and observed history, updates the proposal to the KH7 7kW inverter, and adds paced battery export, smoother learning confidence, a seven-complete-day ROI gate, expanded diagnostics, and a full-width actual-versus-simulated dashboard.
 
 ## Supported sources
 
@@ -33,7 +33,7 @@ The supplied proposal is represented as:
 
 - 21 × DMEGC 460 W panels
 - 9.66 kWp total PV
-- Fox ESS KH10 10 kW hybrid inverter
+- Fox ESS KH7 7 kW hybrid inverter
 - 2 × Fox ESS ECS4100-H7 battery stacks
 - 56.42 kWh nominal battery capacity
 - 50.77 kWh proposal usable capacity / 10% operating reserve
@@ -50,10 +50,12 @@ This feature is configured for:
 - **Intelligent Octopus Go** import pricing read live from Home Assistant
 - normal off-peak periods reported by Octopus
 - extra Intelligent dispatch slots accepted as cheap only when Octopus reports a slot **and Ohme reports active charging**
-- **Octopus fixed export at 12 p/kWh all day** as the simulation fallback
-- a live Octopus export-rate entity takes priority when one is available
+- **Fixed export at 12 p/kWh all day** for every simulated export interval
+- Intelligent Octopus Flux/time-of-use export rates are intentionally ignored
 
-The default simulated export power limit is 10 kW. This is an editable modelling assumption, not a confirmed DNO export permission. Change it when the approved export limit is known.
+The combined simulated solar and battery AC output is capped at the KH7 limit of 7kW. A separate editable grid-export limit remains available for the final DNO approval.
+
+At the default 95% charging efficiency, a six-hour 7kW cheap window can store about 39.9kWh. Starting from the 10% reserve, the model therefore reaches roughly 80.7% SOC by 05:30 unless extra confirmed Intelligent slots provide more charging time. KEMS no longer assumes the revised KH7 can always fill this battery from 10% to 100% in one standard cheap window.
 
 ## Whole-home gas tracking
 
@@ -76,6 +78,17 @@ Gas is observed rather than optimised. The simulated whole-home comparison chang
 - `sensor.kems_simulated_solar_power`
 - `sensor.kems_simulated_battery_power`
 - `sensor.kems_simulated_house_load_power`
+
+### Paced battery export
+
+- `sensor.kems_simulated_battery_to_home_power`
+- `sensor.kems_simulated_battery_export_power`
+- `sensor.kems_target_battery_export_power`
+- `sensor.kems_exportable_battery_energy_remaining`
+- `sensor.kems_battery_energy_reserved_for_home`
+- `sensor.kems_hours_until_next_cheap_period`
+- `sensor.kems_projected_soc_at_cheap_period_start`
+- `sensor.kems_simulation_strategy`
 
 ### Import, export, battery and solar
 
@@ -106,7 +119,7 @@ Gas is observed rather than optimised. The simulated whole-home comparison chang
 
 ## ROI and lifetime tracking
 
-KEMS now keeps a permanent local ledger, separate from Home Assistant Recorder retention. Before installation it annualises the accumulated proposal simulation value to estimate payback and discounted net value. After a commissioning date is entered in KEMS options, it switches to actual value-created tracking.
+KEMS now keeps a permanent local ledger, separate from Home Assistant Recorder retention. Before installation it waits for seven complete 24-hour observation periods, then annualises the accumulated proposal simulation value to estimate payback and discounted net value. After a commissioning date is entered in KEMS options, it switches to actual value-created tracking.
 
 When recovered value reaches the net investment, KEMS permanently records the payback date and changes to **SYSTEM PAID BACK — PROFIT MODE**. Profit is calculated after the investment and recorded operating costs have been deducted.
 
@@ -114,7 +127,7 @@ The default investment is the quoted £20,995. Grants, extra installation costs,
 
 ## Dashboards
 
-The `dashboards/` directory contains eight complete dashboards:
+The `dashboards/` directory contains nine complete dashboards:
 
 - pre-install proposal comparison
 - advanced desktop mission control, styled like the supplied reference
@@ -124,6 +137,7 @@ The `dashboards/` directory contains eight complete dashboards:
 - built-in ROI and lifetime dashboard
 - advanced ROI dashboard with a filling financial battery and Profit Mode
 - complete dynamic diagnostics dashboard listing every KEMS entity
+- full-width actual-versus-simulated dashboard with paced-export diagnostics
 
 See `dashboards/README.md` for installation and frontend-card requirements.
 

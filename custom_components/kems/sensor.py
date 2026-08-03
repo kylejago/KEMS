@@ -101,6 +101,19 @@ def _simulation_attributes(data: KEMSData) -> Mapping[str, Any]:
         "simulated_battery_to_home_kwh": simulation.simulated_battery_to_home_kwh,
         "simulated_battery_export_kwh": simulation.simulated_battery_export_kwh,
         "simulated_battery_soc": simulation.simulated_battery_soc,
+        "current_simulated_battery_to_home_power_kw": (
+            simulation.current_simulated_battery_to_home_power_kw
+        ),
+        "current_simulated_battery_export_power_kw": (
+            simulation.current_simulated_battery_export_power_kw
+        ),
+        "target_battery_export_power_kw": (simulation.target_battery_export_power_kw),
+        "exportable_battery_energy_kwh": (simulation.exportable_battery_energy_kwh),
+        "reserved_for_home_kwh": simulation.reserved_for_home_kwh,
+        "hours_until_next_cheap_period": (simulation.hours_until_next_cheap_period),
+        "projected_soc_at_cheap_period_percent": (
+            simulation.projected_soc_at_cheap_period_percent
+        ),
         "avoided_day_rate_import_kwh": simulation.avoided_day_rate_import_kwh,
         "baseline_no_system_cost_pence": simulation.baseline_no_system_cost_pence,
         "actual_avoided_import_value_pence": (
@@ -112,7 +125,9 @@ def _simulation_attributes(data: KEMSData) -> Mapping[str, Any]:
         "actual_system_value_pence": simulation.actual_system_value_pence,
         "simulated_system_value_pence": simulation.simulated_system_value_pence,
         "effective_export_rate_pence": simulation.effective_export_rate_pence,
+        "inverter_limit_kw": simulation.inverter_limit_kw,
         "export_limit_kw": simulation.export_limit_kw,
+        "strategy": simulation.strategy,
         "proposal_solar_active": simulation.proposal_solar_active,
         "battery_export_enabled": simulation.battery_export_enabled,
         "data_coverage": simulation.data_coverage,
@@ -526,7 +541,9 @@ SENSORS: tuple[KEMSSensorEntityDescription, ...] = (
         value_fn=lambda data: data.learned.confidence,
         attributes_fn=lambda data: {
             "days_observed": data.learned.days_observed,
+            "elapsed_observation_days": data.learned.elapsed_observation_days,
             "samples": data.learned.samples,
+            "data_coverage": data.learned.data_coverage,
             "profile_slots": data.learned.profile_slots,
             "ready": data.learned.ready,
         },
@@ -695,6 +712,83 @@ SENSORS: tuple[KEMSSensorEntityDescription, ...] = (
         native_unit_of_measurement=PERCENTAGE,
         suggested_display_precision=0,
         value_fn=lambda data: data.simulation.simulated_battery_soc,
+    ),
+    KEMSSensorEntityDescription(
+        key="simulated_battery_to_home_power",
+        name="Simulated battery to home power",
+        icon="mdi:home-battery-outline",
+        device_class=SensorDeviceClass.POWER,
+        native_unit_of_measurement=UnitOfPower.KILO_WATT,
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=2,
+        value_fn=lambda data: (
+            data.simulation.current_simulated_battery_to_home_power_kw
+        ),
+    ),
+    KEMSSensorEntityDescription(
+        key="simulated_battery_export_power",
+        name="Simulated battery export power",
+        icon="mdi:battery-arrow-up-outline",
+        device_class=SensorDeviceClass.POWER,
+        native_unit_of_measurement=UnitOfPower.KILO_WATT,
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=2,
+        value_fn=lambda data: (
+            data.simulation.current_simulated_battery_export_power_kw
+        ),
+    ),
+    KEMSSensorEntityDescription(
+        key="target_battery_export_power",
+        name="Target battery export power",
+        icon="mdi:battery-clock-outline",
+        device_class=SensorDeviceClass.POWER,
+        native_unit_of_measurement=UnitOfPower.KILO_WATT,
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=2,
+        value_fn=lambda data: data.simulation.target_battery_export_power_kw,
+        attributes_fn=_simulation_attributes,
+    ),
+    KEMSSensorEntityDescription(
+        key="exportable_battery_energy",
+        name="Exportable battery energy remaining",
+        icon="mdi:battery-arrow-down-outline",
+        device_class=SensorDeviceClass.ENERGY,
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        suggested_display_precision=2,
+        value_fn=lambda data: data.simulation.exportable_battery_energy_kwh,
+    ),
+    KEMSSensorEntityDescription(
+        key="battery_energy_reserved_for_home",
+        name="Battery energy reserved for home",
+        icon="mdi:home-battery-outline",
+        device_class=SensorDeviceClass.ENERGY,
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        suggested_display_precision=2,
+        value_fn=lambda data: data.simulation.reserved_for_home_kwh,
+    ),
+    KEMSSensorEntityDescription(
+        key="hours_until_next_cheap_period",
+        name="Hours until next cheap period",
+        icon="mdi:clock-fast",
+        native_unit_of_measurement="h",
+        suggested_display_precision=1,
+        value_fn=lambda data: data.simulation.hours_until_next_cheap_period,
+    ),
+    KEMSSensorEntityDescription(
+        key="projected_soc_at_cheap_period",
+        name="Projected SOC at cheap-period start",
+        icon="mdi:battery-clock",
+        native_unit_of_measurement=PERCENTAGE,
+        suggested_display_precision=0,
+        value_fn=lambda data: (data.simulation.projected_soc_at_cheap_period_percent),
+    ),
+    KEMSSensorEntityDescription(
+        key="simulation_strategy",
+        name="Simulation strategy",
+        icon="mdi:chart-timeline-variant-shimmer",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda data: data.simulation.strategy,
+        attributes_fn=_simulation_attributes,
     ),
     KEMSSensorEntityDescription(
         key="avoided_day_rate_import_today",

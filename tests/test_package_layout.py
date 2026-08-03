@@ -88,15 +88,29 @@ def test_manifest_classifies_kems_as_hub() -> None:
 
     manifest = json.loads((INTEGRATION / "manifest.json").read_text(encoding="utf-8"))
     assert manifest["integration_type"] == "hub"
-    assert manifest["version"] == "0.6.0-alpha2"
+    assert manifest["version"] == "0.6.0-alpha3"
 
 
-def test_clean_build_uses_fresh_storage_namespace() -> None:
-    """The clean build must not load storage created by earlier KEMS alphas."""
+def test_alpha3_preserves_alpha2_history_and_versions_simulation_ledger() -> None:
+    """Observed history must survive while simulated financial value can reset."""
     const_source = (INTEGRATION / "const.py").read_text(encoding="utf-8")
     history_source = (INTEGRATION / "history.py").read_text(encoding="utf-8")
     lifetime_source = (INTEGRATION / "lifetime.py").read_text(encoding="utf-8")
 
     assert 'STORAGE_NAMESPACE = "clean_v6_alpha2"' in const_source
+    assert "SIMULATION_LEDGER_VERSION = 2" in const_source
     assert "STORAGE_NAMESPACE" in history_source
-    assert "STORAGE_NAMESPACE" in lifetime_source
+    assert "simulation_ledger_version" in lifetime_source
+
+
+def test_entry_migration_applies_kh7_paced_export_defaults() -> None:
+    """Existing alpha2 entries should be migrated without manual option edits."""
+    source = (INTEGRATION / "__init__.py").read_text(encoding="utf-8")
+    config_flow = (INTEGRATION / "config_flow.py").read_text(encoding="utf-8")
+
+    assert "VERSION = 8" in config_flow
+    assert "options[CONF_INVERTER_LIMIT] = 7.0" in source
+    assert "options[CONF_MAX_CHARGE] = 7.0" in source
+    assert "options[CONF_MAX_DISCHARGE] = 7.0" in source
+    assert "options[CONF_EXPORT_RATE] = 12.0" in source
+    assert 'options[CONF_SIMULATION_STRATEGY] = "paced_export"' in source

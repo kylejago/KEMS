@@ -23,4 +23,12 @@ def test_manifest_stays_a_hub() -> None:
     source = MANIFEST.read_text(encoding="utf-8")
 
     assert '"integration_type": "hub"' in source
-    assert '"version": "0.6.0-alpha2"' in source
+    assert '"version": "0.6.0-alpha3"' in source
+
+
+def test_options_flow_includes_kh7_inverter_limit_and_paced_strategy() -> None:
+    """The settings form must expose the physical and strategy assumptions."""
+    source = CONFIG_FLOW.read_text(encoding="utf-8")
+    assert "CONF_INVERTER_LIMIT" in source
+    assert '"paced_export"' in source
+    assert "VERSION = 8" in source

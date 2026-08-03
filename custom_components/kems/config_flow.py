@@ -54,6 +54,7 @@ from .const import (
     CONF_HISTORY_DAYS,
     CONF_HOUSE_LOAD,
     CONF_INTELLIGENT_SLOT,
+    CONF_INVERTER_LIMIT,
     CONF_MANUAL_SYSTEM_COSTS,
     CONF_MAX_CHARGE,
     CONF_MAX_DISCHARGE,
@@ -140,6 +141,9 @@ OPTIONS_SCHEMA = vol.Schema(
         vol.Required(CONF_EXPORT_RATE): vol.All(
             vol.Coerce(float), vol.Range(min=0, max=200)
         ),
+        vol.Required(CONF_INVERTER_LIMIT): vol.All(
+            vol.Coerce(float), vol.Range(min=0.1, max=100)
+        ),
         vol.Required(CONF_EXPORT_LIMIT): vol.All(
             vol.Coerce(float), vol.Range(min=0, max=100)
         ),
@@ -182,7 +186,7 @@ OPTIONS_SCHEMA = vol.Schema(
         ),
         vol.Required(CONF_SIMULATION_STRATEGY): vol.In(
             {
-                "export_first": "Export solar first",
+                "paced_export": "Pace battery export until next cheap period",
                 "self_use": "Solar self-use first",
             }
         ),
@@ -193,7 +197,7 @@ OPTIONS_SCHEMA = vol.Schema(
 class KEMSConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Handle automatic and manual KEMS setup."""
 
-    VERSION = 7
+    VERSION = 8
     MINOR_VERSION = 0
 
     def __init__(self) -> None:

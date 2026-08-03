@@ -105,10 +105,10 @@ def _normalisation_scale(year: int, month: int) -> float:
 
 
 FOXHOLE_PROPOSAL_PROFILE = ProposalSystemProfile(
-    name="151 Foxhole Road - LA Renewables proposal 10439248",
+    name="151 Foxhole Road - LA Renewables KH7 proposal 10439248",
     solar_capacity_kwp=9.66,
     annual_generation_kwh=8016.0,
-    inverter_limit_kw=10.0,
+    inverter_limit_kw=7.0,
     battery_capacity_kwh=56.42,
     usable_battery_capacity_kwh=50.77,
     shading_factor=0.938,
