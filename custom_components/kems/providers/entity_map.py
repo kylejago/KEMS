@@ -31,6 +31,9 @@ from ..const import (
     CONF_NEXT_OFFPEAK_START,
     CONF_OFF_PEAK,
     CONF_OFFPEAK_END,
+    CONF_SAVING_SESSION_EVENTS,
+    CONF_SAVING_SESSION_EXPORT_BASELINE,
+    CONF_SAVING_SESSION_IMPORT_BASELINE,
     CONF_SOLAR_POWER,
     ENTITY_MAPPING_KEYS,
 )
@@ -58,6 +61,9 @@ class KEMSEntities:
     intelligent_slot: str | None = None
     next_offpeak_start: str | None = None
     offpeak_end: str | None = None
+    saving_session_events: str | None = None
+    saving_session_import_baseline: str | None = None
+    saving_session_export_baseline: str | None = None
     gas_current_rate: str | None = None
     gas_standing_charge: str | None = None
     gas_meter_total: str | None = None
@@ -92,6 +98,13 @@ class KEMSEntities:
             intelligent_slot=_safe_source(data, CONF_INTELLIGENT_SLOT),
             next_offpeak_start=_safe_source(data, CONF_NEXT_OFFPEAK_START),
             offpeak_end=_safe_source(data, CONF_OFFPEAK_END),
+            saving_session_events=_safe_source(data, CONF_SAVING_SESSION_EVENTS),
+            saving_session_import_baseline=_safe_source(
+                data, CONF_SAVING_SESSION_IMPORT_BASELINE
+            ),
+            saving_session_export_baseline=_safe_source(
+                data, CONF_SAVING_SESSION_EXPORT_BASELINE
+            ),
             gas_current_rate=_safe_source(data, CONF_GAS_CURRENT_RATE),
             gas_standing_charge=_safe_source(data, CONF_GAS_STANDING_CHARGE),
             gas_meter_total=_safe_source(data, CONF_GAS_METER_TOTAL),

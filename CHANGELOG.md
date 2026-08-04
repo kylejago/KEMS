@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.6.0-alpha5
+
+- Added read-only Octoplus Power Down / Saving Session awareness using BottlecapDave's joined event data.
+- Discover both `power_down` and `saving_session` event/baseline entity names for compatibility across BottlecapDave releases.
+- Preserve enough battery for forecast home demand and maximum useful KH7 export during a joined session before the next cheap recharge.
+- Maximise session output within the 7kW inverter, 7kW battery-discharge, and configurable grid-export limits.
+- Convert the joined event reward at **8 Octopoints = 1p** and keep the Power Down bonus separate from normal fixed 12p/kWh export income.
+- Use optional import and export baseline sensors to estimate net baseline, rewardable reduction, bonus, and total session income.
+- Added Power Down status, reserve, export-target, baseline, reward, and income entities plus dashboard diagnostics.
+- KEMS remains read-only: BottlecapDave's automation handles enrolment and KEMS only reacts to events already present in `joined_events`.
+- Reset only the simulated financial ledger; all observed history and learning data remain preserved.
+
 ## 0.6.0-alpha4
 
 - Prevented paced battery export whenever learned demand forecasts are unavailable and the remaining battery is needed by the home.

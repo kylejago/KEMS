@@ -23,7 +23,7 @@ def test_manifest_stays_a_hub() -> None:
     source = MANIFEST.read_text(encoding="utf-8")
 
     assert '"integration_type": "hub"' in source
-    assert '"version": "0.6.0-alpha4"' in source
+    assert '"version": "0.6.0-alpha5"' in source
 
 
 def test_options_flow_includes_kh7_inverter_limit_and_paced_strategy() -> None:
@@ -31,4 +31,14 @@ def test_options_flow_includes_kh7_inverter_limit_and_paced_strategy() -> None:
     source = CONFIG_FLOW.read_text(encoding="utf-8")
     assert "CONF_INVERTER_LIMIT" in source
     assert '"paced_export"' in source
-    assert "VERSION = 8" in source
+    assert "VERSION = 9" in source
+
+
+def test_options_flow_includes_power_down_sources_and_toggle() -> None:
+    """Power Down sources and planning toggle must be configurable."""
+    source = CONFIG_FLOW.read_text(encoding="utf-8")
+    assert "CONF_SAVING_SESSION_EVENTS" in source
+    assert "CONF_SAVING_SESSION_IMPORT_BASELINE" in source
+    assert "CONF_SAVING_SESSION_EXPORT_BASELINE" in source
+    assert "CONF_SAVING_SESSION_ENABLED" in source
+    assert "EVENT_SELECTOR" in source

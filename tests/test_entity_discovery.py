@@ -511,3 +511,72 @@ def test_platform_normalisation_preserves_integration_domain() -> None:
 
     assert discovery._normalise_platform("octopus_energy") == "octopus_energy"
     assert discovery._normalise_platform("foxess_modbus") == "foxess_modbus"
+
+
+def test_power_down_sources_are_discovered_with_export_role_separation() -> None:
+    """Prefer current Power Down entities and keep import/export baselines apart."""
+    constants, discovery = _load_discovery()
+    candidates = [
+        discovery.Candidate(
+            "event.octopus_energy_a_123_octoplus_power_down_events",
+            "octopus_energy",
+            "event",
+            "octopus energy octoplus power down events",
+            "",
+            "",
+        ),
+        discovery.Candidate(
+            "sensor.octopus_energy_electricity_meter_mpan_octoplus_power_down_baseline",
+            "octopus_energy",
+            "sensor",
+            "octopus energy electricity power down baseline",
+            "kwh",
+            "energy",
+            False,
+        ),
+        discovery.Candidate(
+            (
+                "sensor.octopus_energy_electricity_meter_mpan_export_"
+                "octoplus_power_down_baseline"
+            ),
+            "octopus_energy",
+            "sensor",
+            "octopus energy electricity export power down baseline",
+            "kwh",
+            "energy",
+            True,
+        ),
+    ]
+
+    result = discovery.discover_from_candidates(candidates)
+
+    assert (
+        result.mappings[constants.CONF_SAVING_SESSION_EVENTS] == candidates[0].entity_id
+    )
+    assert (
+        result.mappings[constants.CONF_SAVING_SESSION_IMPORT_BASELINE]
+        == candidates[1].entity_id
+    )
+    assert (
+        result.mappings[constants.CONF_SAVING_SESSION_EXPORT_BASELINE]
+        == candidates[2].entity_id
+    )
+
+
+def test_legacy_saving_session_event_remains_a_fallback() -> None:
+    """Existing accounts can still use the legacy entity until it is removed."""
+    constants, discovery = _load_discovery()
+    entity_id = "event.octopus_energy_a_123_octoplus_saving_session_events"
+    result = discovery.discover_from_candidates(
+        [
+            discovery.Candidate(
+                entity_id,
+                "octopus_energy",
+                "event",
+                "octopus energy octoplus saving session events",
+                "",
+                "",
+            )
+        ]
+    )
+    assert result.mappings[constants.CONF_SAVING_SESSION_EVENTS] == entity_id

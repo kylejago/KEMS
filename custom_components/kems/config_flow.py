@@ -65,6 +65,10 @@ from .const import (
     CONF_PROPOSAL_SOLAR_ENABLED,
     CONF_PROPOSAL_SOLAR_FACTOR,
     CONF_ROI_FORECAST_YEARS,
+    CONF_SAVING_SESSION_ENABLED,
+    CONF_SAVING_SESSION_EVENTS,
+    CONF_SAVING_SESSION_EXPORT_BASELINE,
+    CONF_SAVING_SESSION_IMPORT_BASELINE,
     CONF_SCAN_INTERVAL,
     CONF_SIMULATION_STRATEGY,
     CONF_SOLAR_POWER,
@@ -82,6 +86,7 @@ from .entity_discovery import (
 
 SENSOR_SELECTOR = EntitySelector(EntitySelectorConfig(domain="sensor"))
 BINARY_SENSOR_SELECTOR = EntitySelector(EntitySelectorConfig(domain="binary_sensor"))
+EVENT_SELECTOR = EntitySelector(EntitySelectorConfig(domain="event"))
 
 BINARY_KEYS = {
     CONF_OFF_PEAK,
@@ -95,7 +100,10 @@ def _entity_schema(suggested: dict[str, Any]) -> vol.Schema:
     """Build the manual entity-review form with discovered suggestions."""
     schema: dict[vol.Marker, Any] = {}
     for key in ENTITY_MAPPING_KEYS:
-        selector = BINARY_SENSOR_SELECTOR if key in BINARY_KEYS else SENSOR_SELECTOR
+        if key == CONF_SAVING_SESSION_EVENTS:
+            selector = EVENT_SELECTOR
+        else:
+            selector = BINARY_SENSOR_SELECTOR if key in BINARY_KEYS else SENSOR_SELECTOR
         default = suggested.get(key)
         if key == CONF_CURRENT_IMPORT_RATE:
             marker = (
@@ -148,6 +156,7 @@ OPTIONS_SCHEMA = vol.Schema(
             vol.Coerce(float), vol.Range(min=0, max=100)
         ),
         vol.Required(CONF_BATTERY_EXPORT_ENABLED): bool,
+        vol.Required(CONF_SAVING_SESSION_ENABLED): bool,
         vol.Required(CONF_PROPOSAL_SOLAR_ENABLED): bool,
         vol.Required(CONF_PROPOSAL_SOLAR_FACTOR): vol.All(
             vol.Coerce(float), vol.Range(min=0, max=2)
@@ -197,7 +206,7 @@ OPTIONS_SCHEMA = vol.Schema(
 class KEMSConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Handle automatic and manual KEMS setup."""
 
-    VERSION = 8
+    VERSION = 9
     MINOR_VERSION = 0
 
     def __init__(self) -> None:
@@ -240,6 +249,9 @@ class KEMSConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     CONF_INTELLIGENT_SLOT,
                     CONF_NEXT_OFFPEAK_START,
                     CONF_OFFPEAK_END,
+                    CONF_SAVING_SESSION_EVENTS,
+                    CONF_SAVING_SESSION_IMPORT_BASELINE,
+                    CONF_SAVING_SESSION_EXPORT_BASELINE,
                 }
                 for key in self._suggested
             ),

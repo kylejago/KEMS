@@ -7,6 +7,7 @@ from homeassistant.util import dt as dt_util
 from .kems_core import Snapshot
 from .providers.foxess import FoxESSProvider
 from .providers.gas import GasProvider
+from .providers.octoplus import OctoplusProvider
 from .providers.octopus import OctopusProvider
 from .providers.ohme import OhmeProvider
 
@@ -20,12 +21,14 @@ class Collector:
         gas: GasProvider,
         ohme: OhmeProvider,
         foxess: FoxESSProvider,
+        octoplus: OctoplusProvider,
     ) -> None:
         """Initialise the collector."""
         self._octopus = octopus
         self._gas = gas
         self._ohme = ohme
         self._foxess = foxess
+        self._octoplus = octoplus
 
     def collect(self) -> Snapshot:
         """Create a complete whole-home monitoring snapshot."""
@@ -33,6 +36,7 @@ class Collector:
         gas = self._gas.get_state()
         ohme = self._ohme.get_state()
         foxess = self._foxess.get_state()
+        octoplus = self._octoplus.get_state()
 
         return Snapshot(
             timestamp=dt_util.now(),
@@ -44,6 +48,27 @@ class Collector:
             intelligent_slot=octopus.intelligent_slot,
             next_offpeak_start=octopus.next_offpeak_start,
             offpeak_end=octopus.offpeak_end,
+            saving_session_joined=octoplus.joined,
+            saving_session_active=octoplus.active,
+            saving_session_id=octoplus.event_id,
+            saving_session_start=octoplus.start,
+            saving_session_end=octoplus.end,
+            saving_session_octopoints_per_kwh=octoplus.octopoints_per_kwh,
+            saving_session_import_baseline_period_kwh=(
+                octoplus.import_baseline_period_kwh
+            ),
+            saving_session_export_baseline_period_kwh=(
+                octoplus.export_baseline_period_kwh
+            ),
+            saving_session_import_baseline_total_kwh=(
+                octoplus.import_baseline_total_kwh
+            ),
+            saving_session_export_baseline_total_kwh=(
+                octoplus.export_baseline_total_kwh
+            ),
+            saving_session_baseline_period_start=octoplus.baseline_period_start,
+            saving_session_baseline_period_end=octoplus.baseline_period_end,
+            saving_session_baseline_incomplete=octoplus.baseline_incomplete,
             gas_current_rate=gas.current_rate,
             gas_standing_charge=gas.standing_charge,
             gas_meter_total_kwh=gas.meter_total_kwh,

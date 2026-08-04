@@ -11,16 +11,16 @@ The Control phase remains deliberately excluded. This build does not call Octopu
 This package is prepared for:
 
 ```text
-fix/home-reserve-fallback
+feature/octoplus-power-down-aware-export
 ```
 
-It keeps the alpha2 source-isolation protections and observed history, retains the KH7 7kW paced-export model, and fixes the home reserve so missing learned forecasts fall back to recent or current household demand instead of zero.
+It keeps the source-isolation protections, KH7 7kW paced-export model, and home-reserve fallbacks, then adds session-aware planning around joined Octoplus Power Down events.
 
 ## Supported sources
 
 KEMS automatically discovers and can manually map:
 
-- **Octopus Energy electricity** — current/next import rates, current export rate, standing charge, off-peak state, Intelligent dispatch slots, and off-peak timestamps.
+- **Octopus Energy electricity** — current/next import rates, current export rate, standing charge, off-peak state, Intelligent dispatch slots, off-peak timestamps, joined Octoplus Power Down events, and optional import/export baselines.
 - **Octopus Energy gas** — gas rate, standing charge, cumulative consumption, daily consumption, and daily cost.
 - **Ohme** — EV connected/charging state, charger power, and vehicle state of charge.
 - **FoxESS Modbus** — house load, solar power, battery SOC/power, grid import, and grid export.
@@ -57,6 +57,20 @@ The combined simulated solar and battery AC output is capped at the KH7 limit of
 
 At the default 95% charging efficiency, a six-hour 7kW cheap window can store about 39.9kWh. Starting from the 10% reserve, the model therefore reaches roughly 80.7% SOC by 05:30 unless extra confirmed Intelligent slots provide more charging time. KEMS no longer assumes the revised KH7 can always fill this battery from 10% to 100% in one standard cheap window.
 
+## Octoplus Power Down session planning
+
+KEMS discovers both BottlecapDave `octoplus_power_down_events` and `octoplus_saving_session_events` entities, so it works across the current and transitional naming used by the integration. It plans only around entries already present in `joined_events`; it never calls the join service. BottlecapDave's auto-enrol blueprint remains responsible for joining sessions.
+
+For a joined event before the next cheap recharge, KEMS protects enough stored energy for:
+
+- forecast household demand through the event;
+- maximum useful session export within the KH7 and DNO limits;
+- the normal 10% battery reserve.
+
+During the event, solar and battery output are combined up to the 7kW inverter limit. The home is supplied first and the remaining output is exported. After the event, KEMS returns to ordinary paced export and recalculates the plan toward the next cheap period.
+
+Reward calculations use **8 Octopoints = 1p**. Normal export income remains fixed at 12p/kWh and is reported separately from the estimated Power Down bonus. The optional Power Down import baseline is disabled by default in BottlecapDave's integration; enable it for a bonus estimate. When an export baseline exists, KEMS calculates the net baseline as import minus export.
+
 ## Whole-home gas tracking
 
 KEMS records gas separately and combines it with electricity for whole-home reporting. It supports direct daily Octopus gas totals or positive deltas from a cumulative kWh/m³ meter. It adds:
@@ -92,6 +106,28 @@ Gas is observed rather than optimised. The simulated whole-home comparison chang
 - `sensor.kems_projected_grid_import_before_cheap_period`
 - `binary_sensor.kems_battery_export_paused_for_home_reserve`
 - `sensor.kems_simulation_strategy`
+
+### Octoplus Power Down planning
+
+- `binary_sensor.kems_saving_session_joined`
+- `binary_sensor.kems_saving_session_active`
+- `binary_sensor.kems_saving_session_baseline_incomplete`
+- `binary_sensor.kems_battery_reserved_for_saving_session`
+- `binary_sensor.kems_battery_export_reduced_for_saving_session`
+- `sensor.kems_next_saving_session_start`
+- `sensor.kems_next_saving_session_end`
+- `sensor.kems_saving_session_duration`
+- `sensor.kems_saving_session_octopoints_per_kwh`
+- `sensor.kems_saving_session_bonus_rate`
+- `sensor.kems_saving_session_baseline_net_energy`
+- `sensor.kems_saving_session_battery_reserve`
+- `sensor.kems_saving_session_export_target`
+- `sensor.kems_estimated_saving_session_export`
+- `sensor.kems_estimated_saving_session_reduction`
+- `sensor.kems_estimated_saving_session_bonus`
+- `sensor.kems_estimated_saving_session_export_income`
+- `sensor.kems_estimated_saving_session_total_income`
+- `sensor.kems_simulated_saving_session_bonus_today`
 
 ### Import, export, battery and solar
 

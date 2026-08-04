@@ -48,7 +48,10 @@
           "battery_current": "Battery current (optional)",
           "solar_power_kw": "Solar power (optional)",
           "grid_import_kw": "Grid import power (optional)",
-          "grid_export_kw": "Grid export power (optional)"
+          "grid_export_kw": "Grid export power (optional)",
+          "saving_session_events": "Octoplus Power Down events (optional)",
+          "saving_session_import_baseline": "Power Down import baseline (optional)",
+          "saving_session_export_baseline": "Power Down export baseline (optional)"
         },
         "data_description": {
           "current_import_rate": "Octopus current electricity import price.",
@@ -76,7 +79,10 @@
           "battery_current": "FoxESS Battery Current, used with Battery Voltage to derive power.",
           "solar_power_kw": "FoxESS Modbus total PV/solar power.",
           "grid_import_kw": "FoxESS grid-import power when installed. Before installation KEMS can use the Octopus current-demand sensor.",
-          "grid_export_kw": "FoxESS Modbus power currently exported to the grid."
+          "grid_export_kw": "FoxESS Modbus power currently exported to the grid.",
+          "saving_session_events": "BottlecapDave Octopus Energy Power Down event entity containing available_events and joined_events. The legacy Saving Session event is also supported. KEMS plans only around joined sessions.",
+          "saving_session_import_baseline": "Optional Octoplus Power Down import baseline sensor used to estimate rewardable net reduction. The legacy Saving Session baseline is also supported.",
+          "saving_session_export_baseline": "Optional export-meter baseline variant. KEMS subtracts it from the import baseline to estimate the net baseline."
         }
       },
       "reconfigure": {
@@ -118,7 +124,10 @@
           "battery_current": "Battery current (optional)",
           "solar_power_kw": "Solar power (optional)",
           "grid_import_kw": "Grid import power (optional)",
-          "grid_export_kw": "Grid export power (optional)"
+          "grid_export_kw": "Grid export power (optional)",
+          "saving_session_events": "Octoplus Power Down events (optional)",
+          "saving_session_import_baseline": "Power Down import baseline (optional)",
+          "saving_session_export_baseline": "Power Down export baseline (optional)"
         },
         "data_description": {
           "current_import_rate": "Octopus current electricity import price.",
@@ -146,7 +155,10 @@
           "battery_current": "FoxESS Battery Current, used with Battery Voltage to derive power.",
           "solar_power_kw": "FoxESS Modbus total PV/solar power.",
           "grid_import_kw": "FoxESS Modbus power currently imported from the grid.",
-          "grid_export_kw": "FoxESS Modbus power currently exported to the grid."
+          "grid_export_kw": "FoxESS Modbus power currently exported to the grid.",
+          "saving_session_events": "BottlecapDave Octopus Energy Power Down event entity containing available_events and joined_events. The legacy Saving Session event is also supported. KEMS plans only around joined sessions.",
+          "saving_session_import_baseline": "Optional Octoplus Power Down import baseline sensor used to estimate rewardable net reduction. The legacy Saving Session baseline is also supported.",
+          "saving_session_export_baseline": "Optional export-meter baseline variant. KEMS subtracts it from the import baseline to estimate the net baseline."
         }
       }
     },
@@ -187,7 +199,8 @@
           "electricity_inflation_percent": "Annual electricity price inflation (%)",
           "battery_degradation_percent": "Annual battery/value degradation (%)",
           "discount_rate_percent": "Financial discount rate (%)",
-          "roi_forecast_years": "ROI forecast horizon (years)"
+          "roi_forecast_years": "ROI forecast horizon (years)",
+          "saving_session_enabled": "Use joined Octoplus Power Down sessions"
         },
         "data_description": {
           "scan_interval_seconds": "KEMS reads Home Assistant state only; minimum 30 seconds.",
@@ -217,7 +230,8 @@
           "battery_degradation_percent": "Reduces projected future annual value over time.",
           "discount_rate_percent": "Used to calculate discounted net value. The proposal benchmark used 6.75%.",
           "roi_forecast_years": "Number of years included in the predicted net-value calculation.",
-          "inverter_ac_limit_kw": "Combined simulated solar and battery AC output cannot exceed the revised Fox ESS KH7 7kW limit."
+          "inverter_ac_limit_kw": "Combined simulated solar and battery AC output cannot exceed the revised Fox ESS KH7 7kW limit.",
+          "saving_session_enabled": "Hold battery energy before a joined session, cover the home, and maximise permitted export during the higher-reward window. KEMS remains read-only and does not join sessions itself."
         }
       }
     }

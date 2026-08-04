@@ -116,6 +116,38 @@ BINARY_SENSORS: tuple[KEMSBinarySensorEntityDescription, ...] = (
         is_on_fn=lambda data: (data.simulation.battery_export_paused_for_home_reserve),
     ),
     KEMSBinarySensorEntityDescription(
+        key="saving_session_joined",
+        name="Power Down session joined",
+        icon="mdi:calendar-check",
+        is_on_fn=lambda data: data.simulation.saving_session_joined,
+    ),
+    KEMSBinarySensorEntityDescription(
+        key="saving_session_active",
+        name="Power Down session active",
+        icon="mdi:lightning-bolt-circle",
+        is_on_fn=lambda data: data.simulation.saving_session_active,
+    ),
+    KEMSBinarySensorEntityDescription(
+        key="saving_session_baseline_incomplete",
+        name="Power Down baseline incomplete",
+        icon="mdi:progress-alert",
+        is_on_fn=lambda data: bool(data.simulation.saving_session_baseline_incomplete),
+    ),
+    KEMSBinarySensorEntityDescription(
+        key="battery_reserved_for_saving_session",
+        name="Battery reserved for Power Down session",
+        icon="mdi:battery-lock",
+        is_on_fn=lambda data: data.simulation.battery_reserved_for_saving_session,
+    ),
+    KEMSBinarySensorEntityDescription(
+        key="battery_export_reduced_for_saving_session",
+        name="Battery export reduced for Power Down session",
+        icon="mdi:battery-clock-outline",
+        is_on_fn=lambda data: (
+            data.simulation.battery_export_reduced_for_saving_session
+        ),
+    ),
+    KEMSBinarySensorEntityDescription(
         key="learning_ready",
         name="Learning ready",
         icon="mdi:brain",

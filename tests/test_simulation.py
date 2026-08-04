@@ -509,3 +509,266 @@ def test_current_load_is_final_home_reserve_fallback() -> None:
     assert plan["target_battery_export"] == 0.0
     assert plan["battery_export"] == 0.0
     assert plan["export_paused_for_home"] is True
+
+
+def test_joined_power_down_session_reduces_pre_session_export() -> None:
+    """Battery energy should be held for a joined session before the next charge."""
+    now = datetime(2026, 11, 1, 12, 0, tzinfo=UTC)
+    cheap_start = now + timedelta(hours=11.5)
+    session_start = now + timedelta(hours=4)
+    session_end = session_start + timedelta(hours=1)
+    base = Snapshot(
+        timestamp=now,
+        current_import_rate=28.3,
+        house_load_kw=1.0,
+        grid_import_kw=1.0,
+        next_offpeak_start=cheap_start,
+    )
+    joined = Snapshot(
+        timestamp=now,
+        current_import_rate=28.3,
+        house_load_kw=1.0,
+        grid_import_kw=1.0,
+        next_offpeak_start=cheap_start,
+        saving_session_joined=True,
+        saving_session_start=session_start,
+        saving_session_end=session_end,
+        saving_session_octopoints_per_kwh=800,
+    )
+    config = SimulationConfig(
+        battery_capacity_kwh=20.0,
+        battery_reserve_percent=10.0,
+        max_discharge_kw=7.0,
+        inverter_limit_kw=7.0,
+        export_limit_kw=7.0,
+        discharge_efficiency=0.95,
+        proposal_solar_enabled=False,
+        strategy="paced_export",
+        saving_session_enabled=True,
+    )
+    engine = SimulationEngine()
+
+    normal = engine._current_plan(
+        base,
+        [base],
+        battery_kwh=20.0,
+        reserve_kwh=2.0,
+        capacity=20.0,
+        config=config,
+        forecast_energy_until_offpeak_kwh=4.0,
+    )
+    protected = engine._current_plan(
+        joined,
+        [joined],
+        battery_kwh=20.0,
+        reserve_kwh=2.0,
+        capacity=20.0,
+        config=config,
+        forecast_energy_until_offpeak_kwh=4.0,
+    )
+
+    assert protected["saving_session_joined"] is True
+    assert protected["battery_reserved_for_saving_session"] is True
+    assert protected["battery_export_reduced_for_saving_session"] is True
+    assert protected["saving_session_battery_reserve_kwh"] == 7.368
+    assert protected["saving_session_export_target_kw"] == 6.0
+    assert protected["target_battery_export"] < normal["target_battery_export"]
+    assert protected["export_paused_for_home"] is False
+
+
+def test_session_after_next_cheap_period_does_not_reduce_export_now() -> None:
+    """A battery recharge before the event means no pre-session hold is needed yet."""
+    now = datetime(2026, 11, 1, 12, 0, tzinfo=UTC)
+    snapshot = Snapshot(
+        timestamp=now,
+        current_import_rate=28.3,
+        house_load_kw=1.0,
+        grid_import_kw=1.0,
+        next_offpeak_start=now + timedelta(hours=2),
+        saving_session_joined=True,
+        saving_session_start=now + timedelta(hours=5),
+        saving_session_end=now + timedelta(hours=6),
+        saving_session_octopoints_per_kwh=800,
+    )
+    config = SimulationConfig(
+        battery_capacity_kwh=20.0,
+        battery_reserve_percent=10.0,
+        max_discharge_kw=7.0,
+        inverter_limit_kw=7.0,
+        export_limit_kw=7.0,
+        discharge_efficiency=0.95,
+        proposal_solar_enabled=False,
+        strategy="paced_export",
+    )
+
+    plan = SimulationEngine()._current_plan(
+        snapshot,
+        [snapshot],
+        battery_kwh=20.0,
+        reserve_kwh=2.0,
+        capacity=20.0,
+        config=config,
+        forecast_energy_until_offpeak_kwh=1.0,
+    )
+
+    assert plan["saving_session_joined"] is True
+    assert plan["battery_reserved_for_saving_session"] is False
+    assert plan["battery_export_reduced_for_saving_session"] is False
+    assert plan["target_battery_export"] > 0.0
+
+
+def test_active_power_down_maximises_kh7_export_and_adds_bonus() -> None:
+    """An active joined session should cover home and use remaining KH7 output."""
+    start = datetime(2026, 11, 1, 16, 0, tzinfo=UTC)
+    end = start + timedelta(hours=1)
+    records = [
+        Snapshot(
+            timestamp=start,
+            current_import_rate=28.3,
+            house_load_kw=2.0,
+            grid_import_kw=2.0,
+            battery_soc=100.0,
+            saving_session_joined=True,
+            saving_session_start=start,
+            saving_session_end=end,
+            saving_session_octopoints_per_kwh=800,
+            saving_session_import_baseline_period_kwh=0.5,
+            saving_session_export_baseline_period_kwh=0.0,
+            saving_session_import_baseline_total_kwh=1.0,
+            saving_session_export_baseline_total_kwh=0.0,
+            saving_session_baseline_period_start=start,
+            saving_session_baseline_period_end=start + timedelta(minutes=30),
+            saving_session_baseline_incomplete=True,
+        ),
+        Snapshot(
+            timestamp=start + timedelta(minutes=30),
+            current_import_rate=28.3,
+            house_load_kw=2.0,
+            grid_import_kw=2.0,
+            saving_session_joined=True,
+            saving_session_start=start,
+            saving_session_end=end,
+            saving_session_octopoints_per_kwh=800,
+            saving_session_import_baseline_period_kwh=0.5,
+            saving_session_export_baseline_period_kwh=0.0,
+            saving_session_import_baseline_total_kwh=1.0,
+            saving_session_export_baseline_total_kwh=0.0,
+            saving_session_baseline_period_start=start + timedelta(minutes=30),
+            saving_session_baseline_period_end=end,
+            saving_session_baseline_incomplete=True,
+        ),
+        Snapshot(
+            timestamp=end,
+            current_import_rate=28.3,
+            house_load_kw=2.0,
+            grid_import_kw=2.0,
+        ),
+    ]
+
+    result = SimulationEngine().simulate_today(
+        records,
+        end,
+        SimulationConfig(
+            battery_capacity_kwh=20.0,
+            battery_initial_percent=100.0,
+            battery_reserve_percent=10.0,
+            max_discharge_kw=7.0,
+            inverter_limit_kw=7.0,
+            export_limit_kw=7.0,
+            discharge_efficiency=0.95,
+            export_rate_pence=12.0,
+            proposal_solar_enabled=False,
+            strategy="paced_export",
+        ),
+        current_snapshot=records[1],
+    )
+
+    assert result.saving_session_active is True
+    assert result.current_simulated_battery_to_home_power_kw == 2.0
+    assert result.current_simulated_battery_export_power_kw == 5.0
+    assert result.current_simulated_battery_power_kw == 7.0
+    assert result.current_simulated_grid_import_kw == 0.0
+    assert result.current_simulated_grid_export_kw == 5.0
+    assert result.saving_session_bonus_rate_pence == 100.0
+    assert result.saving_session_baseline_net_kwh == 1.0
+    assert result.saving_session_baseline_incomplete is True
+    assert result.estimated_saving_session_rewardable_reduction_kwh == 6.0
+    assert result.estimated_saving_session_bonus_pence == 600.0
+    assert result.estimated_saving_session_export_income_pence == 60.0
+    assert result.estimated_saving_session_total_income_pence == 660.0
+    assert result.simulated_saving_session_bonus_pence == 600.0
+    assert result.simulated_export_income_pence == 60.0
+    assert result.simulated_cost_pence == -660.0
+
+
+def test_active_power_down_battery_target_excludes_solar_export() -> None:
+    """The battery-export target must not include solar already sent to grid."""
+    now = datetime(2026, 6, 1, 16, 0, tzinfo=UTC)
+    snapshot = Snapshot(
+        timestamp=now,
+        current_import_rate=28.3,
+        house_load_kw=2.0,
+        grid_import_kw=2.0,
+        solar_power_kw=3.0,
+        saving_session_joined=True,
+        saving_session_start=now,
+        saving_session_end=now + timedelta(hours=1),
+        saving_session_octopoints_per_kwh=800,
+    )
+    config = SimulationConfig(
+        battery_capacity_kwh=20.0,
+        battery_reserve_percent=10.0,
+        max_discharge_kw=7.0,
+        inverter_limit_kw=7.0,
+        export_limit_kw=7.0,
+        proposal_solar_enabled=False,
+        strategy="paced_export",
+    )
+
+    plan = SimulationEngine()._current_plan(
+        snapshot,
+        [snapshot],
+        battery_kwh=20.0,
+        reserve_kwh=2.0,
+        capacity=20.0,
+        config=config,
+        forecast_energy_until_offpeak_kwh=None,
+    )
+
+    assert plan["grid_export"] == 5.0
+    assert plan["battery_export"] == 4.0
+    assert plan["target_battery_export"] == 4.0
+
+
+def test_power_down_bonus_is_unknown_without_baseline() -> None:
+    """Normal 12p export remains visible when the Octopus baseline is unavailable."""
+    now = datetime(2026, 11, 1, 16, 0, tzinfo=UTC)
+    snapshot = Snapshot(
+        timestamp=now,
+        current_import_rate=28.3,
+        house_load_kw=2.0,
+        grid_import_kw=2.0,
+        saving_session_joined=True,
+        saving_session_start=now,
+        saving_session_end=now + timedelta(hours=1),
+        saving_session_octopoints_per_kwh=400,
+    )
+    config = SimulationConfig(
+        battery_capacity_kwh=20.0,
+        battery_reserve_percent=10.0,
+        max_discharge_kw=7.0,
+        inverter_limit_kw=7.0,
+        export_limit_kw=7.0,
+        export_rate_pence=12.0,
+        proposal_solar_enabled=False,
+        strategy="paced_export",
+    )
+
+    plan = SimulationEngine()._saving_session_plan(snapshot, [snapshot], config)
+
+    assert plan["saving_session_bonus_rate_pence"] == 50.0
+    assert plan["estimated_saving_session_export_kwh"] == 5.0
+    assert plan["estimated_saving_session_export_income_pence"] == 60.0
+    assert plan["estimated_saving_session_rewardable_reduction_kwh"] is None
+    assert plan["estimated_saving_session_bonus_pence"] is None
+    assert plan["estimated_saving_session_total_income_pence"] is None

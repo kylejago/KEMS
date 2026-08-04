@@ -27,6 +27,7 @@ from .entity_discovery import (
 from .providers.entity_map import KEMSEntities
 from .providers.foxess import FoxESSProvider
 from .providers.gas import GasProvider
+from .providers.octoplus import OctoplusProvider
 from .providers.octopus import OctopusProvider
 from .providers.ohme import OhmeProvider
 from .settings import KEMSSettings
@@ -64,6 +65,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         gas=GasProvider(hass, entities, settings.gas_kwh_per_m3),
         ohme=OhmeProvider(hass, entities),
         foxess=FoxESSProvider(hass, entities),
+        octoplus=OctoplusProvider(hass, entities),
     )
     coordinator = KEMSCoordinator(
         hass,
@@ -90,7 +92,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
 async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Migrate earlier KEMS config entries to the current schema."""
-    if entry.version > 8:
+    if entry.version > 9:
         return False
 
     data = dict(entry.data)
@@ -118,7 +120,7 @@ async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         entry,
         data=data,
         options=options,
-        version=8,
+        version=9,
         minor_version=0,
     )
     return True

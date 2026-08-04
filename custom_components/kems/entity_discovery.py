@@ -35,6 +35,9 @@ from .const import (
     CONF_NEXT_OFFPEAK_START,
     CONF_OFF_PEAK,
     CONF_OFFPEAK_END,
+    CONF_SAVING_SESSION_EVENTS,
+    CONF_SAVING_SESSION_EXPORT_BASELINE,
+    CONF_SAVING_SESSION_IMPORT_BASELINE,
     CONF_SOLAR_POWER,
     DOMAIN,
     ENTITY_MAPPING_KEYS,
@@ -51,6 +54,7 @@ class Candidate:
     text: str
     unit: str
     device_class: str
+    is_export: bool | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -66,6 +70,7 @@ class DiscoveryRule:
     device_classes: tuple[str, ...] = ()
     exact_patterns: tuple[str, ...] = ()
     minimum_score: int = 45
+    is_export: bool | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -195,6 +200,38 @@ RULES = (
         exact_patterns=(
             "sensor.octopus_intelligent_*_octopus_intelligent_offpeak_end",
         ),
+    ),
+    DiscoveryRule(
+        CONF_SAVING_SESSION_EVENTS,
+        OCTOPUS_PLATFORMS,
+        ("event",),
+        (("octoplus",), ("power down", "saving session"), ("event",)),
+        exact_patterns=(
+            "event.octopus_energy_*_octoplus_power_down_events",
+            "event.octopus_energy_*_octoplus_saving_session_events",
+        ),
+    ),
+    DiscoveryRule(
+        CONF_SAVING_SESSION_IMPORT_BASELINE,
+        OCTOPUS_PLATFORMS,
+        ("sensor",),
+        (("octoplus",), ("power down", "saving session"), ("baseline",)),
+        exact_patterns=(
+            "sensor.octopus_energy_electricity_*_octoplus_power_down_baseline*",
+            "sensor.octopus_energy_electricity_*_octoplus_saving_session_baseline*",
+        ),
+        is_export=False,
+    ),
+    DiscoveryRule(
+        CONF_SAVING_SESSION_EXPORT_BASELINE,
+        OCTOPUS_PLATFORMS,
+        ("sensor",),
+        (("octoplus",), ("power down", "saving session"), ("baseline",)),
+        exact_patterns=(
+            "sensor.octopus_energy_electricity_*_octoplus_power_down_baseline*",
+            "sensor.octopus_energy_electricity_*_octoplus_saving_session_baseline*",
+        ),
+        is_export=True,
     ),
     DiscoveryRule(
         CONF_GAS_CURRENT_RATE,
@@ -400,6 +437,11 @@ def score_candidate(candidate: Candidate, rule: DiscoveryRule) -> int:
         return -1000
     if any(token in candidate.text for token in rule.excluded_tokens):
         return -1000
+    if rule.is_export is not None:
+        if candidate.is_export is None and rule.is_export:
+            return -1000
+        if candidate.is_export is not None and candidate.is_export != rule.is_export:
+            return -1000
 
     for index, pattern in enumerate(rule.exact_patterns):
         if fnmatch(candidate.entity_id.casefold(), pattern.casefold()):
@@ -463,6 +505,11 @@ def _candidate_from_registry_entry(hass: HomeAssistant, entry) -> Candidate:
         text=text,
         unit=_normalise(str(attributes.get("unit_of_measurement", ""))),
         device_class=_normalise(str(attributes.get("device_class", ""))),
+        is_export=(
+            attributes.get("is_export")
+            if isinstance(attributes.get("is_export"), bool)
+            else (" export " in f" {text} " or "_export_" in entry.entity_id)
+        ),
     )
 
 
@@ -484,6 +531,14 @@ def _source_rejection_reason(
     if candidate.domain not in rule.domains:
         expected = ", ".join(rule.domains)
         return f"entity domain is {candidate.domain}; expected {expected}"
+    if (
+        rule.is_export is not None
+        and candidate.is_export is not None
+        and candidate.is_export != rule.is_export
+    ):
+        return f"entity export role is {candidate.is_export}; expected {rule.is_export}"
+    if rule.is_export is True and candidate.is_export is None:
+        return "entity does not identify itself as an export baseline"
     if rule.units and candidate.unit and candidate.unit not in rule.units:
         expected = ", ".join(rule.units)
         return f"entity unit is {candidate.unit}; expected one of {expected}"

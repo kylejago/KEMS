@@ -169,6 +169,67 @@ views:
                     name: Whole-home cost
                     icon: mdi:home-currency-gbp
 
+          - type: entities
+            title: Octoplus Power Down session planning
+            icon: mdi:lightning-bolt-circle
+            show_header_toggle: false
+            state_color: true
+            entities:
+              - entity: binary_sensor.kems_saving_session_joined
+                name: Joined
+                icon: mdi:calendar-check
+              - entity: binary_sensor.kems_saving_session_active
+                name: Active now
+                icon: mdi:lightning-bolt-circle
+              - entity: sensor.kems_next_saving_session_start
+                name: Session start
+                icon: mdi:calendar-start
+              - entity: sensor.kems_next_saving_session_end
+                name: Session end
+                icon: mdi:calendar-end
+              - entity: sensor.kems_saving_session_octopoints_per_kwh
+                name: Octopoints per kWh
+                icon: mdi:octagram-outline
+              - entity: sensor.kems_saving_session_bonus_rate
+                name: Bonus rate
+                icon: mdi:cash-plus
+              - entity: sensor.kems_saving_session_battery_reserve
+                name: Battery required at session start
+                icon: mdi:battery-lock
+              - entity: binary_sensor.kems_battery_reserved_for_saving_session
+                name: Battery being protected
+                icon: mdi:battery-lock
+              - entity: binary_sensor.kems_battery_export_reduced_for_saving_session
+                name: Ordinary export reduced
+                icon: mdi:battery-clock-outline
+              - entity: sensor.kems_saving_session_export_target
+                name: Session export target
+                icon: mdi:transmission-tower-export
+              - entity: sensor.kems_estimated_saving_session_export
+                name: Estimated session export
+                icon: mdi:transmission-tower-export
+              - entity: sensor.kems_estimated_saving_session_reduction
+                name: Estimated rewardable reduction
+                icon: mdi:chart-line-variant
+              - entity: sensor.kems_estimated_saving_session_bonus
+                name: Estimated Octopoints bonus
+                icon: mdi:cash-star
+              - entity: sensor.kems_estimated_saving_session_export_income
+                name: Estimated 12p export income
+                icon: mdi:cash-plus
+              - entity: sensor.kems_estimated_saving_session_total_income
+                name: Estimated total session income
+                icon: mdi:cash-multiple
+              - entity: sensor.kems_simulated_saving_session_bonus_today
+                name: Simulated bonus today
+                icon: mdi:cash-fast
+              - entity: sensor.kems_saving_session_baseline_source
+                name: Baseline source
+                icon: mdi:database-search-outline
+              - entity: binary_sensor.kems_saving_session_baseline_incomplete
+                name: Baseline calculation incomplete
+                icon: mdi:progress-alert
+
           - type: grid
             title: Live power comparison
             columns: 2

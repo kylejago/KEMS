@@ -1,29 +1,24 @@
-# KEMS 0.6.0-alpha4 home-reserve fallback correction
+# KEMS 0.6.0-alpha5 Power Down aware export planning
 
-This build retains the alpha2 source-isolation protections and alpha3 KH7
-pacing model, while correcting the reserve calculation used when learning has
-not produced a forecast.
+This build retains the alpha2 source-isolation protections, KH7 paced export, and alpha4 home-reserve fallbacks. It adds read-only planning for joined Octoplus Power Down / Saving Session events.
 
 Key changes:
 
-- Fox ESS KH7 7kW inverter profile;
-- 7kW charge and discharge limits;
-- combined solar plus battery AC output capped at 7kW;
-- fixed 12p/kWh simulated export tariff;
-- paced battery export toward the next cheap period;
-- forecast house-energy reserve before battery export;
-- recent-average and current-load fallbacks when learning has no forecast;
-- a 10% demand safety margin;
-- automatic export pause when the home needs all remaining usable battery;
-- reserve-source and projected-shortfall diagnostics;
-- projected SOC target close to 10% at the next cheap-period start;
+- discovery of both Power Down and Saving Session event names;
+- joined-event detection from BottlecapDave's `joined_events` attribute;
+- pre-session battery reserve for home demand and maximum useful KH7 export;
+- maximum session export while respecting the 7kW inverter, discharge, and grid-export limits;
+- 8 Octopoints = 1p reward conversion;
+- separate fixed 12p export income and Power Down bonus;
+- optional import/export baseline support for net-reduction estimates;
+- baseline-incomplete diagnostics;
 - preserved observed learning history;
 - one-time reset of superseded simulated financial value;
-- smoother learning confidence and seven-complete-day ROI gate.
+- no enrolment service calls and no inverter control.
 
 The manifest contains:
 
 ```json
 "integration_type": "hub",
-"version": "0.6.0-alpha4"
+"version": "0.6.0-alpha5"
 ```

@@ -33,6 +33,7 @@ from .const import (
     CONF_PROPOSAL_SOLAR_ENABLED,
     CONF_PROPOSAL_SOLAR_FACTOR,
     CONF_ROI_FORECAST_YEARS,
+    CONF_SAVING_SESSION_ENABLED,
     CONF_SCAN_INTERVAL,
     CONF_SIMULATION_STRATEGY,
     CONF_SYSTEM_COST,
@@ -89,6 +90,7 @@ class KEMSSettings:
                 battery_power_positive_is_discharge=bool(
                     values[CONF_BATTERY_POWER_POSITIVE_IS_DISCHARGE]
                 ),
+                saving_session_enabled=bool(values[CONF_SAVING_SESSION_ENABLED]),
                 strategy=(
                     "self_use"
                     if str(values[CONF_SIMULATION_STRATEGY]) == "self_use"

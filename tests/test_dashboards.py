@@ -69,3 +69,17 @@ def test_actual_vs_simulated_dashboard_includes_paced_export_diagnostics() -> No
     assert "sensor.kems_home_reserve_forecast_source" in text
     assert "sensor.kems_projected_grid_import_before_cheap_period" in text
     assert "binary_sensor.kems_battery_export_paused_for_home_reserve" in text
+
+
+def test_dashboards_include_power_down_planning() -> None:
+    """The main and diagnostic dashboards must expose session-aware planning."""
+    for name in (
+        "kems_actual_vs_simulated.yaml",
+        "kems_diagnostics_all_entities.yaml",
+    ):
+        text = (DASHBOARDS / name).read_text(encoding="utf-8")
+        assert "binary_sensor.kems_saving_session_joined" in text
+        assert "sensor.kems_saving_session_battery_reserve" in text
+        assert "sensor.kems_estimated_saving_session_bonus" in text
+        assert "sensor.kems_estimated_saving_session_total_income" in text
+        assert "binary_sensor.kems_battery_export_reduced_for_saving_session" in text
