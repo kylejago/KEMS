@@ -1,12 +1,7 @@
-# KEMS v0.6.0-beta1 preserved-history release
+# KEMS 0.7.0-alpha1 in-place development upgrade
 
-This package is an in-place upgrade. Do not delete the KEMS Home Assistant config entry.
+This build preserves all 0.6.0-beta1 observation history, learning data, source mappings, simulation totals, Power Down planning, and ROI state.
 
-Preserved:
+It adds new options and calculated entities for the Control Lab. Existing config entries migrate to schema version 10 and receive safe defaults automatically.
 
-- observed electricity, gas, tariff, EV, and learning history;
-- source mappings and source-isolation protections;
-- actual post-install lifetime data, when applicable;
-- KH7 7kW proposal settings and fixed 12p/kWh export model.
-
-The simulation ledger version remains aligned with alpha5, so upgrading from the dashboard-hotfixed alpha5 build does not require another intentional simulation reset.
+No real inverter or charger service calls are made. The real control backend is intentionally unavailable until the KH7 is installed and commissioned.

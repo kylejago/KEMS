@@ -1,14 +1,14 @@
-# Start here — KEMS v0.6.0-beta1
+# Start here — KEMS 0.7.0-alpha1 Control Lab
 
-This is the consolidated, read-only release candidate containing every tested fix through alpha5, including the Power Down dashboard correction.
+Apply this package only after `v0.6.0-beta1` has been merged and tagged on `main`.
 
-## Branch and release
+## Development branch
 
 ```text
-release/0.6.0-beta1
+feature/control-lab-and-island-simulation
 ```
 
-Copy the package into the repository root, preserving `.git`, then run:
+Create it from the refreshed `develop` branch, copy the package into the repository root while preserving `.git`, then run:
 
 ```powershell
 .\.venv\Scripts\Activate.ps1
@@ -19,14 +19,24 @@ python -m pytest
 python -m pre_commit run --all-files
 ```
 
-Expected pytest result: `67 passed`.
+Expected pytest result: `82 passed`.
 
 Commit:
 
 ```text
-release: prepare v0.6.0-beta1
+feat: add pre-installation control and island simulation lab
 ```
 
-Merge the release branch into `develop`, then merge `develop` into `main`. Create Git tag and GitHub release `v0.6.0-beta1` from `main`.
+Merge this feature into `develop` only. Do not merge 0.7 control work into `main` yet.
 
-This beta remains the safe rollback baseline. It does not write to FoxESS, Ohme, or Octopus.
+Safe pre-install settings:
+
+```text
+Operating mode: Simulate
+Virtual scenario: Normal
+Master control enabled: Off
+System commissioned: Off
+Emergency stop: Off
+```
+
+Real FoxESS writes are hard-blocked in this alpha even if Control is selected.

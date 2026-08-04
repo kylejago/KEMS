@@ -1,14 +1,14 @@
 # KEMS — Kyle Energy Management System
 
-KEMS 0.6.0-beta1 is the release-candidate baseline for Home Assistant. It turns existing whole-home energy entities into one explainable pipeline:
+KEMS 0.7.0-alpha1 is the pre-installation control-development lab for Home Assistant. It extends the 0.6.0-beta1 baseline into:
 
-**Observe → Learn → Advise → Simulate**
+**Observe → Learn → Advise → Simulate → Shadow → Control**
 
-The Control phase remains deliberately excluded. This build does not call Octopus, Ohme, or FoxESS services and does not write inverter or charger settings.
+This alpha builds and validates desired FoxESS commands, whole-house island behaviour, EPS limits, cheap charging, Power Down export, and safety interlocks. Real FoxESS writes are deliberately hard-blocked until the commissioned KH7 backend is mapped and verified on installation day.
 
-## Release purpose
+## Development branch purpose
 
-This package is prepared for merging the tested `develop` branch into `main` and publishing GitHub release `v0.6.0-beta1`. It includes every monitoring, learning, simulation, KH7 paced-export, home-reserve, Power Down, ROI-gating, and dashboard correction completed through alpha5.
+This package starts the post-beta `develop` branch for the 17 August commissioning target. It preserves the complete 0.6.0-beta1 monitoring/simulation fallback and adds a hardware-independent control planner plus virtual outage scenarios.
 
 ## Supported sources
 
@@ -188,3 +188,13 @@ python -m pre_commit run --all-files
 ```
 
 See `START_HERE.md` for the exact GitHub Desktop workflow.
+
+## Pre-installation Control Lab
+
+The KEMS options page and `dashboards/kems_control_lab.yaml` provide interactive controls for:
+
+- operating mode: Observe, Simulate, Shadow, or blocked Control;
+- virtual scenario: normal, sunny, cloudy, high load, active Power Down, daylight outage, night outage, EPS overload, or unstable grid restoration;
+- emergency-stop latch and master-control opt-in.
+
+The controller publishes desired work mode, charge/discharge/export power, minimum SOC, EPS headroom, island energy routing, outage runtime, safety status, and a clear blocked reason. The real backend is absent by design, so `Control commands permitted` remains off in this alpha.

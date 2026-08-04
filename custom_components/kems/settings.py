@@ -18,28 +18,39 @@ from .const import (
     CONF_BATTERY_RESERVE,
     CONF_CHARGE_EFFICIENCY,
     CONF_COMMISSIONING_DATE,
+    CONF_CONTROL_ENABLED,
     CONF_DISCHARGE_EFFICIENCY,
     CONF_DISCOUNT_RATE,
     CONF_ELECTRICITY_INFLATION,
+    CONF_EMERGENCY_STOP,
+    CONF_EPS_CRITICAL_PERCENT,
+    CONF_EPS_LIMIT,
+    CONF_EPS_WARNING_PERCENT,
     CONF_EXPORT_LIMIT,
     CONF_EXPORT_RATE,
     CONF_GAS_KWH_PER_M3,
     CONF_GRANTS_REBATES,
+    CONF_GRID_STABILITY_SECONDS,
     CONF_HISTORY_DAYS,
     CONF_INVERTER_LIMIT,
+    CONF_ISLAND_RESERVE_PERCENT,
     CONF_MANUAL_SYSTEM_COSTS,
     CONF_MAX_CHARGE,
     CONF_MAX_DISCHARGE,
+    CONF_OPERATING_MODE,
     CONF_PROPOSAL_SOLAR_ENABLED,
     CONF_PROPOSAL_SOLAR_FACTOR,
     CONF_ROI_FORECAST_YEARS,
     CONF_SAVING_SESSION_ENABLED,
     CONF_SCAN_INTERVAL,
     CONF_SIMULATION_STRATEGY,
+    CONF_STALE_DATA_SECONDS,
+    CONF_SYSTEM_COMMISSIONED,
     CONF_SYSTEM_COST,
+    CONF_VIRTUAL_SCENARIO,
     DEFAULT_OPTIONS,
 )
-from .kems_core import ROIConfig, SimulationConfig
+from .kems_core import ControlConfig, ROIConfig, SimulationConfig
 
 
 @dataclass(frozen=True, slots=True)
@@ -51,6 +62,7 @@ class KEMSSettings:
     gas_kwh_per_m3: float
     simulation: SimulationConfig
     roi: ROIConfig
+    control: ControlConfig
 
     @classmethod
     def from_options(cls, options: Mapping[str, Any]) -> KEMSSettings:
@@ -117,6 +129,36 @@ class KEMSSettings:
                 ),
                 discount_rate_percent=max(float(values[CONF_DISCOUNT_RATE]), 0.0),
                 forecast_years=max(int(values[CONF_ROI_FORECAST_YEARS]), 1),
+            ),
+            control=ControlConfig(
+                operating_mode=str(values[CONF_OPERATING_MODE]),
+                virtual_scenario=str(values[CONF_VIRTUAL_SCENARIO]),
+                control_enabled=bool(values[CONF_CONTROL_ENABLED]),
+                commissioned=bool(values[CONF_SYSTEM_COMMISSIONED]),
+                emergency_stop=bool(values[CONF_EMERGENCY_STOP]),
+                stale_data_seconds=max(int(values[CONF_STALE_DATA_SECONDS]), 30),
+                grid_stability_seconds=max(
+                    int(values[CONF_GRID_STABILITY_SECONDS]), 30
+                ),
+                eps_limit_kw=max(float(values[CONF_EPS_LIMIT]), 0.1),
+                eps_warning_percent=float(values[CONF_EPS_WARNING_PERCENT]),
+                eps_critical_percent=float(values[CONF_EPS_CRITICAL_PERCENT]),
+                island_reserve_percent=float(values[CONF_ISLAND_RESERVE_PERCENT]),
+                normal_reserve_percent=float(values[CONF_BATTERY_RESERVE]),
+                battery_capacity_kwh=float(values[CONF_BATTERY_CAPACITY]),
+                discharge_efficiency=float(values[CONF_DISCHARGE_EFFICIENCY]),
+                max_charge_kw=min(
+                    float(values[CONF_MAX_CHARGE]),
+                    max(float(values[CONF_EPS_LIMIT]), 0.1),
+                ),
+                max_discharge_kw=min(
+                    float(values[CONF_MAX_DISCHARGE]),
+                    max(float(values[CONF_EPS_LIMIT]), 0.1),
+                ),
+                export_limit_kw=min(
+                    float(values[CONF_EXPORT_LIMIT]),
+                    max(float(values[CONF_EPS_LIMIT]), 0.1),
+                ),
             ),
         )
 

@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.7.0-alpha1 — pre-installation control lab
+
+- Added hardware-independent Observe, Simulate, Shadow, and Control planning modes.
+- Added a virtual KH7 scenario lab for normal operation, high/low solar, high load, active Power Down, daylight/night grid outage, and unstable grid restoration.
+- Added whole-house island planning: solar to house first, surplus solar to battery, battery only for the shortfall, no export, and EV charging blocked.
+- Added EPS load, headroom, utilisation, warning/critical thresholds, outage-runtime estimate, and five-minute grid-restoration hold planning.
+- Added desired work mode, charge, battery-to-home, battery-export, total-discharge, minimum-SOC, operating-reason, blocked-reason, and next-action entities.
+- Added stale-data and emergency-stop fail-safe plans plus a 12-check built-in control preflight.
+- Added a dedicated Control Lab dashboard and 11 control regression tests.
+- Real FoxESS writes remain hard-blocked; alpha1 is safe to run before hardware installation.
+
+
 ## 0.6.0-beta1
 
 - Consolidated all alpha1–alpha5 monitoring and simulation work into the first main-branch beta.
