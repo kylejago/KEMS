@@ -1,60 +1,49 @@
-"""Octopus Energy provider."""
+"""Octopus Energy electricity state provider."""
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import datetime
 
 from homeassistant.core import HomeAssistant
 
-from kems_core.octopus import OctopusState
+from .base import HomeAssistantStateReader
+from .entity_map import KEMSEntities
 
-from .entity_map import OctopusEntities
+
+@dataclass(frozen=True, slots=True)
+class OctopusState:
+    """Current Octopus electricity tariff observation."""
+
+    current_import_rate: float | None = None
+    next_import_rate: float | None = None
+    current_export_rate: float | None = None
+    electricity_standing_charge: float | None = None
+    off_peak: bool | None = None
+    intelligent_slot: bool | None = None
+    next_offpeak_start: datetime | None = None
+    offpeak_end: datetime | None = None
 
 
-class OctopusProvider:
-    """Reads data from the Octopus integrations."""
+class OctopusProvider(HomeAssistantStateReader):
+    """Read data from configured Octopus Energy electricity entities."""
 
-    def __init__(self, hass: HomeAssistant) -> None:
-        self._hass = hass
-        self._entities = OctopusEntities()
-
-    def _state(self, entity_id: str):
-        """Return a Home Assistant State object."""
-        return self._hass.states.get(entity_id)
-
-    def _float(self, entity_id: str) -> float | None:
-        state = self._state(entity_id)
-        if state is None or state.state in ("unknown", "unavailable"):
-            return None
-
-        try:
-            return float(state.state)
-        except ValueError:
-            return None
-
-    def _bool(self, entity_id: str) -> bool:
-        state = self._state(entity_id)
-        return state is not None and state.state == "on"
-
-    def _datetime(self, entity_id: str) -> datetime | None:
-        state = self._state(entity_id)
-        if state is None or state.state in ("unknown", "unavailable"):
-            return None
-
-        try:
-            return datetime.fromisoformat(state.state)
-        except ValueError:
-            return None
+    def __init__(self, hass: HomeAssistant, entities: KEMSEntities) -> None:
+        """Initialise the provider."""
+        super().__init__(hass)
+        self._entities = entities
 
     def get_state(self) -> OctopusState:
-        """Return the current Octopus state."""
-
+        """Return the current Octopus electricity observation."""
         return OctopusState(
-            current_rate=self._float(self._entities.current_rate),
-            next_rate=self._float(self._entities.next_rate),
+            current_import_rate=self._rate_pence(self._entities.current_import_rate),
+            next_import_rate=self._rate_pence(self._entities.next_import_rate),
+            current_export_rate=self._rate_pence(self._entities.current_export_rate),
+            electricity_standing_charge=self._money_pence(
+                self._entities.electricity_standing_charge
+            ),
             off_peak=self._bool(self._entities.off_peak),
             intelligent_slot=self._bool(self._entities.intelligent_slot),
-            planned_dispatch=self._bool(self._entities.planned_dispatch),
             next_offpeak_start=self._datetime(self._entities.next_offpeak_start),
             offpeak_end=self._datetime(self._entities.offpeak_end),
         )

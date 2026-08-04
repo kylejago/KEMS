@@ -1,0 +1,144 @@
+title: KEMS Pre-install Comparison
+views:
+  - title: Before Installation
+    path: before-installation
+    icon: mdi:home-clock-outline
+    type: masonry
+    cards:
+      - type: markdown
+        content: |
+          # ⚡ KEMS — Before the solar installation
+          Compare your **actual home today** with the proposed **9.66 kWp solar + 56.42 kWh battery** system.
+
+          This dashboard intentionally avoids live FoxESS solar and battery entities, so it works before the hardware is commissioned.
+
+      - type: grid
+        columns: 4
+        square: false
+        cards:
+          - type: tile
+            entity: sensor.kems_current_import_rate
+            name: Current import rate
+          - type: tile
+            entity: sensor.kems_next_import_rate
+            name: Next import rate
+          - type: tile
+            entity: sensor.kems_simulation_export_rate
+            name: Fixed export rate
+          - type: tile
+            entity: binary_sensor.kems_cheap_period_confirmed
+            name: Cheap period confirmed
+
+      - type: grid
+        columns: 2
+        square: false
+        cards:
+          - type: entities
+            title: LIVE — home today
+            show_header_toggle: false
+            entities:
+              - sensor.kems_house_load
+              - sensor.kems_grid_import
+              - sensor.kems_ev_charging_power
+              - sensor.kems_ev_state_of_charge
+              - binary_sensor.kems_ev_connected
+              - binary_sensor.kems_ev_charging
+              - binary_sensor.kems_grid_import_outside_cheap_period
+          - type: entities
+            title: SIMULATED — proposed system now
+            show_header_toggle: false
+            entities:
+              - sensor.kems_simulated_house_load_power
+              - sensor.kems_simulated_solar_power
+              - sensor.kems_simulated_grid_import_power
+              - sensor.kems_simulated_grid_export_power
+              - sensor.kems_simulated_battery_power
+              - sensor.kems_simulated_battery_state_of_charge
+
+      - type: grid
+        columns: 2
+        square: false
+        cards:
+          - type: history-graph
+            title: LIVE load and grid — 24 hours
+            hours_to_show: 24
+            entities:
+              - sensor.kems_house_load
+              - sensor.kems_grid_import
+              - sensor.kems_ev_charging_power
+          - type: history-graph
+            title: SIMULATED proposal system — 24 hours
+            hours_to_show: 24
+            entities:
+              - sensor.kems_simulated_house_load_power
+              - sensor.kems_simulated_solar_power
+              - sensor.kems_simulated_grid_net_power
+              - sensor.kems_simulated_battery_power
+
+      - type: grid
+        columns: 2
+        square: false
+        cards:
+          - type: entities
+            title: Observed today
+            show_header_toggle: false
+            entities:
+              - sensor.kems_observed_grid_import_today
+              - sensor.kems_observed_grid_export_today
+              - sensor.kems_observed_export_income_today
+              - sensor.kems_observed_cost_today
+              - sensor.kems_gas_usage_today
+              - sensor.kems_gas_cost_today
+              - sensor.kems_whole_home_observed_cost_today
+          - type: entities
+            title: Simulated today
+            show_header_toggle: false
+            entities:
+              - sensor.kems_simulated_grid_import_today
+              - sensor.kems_simulated_grid_export_today
+              - sensor.kems_simulated_export_income_today
+              - sensor.kems_simulated_kems_cost_today
+              - sensor.kems_simulated_saving_today
+              - sensor.kems_whole_home_simulated_cost_today
+              - sensor.kems_whole_home_simulated_saving_today
+
+      - type: grid
+        columns: 2
+        square: false
+        cards:
+          - type: gauge
+            entity: sensor.kems_simulated_battery_state_of_charge
+            name: Simulated battery SOC
+            min: 0
+            max: 100
+            needle: true
+            segments:
+              - from: 0
+                color: var(--error-color)
+              - from: 10
+                color: var(--warning-color)
+              - from: 30
+                color: var(--success-color)
+          - type: gauge
+            entity: sensor.kems_learning_confidence
+            name: Learning confidence
+            min: 0
+            max: 100
+            needle: true
+            segments:
+              - from: 0
+                color: var(--error-color)
+              - from: 30
+                color: var(--warning-color)
+              - from: 70
+                color: var(--success-color)
+
+      - type: markdown
+        title: KEMS advice
+        content: |
+          ## 💡 {{ states('sensor.kems_advice') }}
+          {{ state_attr('sensor.kems_advice', 'message') or 'KEMS is collecting observations.' }}
+
+          **History:** {{ states('sensor.kems_history_samples') }} samples  
+          **Learning:** {{ states('sensor.kems_learning_confidence') }}%  
+          **Simulation ready:** {{ states('binary_sensor.kems_simulation_ready') }}

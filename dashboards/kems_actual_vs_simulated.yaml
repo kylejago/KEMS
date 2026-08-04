@@ -1,0 +1,303 @@
+title: KEMS Actual vs Simulated
+
+views:
+  - title: Comparison
+    path: comparison
+    icon: mdi:compare-horizontal
+    panel: true
+
+    cards:
+      - type: vertical-stack
+        cards:
+          - type: glance
+            title: KEMS status
+            show_name: true
+            show_state: true
+            columns: 5
+            entities:
+              - entity: sensor.kems_status
+                name: Status
+              - entity: sensor.kems_phase
+                name: Phase
+              - entity: sensor.kems_data_quality
+                name: Data quality
+              - entity: sensor.kems_learning_confidence
+                name: Learning confidence
+              - entity: sensor.kems_source_validation
+                name: Sources
+
+          - type: grid
+            title: Today — actual vs simulated
+            columns: 2
+            square: false
+            cards:
+              - type: entities
+                title: Actual home
+                icon: mdi:home-lightning-bolt
+                show_header_toggle: false
+                state_color: true
+                entities:
+                  - type: section
+                    label: Live power
+                  - entity: sensor.kems_house_load
+                    name: House load now
+                    icon: mdi:home-lightning-bolt
+                  - entity: sensor.kems_grid_import
+                    name: Grid import now
+                    icon: mdi:transmission-tower-import
+                  - entity: sensor.kems_grid_export
+                    name: Grid export now
+                    icon: mdi:transmission-tower-export
+                  - entity: sensor.kems_grid_net_power
+                    name: Grid net power
+                    icon: mdi:swap-horizontal
+                  - entity: sensor.kems_grid_flow_direction
+                    name: Grid direction
+                    icon: mdi:arrow-left-right
+
+                  - type: section
+                    label: Energy today
+                  - entity: sensor.kems_observed_grid_import_today
+                    name: Grid import today
+                    icon: mdi:transmission-tower-import
+                  - entity: sensor.kems_observed_grid_export_today
+                    name: Grid export today
+                    icon: mdi:transmission-tower-export
+
+                  - type: section
+                    label: Cost today
+                  - entity: sensor.kems_observed_cost_today
+                    name: Electricity cost
+                    icon: mdi:currency-gbp
+                  - entity: sensor.kems_observed_export_income_today
+                    name: Export income
+                    icon: mdi:cash-plus
+                  - entity: sensor.kems_whole_home_observed_cost_today
+                    name: Whole-home cost
+                    icon: mdi:home-currency-gbp
+
+              - type: entities
+                title: Simulated KEMS system — KH7 paced export
+                icon: mdi:solar-power
+                show_header_toggle: false
+                state_color: true
+                entities:
+                  - type: section
+                    label: Live power
+                  - entity: sensor.kems_simulated_house_load_power
+                    name: House load now
+                    icon: mdi:home-lightning-bolt
+                  - entity: sensor.kems_simulated_grid_import_power
+                    name: Grid import now
+                    icon: mdi:transmission-tower-import
+                  - entity: sensor.kems_simulated_grid_export_power
+                    name: Grid export now
+                    icon: mdi:transmission-tower-export
+                  - entity: sensor.kems_simulated_grid_net_power
+                    name: Grid net power
+                    icon: mdi:swap-horizontal
+                  - entity: sensor.kems_simulated_solar_power
+                    name: Solar power now
+                    icon: mdi:solar-power
+                  - entity: sensor.kems_simulated_battery_power
+                    name: Battery power now
+                    icon: mdi:battery-charging
+                  - entity: sensor.kems_simulated_battery_to_home_power
+                    name: Battery to home now
+                    icon: mdi:home-battery-outline
+                  - entity: sensor.kems_simulated_battery_export_power
+                    name: Battery export now
+                    icon: mdi:battery-arrow-up-outline
+                  - entity: sensor.kems_simulated_battery_state_of_charge
+                    name: Battery state of charge
+                    icon: mdi:battery
+
+                  - type: section
+                    label: Paced battery export
+                  - entity: sensor.kems_target_battery_export_power
+                    name: Target battery export power
+                    icon: mdi:battery-clock-outline
+                  - entity: sensor.kems_exportable_battery_energy_remaining
+                    name: Exportable battery energy remaining
+                    icon: mdi:battery-arrow-down-outline
+                  - entity: sensor.kems_battery_energy_reserved_for_home
+                    name: Reserved for home
+                    icon: mdi:home-battery-outline
+                  - entity: sensor.kems_home_reserve_forecast_source
+                    name: Reserve forecast source
+                    icon: mdi:home-clock-outline
+                  - entity: sensor.kems_projected_grid_import_before_cheap_period
+                    name: Projected import before cheap
+                    icon: mdi:transmission-tower-import
+                  - entity: binary_sensor.kems_battery_export_paused_for_home_reserve
+                    name: Export paused for home reserve
+                    icon: mdi:home-battery-outline
+                  - entity: sensor.kems_hours_until_next_cheap_period
+                    name: Hours until cheap period
+                    icon: mdi:clock-fast
+                  - entity: sensor.kems_projected_soc_at_cheap_period_start
+                    name: Projected SOC at 23:30
+                    icon: mdi:battery-clock
+
+                  - type: section
+                    label: Energy today
+                  - entity: sensor.kems_simulated_grid_import_today
+                    name: Grid import today
+                    icon: mdi:transmission-tower-import
+                  - entity: sensor.kems_simulated_grid_export_today
+                    name: Grid export today
+                    icon: mdi:transmission-tower-export
+                  - entity: sensor.kems_simulated_solar_generation_today
+                    name: Solar generation today
+                    icon: mdi:solar-power
+                  - entity: sensor.kems_simulated_battery_to_home_today
+                    name: Battery supplied to home
+                    icon: mdi:home-battery
+                  - entity: sensor.kems_simulated_battery_export_today
+                    name: Battery exported
+                    icon: mdi:battery-arrow-up
+
+                  - type: section
+                    label: Cost today
+                  - entity: sensor.kems_simulated_kems_cost_today
+                    name: Electricity cost
+                    icon: mdi:currency-gbp
+                  - entity: sensor.kems_simulated_export_income_today
+                    name: Export income
+                    icon: mdi:cash-plus
+                  - entity: sensor.kems_whole_home_simulated_cost_today
+                    name: Whole-home cost
+                    icon: mdi:home-currency-gbp
+
+          - type: entities
+            title: Octoplus Power Down session planning
+            icon: mdi:lightning-bolt-circle
+            show_header_toggle: false
+            state_color: true
+            entities:
+              - entity: binary_sensor.kems_power_down_session_joined
+                name: Joined
+                icon: mdi:calendar-check
+              - entity: binary_sensor.kems_power_down_session_active
+                name: Active now
+                icon: mdi:lightning-bolt-circle
+              - entity: sensor.kems_next_power_down_session_start
+                name: Session start
+                icon: mdi:calendar-start
+              - entity: sensor.kems_next_power_down_session_end
+                name: Session end
+                icon: mdi:calendar-end
+              - entity: sensor.kems_power_down_session_duration
+                name: Duration
+                icon: mdi:timer-outline
+              - entity: sensor.kems_power_down_session_octopoints_per_kwh
+                name: Octopoints per kWh
+                icon: mdi:octagram-outline
+              - entity: sensor.kems_power_down_session_bonus_rate
+                name: Bonus rate
+                icon: mdi:cash-plus
+              - entity: sensor.kems_power_down_session_baseline_net_energy
+                name: Baseline net energy
+                icon: mdi:chart-bell-curve-cumulative
+              - entity: sensor.kems_power_down_session_battery_reserve
+                name: Battery required at session start
+                icon: mdi:battery-lock
+              - entity: binary_sensor.kems_battery_reserved_for_power_down_session
+                name: Battery being protected
+                icon: mdi:battery-lock
+              - entity: binary_sensor.kems_battery_export_reduced_for_power_down_session
+                name: Ordinary export reduced
+                icon: mdi:battery-clock-outline
+              - entity: sensor.kems_power_down_session_export_target
+                name: Session export target
+                icon: mdi:transmission-tower-export
+              - entity: sensor.kems_estimated_power_down_session_export
+                name: Estimated session export
+                icon: mdi:transmission-tower-export
+              - entity: sensor.kems_estimated_power_down_session_rewardable_reduction
+                name: Estimated rewardable reduction
+                icon: mdi:chart-line-variant
+              - entity: sensor.kems_estimated_power_down_session_bonus
+                name: Estimated Octopoints bonus
+                icon: mdi:cash-star
+              - entity: sensor.kems_estimated_power_down_session_export_income
+                name: Estimated 12p export income
+                icon: mdi:cash-plus
+              - entity: sensor.kems_estimated_power_down_session_total_income
+                name: Estimated total session income
+                icon: mdi:cash-multiple
+              - entity: sensor.kems_simulated_power_down_session_bonus_today
+                name: Simulated bonus today
+                icon: mdi:cash-fast
+              - entity: sensor.kems_power_down_session_baseline_source
+                name: Baseline source
+                icon: mdi:database-search-outline
+              - entity: binary_sensor.kems_power_down_baseline_incomplete
+                name: Baseline calculation incomplete
+                icon: mdi:progress-alert
+
+          - type: grid
+            title: Live power comparison
+            columns: 2
+            square: false
+            cards:
+              - type: history-graph
+                title: Actual power — last 12 hours
+                hours_to_show: 12
+                show_names: true
+                entities:
+                  - entity: sensor.kems_house_load
+                    name: House load
+                  - entity: sensor.kems_grid_import
+                    name: Grid import
+                  - entity: sensor.kems_grid_net_power
+                    name: Grid net
+
+              - type: history-graph
+                title: Simulated power — last 12 hours
+                hours_to_show: 12
+                show_names: true
+                entities:
+                  - entity: sensor.kems_simulated_house_load_power
+                    name: House load
+                  - entity: sensor.kems_simulated_solar_power
+                    name: Solar
+                  - entity: sensor.kems_simulated_battery_power
+                    name: Battery
+                  - entity: sensor.kems_simulated_battery_export_power
+                    name: Battery export actual
+                  - entity: sensor.kems_target_battery_export_power
+                    name: Battery export target
+                  - entity: sensor.kems_simulated_grid_net_power
+                    name: Grid net
+
+          - type: entities
+            title: Difference and estimated benefit
+            icon: mdi:chart-box-outline
+            show_header_toggle: false
+            state_color: true
+            entities:
+              - entity: sensor.kems_whole_home_observed_cost_today
+                name: Actual whole-home cost today
+                icon: mdi:home-currency-gbp
+              - entity: sensor.kems_whole_home_simulated_cost_today
+                name: Simulated whole-home cost today
+                icon: mdi:home-currency-gbp
+              - entity: sensor.kems_whole_home_simulated_saving_today
+                name: Saving today
+                icon: mdi:piggy-bank
+              - entity: sensor.kems_avoided_day_rate_import_today
+                name: Day-rate import avoided
+                icon: mdi:transmission-tower-off
+              - entity: sensor.kems_simulated_battery_to_home_today
+                name: Battery supplied to home
+                icon: mdi:home-battery
+              - entity: sensor.kems_simulated_battery_export_today
+                name: Battery exported
+                icon: mdi:battery-arrow-up
+              - entity: sensor.kems_predicted_annual_saving
+                name: Predicted annual saving
+                icon: mdi:calendar-cash
+              - entity: sensor.kems_roi_confidence
+                name: Prediction confidence
+                icon: mdi:chart-bell-curve

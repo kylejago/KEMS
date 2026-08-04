@@ -1,0 +1,128 @@
+title: KEMS ROI & Lifetime
+views:
+  - title: ROI & Lifetime
+    path: roi-lifetime
+    icon: mdi:finance
+    type: masonry
+    cards:
+      - type: markdown
+        content: |
+          # KEMS ROI & Lifetime
+
+          **Status:** {{ states('sensor.kems_roi_status') }}
+
+          {% if is_state('binary_sensor.kems_system_paid_back', 'on') %}
+          ## 🏆 SYSTEM PAID BACK
+          **Profit after payback:** £{{ states('sensor.kems_actual_net_profit') }}  
+          **Total system value:** £{{ states('sensor.kems_actual_value_created_total') }}  
+          **Paid back:** {{ states('sensor.kems_actual_payback_date') }}
+          {% elif is_state('binary_sensor.kems_system_installed', 'on') %}
+          ## 🔋 SYSTEM PAYBACK
+          **Recovered:** £{{ states('sensor.kems_actual_value_created_total') }} of £{{ states('sensor.kems_system_investment') }}  
+          **Remaining:** £{{ states('sensor.kems_actual_payback_remaining') }}  
+          **Progress:** {{ states('sensor.kems_actual_roi_percentage') }}%
+          {% else %}
+          ## 🧮 PRE-INSTALL ROI SIMULATION
+          **Predicted annual saving:** £{{ states('sensor.kems_predicted_annual_saving') }}  
+          **Predicted payback:** {{ states('sensor.kems_predicted_payback_years') }} years  
+          **Predicted payback date:** {{ states('sensor.kems_predicted_payback_date') }}
+          {% endif %}
+
+      - type: gauge
+        entity: sensor.kems_actual_roi_percentage
+        name: Actual investment recovered
+        min: 0
+        max: 100
+        needle: true
+        segments:
+          - from: 0
+            color: var(--error-color)
+          - from: 35
+            color: var(--warning-color)
+          - from: 70
+            color: var(--success-color)
+
+      - type: grid
+        columns: 2
+        square: false
+        cards:
+          - type: tile
+            entity: sensor.kems_system_investment
+            name: Net investment
+            icon: mdi:cash-multiple
+          - type: tile
+            entity: sensor.kems_predicted_annual_saving
+            name: Predicted annual saving
+            icon: mdi:chart-line
+          - type: tile
+            entity: sensor.kems_predicted_payback_years
+            name: Predicted payback
+            icon: mdi:calendar-clock
+          - type: tile
+            entity: sensor.kems_predicted_net_value
+            name: Predicted net value
+            icon: mdi:cash-fast
+          - type: tile
+            entity: sensor.kems_actual_value_created_total
+            name: Actual value created
+            icon: mdi:piggy-bank
+          - type: tile
+            entity: sensor.kems_actual_net_profit
+            name: Profit after payback
+            icon: mdi:trending-up
+
+      - type: history-graph
+        title: Value created and profit
+        hours_to_show: 720
+        entities:
+          - entity: sensor.kems_actual_value_created_total
+            name: Actual system value
+          - entity: sensor.kems_lifetime_simulated_system_value
+            name: Simulated system value
+          - entity: sensor.kems_actual_net_profit
+            name: Profit
+
+      - type: entities
+        title: Lifetime electricity and storage
+        show_header_toggle: false
+        entities:
+          - sensor.kems_lifetime_house_consumption
+          - sensor.kems_lifetime_ev_energy
+          - sensor.kems_lifetime_solar_generation
+          - sensor.kems_lifetime_grid_import
+          - sensor.kems_lifetime_grid_export
+          - sensor.kems_lifetime_battery_charge
+          - sensor.kems_lifetime_battery_discharge
+          - sensor.kems_lifetime_battery_cycles
+          - sensor.kems_lifetime_grid_independence
+
+      - type: entities
+        title: Lifetime whole-home energy
+        show_header_toggle: false
+        entities:
+          - sensor.kems_lifetime_total_home_energy
+          - sensor.kems_lifetime_gas_consumption
+          - sensor.kems_lifetime_observed_days
+          - sensor.kems_system_operating_days
+
+      - type: entities
+        title: Lifetime costs and earnings
+        show_header_toggle: false
+        entities:
+          - sensor.kems_lifetime_import_cost
+          - sensor.kems_lifetime_gas_cost
+          - sensor.kems_lifetime_export_income
+          - sensor.kems_lifetime_total_energy_cost
+          - sensor.kems_lifetime_avoided_import_value
+          - sensor.kems_lifetime_system_value
+          - sensor.kems_system_operating_costs
+
+      - type: history-graph
+        title: Lifetime energy totals
+        hours_to_show: 720
+        entities:
+          - sensor.kems_lifetime_house_consumption
+          - sensor.kems_lifetime_solar_generation
+          - sensor.kems_lifetime_grid_import
+          - sensor.kems_lifetime_grid_export
+          - sensor.kems_lifetime_gas_consumption

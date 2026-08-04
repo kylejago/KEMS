@@ -1,13 +1,239 @@
 {
   "config": {
+    "abort": {
+      "already_configured": "KEMS is already configured.",
+      "reconfigure_successful": "KEMS source entities were updated."
+    },
     "step": {
       "user": {
-        "title": "KEMS",
-        "description": "Set up the KEMS Energy Management System."
+        "title": "Set up KEMS",
+        "description": "KEMS will scan Home Assistant for compatible Octopus electricity and gas, Ohme, and FoxESS Modbus entities. KEMS remains read-only."
+      },
+      "confirm": {
+        "title": "Set up KEMS automatically",
+        "description": "KEMS found {electricity_count} Octopus electricity, {gas_count} gas, {ohme_count} Ohme, and {foxess_count} live power/battery/solar source entities.\n\nDetected mappings:\n{detected_entities}\n\nAmbiguous fields: {ambiguous}\n\nLeave review disabled to accept high-confidence matches.",
+        "data": {
+          "review_entities": "Review or change detected entities"
+        },
+        "data_description": {
+          "review_entities": "Open the full mapping screen before KEMS is created."
+        }
+      },
+      "entities": {
+        "title": "Review KEMS source entities",
+        "description": "Choose the entities KEMS observes. Only the current electricity import rate is required. Gas, Ohme, and FoxESS Modbus can be added later through Reconfigure.",
+        "data": {
+          "current_import_rate": "Current import rate",
+          "next_import_rate": "Next import rate (optional)",
+          "current_export_rate": "Current export rate (optional)",
+          "electricity_standing_charge": "Electricity standing charge (optional)",
+          "off_peak": "Off-peak status (optional)",
+          "intelligent_slot": "Intelligent slot status (optional)",
+          "next_offpeak_start": "Next off-peak start (optional)",
+          "offpeak_end": "Off-peak end (optional)",
+          "gas_current_rate": "Gas current rate (optional)",
+          "gas_standing_charge": "Gas standing charge (optional)",
+          "gas_meter_total": "Gas cumulative meter (optional)",
+          "gas_usage_today": "Gas usage today (optional)",
+          "gas_cost_today": "Gas cost today (optional)",
+          "ev_status": "EV charger status (optional)",
+          "ev_connected": "EV connected (optional)",
+          "ev_charging": "EV charging (optional)",
+          "ev_power_kw": "EV charging power (optional)",
+          "ev_soc": "EV state of charge (optional)",
+          "house_load_kw": "House load power (optional)",
+          "battery_soc": "Battery state of charge (optional)",
+          "battery_power_kw": "Battery power (optional)",
+          "battery_voltage": "Battery voltage (optional)",
+          "battery_current": "Battery current (optional)",
+          "solar_power_kw": "Solar power (optional)",
+          "grid_import_kw": "Grid import power (optional)",
+          "grid_export_kw": "Grid export power (optional)",
+          "saving_session_events": "Octoplus Power Down events (optional)",
+          "saving_session_import_baseline": "Power Down import baseline (optional)",
+          "saving_session_export_baseline": "Power Down export baseline (optional)"
+        },
+        "data_description": {
+          "current_import_rate": "Octopus current electricity import price.",
+          "next_import_rate": "Octopus next electricity import price.",
+          "current_export_rate": "Optional observed export-rate entity. The proposal simulation uses the fixed export rate from KEMS settings.",
+          "electricity_standing_charge": "Octopus electricity standing charge, used in whole-home cost totals.",
+          "off_peak": "Octopus binary sensor that is on during the normal Intelligent Go cheap period.",
+          "intelligent_slot": "Octopus binary sensor for an active Intelligent dispatch slot.",
+          "next_offpeak_start": "Octopus timestamp for the next cheap-period start.",
+          "offpeak_end": "Octopus timestamp for the current or next cheap-period end.",
+          "gas_current_rate": "Octopus gas unit rate in p/kWh or GBP/kWh.",
+          "gas_standing_charge": "Octopus gas standing charge in p/day or GBP/day.",
+          "gas_meter_total": "Cumulative gas meter in kWh or m³. KEMS converts m³ using the options conversion factor.",
+          "gas_usage_today": "Octopus current accumulated gas consumption for today.",
+          "gas_cost_today": "Octopus current accumulated gas cost for today.",
+          "ev_status": "Ohme charger status sensor; KEMS derives connected and charging states from it.",
+          "ev_connected": "Optional legacy/custom Ohme connected binary sensor.",
+          "ev_charging": "Optional legacy/custom Ohme charging binary sensor.",
+          "ev_power_kw": "Ohme charging power sensor.",
+          "ev_soc": "Ohme vehicle state of charge percentage.",
+          "house_load_kw": "FoxESS total house-load power when installed. Before installation KEMS can use the Octopus current-demand sensor.",
+          "battery_soc": "FoxESS Modbus battery state of charge percentage.",
+          "battery_power_kw": "Optional direct FoxESS battery-power sensor.",
+          "battery_voltage": "FoxESS Battery Voltage, used with Battery Current to derive power.",
+          "battery_current": "FoxESS Battery Current, used with Battery Voltage to derive power.",
+          "solar_power_kw": "FoxESS Modbus total PV/solar power.",
+          "grid_import_kw": "FoxESS grid-import power when installed. Before installation KEMS can use the Octopus current-demand sensor.",
+          "grid_export_kw": "FoxESS Modbus power currently exported to the grid.",
+          "saving_session_events": "BottlecapDave Octopus Energy Power Down event entity containing available_events and joined_events. The legacy Saving Session event is also supported. KEMS plans only around joined sessions.",
+          "saving_session_import_baseline": "Optional Octoplus Power Down import baseline sensor used to estimate rewardable net reduction. The legacy Saving Session baseline is also supported.",
+          "saving_session_export_baseline": "Optional export-meter baseline variant. KEMS subtracts it from the import baseline to estimate the net baseline."
+        }
+      },
+      "reconfigure": {
+        "title": "Rescan KEMS source entities",
+        "description": "KEMS rescanned Octopus Energy, Octopus Intelligent, Ohme, and FoxESS Modbus.\n\nDetected mappings:\n{detected_entities}\n\nAmbiguous fields: {ambiguous}",
+        "data": {
+          "review_entities": "Review or change detected entities"
+        },
+        "data_description": {
+          "review_entities": "Leave this off to accept the automatic mappings and reload KEMS."
+        }
+      },
+      "reconfigure_entities": {
+        "title": "Review KEMS source entities",
+        "description": "Only change a detected entity when KEMS selected the wrong source.",
+        "data": {
+          "current_import_rate": "Current import rate",
+          "next_import_rate": "Next import rate (optional)",
+          "current_export_rate": "Current export rate (optional)",
+          "electricity_standing_charge": "Electricity standing charge (optional)",
+          "off_peak": "Off-peak status (optional)",
+          "intelligent_slot": "Intelligent slot status (optional)",
+          "next_offpeak_start": "Next off-peak start (optional)",
+          "offpeak_end": "Off-peak end (optional)",
+          "gas_current_rate": "Gas current rate (optional)",
+          "gas_standing_charge": "Gas standing charge (optional)",
+          "gas_meter_total": "Gas cumulative meter (optional)",
+          "gas_usage_today": "Gas usage today (optional)",
+          "gas_cost_today": "Gas cost today (optional)",
+          "ev_status": "EV charger status (optional)",
+          "ev_connected": "EV connected (optional)",
+          "ev_charging": "EV charging (optional)",
+          "ev_power_kw": "EV charging power (optional)",
+          "ev_soc": "EV state of charge (optional)",
+          "house_load_kw": "House load power (optional)",
+          "battery_soc": "Battery state of charge (optional)",
+          "battery_power_kw": "Battery power (optional)",
+          "battery_voltage": "Battery voltage (optional)",
+          "battery_current": "Battery current (optional)",
+          "solar_power_kw": "Solar power (optional)",
+          "grid_import_kw": "Grid import power (optional)",
+          "grid_export_kw": "Grid export power (optional)",
+          "saving_session_events": "Octoplus Power Down events (optional)",
+          "saving_session_import_baseline": "Power Down import baseline (optional)",
+          "saving_session_export_baseline": "Power Down export baseline (optional)"
+        },
+        "data_description": {
+          "current_import_rate": "Octopus current electricity import price.",
+          "next_import_rate": "Octopus next electricity import price.",
+          "current_export_rate": "Optional observed export-rate entity. The proposal simulation uses the fixed export rate from KEMS settings.",
+          "electricity_standing_charge": "Octopus electricity standing charge, used in whole-home cost totals.",
+          "off_peak": "Octopus binary sensor that is on during the normal Intelligent Go cheap period.",
+          "intelligent_slot": "Octopus binary sensor for an active Intelligent dispatch slot.",
+          "next_offpeak_start": "Octopus timestamp for the next cheap-period start.",
+          "offpeak_end": "Octopus timestamp for the current or next cheap-period end.",
+          "gas_current_rate": "Octopus gas unit rate in p/kWh or GBP/kWh.",
+          "gas_standing_charge": "Octopus gas standing charge in p/day or GBP/day.",
+          "gas_meter_total": "Cumulative gas meter in kWh or m³. KEMS converts m³ using the options conversion factor.",
+          "gas_usage_today": "Octopus current accumulated gas consumption for today.",
+          "gas_cost_today": "Octopus current accumulated gas cost for today.",
+          "ev_status": "Ohme charger status sensor; KEMS derives connected and charging states from it.",
+          "ev_connected": "Optional legacy/custom Ohme connected binary sensor.",
+          "ev_charging": "Optional legacy/custom Ohme charging binary sensor.",
+          "ev_power_kw": "Ohme charging power sensor.",
+          "ev_soc": "Ohme vehicle state of charge percentage.",
+          "house_load_kw": "FoxESS Modbus total house-load power.",
+          "battery_soc": "FoxESS Modbus battery state of charge percentage.",
+          "battery_power_kw": "Optional direct FoxESS battery-power sensor.",
+          "battery_voltage": "FoxESS Battery Voltage, used with Battery Current to derive power.",
+          "battery_current": "FoxESS Battery Current, used with Battery Voltage to derive power.",
+          "solar_power_kw": "FoxESS Modbus total PV/solar power.",
+          "grid_import_kw": "FoxESS Modbus power currently imported from the grid.",
+          "grid_export_kw": "FoxESS Modbus power currently exported to the grid.",
+          "saving_session_events": "BottlecapDave Octopus Energy Power Down event entity containing available_events and joined_events. The legacy Saving Session event is also supported. KEMS plans only around joined sessions.",
+          "saving_session_import_baseline": "Optional Octoplus Power Down import baseline sensor used to estimate rewardable net reduction. The legacy Saving Session baseline is also supported.",
+          "saving_session_export_baseline": "Optional export-meter baseline variant. KEMS subtracts it from the import baseline to estimate the net baseline."
+        }
       }
     },
-    "abort": {
-      "already_configured": "KEMS is already configured."
+    "error": {
+      "invalid_source_mapping": "One or more selected entities do not belong to the supported Octopus Energy, Octopus Intelligent, Ohme, or FoxESS Modbus integration. KEMS output entities cannot be selected as inputs."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "KEMS KH7 proposal, paced export, gas, ROI, and lifetime settings",
+        "description": "These settings affect read-only analysis, simulation, ROI, and the permanent lifetime ledger. KEMS never writes to Octopus, Ohme, or FoxESS Modbus.",
+        "data": {
+          "scan_interval_seconds": "Observation interval (seconds)",
+          "history_days": "Learning history retention (days)",
+          "battery_capacity_kwh": "Simulated battery capacity (kWh)",
+          "battery_reserve_percent": "Battery reserve (%)",
+          "battery_initial_percent": "Simulation starting battery (%)",
+          "max_charge_kw": "Maximum battery charge power (kW)",
+          "max_discharge_kw": "Maximum battery discharge power (kW)",
+          "charge_efficiency": "Charge efficiency (0.50-1.00)",
+          "discharge_efficiency": "Discharge efficiency (0.50-1.00)",
+          "export_rate_pence": "Fixed export rate (p/kWh)",
+          "inverter_ac_limit_kw": "Inverter AC limit (kW)",
+          "export_limit_kw": "Assumed export limit (kW)",
+          "battery_export_enabled": "Simulate exporting surplus battery energy",
+          "proposal_solar_enabled": "Use proposal solar model when live PV is unavailable",
+          "proposal_solar_factor": "Proposal solar/weather factor (0.0-2.0)",
+          "gas_kwh_per_m3": "Gas conversion factor (kWh per m³)",
+          "simulation_strategy": "Simulation strategy",
+          "battery_power_positive_is_discharge": "Positive battery power means discharge",
+          "system_cost_gbp": "Quoted system cost (GBP)",
+          "additional_costs_gbp": "Additional installation costs (GBP)",
+          "grants_rebates_gbp": "Grants or rebates (GBP)",
+          "commissioning_date": "Commissioning date (YYYY-MM-DD)",
+          "annual_maintenance_gbp": "Annual maintenance allowance (GBP)",
+          "manual_system_costs_gbp": "Recorded repair/replacement costs (GBP)",
+          "electricity_inflation_percent": "Annual electricity price inflation (%)",
+          "battery_degradation_percent": "Annual battery/value degradation (%)",
+          "discount_rate_percent": "Financial discount rate (%)",
+          "roi_forecast_years": "ROI forecast horizon (years)",
+          "saving_session_enabled": "Use joined Octoplus Power Down sessions"
+        },
+        "data_description": {
+          "scan_interval_seconds": "KEMS reads Home Assistant state only; minimum 30 seconds.",
+          "history_days": "KEMS stores compact observations locally in Home Assistant storage.",
+          "battery_capacity_kwh": "Defaults to the quoted 56.42kWh FoxESS battery storage.",
+          "battery_reserve_percent": "Defaults to 10%, matching the proposal's 50.77kWh usable capacity.",
+          "battery_initial_percent": "Used when no real FoxESS battery SOC is available.",
+          "max_charge_kw": "Maximum battery charging power. Defaults to the revised Fox ESS KH7 7kW inverter limit.",
+          "max_discharge_kw": "Maximum battery discharge power. Defaults to the revised Fox ESS KH7 7kW inverter limit.",
+          "charge_efficiency": "Simulation assumption; the proposal does not guarantee conversion efficiency.",
+          "discharge_efficiency": "Simulation assumption; the proposal does not guarantee conversion efficiency.",
+          "export_rate_pence": "Fixed 12p/kWh export rate used for every simulated export interval. Intelligent Octopus Flux rates are intentionally ignored.",
+          "export_limit_kw": "Separate DNO/grid export limit. Runtime export is also capped by the 7kW inverter limit.",
+          "battery_export_enabled": "Preserve forecast house demand, then spread remaining battery export across the hours until the next cheap period.",
+          "proposal_solar_enabled": "Models 21 x 460W panels, 9.66kWp, three roof orientations, and the proposal monthly generation baseline.",
+          "proposal_solar_factor": "Scale the proposal baseline for cloud/weather sensitivity; 1.0 uses the proposal average.",
+          "gas_kwh_per_m3": "Used only when the configured gas source reports cubic metres rather than kWh.",
+          "simulation_strategy": "Paced export targets the configured reserve at the next cheap-period start instead of exporting the battery early in the day.",
+          "battery_power_positive_is_discharge": "Controls how KEMS separates FoxESS battery charge and discharge totals. Leave enabled when positive power means battery discharge.",
+          "system_cost_gbp": "Defaults to the quoted system price of £20,995.",
+          "additional_costs_gbp": "Add DNO fees, structural work, smart-meter work, or later installation additions.",
+          "grants_rebates_gbp": "Deduct grants, rebates, or discounts from the investment KEMS must recover.",
+          "commissioning_date": "Leave blank before installation. Set this once the system is commissioned to begin actual ROI and payback tracking.",
+          "annual_maintenance_gbp": "KEMS accrues this allowance daily after commissioning.",
+          "manual_system_costs_gbp": "All-time repair, servicing, or replacement expenditure already incurred. Update the total when new costs occur.",
+          "electricity_inflation_percent": "Used only in future ROI projections. KEMS still uses actual Octopus rates for current simulations.",
+          "battery_degradation_percent": "Reduces projected future annual value over time.",
+          "discount_rate_percent": "Used to calculate discounted net value. The proposal benchmark used 6.75%.",
+          "roi_forecast_years": "Number of years included in the predicted net-value calculation.",
+          "inverter_ac_limit_kw": "Combined simulated solar and battery AC output cannot exceed the revised Fox ESS KH7 7kW limit.",
+          "saving_session_enabled": "Hold battery energy before a joined session, cover the home, and maximise permitted export during the higher-reward window. KEMS remains read-only and does not join sessions itself."
+        }
+      }
     }
   }
 }

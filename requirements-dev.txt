@@ -1,4 +1,6 @@
-black
-ruff
-pytest
-pre-commit
+black==26.5.1
+pre-commit==4.6.1
+pytest==9.1.1
+PyYAML==6.0.3
+ruff==0.16.0
+tzdata

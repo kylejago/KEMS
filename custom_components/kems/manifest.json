@@ -1,15 +1,14 @@
 {
   "domain": "kems",
   "name": "KEMS",
-  "version": "0.2.0-alpha1",
-  "documentation": "https://github.com/kylejago/KEMS",
-  "issue_tracker": "https://github.com/kylejago/KEMS/issues",
   "codeowners": [
     "@kylejago"
   ],
   "config_flow": true,
-  "iot_class": "local_polling",
-  "requirements": [],
-  "dependencies": [],
-  "integration_type": "hub"
+  "documentation": "https://github.com/kylejago/KEMS",
+  "integration_type": "hub",
+  "iot_class": "calculated",
+  "issue_tracker": "https://github.com/kylejago/KEMS/issues",
+  "single_config_entry": true,
+  "version": "0.6.0-beta1"
 }

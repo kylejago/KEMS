@@ -1,0 +1,145 @@
+title: KEMS Diagnostics
+views:
+  - title: All entities
+    path: all-entities
+    icon: mdi:stethoscope
+    type: masonry
+    cards:
+      - type: markdown
+        content: |
+          # KEMS complete diagnostic dashboard
+
+          This dashboard dynamically lists every current KEMS entity, so it also
+          works if Home Assistant changes or suffixes an entity ID.
+
+          When reporting a problem, capture this page using a full-page screenshot.
+          Also download diagnostics from **Settings → Devices & services → KEMS →
+          three dots → Download diagnostics**.
+
+          **Status:** {{ states('sensor.kems_status') }}  
+          **Phase:** {{ states('sensor.kems_phase') }}  
+          **Data quality:** {{ states('sensor.kems_data_quality') }}%  
+          **History samples:** {{ states('sensor.kems_history_samples') }}  
+          **Learning confidence:** {{ states('sensor.kems_learning_confidence') }}%  
+          **Simulation strategy:** {{ states('sensor.kems_simulation_strategy') }}  
+          **Source validation:** {{ states('sensor.kems_source_validation') }}
+
+      - type: markdown
+        title: Source isolation
+        content: |
+          {% set validation = states('sensor.kems_source_validation') %}
+          {% if validation == 'OK' %}
+          ✅ All configured inputs belong to supported source integrations.
+          {% else %}
+          ⚠️ **{{ validation }}**
+
+          KEMS rejected and removed these mappings during startup:
+
+          {{ state_attr('sensor.kems_source_validation', 'summary') }}
+          {% endif %}
+
+          Observed data can never use `sensor.kems_*` simulation outputs as inputs.
+
+      - type: markdown
+        title: Octoplus Power Down planning detail
+        content: |
+          | Reading | Value |
+          |---|---:|
+          | Joined | {{ states('binary_sensor.kems_power_down_session_joined') }} |
+          | Active now | {{ states('binary_sensor.kems_power_down_session_active') }} |
+          | Start | {{ states('sensor.kems_next_power_down_session_start') }} |
+          | End | {{ states('sensor.kems_next_power_down_session_end') }} |
+          | Duration | {{ states('sensor.kems_power_down_session_duration') }} min |
+          | Octopoints | {{ states('sensor.kems_power_down_session_octopoints_per_kwh') }} points/kWh |
+          | Bonus rate | {{ states('sensor.kems_power_down_session_bonus_rate') }} p/kWh |
+          | Net baseline | {{ states('sensor.kems_power_down_session_baseline_net_energy') }} kWh |
+          | Baseline source | {{ states('sensor.kems_power_down_session_baseline_source') }} |
+          | Baseline incomplete | {{ states('binary_sensor.kems_power_down_baseline_incomplete') }} |
+          | Battery reserve at session start | {{ states('sensor.kems_power_down_session_battery_reserve') }} kWh |
+          | Battery protected now | {{ states('binary_sensor.kems_battery_reserved_for_power_down_session') }} |
+          | Ordinary export reduced | {{ states('binary_sensor.kems_battery_export_reduced_for_power_down_session') }} |
+          | Session export target | {{ states('sensor.kems_power_down_session_export_target') }} kW |
+          | Estimated export | {{ states('sensor.kems_estimated_power_down_session_export') }} kWh |
+          | Estimated rewardable reduction | {{ states('sensor.kems_estimated_power_down_session_rewardable_reduction') }} kWh |
+          | Estimated Octopoints bonus | {{ states('sensor.kems_estimated_power_down_session_bonus') }} p |
+          | Estimated fixed 12p export income | {{ states('sensor.kems_estimated_power_down_session_export_income') }} p |
+          | Estimated total income | {{ states('sensor.kems_estimated_power_down_session_total_income') }} p |
+          | Simulated bonus today | {{ states('sensor.kems_simulated_power_down_session_bonus_today') }} p |
+
+          KEMS reads BottlecapDave's joined event and remains read-only. It does
+          not enrol the account or write inverter settings. Bonus estimates use
+          **8 Octopoints = 1p** and remain unavailable until the optional import
+          baseline is enabled. The export baseline is used when available.
+
+      - type: markdown
+        title: Grid calculation detail
+        content: |
+          | Reading | Value |
+          |---|---:|
+          | Import | {{ states('sensor.kems_grid_import') }} kW |
+          | Export | {{ states('sensor.kems_grid_export') }} kW |
+          | Signed net | {{ states('sensor.kems_grid_net_power') }} kW |
+          | Direction | {{ states('sensor.kems_grid_flow_direction') }} |
+          | Normalisation | {{ states('sensor.kems_grid_normalisation_mode') }} |
+          | Raw import source | {{ states('sensor.kems_raw_grid_import_source') }} kW |
+          | Raw export source | {{ states('sensor.kems_raw_grid_export_source') }} kW |
+
+          **Net convention:** positive means importing; negative means exporting.
+          The separate import and export entities are always non-negative.
+
+      - type: markdown
+        title: Battery export pacing detail
+        content: |
+          | Reading | Value |
+          |---|---:|
+          | Battery SOC | {{ states('sensor.kems_simulated_battery_state_of_charge') }}% |
+          | Battery power now | {{ states('sensor.kems_simulated_battery_power') }} kW |
+          | Battery to home now | {{ states('sensor.kems_simulated_battery_to_home_power') }} kW |
+          | Actual battery export now | {{ states('sensor.kems_simulated_battery_export_power') }} kW |
+          | Target battery export | {{ states('sensor.kems_target_battery_export_power') }} kW |
+          | Exportable battery energy | {{ states('sensor.kems_exportable_battery_energy_remaining') }} kWh |
+          | Reserved for home | {{ states('sensor.kems_battery_energy_reserved_for_home') }} kWh |
+          | Home reserve source | {{ states('sensor.kems_home_reserve_forecast_source') }} |
+          | Projected grid import before cheap | {{ states('sensor.kems_projected_grid_import_before_cheap_period') }} kWh |
+          | Export paused for home reserve | {{ states('binary_sensor.kems_battery_export_paused_for_home_reserve') }} |
+          | Hours until cheap period | {{ states('sensor.kems_hours_until_next_cheap_period') }} h |
+          | Projected SOC at cheap start | {{ states('sensor.kems_projected_soc_at_cheap_period_start') }}% |
+          | Inverter limit | {{ state_attr('sensor.kems_simulated_kems_cost_today', 'inverter_limit_kw') }} kW |
+          | Grid export limit | {{ state_attr('sensor.kems_simulated_kems_cost_today', 'export_limit_kw') }} kW |
+          | Fixed export rate | {{ states('sensor.kems_simulation_export_rate') }} p/kWh |
+
+          Battery export is recalculated on every KEMS refresh so the forecast
+          home reserve and target SOC can adapt through the day.
+
+      - type: markdown
+        title: All KEMS sensors
+        content: |
+          | Entity | State | Unit |
+          |---|---:|---|
+          {% for item in states.sensor | sort(attribute='entity_id') %}
+          {% if item.entity_id.startswith('sensor.kems_') %}
+          | `{{ item.entity_id }}` | {{ item.state }} | {{ item.attributes.unit_of_measurement | default('', true) }} |
+          {% endif %}
+          {% endfor %}
+
+      - type: markdown
+        title: All KEMS binary sensors
+        content: |
+          | Entity | State |
+          |---|---:|
+          {% for item in states.binary_sensor | sort(attribute='entity_id') %}
+          {% if item.entity_id.startswith('binary_sensor.kems_') %}
+          | `{{ item.entity_id }}` | {{ item.state }} |
+          {% endif %}
+          {% endfor %}
+
+      - type: markdown
+        title: KEMS update entities
+        content: |
+          | Entity | State | Installed | Latest |
+          |---|---:|---|---|
+          {% for item in states.update | sort(attribute='entity_id') %}
+          {% if item.entity_id.startswith('update.kems_') %}
+          | `{{ item.entity_id }}` | {{ item.state }} | {{ item.attributes.installed_version | default('', true) }} | {{ item.attributes.latest_version | default('', true) }} |
+          {% endif %}
+          {% endfor %}

@@ -1,36 +1,167 @@
-"""Known Home Assistant entity IDs."""
+"""Configured Home Assistant entity mapping."""
+
+from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Any
+
+from ..const import (
+    CONF_BATTERY_CURRENT,
+    CONF_BATTERY_POWER,
+    CONF_BATTERY_SOC,
+    CONF_BATTERY_VOLTAGE,
+    CONF_CURRENT_EXPORT_RATE,
+    CONF_CURRENT_IMPORT_RATE,
+    CONF_ELECTRICITY_STANDING_CHARGE,
+    CONF_EV_CHARGING,
+    CONF_EV_CONNECTED,
+    CONF_EV_POWER,
+    CONF_EV_SOC,
+    CONF_EV_STATUS,
+    CONF_GAS_COST_TODAY,
+    CONF_GAS_CURRENT_RATE,
+    CONF_GAS_METER_TOTAL,
+    CONF_GAS_STANDING_CHARGE,
+    CONF_GAS_USAGE_TODAY,
+    CONF_GRID_EXPORT,
+    CONF_GRID_IMPORT,
+    CONF_HOUSE_LOAD,
+    CONF_INTELLIGENT_SLOT,
+    CONF_NEXT_IMPORT_RATE,
+    CONF_NEXT_OFFPEAK_START,
+    CONF_OFF_PEAK,
+    CONF_OFFPEAK_END,
+    CONF_SAVING_SESSION_EVENTS,
+    CONF_SAVING_SESSION_EXPORT_BASELINE,
+    CONF_SAVING_SESSION_IMPORT_BASELINE,
+    CONF_SOLAR_POWER,
+    ENTITY_MAPPING_KEYS,
+)
+
+
+def _safe_source(data: dict[str, Any], key: str) -> str | None:
+    """Return a configured source unless it is a KEMS-generated entity."""
+    value = data.get(key)
+    if not isinstance(value, str) or not value:
+        return None
+    if value.startswith(("sensor.kems_", "binary_sensor.kems_")):
+        return None
+    return value
 
 
 @dataclass(frozen=True, slots=True)
-class OctopusEntities:
-    """Default Octopus Intelligent entity IDs."""
+class KEMSEntities:
+    """Entity IDs observed by KEMS."""
 
-    current_rate: str = (
-        "sensor.octopus_energy_electricity_20e5126162_2200019564326_current_rate"
-    )
+    current_import_rate: str | None = None
+    next_import_rate: str | None = None
+    current_export_rate: str | None = None
+    electricity_standing_charge: str | None = None
+    off_peak: str | None = None
+    intelligent_slot: str | None = None
+    next_offpeak_start: str | None = None
+    offpeak_end: str | None = None
+    saving_session_events: str | None = None
+    saving_session_import_baseline: str | None = None
+    saving_session_export_baseline: str | None = None
+    gas_current_rate: str | None = None
+    gas_standing_charge: str | None = None
+    gas_meter_total: str | None = None
+    gas_usage_today: str | None = None
+    gas_cost_today: str | None = None
+    ev_status: str | None = None
+    ev_connected: str | None = None
+    ev_charging: str | None = None
+    ev_power_kw: str | None = None
+    ev_soc: str | None = None
+    house_load_kw: str | None = None
+    battery_soc: str | None = None
+    battery_power_kw: str | None = None
+    battery_voltage: str | None = None
+    battery_current: str | None = None
+    solar_power_kw: str | None = None
+    grid_import_kw: str | None = None
+    grid_export_kw: str | None = None
 
-    next_rate: str = (
-        "sensor.octopus_energy_electricity_20e5126162_2200019564326_next_rate"
-    )
+    @classmethod
+    def from_entry_data(cls, data: dict[str, Any]) -> KEMSEntities:
+        """Build an entity map from config-entry data."""
+        return cls(
+            current_import_rate=_safe_source(data, CONF_CURRENT_IMPORT_RATE),
+            next_import_rate=_safe_source(data, CONF_NEXT_IMPORT_RATE),
+            current_export_rate=_safe_source(data, CONF_CURRENT_EXPORT_RATE),
+            electricity_standing_charge=_safe_source(
+                data,
+                CONF_ELECTRICITY_STANDING_CHARGE,
+            ),
+            off_peak=_safe_source(data, CONF_OFF_PEAK),
+            intelligent_slot=_safe_source(data, CONF_INTELLIGENT_SLOT),
+            next_offpeak_start=_safe_source(data, CONF_NEXT_OFFPEAK_START),
+            offpeak_end=_safe_source(data, CONF_OFFPEAK_END),
+            saving_session_events=_safe_source(data, CONF_SAVING_SESSION_EVENTS),
+            saving_session_import_baseline=_safe_source(
+                data, CONF_SAVING_SESSION_IMPORT_BASELINE
+            ),
+            saving_session_export_baseline=_safe_source(
+                data, CONF_SAVING_SESSION_EXPORT_BASELINE
+            ),
+            gas_current_rate=_safe_source(data, CONF_GAS_CURRENT_RATE),
+            gas_standing_charge=_safe_source(data, CONF_GAS_STANDING_CHARGE),
+            gas_meter_total=_safe_source(data, CONF_GAS_METER_TOTAL),
+            gas_usage_today=_safe_source(data, CONF_GAS_USAGE_TODAY),
+            gas_cost_today=_safe_source(data, CONF_GAS_COST_TODAY),
+            ev_status=_safe_source(data, CONF_EV_STATUS),
+            ev_connected=_safe_source(data, CONF_EV_CONNECTED),
+            ev_charging=_safe_source(data, CONF_EV_CHARGING),
+            ev_power_kw=_safe_source(data, CONF_EV_POWER),
+            ev_soc=_safe_source(data, CONF_EV_SOC),
+            house_load_kw=_safe_source(data, CONF_HOUSE_LOAD),
+            battery_soc=_safe_source(data, CONF_BATTERY_SOC),
+            battery_power_kw=_safe_source(data, CONF_BATTERY_POWER),
+            battery_voltage=_safe_source(data, CONF_BATTERY_VOLTAGE),
+            battery_current=_safe_source(data, CONF_BATTERY_CURRENT),
+            solar_power_kw=_safe_source(data, CONF_SOLAR_POWER),
+            grid_import_kw=_safe_source(data, CONF_GRID_IMPORT),
+            grid_export_kw=_safe_source(data, CONF_GRID_EXPORT),
+        )
 
-    off_peak: str = (
-        "binary_sensor.octopus_energy_electricity_20e5126162_2200019564326_off_peak"
-    )
+    def configured_snapshot_fields(self) -> set[str]:
+        """Return logical snapshot fields with configured source data."""
+        direct = {
+            "current_import_rate": self.current_import_rate,
+            "next_import_rate": self.next_import_rate,
+            "current_export_rate": self.current_export_rate,
+            "electricity_standing_charge": self.electricity_standing_charge,
+            "off_peak": self.off_peak,
+            "intelligent_slot": self.intelligent_slot,
+            "next_offpeak_start": self.next_offpeak_start,
+            "offpeak_end": self.offpeak_end,
+            "gas_current_rate": self.gas_current_rate,
+            "gas_standing_charge": self.gas_standing_charge,
+            "gas_meter_total_kwh": self.gas_meter_total,
+            "gas_usage_today_kwh": self.gas_usage_today,
+            "gas_cost_today_pence": self.gas_cost_today,
+            "ev_power_kw": self.ev_power_kw,
+            "ev_soc": self.ev_soc,
+            "house_load_kw": self.house_load_kw,
+            "battery_soc": self.battery_soc,
+            "solar_power_kw": self.solar_power_kw,
+            "grid_import_kw": self.grid_import_kw,
+            "grid_export_kw": self.grid_export_kw,
+        }
+        fields = {key for key, value in direct.items() if value is not None}
+        if self.ev_status or self.ev_connected:
+            fields.add("ev_connected")
+        if self.ev_status or self.ev_charging:
+            fields.add("ev_charging")
+        if self.battery_power_kw or (self.battery_voltage and self.battery_current):
+            fields.add("battery_power_kw")
+        return fields
 
-    intelligent_slot: str = (
-        "binary_sensor.octopus_intelligent_tariff_octopus_intelligent_slot"
-    )
-
-    planned_dispatch: str = (
-        "binary_sensor.octopus_intelligent_tariff_octopus_intelligent_planned_dispatch_slot"
-    )
-
-    next_offpeak_start: str = (
-        "sensor.octopus_intelligent_tariff_octopus_intelligent_next_offpeak_start"
-    )
-
-    offpeak_end: str = (
-        "sensor.octopus_intelligent_tariff_octopus_intelligent_offpeak_end"
-    )
+    def as_dict(self) -> dict[str, str]:
+        """Return configured mappings only."""
+        return {
+            key: value
+            for key in ENTITY_MAPPING_KEYS
+            if (value := getattr(self, key, None)) is not None
+        }
