@@ -10,9 +10,10 @@ views:
           - type: markdown
             content: |
               # KEMS pre-installation control lab
-              This page shows desired behaviour only. **0.7.0-alpha1 cannot send real FoxESS commands.**
+              This page shows desired behaviour only. **0.7.0-alpha2 cannot send real FoxESS commands.**
           - type: entities
             title: Interactive lab controls
+            show_header_toggle: false
             entities:
               - select.kems_operating_mode
               - select.kems_virtual_scenario
@@ -71,6 +72,10 @@ views:
                   - sensor.kems_whole_house_eps_load
                   - sensor.kems_eps_headroom
                   - sensor.kems_eps_utilisation
+                  - sensor.kems_island_battery_status
+                  - sensor.kems_island_conservation_threshold
+                  - sensor.kems_island_emergency_floor
+                  - binary_sensor.kems_island_battery_conservation_active
                   - binary_sensor.kems_eps_load_warning
                   - binary_sensor.kems_eps_load_critical
                   - sensor.kems_estimated_outage_runtime
@@ -81,8 +86,8 @@ views:
                   - sensor.kems_island_solar_to_battery_power
                   - sensor.kems_island_battery_to_house_power
                   - sensor.kems_simulated_battery_state_of_charge
-                  - sensor.kems_simulated_solar_power
-                  - sensor.kems_simulated_house_load_power
+                  - sensor.kems_virtual_scenario_solar_power
+                  - sensor.kems_virtual_scenario_house_load
           - type: history-graph
             title: Desired control powers
             hours_to_show: 24

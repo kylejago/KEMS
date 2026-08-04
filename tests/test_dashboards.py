@@ -100,3 +100,8 @@ def test_control_lab_dashboard_exposes_island_and_write_boundary() -> None:
     assert "sensor.kems_island_solar_to_battery_power" in text
     assert "binary_sensor.kems_control_commands_permitted" in text
     assert "cannot send real FoxESS commands" in text
+    assert "show_header_toggle: false" in text
+    assert "sensor.kems_virtual_scenario_solar_power" in text
+    assert "sensor.kems_virtual_scenario_house_load" in text
+    assert "sensor.kems_simulated_solar_power" not in text
+    assert "sensor.kems_simulated_house_load_power" not in text

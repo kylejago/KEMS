@@ -58,6 +58,12 @@ class ControlEngine:
             "grid_available": inputs.grid_available,
             "island_mode_active": inputs.island_active,
             "whole_house_eps_load_kw": round(inputs.house_load_kw, 3),
+            "virtual_scenario_house_load_kw": round(inputs.house_load_kw, 3),
+            "virtual_scenario_solar_power_kw": round(inputs.solar_power_kw, 3),
+            "island_conservation_threshold_percent": round(
+                config.island_reserve_percent, 1
+            ),
+            "island_emergency_floor_percent": round(config.normal_reserve_percent, 1),
             "eps_headroom_kw": round(
                 max(config.eps_limit_kw - inputs.house_load_kw, 0.0), 3
             ),
@@ -187,7 +193,7 @@ class ControlEngine:
             desired_battery_export_power_kw=round(export, 3),
             desired_total_discharge_power_kw=round(battery_home + export, 3),
             desired_min_soc_percent=config.normal_reserve_percent,
-            desired_ev_charging_allowed=True,
+            desired_ev_charging_allowed=not inputs.saving_session_active,
             desired_grid_export_allowed=True,
             plan_safe=safe,
             blocked_reason=_backend_block_reason(config),
@@ -206,7 +212,20 @@ class ControlEngine:
         solar = max(inputs.solar_power_kw, 0.0)
         solar_to_house = min(solar, load, config.eps_limit_kw)
         shortfall = max(load - solar_to_house, 0.0)
-        battery_to_house = min(shortfall, config.max_discharge_kw, config.eps_limit_kw)
+        emergency_floor = min(
+            config.normal_reserve_percent,
+            config.island_reserve_percent,
+        )
+        conservation_threshold = max(
+            config.island_reserve_percent,
+            emergency_floor,
+        )
+        battery_above_floor = inputs.battery_soc_percent > emergency_floor + 1e-6
+        battery_to_house = (
+            min(shortfall, config.max_discharge_kw, config.eps_limit_kw)
+            if battery_above_floor
+            else 0.0
+        )
         solar_to_battery = min(
             max(solar - solar_to_house, 0.0),
             config.max_charge_kw,
@@ -215,7 +234,7 @@ class ControlEngine:
         usable_battery = (
             max(
                 config.battery_capacity_kwh
-                * (inputs.battery_soc_percent - config.island_reserve_percent)
+                * (inputs.battery_soc_percent - emergency_floor)
                 / 100,
                 0.0,
             )
@@ -223,12 +242,28 @@ class ControlEngine:
         )
         runtime = None if shortfall <= 0.01 else usable_battery / shortfall
         safe = load <= config.eps_limit_kw + 1e-6
+        if inputs.battery_soc_percent <= emergency_floor + 1e-6:
+            battery_status = "emergency_floor"
+        elif inputs.battery_soc_percent < conservation_threshold:
+            battery_status = "conservation"
+        else:
+            battery_status = "normal"
         if solar_to_battery > 0:
             action = "Use solar for the house and charge the battery with the surplus"
         elif battery_to_house > 0:
             action = "Use solar first and battery only for the remaining house load"
         else:
             action = "House is covered by solar; preserve the battery"
+        if battery_status == "conservation" and safe:
+            action = (
+                "Battery is below the island conservation threshold; "
+                "reduce discretionary whole-house load"
+            )
+        elif battery_status == "emergency_floor" and shortfall > 0.01 and safe:
+            action = (
+                "Battery has reached the emergency floor; reduce load and wait "
+                "for solar or grid restoration"
+            )
         if not safe:
             action = "Reduce whole-house load immediately to stay within EPS capacity"
 
@@ -239,12 +274,13 @@ class ControlEngine:
             desired_charge_power_kw=round(solar_to_battery, 3),
             desired_battery_to_home_power_kw=round(battery_to_house, 3),
             desired_total_discharge_power_kw=round(battery_to_house, 3),
-            desired_min_soc_percent=config.island_reserve_percent,
+            desired_min_soc_percent=emergency_floor,
             desired_ev_charging_allowed=False,
             desired_grid_export_allowed=False,
             solar_to_house_kw=round(solar_to_house, 3),
             solar_to_battery_kw=round(solar_to_battery, 3),
             battery_to_house_kw=round(battery_to_house, 3),
+            island_battery_status=battery_status,
             estimated_outage_runtime_hours=(
                 None if runtime is None else round(runtime, 2)
             ),
@@ -336,7 +372,7 @@ def _valid_scenario(value: str) -> str:
 
 
 def _backend_block_reason(config: ControlConfig) -> str:
-    """Explain why alpha1 will not issue a real inverter write."""
+    """Explain why alpha2 will not issue a real inverter write."""
     if config.operating_mode == "simulate":
         return "Virtual backend only"
     if config.operating_mode == "shadow":
@@ -347,7 +383,7 @@ def _backend_block_reason(config: ControlConfig) -> str:
         return "System has not been commissioned"
     if not config.control_enabled:
         return "Master control enable is off"
-    return "Real FoxESS control backend is intentionally unavailable in alpha1"
+    return "Real FoxESS control backend is intentionally unavailable in alpha2"
 
 
 def run_preflight_suite(config: ControlConfig) -> tuple[int, int]:

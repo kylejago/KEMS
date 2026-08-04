@@ -450,6 +450,8 @@ class ControlState:
     grid_available: bool = True
     island_mode_active: bool = False
     whole_house_eps_load_kw: float = 0.0
+    virtual_scenario_house_load_kw: float = 0.0
+    virtual_scenario_solar_power_kw: float = 0.0
     eps_headroom_kw: float = 7.0
     eps_utilisation_percent: float = 0.0
     eps_warning: bool = False
@@ -457,6 +459,9 @@ class ControlState:
     solar_to_house_kw: float = 0.0
     solar_to_battery_kw: float = 0.0
     battery_to_house_kw: float = 0.0
+    island_conservation_threshold_percent: float = 20.0
+    island_emergency_floor_percent: float = 10.0
+    island_battery_status: str = "not_active"
     estimated_outage_runtime_hours: float | None = None
     data_age_seconds: float = 0.0
     data_fresh: bool = True

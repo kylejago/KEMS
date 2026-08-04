@@ -1,14 +1,14 @@
-# Start here — KEMS 0.7.0-alpha1 Control Lab
+# Start here — KEMS 0.7.0-alpha2 Control Lab
 
-Apply this package only after `v0.6.0-beta1` has been merged and tagged on `main`.
+Apply this package over the current 0.7.0-alpha1 `develop` branch. It preserves all existing KEMS observation and simulation data.
 
 ## Development branch
 
 ```text
-feature/control-lab-and-island-simulation
+fix/control-lab-validated-scenario-fixes
 ```
 
-Create it from the refreshed `develop` branch, copy the package into the repository root while preserving `.git`, then run:
+Create it from the latest `develop` branch, copy the package into the repository root while preserving `.git`, then run:
 
 ```powershell
 .\.venv\Scripts\Activate.ps1
@@ -19,12 +19,12 @@ python -m pytest
 python -m pre_commit run --all-files
 ```
 
-Expected pytest result: `82 passed`.
+Expected pytest result: `83 passed`.
 
 Commit:
 
 ```text
-feat: add pre-installation control and island simulation lab
+fix: correct Power Down and island Control Lab behaviour
 ```
 
 Merge this feature into `develop` only. Do not merge 0.7 control work into `main` yet.

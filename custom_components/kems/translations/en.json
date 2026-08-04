@@ -170,7 +170,7 @@
     "step": {
       "init": {
         "title": "KEMS KH7 simulation, Control Lab, island safety, ROI, and lifetime settings",
-        "description": "Configure monitoring, proposal simulation, virtual/shadow control planning, whole-house island safeguards, ROI, and the permanent ledger. Version 0.7.0-alpha1 does not send real FoxESS or charger commands.",
+        "description": "Configure monitoring, proposal simulation, virtual/shadow control planning, whole-house island safeguards, ROI, and the permanent ledger. Version 0.7.0-alpha2 does not send real FoxESS or charger commands.",
         "data": {
           "scan_interval_seconds": "Observation interval (seconds)",
           "history_days": "Learning history retention (days)",
@@ -211,7 +211,7 @@
           "eps_limit_kw": "Whole-house EPS continuous limit (kW)",
           "eps_warning_percent": "EPS warning threshold (%)",
           "eps_critical_percent": "EPS critical threshold (%)",
-          "island_reserve_percent": "Island-mode battery reserve (%)"
+          "island_reserve_percent": "Island conservation threshold (%)"
         },
         "data_description": {
           "scan_interval_seconds": "KEMS reads Home Assistant state only; minimum 30 seconds.",
@@ -243,7 +243,7 @@
           "roi_forecast_years": "Number of years included in the predicted net-value calculation.",
           "inverter_ac_limit_kw": "Combined simulated solar and battery AC output cannot exceed the revised Fox ESS KH7 7kW limit.",
           "saving_session_enabled": "Hold battery energy before a joined session, cover the home, and maximise permitted export during the higher-reward window. KEMS remains read-only and does not join sessions itself.",
-          "operating_mode": "Observe, virtual simulation, shadow planning, or control. Real control remains hard-blocked in alpha1.",
+          "operating_mode": "Observe, virtual simulation, shadow planning, or control. Real control remains hard-blocked in alpha2.",
           "virtual_scenario": "Inject normal, solar, cloud, high-load, Power Down, outage, overload, or unstable-grid conditions.",
           "control_enabled": "Records explicit control opt-in only. It cannot permit real writes until a verified backend exists.",
           "system_commissioned": "Leave off before the installer has commissioned the KH7 and KEMS has verified all readings and limits.",
@@ -253,7 +253,7 @@
           "eps_limit_kw": "Use the installer-confirmed whole-house EPS continuous limit. The pre-install default is 7kW.",
           "eps_warning_percent": "Whole-house island-load level that raises an early warning.",
           "eps_critical_percent": "Whole-house island-load level that raises a critical warning.",
-          "island_reserve_percent": "Higher resilience reserve used during a whole-house grid outage instead of the normal export reserve."
+          "island_reserve_percent": "Warning threshold for reducing discretionary load during a whole-house outage. The normal battery reserve remains the emergency discharge floor."
         }
       }
     }
