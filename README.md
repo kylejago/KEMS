@@ -1,20 +1,14 @@
 # KEMS — Kyle Energy Management System
 
-KEMS is a read-only Home Assistant custom integration that turns existing whole-home energy entities into one explainable pipeline:
+KEMS 0.6.0-beta1 is the release-candidate baseline for Home Assistant. It turns existing whole-home energy entities into one explainable pipeline:
 
 **Observe → Learn → Advise → Simulate**
 
 The Control phase remains deliberately excluded. This build does not call Octopus, Ohme, or FoxESS services and does not write inverter or charger settings.
 
-## Feature branch purpose
+## Release purpose
 
-This package is prepared for:
-
-```text
-feature/octoplus-power-down-aware-export
-```
-
-It keeps the source-isolation protections, KH7 7kW paced-export model, and home-reserve fallbacks, then adds session-aware planning around joined Octoplus Power Down events.
+This package is prepared for merging the tested `develop` branch into `main` and publishing GitHub release `v0.6.0-beta1`. It includes every monitoring, learning, simulation, KH7 paced-export, home-reserve, Power Down, ROI-gating, and dashboard correction completed through alpha5.
 
 ## Supported sources
 
@@ -109,25 +103,25 @@ Gas is observed rather than optimised. The simulated whole-home comparison chang
 
 ### Octoplus Power Down planning
 
-- `binary_sensor.kems_saving_session_joined`
-- `binary_sensor.kems_saving_session_active`
-- `binary_sensor.kems_saving_session_baseline_incomplete`
-- `binary_sensor.kems_battery_reserved_for_saving_session`
-- `binary_sensor.kems_battery_export_reduced_for_saving_session`
-- `sensor.kems_next_saving_session_start`
-- `sensor.kems_next_saving_session_end`
-- `sensor.kems_saving_session_duration`
-- `sensor.kems_saving_session_octopoints_per_kwh`
-- `sensor.kems_saving_session_bonus_rate`
-- `sensor.kems_saving_session_baseline_net_energy`
-- `sensor.kems_saving_session_battery_reserve`
-- `sensor.kems_saving_session_export_target`
-- `sensor.kems_estimated_saving_session_export`
-- `sensor.kems_estimated_saving_session_reduction`
-- `sensor.kems_estimated_saving_session_bonus`
-- `sensor.kems_estimated_saving_session_export_income`
-- `sensor.kems_estimated_saving_session_total_income`
-- `sensor.kems_simulated_saving_session_bonus_today`
+- `binary_sensor.kems_power_down_session_joined`
+- `binary_sensor.kems_power_down_session_active`
+- `binary_sensor.kems_power_down_baseline_incomplete`
+- `binary_sensor.kems_battery_reserved_for_power_down_session`
+- `binary_sensor.kems_battery_export_reduced_for_power_down_session`
+- `sensor.kems_next_power_down_session_start`
+- `sensor.kems_next_power_down_session_end`
+- `sensor.kems_power_down_session_duration`
+- `sensor.kems_power_down_session_octopoints_per_kwh`
+- `sensor.kems_power_down_session_bonus_rate`
+- `sensor.kems_power_down_session_baseline_net_energy`
+- `sensor.kems_power_down_session_battery_reserve`
+- `sensor.kems_power_down_session_export_target`
+- `sensor.kems_estimated_power_down_session_export`
+- `sensor.kems_estimated_power_down_session_rewardable_reduction`
+- `sensor.kems_estimated_power_down_session_bonus`
+- `sensor.kems_estimated_power_down_session_export_income`
+- `sensor.kems_estimated_power_down_session_total_income`
+- `sensor.kems_simulated_power_down_session_bonus_today`
 
 ### Import, export, battery and solar
 

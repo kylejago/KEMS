@@ -23,7 +23,7 @@ def test_manifest_stays_a_hub() -> None:
     source = MANIFEST.read_text(encoding="utf-8")
 
     assert '"integration_type": "hub"' in source
-    assert '"version": "0.6.0-alpha5"' in source
+    assert '"version": "0.6.0-beta1"' in source
 
 
 def test_options_flow_includes_kh7_inverter_limit_and_paced_strategy() -> None:

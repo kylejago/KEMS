@@ -1,6 +1,6 @@
 # Proposal system profile
 
-KEMS v0.6.0-alpha5 uses the revised proposal profile for simulation before the
+KEMS v0.6.0-beta1 uses the revised proposal profile for simulation before the
 physical solar/battery system is commissioned.
 
 ## Hardware assumptions

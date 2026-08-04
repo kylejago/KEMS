@@ -34,7 +34,7 @@ The built-in comparison, portrait, pre-install, whole-home analytics, and built-
 
 ## Entity IDs
 
-These files target KEMS 0.6.0-alpha5. Home Assistant may append `_2` if old entity-registry entries still use an ID. The diagnostic dashboard discovers KEMS entities dynamically and is not affected by suffixes.
+These files target KEMS 0.6.0-beta1. Home Assistant may append `_2` if old entity-registry entries still use an ID. The diagnostic dashboard discovers KEMS entities dynamically and is not affected by suffixes.
 
 ## Live hardware not installed yet
 
@@ -56,5 +56,5 @@ Before commissioning, the financial battery uses the accumulated simulated syste
 ## Complete diagnostic dashboard
 
 `kems_diagnostics_all_entities.yaml` uses only built-in Home Assistant cards and
-lists every entity shipped by KEMS 0.6.0-alpha5, including Power Down planning and reward estimates. Use it for screenshots and pair
+lists every entity shipped by KEMS 0.6.0-beta1, including Power Down planning and reward estimates. Use it for screenshots and pair
 it with Home Assistant's Download diagnostics action when reporting an issue.
