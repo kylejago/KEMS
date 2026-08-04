@@ -16,6 +16,7 @@ from .entity_discovery import SourceValidationResult
 from .history import HistoryRecorder
 from .kems_core import (
     AdviceEngine,
+    ControlEngine,
     GasEngine,
     KEMSData,
     LearningEngine,
@@ -60,6 +61,7 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
         self._advice = AdviceEngine()
         self._simulation = SimulationEngine()
         self._whole_home = WholeHomeEngine()
+        self._control = ControlEngine()
         self._lifetime = LifetimeLedgerRecorder(hass, entry.entry_id)
         self._roi = ROIEngine()
 
@@ -124,7 +126,17 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                 snapshot,
                 self.entities.configured_snapshot_fields(),
             )
-            phase = self._phase(learned.ready, simulation.ready)
+            control = self._control.plan(
+                snapshot,
+                simulation,
+                now,
+                self.settings.control,
+            )
+            phase = self._phase(
+                learned.ready,
+                simulation.ready,
+                control.operating_mode,
+            )
             return KEMSData(
                 snapshot=snapshot,
                 learned=learned,
@@ -135,6 +147,7 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                 lifetime=lifetime,
                 roi=roi,
                 quality=quality,
+                control=control,
                 history_samples=len(records),
                 phase=phase,
             )
@@ -147,10 +160,21 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
         await self._lifetime.async_save()
 
     @staticmethod
-    def _phase(learning_ready: bool, simulation_ready: bool) -> str:
-        """Return the furthest currently active read-only phase."""
-        if simulation_ready and learning_ready:
-            return "Observe → Learn → Advise → Simulate"
-        if learning_ready:
-            return "Observe → Learn → Advise"
-        return "Observe → Learn"
+    def _phase(
+        learning_ready: bool,
+        simulation_ready: bool,
+        operating_mode: str,
+    ) -> str:
+        """Return the furthest currently active phase."""
+        base = (
+            "Observe → Learn → Advise → Simulate"
+            if (simulation_ready and learning_ready)
+            else "Observe → Learn → Advise" if learning_ready else "Observe → Learn"
+        )
+        if operating_mode == "shadow":
+            return f"{base} → Shadow"
+        if operating_mode == "control":
+            return f"{base} → Control (blocked until commissioning)"
+        if operating_mode == "simulate":
+            return f"{base} → Control Lab"
+        return base

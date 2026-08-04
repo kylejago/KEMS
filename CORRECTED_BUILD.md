@@ -1,17 +1,19 @@
-# KEMS v0.6.0-beta1 release contents
+# KEMS 0.7.0-alpha1 pre-installation Control Lab
 
-- Fox ESS KH7 7kW / 56.42kWh proposal simulation.
-- Paced battery export to the next cheap period.
-- Learned/recent/current-load home reserve fallback.
-- Fixed 12p/kWh export income; Flux assumptions ignored.
-- Octoplus Power Down joined-session planning and 8 Octopoints = 1p conversion.
-- Seven-complete-day ROI readiness gate.
-- Strict prevention of KEMS simulation entities becoming observed inputs.
-- Correct Power Down entity IDs in the Actual vs Simulated dashboard.
-- Dynamic complete diagnostics dashboard.
+This development build adds:
+
+- Observe, Simulate, Shadow, and blocked Control planning modes;
+- normal, solar, cloud, high-load, Power Down, outage, EPS-overload, and unstable-grid scenarios;
+- whole-house island energy routing;
+- EPS utilisation, headroom, warning, critical, and outage-runtime calculations;
+- emergency-stop and stale-data fail-safe plans;
+- desired work mode, charge, home supply, export, total discharge, and SOC commands;
+- a 12-check built-in safety preflight;
+- a dedicated `dashboards/kems_control_lab.yaml` view;
+- 15 new control and dashboard/platform tests on top of the beta suite.
 
 Manifest version:
 
 ```json
-"version": "0.6.0-beta1"
+"version": "0.7.0-alpha1"
 ```

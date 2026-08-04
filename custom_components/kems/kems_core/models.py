@@ -410,6 +410,69 @@ class ROIState:
 
 
 @dataclass(frozen=True, slots=True)
+class ControlConfig:
+    """Safety and commissioning settings for the control planner."""
+
+    operating_mode: str = "simulate"
+    virtual_scenario: str = "normal"
+    control_enabled: bool = False
+    commissioned: bool = False
+    emergency_stop: bool = False
+    stale_data_seconds: int = 180
+    grid_stability_seconds: int = 300
+    eps_limit_kw: float = 7.0
+    eps_warning_percent: float = 70.0
+    eps_critical_percent: float = 90.0
+    island_reserve_percent: float = 20.0
+    normal_reserve_percent: float = 10.0
+    battery_capacity_kwh: float = 56.42
+    discharge_efficiency: float = 0.95
+    max_charge_kw: float = 7.0
+    max_discharge_kw: float = 7.0
+    export_limit_kw: float = 7.0
+
+
+@dataclass(frozen=True, slots=True)
+class ControlState:
+    """One explainable desired-control plan."""
+
+    operating_mode: str = "simulate"
+    virtual_scenario: str = "normal"
+    operating_reason: str = "observe_only"
+    desired_work_mode: str = "No change"
+    desired_charge_power_kw: float = 0.0
+    desired_battery_to_home_power_kw: float = 0.0
+    desired_battery_export_power_kw: float = 0.0
+    desired_total_discharge_power_kw: float = 0.0
+    desired_min_soc_percent: float = 10.0
+    desired_ev_charging_allowed: bool = True
+    desired_grid_export_allowed: bool = True
+    grid_available: bool = True
+    island_mode_active: bool = False
+    whole_house_eps_load_kw: float = 0.0
+    eps_headroom_kw: float = 7.0
+    eps_utilisation_percent: float = 0.0
+    eps_warning: bool = False
+    eps_critical: bool = False
+    solar_to_house_kw: float = 0.0
+    solar_to_battery_kw: float = 0.0
+    battery_to_house_kw: float = 0.0
+    estimated_outage_runtime_hours: float | None = None
+    data_age_seconds: float = 0.0
+    data_fresh: bool = True
+    plan_safe: bool = True
+    control_enabled: bool = False
+    commissioned: bool = False
+    real_backend_available: bool = False
+    commands_permitted: bool = False
+    blocked_reason: str = "Simulation/shadow only"
+    next_action: str = "Continue observing"
+    preflight_passed: int = 0
+    preflight_total: int = 0
+    preflight_status: str = "Not run"
+
+
+@dataclass(frozen=True, slots=True)
 class DataQuality:
     """Coverage and health of the configured observations."""
 
@@ -432,5 +495,6 @@ class KEMSData:
     lifetime: LifetimeLedger
     roi: ROIState
     quality: DataQuality
+    control: ControlState
     history_samples: int
     phase: str

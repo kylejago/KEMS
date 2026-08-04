@@ -13,7 +13,7 @@ DASHBOARDS = ROOT / "dashboards"
 def test_all_dashboard_yaml_is_valid() -> None:
     """Every shipped dashboard should parse as YAML."""
     files = sorted(DASHBOARDS.glob("*.yaml"))
-    assert len(files) == 9
+    assert len(files) == 10
     for path in files:
         content = yaml.safe_load(path.read_text(encoding="utf-8"))
         assert isinstance(content, dict)
@@ -88,3 +88,15 @@ def test_dashboards_include_power_down_planning() -> None:
         assert "sensor.kems_saving_session" not in text
         assert "binary_sensor.kems_saving_session" not in text
         assert "for_saving_session" not in text
+
+
+def test_control_lab_dashboard_exposes_island_and_write_boundary() -> None:
+    """The control lab must show desired commands and the hard write block."""
+    text = (DASHBOARDS / "kems_control_lab.yaml").read_text(encoding="utf-8")
+    assert "select.kems_operating_mode" in text
+    assert "select.kems_virtual_scenario" in text
+    assert "switch.kems_emergency_stop" in text
+    assert "binary_sensor.kems_whole_house_island_mode" in text
+    assert "sensor.kems_island_solar_to_battery_power" in text
+    assert "binary_sensor.kems_control_commands_permitted" in text
+    assert "cannot send real FoxESS commands" in text
