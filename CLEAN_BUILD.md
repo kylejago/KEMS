@@ -1,5 +1,12 @@
-# KEMS preserved-history upgrade 0.6.0-alpha5
+# KEMS v0.6.0-beta1 preserved-history release
 
-This is not a clean-history release. It deliberately keeps the existing `clean_v6_alpha2` observation namespace so collected learning data continues without interruption.
+This package is an in-place upgrade. Do not delete the KEMS Home Assistant config entry.
 
-The simulated financial ledger has its own migration version. On the first alpha5 startup, alpha4 simulated value resets because joined Power Down sessions can change battery timing and add a separate Octopoints bonus. Observed history, mappings, gas data, and actual post-install totals remain untouched.
+Preserved:
+
+- observed electricity, gas, tariff, EV, and learning history;
+- source mappings and source-isolation protections;
+- actual post-install lifetime data, when applicable;
+- KH7 7kW proposal settings and fixed 12p/kWh export model.
+
+The simulation ledger version remains aligned with alpha5, so upgrading from the dashboard-hotfixed alpha5 build does not require another intentional simulation reset.

@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.6.0-beta1
+
+- Consolidated all alpha1–alpha5 monitoring and simulation work into the first main-branch beta.
+- Included the corrected Power Down dashboard entity IDs and regression tests.
+- Retained strict observed-source isolation, KH7 7kW paced export, home-energy reserve protection, fixed 12p/kWh export, Power Down planning, smooth learning confidence, and seven-complete-day ROI gating.
+- Removed generated test caches from the release package and aligned manifest, core, and Python package versions.
+- Live inverter control remains disabled; this beta is the stable read-only fallback for the separate 0.7 control-development branch.
+
+### Dashboard hotfix
+
+- Corrected Power Down dashboard entity IDs to match the IDs Home Assistant creates from the visible entity names.
+- Added duration and baseline net energy to the Actual vs Simulated Power Down card.
+- Added regression checks preventing legacy `saving_session` dashboard IDs from returning.
+
+
 ## 0.6.0-alpha5
 
 - Added read-only Octoplus Power Down / Saving Session awareness using BottlecapDave's joined event data.

@@ -72,14 +72,19 @@ def test_actual_vs_simulated_dashboard_includes_paced_export_diagnostics() -> No
 
 
 def test_dashboards_include_power_down_planning() -> None:
-    """The main and diagnostic dashboards must expose session-aware planning."""
+    """Dashboards must use Home Assistant's Power Down entity IDs."""
     for name in (
         "kems_actual_vs_simulated.yaml",
         "kems_diagnostics_all_entities.yaml",
     ):
         text = (DASHBOARDS / name).read_text(encoding="utf-8")
-        assert "binary_sensor.kems_saving_session_joined" in text
-        assert "sensor.kems_saving_session_battery_reserve" in text
-        assert "sensor.kems_estimated_saving_session_bonus" in text
-        assert "sensor.kems_estimated_saving_session_total_income" in text
-        assert "binary_sensor.kems_battery_export_reduced_for_saving_session" in text
+        assert "binary_sensor.kems_power_down_session_joined" in text
+        assert "sensor.kems_power_down_session_battery_reserve" in text
+        assert "sensor.kems_estimated_power_down_session_bonus" in text
+        assert "sensor.kems_estimated_power_down_session_total_income" in text
+        assert (
+            "binary_sensor.kems_battery_export_reduced_for_power_down_session" in text
+        )
+        assert "sensor.kems_saving_session" not in text
+        assert "binary_sensor.kems_saving_session" not in text
+        assert "for_saving_session" not in text

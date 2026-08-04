@@ -45,26 +45,26 @@ views:
         content: |
           | Reading | Value |
           |---|---:|
-          | Joined | {{ states('binary_sensor.kems_saving_session_joined') }} |
-          | Active now | {{ states('binary_sensor.kems_saving_session_active') }} |
-          | Start | {{ states('sensor.kems_next_saving_session_start') }} |
-          | End | {{ states('sensor.kems_next_saving_session_end') }} |
-          | Duration | {{ states('sensor.kems_saving_session_duration') }} min |
-          | Octopoints | {{ states('sensor.kems_saving_session_octopoints_per_kwh') }} points/kWh |
-          | Bonus rate | {{ states('sensor.kems_saving_session_bonus_rate') }} p/kWh |
-          | Net baseline | {{ states('sensor.kems_saving_session_baseline_net_energy') }} kWh |
-          | Baseline source | {{ states('sensor.kems_saving_session_baseline_source') }} |
-          | Baseline incomplete | {{ states('binary_sensor.kems_saving_session_baseline_incomplete') }} |
-          | Battery reserve at session start | {{ states('sensor.kems_saving_session_battery_reserve') }} kWh |
-          | Battery protected now | {{ states('binary_sensor.kems_battery_reserved_for_saving_session') }} |
-          | Ordinary export reduced | {{ states('binary_sensor.kems_battery_export_reduced_for_saving_session') }} |
-          | Session export target | {{ states('sensor.kems_saving_session_export_target') }} kW |
-          | Estimated export | {{ states('sensor.kems_estimated_saving_session_export') }} kWh |
-          | Estimated rewardable reduction | {{ states('sensor.kems_estimated_saving_session_reduction') }} kWh |
-          | Estimated Octopoints bonus | {{ states('sensor.kems_estimated_saving_session_bonus') }} p |
-          | Estimated fixed 12p export income | {{ states('sensor.kems_estimated_saving_session_export_income') }} p |
-          | Estimated total income | {{ states('sensor.kems_estimated_saving_session_total_income') }} p |
-          | Simulated bonus today | {{ states('sensor.kems_simulated_saving_session_bonus_today') }} p |
+          | Joined | {{ states('binary_sensor.kems_power_down_session_joined') }} |
+          | Active now | {{ states('binary_sensor.kems_power_down_session_active') }} |
+          | Start | {{ states('sensor.kems_next_power_down_session_start') }} |
+          | End | {{ states('sensor.kems_next_power_down_session_end') }} |
+          | Duration | {{ states('sensor.kems_power_down_session_duration') }} min |
+          | Octopoints | {{ states('sensor.kems_power_down_session_octopoints_per_kwh') }} points/kWh |
+          | Bonus rate | {{ states('sensor.kems_power_down_session_bonus_rate') }} p/kWh |
+          | Net baseline | {{ states('sensor.kems_power_down_session_baseline_net_energy') }} kWh |
+          | Baseline source | {{ states('sensor.kems_power_down_session_baseline_source') }} |
+          | Baseline incomplete | {{ states('binary_sensor.kems_power_down_baseline_incomplete') }} |
+          | Battery reserve at session start | {{ states('sensor.kems_power_down_session_battery_reserve') }} kWh |
+          | Battery protected now | {{ states('binary_sensor.kems_battery_reserved_for_power_down_session') }} |
+          | Ordinary export reduced | {{ states('binary_sensor.kems_battery_export_reduced_for_power_down_session') }} |
+          | Session export target | {{ states('sensor.kems_power_down_session_export_target') }} kW |
+          | Estimated export | {{ states('sensor.kems_estimated_power_down_session_export') }} kWh |
+          | Estimated rewardable reduction | {{ states('sensor.kems_estimated_power_down_session_rewardable_reduction') }} kWh |
+          | Estimated Octopoints bonus | {{ states('sensor.kems_estimated_power_down_session_bonus') }} p |
+          | Estimated fixed 12p export income | {{ states('sensor.kems_estimated_power_down_session_export_income') }} p |
+          | Estimated total income | {{ states('sensor.kems_estimated_power_down_session_total_income') }} p |
+          | Simulated bonus today | {{ states('sensor.kems_simulated_power_down_session_bonus_today') }} p |
 
           KEMS reads BottlecapDave's joined event and remains read-only. It does
           not enrol the account or write inverter settings. Bonus estimates use
