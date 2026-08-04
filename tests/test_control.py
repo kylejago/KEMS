@@ -81,6 +81,7 @@ def test_power_down_uses_session_export_target() -> None:
     assert state.operating_reason == "power_down_session"
     assert state.desired_total_discharge_power_kw == 7.0
     assert state.desired_battery_export_power_kw == 5.0
+    assert state.desired_ev_charging_allowed is False
 
 
 def test_daylight_island_uses_solar_then_charges_battery() -> None:
@@ -96,21 +97,30 @@ def test_daylight_island_uses_solar_then_charges_battery() -> None:
     assert state.island_mode_active is True
     assert state.solar_to_house_kw == 2.0
     assert state.solar_to_battery_kw == 3.0
+    assert state.virtual_scenario_solar_power_kw == 5.0
+    assert state.virtual_scenario_house_load_kw == 2.0
     assert state.battery_to_house_kw == 0.0
     assert state.desired_battery_export_power_kw == 0.0
     assert state.desired_ev_charging_allowed is False
 
 
-def test_night_island_uses_battery_only_for_house_shortfall() -> None:
+def test_night_island_uses_battery_to_emergency_floor() -> None:
     state = ControlEngine().plan(
         _snapshot(),
-        _simulation(current_simulated_house_load_kw=2.4),
+        _simulation(
+            current_simulated_house_load_kw=2.4,
+            simulated_battery_soc=14.0,
+        ),
         NOW,
         ControlConfig(virtual_scenario="grid_outage_night"),
     )
     assert state.solar_to_house_kw == 0.0
     assert state.battery_to_house_kw == 2.4
-    assert state.estimated_outage_runtime_hours is not None
+    assert state.desired_min_soc_percent == 10.0
+    assert state.island_conservation_threshold_percent == 20.0
+    assert state.island_emergency_floor_percent == 10.0
+    assert state.island_battery_status == "conservation"
+    assert state.estimated_outage_runtime_hours == 0.89
     assert state.desired_grid_export_allowed is False
 
 
@@ -189,3 +199,19 @@ def test_live_control_stays_hard_blocked_before_real_backend() -> None:
     assert state.commands_permitted is False
     assert state.real_backend_available is False
     assert "backend" in state.blocked_reason.lower()
+
+
+def test_island_stops_battery_at_emergency_floor() -> None:
+    state = ControlEngine().plan(
+        _snapshot(),
+        _simulation(
+            current_simulated_house_load_kw=2.4,
+            simulated_battery_soc=10.0,
+        ),
+        NOW,
+        ControlConfig(virtual_scenario="grid_outage_night"),
+    )
+    assert state.battery_to_house_kw == 0.0
+    assert state.estimated_outage_runtime_hours == 0.0
+    assert state.island_battery_status == "emergency_floor"
+    assert "emergency floor" in state.next_action.lower()

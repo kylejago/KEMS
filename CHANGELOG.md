@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.7.0-alpha2 — validated scenario fixes
+
+- Blocked EV charging during active Power Down sessions so EV demand cannot reduce the rewardable net reduction.
+- Split island battery protection into a 20% conservation threshold and a 10% emergency hardware floor.
+- Continued whole-house battery support below the conservation threshold while estimating runtime down to the emergency floor.
+- Stopped simulated battery discharge once the emergency floor is reached.
+- Added explicit virtual-scenario solar and house-load entities so the Control Lab displays injected scenario inputs rather than the normal time-based simulation.
+- Added island battery status, conservation-threshold, emergency-floor, and conservation-active diagnostics.
+- Removed the aggregate header toggle from the interactive controls card to prevent accidental simultaneous switch changes.
+- Added regression coverage for Power Down EV blocking, low-SOC island runtime, emergency-floor protection, and Control Lab entity selection.
+- Real FoxESS writes remain hard-blocked; alpha2 is safe to run before hardware installation.
+
 ## 0.7.0-alpha1 — pre-installation control lab
 
 - Added hardware-independent Observe, Simulate, Shadow, and Control planning modes.

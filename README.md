@@ -1,6 +1,6 @@
 # KEMS — Kyle Energy Management System
 
-KEMS 0.7.0-alpha1 is the pre-installation control-development lab for Home Assistant. It extends the 0.6.0-beta1 baseline into:
+KEMS 0.7.0-alpha2 is the pre-installation control-development lab for Home Assistant. It extends the 0.6.0-beta1 baseline into:
 
 **Observe → Learn → Advise → Simulate → Shadow → Control**
 
@@ -123,6 +123,19 @@ Gas is observed rather than optimised. The simulated whole-home comparison chang
 - `sensor.kems_estimated_power_down_session_total_income`
 - `sensor.kems_simulated_power_down_session_bonus_today`
 
+### Control Lab and island resilience
+
+- `sensor.kems_virtual_scenario_house_load`
+- `sensor.kems_virtual_scenario_solar_power`
+- `sensor.kems_island_battery_status`
+- `sensor.kems_island_conservation_threshold`
+- `sensor.kems_island_emergency_floor`
+- `binary_sensor.kems_island_battery_conservation_active`
+- `sensor.kems_estimated_outage_runtime`
+- `sensor.kems_control_operating_reason`
+- `sensor.kems_control_blocked_reason`
+- `sensor.kems_control_next_action`
+
 ### Import, export, battery and solar
 
 - `sensor.kems_observed_grid_import_today`
@@ -160,7 +173,7 @@ The default investment is the quoted £20,995. Grants, extra installation costs,
 
 ## Dashboards
 
-The `dashboards/` directory contains nine complete dashboards:
+The `dashboards/` directory contains ten complete dashboards:
 
 - pre-install proposal comparison
 - advanced desktop mission control, styled like the supplied reference
@@ -171,6 +184,7 @@ The `dashboards/` directory contains nine complete dashboards:
 - advanced ROI dashboard with a filling financial battery and Profit Mode
 - complete dynamic diagnostics dashboard listing every KEMS entity
 - full-width actual-versus-simulated dashboard with paced-export diagnostics
+- pre-installation Control Lab for scenario and safety validation
 
 See `dashboards/README.md` for installation and frontend-card requirements.
 

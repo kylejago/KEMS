@@ -62,7 +62,7 @@ class KEMSEmergencyStopSwitch(KEMSEntity, SwitchEntity):
 
 
 class KEMSMasterControlEnableSwitch(KEMSEntity, SwitchEntity):
-    """Master opt-in; alpha1 still hard-blocks all real writes."""
+    """Master opt-in; alpha2 still hard-blocks all real writes."""
 
     _attr_name = "Master control enable"
     _attr_icon = "mdi:shield-key-outline"
@@ -77,7 +77,7 @@ class KEMSMasterControlEnableSwitch(KEMSEntity, SwitchEntity):
         return self.coordinator.settings.control.control_enabled
 
     async def async_turn_on(self, **kwargs) -> None:
-        """Record opt-in; no real backend exists in alpha1."""
+        """Record opt-in; no real backend exists in alpha2."""
         await async_set_runtime_option(
             self.hass,
             self.coordinator.entry,

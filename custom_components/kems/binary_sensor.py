@@ -245,6 +245,13 @@ BINARY_SENSORS: tuple[KEMSBinarySensorEntityDescription, ...] = (
         is_on_fn=lambda data: data.control.commands_permitted,
     ),
     KEMSBinarySensorEntityDescription(
+        key="island_battery_conservation_active",
+        name="Island battery conservation active",
+        icon="mdi:battery-alert-variant-outline",
+        is_on_fn=lambda data: data.control.island_battery_status
+        in {"conservation", "emergency_floor"},
+    ),
+    KEMSBinarySensorEntityDescription(
         key="eps_load_warning",
         name="EPS load warning",
         icon="mdi:alert-outline",

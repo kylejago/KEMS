@@ -8,6 +8,14 @@
 - ROI/lifetime accounting and corrected dashboards
 - main-branch rollback point
 
+## 0.7.0-alpha2 — validated scenario fixes
+
+- Power Down EV blocking
+- Island conservation threshold separated from emergency floor
+- Low-SOC outage runtime correction
+- Explicit virtual scenario input diagnostics
+- Safer Control Lab dashboard controls
+
 ## 0.7.0-alpha1 — pre-installation Control Lab
 
 - hardware-independent command planning

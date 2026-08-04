@@ -1,4 +1,4 @@
-# KEMS 0.7.0-alpha1 in-place development upgrade
+# KEMS 0.7.0-alpha2 in-place development upgrade
 
 This build preserves all 0.6.0-beta1 observation history, learning data, source mappings, simulation totals, Power Down planning, and ROI state.
 
