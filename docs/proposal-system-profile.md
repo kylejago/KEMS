@@ -1,6 +1,6 @@
 # Proposal system profile
 
-KEMS v0.6.0-alpha4 uses the revised proposal profile for simulation before the
+KEMS v0.6.0-alpha5 uses the revised proposal profile for simulation before the
 physical solar/battery system is commissioned.
 
 ## Hardware assumptions
@@ -44,3 +44,7 @@ values and the separate 8,016 kWh annual headline.
 - Combined solar and battery AC output cannot exceed 7kW.
 - The separate grid-export limit remains editable for the final DNO approval.
 - A standard six-hour cheap window at 7kW and 95% efficiency adds about 39.9kWh, so a battery starting at the 10% reserve reaches roughly 80.7% unless confirmed extra Intelligent slots extend charging.
+
+## Power Down override
+
+A joined Octoplus Power Down session temporarily overrides ordinary paced export. Before the event, KEMS holds the energy needed for forecast home use plus maximum useful session output. During the event, the home is covered and remaining KH7 output is exported. Normal export remains valued at 12p/kWh; the Octopoints bonus is additional and uses 8 points = 1p.

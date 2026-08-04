@@ -121,6 +121,48 @@ def _simulation_attributes(data: KEMSData) -> Mapping[str, Any]:
         "battery_export_paused_for_home_reserve": (
             simulation.battery_export_paused_for_home_reserve
         ),
+        "saving_session_joined": simulation.saving_session_joined,
+        "saving_session_active": simulation.saving_session_active,
+        "saving_session_start": simulation.saving_session_start,
+        "saving_session_end": simulation.saving_session_end,
+        "saving_session_duration_minutes": (simulation.saving_session_duration_minutes),
+        "saving_session_octopoints_per_kwh": (
+            simulation.saving_session_octopoints_per_kwh
+        ),
+        "saving_session_bonus_rate_pence": (simulation.saving_session_bonus_rate_pence),
+        "saving_session_baseline_net_kwh": (simulation.saving_session_baseline_net_kwh),
+        "saving_session_baseline_source": (simulation.saving_session_baseline_source),
+        "saving_session_baseline_incomplete": (
+            simulation.saving_session_baseline_incomplete
+        ),
+        "saving_session_battery_reserve_kwh": (
+            simulation.saving_session_battery_reserve_kwh
+        ),
+        "saving_session_export_target_kw": (simulation.saving_session_export_target_kw),
+        "estimated_saving_session_export_kwh": (
+            simulation.estimated_saving_session_export_kwh
+        ),
+        "estimated_saving_session_rewardable_reduction_kwh": (
+            simulation.estimated_saving_session_rewardable_reduction_kwh
+        ),
+        "estimated_saving_session_bonus_pence": (
+            simulation.estimated_saving_session_bonus_pence
+        ),
+        "estimated_saving_session_export_income_pence": (
+            simulation.estimated_saving_session_export_income_pence
+        ),
+        "estimated_saving_session_total_income_pence": (
+            simulation.estimated_saving_session_total_income_pence
+        ),
+        "simulated_saving_session_bonus_pence": (
+            simulation.simulated_saving_session_bonus_pence
+        ),
+        "battery_reserved_for_saving_session": (
+            simulation.battery_reserved_for_saving_session
+        ),
+        "battery_export_reduced_for_saving_session": (
+            simulation.battery_export_reduced_for_saving_session
+        ),
         "avoided_day_rate_import_kwh": simulation.avoided_day_rate_import_kwh,
         "baseline_no_system_cost_pence": simulation.baseline_no_system_cost_pence,
         "actual_avoided_import_value_pence": (
@@ -805,6 +847,134 @@ SENSORS: tuple[KEMSSensorEntityDescription, ...] = (
         suggested_display_precision=2,
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda data: (data.simulation.projected_grid_import_before_cheap_kwh),
+    ),
+    KEMSSensorEntityDescription(
+        key="next_saving_session_start",
+        name="Next Power Down session start",
+        icon="mdi:calendar-start",
+        device_class=SensorDeviceClass.TIMESTAMP,
+        value_fn=lambda data: data.simulation.saving_session_start,
+    ),
+    KEMSSensorEntityDescription(
+        key="next_saving_session_end",
+        name="Next Power Down session end",
+        icon="mdi:calendar-end",
+        device_class=SensorDeviceClass.TIMESTAMP,
+        value_fn=lambda data: data.simulation.saving_session_end,
+    ),
+    KEMSSensorEntityDescription(
+        key="saving_session_duration",
+        name="Power Down session duration",
+        icon="mdi:timer-outline",
+        native_unit_of_measurement="min",
+        suggested_display_precision=0,
+        value_fn=lambda data: data.simulation.saving_session_duration_minutes,
+    ),
+    KEMSSensorEntityDescription(
+        key="saving_session_octopoints_per_kwh",
+        name="Power Down session Octopoints per kWh",
+        icon="mdi:octagram-outline",
+        native_unit_of_measurement="points/kWh",
+        suggested_display_precision=0,
+        value_fn=lambda data: data.simulation.saving_session_octopoints_per_kwh,
+    ),
+    KEMSSensorEntityDescription(
+        key="saving_session_bonus_rate",
+        name="Power Down session bonus rate",
+        icon="mdi:cash-plus",
+        native_unit_of_measurement="p/kWh",
+        suggested_display_precision=2,
+        value_fn=lambda data: data.simulation.saving_session_bonus_rate_pence,
+    ),
+    KEMSSensorEntityDescription(
+        key="saving_session_baseline_net_energy",
+        name="Power Down session baseline net energy",
+        icon="mdi:chart-bell-curve-cumulative",
+        device_class=SensorDeviceClass.ENERGY,
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        suggested_display_precision=3,
+        value_fn=lambda data: data.simulation.saving_session_baseline_net_kwh,
+    ),
+    KEMSSensorEntityDescription(
+        key="saving_session_baseline_source",
+        name="Power Down session baseline source",
+        icon="mdi:database-search-outline",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda data: data.simulation.saving_session_baseline_source,
+    ),
+    KEMSSensorEntityDescription(
+        key="saving_session_battery_reserve",
+        name="Power Down session battery reserve",
+        icon="mdi:battery-lock",
+        device_class=SensorDeviceClass.ENERGY,
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        suggested_display_precision=2,
+        value_fn=lambda data: data.simulation.saving_session_battery_reserve_kwh,
+    ),
+    KEMSSensorEntityDescription(
+        key="saving_session_export_target",
+        name="Power Down session export target",
+        icon="mdi:transmission-tower-export",
+        device_class=SensorDeviceClass.POWER,
+        native_unit_of_measurement=UnitOfPower.KILO_WATT,
+        suggested_display_precision=2,
+        value_fn=lambda data: data.simulation.saving_session_export_target_kw,
+    ),
+    KEMSSensorEntityDescription(
+        key="estimated_saving_session_export",
+        name="Estimated Power Down session export",
+        icon="mdi:transmission-tower-export",
+        device_class=SensorDeviceClass.ENERGY,
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        suggested_display_precision=2,
+        value_fn=lambda data: data.simulation.estimated_saving_session_export_kwh,
+    ),
+    KEMSSensorEntityDescription(
+        key="estimated_saving_session_reduction",
+        name="Estimated Power Down session rewardable reduction",
+        icon="mdi:chart-line-variant",
+        device_class=SensorDeviceClass.ENERGY,
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        suggested_display_precision=2,
+        value_fn=lambda data: (
+            data.simulation.estimated_saving_session_rewardable_reduction_kwh
+        ),
+    ),
+    KEMSSensorEntityDescription(
+        key="estimated_saving_session_bonus",
+        name="Estimated Power Down session bonus",
+        icon="mdi:cash-star",
+        native_unit_of_measurement="p",
+        suggested_display_precision=2,
+        value_fn=lambda data: data.simulation.estimated_saving_session_bonus_pence,
+    ),
+    KEMSSensorEntityDescription(
+        key="estimated_saving_session_export_income",
+        name="Estimated Power Down session export income",
+        icon="mdi:cash-plus",
+        native_unit_of_measurement="p",
+        suggested_display_precision=2,
+        value_fn=lambda data: (
+            data.simulation.estimated_saving_session_export_income_pence
+        ),
+    ),
+    KEMSSensorEntityDescription(
+        key="estimated_saving_session_total_income",
+        name="Estimated Power Down session total income",
+        icon="mdi:cash-multiple",
+        native_unit_of_measurement="p",
+        suggested_display_precision=2,
+        value_fn=lambda data: (
+            data.simulation.estimated_saving_session_total_income_pence
+        ),
+    ),
+    KEMSSensorEntityDescription(
+        key="simulated_saving_session_bonus_today",
+        name="Simulated Power Down session bonus today",
+        icon="mdi:cash-fast",
+        native_unit_of_measurement="p",
+        suggested_display_precision=2,
+        value_fn=lambda data: data.simulation.simulated_saving_session_bonus_pence,
     ),
     KEMSSensorEntityDescription(
         key="simulation_strategy",

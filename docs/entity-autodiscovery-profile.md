@@ -1,6 +1,6 @@
 # Automatic source matching profile
 
-KEMS 0.6.0-alpha4 includes deterministic matching before fuzzy discovery for:
+KEMS 0.6.0-alpha5 includes deterministic matching before fuzzy discovery for:
 
 - BottlecapDave Octopus Energy (`octopus_energy`)
 - MegaKid Octopus Intelligent (`octopus_intelligent`)
@@ -19,3 +19,7 @@ sensor. The Ohme power and vehicle-battery sensors are mapped directly.
 
 Gas prefers the Octopus kWh cumulative sensors. The m³ sensors remain available
 as a fallback and use the configured conversion factor.
+
+## Octoplus Power Down sources
+
+KEMS prefers the current BottlecapDave `octoplus_power_down_events` event entity and supports the legacy `octoplus_saving_session_events` entity as a fallback. Optional import and export baseline sensors are separated by their export role so an export-meter baseline cannot be mistaken for the import baseline.

@@ -1,51 +1,54 @@
 # KEMS validation report
 
-Build: `0.6.0-alpha4`  
-Feature branch: `fix/home-reserve-fallback`  
-Scope: read-only **Observe → Learn → Advise → Simulate** plus ROI and lifetime accounting
+Build: `0.6.0-alpha5`  
+Feature branch: `feature/octoplus-power-down-aware-export`  
+Scope: read-only **Observe → Learn → Advise → Simulate** plus ROI, lifetime accounting, and Power Down-aware export planning
 
 ## Automated checks completed in the build environment
 
-- 55 Pytest tests passed.
-- All 50 Python source/test files parsed successfully.
-- All 3 JSON files parsed successfully.
-- All 14 dashboard/example YAML files parsed successfully.
-- The proposal profile uses the Fox ESS KH7 7kW inverter, 56.42kWh battery,
-  10% reserve, and 12p/kWh fixed export rate.
-- Charge and discharge are capped at 7kW.
-- Combined solar and battery AC output is capped at 7kW.
-- Battery export is paced across the time remaining until the next cheap period.
-- Live diagnostics distinguish battery-to-home power, actual battery-export power, and the unconstrained paced-export target.
-- Forecast house demand is reserved before battery export is permitted.
-- Missing learned forecasts fall back to the recent one-hour average and then
-  the current house load, with a 10% safety margin.
-- Battery export pauses when the remaining battery is required by the home.
-- Diagnostics expose the reserve source and any projected grid shortfall before
-  the next cheap period.
-- The 23:30-to-midnight portion of overnight charging carries into the next
-  calendar day's simulated SOC.
-- A six-hour 7kW cheap window at 95% efficiency is verified to reach roughly
-  80.7% SOC from a 10% start rather than incorrectly forcing a full charge.
-- Proposal export rates remain fixed at 12p/kWh even if another export-rate
-  entity exists.
-- Current simulated flow uses the current snapshot rather than a stale retained
-  history sample.
-- Learning confidence uses elapsed time and data coverage.
-- ROI annualisation remains unavailable until seven complete 24-hour periods.
-- Existing alpha2 observed history is preserved.
-- The superseded alpha3 simulated financial ledger resets once through a separate
+- 67 Pytest tests passed.
+- All 52 Python source and test files parse successfully.
+- All 3 JSON files parse successfully.
+- All 14 YAML files parse successfully.
+- The system profile uses the Fox ESS KH7 7kW inverter, 56.42kWh battery,
+  10% reserve, and fixed 12p/kWh export rate.
+- Normal battery export remains paced towards the next cheap period.
+- Joined Octoplus Power Down sessions are discovered from the BottlecapDave
+  event entity; legacy Saving Session entities remain supported as a fallback.
+- KEMS does not join sessions or write to Octopus or inverter entities.
+- Before a joined session, KEMS protects enough stored energy to cover the home
+  and maximise useful session export within the 7kW inverter/export constraints.
+- During an active session, the model supplies the home first and exports the
+  remaining available inverter output without dropping below the 10% reserve.
+- Session reward estimates use net baseline reduction, keeping the fixed 12p/kWh
+  export income separate from the Power Down bonus.
+- The Power Down bonus rate is calculated using the user-confirmed conversion of
+  8 Octopoints = 1p.
+- Optional import and export baseline sensors are supported. Estimated bonus and
+  combined session income remain unavailable when no suitable baseline exists.
+- Baseline incompleteness is exposed separately in diagnostics.
+- A session after the next cheap period does not unnecessarily suppress current
+  daytime export because the battery can recharge first.
+- Existing source isolation, KH7 output limits, home-reserve fallbacks, smooth
+  learning confidence, and seven-complete-day ROI gating remain covered.
+- Existing observed history and learning data are preserved.
+- The superseded alpha4 simulated financial ledger resets once through the
   simulation-ledger migration version.
-- Source isolation continues to reject KEMS outputs as observed inputs.
-- No `__pycache__` or `.pyc` files are included in the final package.
+- No `__pycache__`, `.pyc`, or `.pytest_cache` files are included in the final
+  package.
 
 ## Checks required locally and on GitHub
 
-Black, Ruff, HACS validation and Hassfest must still be run locally and through
-GitHub Actions:
+Black and Ruff are pinned in `requirements-dev.txt` but are not available from
+this build environment's package index. Run the complete local validation before
+merging:
 
 ```powershell
+python -m pip install -r requirements-dev.txt
 python -m black .
 python -m ruff check . --fix
 python -m pytest
 python -m pre_commit run --all-files
 ```
+
+HACS validation and Hassfest should also complete through GitHub Actions.

@@ -67,6 +67,7 @@ class SimulationEngine:
         actual_export_income = 0.0
         simulated_import_cost = 0.0
         simulated_export_income = 0.0
+        simulated_saving_session_bonus = 0.0
         actual_house = 0.0
         actual_ev = 0.0
         actual_solar = 0.0
@@ -137,13 +138,66 @@ class SimulationEngine:
             interval_import = 0.0
             interval_export = 0.0
             interval_curtailment = 0.0
+            interval_saving_session_bonus = 0.0
             inverter_capacity = max(config.inverter_limit_kw, 0.0) * hours
             export_capacity = min(
                 max(config.export_limit_kw, 0.0) * hours,
                 inverter_capacity,
             )
 
-            if current.cheap_period_confirmed:
+            if self._saving_session_active(current, config):
+                useful_output = min(
+                    inverter_capacity,
+                    actual_house_kwh + export_capacity,
+                )
+                solar_used = min(solar_energy, useful_output)
+                available_battery_ac = (
+                    max(
+                        battery_kwh - reserve_kwh,
+                        0.0,
+                    )
+                    * config.discharge_efficiency
+                )
+                battery_output = min(
+                    max(useful_output - solar_used, 0.0),
+                    config.max_discharge_kw * hours,
+                    available_battery_ac,
+                )
+                battery_kwh -= battery_output / max(
+                    config.discharge_efficiency,
+                    0.01,
+                )
+
+                solar_to_home = min(actual_house_kwh, solar_used)
+                battery_to_home_interval = min(
+                    max(actual_house_kwh - solar_to_home, 0.0),
+                    battery_output,
+                )
+                supplied_home = solar_to_home + battery_to_home_interval
+                interval_import = max(actual_house_kwh - supplied_home, 0.0)
+                solar_export = max(solar_used - solar_to_home, 0.0)
+                battery_export_interval = max(
+                    battery_output - battery_to_home_interval,
+                    0.0,
+                )
+                interval_export = min(
+                    solar_export + battery_export_interval,
+                    export_capacity,
+                )
+                interval_curtailment = max(solar_energy - solar_used, 0.0)
+                battery_to_home += battery_to_home_interval
+                battery_export += battery_export_interval
+                avoided_day_import += battery_to_home_interval
+                interval_saving_session_bonus = (
+                    self._saving_session_interval_bonus_pence(
+                        current,
+                        hours,
+                        interval_import,
+                        interval_export,
+                    )
+                    or 0.0
+                )
+            elif current.cheap_period_confirmed:
                 house_grid_kwh = actual_house_kwh
                 charge_input_kwh = min(
                     min(config.max_charge_kw, config.inverter_limit_kw) * hours,
@@ -213,6 +267,11 @@ class SimulationEngine:
                         config.discharge_efficiency,
                         0.01,
                     )
+                    required_stored += self._saving_session_extra_reserve_stored_kwh(
+                        current,
+                        today,
+                        config,
+                    )
                     surplus_stored = max(
                         battery_kwh - reserve_kwh - required_stored,
                         0.0,
@@ -249,6 +308,7 @@ class SimulationEngine:
             simulated_curtailment += interval_curtailment
             simulated_import_cost += interval_import * rate
             simulated_export_income += interval_export * export_rate
+            simulated_saving_session_bonus += interval_saving_session_bonus
 
         coverage = covered / intervals if intervals else 0.0
         if covered == 0:
@@ -264,12 +324,18 @@ class SimulationEngine:
             forecast_energy_until_offpeak_kwh,
         )
         actual_cost = actual_import_cost - actual_export_income
-        simulated_cost = simulated_import_cost - simulated_export_income
+        simulated_cost = (
+            simulated_import_cost
+            - simulated_export_income
+            - simulated_saving_session_bonus
+        )
         actual_avoided_import_value = baseline_import_cost - actual_import_cost
         simulated_avoided_import_value = baseline_import_cost - simulated_import_cost
         actual_system_value = actual_avoided_import_value + actual_export_income
         simulated_system_value = (
-            simulated_avoided_import_value + simulated_export_income
+            simulated_avoided_import_value
+            + simulated_export_income
+            + simulated_saving_session_bonus
         )
 
         return SimulationState(
@@ -327,6 +393,59 @@ class SimulationEngine:
             battery_export_paused_for_home_reserve=current_plan[
                 "export_paused_for_home"
             ],
+            saving_session_joined=current_plan["saving_session_joined"],
+            saving_session_active=current_plan["saving_session_active"],
+            saving_session_start=current_plan["saving_session_start"],
+            saving_session_end=current_plan["saving_session_end"],
+            saving_session_duration_minutes=current_plan[
+                "saving_session_duration_minutes"
+            ],
+            saving_session_octopoints_per_kwh=current_plan[
+                "saving_session_octopoints_per_kwh"
+            ],
+            saving_session_bonus_rate_pence=current_plan[
+                "saving_session_bonus_rate_pence"
+            ],
+            saving_session_baseline_net_kwh=current_plan[
+                "saving_session_baseline_net_kwh"
+            ],
+            saving_session_baseline_source=current_plan[
+                "saving_session_baseline_source"
+            ],
+            saving_session_baseline_incomplete=current_plan[
+                "saving_session_baseline_incomplete"
+            ],
+            saving_session_battery_reserve_kwh=current_plan[
+                "saving_session_battery_reserve_kwh"
+            ],
+            saving_session_export_target_kw=current_plan[
+                "saving_session_export_target_kw"
+            ],
+            estimated_saving_session_export_kwh=current_plan[
+                "estimated_saving_session_export_kwh"
+            ],
+            estimated_saving_session_rewardable_reduction_kwh=current_plan[
+                "estimated_saving_session_rewardable_reduction_kwh"
+            ],
+            estimated_saving_session_bonus_pence=current_plan[
+                "estimated_saving_session_bonus_pence"
+            ],
+            estimated_saving_session_export_income_pence=current_plan[
+                "estimated_saving_session_export_income_pence"
+            ],
+            estimated_saving_session_total_income_pence=current_plan[
+                "estimated_saving_session_total_income_pence"
+            ],
+            simulated_saving_session_bonus_pence=round(
+                simulated_saving_session_bonus,
+                2,
+            ),
+            battery_reserved_for_saving_session=current_plan[
+                "battery_reserved_for_saving_session"
+            ],
+            battery_export_reduced_for_saving_session=current_plan[
+                "battery_export_reduced_for_saving_session"
+            ],
             effective_export_rate_pence=round(effective_export_rate, 4),
             inverter_limit_kw=config.inverter_limit_kw,
             export_limit_kw=min(config.export_limit_kw, config.inverter_limit_kw),
@@ -346,10 +465,52 @@ class SimulationEngine:
         if snapshot is None:
             return SimulationState()
         solar = self._simulated_solar_power(snapshot, config)
+        session = self._saving_session_plan(snapshot, [snapshot], config)
         return SimulationState(
             samples=1,
             current_simulated_house_load_kw=_load_kw(snapshot),
             current_simulated_solar_power_kw=solar,
+            saving_session_joined=bool(session["saving_session_joined"]),
+            saving_session_active=bool(session["saving_session_active"]),
+            saving_session_start=session["saving_session_start"],
+            saving_session_end=session["saving_session_end"],
+            saving_session_duration_minutes=session["saving_session_duration_minutes"],
+            saving_session_octopoints_per_kwh=session[
+                "saving_session_octopoints_per_kwh"
+            ],
+            saving_session_bonus_rate_pence=session["saving_session_bonus_rate_pence"],
+            saving_session_baseline_net_kwh=session["saving_session_baseline_net_kwh"],
+            saving_session_baseline_source=str(
+                session["saving_session_baseline_source"]
+            ),
+            saving_session_baseline_incomplete=session[
+                "saving_session_baseline_incomplete"
+            ],
+            saving_session_battery_reserve_kwh=session[
+                "saving_session_battery_reserve_kwh"
+            ],
+            saving_session_export_target_kw=session["saving_session_export_target_kw"],
+            estimated_saving_session_export_kwh=session[
+                "estimated_saving_session_export_kwh"
+            ],
+            estimated_saving_session_rewardable_reduction_kwh=session[
+                "estimated_saving_session_rewardable_reduction_kwh"
+            ],
+            estimated_saving_session_bonus_pence=session[
+                "estimated_saving_session_bonus_pence"
+            ],
+            estimated_saving_session_export_income_pence=session[
+                "estimated_saving_session_export_income_pence"
+            ],
+            estimated_saving_session_total_income_pence=session[
+                "estimated_saving_session_total_income_pence"
+            ],
+            battery_reserved_for_saving_session=bool(
+                session["battery_reserved_for_saving_session"]
+            ),
+            battery_export_reduced_for_saving_session=bool(
+                session["battery_export_reduced_for_saving_session"]
+            ),
             effective_export_rate_pence=config.export_rate_pence,
             inverter_limit_kw=config.inverter_limit_kw,
             export_limit_kw=min(config.export_limit_kw, config.inverter_limit_kw),
@@ -544,6 +705,305 @@ class SimulationEngine:
         return required * HOME_RESERVE_SAFETY_FACTOR, source
 
     @staticmethod
+    def _saving_session_active(
+        snapshot: Snapshot,
+        config: SimulationConfig,
+    ) -> bool:
+        """Return whether a joined Power Down session is active now."""
+        if not config.saving_session_enabled or not snapshot.saving_session_joined:
+            return False
+        start = snapshot.saving_session_start
+        end = snapshot.saving_session_end
+        return bool(start and end and start <= snapshot.timestamp < end)
+
+    @staticmethod
+    def _saving_session_relevant_before_cheap(
+        snapshot: Snapshot,
+        config: SimulationConfig,
+    ) -> bool:
+        """Return whether the battery must be protected before the next charge."""
+        if not config.saving_session_enabled or not snapshot.saving_session_joined:
+            return False
+        start = snapshot.saving_session_start
+        end = snapshot.saving_session_end
+        if start is None or end is None or end <= snapshot.timestamp:
+            return False
+        if start <= snapshot.timestamp < end:
+            return True
+        next_cheap = snapshot.next_offpeak_start
+        return next_cheap is None or start < next_cheap
+
+    @staticmethod
+    def _saving_session_duration_hours(snapshot: Snapshot) -> float | None:
+        start = snapshot.saving_session_start
+        end = snapshot.saving_session_end
+        if start is None or end is None or end <= start:
+            return None
+        return (end - start).total_seconds() / 3600
+
+    def _saving_session_expected_load_kw(
+        self,
+        snapshot: Snapshot,
+        records: list[Snapshot],
+    ) -> float:
+        recent = self._recent_average_load_kw(records, snapshot)
+        if recent is not None:
+            return recent
+        return _load_kw(snapshot) or 0.0
+
+    def _saving_session_export_target_kw(
+        self,
+        snapshot: Snapshot,
+        records: list[Snapshot],
+        config: SimulationConfig,
+    ) -> float:
+        """Return the maximum useful grid export while still covering home load."""
+        load = self._saving_session_expected_load_kw(snapshot, records)
+        total_output = min(config.inverter_limit_kw, config.max_discharge_kw)
+        return max(min(config.export_limit_kw, total_output - load), 0.0)
+
+    def _saving_session_extra_reserve_stored_kwh(
+        self,
+        snapshot: Snapshot,
+        records: list[Snapshot],
+        config: SimulationConfig,
+    ) -> float:
+        """Return stored energy reserved for high-value session export only."""
+        if not self._saving_session_relevant_before_cheap(snapshot, config):
+            return 0.0
+        duration = self._saving_session_duration_hours(snapshot)
+        if duration is None:
+            return 0.0
+        export_target = self._saving_session_export_target_kw(
+            snapshot,
+            records,
+            config,
+        )
+        return export_target * duration / max(config.discharge_efficiency, 0.01)
+
+    def _saving_session_total_reserve_stored_kwh(
+        self,
+        snapshot: Snapshot,
+        records: list[Snapshot],
+        config: SimulationConfig,
+    ) -> float | None:
+        if not config.saving_session_enabled or not snapshot.saving_session_joined:
+            return None
+        duration = self._saving_session_duration_hours(snapshot)
+        if duration is None:
+            return None
+        total_output = min(config.inverter_limit_kw, config.max_discharge_kw)
+        return total_output * duration / max(config.discharge_efficiency, 0.01)
+
+    @staticmethod
+    def _saving_session_baseline(
+        snapshot: Snapshot,
+    ) -> tuple[float | None, str]:
+        imported = snapshot.saving_session_import_baseline_total_kwh
+        exported = snapshot.saving_session_export_baseline_total_kwh
+        if imported is None:
+            return None, "unavailable"
+        if exported is None:
+            return max(imported, 0.0), "import_only_assumed_zero_export"
+        return imported - exported, "import_minus_export"
+
+    @staticmethod
+    def _saving_session_period_baseline(snapshot: Snapshot) -> float | None:
+        imported = snapshot.saving_session_import_baseline_period_kwh
+        exported = snapshot.saving_session_export_baseline_period_kwh
+        if imported is None:
+            return None
+        return imported - (exported or 0.0)
+
+    def _saving_session_interval_bonus_pence(
+        self,
+        snapshot: Snapshot,
+        hours: float,
+        simulated_import_kwh: float,
+        simulated_export_kwh: float,
+    ) -> float | None:
+        points = snapshot.saving_session_octopoints_per_kwh
+        if points is None:
+            return None
+        baseline_period = self._saving_session_period_baseline(snapshot)
+        baseline_interval = None
+        start = snapshot.saving_session_baseline_period_start
+        end = snapshot.saving_session_baseline_period_end
+        if baseline_period is not None and start and end and end > start:
+            period_hours = (end - start).total_seconds() / 3600
+            baseline_interval = baseline_period * hours / period_hours
+        if baseline_interval is None:
+            baseline_total, _ = self._saving_session_baseline(snapshot)
+            duration = self._saving_session_duration_hours(snapshot)
+            if baseline_total is None or duration is None or duration <= 0:
+                return None
+            baseline_interval = baseline_total * hours / duration
+        simulated_net = simulated_import_kwh - simulated_export_kwh
+        reduction = max(baseline_interval - simulated_net, 0.0)
+        return reduction * max(points, 0.0) / 8.0
+
+    def _empty_saving_session_plan(
+        self,
+        snapshot: Snapshot,
+        config: SimulationConfig,
+    ) -> dict[str, object]:
+        return self._saving_session_plan(snapshot, [snapshot], config)
+
+    def _saving_session_plan(
+        self,
+        snapshot: Snapshot,
+        records: list[Snapshot],
+        config: SimulationConfig,
+        normal_exportable_ac: float | None = None,
+        protected_exportable_ac: float | None = None,
+    ) -> dict[str, object]:
+        joined = bool(config.saving_session_enabled and snapshot.saving_session_joined)
+        active = self._saving_session_active(snapshot, config)
+        duration = self._saving_session_duration_hours(snapshot)
+        points = snapshot.saving_session_octopoints_per_kwh
+        bonus_rate = max(points, 0.0) / 8.0 if points is not None else None
+        baseline, baseline_source = self._saving_session_baseline(snapshot)
+        relevant = self._saving_session_relevant_before_cheap(snapshot, config)
+        export_target = (
+            self._saving_session_export_target_kw(snapshot, records, config)
+            if joined and duration is not None
+            else None
+        )
+        reserve = self._saving_session_total_reserve_stored_kwh(
+            snapshot,
+            records,
+            config,
+        )
+        estimated_export = (
+            export_target * duration
+            if export_target is not None and duration is not None
+            else None
+        )
+        rewardable = (
+            max(baseline + estimated_export, 0.0)
+            if baseline is not None and estimated_export is not None
+            else None
+        )
+        bonus = (
+            rewardable * bonus_rate
+            if rewardable is not None and bonus_rate is not None
+            else None
+        )
+        export_income = (
+            estimated_export * max(config.export_rate_pence, 0.0)
+            if estimated_export is not None
+            else None
+        )
+        total_income = (
+            export_income + bonus
+            if export_income is not None and bonus is not None
+            else None
+        )
+        reduced = bool(
+            relevant
+            and normal_exportable_ac is not None
+            and protected_exportable_ac is not None
+            and protected_exportable_ac + 0.001 < normal_exportable_ac
+        )
+        return {
+            "saving_session_joined": joined,
+            "saving_session_active": active,
+            "saving_session_start": snapshot.saving_session_start if joined else None,
+            "saving_session_end": snapshot.saving_session_end if joined else None,
+            "saving_session_duration_minutes": (
+                round(duration * 60, 1) if duration is not None and joined else None
+            ),
+            "saving_session_octopoints_per_kwh": points if joined else None,
+            "saving_session_bonus_rate_pence": (
+                round(bonus_rate, 4) if bonus_rate is not None and joined else None
+            ),
+            "saving_session_baseline_net_kwh": (
+                round(baseline, 3) if baseline is not None and joined else None
+            ),
+            "saving_session_baseline_source": (
+                baseline_source if joined else "unavailable"
+            ),
+            "saving_session_baseline_incomplete": (
+                snapshot.saving_session_baseline_incomplete if joined else None
+            ),
+            "saving_session_battery_reserve_kwh": (
+                round(reserve, 3) if reserve is not None else None
+            ),
+            "saving_session_export_target_kw": (
+                round(export_target, 3) if export_target is not None else None
+            ),
+            "estimated_saving_session_export_kwh": (
+                round(estimated_export, 3) if estimated_export is not None else None
+            ),
+            "estimated_saving_session_rewardable_reduction_kwh": (
+                round(rewardable, 3) if rewardable is not None else None
+            ),
+            "estimated_saving_session_bonus_pence": (
+                round(bonus, 2) if bonus is not None else None
+            ),
+            "estimated_saving_session_export_income_pence": (
+                round(export_income, 2) if export_income is not None else None
+            ),
+            "estimated_saving_session_total_income_pence": (
+                round(total_income, 2) if total_income is not None else None
+            ),
+            "battery_reserved_for_saving_session": relevant and reserve is not None,
+            "battery_export_reduced_for_saving_session": reduced,
+        }
+
+    def _current_saving_session_plan(
+        self,
+        snapshot: Snapshot,
+        records: list[Snapshot],
+        battery_kwh: float,
+        reserve_kwh: float,
+        capacity: float,
+        config: SimulationConfig,
+    ) -> dict[str, object]:
+        load = _load_kw(snapshot) or 0.0
+        solar = self._simulated_solar_power(snapshot, config)
+        useful_output = min(
+            config.inverter_limit_kw,
+            load + config.export_limit_kw,
+        )
+        solar_used = min(solar, useful_output)
+        available_ac = max(battery_kwh - reserve_kwh, 0.0) * config.discharge_efficiency
+        battery_output = min(
+            max(useful_output - solar_used, 0.0),
+            config.max_discharge_kw,
+            available_ac,
+        )
+        total_output = solar_used + battery_output
+        grid_import = max(load - total_output, 0.0)
+        grid_export = min(max(total_output - load, 0.0), config.export_limit_kw)
+        solar_to_home = min(load, solar_used)
+        battery_to_home = min(max(load - solar_to_home, 0.0), battery_output)
+        battery_export = max(battery_output - battery_to_home, 0.0)
+        base = self._saving_session_plan(snapshot, records, config)
+        return {
+            "house": round(load, 3),
+            "solar": round(solar_used, 3),
+            "grid_import": round(grid_import, 3),
+            "grid_export": round(grid_export, 3),
+            "battery": round(battery_output, 3),
+            "battery_to_home": round(battery_to_home, 3),
+            "battery_export": round(battery_export, 3),
+            "target_battery_export": round(battery_export, 3),
+            "exportable_battery": round(available_ac, 3),
+            "reserved_for_home": 0.0,
+            "hours_until_cheap": self._hours_until_next_cheap(snapshot),
+            "projected_soc_at_cheap": (
+                config.battery_reserve_percent
+                if self._hours_until_next_cheap(snapshot) is not None
+                else None
+            ),
+            "reserve_source": "saving_session_active",
+            "projected_grid_import": round(grid_import, 3),
+            "export_paused_for_home": False,
+            **base,
+        }
+
+    @staticmethod
     def _paced_export_target_kw(
         surplus_stored_kwh: float,
         remaining_hours: float | None,
@@ -586,10 +1046,21 @@ class SimulationEngine:
                 "reserve_source": "unavailable",
                 "projected_grid_import": None,
                 "export_paused_for_home": False,
+                **self._empty_saving_session_plan(snapshot, config),
             }
         solar = self._simulated_solar_power(snapshot, config)
         inverter_limit = max(config.inverter_limit_kw, 0.0)
         export_limit = min(max(config.export_limit_kw, 0.0), inverter_limit)
+
+        if self._saving_session_active(snapshot, config):
+            return self._current_saving_session_plan(
+                snapshot,
+                today,
+                battery_kwh,
+                reserve_kwh,
+                capacity,
+                config,
+            )
 
         if snapshot.cheap_period_confirmed:
             charge_kw = min(
@@ -613,6 +1084,7 @@ class SimulationEngine:
                 "reserve_source": "cheap_period",
                 "projected_grid_import": 0.0,
                 "export_paused_for_home": False,
+                **self._saving_session_plan(snapshot, today, config),
             }
 
         if config.strategy == "self_use":
@@ -651,7 +1123,17 @@ class SimulationEngine:
         )
         reserved_for_home = min(required_home_energy, available_ac)
         projected_grid_import = max(required_home_energy - available_ac, 0.0)
-        exportable_battery = max(available_ac - required_home_energy, 0.0)
+        session_extra_stored = self._saving_session_extra_reserve_stored_kwh(
+            snapshot,
+            today,
+            config,
+        )
+        session_extra_ac = session_extra_stored * config.discharge_efficiency
+        exportable_without_session = max(available_ac - required_home_energy, 0.0)
+        exportable_battery = max(
+            available_ac - required_home_energy - session_extra_ac,
+            0.0,
+        )
         surplus_stored = exportable_battery / max(
             config.discharge_efficiency,
             0.01,
@@ -671,15 +1153,15 @@ class SimulationEngine:
             max(inverter_limit - inverter_used, 0.0),
         )
 
-        projected_stored = battery_kwh - (reserved_for_home + exportable_battery) / max(
-            config.discharge_efficiency, 0.01
-        )
+        projected_stored = battery_kwh - (
+            reserved_for_home + exportable_battery + session_extra_ac
+        ) / max(config.discharge_efficiency, 0.01)
         projected_soc = 100 * max(projected_stored, reserve_kwh) / capacity
         export_paused = bool(
             config.battery_export_enabled
             and remaining_hours is not None
             and required_home_energy > 0
-            and exportable_battery <= 0.001
+            and exportable_without_session <= 0.001
         )
 
         return {
@@ -700,4 +1182,11 @@ class SimulationEngine:
             "reserve_source": reserve_source,
             "projected_grid_import": round(projected_grid_import, 3),
             "export_paused_for_home": export_paused,
+            **self._saving_session_plan(
+                snapshot,
+                today,
+                config,
+                normal_exportable_ac=exportable_without_session,
+                protected_exportable_ac=exportable_battery,
+            ),
         }

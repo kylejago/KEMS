@@ -1,37 +1,39 @@
-# Start here — KH7 paced-export simulation
+# Start here — Octoplus Power Down aware export
 
 This package is prepared for:
 
 ```text
-fix/home-reserve-fallback
+feature/octoplus-power-down-aware-export
 ```
 
-It is KEMS `0.6.0-alpha4`. It keeps the Fox ESS KH7 7kW paced-export model
-and fixes the home-energy reserve fallback so a missing learned forecast can
-never be treated as zero demand.
+It is KEMS `0.6.0-alpha5`. It keeps the Fox ESS KH7 7kW paced-export and home-reserve logic, then protects battery energy for joined Octoplus Power Down sessions.
 
 ## Preserved and reset data
 
-- Existing alpha2 observation history and learning data are preserved.
-- Source mappings and observed electricity/gas data are preserved.
-- The simulated financial ledger is reset once because alpha3 could export
-  battery energy that was still needed by the home when its forecast was missing.
-- The current day is recalculated immediately using the new KH7 paced-export
-  model.
+- Existing observation history, learning data, source mappings, and observed electricity/gas totals are preserved.
+- The simulated financial ledger resets once because alpha5 adds a new higher-value session strategy and bonus calculation.
+- The current day is recalculated immediately using the Power Down aware model.
+
+## BottlecapDave prerequisites
+
+1. Keep BottlecapDave's auto-enrol blueprint enabled so sessions are added to `joined_events`.
+2. KEMS discovers both `event.octopus_energy_*_octoplus_power_down_events` and `event.octopus_energy_*_octoplus_saving_session_events`.
+3. For estimated bonus values, enable the disabled-by-default Power Down import baseline sensor. Enable its export variant too when available.
+4. KEMS remains read-only and does not join events or control the inverter.
 
 ## Upload with GitHub Desktop
 
 1. Switch to `develop` and pull the latest changes.
-2. Create `fix/home-reserve-fallback`.
+2. Create `feature/octoplus-power-down-aware-export`.
 3. Extract this ZIP elsewhere.
-4. Copy everything inside its top-level folder into the repository root,
-   replacing existing files but preserving the hidden `.git` directory.
+4. Copy everything inside its top-level folder into the repository root, replacing existing files but preserving the hidden `.git` directory.
 5. Open the repository in VS Code.
 
 ## Local validation
 
 ```powershell
 .\.venv\Scripts\Activate.ps1
+python -m pip install -r requirements-dev.txt
 python -m black .
 python -m ruff check . --fix
 python -m pytest
@@ -41,21 +43,19 @@ python -m pre_commit run --all-files
 ## Commit
 
 ```text
-fix: protect home reserve when learning forecast is unavailable
+feat: add Power Down aware battery export planning
 ```
 
 ## Home Assistant update
 
-A full uninstall is not required. After merging into `develop`:
+After merging into `develop`, install the exact full `develop` commit SHA with `update.install`, restart Home Assistant, and keep the KEMS config entry.
 
-1. Install the exact new `develop` commit SHA with `update.install`.
-2. Restart Home Assistant.
-3. KEMS keeps the 7kW limits, fixed 12p export, and paced-export strategy.
-4. Confirm `sensor.kems_simulation_strategy` reports `paced_export`.
-5. Confirm `sensor.kems_home_reserve_forecast_source` reports `learned_profile`,
-   `recent_average`, or `current_load`.
-6. When the remaining battery is needed by the house, confirm the target and
-   actual battery-export power both fall to `0.0kW` and
-   `binary_sensor.kems_battery_export_paused_for_home_reserve` turns on.
-7. Replace or add the dashboard from
-   `dashboards/kems_actual_vs_simulated.yaml`.
+Confirm:
+
+- `sensor.kems_simulation_strategy` is `paced_export`;
+- `sensor.kems_simulation_export_rate` is `12.0`;
+- `sensor.kems_source_validation` is `OK`;
+- `binary_sensor.kems_saving_session_joined` turns on for a joined event;
+- `binary_sensor.kems_battery_reserved_for_saving_session` turns on when the event is before the next cheap recharge;
+- ordinary battery export reduces as needed;
+- during the event, battery-to-home plus battery export respects the 7kW limit.

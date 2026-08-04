@@ -27,6 +27,20 @@ class Snapshot:
     next_offpeak_start: datetime | None = None
     offpeak_end: datetime | None = None
 
+    saving_session_joined: bool = False
+    saving_session_active: bool = False
+    saving_session_id: str | None = None
+    saving_session_start: datetime | None = None
+    saving_session_end: datetime | None = None
+    saving_session_octopoints_per_kwh: float | None = None
+    saving_session_import_baseline_period_kwh: float | None = None
+    saving_session_export_baseline_period_kwh: float | None = None
+    saving_session_import_baseline_total_kwh: float | None = None
+    saving_session_export_baseline_total_kwh: float | None = None
+    saving_session_baseline_period_start: datetime | None = None
+    saving_session_baseline_period_end: datetime | None = None
+    saving_session_baseline_incomplete: bool | None = None
+
     gas_current_rate: float | None = None
     gas_standing_charge: float | None = None
     gas_meter_total_kwh: float | None = None
@@ -59,7 +73,14 @@ class Snapshot:
         """Return a JSON-serialisable representation."""
         data = asdict(self)
         data["timestamp"] = self.timestamp.isoformat()
-        for key in ("next_offpeak_start", "offpeak_end"):
+        for key in (
+            "next_offpeak_start",
+            "offpeak_end",
+            "saving_session_start",
+            "saving_session_end",
+            "saving_session_baseline_period_start",
+            "saving_session_baseline_period_end",
+        ):
             value = data[key]
             if isinstance(value, datetime):
                 data[key] = value.isoformat()
@@ -69,7 +90,15 @@ class Snapshot:
     def from_dict(cls, data: dict[str, Any]) -> Snapshot:
         """Restore a snapshot from JSON-compatible data."""
         values = dict(data)
-        for key in ("timestamp", "next_offpeak_start", "offpeak_end"):
+        for key in (
+            "timestamp",
+            "next_offpeak_start",
+            "offpeak_end",
+            "saving_session_start",
+            "saving_session_end",
+            "saving_session_baseline_period_start",
+            "saving_session_baseline_period_end",
+        ):
             value = values.get(key)
             if isinstance(value, str):
                 values[key] = datetime.fromisoformat(value)
@@ -154,6 +183,7 @@ class SimulationConfig:
     proposal_solar_factor: float = 1.0
     battery_power_positive_is_discharge: bool = True
     strategy: str = "paced_export"
+    saving_session_enabled: bool = True
 
 
 @dataclass(frozen=True, slots=True)
@@ -205,6 +235,26 @@ class SimulationState:
     home_reserve_forecast_source: str = "unavailable"
     projected_grid_import_before_cheap_kwh: float | None = None
     battery_export_paused_for_home_reserve: bool = False
+    saving_session_joined: bool = False
+    saving_session_active: bool = False
+    saving_session_start: datetime | None = None
+    saving_session_end: datetime | None = None
+    saving_session_duration_minutes: float | None = None
+    saving_session_octopoints_per_kwh: float | None = None
+    saving_session_bonus_rate_pence: float | None = None
+    saving_session_baseline_net_kwh: float | None = None
+    saving_session_baseline_source: str = "unavailable"
+    saving_session_baseline_incomplete: bool | None = None
+    saving_session_battery_reserve_kwh: float | None = None
+    saving_session_export_target_kw: float | None = None
+    estimated_saving_session_export_kwh: float | None = None
+    estimated_saving_session_rewardable_reduction_kwh: float | None = None
+    estimated_saving_session_bonus_pence: float | None = None
+    estimated_saving_session_export_income_pence: float | None = None
+    estimated_saving_session_total_income_pence: float | None = None
+    simulated_saving_session_bonus_pence: float | None = None
+    battery_reserved_for_saving_session: bool = False
+    battery_export_reduced_for_saving_session: bool = False
     effective_export_rate_pence: float | None = None
     inverter_limit_kw: float | None = None
     export_limit_kw: float | None = None
