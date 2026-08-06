@@ -1,4 +1,4 @@
-# Entity inventory — v0.7.0-alpha2
+# Entity inventory — v0.7.0-alpha3
 
 KEMS creates source-mirror entities only when the matching source is configured. Derived analysis and proposal-simulation entities are created automatically and may be `unknown` until enough observations exist.
 
@@ -67,6 +67,13 @@ KEMS creates source-mirror entities only when the matching source is configured.
 - simulated solar generation and curtailment
 - simulated battery charged, delivered to home, and exported
 - avoided day-rate grid import
+
+## Native period summaries
+
+- Today, Week, Month, Year, and All-time summary sensors
+- actual house, EV, grid, solar, battery, gas, import-cost, export-income, and system-value attributes
+- separately retained simulated import, export, solar, battery, avoided-import, cost, income, and system-value attributes
+- complete/incomplete day counts and explicit data-completeness status
 
 ## Whole-home totals
 

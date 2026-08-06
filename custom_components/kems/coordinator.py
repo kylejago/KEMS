@@ -27,6 +27,7 @@ from .kems_core import (
     assess_quality,
 )
 from .lifetime import LifetimeLedgerRecorder
+from .power_down import PowerDownHistoryRecorder
 from .providers.entity_map import KEMSEntities
 from .settings import KEMSSettings
 
@@ -63,6 +64,7 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
         self._whole_home = WholeHomeEngine()
         self._control = ControlEngine()
         self._lifetime = LifetimeLedgerRecorder(hass, entry.entry_id)
+        self._power_down = PowerDownHistoryRecorder(hass, entry.entry_id)
         self._roi = ROIEngine()
 
         super().__init__(
@@ -78,6 +80,7 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
         """Load retained learning history and the permanent lifetime ledger."""
         await self._history.async_load()
         await self._lifetime.async_load()
+        await self._power_down.async_load()
         await self._lifetime.async_bootstrap(
             self._history.records,
             self._simulation,
@@ -116,6 +119,7 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                 self.settings.roi,
             )
             lifetime = LifetimeLedger.from_dict(stored_lifetime.to_dict())
+            periods = self._lifetime.period_summaries(now)
             roi = self._roi.evaluate(
                 lifetime,
                 simulation,
@@ -131,6 +135,12 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                 simulation,
                 now,
                 self.settings.control,
+            )
+            last_power_down = await self._power_down.async_update(
+                snapshot,
+                simulation,
+                control,
+                now,
             )
             phase = self._phase(
                 learned.ready,
@@ -148,6 +158,8 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                 roi=roi,
                 quality=quality,
                 control=control,
+                last_power_down=last_power_down,
+                periods=periods,
                 history_samples=len(records),
                 phase=phase,
             )
@@ -158,6 +170,7 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
         """Flush learning history before unloading."""
         await self._history.async_save()
         await self._lifetime.async_save()
+        await self._power_down.async_save()
 
     @staticmethod
     def _phase(

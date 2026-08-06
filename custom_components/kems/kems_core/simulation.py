@@ -199,10 +199,17 @@ class SimulationEngine:
                 )
             elif current.cheap_period_confirmed:
                 house_grid_kwh = actual_house_kwh
+                site_charge_headroom_kwh = float("inf")
+                if config.site_import_limit_kw is not None:
+                    site_charge_headroom_kwh = max(
+                        config.site_import_limit_kw * hours - house_grid_kwh,
+                        0.0,
+                    )
                 charge_input_kwh = min(
-                    min(config.max_charge_kw, config.inverter_limit_kw) * hours,
+                    max(config.max_charge_kw, 0.0) * hours,
                     max(capacity - battery_kwh, 0.0)
                     / max(config.charge_efficiency, 0.01),
+                    site_charge_headroom_kwh,
                 )
                 battery_kwh += charge_input_kwh * config.charge_efficiency
                 battery_charge += charge_input_kwh * config.charge_efficiency
@@ -377,9 +384,13 @@ class SimulationEngine:
             current_simulated_grid_import_kw=current_plan["grid_import"],
             current_simulated_grid_export_kw=current_plan["grid_export"],
             current_simulated_battery_power_kw=current_plan["battery"],
+            current_simulated_battery_charge_power_kw=current_plan["battery_charge"],
             current_simulated_battery_to_home_power_kw=current_plan["battery_to_home"],
             current_simulated_battery_export_power_kw=current_plan["battery_export"],
             target_battery_export_power_kw=current_plan["target_battery_export"],
+            current_simulated_total_kh7_output_kw=current_plan["total_kh7_output"],
+            current_simulated_grid_bypass_power_kw=current_plan["grid_bypass"],
+            current_simulated_total_site_import_kw=current_plan["total_site_import"],
             exportable_battery_energy_kwh=current_plan["exportable_battery"],
             reserved_for_home_kwh=current_plan["reserved_for_home"],
             hours_until_next_cheap_period=current_plan["hours_until_cheap"],
@@ -449,6 +460,12 @@ class SimulationEngine:
             effective_export_rate_pence=round(effective_export_rate, 4),
             inverter_limit_kw=config.inverter_limit_kw,
             export_limit_kw=min(config.export_limit_kw, config.inverter_limit_kw),
+            battery_charge_limit_kw=config.max_charge_kw,
+            battery_discharge_limit_kw=config.max_discharge_kw,
+            eps_output_limit_kw=config.eps_output_limit_kw,
+            site_import_limit_kw=config.site_import_limit_kw,
+            site_import_headroom_kw=current_plan["site_import_headroom"],
+            site_import_limit_exceeded=bool(current_plan["site_import_exceeded"]),
             strategy=config.strategy,
             proposal_solar_active=config.proposal_solar_enabled
             and all(item.solar_power_kw is None for item in today),
@@ -470,6 +487,13 @@ class SimulationEngine:
             samples=1,
             current_simulated_house_load_kw=_load_kw(snapshot),
             current_simulated_solar_power_kw=solar,
+            current_simulated_battery_charge_power_kw=0.0,
+            current_simulated_total_kh7_output_kw=round(
+                min(solar, config.inverter_limit_kw),
+                3,
+            ),
+            current_simulated_grid_bypass_power_kw=_load_kw(snapshot),
+            current_simulated_total_site_import_kw=_load_kw(snapshot),
             saving_session_joined=bool(session["saving_session_joined"]),
             saving_session_active=bool(session["saving_session_active"]),
             saving_session_start=session["saving_session_start"],
@@ -514,6 +538,19 @@ class SimulationEngine:
             effective_export_rate_pence=config.export_rate_pence,
             inverter_limit_kw=config.inverter_limit_kw,
             export_limit_kw=min(config.export_limit_kw, config.inverter_limit_kw),
+            battery_charge_limit_kw=config.max_charge_kw,
+            battery_discharge_limit_kw=config.max_discharge_kw,
+            eps_output_limit_kw=config.eps_output_limit_kw,
+            site_import_limit_kw=config.site_import_limit_kw,
+            site_import_headroom_kw=(
+                None
+                if config.site_import_limit_kw is None or _load_kw(snapshot) is None
+                else round(config.site_import_limit_kw - (_load_kw(snapshot) or 0.0), 3)
+            ),
+            site_import_limit_exceeded=bool(
+                config.site_import_limit_kw is not None
+                and (_load_kw(snapshot) or 0.0) > config.site_import_limit_kw
+            ),
             strategy=config.strategy,
             proposal_solar_active=config.proposal_solar_enabled
             and snapshot.solar_power_kw is None,
@@ -759,7 +796,11 @@ class SimulationEngine:
     ) -> float:
         """Return the maximum useful grid export while still covering home load."""
         load = self._saving_session_expected_load_kw(snapshot, records)
-        total_output = min(config.inverter_limit_kw, config.max_discharge_kw)
+        solar = self._simulated_solar_power(snapshot, config)
+        total_output = min(
+            max(config.inverter_limit_kw, 0.0),
+            max(solar, 0.0) + max(config.max_discharge_kw, 0.0),
+        )
         return max(min(config.export_limit_kw, total_output - load), 0.0)
 
     def _saving_session_extra_reserve_stored_kwh(
@@ -986,9 +1027,15 @@ class SimulationEngine:
             "grid_import": round(grid_import, 3),
             "grid_export": round(grid_export, 3),
             "battery": round(battery_output, 3),
+            "battery_charge": 0.0,
             "battery_to_home": round(battery_to_home, 3),
             "battery_export": round(battery_export, 3),
             "target_battery_export": round(battery_export, 3),
+            "total_kh7_output": round(total_output, 3),
+            "grid_bypass": round(grid_import, 3),
+            "total_site_import": round(grid_import, 3),
+            "site_import_headroom": self._site_import_status(grid_import, config)[0],
+            "site_import_exceeded": self._site_import_status(grid_import, config)[1],
             "exportable_battery": round(available_ac, 3),
             "reserved_for_home": 0.0,
             "hours_until_cheap": self._hours_until_next_cheap(snapshot),
@@ -1002,6 +1049,17 @@ class SimulationEngine:
             "export_paused_for_home": False,
             **base,
         }
+
+    @staticmethod
+    def _site_import_status(
+        total_site_import_kw: float,
+        config: SimulationConfig,
+    ) -> tuple[float | None, bool]:
+        """Return configured site-import headroom and limit status."""
+        if config.site_import_limit_kw is None:
+            return None, False
+        headroom = config.site_import_limit_kw - max(total_site_import_kw, 0.0)
+        return round(headroom, 3), headroom < -1e-6
 
     @staticmethod
     def _paced_export_target_kw(
@@ -1036,9 +1094,15 @@ class SimulationEngine:
                 "grid_import": None,
                 "grid_export": None,
                 "battery": None,
+                "battery_charge": None,
                 "battery_to_home": None,
                 "battery_export": None,
                 "target_battery_export": None,
+                "total_kh7_output": None,
+                "grid_bypass": None,
+                "total_site_import": None,
+                "site_import_headroom": None,
+                "site_import_exceeded": False,
                 "exportable_battery": None,
                 "reserved_for_home": None,
                 "hours_until_cheap": None,
@@ -1063,20 +1127,37 @@ class SimulationEngine:
             )
 
         if snapshot.cheap_period_confirmed:
+            site_headroom = (
+                float("inf")
+                if config.site_import_limit_kw is None
+                else max(config.site_import_limit_kw - load, 0.0)
+            )
             charge_kw = min(
                 config.max_charge_kw,
-                inverter_limit,
                 max(capacity - battery_kwh, 0.0) / max(config.charge_efficiency, 0.01),
+                site_headroom,
             )
+            total_site_import = load + charge_kw
+            site_import_headroom, site_import_exceeded = self._site_import_status(
+                total_site_import,
+                config,
+            )
+            solar_output = min(solar, inverter_limit, export_limit)
             return {
                 "house": round(load, 3),
-                "solar": round(solar, 3),
-                "grid_import": round(load + charge_kw, 3),
-                "grid_export": round(min(solar, export_limit), 3),
+                "solar": round(solar_output, 3),
+                "grid_import": round(total_site_import, 3),
+                "grid_export": round(solar_output, 3),
                 "battery": round(-charge_kw * config.charge_efficiency, 3),
+                "battery_charge": round(charge_kw, 3),
                 "battery_to_home": 0.0,
                 "battery_export": 0.0,
                 "target_battery_export": 0.0,
+                "total_kh7_output": round(solar_output, 3),
+                "grid_bypass": round(load, 3),
+                "total_site_import": round(total_site_import, 3),
+                "site_import_headroom": site_import_headroom,
+                "site_import_exceeded": site_import_exceeded,
                 "exportable_battery": 0.0,
                 "reserved_for_home": 0.0,
                 "hours_until_cheap": 0.0,
@@ -1170,9 +1251,15 @@ class SimulationEngine:
             "grid_import": round(grid_import, 3),
             "grid_export": round(solar_export + battery_export_kw, 3),
             "battery": round(home_from_battery + battery_export_kw, 3),
+            "battery_charge": 0.0,
             "battery_to_home": round(home_from_battery, 3),
             "battery_export": round(battery_export_kw, 3),
             "target_battery_export": round(target_export_kw, 3),
+            "total_kh7_output": round(inverter_used + battery_export_kw, 3),
+            "grid_bypass": round(grid_import, 3),
+            "total_site_import": round(grid_import, 3),
+            "site_import_headroom": self._site_import_status(grid_import, config)[0],
+            "site_import_exceeded": self._site_import_status(grid_import, config)[1],
             "exportable_battery": round(exportable_battery, 3),
             "reserved_for_home": round(reserved_for_home, 3),
             "hours_until_cheap": (

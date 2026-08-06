@@ -275,6 +275,42 @@ BINARY_SENSORS: tuple[KEMSBinarySensorEntityDescription, ...] = (
         icon="mdi:transmission-tower-export",
         is_on_fn=lambda data: data.control.desired_grid_export_allowed,
     ),
+    KEMSBinarySensorEntityDescription(
+        key="site_import_limit_exceeded",
+        name="Site import limit exceeded",
+        icon="mdi:transmission-tower-off",
+        is_on_fn=lambda data: data.control.site_import_limit_exceeded,
+    ),
+    KEMSBinarySensorEntityDescription(
+        key="accumulator_healthy",
+        name="Accumulator healthy",
+        icon="mdi:database-check-outline",
+        is_on_fn=lambda data: data.lifetime.accumulator_status == "healthy",
+    ),
+    KEMSBinarySensorEntityDescription(
+        key="historical_repair_required",
+        name="Historical repair required",
+        icon="mdi:database-alert-outline",
+        is_on_fn=lambda data: data.lifetime.historical_repair_required,
+    ),
+    KEMSBinarySensorEntityDescription(
+        key="last_power_down_available",
+        name="Last Power Down result available",
+        icon="mdi:history",
+        is_on_fn=lambda data: data.last_power_down.available,
+    ),
+    KEMSBinarySensorEntityDescription(
+        key="last_power_down_completed_successfully",
+        name="Last Power Down completed successfully",
+        icon="mdi:check-decagram-outline",
+        is_on_fn=lambda data: data.last_power_down.completed_successfully,
+    ),
+    KEMSBinarySensorEntityDescription(
+        key="last_power_down_ev_blocked",
+        name="Last Power Down EV successfully blocked",
+        icon="mdi:ev-station-off",
+        is_on_fn=lambda data: data.last_power_down.ev_successfully_blocked,
+    ),
 )
 
 

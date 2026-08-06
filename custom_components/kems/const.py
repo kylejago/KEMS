@@ -4,13 +4,13 @@ from __future__ import annotations
 
 DOMAIN = "kems"
 NAME = "KEMS"
-VERSION = "0.7.0-alpha2"
+VERSION = "0.7.0-alpha3"
 
 DEFAULT_SCAN_INTERVAL_SECONDS = 60
 DEFAULT_HISTORY_DAYS = 90
 DEFAULT_RECORD_INTERVAL_SECONDS = 300
 STORAGE_NAMESPACE = "clean_v6_alpha2"
-SIMULATION_LEDGER_VERSION = 4
+SIMULATION_LEDGER_VERSION = 5
 
 CONF_CURRENT_IMPORT_RATE = "current_import_rate"
 CONF_NEXT_IMPORT_RATE = "next_import_rate"
@@ -91,6 +91,7 @@ CONF_DISCHARGE_EFFICIENCY = "discharge_efficiency"
 CONF_EXPORT_RATE = "export_rate_pence"
 CONF_INVERTER_LIMIT = "inverter_ac_limit_kw"
 CONF_EXPORT_LIMIT = "export_limit_kw"
+CONF_SITE_IMPORT_LIMIT = "site_import_limit_kw"
 CONF_BATTERY_EXPORT_ENABLED = "battery_export_enabled"
 CONF_PROPOSAL_SOLAR_ENABLED = "proposal_solar_enabled"
 CONF_PROPOSAL_SOLAR_FACTOR = "proposal_solar_factor"
@@ -135,6 +136,7 @@ DEFAULT_OPTIONS = {
     CONF_EXPORT_RATE: 12.0,
     CONF_INVERTER_LIMIT: 7.0,
     CONF_EXPORT_LIMIT: 7.0,
+    CONF_SITE_IMPORT_LIMIT: 0.0,
     CONF_BATTERY_EXPORT_ENABLED: True,
     CONF_PROPOSAL_SOLAR_ENABLED: True,
     CONF_PROPOSAL_SOLAR_FACTOR: 1.0,

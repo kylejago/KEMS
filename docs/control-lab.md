@@ -1,13 +1,13 @@
 # KEMS pre-installation control lab
 
-KEMS 0.7.0-alpha2 calculates the exact desired behaviour of the proposed KH7 system without sending real inverter commands.
+KEMS 0.7.0-alpha3 calculates the exact desired behaviour of the proposed KH7 system without sending real inverter commands.
 
 ## Modes
 
 - `observe`: monitoring only; no desired commands.
 - `simulate`: desired commands are calculated against the virtual KH7 model.
 - `shadow`: intended for installation day; real readings are used but commands are not sent.
-- `control`: visible in the options flow, but real commands remain hard-blocked in alpha2.
+- `control`: visible in the options flow, but real commands remain hard-blocked in alpha3.
 
 ## Virtual scenarios
 

@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.7.0-alpha3 — KH7 topology, retained Power Down results, and accumulator repair
+
+- Separated the 7kW battery charge/discharge limits, 7kW combined KH7 AC output limit, 7kW island/EPS limit, and an independently configurable whole-site import limit.
+- Modelled grid bypass correctly so a 2kW home plus 7kW battery charge is a valid 9kW site import when the installer-confirmed site limit permits it.
+- Enforced `solar AC + battery AC <= 7kW` during paced export, Power Down, high-solar operation, island operation, and restoration planning.
+- Restricted EPS utilisation and warning thresholds to islanded operation; grid-connected demand now uses bypass/site-import diagnostics instead.
+- Added battery-charge, total KH7 output, grid-bypass, total-site-import, limit, and headroom entities for clearer dashboards.
+- Persisted a separate last-completed Power Down result after Octopus removes the live event, including SOC, planned energy, maximum output, reward estimates, EV blocking, and completion status.
+- Repaired the lifetime accumulator so observed electricity, gas, import/export, and bill evidence accumulate before commissioning while actual system-created value remains commissioning-gated.
+- Added native Today, Week, Month, Year, and All-time summaries with separate actual/simulated totals and explicit incomplete-day reporting.
+- Prevented a mid-day commissioning change from claiming modelled value created before the physical system was commissioned.
+- Added an alpha2 ledger migration that rebuilds recoverable observed totals from retained history without double-counting the temporary single-import-source mapping.
+- Added accumulator health, rollover, historical-repair, site-limit, KH7-headroom, EPS-status, and retained Power Down diagnostics.
+- Expanded the deterministic safety suite from 12 to 15 checks and added topology, site-import, high-solar, and island-cap regression tests.
+- Real FoxESS writes remain hard-blocked: backend available, commands permitted, system commissioned, and control enable all remain off by default.
+
 ## 0.7.0-alpha2 — validated scenario fixes
 
 - Blocked EV charging during active Power Down sessions so EV demand cannot reduce the rewardable net reduction.

@@ -772,3 +772,141 @@ def test_power_down_bonus_is_unknown_without_baseline() -> None:
     assert plan["estimated_saving_session_rewardable_reduction_kwh"] is None
     assert plan["estimated_saving_session_bonus_pence"] is None
     assert plan["estimated_saving_session_total_income_pence"] is None
+
+
+def test_cheap_period_site_import_includes_house_bypass_and_battery_charge() -> None:
+    """A 2kW home plus 7kW battery charge is a valid 9kW site import."""
+    now = datetime(2026, 8, 6, 0, 0, tzinfo=UTC)
+    snapshot = Snapshot(
+        timestamp=now,
+        current_import_rate=3.4933,
+        off_peak=True,
+        house_load_kw=2.0,
+        grid_import_kw=2.0,
+    )
+    config = SimulationConfig(
+        battery_capacity_kwh=56.42,
+        battery_initial_percent=10.0,
+        battery_reserve_percent=10.0,
+        max_charge_kw=7.0,
+        inverter_limit_kw=7.0,
+        proposal_solar_enabled=False,
+        site_import_limit_kw=None,
+    )
+
+    plan = SimulationEngine()._current_plan(
+        snapshot,
+        [snapshot],
+        battery_kwh=5.642,
+        reserve_kwh=5.642,
+        capacity=56.42,
+        config=config,
+        forecast_energy_until_offpeak_kwh=None,
+    )
+
+    assert plan["battery_charge"] == 7.0
+    assert plan["grid_bypass"] == 2.0
+    assert plan["total_site_import"] == 9.0
+    assert plan["grid_import"] == 9.0
+    assert plan["total_kh7_output"] == 0.0
+
+
+def test_site_import_limit_caps_cheap_battery_charge_not_house_bypass() -> None:
+    """The configurable site limit should reduce only the flexible charge load."""
+    now = datetime(2026, 8, 6, 0, 0, tzinfo=UTC)
+    snapshot = Snapshot(
+        timestamp=now,
+        current_import_rate=3.4933,
+        off_peak=True,
+        house_load_kw=2.0,
+        grid_import_kw=2.0,
+    )
+    config = SimulationConfig(
+        battery_capacity_kwh=56.42,
+        battery_initial_percent=10.0,
+        battery_reserve_percent=10.0,
+        max_charge_kw=7.0,
+        inverter_limit_kw=7.0,
+        proposal_solar_enabled=False,
+        site_import_limit_kw=8.0,
+    )
+
+    plan = SimulationEngine()._current_plan(
+        snapshot,
+        [snapshot],
+        battery_kwh=5.642,
+        reserve_kwh=5.642,
+        capacity=56.42,
+        config=config,
+        forecast_energy_until_offpeak_kwh=None,
+    )
+
+    assert plan["battery_charge"] == 6.0
+    assert plan["grid_bypass"] == 2.0
+    assert plan["total_site_import"] == 8.0
+    assert plan["site_import_headroom"] == 0.0
+    assert plan["site_import_exceeded"] is False
+
+
+def test_power_down_high_solar_exposes_shared_kh7_output() -> None:
+    """Power Down solar and battery output should reconcile to the 7kW cap."""
+    now = datetime(2026, 6, 1, 16, 0, tzinfo=UTC)
+    snapshot = Snapshot(
+        timestamp=now,
+        current_import_rate=28.3,
+        house_load_kw=2.0,
+        grid_import_kw=2.0,
+        solar_power_kw=3.0,
+        saving_session_joined=True,
+        saving_session_active=True,
+        saving_session_start=now,
+        saving_session_end=now + timedelta(hours=1),
+    )
+    config = SimulationConfig(
+        battery_capacity_kwh=20.0,
+        battery_reserve_percent=10.0,
+        max_discharge_kw=7.0,
+        inverter_limit_kw=7.0,
+        export_limit_kw=7.0,
+        proposal_solar_enabled=False,
+    )
+
+    plan = SimulationEngine()._current_plan(
+        snapshot,
+        [snapshot],
+        battery_kwh=20.0,
+        reserve_kwh=2.0,
+        capacity=20.0,
+        config=config,
+        forecast_energy_until_offpeak_kwh=None,
+    )
+
+    assert plan["battery_to_home"] == 0.0 or plan["battery_to_home"] == 0
+    assert plan["battery_export"] == 4.0
+    assert plan["grid_export"] == 5.0
+    assert plan["total_kh7_output"] == 7.0
+
+
+def test_simulation_exposes_eps_limit_separately_from_grid_output_limit() -> None:
+    """The dashboard should not infer EPS capacity from the site-import path."""
+    now = datetime(2026, 8, 6, 12, 0, tzinfo=UTC)
+    snapshot = Snapshot(
+        timestamp=now,
+        current_import_rate=28.3,
+        house_load_kw=1.0,
+        grid_import_kw=1.0,
+    )
+
+    result = SimulationEngine().simulate_today(
+        [snapshot],
+        now,
+        SimulationConfig(
+            inverter_limit_kw=7.0,
+            eps_output_limit_kw=6.5,
+            site_import_limit_kw=12.0,
+        ),
+    )
+
+    assert result.inverter_limit_kw == 7.0
+    assert result.eps_output_limit_kw == 6.5
+    assert result.site_import_limit_kw == 12.0
