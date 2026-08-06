@@ -23,15 +23,16 @@ def test_manifest_stays_a_hub() -> None:
     source = MANIFEST.read_text(encoding="utf-8")
 
     assert '"integration_type": "hub"' in source
-    assert '"version": "0.7.0-alpha2"' in source
+    assert '"version": "0.7.0-alpha3"' in source
 
 
 def test_options_flow_includes_kh7_inverter_limit_and_paced_strategy() -> None:
     """The settings form must expose the physical and strategy assumptions."""
     source = CONFIG_FLOW.read_text(encoding="utf-8")
     assert "CONF_INVERTER_LIMIT" in source
+    assert "CONF_SITE_IMPORT_LIMIT" in source
     assert '"paced_export"' in source
-    assert "VERSION = 10" in source
+    assert "VERSION = 11" in source
 
 
 def test_options_flow_includes_power_down_sources_and_toggle() -> None:
@@ -61,3 +62,16 @@ def test_options_flow_includes_control_lab_and_island_safety_settings() -> None:
         '"grid_outage_high_load"',
     ):
         assert token in source
+
+
+def test_site_import_limit_is_an_option_not_a_source_mapping() -> None:
+    """The fuse/gateway limit must not be counted as a discovered entity."""
+    source = CONFIG_FLOW.read_text(encoding="utf-8")
+    provider_block = source[
+        source.index("provider_counts = {") : source.index(
+            "return self.async_show_form",
+            source.index("provider_counts = {"),
+        )
+    ]
+
+    assert "CONF_SITE_IMPORT_LIMIT" not in provider_block

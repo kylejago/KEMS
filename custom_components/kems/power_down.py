@@ -1,0 +1,179 @@
+"""Persistent completed Power Down event history for KEMS."""
+
+from __future__ import annotations
+
+from datetime import datetime
+from typing import Any
+
+from homeassistant.core import HomeAssistant
+from homeassistant.helpers.storage import Store
+
+from .const import DOMAIN, STORAGE_NAMESPACE
+from .kems_core import ControlState, PowerDownResult, SimulationState, Snapshot
+
+STORAGE_VERSION = 1
+
+
+class PowerDownHistoryRecorder:
+    """Retain the last completed event after Octopus removes the live entity."""
+
+    def __init__(self, hass: HomeAssistant, entry_id: str) -> None:
+        self._store: Store[dict[str, Any]] = Store(
+            hass,
+            STORAGE_VERSION,
+            f"{DOMAIN}.{entry_id}.{STORAGE_NAMESPACE}.power_down",
+        )
+        self._last = PowerDownResult()
+        self._pending: dict[str, Any] | None = None
+
+    @property
+    def last_result(self) -> PowerDownResult:
+        """Return the retained completed event."""
+        return self._last
+
+    async def async_load(self) -> None:
+        """Restore the retained result and any in-progress session."""
+        data = await self._store.async_load()
+        if not data:
+            return
+        self._last = PowerDownResult.from_dict(data.get("last_result", {}))
+        pending = data.get("pending")
+        if isinstance(pending, dict):
+            self._pending = dict(pending)
+
+    async def async_update(
+        self,
+        snapshot: Snapshot,
+        simulation: SimulationState,
+        control: ControlState,
+        now: datetime,
+    ) -> PowerDownResult:
+        """Capture an active event and finalise it exactly once after its end."""
+        session_start = simulation.saving_session_start or snapshot.saving_session_start
+        session_end = simulation.saving_session_end or snapshot.saving_session_end
+        session_id = snapshot.saving_session_id or (
+            session_start.isoformat() if session_start is not None else None
+        )
+        session_known = bool(
+            session_id
+            and session_start is not None
+            and session_end is not None
+            and (snapshot.saving_session_joined or simulation.saving_session_joined)
+            and (
+                now >= session_start
+                or snapshot.saving_session_active
+                or simulation.saving_session_active
+            )
+        )
+        already_completed = bool(
+            self._last.available and self._last.session_id == session_id
+        )
+
+        if session_known and not already_completed:
+            if self._pending is None or self._pending.get("session_id") != session_id:
+                duration_hours = max(
+                    (session_end - session_start).total_seconds() / 3600,
+                    0.0,
+                )
+                self._pending = {
+                    "session_id": session_id,
+                    "session_start": session_start.isoformat(),
+                    "session_end": session_end.isoformat(),
+                    "starting_simulated_soc_percent": simulation.simulated_battery_soc,
+                    "finishing_simulated_soc_percent": simulation.simulated_battery_soc,
+                    "planned_battery_to_home_kwh": round(
+                        control.desired_battery_to_home_power_kw * duration_hours,
+                        3,
+                    ),
+                    "planned_export_kwh": (
+                        simulation.estimated_saving_session_export_kwh
+                    ),
+                    "maximum_inverter_output_kw": control.total_kh7_ac_output_kw,
+                    "rewardable_reduction_kwh": (
+                        simulation.estimated_saving_session_rewardable_reduction_kwh
+                    ),
+                    "bonus_pence": simulation.estimated_saving_session_bonus_pence,
+                    "fixed_export_income_pence": (
+                        simulation.estimated_saving_session_export_income_pence
+                    ),
+                    "combined_income_pence": (
+                        simulation.estimated_saving_session_total_income_pence
+                    ),
+                    "ev_successfully_blocked": not control.desired_ev_charging_allowed,
+                    "plan_safe": control.plan_safe,
+                    "island_override": control.island_mode_active,
+                }
+            else:
+                self._pending["finishing_simulated_soc_percent"] = (
+                    simulation.simulated_battery_soc
+                )
+                self._pending["maximum_inverter_output_kw"] = max(
+                    float(self._pending.get("maximum_inverter_output_kw") or 0.0),
+                    control.total_kh7_ac_output_kw,
+                )
+                self._pending["ev_successfully_blocked"] = bool(
+                    self._pending.get("ev_successfully_blocked", True)
+                    and not control.desired_ev_charging_allowed
+                )
+                self._pending["plan_safe"] = bool(
+                    self._pending.get("plan_safe", True) and control.plan_safe
+                )
+                self._pending["island_override"] = bool(
+                    self._pending.get("island_override", False)
+                    or control.island_mode_active
+                )
+                for pending_key, value in (
+                    (
+                        "planned_export_kwh",
+                        simulation.estimated_saving_session_export_kwh,
+                    ),
+                    (
+                        "rewardable_reduction_kwh",
+                        simulation.estimated_saving_session_rewardable_reduction_kwh,
+                    ),
+                    ("bonus_pence", simulation.estimated_saving_session_bonus_pence),
+                    (
+                        "fixed_export_income_pence",
+                        simulation.estimated_saving_session_export_income_pence,
+                    ),
+                    (
+                        "combined_income_pence",
+                        simulation.estimated_saving_session_total_income_pence,
+                    ),
+                ):
+                    if value is not None:
+                        self._pending[pending_key] = value
+
+        if self._pending is not None:
+            pending_end = datetime.fromisoformat(str(self._pending["session_end"]))
+            if now >= pending_end:
+                island_override = bool(self._pending.get("island_override", False))
+                plan_safe = bool(self._pending.get("plan_safe", False))
+                ev_blocked = bool(self._pending.get("ev_successfully_blocked", False))
+                completed = plan_safe and ev_blocked and not island_override
+                reason = (
+                    "island_safety_override"
+                    if island_override
+                    else "completed" if completed else "plan_or_ev_safety_check_failed"
+                )
+                self._last = PowerDownResult.from_dict(
+                    {
+                        **self._pending,
+                        "available": True,
+                        "completed_successfully": completed,
+                        "completion_reason": reason,
+                    }
+                )
+                self._pending = None
+
+        await self.async_save()
+        return self._last
+
+    async def async_save(self) -> None:
+        """Persist the completed result and an in-progress session."""
+        await self._store.async_save(
+            {
+                "last_result": self._last.to_dict(),
+                "pending": self._pending,
+            }
+        )

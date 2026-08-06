@@ -1,6 +1,6 @@
 # KEMS — Kyle Energy Management System
 
-KEMS 0.7.0-alpha2 is the pre-installation control-development lab for Home Assistant. It extends the 0.6.0-beta1 baseline into:
+KEMS 0.7.0-alpha3 is the pre-installation control-development lab for Home Assistant. It extends the 0.6.0-beta1 baseline into:
 
 **Observe → Learn → Advise → Simulate → Shadow → Control**
 
@@ -162,10 +162,15 @@ Gas is observed rather than optimised. The simulated whole-home comparison chang
 - `sensor.kems_whole_home_observed_cost_today`
 - `sensor.kems_whole_home_simulated_cost_today`
 - `sensor.kems_whole_home_simulated_saving_today`
+- `sensor.kems_today_summary`
+- `sensor.kems_week_summary`
+- `sensor.kems_month_summary`
+- `sensor.kems_year_summary`
+- `sensor.kems_all_time_summary`
 
 ## ROI and lifetime tracking
 
-KEMS now keeps a permanent local ledger, separate from Home Assistant Recorder retention. Before installation it waits for seven complete 24-hour observation periods, then annualises the accumulated proposal simulation value to estimate payback and discounted net value. After a commissioning date is entered in KEMS options, it switches to actual value-created tracking.
+KEMS now keeps a permanent local ledger, separate from Home Assistant Recorder retention. Alpha3 accumulates observed electricity, gas, import/export, and billing evidence before installation, while keeping realised system-created value locked until commissioning. It publishes native Today, Week, Month, Year, and All-time summaries with actual and simulated figures stored separately. Missing historical days are marked incomplete instead of silently becoming zero. Before installation it waits for seven complete 24-hour observation periods, then annualises the accumulated proposal simulation value to estimate payback and discounted net value. After a commissioning date is entered in KEMS options, it switches to actual value-created tracking.
 
 When recovered value reaches the net investment, KEMS permanently records the payback date and changes to **SYSTEM PAID BACK — PROFIT MODE**. Profit is calculated after the investment and recorded operating costs have been deducted.
 

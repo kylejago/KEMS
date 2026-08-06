@@ -51,25 +51,86 @@ class ControlEngine:
         fresh = age <= max(config.stale_data_seconds, 30)
         passed, total = run_preflight_suite(config)
 
-        eps_utilisation = 100 * inputs.house_load_kw / max(config.eps_limit_kw, 0.1)
+        island_active = inputs.island_active or not inputs.grid_available
+        eps_utilisation = (
+            100 * inputs.house_load_kw / max(config.eps_limit_kw, 0.1)
+            if island_active
+            else 0.0
+        )
+        if not island_active:
+            eps_status = "not_active"
+        elif eps_utilisation > 100.0:
+            eps_status = "unsafe"
+        elif eps_utilisation >= config.eps_critical_percent:
+            eps_status = "critical"
+        elif eps_utilisation >= config.eps_warning_percent:
+            eps_status = "elevated"
+        else:
+            eps_status = "normal"
+
+        total_site_import = max(
+            (
+                simulation.current_simulated_total_site_import_kw
+                if simulation.current_simulated_total_site_import_kw is not None
+                else snapshot.grid_import_kw or 0.0
+            ),
+            0.0,
+        )
+        site_headroom = (
+            None
+            if config.site_import_limit_kw is None
+            else round(config.site_import_limit_kw - total_site_import, 3)
+        )
+        site_exceeded = bool(site_headroom is not None and site_headroom < -1e-6)
+        total_kh7 = max(simulation.current_simulated_total_kh7_output_kw or 0.0, 0.0)
+        grid_bypass = max(
+            (
+                simulation.current_simulated_grid_bypass_power_kw
+                if simulation.current_simulated_grid_bypass_power_kw is not None
+                else total_site_import
+            ),
+            0.0,
+        )
+
         base = {
             "operating_mode": _valid_mode(config.operating_mode),
             "virtual_scenario": _valid_scenario(config.virtual_scenario),
             "grid_available": inputs.grid_available,
-            "island_mode_active": inputs.island_active,
-            "whole_house_eps_load_kw": round(inputs.house_load_kw, 3),
+            "island_mode_active": island_active,
+            "whole_house_eps_load_kw": (
+                round(inputs.house_load_kw, 3) if island_active else 0.0
+            ),
             "virtual_scenario_house_load_kw": round(inputs.house_load_kw, 3),
             "virtual_scenario_solar_power_kw": round(inputs.solar_power_kw, 3),
             "island_conservation_threshold_percent": round(
                 config.island_reserve_percent, 1
             ),
             "island_emergency_floor_percent": round(config.normal_reserve_percent, 1),
-            "eps_headroom_kw": round(
-                max(config.eps_limit_kw - inputs.house_load_kw, 0.0), 3
+            "eps_headroom_kw": (
+                round(max(config.eps_limit_kw - inputs.house_load_kw, 0.0), 3)
+                if island_active
+                else round(config.eps_limit_kw, 3)
             ),
             "eps_utilisation_percent": round(eps_utilisation, 1),
-            "eps_warning": eps_utilisation >= config.eps_warning_percent,
-            "eps_critical": eps_utilisation >= config.eps_critical_percent,
+            "eps_warning": island_active
+            and eps_utilisation >= config.eps_warning_percent,
+            "eps_critical": island_active
+            and eps_utilisation >= config.eps_critical_percent,
+            "eps_status": eps_status,
+            "eps_load_reduction_required_kw": (
+                round(max(inputs.house_load_kw - config.eps_limit_kw, 0.0), 3)
+                if island_active
+                else 0.0
+            ),
+            "total_kh7_ac_output_kw": round(total_kh7, 3),
+            "kh7_output_headroom_kw": round(
+                max(config.inverter_limit_kw - total_kh7, 0.0), 3
+            ),
+            "grid_bypass_power_kw": round(grid_bypass, 3),
+            "total_site_import_kw": round(total_site_import, 3),
+            "site_import_limit_kw": config.site_import_limit_kw,
+            "site_import_headroom_kw": site_headroom,
+            "site_import_limit_exceeded": site_exceeded,
             "data_age_seconds": round(age, 1),
             "data_fresh": fresh,
             "control_enabled": config.control_enabled,
@@ -82,8 +143,8 @@ class ControlEngine:
         }
 
         if config.emergency_stop:
-            return ControlState(
-                **base,
+            return _control_state(
+                base,
                 operating_reason="emergency_stop",
                 desired_work_mode="Stop KEMS writes",
                 desired_min_soc_percent=max(
@@ -98,8 +159,8 @@ class ControlEngine:
             )
 
         if not fresh:
-            return ControlState(
-                **base,
+            return _control_state(
+                base,
                 operating_reason="stale_data_failsafe",
                 desired_work_mode="No change",
                 desired_min_soc_percent=config.normal_reserve_percent,
@@ -111,8 +172,8 @@ class ControlEngine:
             )
 
         if inputs.grid_unstable:
-            return ControlState(
-                **base,
+            return _control_state(
+                base,
                 operating_reason="grid_restoration_hold",
                 desired_work_mode="Self Use",
                 desired_min_soc_percent=config.island_reserve_percent,
@@ -130,8 +191,8 @@ class ControlEngine:
 
         mode = _valid_mode(config.operating_mode)
         if mode == "observe":
-            return ControlState(
-                **base,
+            return _control_state(
+                base,
                 operating_reason="observe_only",
                 desired_work_mode="No change",
                 desired_min_soc_percent=config.normal_reserve_percent,
@@ -141,32 +202,61 @@ class ControlEngine:
             )
 
         if inputs.cheap_period:
-            desired_charge = min(config.max_charge_kw, config.eps_limit_kw)
-            return ControlState(
-                **base,
+            available_site_headroom = (
+                config.max_charge_kw
+                if config.site_import_limit_kw is None
+                else max(config.site_import_limit_kw - inputs.house_load_kw, 0.0)
+            )
+            desired_charge = min(config.max_charge_kw, available_site_headroom)
+            planned_site_import = inputs.house_load_kw + desired_charge
+            planned_site_headroom = (
+                None
+                if config.site_import_limit_kw is None
+                else round(config.site_import_limit_kw - planned_site_import, 3)
+            )
+            safe = bool(
+                config.site_import_limit_kw is None
+                or planned_site_import <= config.site_import_limit_kw + 1e-6
+            )
+            return _control_state(
+                base,
                 operating_reason="confirmed_cheap_charge",
                 desired_work_mode="Force Charge",
                 desired_charge_power_kw=round(desired_charge, 3),
                 desired_min_soc_percent=config.normal_reserve_percent,
                 desired_ev_charging_allowed=True,
                 desired_grid_export_allowed=False,
-                plan_safe=True,
-                blocked_reason=_backend_block_reason(config),
-                next_action="Charge battery and supply home from the grid",
+                grid_bypass_power_kw=round(inputs.house_load_kw, 3),
+                total_site_import_kw=round(planned_site_import, 3),
+                site_import_headroom_kw=planned_site_headroom,
+                site_import_limit_exceeded=not safe,
+                plan_safe=safe,
+                blocked_reason=(
+                    "Configured site-import limit leaves no safe charging headroom"
+                    if not safe
+                    else _backend_block_reason(config)
+                ),
+                next_action=(
+                    "Charge battery at the available site-import headroom "
+                    "and supply home from grid"
+                ),
             )
 
         house = inputs.house_load_kw
+        solar_output = min(max(inputs.solar_power_kw, 0.0), config.inverter_limit_kw)
+        battery_output_headroom = max(config.inverter_limit_kw - solar_output, 0.0)
+        battery_output_limit = min(config.max_discharge_kw, battery_output_headroom)
         battery_home = min(
             max(simulation.current_simulated_battery_to_home_power_kw or house, 0.0),
-            config.max_discharge_kw,
+            battery_output_limit,
         )
         if inputs.saving_session_active:
-            export = simulation.saving_session_export_target_kw
-            if export is None:
-                export = min(
-                    max(config.eps_limit_kw - battery_home, 0.0),
-                    config.export_limit_kw,
-                )
+            requested_session_export = (
+                simulation.current_simulated_battery_export_power_kw
+                if simulation.current_simulated_battery_export_power_kw is not None
+                else simulation.saving_session_export_target_kw
+            )
+            export = max(requested_session_export or 0.0, 0.0)
             reason = "power_down_session"
             next_action = "Supply the home and maximise safe Power Down export"
         else:
@@ -182,21 +272,60 @@ class ControlEngine:
                 else "Pace export to the next confirmed cheap period"
             )
 
-        total = min(battery_home + export, config.max_discharge_kw, config.eps_limit_kw)
-        export = min(export, max(total - battery_home, 0.0), config.export_limit_kw)
-        safe = total <= config.eps_limit_kw + 1e-6
-        return ControlState(
-            **base,
+        export = min(
+            export,
+            max(battery_output_limit - battery_home, 0.0),
+            config.export_limit_kw,
+        )
+        battery_output = battery_home + export
+        total_output = solar_output + battery_output
+        grid_import = max(
+            (
+                simulation.current_simulated_grid_import_kw
+                if simulation.current_simulated_grid_import_kw is not None
+                else house - battery_home
+            ),
+            0.0,
+        )
+        site_headroom = (
+            None
+            if config.site_import_limit_kw is None
+            else round(config.site_import_limit_kw - grid_import, 3)
+        )
+        site_exceeded = bool(site_headroom is not None and site_headroom < -1e-6)
+        safe = (
+            total_output <= config.inverter_limit_kw + 1e-6
+            and battery_output <= config.max_discharge_kw + 1e-6
+            and not site_exceeded
+        )
+        return _control_state(
+            base,
             operating_reason=reason,
             desired_work_mode="Feed-in First" if export > 0 else "Self Use",
             desired_battery_to_home_power_kw=round(battery_home, 3),
             desired_battery_export_power_kw=round(export, 3),
-            desired_total_discharge_power_kw=round(battery_home + export, 3),
+            desired_total_discharge_power_kw=round(battery_output, 3),
             desired_min_soc_percent=config.normal_reserve_percent,
             desired_ev_charging_allowed=not inputs.saving_session_active,
             desired_grid_export_allowed=True,
+            total_kh7_ac_output_kw=round(total_output, 3),
+            kh7_output_headroom_kw=round(
+                max(config.inverter_limit_kw - total_output, 0.0), 3
+            ),
+            grid_bypass_power_kw=round(grid_import, 3),
+            total_site_import_kw=round(grid_import, 3),
+            site_import_headroom_kw=site_headroom,
+            site_import_limit_exceeded=site_exceeded,
             plan_safe=safe,
-            blocked_reason=_backend_block_reason(config),
+            blocked_reason=(
+                "Combined solar and battery output exceeds the KH7 limit"
+                if total_output > config.inverter_limit_kw + 1e-6
+                else (
+                    "Configured site-import limit exceeded"
+                    if site_exceeded
+                    else _backend_block_reason(config)
+                )
+            ),
             next_action=next_action,
         )
 
@@ -222,7 +351,11 @@ class ControlEngine:
         )
         battery_above_floor = inputs.battery_soc_percent > emergency_floor + 1e-6
         battery_to_house = (
-            min(shortfall, config.max_discharge_kw, config.eps_limit_kw)
+            min(
+                shortfall,
+                config.max_discharge_kw,
+                max(config.eps_limit_kw - solar_to_house, 0.0),
+            )
             if battery_above_floor
             else 0.0
         )
@@ -267,8 +400,8 @@ class ControlEngine:
         if not safe:
             action = "Reduce whole-house load immediately to stay within EPS capacity"
 
-        return ControlState(
-            **base,
+        return _control_state(
+            base,
             operating_reason="whole_house_island",
             desired_work_mode="Self Use / EPS",
             desired_charge_power_kw=round(solar_to_battery, 3),
@@ -284,6 +417,15 @@ class ControlEngine:
             estimated_outage_runtime_hours=(
                 None if runtime is None else round(runtime, 2)
             ),
+            total_kh7_ac_output_kw=round(solar_to_house + battery_to_house, 3),
+            kh7_output_headroom_kw=round(
+                max(config.eps_limit_kw - solar_to_house - battery_to_house, 0.0),
+                3,
+            ),
+            grid_bypass_power_kw=0.0,
+            total_site_import_kw=0.0,
+            site_import_headroom_kw=config.site_import_limit_kw,
+            site_import_limit_exceeded=False,
             plan_safe=safe,
             blocked_reason=(
                 "Whole-house demand exceeds the configured EPS limit"
@@ -363,6 +505,11 @@ class ControlEngine:
         )
 
 
+def _control_state(base: dict[str, object], **overrides: object) -> ControlState:
+    """Build a control state while allowing branch-specific topology overrides."""
+    return ControlState(**{**base, **overrides})
+
+
 def _valid_mode(value: str) -> str:
     return value if value in OPERATING_MODES else "simulate"
 
@@ -372,7 +519,7 @@ def _valid_scenario(value: str) -> str:
 
 
 def _backend_block_reason(config: ControlConfig) -> str:
-    """Explain why alpha2 will not issue a real inverter write."""
+    """Explain why alpha3 will not issue a real inverter write."""
     if config.operating_mode == "simulate":
         return "Virtual backend only"
     if config.operating_mode == "shadow":
@@ -383,18 +530,21 @@ def _backend_block_reason(config: ControlConfig) -> str:
         return "System has not been commissioned"
     if not config.control_enabled:
         return "Master control enable is off"
-    return "Real FoxESS control backend is intentionally unavailable in alpha2"
+    return "Real FoxESS control backend is intentionally unavailable in alpha3"
 
 
 def run_preflight_suite(config: ControlConfig) -> tuple[int, int]:
     """Run fast deterministic safety checks used by diagnostics and tests."""
     checks = (
+        config.inverter_limit_kw > 0,
         config.eps_limit_kw > 0,
+        config.eps_limit_kw <= config.inverter_limit_kw,
         0 <= config.normal_reserve_percent < 100,
         config.island_reserve_percent >= config.normal_reserve_percent,
-        config.max_charge_kw <= config.eps_limit_kw,
-        config.max_discharge_kw <= config.eps_limit_kw,
-        config.export_limit_kw <= config.eps_limit_kw,
+        config.max_charge_kw > 0,
+        config.max_discharge_kw <= config.inverter_limit_kw,
+        config.export_limit_kw <= config.inverter_limit_kw,
+        config.site_import_limit_kw is None or config.site_import_limit_kw > 0,
         config.eps_warning_percent < config.eps_critical_percent,
         config.eps_critical_percent <= 100,
         config.stale_data_seconds >= 30,

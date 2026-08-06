@@ -1,11 +1,11 @@
-# Start here — KEMS 0.7.0-alpha2 Control Lab
+# Start here — KEMS 0.7.0-alpha3 Control Lab
 
-Apply this package over the current 0.7.0-alpha1 `develop` branch. It preserves all existing KEMS observation and simulation data.
+Apply this package over the current 0.7.0-alpha2 integration branch. It preserves all existing KEMS observation and simulation data.
 
 ## Development branch
 
 ```text
-fix/control-lab-validated-scenario-fixes
+release/0.7.0-alpha3
 ```
 
 Create it from the latest `develop` branch, copy the package into the repository root while preserving `.git`, then run:
@@ -19,15 +19,15 @@ python -m pytest
 python -m pre_commit run --all-files
 ```
 
-Expected pytest result: `83 passed`.
+Expected pytest result: `97 passed`.
 
 Commit:
 
 ```text
-fix: correct Power Down and island Control Lab behaviour
+feat: build KEMS 0.7.0-alpha3 KH7 topology
 ```
 
-Merge this feature into `develop` only. Do not merge 0.7 control work into `main` yet.
+Push this release branch for live Home Assistant testing. Do not merge into `main` until the alpha3 Control Lab matrix passes.
 
 Safe pre-install settings:
 

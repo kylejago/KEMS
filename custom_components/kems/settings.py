@@ -44,6 +44,7 @@ from .const import (
     CONF_SAVING_SESSION_ENABLED,
     CONF_SCAN_INTERVAL,
     CONF_SIMULATION_STRATEGY,
+    CONF_SITE_IMPORT_LIMIT,
     CONF_STALE_DATA_SECONDS,
     CONF_SYSTEM_COMMISSIONED,
     CONF_SYSTEM_COST,
@@ -95,6 +96,10 @@ class KEMSSettings:
                 export_limit_kw=min(
                     float(values[CONF_EXPORT_LIMIT]),
                     max(float(values[CONF_INVERTER_LIMIT]), 0.1),
+                ),
+                eps_output_limit_kw=max(float(values[CONF_EPS_LIMIT]), 0.1),
+                site_import_limit_kw=(
+                    max(float(values[CONF_SITE_IMPORT_LIMIT]), 0.0) or None
                 ),
                 battery_export_enabled=bool(values[CONF_BATTERY_EXPORT_ENABLED]),
                 proposal_solar_enabled=bool(values[CONF_PROPOSAL_SOLAR_ENABLED]),
@@ -149,15 +154,19 @@ class KEMSSettings:
                 discharge_efficiency=float(values[CONF_DISCHARGE_EFFICIENCY]),
                 max_charge_kw=min(
                     float(values[CONF_MAX_CHARGE]),
-                    max(float(values[CONF_EPS_LIMIT]), 0.1),
+                    max(float(values[CONF_INVERTER_LIMIT]), 0.1),
                 ),
                 max_discharge_kw=min(
                     float(values[CONF_MAX_DISCHARGE]),
-                    max(float(values[CONF_EPS_LIMIT]), 0.1),
+                    max(float(values[CONF_INVERTER_LIMIT]), 0.1),
                 ),
                 export_limit_kw=min(
                     float(values[CONF_EXPORT_LIMIT]),
-                    max(float(values[CONF_EPS_LIMIT]), 0.1),
+                    max(float(values[CONF_INVERTER_LIMIT]), 0.1),
+                ),
+                inverter_limit_kw=max(float(values[CONF_INVERTER_LIMIT]), 0.1),
+                site_import_limit_kw=(
+                    max(float(values[CONF_SITE_IMPORT_LIMIT]), 0.0) or None
                 ),
             ),
         )

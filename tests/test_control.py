@@ -45,7 +45,7 @@ def _simulation(**changes) -> SimulationState:
 
 def test_preflight_suite_passes_default_kh7_safety_constraints() -> None:
     passed, total = run_preflight_suite(ControlConfig())
-    assert passed == total == 12
+    assert passed == total == 15
 
 
 def test_normal_paced_export_plan_respects_seven_kw_limit() -> None:
@@ -79,8 +79,11 @@ def test_power_down_uses_session_export_target() -> None:
         ControlConfig(),
     )
     assert state.operating_reason == "power_down_session"
-    assert state.desired_total_discharge_power_kw == 7.0
-    assert state.desired_battery_export_power_kw == 5.0
+    # Solar is already producing 3kW, so the battery can contribute only
+    # 4kW under the shared KH7 7kW AC cap: 2kW home + 2kW export.
+    assert state.desired_total_discharge_power_kw == 4.0
+    assert state.desired_battery_export_power_kw == 2.0
+    assert state.total_kh7_ac_output_kw == 7.0
     assert state.desired_ev_charging_allowed is False
 
 
@@ -131,8 +134,11 @@ def test_high_whole_house_load_triggers_eps_critical_warning() -> None:
         NOW,
         ControlConfig(virtual_scenario="high_house_load"),
     )
-    assert state.whole_house_eps_load_kw == 6.44
-    # Grid-connected high load is measured but is not island load, so no island alarm.
+    # Grid-connected high load uses bypass and must not be labelled as EPS load.
+    assert state.whole_house_eps_load_kw == 0.0
+    assert state.eps_status == "not_active"
+    assert state.eps_warning is False
+    assert state.eps_critical is False
     assert state.island_mode_active is False
 
 
@@ -199,6 +205,48 @@ def test_live_control_stays_hard_blocked_before_real_backend() -> None:
     assert state.commands_permitted is False
     assert state.real_backend_available is False
     assert "backend" in state.blocked_reason.lower()
+
+
+def test_cheap_charge_allows_grid_bypass_above_kh7_output_limit() -> None:
+    state = ControlEngine().plan(
+        _snapshot(off_peak=True, house_load_kw=2.0, grid_import_kw=2.0),
+        _simulation(current_simulated_house_load_kw=2.0),
+        NOW,
+        ControlConfig(),
+    )
+    assert state.desired_charge_power_kw == 7.0
+    assert state.grid_bypass_power_kw == 2.0
+    assert state.total_site_import_kw == 9.0
+    assert state.plan_safe is True
+
+
+def test_site_import_limit_reduces_flexible_battery_charge() -> None:
+    state = ControlEngine().plan(
+        _snapshot(off_peak=True, house_load_kw=2.0, grid_import_kw=2.0),
+        _simulation(current_simulated_house_load_kw=2.0),
+        NOW,
+        ControlConfig(site_import_limit_kw=8.0),
+    )
+    assert state.desired_charge_power_kw == 6.0
+    assert state.total_site_import_kw == 8.0
+    assert state.site_import_headroom_kw == 0.0
+    assert state.site_import_limit_exceeded is False
+
+
+def test_island_solar_and_battery_share_eps_output_cap() -> None:
+    state = ControlEngine().plan(
+        _snapshot(),
+        _simulation(
+            current_simulated_house_load_kw=8.0,
+            current_simulated_solar_power_kw=4.0,
+            simulated_battery_soc=80.0,
+        ),
+        NOW,
+        ControlConfig(virtual_scenario="grid_outage_high_load"),
+    )
+    assert state.solar_to_house_kw + state.battery_to_house_kw <= 7.0
+    assert state.eps_status == "unsafe"
+    assert state.eps_load_reduction_required_kw > 0.0
 
 
 def test_island_stops_battery_at_emergency_floor() -> None:

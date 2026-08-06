@@ -79,6 +79,7 @@ from .const import (
     CONF_SAVING_SESSION_IMPORT_BASELINE,
     CONF_SCAN_INTERVAL,
     CONF_SIMULATION_STRATEGY,
+    CONF_SITE_IMPORT_LIMIT,
     CONF_SOLAR_POWER,
     CONF_STALE_DATA_SECONDS,
     CONF_SYSTEM_COMMISSIONED,
@@ -164,6 +165,9 @@ OPTIONS_SCHEMA = vol.Schema(
             vol.Coerce(float), vol.Range(min=0.1, max=100)
         ),
         vol.Required(CONF_EXPORT_LIMIT): vol.All(
+            vol.Coerce(float), vol.Range(min=0, max=100)
+        ),
+        vol.Required(CONF_SITE_IMPORT_LIMIT): vol.All(
             vol.Coerce(float), vol.Range(min=0, max=100)
         ),
         vol.Required(CONF_BATTERY_EXPORT_ENABLED): bool,
@@ -259,7 +263,7 @@ OPTIONS_SCHEMA = vol.Schema(
 class KEMSConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Handle automatic and manual KEMS setup."""
 
-    VERSION = 10
+    VERSION = 11
     MINOR_VERSION = 0
 
     def __init__(self) -> None:
