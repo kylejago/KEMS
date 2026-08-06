@@ -1,11 +1,11 @@
-# KEMS 0.7.0-alpha3 development steps
+# KEMS 0.7.0-alpha4 development steps
 
-1. Update local `develop` and create `release/0.7.0-alpha3`.
-2. Copy this package over the repository root, preserving `.git`.
+1. Update local `develop` and create `release/0.7.0-alpha4-user-settings`.
+2. Apply the supplied patch or copy the package over the repository root while preserving `.git`.
 3. Run Black, Ruff, pytest, and pre-commit.
-4. Commit as `feat: build KEMS 0.7.0-alpha3 KH7 topology`.
+4. Commit as `feat: add guided setup and editable tariff UI`.
 5. Push the release branch for live Home Assistant testing.
-6. Install the exact alpha3 release-branch commit in Home Assistant.
-7. Keep `operating_mode=simulate`, `control_enabled=false`, `system_commissioned=false`, and `emergency_stop=false`.
-8. Re-run Power Down, night-outage, daylight-outage, emergency-stop, grid-flapping, and normal scenarios.
-9. Do not merge 0.7 control work into `main` until the full scenario matrix and commissioning checks pass.
+6. Install the exact alpha4 release-branch commit in Home Assistant.
+7. Open **Settings → Devices & services → KEMS → Configure** and verify all six settings pages.
+8. Test automatic pricing, manual pricing, an overnight cheap period, and a confirmed Intelligent extra slot.
+9. Keep real control disabled until the commissioned backend is separately implemented and verified.

@@ -1,6 +1,6 @@
 [project]
 name = "kems"
-version = "0.7.0a3"
+version = "0.7.0a4"
 description = "Kyle Energy Management System"
 requires-python = ">=3.13"
 

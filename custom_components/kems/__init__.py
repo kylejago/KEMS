@@ -13,11 +13,18 @@ from .const import (
     CONF_EV_POWER,
     CONF_EXPORT_LIMIT,
     CONF_EXPORT_RATE,
+    CONF_INTELLIGENT_SLOTS_ENABLED,
     CONF_INVERTER_LIMIT,
+    CONF_MANUAL_DAY_RATE,
+    CONF_MANUAL_OFFPEAK_END,
+    CONF_MANUAL_OFFPEAK_RATE,
+    CONF_MANUAL_OFFPEAK_START,
+    CONF_MANUAL_STANDING_CHARGE,
     CONF_MAX_CHARGE,
     CONF_MAX_DISCHARGE,
     CONF_SIMULATION_STRATEGY,
     CONF_SITE_IMPORT_LIMIT,
+    CONF_TARIFF_MODE,
 )
 from .coordinator import KEMSCoordinator
 from .entity_discovery import (
@@ -72,6 +79,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         ohme=OhmeProvider(hass, entities),
         foxess=FoxESSProvider(hass, entities),
         octoplus=OctoplusProvider(hass, entities),
+        settings=settings,
     )
     coordinator = KEMSCoordinator(
         hass,
@@ -100,7 +108,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
 async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Migrate earlier KEMS config entries to the current schema."""
-    if entry.version > 11:
+    if entry.version > 12:
         return False
 
     data = dict(entry.data)
@@ -129,11 +137,22 @@ async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         # installer-confirmed limit has not yet been configured.
         options.setdefault(CONF_SITE_IMPORT_LIMIT, 0.0)
 
+    if entry.version < 12:
+        # Alpha4 adds a user-editable tariff profile. Automatic mode preserves
+        # existing live Octopus behaviour and uses these values only as fallback.
+        options.setdefault(CONF_TARIFF_MODE, "automatic")
+        options.setdefault(CONF_MANUAL_DAY_RATE, 28.3036)
+        options.setdefault(CONF_MANUAL_OFFPEAK_RATE, 3.4933)
+        options.setdefault(CONF_MANUAL_STANDING_CHARGE, 53.70435)
+        options.setdefault(CONF_MANUAL_OFFPEAK_START, "23:30:00")
+        options.setdefault(CONF_MANUAL_OFFPEAK_END, "05:30:00")
+        options.setdefault(CONF_INTELLIGENT_SLOTS_ENABLED, True)
+
     hass.config_entries.async_update_entry(
         entry,
         data=data,
         options=options,
-        version=11,
+        version=12,
         minor_version=0,
     )
     return True

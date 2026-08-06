@@ -10,18 +10,20 @@
         "description": "KEMS will scan Home Assistant for compatible Octopus electricity and gas, Ohme, and FoxESS Modbus entities. The Control Lab calculates safe desired behaviour but real hardware writes remain blocked."
       },
       "confirm": {
-        "title": "Set up KEMS automatically",
-        "description": "KEMS found {electricity_count} Octopus electricity, {gas_count} gas, {ohme_count} Ohme, and {foxess_count} live power/battery/solar source entities.\n\nDetected mappings:\n{detected_entities}\n\nAmbiguous fields: {ambiguous}\n\nLeave review disabled to accept high-confidence matches.",
+        "title": "Choose how KEMS gets your tariff",
+        "description": "KEMS found {electricity_count} electricity, {gas_count} gas, {ohme_count} Ohme, and {foxess_count} live power/battery/solar source entities.\n\nDetected mappings:\n{detected_entities}\n\nAmbiguous fields: {ambiguous}\n\nAutomatic mode follows Home Assistant tariff entities and uses your editable manual values only if a live value is unavailable. Manual mode always uses the prices and cheap-period times you enter.",
         "data": {
+          "tariff_mode": "Tariff source",
           "review_entities": "Review or change detected entities"
         },
         "data_description": {
+          "tariff_mode": "Choose automatic live pricing or a fully manual tariff schedule.",
           "review_entities": "Open the full mapping screen before KEMS is created."
         }
       },
       "entities": {
         "title": "Review KEMS source entities",
-        "description": "Choose the entities KEMS observes. Only the current electricity import rate is required. Gas, Ohme, and FoxESS Modbus can be added later through Reconfigure.",
+        "description": "Choose the entities KEMS observes. A current import-rate entity is required only in automatic tariff mode. Gas, Ohme, and FoxESS sources can be added later through Reconfigure.",
         "data": {
           "current_import_rate": "Current import rate",
           "next_import_rate": "Next import rate (optional)",
@@ -160,6 +162,30 @@
           "saving_session_import_baseline": "Optional Octoplus Power Down import baseline sensor used to estimate rewardable net reduction. The legacy Saving Session baseline is also supported.",
           "saving_session_export_baseline": "Optional export-meter baseline variant. KEMS subtracts it from the import baseline to estimate the net baseline."
         }
+      },
+      "manual_tariff": {
+        "title": "Enter your electricity tariff",
+        "description": "Enter prices in pence. KEMS supports a cheap period that crosses midnight and can still recognise Intelligent extra slots when the relevant entities are available.",
+        "data": {
+          "tariff_mode": "Tariff source",
+          "manual_day_rate_pence": "Day rate",
+          "manual_offpeak_rate_pence": "Off-peak rate",
+          "manual_standing_charge_pence": "Electricity standing charge",
+          "export_rate_pence": "Export rate",
+          "manual_offpeak_start": "Off-peak starts",
+          "manual_offpeak_end": "Off-peak ends",
+          "intelligent_slots_enabled": "Use confirmed Intelligent extra slots"
+        },
+        "data_description": {
+          "tariff_mode": "Manual is selected for this setup.",
+          "manual_day_rate_pence": "Price paid outside cheap periods.",
+          "manual_offpeak_rate_pence": "Price paid during the normal cheap period and confirmed Intelligent extra slots.",
+          "manual_standing_charge_pence": "Daily electricity standing charge.",
+          "export_rate_pence": "Fixed payment received per exported kWh.",
+          "manual_offpeak_start": "Local Home Assistant time.",
+          "manual_offpeak_end": "Local Home Assistant time. Overnight periods are supported.",
+          "intelligent_slots_enabled": "Requires the Intelligent slot and EV charging sources to confirm an extra slot safely."
+        }
       }
     },
     "error": {
@@ -169,28 +195,93 @@
   "options": {
     "step": {
       "init": {
-        "title": "KEMS KH7 simulation, Control Lab, island safety, ROI, and lifetime settings",
-        "description": "Configure monitoring, proposal simulation, virtual/shadow control planning, whole-house island safeguards, ROI, and the permanent ledger. Version 0.7.0-alpha3 does not send real FoxESS or charger commands.",
+        "title": "KEMS settings",
+        "description": "Choose the part of KEMS you want to configure. Each page saves independently and reloads the integration safely.",
+        "menu_options": {
+          "tariff": "Tariff and prices",
+          "battery": "Battery, inverter and grid limits",
+          "solar": "Solar, export and Power Down",
+          "financial": "System cost and ROI",
+          "monitoring": "Monitoring and history",
+          "control": "Control Lab and EPS safety"
+        }
+      },
+      "tariff": {
+        "title": "Tariff and prices",
+        "description": "Use automatic pricing from Home Assistant or enter a tariff manually. Automatic mode keeps the manual values as a safe fallback.",
         "data": {
-          "scan_interval_seconds": "Observation interval (seconds)",
-          "history_days": "Learning history retention (days)",
+          "tariff_mode": "Tariff source",
+          "manual_day_rate_pence": "Day rate",
+          "manual_offpeak_rate_pence": "Off-peak rate",
+          "manual_standing_charge_pence": "Electricity standing charge",
+          "export_rate_pence": "Fixed export rate (p/kWh)",
+          "manual_offpeak_start": "Off-peak starts",
+          "manual_offpeak_end": "Off-peak ends",
+          "intelligent_slots_enabled": "Use confirmed Intelligent extra slots"
+        },
+        "data_description": {
+          "tariff_mode": "Automatic follows configured Home Assistant tariff entities. When a live value is unavailable, KEMS uses the manual fallback values below. Manual always uses the values below.",
+          "manual_day_rate_pence": "Price paid outside the normal cheap period.",
+          "manual_offpeak_rate_pence": "Price paid during the normal cheap period and confirmed Intelligent extra slots.",
+          "manual_standing_charge_pence": "Daily electricity standing charge in pence.",
+          "export_rate_pence": "Fixed 12p/kWh export rate used for every simulated export interval. Intelligent Octopus Flux rates are intentionally ignored.",
+          "manual_offpeak_start": "Start of the normal cheap period in local Home Assistant time.",
+          "manual_offpeak_end": "End of the normal cheap period. Overnight periods are supported.",
+          "intelligent_slots_enabled": "Allow a live Intelligent slot plus active EV charging to confirm an extra cheap period."
+        }
+      },
+      "battery": {
+        "title": "Battery, inverter and grid limits",
+        "description": "Describe the installed or proposed battery system. Site import is separate from inverter output; leave it at 0 until the installer confirms it.",
+        "data": {
           "battery_capacity_kwh": "Simulated battery capacity (kWh)",
           "battery_reserve_percent": "Battery reserve (%)",
           "battery_initial_percent": "Simulation starting battery (%)",
           "max_charge_kw": "Maximum battery charge power (kW)",
           "max_discharge_kw": "Maximum battery discharge power (kW)",
-          "charge_efficiency": "Charge efficiency (0.50-1.00)",
-          "discharge_efficiency": "Discharge efficiency (0.50-1.00)",
-          "export_rate_pence": "Fixed export rate (p/kWh)",
           "inverter_ac_limit_kw": "Inverter AC limit (kW)",
           "export_limit_kw": "Assumed export limit (kW)",
           "site_import_limit_kw": "Site import limit (kW, 0 = not configured)",
-          "battery_export_enabled": "Simulate exporting surplus battery energy",
+          "charge_efficiency": "Charge efficiency (0.50-1.00)",
+          "discharge_efficiency": "Discharge efficiency (0.50-1.00)",
+          "battery_power_positive_is_discharge": "Positive battery power means discharge"
+        },
+        "data_description": {
+          "battery_capacity_kwh": "Defaults to the quoted 56.42kWh FoxESS battery storage.",
+          "battery_reserve_percent": "Defaults to 10%, matching the proposal's 50.77kWh usable capacity.",
+          "battery_initial_percent": "Used when no real FoxESS battery SOC is available.",
+          "max_charge_kw": "Maximum battery charging power. Defaults to the revised Fox ESS KH7 7kW inverter limit.",
+          "max_discharge_kw": "Maximum battery discharge power. Defaults to the revised Fox ESS KH7 7kW inverter limit.",
+          "inverter_ac_limit_kw": "Combined simulated solar and battery AC output cannot exceed the revised Fox ESS KH7 7kW limit.",
+          "export_limit_kw": "Separate DNO/grid export limit. Runtime export is also capped by the 7kW inverter limit.",
+          "site_import_limit_kw": "Installer-confirmed whole-site import limit based on the main fuse and gateway configuration. This is separate from the KH7 7kW output limit; use 0 until confirmed.",
+          "charge_efficiency": "Simulation assumption; the proposal does not guarantee conversion efficiency.",
+          "discharge_efficiency": "Simulation assumption; the proposal does not guarantee conversion efficiency.",
+          "battery_power_positive_is_discharge": "Controls how KEMS separates FoxESS battery charge and discharge totals. Leave enabled when positive power means battery discharge."
+        }
+      },
+      "solar": {
+        "title": "Solar, export and Power Down",
+        "description": "Configure the solar estimate, battery export strategy and Octoplus Power Down simulation.",
+        "data": {
           "proposal_solar_enabled": "Use proposal solar model when live PV is unavailable",
           "proposal_solar_factor": "Proposal solar/weather factor (0.0-2.0)",
-          "gas_kwh_per_m3": "Gas conversion factor (kWh per m³)",
+          "battery_export_enabled": "Simulate exporting surplus battery energy",
           "simulation_strategy": "Simulation strategy",
-          "battery_power_positive_is_discharge": "Positive battery power means discharge",
+          "saving_session_enabled": "Use joined Octoplus Power Down sessions"
+        },
+        "data_description": {
+          "proposal_solar_enabled": "Models 21 x 460W panels, 9.66kWp, three roof orientations, and the proposal monthly generation baseline.",
+          "proposal_solar_factor": "Scale the proposal baseline for cloud/weather sensitivity; 1.0 uses the proposal average.",
+          "battery_export_enabled": "Preserve forecast house demand, then spread remaining battery export across the hours until the next cheap period.",
+          "simulation_strategy": "Paced export targets the configured reserve at the next cheap-period start instead of exporting the battery early in the day.",
+          "saving_session_enabled": "Hold battery energy before a joined session, cover the home, and maximise permitted export during the higher-reward window. KEMS remains read-only and does not join sessions itself."
+        }
+      },
+      "financial": {
+        "title": "System cost and ROI",
+        "description": "Enter the real project costs and financial assumptions used by KEMS payback and ROI reporting.",
+        "data": {
           "system_cost_gbp": "Quoted system cost (GBP)",
           "additional_costs_gbp": "Additional installation costs (GBP)",
           "grants_rebates_gbp": "Grants or rebates (GBP)",
@@ -200,8 +291,39 @@
           "electricity_inflation_percent": "Annual electricity price inflation (%)",
           "battery_degradation_percent": "Annual battery/value degradation (%)",
           "discount_rate_percent": "Financial discount rate (%)",
-          "roi_forecast_years": "ROI forecast horizon (years)",
-          "saving_session_enabled": "Use joined Octoplus Power Down sessions",
+          "roi_forecast_years": "ROI forecast horizon (years)"
+        },
+        "data_description": {
+          "system_cost_gbp": "Defaults to the quoted system price of £20,995.",
+          "additional_costs_gbp": "Add DNO fees, structural work, smart-meter work, or later installation additions.",
+          "grants_rebates_gbp": "Deduct grants, rebates, or discounts from the investment KEMS must recover.",
+          "commissioning_date": "Leave blank before installation. Set this once the system is commissioned to begin actual ROI and payback tracking.",
+          "annual_maintenance_gbp": "KEMS accrues this allowance daily after commissioning.",
+          "manual_system_costs_gbp": "All-time repair, servicing, or replacement expenditure already incurred. Update the total when new costs occur.",
+          "electricity_inflation_percent": "Used only in future ROI projections. KEMS still uses actual Octopus rates for current simulations.",
+          "battery_degradation_percent": "Reduces projected future annual value over time.",
+          "discount_rate_percent": "Used to calculate discounted net value. The proposal benchmark used 6.75%.",
+          "roi_forecast_years": "Number of years included in the predicted net-value calculation."
+        }
+      },
+      "monitoring": {
+        "title": "Monitoring and history",
+        "description": "Choose how often KEMS observes Home Assistant and how much learning history it retains.",
+        "data": {
+          "scan_interval_seconds": "Observation interval (seconds)",
+          "history_days": "Learning history retention (days)",
+          "gas_kwh_per_m3": "Gas conversion factor (kWh per m³)"
+        },
+        "data_description": {
+          "scan_interval_seconds": "KEMS reads Home Assistant state only; minimum 30 seconds.",
+          "history_days": "KEMS stores compact observations locally in Home Assistant storage.",
+          "gas_kwh_per_m3": "Used only when the configured gas source reports cubic metres rather than kWh."
+        }
+      },
+      "control": {
+        "title": "Control Lab and EPS safety",
+        "description": "Configure simulation, shadow planning and safeguards. Alpha4 still blocks real FoxESS and charger commands.",
+        "data": {
           "operating_mode": "Control Lab operating mode",
           "virtual_scenario": "Virtual KH7 test scenario",
           "control_enabled": "Master control opt-in",
@@ -215,36 +337,6 @@
           "island_reserve_percent": "Island conservation threshold (%)"
         },
         "data_description": {
-          "scan_interval_seconds": "KEMS reads Home Assistant state only; minimum 30 seconds.",
-          "history_days": "KEMS stores compact observations locally in Home Assistant storage.",
-          "battery_capacity_kwh": "Defaults to the quoted 56.42kWh FoxESS battery storage.",
-          "battery_reserve_percent": "Defaults to 10%, matching the proposal's 50.77kWh usable capacity.",
-          "battery_initial_percent": "Used when no real FoxESS battery SOC is available.",
-          "max_charge_kw": "Maximum battery charging power. Defaults to the revised Fox ESS KH7 7kW inverter limit.",
-          "max_discharge_kw": "Maximum battery discharge power. Defaults to the revised Fox ESS KH7 7kW inverter limit.",
-          "charge_efficiency": "Simulation assumption; the proposal does not guarantee conversion efficiency.",
-          "discharge_efficiency": "Simulation assumption; the proposal does not guarantee conversion efficiency.",
-          "export_rate_pence": "Fixed 12p/kWh export rate used for every simulated export interval. Intelligent Octopus Flux rates are intentionally ignored.",
-          "export_limit_kw": "Separate DNO/grid export limit. Runtime export is also capped by the 7kW inverter limit.",
-          "site_import_limit_kw": "Installer-confirmed whole-site import limit based on the main fuse and gateway configuration. This is separate from the KH7 7kW output limit; use 0 until confirmed.",
-          "battery_export_enabled": "Preserve forecast house demand, then spread remaining battery export across the hours until the next cheap period.",
-          "proposal_solar_enabled": "Models 21 x 460W panels, 9.66kWp, three roof orientations, and the proposal monthly generation baseline.",
-          "proposal_solar_factor": "Scale the proposal baseline for cloud/weather sensitivity; 1.0 uses the proposal average.",
-          "gas_kwh_per_m3": "Used only when the configured gas source reports cubic metres rather than kWh.",
-          "simulation_strategy": "Paced export targets the configured reserve at the next cheap-period start instead of exporting the battery early in the day.",
-          "battery_power_positive_is_discharge": "Controls how KEMS separates FoxESS battery charge and discharge totals. Leave enabled when positive power means battery discharge.",
-          "system_cost_gbp": "Defaults to the quoted system price of £20,995.",
-          "additional_costs_gbp": "Add DNO fees, structural work, smart-meter work, or later installation additions.",
-          "grants_rebates_gbp": "Deduct grants, rebates, or discounts from the investment KEMS must recover.",
-          "commissioning_date": "Leave blank before installation. Set this once the system is commissioned to begin actual ROI and payback tracking.",
-          "annual_maintenance_gbp": "KEMS accrues this allowance daily after commissioning.",
-          "manual_system_costs_gbp": "All-time repair, servicing, or replacement expenditure already incurred. Update the total when new costs occur.",
-          "electricity_inflation_percent": "Used only in future ROI projections. KEMS still uses actual Octopus rates for current simulations.",
-          "battery_degradation_percent": "Reduces projected future annual value over time.",
-          "discount_rate_percent": "Used to calculate discounted net value. The proposal benchmark used 6.75%.",
-          "roi_forecast_years": "Number of years included in the predicted net-value calculation.",
-          "inverter_ac_limit_kw": "Combined simulated solar and battery AC output cannot exceed the revised Fox ESS KH7 7kW limit.",
-          "saving_session_enabled": "Hold battery energy before a joined session, cover the home, and maximise permitted export during the higher-reward window. KEMS remains read-only and does not join sessions itself.",
           "operating_mode": "Observe, virtual simulation, shadow planning, or control. Real control remains hard-blocked in alpha3.",
           "virtual_scenario": "Inject normal, solar, cloud, high-load, Power Down, outage, overload, or unstable-grid conditions.",
           "control_enabled": "Records explicit control opt-in only. It cannot permit real writes until a verified backend exists.",
