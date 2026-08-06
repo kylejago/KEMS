@@ -1,31 +1,25 @@
 # Validation report
 
-Build: `0.7.0-alpha3`
-Branch: `release/0.7.0-alpha3`
+Build: `0.7.0-alpha4`
+Branch: `release/0.7.0-alpha4-user-settings`
 
 Validated in the build environment:
 
-- `99 passed` with pytest.
-- Corrected the alpha3 lifetime-history rebuild by importing `collections.defaultdict`.
-- 61 Python source/test files parsed and compiled successfully.
-- 2 JSON files parsed successfully.
-- 12 YAML files parsed successfully.
-- No Python source/test line exceeds 100 characters.
+- `106 passed` with pytest.
+- All 42 shipped Python modules parsed and compiled successfully.
+- Home Assistant manifest and English translations parsed successfully.
 - `git diff --check` reports no whitespace errors.
-- The default KH7 control preflight reports 15/15 checks passed.
-- Separate 7kW battery charge, battery discharge, combined KH7 AC output, and island/EPS limits are modelled.
-- A 2kW house plus 7kW battery charge is validated as 9kW total site import when the separately configured site limit permits it.
-- Solar plus battery output is capped at 7kW during normal export, high-solar Power Down operation, island operation, and restoration planning.
-- Site-import headroom limits only flexible charging rather than incorrectly capping grid bypass at 7kW.
-- EPS utilisation and warnings apply only when islanded; grid-connected demand uses site-import diagnostics.
-- Last-completed Power Down results persist independently from the live Octopus event entity.
-- Observed electricity, gas, import/export, and billing evidence accumulate before commissioning, while actual physical-system value remains commissioning-gated.
-- Today, Week, Month, Year, and All-time summaries preserve separate actual and simulated totals and mark incomplete historical days explicitly.
-- Simulated lifetime and All-time values are reconciled from the same persisted daily ledger used by Month and Year, including legitimate downward intraday forecast revisions.
-- Mid-day commissioning does not claim pre-installation system value.
+- Existing alpha3 entries migrate to automatic tariff mode without changing live Octopus pricing behaviour.
+- Automatic mode prefers live Home Assistant tariff values and uses editable manual values only when a live field is unavailable.
+- Manual mode works without a current-import-rate entity.
+- Manual day, off-peak, standing-charge, export-rate, start-time, and end-time settings are persisted through the config-entry options flow.
+- Overnight cheap periods that cross midnight resolve correctly.
+- Confirmed Intelligent extra slots use the cheap rate only when the Intelligent slot and active EV charging agree.
+- The options flow is split into six focused pages and preserves settings from other pages when one category is saved.
+- Battery, inverter, site-import, solar/export, ROI, monitoring, Control Lab, and EPS settings remain available.
+- Alpha3 accumulator repair, period reconciliation, KH7 topology, and 15/15 control preflight behaviour remain covered by the suite.
 - No Python bytecode, `__pycache__`, or pytest cache directories are included.
-- 111 shipped files are covered by `FILE_MANIFEST.sha256`.
-- Real FoxESS writes remain hard-blocked: backend available, command permission, commissioning, and master control all default to off.
-- `pyproject.toml`, the Home Assistant manifest, and runtime constants all identify `0.7.0-alpha3` / `0.7.0a3`.
+- Real FoxESS and charger writes remain hard-blocked.
+- `pyproject.toml`, the Home Assistant manifest, and runtime constants identify `0.7.0-alpha4` / `0.7.0a4`.
 
-Black, Ruff, and pre-commit were not available in this isolated build environment. Run the repository's normal Black, Ruff, and pre-commit checks in the Windows development environment before merging the release branch into `main`.
+Black, Ruff, and pre-commit are not installed in this isolated build environment. Run the repository's normal development checks after applying the patch and before merging.

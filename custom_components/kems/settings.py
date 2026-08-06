@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, time
 from typing import Any
 
 from .const import (
@@ -32,8 +32,14 @@ from .const import (
     CONF_GRANTS_REBATES,
     CONF_GRID_STABILITY_SECONDS,
     CONF_HISTORY_DAYS,
+    CONF_INTELLIGENT_SLOTS_ENABLED,
     CONF_INVERTER_LIMIT,
     CONF_ISLAND_RESERVE_PERCENT,
+    CONF_MANUAL_DAY_RATE,
+    CONF_MANUAL_OFFPEAK_END,
+    CONF_MANUAL_OFFPEAK_RATE,
+    CONF_MANUAL_OFFPEAK_START,
+    CONF_MANUAL_STANDING_CHARGE,
     CONF_MANUAL_SYSTEM_COSTS,
     CONF_MAX_CHARGE,
     CONF_MAX_DISCHARGE,
@@ -48,10 +54,12 @@ from .const import (
     CONF_STALE_DATA_SECONDS,
     CONF_SYSTEM_COMMISSIONED,
     CONF_SYSTEM_COST,
+    CONF_TARIFF_MODE,
     CONF_VIRTUAL_SCENARIO,
     DEFAULT_OPTIONS,
 )
 from .kems_core import ControlConfig, ROIConfig, SimulationConfig
+from .tariff import TariffSettings, parse_time
 
 
 @dataclass(frozen=True, slots=True)
@@ -61,6 +69,7 @@ class KEMSSettings:
     scan_interval_seconds: int
     history_days: int
     gas_kwh_per_m3: float
+    tariff: TariffSettings
     simulation: SimulationConfig
     roi: ROIConfig
     control: ControlConfig
@@ -74,6 +83,31 @@ class KEMSSettings:
             scan_interval_seconds=max(int(values[CONF_SCAN_INTERVAL]), 30),
             history_days=max(int(values[CONF_HISTORY_DAYS]), 1),
             gas_kwh_per_m3=max(float(values[CONF_GAS_KWH_PER_M3]), 0.1),
+            tariff=TariffSettings(
+                mode=(
+                    "manual"
+                    if str(values[CONF_TARIFF_MODE]) == "manual"
+                    else "automatic"
+                ),
+                day_rate_pence=max(float(values[CONF_MANUAL_DAY_RATE]), 0.0),
+                offpeak_rate_pence=max(
+                    float(values[CONF_MANUAL_OFFPEAK_RATE]),
+                    0.0,
+                ),
+                standing_charge_pence=max(
+                    float(values[CONF_MANUAL_STANDING_CHARGE]),
+                    0.0,
+                ),
+                offpeak_start=parse_time(
+                    values.get(CONF_MANUAL_OFFPEAK_START),
+                    time(23, 30),
+                ),
+                offpeak_end=parse_time(
+                    values.get(CONF_MANUAL_OFFPEAK_END),
+                    time(5, 30),
+                ),
+                intelligent_slots_enabled=bool(values[CONF_INTELLIGENT_SLOTS_ENABLED]),
+            ),
             simulation=SimulationConfig(
                 battery_capacity_kwh=float(values[CONF_BATTERY_CAPACITY]),
                 battery_reserve_percent=float(values[CONF_BATTERY_RESERVE]),

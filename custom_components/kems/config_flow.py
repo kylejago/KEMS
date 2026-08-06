@@ -12,6 +12,7 @@ from homeassistant.helpers.selector import (
     DateSelector,
     EntitySelector,
     EntitySelectorConfig,
+    selector,
 )
 
 from .const import (
@@ -60,8 +61,14 @@ from .const import (
     CONF_HISTORY_DAYS,
     CONF_HOUSE_LOAD,
     CONF_INTELLIGENT_SLOT,
+    CONF_INTELLIGENT_SLOTS_ENABLED,
     CONF_INVERTER_LIMIT,
     CONF_ISLAND_RESERVE_PERCENT,
+    CONF_MANUAL_DAY_RATE,
+    CONF_MANUAL_OFFPEAK_END,
+    CONF_MANUAL_OFFPEAK_RATE,
+    CONF_MANUAL_OFFPEAK_START,
+    CONF_MANUAL_STANDING_CHARGE,
     CONF_MANUAL_SYSTEM_COSTS,
     CONF_MAX_CHARGE,
     CONF_MAX_DISCHARGE,
@@ -84,6 +91,7 @@ from .const import (
     CONF_STALE_DATA_SECONDS,
     CONF_SYSTEM_COMMISSIONED,
     CONF_SYSTEM_COST,
+    CONF_TARIFF_MODE,
     CONF_VIRTUAL_SCENARIO,
     DEFAULT_OPTIONS,
     DOMAIN,
@@ -108,16 +116,69 @@ BINARY_KEYS = {
 }
 
 
-def _entity_schema(suggested: dict[str, Any]) -> vol.Schema:
+def _number(
+    minimum: float,
+    maximum: float,
+    step: float,
+    unit: str | None = None,
+):
+    """Return a boxed Home Assistant number selector."""
+    config: dict[str, Any] = {
+        "min": minimum,
+        "max": maximum,
+        "step": step,
+        "mode": "box",
+    }
+    if unit:
+        config["unit_of_measurement"] = unit
+    return selector({"number": config})
+
+
+def _select(options: list[tuple[str, str]]):
+    """Return a labelled dropdown selector."""
+    return selector(
+        {
+            "select": {
+                "mode": "dropdown",
+                "options": [
+                    {"value": value, "label": label} for value, label in options
+                ],
+            }
+        }
+    )
+
+
+BOOLEAN_SELECTOR = selector({"boolean": {}})
+TIME_SELECTOR = selector({"time": {}})
+
+TARIFF_MODE_SELECTOR = _select(
+    [
+        (
+            "automatic",
+            "Automatic from Home Assistant, with manual fallback",
+        ),
+        ("manual", "Always use the prices and times entered below"),
+    ]
+)
+
+
+def _entity_schema(
+    suggested: dict[str, Any],
+    *,
+    require_import_rate: bool,
+) -> vol.Schema:
     """Build the manual entity-review form with discovered suggestions."""
     schema: dict[vol.Marker, Any] = {}
     for key in ENTITY_MAPPING_KEYS:
         if key == CONF_SAVING_SESSION_EVENTS:
-            selector = EVENT_SELECTOR
+            entity_selector = EVENT_SELECTOR
         else:
-            selector = BINARY_SENSOR_SELECTOR if key in BINARY_KEYS else SENSOR_SELECTOR
+            entity_selector = (
+                BINARY_SENSOR_SELECTOR if key in BINARY_KEYS else SENSOR_SELECTOR
+            )
         default = suggested.get(key)
-        if key == CONF_CURRENT_IMPORT_RATE:
+        required = key == CONF_CURRENT_IMPORT_RATE and require_import_rate
+        if required:
             marker = (
                 vol.Required(key, default=default) if default else vol.Required(key)
             )
@@ -125,137 +186,116 @@ def _entity_schema(suggested: dict[str, Any]) -> vol.Schema:
             marker = (
                 vol.Optional(key, default=default) if default else vol.Optional(key)
             )
-        schema[marker] = selector
+        schema[marker] = entity_selector
     return vol.Schema(schema)
 
 
-OPTIONS_SCHEMA = vol.Schema(
+MANUAL_TARIFF_FIELDS = {
+    vol.Required(CONF_MANUAL_DAY_RATE): _number(0, 200, 0.0001, "p/kWh"),
+    vol.Required(CONF_MANUAL_OFFPEAK_RATE): _number(0, 200, 0.0001, "p/kWh"),
+    vol.Required(CONF_MANUAL_STANDING_CHARGE): _number(0, 500, 0.0001, "p/day"),
+    vol.Required(CONF_EXPORT_RATE): _number(0, 200, 0.01, "p/kWh"),
+    vol.Required(CONF_MANUAL_OFFPEAK_START): TIME_SELECTOR,
+    vol.Required(CONF_MANUAL_OFFPEAK_END): TIME_SELECTOR,
+    vol.Required(CONF_INTELLIGENT_SLOTS_ENABLED): BOOLEAN_SELECTOR,
+}
+TARIFF_SCHEMA = vol.Schema(
     {
-        vol.Required(CONF_SCAN_INTERVAL): vol.All(
-            vol.Coerce(int), vol.Range(min=30, max=3600)
+        vol.Required(CONF_TARIFF_MODE): TARIFF_MODE_SELECTOR,
+        **MANUAL_TARIFF_FIELDS,
+    }
+)
+MANUAL_TARIFF_SCHEMA = vol.Schema(MANUAL_TARIFF_FIELDS)
+
+BATTERY_SCHEMA = vol.Schema(
+    {
+        vol.Required(CONF_BATTERY_CAPACITY): _number(0.1, 500, 0.01, "kWh"),
+        vol.Required(CONF_BATTERY_RESERVE): _number(0, 95, 0.1, "%"),
+        vol.Required(CONF_BATTERY_INITIAL): _number(0, 100, 0.1, "%"),
+        vol.Required(CONF_MAX_CHARGE): _number(0.1, 100, 0.1, "kW"),
+        vol.Required(CONF_MAX_DISCHARGE): _number(0.1, 100, 0.1, "kW"),
+        vol.Required(CONF_INVERTER_LIMIT): _number(0.1, 100, 0.1, "kW"),
+        vol.Required(CONF_EXPORT_LIMIT): _number(0, 100, 0.1, "kW"),
+        vol.Required(CONF_SITE_IMPORT_LIMIT): _number(0, 100, 0.1, "kW"),
+        vol.Required(CONF_CHARGE_EFFICIENCY): _number(0.5, 1.0, 0.01),
+        vol.Required(CONF_DISCHARGE_EFFICIENCY): _number(0.5, 1.0, 0.01),
+        vol.Required(CONF_BATTERY_POWER_POSITIVE_IS_DISCHARGE): BOOLEAN_SELECTOR,
+    }
+)
+
+SOLAR_SCHEMA = vol.Schema(
+    {
+        vol.Required(CONF_PROPOSAL_SOLAR_ENABLED): BOOLEAN_SELECTOR,
+        vol.Required(CONF_PROPOSAL_SOLAR_FACTOR): _number(0, 2, 0.01),
+        vol.Required(CONF_BATTERY_EXPORT_ENABLED): BOOLEAN_SELECTOR,
+        vol.Required(CONF_SIMULATION_STRATEGY): _select(
+            [
+                (
+                    "paced_export",
+                    "Reserve the home, then pace export to the next cheap period",
+                ),
+                ("self_use", "Use solar and battery for the home first"),
+            ]
         ),
-        vol.Required(CONF_HISTORY_DAYS): vol.All(
-            vol.Coerce(int), vol.Range(min=1, max=365)
-        ),
-        vol.Required(CONF_BATTERY_CAPACITY): vol.All(
-            vol.Coerce(float), vol.Range(min=0.1, max=500)
-        ),
-        vol.Required(CONF_BATTERY_RESERVE): vol.All(
-            vol.Coerce(float), vol.Range(min=0, max=95)
-        ),
-        vol.Required(CONF_BATTERY_INITIAL): vol.All(
-            vol.Coerce(float), vol.Range(min=0, max=100)
-        ),
-        vol.Required(CONF_MAX_CHARGE): vol.All(
-            vol.Coerce(float), vol.Range(min=0.1, max=100)
-        ),
-        vol.Required(CONF_MAX_DISCHARGE): vol.All(
-            vol.Coerce(float), vol.Range(min=0.1, max=100)
-        ),
-        vol.Required(CONF_CHARGE_EFFICIENCY): vol.All(
-            vol.Coerce(float), vol.Range(min=0.5, max=1.0)
-        ),
-        vol.Required(CONF_DISCHARGE_EFFICIENCY): vol.All(
-            vol.Coerce(float), vol.Range(min=0.5, max=1.0)
-        ),
-        vol.Required(CONF_EXPORT_RATE): vol.All(
-            vol.Coerce(float), vol.Range(min=0, max=200)
-        ),
-        vol.Required(CONF_INVERTER_LIMIT): vol.All(
-            vol.Coerce(float), vol.Range(min=0.1, max=100)
-        ),
-        vol.Required(CONF_EXPORT_LIMIT): vol.All(
-            vol.Coerce(float), vol.Range(min=0, max=100)
-        ),
-        vol.Required(CONF_SITE_IMPORT_LIMIT): vol.All(
-            vol.Coerce(float), vol.Range(min=0, max=100)
-        ),
-        vol.Required(CONF_BATTERY_EXPORT_ENABLED): bool,
-        vol.Required(CONF_SAVING_SESSION_ENABLED): bool,
-        vol.Required(CONF_PROPOSAL_SOLAR_ENABLED): bool,
-        vol.Required(CONF_PROPOSAL_SOLAR_FACTOR): vol.All(
-            vol.Coerce(float), vol.Range(min=0, max=2)
-        ),
-        vol.Required(CONF_GAS_KWH_PER_M3): vol.All(
-            vol.Coerce(float), vol.Range(min=1, max=20)
-        ),
-        vol.Required(CONF_BATTERY_POWER_POSITIVE_IS_DISCHARGE): bool,
-        vol.Required(CONF_SYSTEM_COST): vol.All(
-            vol.Coerce(float), vol.Range(min=0, max=1000000)
-        ),
-        vol.Required(CONF_ADDITIONAL_COSTS): vol.All(
-            vol.Coerce(float), vol.Range(min=0, max=1000000)
-        ),
-        vol.Required(CONF_GRANTS_REBATES): vol.All(
-            vol.Coerce(float), vol.Range(min=0, max=1000000)
-        ),
+        vol.Required(CONF_SAVING_SESSION_ENABLED): BOOLEAN_SELECTOR,
+    }
+)
+
+FINANCIAL_SCHEMA = vol.Schema(
+    {
+        vol.Required(CONF_SYSTEM_COST): _number(0, 1_000_000, 1, "GBP"),
+        vol.Required(CONF_ADDITIONAL_COSTS): _number(0, 1_000_000, 1, "GBP"),
+        vol.Required(CONF_GRANTS_REBATES): _number(0, 1_000_000, 1, "GBP"),
         vol.Optional(CONF_COMMISSIONING_DATE): DateSelector(),
-        vol.Required(CONF_ANNUAL_MAINTENANCE): vol.All(
-            vol.Coerce(float), vol.Range(min=0, max=100000)
+        vol.Required(CONF_ANNUAL_MAINTENANCE): _number(0, 100_000, 1, "GBP"),
+        vol.Required(CONF_MANUAL_SYSTEM_COSTS): _number(0, 1_000_000, 1, "GBP"),
+        vol.Required(CONF_ELECTRICITY_INFLATION): _number(-50, 100, 0.1, "%"),
+        vol.Required(CONF_BATTERY_DEGRADATION): _number(0, 20, 0.1, "%"),
+        vol.Required(CONF_DISCOUNT_RATE): _number(0, 100, 0.01, "%"),
+        vol.Required(CONF_ROI_FORECAST_YEARS): _number(1, 40, 1, "years"),
+    }
+)
+
+MONITORING_SCHEMA = vol.Schema(
+    {
+        vol.Required(CONF_SCAN_INTERVAL): _number(30, 3600, 1, "seconds"),
+        vol.Required(CONF_HISTORY_DAYS): _number(1, 365, 1, "days"),
+        vol.Required(CONF_GAS_KWH_PER_M3): _number(1, 20, 0.0001, "kWh/m³"),
+    }
+)
+
+CONTROL_SCHEMA = vol.Schema(
+    {
+        vol.Required(CONF_OPERATING_MODE): _select(
+            [
+                ("observe", "Observe only"),
+                ("simulate", "Virtual system simulation"),
+                ("shadow", "Calculate real commands but send nothing"),
+                ("control", "Live control, blocked until commissioned"),
+            ]
         ),
-        vol.Required(CONF_MANUAL_SYSTEM_COSTS): vol.All(
-            vol.Coerce(float), vol.Range(min=0, max=1000000)
+        vol.Required(CONF_VIRTUAL_SCENARIO): _select(
+            [
+                ("normal", "Normal grid-connected day"),
+                ("sunny_high_solar", "Sunny high-solar test"),
+                ("cloudy_low_solar", "Cloudy low-solar test"),
+                ("high_house_load", "High whole-house load test"),
+                ("power_down_active", "Active Power Down test"),
+                ("grid_outage_daylight", "Whole-house outage in daylight"),
+                ("grid_outage_night", "Whole-house outage at night"),
+                ("grid_outage_high_load", "Whole-house EPS overload test"),
+                ("grid_flapping", "Grid restoration stability hold"),
+            ]
         ),
-        vol.Required(CONF_ELECTRICITY_INFLATION): vol.All(
-            vol.Coerce(float), vol.Range(min=-50, max=100)
-        ),
-        vol.Required(CONF_BATTERY_DEGRADATION): vol.All(
-            vol.Coerce(float), vol.Range(min=0, max=20)
-        ),
-        vol.Required(CONF_DISCOUNT_RATE): vol.All(
-            vol.Coerce(float), vol.Range(min=0, max=100)
-        ),
-        vol.Required(CONF_ROI_FORECAST_YEARS): vol.All(
-            vol.Coerce(int), vol.Range(min=1, max=40)
-        ),
-        vol.Required(CONF_OPERATING_MODE): vol.In(
-            {
-                "observe": "Observe only",
-                "simulate": "Virtual KH7 simulation",
-                "shadow": "Real readings, calculate commands, send nothing",
-                "control": "Live control (blocked until commissioned backend)",
-            }
-        ),
-        vol.Required(CONF_VIRTUAL_SCENARIO): vol.In(
-            {
-                "normal": "Normal grid-connected day",
-                "sunny_high_solar": "Sunny high-solar test",
-                "cloudy_low_solar": "Cloudy low-solar test",
-                "high_house_load": "High whole-house load test",
-                "power_down_active": "Active Power Down test",
-                "grid_outage_daylight": "Whole-house outage in daylight",
-                "grid_outage_night": "Whole-house outage at night",
-                "grid_outage_high_load": "Whole-house EPS overload test",
-                "grid_flapping": "Grid restoration stability hold",
-            }
-        ),
-        vol.Required(CONF_CONTROL_ENABLED): bool,
-        vol.Required(CONF_SYSTEM_COMMISSIONED): bool,
-        vol.Required(CONF_EMERGENCY_STOP): bool,
-        vol.Required(CONF_STALE_DATA_SECONDS): vol.All(
-            vol.Coerce(int), vol.Range(min=30, max=3600)
-        ),
-        vol.Required(CONF_GRID_STABILITY_SECONDS): vol.All(
-            vol.Coerce(int), vol.Range(min=30, max=1800)
-        ),
-        vol.Required(CONF_EPS_LIMIT): vol.All(
-            vol.Coerce(float), vol.Range(min=0.1, max=100)
-        ),
-        vol.Required(CONF_EPS_WARNING_PERCENT): vol.All(
-            vol.Coerce(float), vol.Range(min=1, max=99)
-        ),
-        vol.Required(CONF_EPS_CRITICAL_PERCENT): vol.All(
-            vol.Coerce(float), vol.Range(min=2, max=100)
-        ),
-        vol.Required(CONF_ISLAND_RESERVE_PERCENT): vol.All(
-            vol.Coerce(float), vol.Range(min=0, max=95)
-        ),
-        vol.Required(CONF_SIMULATION_STRATEGY): vol.In(
-            {
-                "paced_export": "Pace battery export until next cheap period",
-                "self_use": "Solar self-use first",
-            }
-        ),
+        vol.Required(CONF_CONTROL_ENABLED): BOOLEAN_SELECTOR,
+        vol.Required(CONF_SYSTEM_COMMISSIONED): BOOLEAN_SELECTOR,
+        vol.Required(CONF_EMERGENCY_STOP): BOOLEAN_SELECTOR,
+        vol.Required(CONF_STALE_DATA_SECONDS): _number(30, 3600, 1, "seconds"),
+        vol.Required(CONF_GRID_STABILITY_SECONDS): _number(30, 1800, 1, "seconds"),
+        vol.Required(CONF_EPS_LIMIT): _number(0.1, 100, 0.1, "kW"),
+        vol.Required(CONF_EPS_WARNING_PERCENT): _number(1, 99, 0.1, "%"),
+        vol.Required(CONF_EPS_CRITICAL_PERCENT): _number(2, 100, 0.1, "%"),
+        vol.Required(CONF_ISLAND_RESERVE_PERCENT): _number(0, 95, 0.1, "%"),
     }
 )
 
@@ -263,13 +303,22 @@ OPTIONS_SCHEMA = vol.Schema(
 class KEMSConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Handle automatic and manual KEMS setup."""
 
-    VERSION = 11
+    VERSION = 12
     MINOR_VERSION = 0
 
     def __init__(self) -> None:
         """Initialise the flow state."""
         self._discovery = DiscoveryResult({}, {}, ())
         self._suggested: dict[str, Any] = {}
+        self._initial_options: dict[str, Any] = dict(DEFAULT_OPTIONS)
+
+    def _create_entry(self, data: dict[str, Any]):
+        """Create KEMS with complete mutable defaults."""
+        return self.async_create_entry(
+            title=NAME,
+            data=data,
+            options=self._initial_options,
+        )
 
     async def async_step_user(
         self,
@@ -286,13 +335,17 @@ class KEMSConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self,
         user_input: dict[str, Any] | None = None,
     ):
-        """Confirm automatic discovery or open manual review."""
+        """Choose automatic or manual tariff setup and confirm discovery."""
         if user_input is not None:
+            mode = str(user_input[CONF_TARIFF_MODE])
+            self._initial_options[CONF_TARIFF_MODE] = mode
             if user_input.get("review_entities"):
                 return await self.async_step_entities()
+            if mode == "manual":
+                return await self.async_step_manual_tariff()
             if CONF_CURRENT_IMPORT_RATE not in self._suggested:
                 return await self.async_step_entities()
-            return self.async_create_entry(title=NAME, data=self._suggested)
+            return self._create_entry(self._suggested)
 
         provider_counts = {
             "electricity": sum(
@@ -352,7 +405,13 @@ class KEMSConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         return self.async_show_form(
             step_id="confirm",
             data_schema=vol.Schema(
-                {vol.Optional("review_entities", default=False): bool}
+                {
+                    vol.Required(
+                        CONF_TARIFF_MODE,
+                        default=DEFAULT_OPTIONS[CONF_TARIFF_MODE],
+                    ): TARIFF_MODE_SELECTOR,
+                    vol.Optional("review_entities", default=False): BOOLEAN_SELECTOR,
+                }
             ),
             description_placeholders={
                 "electricity_count": str(provider_counts["electricity"]),
@@ -370,24 +429,47 @@ class KEMSConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     ):
         """Review or manually select source entities."""
         errors: dict[str, str] = {}
+        manual = self._initial_options[CONF_TARIFF_MODE] == "manual"
         if user_input is not None:
             cleaned = {key: value for key, value in user_input.items() if value}
             validation = await async_validate_entity_mappings(self.hass, cleaned)
-            if (
-                validation.rejected
-                or CONF_CURRENT_IMPORT_RATE not in validation.accepted
-            ):
+            missing_required = (
+                not manual and CONF_CURRENT_IMPORT_RATE not in validation.accepted
+            )
+            if validation.rejected or missing_required:
                 errors["base"] = "invalid_source_mapping"
                 self._suggested = cleaned
             else:
-                return self.async_create_entry(
-                    title=NAME,
-                    data=validation.accepted,
-                )
+                self._suggested = dict(validation.accepted)
+                if manual:
+                    return await self.async_step_manual_tariff()
+                return self._create_entry(self._suggested)
         return self.async_show_form(
             step_id="entities",
-            data_schema=_entity_schema(self._suggested),
+            data_schema=_entity_schema(
+                self._suggested,
+                require_import_rate=not manual,
+            ),
             errors=errors,
+        )
+
+    async def async_step_manual_tariff(
+        self,
+        user_input: dict[str, Any] | None = None,
+    ):
+        """Collect manual tariff prices and cheap-period times during setup."""
+        if user_input is not None:
+            self._initial_options.update(user_input)
+            self._initial_options[CONF_TARIFF_MODE] = "manual"
+            return self._create_entry(self._suggested)
+        suggested = dict(DEFAULT_OPTIONS)
+        suggested[CONF_TARIFF_MODE] = "manual"
+        return self.async_show_form(
+            step_id="manual_tariff",
+            data_schema=self.add_suggested_values_to_schema(
+                MANUAL_TARIFF_SCHEMA,
+                suggested,
+            ),
         )
 
     async def async_step_reconfigure(
@@ -419,7 +501,7 @@ class KEMSConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         return self.async_show_form(
             step_id="reconfigure",
             data_schema=vol.Schema(
-                {vol.Optional("review_entities", default=False): bool}
+                {vol.Optional("review_entities", default=False): BOOLEAN_SELECTOR}
             ),
             description_placeholders={
                 "detected_entities": self._discovery.summary(),
@@ -434,13 +516,21 @@ class KEMSConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         """Manually review source entities only when requested."""
         entry = self._get_reconfigure_entry()
         errors: dict[str, str] = {}
+        tariff_mode = str(
+            entry.options.get(
+                CONF_TARIFF_MODE,
+                DEFAULT_OPTIONS[CONF_TARIFF_MODE],
+            )
+        )
+        require_import_rate = tariff_mode != "manual"
         if user_input is not None:
             cleaned = {key: value for key, value in user_input.items() if value}
             validation = await async_validate_entity_mappings(self.hass, cleaned)
-            if (
-                validation.rejected
-                or CONF_CURRENT_IMPORT_RATE not in validation.accepted
-            ):
+            missing_required = (
+                require_import_rate
+                and CONF_CURRENT_IMPORT_RATE not in validation.accepted
+            )
+            if validation.rejected or missing_required:
                 errors["base"] = "invalid_source_mapping"
                 self._suggested = cleaned
             else:
@@ -451,7 +541,10 @@ class KEMSConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 )
         return self.async_show_form(
             step_id="reconfigure_entities",
-            data_schema=_entity_schema(self._suggested),
+            data_schema=_entity_schema(
+                self._suggested,
+                require_import_rate=require_import_rate,
+            ),
             errors=errors,
         )
 
@@ -463,24 +556,93 @@ class KEMSConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
 
 class KEMSOptionsFlow(OptionsFlowWithReload):
-    """Configure learning retention and simulation assumptions."""
+    """Present KEMS settings as a friendly category menu."""
+
+    MENU_OPTIONS = [
+        "tariff",
+        "battery",
+        "solar",
+        "financial",
+        "monitoring",
+        "control",
+    ]
 
     async def async_step_init(
         self,
         user_input: dict[str, Any] | None = None,
     ):
-        """Manage KEMS options."""
-        if user_input is not None:
-            return self.async_create_entry(data=user_input)
-
-        suggested = {**DEFAULT_OPTIONS, **dict(self.config_entry.options)}
-        if not suggested.get(CONF_COMMISSIONING_DATE):
-            suggested.pop(CONF_COMMISSIONING_DATE, None)
-
-        return self.async_show_form(
+        """Show the KEMS settings menu."""
+        return self.async_show_menu(
             step_id="init",
+            menu_options=self.MENU_OPTIONS,
+        )
+
+    def _suggested_options(self) -> dict[str, Any]:
+        """Return complete options with safe defaults."""
+        values = {**DEFAULT_OPTIONS, **dict(self.config_entry.options)}
+        if not values.get(CONF_COMMISSIONING_DATE):
+            values.pop(CONF_COMMISSIONING_DATE, None)
+        return values
+
+    def _save_options(self, user_input: dict[str, Any]):
+        """Merge one category without losing settings from other pages."""
+        options = {
+            **DEFAULT_OPTIONS,
+            **dict(self.config_entry.options),
+            **user_input,
+        }
+        if not options.get(CONF_COMMISSIONING_DATE):
+            options.pop(CONF_COMMISSIONING_DATE, None)
+        return self.async_create_entry(data=options)
+
+    def _show_category(self, step_id: str, schema: vol.Schema):
+        """Show a category form with current values prefilled."""
+        return self.async_show_form(
+            step_id=step_id,
             data_schema=self.add_suggested_values_to_schema(
-                OPTIONS_SCHEMA,
-                suggested,
+                schema,
+                self._suggested_options(),
             ),
         )
+
+    async def async_step_tariff(self, user_input: dict[str, Any] | None = None):
+        """Configure import/export prices and cheap-period times."""
+        if user_input is not None:
+            return self._save_options(user_input)
+        return self._show_category("tariff", TARIFF_SCHEMA)
+
+    async def async_step_battery(self, user_input: dict[str, Any] | None = None):
+        """Configure battery, inverter and site limits."""
+        if user_input is not None:
+            return self._save_options(user_input)
+        return self._show_category("battery", BATTERY_SCHEMA)
+
+    async def async_step_solar(self, user_input: dict[str, Any] | None = None):
+        """Configure solar and export simulation behaviour."""
+        if user_input is not None:
+            return self._save_options(user_input)
+        return self._show_category("solar", SOLAR_SCHEMA)
+
+    async def async_step_financial(
+        self,
+        user_input: dict[str, Any] | None = None,
+    ):
+        """Configure system costs and ROI assumptions."""
+        if user_input is not None:
+            return self._save_options(user_input)
+        return self._show_category("financial", FINANCIAL_SCHEMA)
+
+    async def async_step_monitoring(
+        self,
+        user_input: dict[str, Any] | None = None,
+    ):
+        """Configure refresh, retention and gas conversion."""
+        if user_input is not None:
+            return self._save_options(user_input)
+        return self._show_category("monitoring", MONITORING_SCHEMA)
+
+    async def async_step_control(self, user_input: dict[str, Any] | None = None):
+        """Configure Control Lab and EPS safeguards."""
+        if user_input is not None:
+            return self._save_options(user_input)
+        return self._show_category("control", CONTROL_SCHEMA)

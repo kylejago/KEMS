@@ -1,6 +1,6 @@
 # KEMS pre-installation control lab
 
-KEMS 0.7.0-alpha3 calculates the exact desired behaviour of the proposed KH7 system without sending real inverter commands.
+KEMS 0.7.0-alpha4 calculates the exact desired behaviour of the proposed KH7 system without sending real inverter commands.
 
 ## Modes
 

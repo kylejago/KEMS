@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.7.0-alpha4 — guided setup and editable tariff UI
+
+- Replaced the single oversized options form with a six-page Home Assistant Configure menu.
+- Added automatic tariff mode with user-editable day-rate, off-peak-rate, standing-charge, export-rate, and cheap-period fallback values.
+- Added manual tariff mode for users without a supported live tariff integration.
+- Added local-time cheap-period start/end controls with correct overnight handling across midnight.
+- Preserved confirmed Intelligent extra-slot safety: the cheap rate is used only when the Intelligent slot and active EV charging agree.
+- Added guided first-time setup for automatic versus manual tariff selection.
+- Allowed manual-tariff installations to run without a current-import-rate entity.
+- Split battery, solar/export, financial, monitoring, and Control Lab settings into focused pages with descriptive selectors and units.
+- Added alpha3-to-alpha4 migration defaults without changing existing automatic Octopus behaviour.
+- Added tariff-resolution and UI-schema regression coverage; 104 tests pass.
+- Real FoxESS and charger writes remain disabled.
+
 ## 0.7.0-alpha3 hotfix — simulated period reconciliation
 
 - Made the persisted daily ledger authoritative for all simulated lifetime totals.
