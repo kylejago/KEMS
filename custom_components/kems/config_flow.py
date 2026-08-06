@@ -558,14 +558,18 @@ class KEMSConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 class KEMSOptionsFlow(OptionsFlowWithReload):
     """Present KEMS settings as a friendly category menu."""
 
-    MENU_OPTIONS = [
-        "tariff",
-        "battery",
-        "solar",
-        "financial",
-        "monitoring",
-        "control",
-    ]
+    # Use explicit English fallback labels so the menu remains usable when
+    # Home Assistant or the browser still has an older custom-integration
+    # translation bundle cached. The same labels remain in translations/en.json
+    # for normal localisation support.
+    MENU_OPTIONS = {
+        "tariff": "Tariff and prices",
+        "battery": "Battery, inverter and grid limits",
+        "solar": "Solar, export and Power Down",
+        "financial": "System cost and ROI",
+        "monitoring": "Monitoring and history",
+        "control": "Control Lab and EPS safety",
+    }
 
     async def async_step_init(
         self,

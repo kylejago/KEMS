@@ -81,7 +81,7 @@ def test_options_flow_has_friendly_category_menu_and_tariff_editor() -> None:
     """Users should configure KEMS through small named pages, not one huge form."""
     source = CONFIG_FLOW.read_text(encoding="utf-8")
     for token in (
-        "MENU_OPTIONS = [",
+        "MENU_OPTIONS = {",
         '"tariff"',
         '"battery"',
         '"solar"',
@@ -98,6 +98,23 @@ def test_options_flow_has_friendly_category_menu_and_tariff_editor() -> None:
         "async_show_menu",
     ):
         assert token in source
+
+
+def test_options_menu_has_explicit_fallback_labels() -> None:
+    """Menu labels must not disappear when frontend translations are stale."""
+    source = CONFIG_FLOW.read_text(encoding="utf-8")
+
+    for label in (
+        "Tariff and prices",
+        "Battery, inverter and grid limits",
+        "Solar, export and Power Down",
+        "System cost and ROI",
+        "Monitoring and history",
+        "Control Lab and EPS safety",
+    ):
+        assert label in source
+
+    assert "menu_options=self.MENU_OPTIONS" in source
 
 
 def test_manual_setup_can_run_without_live_import_rate_entity() -> None:

@@ -1,3 +1,7 @@
+## 0.7.0-alpha4
+
+- Fixed blank settings-menu labels when Home Assistant or the browser retained an older custom-integration translation bundle.
+
 # Changelog
 
 ## 0.7.0-alpha4 — guided setup and editable tariff UI
