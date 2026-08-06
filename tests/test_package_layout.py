@@ -88,19 +88,26 @@ def test_manifest_classifies_kems_as_hub() -> None:
 
     manifest = json.loads((INTEGRATION / "manifest.json").read_text(encoding="utf-8"))
     assert manifest["integration_type"] == "hub"
-    assert manifest["version"] == "0.6.0-beta1"
+    assert manifest["version"] == "0.7.0-alpha3"
 
 
-def test_alpha5_preserves_history_and_versions_simulation_ledger() -> None:
+def test_alpha3_preserves_history_and_versions_simulation_ledger() -> None:
     """Observed history must survive while alpha4 simulation value can reset."""
     const_source = (INTEGRATION / "const.py").read_text(encoding="utf-8")
     history_source = (INTEGRATION / "history.py").read_text(encoding="utf-8")
     lifetime_source = (INTEGRATION / "lifetime.py").read_text(encoding="utf-8")
 
     assert 'STORAGE_NAMESPACE = "clean_v6_alpha2"' in const_source
-    assert "SIMULATION_LEDGER_VERSION = 4" in const_source
+    assert "SIMULATION_LEDGER_VERSION = 5" in const_source
     assert "STORAGE_NAMESPACE" in history_source
     assert "simulation_ledger_version" in lifetime_source
+    assert "ledger_schema_version" in lifetime_source
+    assert "should_accumulate_lifetime_value" in lifetime_source
+    assert "period_summaries" in lifetime_source
+    assert "daily_records" in lifetime_source
+    assert (
+        "include_commissioned_value=not rebuilding_existing_ledger" in lifetime_source
+    )
 
 
 def test_entry_migration_applies_kh7_paced_export_defaults() -> None:
@@ -108,7 +115,7 @@ def test_entry_migration_applies_kh7_paced_export_defaults() -> None:
     source = (INTEGRATION / "__init__.py").read_text(encoding="utf-8")
     config_flow = (INTEGRATION / "config_flow.py").read_text(encoding="utf-8")
 
-    assert "VERSION = 9" in config_flow
+    assert "VERSION = 11" in config_flow
     assert "options[CONF_INVERTER_LIMIT] = 7.0" in source
     assert "options[CONF_MAX_CHARGE] = 7.0" in source
     assert "options[CONF_MAX_DISCHARGE] = 7.0" in source
@@ -116,10 +123,21 @@ def test_entry_migration_applies_kh7_paced_export_defaults() -> None:
     assert 'options[CONF_SIMULATION_STRATEGY] = "paced_export"' in source
 
 
-def test_alpha5_ships_octoplus_power_down_provider() -> None:
+def test_alpha3_ships_octoplus_power_down_provider() -> None:
     """The HACS package must contain the joined-session source provider."""
     assert (INTEGRATION / "providers" / "octoplus.py").is_file()
     const_source = (INTEGRATION / "const.py").read_text(encoding="utf-8")
     assert "CONF_SAVING_SESSION_EVENTS" in const_source
     assert "CONF_SAVING_SESSION_IMPORT_BASELINE" in const_source
     assert "CONF_SAVING_SESSION_EXPORT_BASELINE" in const_source
+
+
+def test_control_lab_platforms_are_shipped() -> None:
+    """Interactive simulation controls must be available in Home Assistant."""
+    init_source = (INTEGRATION / "__init__.py").read_text(encoding="utf-8")
+    assert (INTEGRATION / "select.py").is_file()
+    assert (INTEGRATION / "switch.py").is_file()
+    assert (INTEGRATION / "runtime_options.py").is_file()
+    assert (INTEGRATION / "power_down.py").is_file()
+    assert "Platform.SELECT" in init_source
+    assert "Platform.SWITCH" in init_source

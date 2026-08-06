@@ -1,4 +1,4 @@
-# Entity inventory — v0.6.0-beta1
+# Entity inventory — v0.7.0-alpha3
 
 KEMS creates source-mirror entities only when the matching source is configured. Derived analysis and proposal-simulation entities are created automatically and may be `unknown` until enough observations exist.
 
@@ -68,6 +68,13 @@ KEMS creates source-mirror entities only when the matching source is configured.
 - simulated battery charged, delivered to home, and exported
 - avoided day-rate grid import
 
+## Native period summaries
+
+- Today, Week, Month, Year, and All-time summary sensors
+- actual house, EV, grid, solar, battery, gas, import-cost, export-income, and system-value attributes
+- separately retained simulated import, export, solar, battery, avoided-import, cost, income, and system-value attributes
+- complete/incomplete day counts and explicit data-completeness status
+
 ## Whole-home totals
 
 - observed whole-home electricity-plus-gas cost
@@ -101,3 +108,19 @@ KEMS creates source-mirror entities only when the matching source is configured.
 - `binary_sensor.kems_system_installed`
 - `binary_sensor.kems_system_paid_back`
 - lifetime electricity, gas, solar, grid, EV, battery, cost, earnings, system-value, and operating-day sensors
+
+
+## Control Lab — desired plan and safety
+
+- operating mode and virtual scenario
+- control operating reason and next action
+- desired inverter work mode
+- desired charge, battery-to-home, battery-export, and total-discharge power
+- desired minimum SOC
+- grid available and whole-house island state
+- whole-house EPS load, headroom, utilisation, warning, and critical state
+- solar-to-house, solar-to-battery, and battery-to-house island routing
+- estimated outage runtime
+- data age/freshness, plan-safe status, preflight result, and blocked reason
+- master control enable, commissioning state, real-backend availability, and command-permission status
+- interactive operating-mode/scenario selects and emergency-stop/master-enable switches

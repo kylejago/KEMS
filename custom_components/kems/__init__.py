@@ -17,6 +17,7 @@ from .const import (
     CONF_MAX_CHARGE,
     CONF_MAX_DISCHARGE,
     CONF_SIMULATION_STRATEGY,
+    CONF_SITE_IMPORT_LIMIT,
 )
 from .coordinator import KEMSCoordinator
 from .entity_discovery import (
@@ -34,7 +35,12 @@ from .settings import KEMSSettings
 
 LOGGER = logging.getLogger(__name__)
 
-PLATFORMS: list[Platform] = [Platform.SENSOR, Platform.BINARY_SENSOR]
+PLATFORMS: list[Platform] = [
+    Platform.SENSOR,
+    Platform.BINARY_SENSOR,
+    Platform.SELECT,
+    Platform.SWITCH,
+]
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
@@ -79,7 +85,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     await coordinator.async_config_entry_first_refresh()
     entry.runtime_data = coordinator
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
-    LOGGER.info("KEMS initialised in read-only proposal simulation and whole-home mode")
+    LOGGER.info(
+        "KEMS initialised with read-only control lab; real hardware writes are blocked"
+    )
     return True
 
 
@@ -92,7 +100,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
 async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Migrate earlier KEMS config entries to the current schema."""
-    if entry.version > 9:
+    if entry.version > 11:
         return False
 
     data = dict(entry.data)
@@ -116,11 +124,16 @@ async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         options[CONF_EXPORT_RATE] = 12.0
         options[CONF_SIMULATION_STRATEGY] = "paced_export"
 
+    if entry.version < 11:
+        # Site import is a separate installation constraint. Zero means the
+        # installer-confirmed limit has not yet been configured.
+        options.setdefault(CONF_SITE_IMPORT_LIMIT, 0.0)
+
     hass.config_entries.async_update_entry(
         entry,
         data=data,
         options=options,
-        version=9,
+        version=11,
         minor_version=0,
     )
     return True

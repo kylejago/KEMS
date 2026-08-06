@@ -1,14 +1,14 @@
 # KEMS — Kyle Energy Management System
 
-KEMS 0.6.0-beta1 is the release-candidate baseline for Home Assistant. It turns existing whole-home energy entities into one explainable pipeline:
+KEMS 0.7.0-alpha3 is the pre-installation control-development lab for Home Assistant. It extends the 0.6.0-beta1 baseline into:
 
-**Observe → Learn → Advise → Simulate**
+**Observe → Learn → Advise → Simulate → Shadow → Control**
 
-The Control phase remains deliberately excluded. This build does not call Octopus, Ohme, or FoxESS services and does not write inverter or charger settings.
+This alpha builds and validates desired FoxESS commands, whole-house island behaviour, EPS limits, cheap charging, Power Down export, and safety interlocks. Real FoxESS writes are deliberately hard-blocked until the commissioned KH7 backend is mapped and verified on installation day.
 
-## Release purpose
+## Development branch purpose
 
-This package is prepared for merging the tested `develop` branch into `main` and publishing GitHub release `v0.6.0-beta1`. It includes every monitoring, learning, simulation, KH7 paced-export, home-reserve, Power Down, ROI-gating, and dashboard correction completed through alpha5.
+This package starts the post-beta `develop` branch for the 17 August commissioning target. It preserves the complete 0.6.0-beta1 monitoring/simulation fallback and adds a hardware-independent control planner plus virtual outage scenarios.
 
 ## Supported sources
 
@@ -123,6 +123,19 @@ Gas is observed rather than optimised. The simulated whole-home comparison chang
 - `sensor.kems_estimated_power_down_session_total_income`
 - `sensor.kems_simulated_power_down_session_bonus_today`
 
+### Control Lab and island resilience
+
+- `sensor.kems_virtual_scenario_house_load`
+- `sensor.kems_virtual_scenario_solar_power`
+- `sensor.kems_island_battery_status`
+- `sensor.kems_island_conservation_threshold`
+- `sensor.kems_island_emergency_floor`
+- `binary_sensor.kems_island_battery_conservation_active`
+- `sensor.kems_estimated_outage_runtime`
+- `sensor.kems_control_operating_reason`
+- `sensor.kems_control_blocked_reason`
+- `sensor.kems_control_next_action`
+
 ### Import, export, battery and solar
 
 - `sensor.kems_observed_grid_import_today`
@@ -149,10 +162,15 @@ Gas is observed rather than optimised. The simulated whole-home comparison chang
 - `sensor.kems_whole_home_observed_cost_today`
 - `sensor.kems_whole_home_simulated_cost_today`
 - `sensor.kems_whole_home_simulated_saving_today`
+- `sensor.kems_today_summary`
+- `sensor.kems_week_summary`
+- `sensor.kems_month_summary`
+- `sensor.kems_year_summary`
+- `sensor.kems_all_time_summary`
 
 ## ROI and lifetime tracking
 
-KEMS now keeps a permanent local ledger, separate from Home Assistant Recorder retention. Before installation it waits for seven complete 24-hour observation periods, then annualises the accumulated proposal simulation value to estimate payback and discounted net value. After a commissioning date is entered in KEMS options, it switches to actual value-created tracking.
+KEMS now keeps a permanent local ledger, separate from Home Assistant Recorder retention. Alpha3 accumulates observed electricity, gas, import/export, and billing evidence before installation, while keeping realised system-created value locked until commissioning. It publishes native Today, Week, Month, Year, and All-time summaries with actual and simulated figures stored separately. Missing historical days are marked incomplete instead of silently becoming zero. Before installation it waits for seven complete 24-hour observation periods, then annualises the accumulated proposal simulation value to estimate payback and discounted net value. After a commissioning date is entered in KEMS options, it switches to actual value-created tracking.
 
 When recovered value reaches the net investment, KEMS permanently records the payback date and changes to **SYSTEM PAID BACK — PROFIT MODE**. Profit is calculated after the investment and recorded operating costs have been deducted.
 
@@ -160,7 +178,7 @@ The default investment is the quoted £20,995. Grants, extra installation costs,
 
 ## Dashboards
 
-The `dashboards/` directory contains nine complete dashboards:
+The `dashboards/` directory contains ten complete dashboards:
 
 - pre-install proposal comparison
 - advanced desktop mission control, styled like the supplied reference
@@ -171,6 +189,7 @@ The `dashboards/` directory contains nine complete dashboards:
 - advanced ROI dashboard with a filling financial battery and Profit Mode
 - complete dynamic diagnostics dashboard listing every KEMS entity
 - full-width actual-versus-simulated dashboard with paced-export diagnostics
+- pre-installation Control Lab for scenario and safety validation
 
 See `dashboards/README.md` for installation and frontend-card requirements.
 
@@ -188,3 +207,13 @@ python -m pre_commit run --all-files
 ```
 
 See `START_HERE.md` for the exact GitHub Desktop workflow.
+
+## Pre-installation Control Lab
+
+The KEMS options page and `dashboards/kems_control_lab.yaml` provide interactive controls for:
+
+- operating mode: Observe, Simulate, Shadow, or blocked Control;
+- virtual scenario: normal, sunny, cloudy, high load, active Power Down, daylight outage, night outage, EPS overload, or unstable grid restoration;
+- emergency-stop latch and master-control opt-in.
+
+The controller publishes desired work mode, charge/discharge/export power, minimum SOC, EPS headroom, island energy routing, outage runtime, safety status, and a clear blocked reason. The real backend is absent by design, so `Control commands permitted` remains off in this alpha.

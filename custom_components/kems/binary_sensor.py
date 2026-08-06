@@ -196,6 +196,121 @@ BINARY_SENSORS: tuple[KEMSBinarySensorEntityDescription, ...] = (
             and not data.snapshot.cheap_period_confirmed
         ),
     ),
+    KEMSBinarySensorEntityDescription(
+        key="grid_available_for_control",
+        name="Grid available for control",
+        icon="mdi:transmission-tower",
+        is_on_fn=lambda data: data.control.grid_available,
+    ),
+    KEMSBinarySensorEntityDescription(
+        key="whole_house_island_mode",
+        name="Whole-house island mode",
+        icon="mdi:home-lightning-bolt",
+        is_on_fn=lambda data: data.control.island_mode_active,
+    ),
+    KEMSBinarySensorEntityDescription(
+        key="control_plan_safe",
+        name="Control plan safe",
+        icon="mdi:shield-check-outline",
+        is_on_fn=lambda data: data.control.plan_safe,
+    ),
+    KEMSBinarySensorEntityDescription(
+        key="control_data_fresh",
+        name="Control data fresh",
+        icon="mdi:database-clock",
+        is_on_fn=lambda data: data.control.data_fresh,
+    ),
+    KEMSBinarySensorEntityDescription(
+        key="kems_control_enabled",
+        name="Control enabled",
+        icon="mdi:toggle-switch-outline",
+        is_on_fn=lambda data: data.control.control_enabled,
+    ),
+    KEMSBinarySensorEntityDescription(
+        key="system_commissioned_for_control",
+        name="System commissioned for control",
+        icon="mdi:certificate-outline",
+        is_on_fn=lambda data: data.control.commissioned,
+    ),
+    KEMSBinarySensorEntityDescription(
+        key="real_control_backend_available",
+        name="Real control backend available",
+        icon="mdi:connection",
+        is_on_fn=lambda data: data.control.real_backend_available,
+    ),
+    KEMSBinarySensorEntityDescription(
+        key="control_commands_permitted",
+        name="Control commands permitted",
+        icon="mdi:send-check-outline",
+        is_on_fn=lambda data: data.control.commands_permitted,
+    ),
+    KEMSBinarySensorEntityDescription(
+        key="island_battery_conservation_active",
+        name="Island battery conservation active",
+        icon="mdi:battery-alert-variant-outline",
+        is_on_fn=lambda data: data.control.island_battery_status
+        in {"conservation", "emergency_floor"},
+    ),
+    KEMSBinarySensorEntityDescription(
+        key="eps_load_warning",
+        name="EPS load warning",
+        icon="mdi:alert-outline",
+        is_on_fn=lambda data: data.control.eps_warning,
+    ),
+    KEMSBinarySensorEntityDescription(
+        key="eps_load_critical",
+        name="EPS load critical",
+        icon="mdi:alert-octagon-outline",
+        is_on_fn=lambda data: data.control.eps_critical,
+    ),
+    KEMSBinarySensorEntityDescription(
+        key="ev_charging_allowed_by_control",
+        name="EV charging allowed by control",
+        icon="mdi:ev-station",
+        is_on_fn=lambda data: data.control.desired_ev_charging_allowed,
+    ),
+    KEMSBinarySensorEntityDescription(
+        key="grid_export_allowed_by_control",
+        name="Grid export allowed by control",
+        icon="mdi:transmission-tower-export",
+        is_on_fn=lambda data: data.control.desired_grid_export_allowed,
+    ),
+    KEMSBinarySensorEntityDescription(
+        key="site_import_limit_exceeded",
+        name="Site import limit exceeded",
+        icon="mdi:transmission-tower-off",
+        is_on_fn=lambda data: data.control.site_import_limit_exceeded,
+    ),
+    KEMSBinarySensorEntityDescription(
+        key="accumulator_healthy",
+        name="Accumulator healthy",
+        icon="mdi:database-check-outline",
+        is_on_fn=lambda data: data.lifetime.accumulator_status == "healthy",
+    ),
+    KEMSBinarySensorEntityDescription(
+        key="historical_repair_required",
+        name="Historical repair required",
+        icon="mdi:database-alert-outline",
+        is_on_fn=lambda data: data.lifetime.historical_repair_required,
+    ),
+    KEMSBinarySensorEntityDescription(
+        key="last_power_down_available",
+        name="Last Power Down result available",
+        icon="mdi:history",
+        is_on_fn=lambda data: data.last_power_down.available,
+    ),
+    KEMSBinarySensorEntityDescription(
+        key="last_power_down_completed_successfully",
+        name="Last Power Down completed successfully",
+        icon="mdi:check-decagram-outline",
+        is_on_fn=lambda data: data.last_power_down.completed_successfully,
+    ),
+    KEMSBinarySensorEntityDescription(
+        key="last_power_down_ev_blocked",
+        name="Last Power Down EV successfully blocked",
+        icon="mdi:ev-station-off",
+        is_on_fn=lambda data: data.last_power_down.ev_successfully_blocked,
+    ),
 )
 
 

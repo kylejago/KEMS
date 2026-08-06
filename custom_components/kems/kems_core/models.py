@@ -178,6 +178,8 @@ class SimulationConfig:
     export_rate_pence: float = 12.0
     inverter_limit_kw: float = 7.0
     export_limit_kw: float = 7.0
+    eps_output_limit_kw: float = 7.0
+    site_import_limit_kw: float | None = None
     battery_export_enabled: bool = True
     proposal_solar_enabled: bool = True
     proposal_solar_factor: float = 1.0
@@ -225,8 +227,12 @@ class SimulationState:
     current_simulated_grid_import_kw: float | None = None
     current_simulated_grid_export_kw: float | None = None
     current_simulated_battery_power_kw: float | None = None
+    current_simulated_battery_charge_power_kw: float | None = None
     current_simulated_battery_to_home_power_kw: float | None = None
     current_simulated_battery_export_power_kw: float | None = None
+    current_simulated_total_kh7_output_kw: float | None = None
+    current_simulated_grid_bypass_power_kw: float | None = None
+    current_simulated_total_site_import_kw: float | None = None
     target_battery_export_power_kw: float | None = None
     exportable_battery_energy_kwh: float | None = None
     reserved_for_home_kwh: float | None = None
@@ -258,6 +264,12 @@ class SimulationState:
     effective_export_rate_pence: float | None = None
     inverter_limit_kw: float | None = None
     export_limit_kw: float | None = None
+    battery_charge_limit_kw: float | None = None
+    battery_discharge_limit_kw: float | None = None
+    eps_output_limit_kw: float | None = None
+    site_import_limit_kw: float | None = None
+    site_import_headroom_kw: float | None = None
+    site_import_limit_exceeded: bool = False
     strategy: str = "paced_export"
     proposal_solar_active: bool = False
     battery_export_enabled: bool = False
@@ -314,6 +326,12 @@ class LifetimeLedger:
     paid_back_date: date | None = None
     observed_days: int = 0
     system_operating_days: int = 0
+    accumulator_status: str = "initialising"
+    last_daily_rollover: date | None = None
+    last_successful_accumulation: datetime | None = None
+    accumulation_days_complete: int = 0
+    accumulation_days_incomplete: int = 0
+    historical_repair_required: bool = False
 
     house_consumption_kwh: float = 0.0
     ev_energy_kwh: float = 0.0
@@ -324,9 +342,21 @@ class LifetimeLedger:
     battery_discharge_kwh: float = 0.0
     gas_consumption_kwh: float = 0.0
 
+    simulated_grid_import_kwh: float = 0.0
+    simulated_grid_export_kwh: float = 0.0
+    simulated_solar_generation_kwh: float = 0.0
+    simulated_battery_charge_kwh: float = 0.0
+    simulated_battery_to_home_kwh: float = 0.0
+    simulated_battery_export_kwh: float = 0.0
+    simulated_avoided_day_rate_import_kwh: float = 0.0
+
     import_cost_pence: float = 0.0
     export_income_pence: float = 0.0
     gas_cost_pence: float = 0.0
+    simulated_import_cost_pence: float = 0.0
+    simulated_export_income_pence: float = 0.0
+    simulated_net_cost_pence: float = 0.0
+    simulated_avoided_import_value_pence: float = 0.0
     actual_avoided_import_value_pence: float = 0.0
     actual_system_value_pence: float = 0.0
     simulated_system_value_pence: float = 0.0
@@ -342,13 +372,18 @@ class LifetimeLedger:
     def to_dict(self) -> dict[str, Any]:
         """Return a JSON-compatible representation."""
         data = asdict(self)
-        for key in ("first_observation", "last_updated"):
+        for key in (
+            "first_observation",
+            "last_updated",
+            "last_successful_accumulation",
+        ):
             value = data[key]
             if isinstance(value, datetime):
                 data[key] = value.isoformat()
         for key in (
             "commissioning_date",
             "paid_back_date",
+            "last_daily_rollover",
             "best_system_value_day",
             "best_solar_day",
             "best_export_day",
@@ -362,13 +397,18 @@ class LifetimeLedger:
     def from_dict(cls, data: dict[str, Any]) -> LifetimeLedger:
         """Restore ledger totals from storage."""
         values = dict(data)
-        for key in ("first_observation", "last_updated"):
+        for key in (
+            "first_observation",
+            "last_updated",
+            "last_successful_accumulation",
+        ):
             value = values.get(key)
             if isinstance(value, str):
                 values[key] = datetime.fromisoformat(value)
         for key in (
             "commissioning_date",
             "paid_back_date",
+            "last_daily_rollover",
             "best_system_value_day",
             "best_solar_day",
             "best_export_day",
@@ -378,6 +418,60 @@ class LifetimeLedger:
                 values[key] = date.fromisoformat(value)
         known = cls.__dataclass_fields__
         return cls(**{key: value for key, value in values.items() if key in known})
+
+
+@dataclass(frozen=True, slots=True)
+class PeriodTotals:
+    """Persisted actual and simulated totals for a reporting period."""
+
+    start_date: date | None = None
+    end_date: date | None = None
+    days_included: int = 0
+    complete_days: int = 0
+    incomplete_days: int = 0
+    data_complete: bool = True
+
+    house_consumption_kwh: float = 0.0
+    ev_energy_kwh: float = 0.0
+    grid_import_kwh: float = 0.0
+    grid_export_kwh: float = 0.0
+    solar_generation_kwh: float = 0.0
+    battery_charge_kwh: float = 0.0
+    battery_discharge_kwh: float = 0.0
+    gas_consumption_kwh: float = 0.0
+    import_cost_pence: float = 0.0
+    export_income_pence: float = 0.0
+    gas_cost_pence: float = 0.0
+    actual_avoided_import_value_pence: float = 0.0
+    actual_system_value_pence: float = 0.0
+
+    simulated_grid_import_kwh: float = 0.0
+    simulated_grid_export_kwh: float = 0.0
+    simulated_solar_generation_kwh: float = 0.0
+    simulated_battery_charge_kwh: float = 0.0
+    simulated_battery_to_home_kwh: float = 0.0
+    simulated_battery_export_kwh: float = 0.0
+    simulated_avoided_day_rate_import_kwh: float = 0.0
+    simulated_import_cost_pence: float = 0.0
+    simulated_export_income_pence: float = 0.0
+    simulated_net_cost_pence: float = 0.0
+    simulated_avoided_import_value_pence: float = 0.0
+    simulated_system_value_pence: float = 0.0
+
+    @property
+    def actual_net_cost_pence(self) -> float:
+        """Return electricity and gas cost after export income."""
+        return self.import_cost_pence + self.gas_cost_pence - self.export_income_pence
+
+    def to_dict(self) -> dict[str, Any]:
+        """Return a JSON-compatible reporting payload."""
+        data = asdict(self)
+        for key in ("start_date", "end_date"):
+            value = data[key]
+            if isinstance(value, date):
+                data[key] = value.isoformat()
+        data["actual_net_cost_pence"] = round(self.actual_net_cost_pence, 2)
+        return data
 
 
 @dataclass(frozen=True, slots=True)
@@ -410,6 +504,125 @@ class ROIState:
 
 
 @dataclass(frozen=True, slots=True)
+class ControlConfig:
+    """Safety and commissioning settings for the control planner."""
+
+    operating_mode: str = "simulate"
+    virtual_scenario: str = "normal"
+    control_enabled: bool = False
+    commissioned: bool = False
+    emergency_stop: bool = False
+    stale_data_seconds: int = 180
+    grid_stability_seconds: int = 300
+    eps_limit_kw: float = 7.0
+    eps_warning_percent: float = 70.0
+    eps_critical_percent: float = 90.0
+    island_reserve_percent: float = 20.0
+    normal_reserve_percent: float = 10.0
+    battery_capacity_kwh: float = 56.42
+    discharge_efficiency: float = 0.95
+    max_charge_kw: float = 7.0
+    max_discharge_kw: float = 7.0
+    export_limit_kw: float = 7.0
+    inverter_limit_kw: float = 7.0
+    site_import_limit_kw: float | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class ControlState:
+    """One explainable desired-control plan."""
+
+    operating_mode: str = "simulate"
+    virtual_scenario: str = "normal"
+    operating_reason: str = "observe_only"
+    desired_work_mode: str = "No change"
+    desired_charge_power_kw: float = 0.0
+    desired_battery_to_home_power_kw: float = 0.0
+    desired_battery_export_power_kw: float = 0.0
+    desired_total_discharge_power_kw: float = 0.0
+    desired_min_soc_percent: float = 10.0
+    desired_ev_charging_allowed: bool = True
+    desired_grid_export_allowed: bool = True
+    grid_available: bool = True
+    island_mode_active: bool = False
+    whole_house_eps_load_kw: float = 0.0
+    virtual_scenario_house_load_kw: float = 0.0
+    virtual_scenario_solar_power_kw: float = 0.0
+    eps_headroom_kw: float = 7.0
+    eps_utilisation_percent: float = 0.0
+    eps_warning: bool = False
+    eps_critical: bool = False
+    eps_status: str = "not_active"
+    eps_load_reduction_required_kw: float = 0.0
+    total_kh7_ac_output_kw: float = 0.0
+    kh7_output_headroom_kw: float = 7.0
+    grid_bypass_power_kw: float = 0.0
+    total_site_import_kw: float = 0.0
+    site_import_limit_kw: float | None = None
+    site_import_headroom_kw: float | None = None
+    site_import_limit_exceeded: bool = False
+    solar_to_house_kw: float = 0.0
+    solar_to_battery_kw: float = 0.0
+    battery_to_house_kw: float = 0.0
+    island_conservation_threshold_percent: float = 20.0
+    island_emergency_floor_percent: float = 10.0
+    island_battery_status: str = "not_active"
+    estimated_outage_runtime_hours: float | None = None
+    data_age_seconds: float = 0.0
+    data_fresh: bool = True
+    plan_safe: bool = True
+    control_enabled: bool = False
+    commissioned: bool = False
+    real_backend_available: bool = False
+    commands_permitted: bool = False
+    blocked_reason: str = "Simulation/shadow only"
+    next_action: str = "Continue observing"
+    preflight_passed: int = 0
+    preflight_total: int = 0
+    preflight_status: str = "Not run"
+
+
+@dataclass(frozen=True, slots=True)
+class PowerDownResult:
+    """Persisted summary of the last completed Power Down event."""
+
+    available: bool = False
+    session_id: str | None = None
+    session_start: datetime | None = None
+    session_end: datetime | None = None
+    starting_simulated_soc_percent: float | None = None
+    finishing_simulated_soc_percent: float | None = None
+    planned_battery_to_home_kwh: float | None = None
+    planned_export_kwh: float | None = None
+    maximum_inverter_output_kw: float | None = None
+    rewardable_reduction_kwh: float | None = None
+    bonus_pence: float | None = None
+    fixed_export_income_pence: float | None = None
+    combined_income_pence: float | None = None
+    ev_successfully_blocked: bool = False
+    completed_successfully: bool = False
+    completion_reason: str = "unavailable"
+
+    def to_dict(self) -> dict[str, Any]:
+        data = asdict(self)
+        for key in ("session_start", "session_end"):
+            value = data[key]
+            if isinstance(value, datetime):
+                data[key] = value.isoformat()
+        return data
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> PowerDownResult:
+        values = dict(data)
+        for key in ("session_start", "session_end"):
+            value = values.get(key)
+            if isinstance(value, str):
+                values[key] = datetime.fromisoformat(value)
+        known = cls.__dataclass_fields__
+        return cls(**{key: value for key, value in values.items() if key in known})
+
+
+@dataclass(frozen=True, slots=True)
 class DataQuality:
     """Coverage and health of the configured observations."""
 
@@ -432,5 +645,8 @@ class KEMSData:
     lifetime: LifetimeLedger
     roi: ROIState
     quality: DataQuality
+    control: ControlState
     history_samples: int
     phase: str
+    last_power_down: PowerDownResult = field(default_factory=PowerDownResult)
+    periods: dict[str, PeriodTotals] = field(default_factory=dict)

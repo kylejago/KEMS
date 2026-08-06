@@ -101,8 +101,20 @@ def _simulation_attributes(data: KEMSData) -> Mapping[str, Any]:
         "simulated_battery_to_home_kwh": simulation.simulated_battery_to_home_kwh,
         "simulated_battery_export_kwh": simulation.simulated_battery_export_kwh,
         "simulated_battery_soc": simulation.simulated_battery_soc,
+        "current_simulated_battery_charge_power_kw": (
+            simulation.current_simulated_battery_charge_power_kw
+        ),
         "current_simulated_battery_to_home_power_kw": (
             simulation.current_simulated_battery_to_home_power_kw
+        ),
+        "current_simulated_total_kh7_output_kw": (
+            simulation.current_simulated_total_kh7_output_kw
+        ),
+        "current_simulated_grid_bypass_power_kw": (
+            simulation.current_simulated_grid_bypass_power_kw
+        ),
+        "current_simulated_total_site_import_kw": (
+            simulation.current_simulated_total_site_import_kw
         ),
         "current_simulated_battery_export_power_kw": (
             simulation.current_simulated_battery_export_power_kw
@@ -176,6 +188,12 @@ def _simulation_attributes(data: KEMSData) -> Mapping[str, Any]:
         "effective_export_rate_pence": simulation.effective_export_rate_pence,
         "inverter_limit_kw": simulation.inverter_limit_kw,
         "export_limit_kw": simulation.export_limit_kw,
+        "battery_charge_limit_kw": simulation.battery_charge_limit_kw,
+        "battery_discharge_limit_kw": simulation.battery_discharge_limit_kw,
+        "eps_output_limit_kw": simulation.eps_output_limit_kw,
+        "site_import_limit_kw": simulation.site_import_limit_kw,
+        "site_import_headroom_kw": simulation.site_import_headroom_kw,
+        "site_import_limit_exceeded": simulation.site_import_limit_exceeded,
         "strategy": simulation.strategy,
         "proposal_solar_active": simulation.proposal_solar_active,
         "battery_export_enabled": simulation.battery_export_enabled,
@@ -223,6 +241,20 @@ def _lifetime_attributes(data: KEMSData) -> Mapping[str, Any]:
         "last_updated": (
             ledger.last_updated.isoformat() if ledger.last_updated else None
         ),
+        "accumulator_status": ledger.accumulator_status,
+        "last_daily_rollover": (
+            ledger.last_daily_rollover.isoformat()
+            if ledger.last_daily_rollover
+            else None
+        ),
+        "last_successful_accumulation": (
+            ledger.last_successful_accumulation.isoformat()
+            if ledger.last_successful_accumulation
+            else None
+        ),
+        "accumulation_days_complete": ledger.accumulation_days_complete,
+        "accumulation_days_incomplete": ledger.accumulation_days_incomplete,
+        "historical_repair_required": ledger.historical_repair_required,
         "commissioning_date": (
             ledger.commissioning_date.isoformat() if ledger.commissioning_date else None
         ),
@@ -281,6 +313,26 @@ def _estimated_battery_cycles(data: KEMSData) -> float | None:
     if usable <= 0:
         return None
     return round(data.lifetime.battery_discharge_kwh / usable, 2)
+
+
+def _last_power_down_attributes(data: KEMSData) -> Mapping[str, Any]:
+    """Expose the full retained Power Down result on each summary sensor."""
+    return data.last_power_down.to_dict()
+
+
+def _period_value(data: KEMSData, period_name: str) -> float | None:
+    """Return the actual net whole-home cost for one reporting period."""
+    period = data.periods.get(period_name)
+    return None if period is None else round(period.actual_net_cost_pence, 2)
+
+
+def _period_attributes(
+    data: KEMSData,
+    period_name: str,
+) -> Mapping[str, Any]:
+    """Expose actual and simulated totals for one native KEMS period."""
+    period = data.periods.get(period_name)
+    return {} if period is None else period.to_dict()
 
 
 def _profile_attributes(data: KEMSData) -> Mapping[str, Any]:
@@ -1524,6 +1576,501 @@ SENSORS: tuple[KEMSSensorEntityDescription, ...] = (
         native_unit_of_measurement="cycles",
         suggested_display_precision=2,
         value_fn=_estimated_battery_cycles,
+    ),
+    KEMSSensorEntityDescription(
+        key="operating_mode",
+        name="Operating mode",
+        icon="mdi:tune-variant",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda data: data.control.operating_mode,
+    ),
+    KEMSSensorEntityDescription(
+        key="virtual_control_scenario",
+        name="Virtual control scenario",
+        icon="mdi:test-tube",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda data: data.control.virtual_scenario,
+    ),
+    KEMSSensorEntityDescription(
+        key="virtual_scenario_house_load",
+        name="Virtual scenario house load",
+        icon="mdi:home-lightning-bolt-outline",
+        device_class=SensorDeviceClass.POWER,
+        native_unit_of_measurement=UnitOfPower.KILO_WATT,
+        suggested_display_precision=2,
+        value_fn=lambda data: data.control.virtual_scenario_house_load_kw,
+    ),
+    KEMSSensorEntityDescription(
+        key="virtual_scenario_solar_power",
+        name="Virtual scenario solar power",
+        icon="mdi:solar-power-variant",
+        device_class=SensorDeviceClass.POWER,
+        native_unit_of_measurement=UnitOfPower.KILO_WATT,
+        suggested_display_precision=2,
+        value_fn=lambda data: data.control.virtual_scenario_solar_power_kw,
+    ),
+    KEMSSensorEntityDescription(
+        key="control_operating_reason",
+        name="Control operating reason",
+        icon="mdi:information-outline",
+        value_fn=lambda data: data.control.operating_reason,
+    ),
+    KEMSSensorEntityDescription(
+        key="desired_inverter_work_mode",
+        name="Desired inverter work mode",
+        icon="mdi:swap-horizontal",
+        value_fn=lambda data: data.control.desired_work_mode,
+    ),
+    KEMSSensorEntityDescription(
+        key="desired_battery_charge_power",
+        name="Desired battery charge power",
+        icon="mdi:battery-arrow-up",
+        device_class=SensorDeviceClass.POWER,
+        native_unit_of_measurement=UnitOfPower.KILO_WATT,
+        suggested_display_precision=2,
+        value_fn=lambda data: data.control.desired_charge_power_kw,
+    ),
+    KEMSSensorEntityDescription(
+        key="desired_battery_to_home_power",
+        name="Desired battery to home power",
+        icon="mdi:home-battery",
+        device_class=SensorDeviceClass.POWER,
+        native_unit_of_measurement=UnitOfPower.KILO_WATT,
+        suggested_display_precision=2,
+        value_fn=lambda data: data.control.desired_battery_to_home_power_kw,
+    ),
+    KEMSSensorEntityDescription(
+        key="desired_battery_export_power",
+        name="Desired battery export power",
+        icon="mdi:transmission-tower-export",
+        device_class=SensorDeviceClass.POWER,
+        native_unit_of_measurement=UnitOfPower.KILO_WATT,
+        suggested_display_precision=2,
+        value_fn=lambda data: data.control.desired_battery_export_power_kw,
+    ),
+    KEMSSensorEntityDescription(
+        key="desired_total_battery_discharge_power",
+        name="Desired total battery discharge power",
+        icon="mdi:battery-arrow-down",
+        device_class=SensorDeviceClass.POWER,
+        native_unit_of_measurement=UnitOfPower.KILO_WATT,
+        suggested_display_precision=2,
+        value_fn=lambda data: data.control.desired_total_discharge_power_kw,
+    ),
+    KEMSSensorEntityDescription(
+        key="desired_minimum_soc",
+        name="Desired minimum SOC",
+        icon="mdi:battery-lock",
+        native_unit_of_measurement=PERCENTAGE,
+        suggested_display_precision=0,
+        value_fn=lambda data: data.control.desired_min_soc_percent,
+    ),
+    KEMSSensorEntityDescription(
+        key="whole_house_eps_load",
+        name="Whole-house EPS load",
+        icon="mdi:home-lightning-bolt",
+        device_class=SensorDeviceClass.POWER,
+        native_unit_of_measurement=UnitOfPower.KILO_WATT,
+        suggested_display_precision=2,
+        value_fn=lambda data: data.control.whole_house_eps_load_kw,
+    ),
+    KEMSSensorEntityDescription(
+        key="eps_headroom",
+        name="EPS headroom",
+        icon="mdi:gauge",
+        device_class=SensorDeviceClass.POWER,
+        native_unit_of_measurement=UnitOfPower.KILO_WATT,
+        suggested_display_precision=2,
+        value_fn=lambda data: data.control.eps_headroom_kw,
+    ),
+    KEMSSensorEntityDescription(
+        key="eps_utilisation",
+        name="EPS utilisation",
+        icon="mdi:speedometer",
+        native_unit_of_measurement=PERCENTAGE,
+        suggested_display_precision=0,
+        value_fn=lambda data: data.control.eps_utilisation_percent,
+    ),
+    KEMSSensorEntityDescription(
+        key="island_solar_to_house_power",
+        name="Island solar to house power",
+        icon="mdi:solar-power",
+        device_class=SensorDeviceClass.POWER,
+        native_unit_of_measurement=UnitOfPower.KILO_WATT,
+        suggested_display_precision=2,
+        value_fn=lambda data: data.control.solar_to_house_kw,
+    ),
+    KEMSSensorEntityDescription(
+        key="island_solar_to_battery_power",
+        name="Island solar to battery power",
+        icon="mdi:battery-charging",
+        device_class=SensorDeviceClass.POWER,
+        native_unit_of_measurement=UnitOfPower.KILO_WATT,
+        suggested_display_precision=2,
+        value_fn=lambda data: data.control.solar_to_battery_kw,
+    ),
+    KEMSSensorEntityDescription(
+        key="island_battery_to_house_power",
+        name="Island battery to house power",
+        icon="mdi:home-battery-outline",
+        device_class=SensorDeviceClass.POWER,
+        native_unit_of_measurement=UnitOfPower.KILO_WATT,
+        suggested_display_precision=2,
+        value_fn=lambda data: data.control.battery_to_house_kw,
+    ),
+    KEMSSensorEntityDescription(
+        key="island_battery_status",
+        name="Island battery status",
+        icon="mdi:battery-heart-variant",
+        value_fn=lambda data: data.control.island_battery_status,
+    ),
+    KEMSSensorEntityDescription(
+        key="island_conservation_threshold",
+        name="Island conservation threshold",
+        icon="mdi:battery-alert-variant-outline",
+        native_unit_of_measurement=PERCENTAGE,
+        suggested_display_precision=0,
+        value_fn=lambda data: data.control.island_conservation_threshold_percent,
+    ),
+    KEMSSensorEntityDescription(
+        key="island_emergency_floor",
+        name="Island emergency floor",
+        icon="mdi:battery-lock-open-outline",
+        native_unit_of_measurement=PERCENTAGE,
+        suggested_display_precision=0,
+        value_fn=lambda data: data.control.island_emergency_floor_percent,
+    ),
+    KEMSSensorEntityDescription(
+        key="estimated_outage_runtime",
+        name="Estimated outage runtime",
+        icon="mdi:timer-sand",
+        native_unit_of_measurement="h",
+        suggested_display_precision=1,
+        value_fn=lambda data: data.control.estimated_outage_runtime_hours,
+    ),
+    KEMSSensorEntityDescription(
+        key="control_data_age",
+        name="Control data age",
+        icon="mdi:timer-alert-outline",
+        native_unit_of_measurement="s",
+        suggested_display_precision=0,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda data: data.control.data_age_seconds,
+    ),
+    KEMSSensorEntityDescription(
+        key="control_blocked_reason",
+        name="Control blocked reason",
+        icon="mdi:shield-lock-outline",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda data: data.control.blocked_reason,
+    ),
+    KEMSSensorEntityDescription(
+        key="control_next_action",
+        name="Control next action",
+        icon="mdi:step-forward",
+        value_fn=lambda data: data.control.next_action,
+    ),
+    KEMSSensorEntityDescription(
+        key="control_preflight",
+        name="Control preflight",
+        icon="mdi:clipboard-check-outline",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda data: data.control.preflight_status,
+        attributes_fn=lambda data: {
+            "passed": data.control.preflight_passed,
+            "total": data.control.preflight_total,
+        },
+    ),
+    KEMSSensorEntityDescription(
+        key="simulated_battery_charging_power",
+        name="Simulated battery charging power",
+        icon="mdi:battery-charging-high",
+        device_class=SensorDeviceClass.POWER,
+        native_unit_of_measurement=UnitOfPower.KILO_WATT,
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=3,
+        value_fn=lambda data: data.simulation.current_simulated_battery_charge_power_kw,
+        attributes_fn=_simulation_attributes,
+    ),
+    KEMSSensorEntityDescription(
+        key="simulated_total_kh7_output",
+        name="Simulated total KH7 AC output",
+        icon="mdi:sine-wave",
+        device_class=SensorDeviceClass.POWER,
+        native_unit_of_measurement=UnitOfPower.KILO_WATT,
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=3,
+        value_fn=lambda data: data.simulation.current_simulated_total_kh7_output_kw,
+        attributes_fn=_simulation_attributes,
+    ),
+    KEMSSensorEntityDescription(
+        key="simulated_grid_bypass_power",
+        name="Simulated grid bypass power",
+        icon="mdi:transmission-tower-import",
+        device_class=SensorDeviceClass.POWER,
+        native_unit_of_measurement=UnitOfPower.KILO_WATT,
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=3,
+        value_fn=lambda data: data.simulation.current_simulated_grid_bypass_power_kw,
+    ),
+    KEMSSensorEntityDescription(
+        key="simulated_total_site_import",
+        name="Simulated total site import",
+        icon="mdi:home-import-outline",
+        device_class=SensorDeviceClass.POWER,
+        native_unit_of_measurement=UnitOfPower.KILO_WATT,
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=3,
+        value_fn=lambda data: data.simulation.current_simulated_total_site_import_kw,
+    ),
+    KEMSSensorEntityDescription(
+        key="kh7_inverter_limit",
+        name="KH7 combined AC output limit",
+        icon="mdi:meter-electric-outline",
+        device_class=SensorDeviceClass.POWER,
+        native_unit_of_measurement=UnitOfPower.KILO_WATT,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda data: data.simulation.inverter_limit_kw,
+    ),
+    KEMSSensorEntityDescription(
+        key="kh7_battery_charge_limit",
+        name="KH7 battery charge limit",
+        icon="mdi:battery-arrow-up",
+        device_class=SensorDeviceClass.POWER,
+        native_unit_of_measurement=UnitOfPower.KILO_WATT,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda data: data.simulation.battery_charge_limit_kw,
+    ),
+    KEMSSensorEntityDescription(
+        key="kh7_battery_discharge_limit",
+        name="KH7 battery discharge limit",
+        icon="mdi:battery-arrow-down",
+        device_class=SensorDeviceClass.POWER,
+        native_unit_of_measurement=UnitOfPower.KILO_WATT,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda data: data.simulation.battery_discharge_limit_kw,
+    ),
+    KEMSSensorEntityDescription(
+        key="eps_output_limit",
+        name="EPS output limit",
+        icon="mdi:home-lightning-bolt-outline",
+        device_class=SensorDeviceClass.POWER,
+        native_unit_of_measurement=UnitOfPower.KILO_WATT,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda data: data.simulation.eps_output_limit_kw,
+    ),
+    KEMSSensorEntityDescription(
+        key="configured_site_import_limit",
+        name="Configured site import limit",
+        icon="mdi:transmission-tower-import",
+        device_class=SensorDeviceClass.POWER,
+        native_unit_of_measurement=UnitOfPower.KILO_WATT,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda data: data.control.site_import_limit_kw,
+    ),
+    KEMSSensorEntityDescription(
+        key="site_import_headroom",
+        name="Site import headroom",
+        icon="mdi:gauge",
+        device_class=SensorDeviceClass.POWER,
+        native_unit_of_measurement=UnitOfPower.KILO_WATT,
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=3,
+        value_fn=lambda data: data.control.site_import_headroom_kw,
+    ),
+    KEMSSensorEntityDescription(
+        key="kh7_output_headroom",
+        name="KH7 output headroom",
+        icon="mdi:gauge-low",
+        device_class=SensorDeviceClass.POWER,
+        native_unit_of_measurement=UnitOfPower.KILO_WATT,
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=3,
+        value_fn=lambda data: data.control.kh7_output_headroom_kw,
+    ),
+    KEMSSensorEntityDescription(
+        key="eps_status",
+        name="EPS load status",
+        icon="mdi:shield-home-outline",
+        value_fn=lambda data: data.control.eps_status,
+    ),
+    KEMSSensorEntityDescription(
+        key="eps_load_reduction_required",
+        name="EPS load reduction required",
+        icon="mdi:home-minus-outline",
+        device_class=SensorDeviceClass.POWER,
+        native_unit_of_measurement=UnitOfPower.KILO_WATT,
+        suggested_display_precision=3,
+        value_fn=lambda data: data.control.eps_load_reduction_required_kw,
+    ),
+    KEMSSensorEntityDescription(
+        key="accumulator_status",
+        name="Accumulator status",
+        icon="mdi:database-check-outline",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda data: data.lifetime.accumulator_status,
+        attributes_fn=_lifetime_attributes,
+    ),
+    KEMSSensorEntityDescription(
+        key="last_daily_rollover",
+        name="Last daily rollover",
+        icon="mdi:calendar-sync-outline",
+        device_class=SensorDeviceClass.DATE,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda data: data.lifetime.last_daily_rollover,
+    ),
+    KEMSSensorEntityDescription(
+        key="last_successful_accumulation",
+        name="Last successful accumulation",
+        icon="mdi:database-clock-outline",
+        device_class=SensorDeviceClass.TIMESTAMP,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda data: data.lifetime.last_successful_accumulation,
+    ),
+    KEMSSensorEntityDescription(
+        key="accumulation_days_complete",
+        name="Accumulation days complete",
+        icon="mdi:calendar-check-outline",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda data: data.lifetime.accumulation_days_complete,
+    ),
+    KEMSSensorEntityDescription(
+        key="today_summary",
+        name="Today energy summary",
+        icon="mdi:calendar-today",
+        native_unit_of_measurement="p",
+        suggested_display_precision=2,
+        value_fn=lambda data: _period_value(data, "today"),
+        attributes_fn=lambda data: _period_attributes(data, "today"),
+    ),
+    KEMSSensorEntityDescription(
+        key="week_summary",
+        name="Week energy summary",
+        icon="mdi:calendar-week",
+        native_unit_of_measurement="p",
+        suggested_display_precision=2,
+        value_fn=lambda data: _period_value(data, "week"),
+        attributes_fn=lambda data: _period_attributes(data, "week"),
+    ),
+    KEMSSensorEntityDescription(
+        key="month_summary",
+        name="Month energy summary",
+        icon="mdi:calendar-month",
+        native_unit_of_measurement="p",
+        suggested_display_precision=2,
+        value_fn=lambda data: _period_value(data, "month"),
+        attributes_fn=lambda data: _period_attributes(data, "month"),
+    ),
+    KEMSSensorEntityDescription(
+        key="year_summary",
+        name="Year energy summary",
+        icon="mdi:calendar-range",
+        native_unit_of_measurement="p",
+        suggested_display_precision=2,
+        value_fn=lambda data: _period_value(data, "year"),
+        attributes_fn=lambda data: _period_attributes(data, "year"),
+    ),
+    KEMSSensorEntityDescription(
+        key="all_time_summary",
+        name="All-time energy summary",
+        icon="mdi:calendar-multiple",
+        native_unit_of_measurement="p",
+        suggested_display_precision=2,
+        value_fn=lambda data: _period_value(data, "all_time"),
+        attributes_fn=lambda data: _period_attributes(data, "all_time"),
+    ),
+    KEMSSensorEntityDescription(
+        key="last_power_down_result",
+        name="Last Power Down result",
+        icon="mdi:history",
+        value_fn=lambda data: (
+            data.last_power_down.completion_reason
+            if data.last_power_down.available
+            else "unavailable"
+        ),
+        attributes_fn=_last_power_down_attributes,
+    ),
+    KEMSSensorEntityDescription(
+        key="last_power_down_start",
+        name="Last Power Down start",
+        icon="mdi:clock-start",
+        device_class=SensorDeviceClass.TIMESTAMP,
+        value_fn=lambda data: data.last_power_down.session_start,
+        attributes_fn=_last_power_down_attributes,
+    ),
+    KEMSSensorEntityDescription(
+        key="last_power_down_end",
+        name="Last Power Down end",
+        icon="mdi:clock-end",
+        device_class=SensorDeviceClass.TIMESTAMP,
+        value_fn=lambda data: data.last_power_down.session_end,
+    ),
+    KEMSSensorEntityDescription(
+        key="last_power_down_starting_soc",
+        name="Last Power Down starting simulated SOC",
+        icon="mdi:battery-clock-outline",
+        native_unit_of_measurement=PERCENTAGE,
+        value_fn=lambda data: data.last_power_down.starting_simulated_soc_percent,
+    ),
+    KEMSSensorEntityDescription(
+        key="last_power_down_finishing_soc",
+        name="Last Power Down finishing simulated SOC",
+        icon="mdi:battery-check-outline",
+        native_unit_of_measurement=PERCENTAGE,
+        value_fn=lambda data: data.last_power_down.finishing_simulated_soc_percent,
+    ),
+    KEMSSensorEntityDescription(
+        key="last_power_down_planned_home_energy",
+        name="Last Power Down planned battery-to-home energy",
+        icon="mdi:home-battery-outline",
+        device_class=SensorDeviceClass.ENERGY,
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        value_fn=lambda data: data.last_power_down.planned_battery_to_home_kwh,
+    ),
+    KEMSSensorEntityDescription(
+        key="last_power_down_planned_export",
+        name="Last Power Down planned export",
+        icon="mdi:transmission-tower-export",
+        device_class=SensorDeviceClass.ENERGY,
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        value_fn=lambda data: data.last_power_down.planned_export_kwh,
+    ),
+    KEMSSensorEntityDescription(
+        key="last_power_down_maximum_inverter_output",
+        name="Last Power Down maximum inverter output",
+        icon="mdi:meter-electric-outline",
+        device_class=SensorDeviceClass.POWER,
+        native_unit_of_measurement=UnitOfPower.KILO_WATT,
+        value_fn=lambda data: data.last_power_down.maximum_inverter_output_kw,
+    ),
+    KEMSSensorEntityDescription(
+        key="last_power_down_rewardable_reduction",
+        name="Last Power Down rewardable reduction",
+        icon="mdi:flash-alert-outline",
+        device_class=SensorDeviceClass.ENERGY,
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        value_fn=lambda data: data.last_power_down.rewardable_reduction_kwh,
+    ),
+    KEMSSensorEntityDescription(
+        key="last_power_down_bonus",
+        name="Last Power Down bonus",
+        icon="mdi:star-circle-outline",
+        native_unit_of_measurement="p",
+        value_fn=lambda data: data.last_power_down.bonus_pence,
+    ),
+    KEMSSensorEntityDescription(
+        key="last_power_down_export_income",
+        name="Last Power Down fixed export income",
+        icon="mdi:cash-plus",
+        native_unit_of_measurement="p",
+        value_fn=lambda data: data.last_power_down.fixed_export_income_pence,
+    ),
+    KEMSSensorEntityDescription(
+        key="last_power_down_combined_income",
+        name="Last Power Down combined estimated income",
+        icon="mdi:cash-multiple",
+        native_unit_of_measurement="p",
+        value_fn=lambda data: data.last_power_down.combined_income_pence,
     ),
 )
 

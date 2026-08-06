@@ -1,0 +1,138 @@
+title: KEMS Control Lab
+views:
+  - title: Control Lab
+    path: kems-control-lab
+    icon: mdi:test-tube
+    panel: true
+    cards:
+      - type: vertical-stack
+        cards:
+          - type: markdown
+            content: |
+              # KEMS pre-installation control lab
+              This page shows desired behaviour only. **0.7.0-alpha3 cannot send real FoxESS commands.**
+          - type: entities
+            title: Interactive lab controls
+            show_header_toggle: false
+            entities:
+              - select.kems_operating_mode
+              - select.kems_virtual_scenario
+              - switch.kems_emergency_stop
+              - switch.kems_master_control_enable
+          - type: glance
+            title: Mode and safety
+            columns: 6
+            entities:
+              - entity: sensor.kems_operating_mode
+                name: Mode
+              - entity: sensor.kems_virtual_control_scenario
+                name: Scenario
+              - entity: sensor.kems_control_operating_reason
+                name: Reason
+              - entity: binary_sensor.kems_control_plan_safe
+                name: Plan safe
+              - entity: binary_sensor.kems_control_data_fresh
+                name: Data fresh
+              - entity: sensor.kems_control_preflight
+                name: Preflight
+          - type: grid
+            columns: 2
+            square: false
+            cards:
+              - type: entities
+                title: Desired inverter plan
+                entities:
+                  - sensor.kems_desired_inverter_work_mode
+                  - sensor.kems_desired_battery_charge_power
+                  - sensor.kems_desired_battery_to_home_power
+                  - sensor.kems_desired_battery_export_power
+                  - sensor.kems_desired_total_battery_discharge_power
+                  - sensor.kems_desired_minimum_soc
+                  - sensor.kems_simulated_battery_charging_power
+                  - sensor.kems_simulated_total_kh7_ac_output
+                  - sensor.kems_simulated_grid_bypass_power
+                  - sensor.kems_simulated_total_site_import
+                  - binary_sensor.kems_ev_charging_allowed_by_control
+                  - binary_sensor.kems_grid_export_allowed_by_control
+                  - sensor.kems_control_next_action
+              - type: entities
+                title: Live-write boundary
+                entities:
+                  - binary_sensor.kems_control_enabled
+                  - binary_sensor.kems_system_commissioned_for_control
+                  - binary_sensor.kems_real_control_backend_available
+                  - binary_sensor.kems_control_commands_permitted
+                  - sensor.kems_control_blocked_reason
+                  - sensor.kems_control_data_age
+          - type: grid
+            columns: 2
+            square: false
+            cards:
+              - type: entities
+                title: Whole-house island / EPS
+                entities:
+                  - binary_sensor.kems_grid_available_for_control
+                  - binary_sensor.kems_whole_house_island_mode
+                  - sensor.kems_whole_house_eps_load
+                  - sensor.kems_eps_headroom
+                  - sensor.kems_eps_utilisation
+                  - sensor.kems_eps_load_status
+                  - sensor.kems_eps_load_reduction_required
+                  - sensor.kems_kh7_output_headroom
+                  - sensor.kems_site_import_headroom
+                  - binary_sensor.kems_site_import_limit_exceeded
+                  - sensor.kems_island_battery_status
+                  - sensor.kems_island_conservation_threshold
+                  - sensor.kems_island_emergency_floor
+                  - binary_sensor.kems_island_battery_conservation_active
+                  - binary_sensor.kems_eps_load_warning
+                  - binary_sensor.kems_eps_load_critical
+                  - sensor.kems_estimated_outage_runtime
+              - type: entities
+                title: Island energy routing
+                entities:
+                  - sensor.kems_island_solar_to_house_power
+                  - sensor.kems_island_solar_to_battery_power
+                  - sensor.kems_island_battery_to_house_power
+                  - sensor.kems_simulated_battery_state_of_charge
+                  - sensor.kems_virtual_scenario_solar_power
+                  - sensor.kems_virtual_scenario_house_load
+          - type: grid
+            columns: 2
+            square: false
+            cards:
+              - type: entities
+                title: Last completed Power Down
+                entities:
+                  - binary_sensor.kems_last_power_down_result_available
+                  - binary_sensor.kems_last_power_down_completed_successfully
+                  - binary_sensor.kems_last_power_down_ev_successfully_blocked
+                  - sensor.kems_last_power_down_start
+                  - sensor.kems_last_power_down_end
+                  - sensor.kems_last_power_down_starting_simulated_soc
+                  - sensor.kems_last_power_down_finishing_simulated_soc
+                  - sensor.kems_last_power_down_planned_export
+                  - sensor.kems_last_power_down_combined_estimated_income
+                  - sensor.kems_last_power_down_result
+              - type: entities
+                title: Accumulator and limits
+                entities:
+                  - binary_sensor.kems_accumulator_healthy
+                  - binary_sensor.kems_historical_repair_required
+                  - sensor.kems_accumulator_status
+                  - sensor.kems_last_daily_rollover
+                  - sensor.kems_last_successful_accumulation
+                  - sensor.kems_accumulation_days_complete
+                  - sensor.kems_kh7_combined_ac_output_limit
+                  - sensor.kems_kh7_battery_charge_limit
+                  - sensor.kems_kh7_battery_discharge_limit
+                  - sensor.kems_eps_output_limit
+                  - sensor.kems_configured_site_import_limit
+          - type: history-graph
+            title: Desired control powers
+            hours_to_show: 24
+            entities:
+              - sensor.kems_desired_battery_charge_power
+              - sensor.kems_desired_battery_to_home_power
+              - sensor.kems_desired_battery_export_power
+              - sensor.kems_island_solar_to_battery_power

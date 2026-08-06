@@ -29,12 +29,17 @@ from .const import (
     CONF_BATTERY_VOLTAGE,
     CONF_CHARGE_EFFICIENCY,
     CONF_COMMISSIONING_DATE,
+    CONF_CONTROL_ENABLED,
     CONF_CURRENT_EXPORT_RATE,
     CONF_CURRENT_IMPORT_RATE,
     CONF_DISCHARGE_EFFICIENCY,
     CONF_DISCOUNT_RATE,
     CONF_ELECTRICITY_INFLATION,
     CONF_ELECTRICITY_STANDING_CHARGE,
+    CONF_EMERGENCY_STOP,
+    CONF_EPS_CRITICAL_PERCENT,
+    CONF_EPS_LIMIT,
+    CONF_EPS_WARNING_PERCENT,
     CONF_EV_CHARGING,
     CONF_EV_CONNECTED,
     CONF_EV_POWER,
@@ -51,10 +56,12 @@ from .const import (
     CONF_GRANTS_REBATES,
     CONF_GRID_EXPORT,
     CONF_GRID_IMPORT,
+    CONF_GRID_STABILITY_SECONDS,
     CONF_HISTORY_DAYS,
     CONF_HOUSE_LOAD,
     CONF_INTELLIGENT_SLOT,
     CONF_INVERTER_LIMIT,
+    CONF_ISLAND_RESERVE_PERCENT,
     CONF_MANUAL_SYSTEM_COSTS,
     CONF_MAX_CHARGE,
     CONF_MAX_DISCHARGE,
@@ -62,6 +69,7 @@ from .const import (
     CONF_NEXT_OFFPEAK_START,
     CONF_OFF_PEAK,
     CONF_OFFPEAK_END,
+    CONF_OPERATING_MODE,
     CONF_PROPOSAL_SOLAR_ENABLED,
     CONF_PROPOSAL_SOLAR_FACTOR,
     CONF_ROI_FORECAST_YEARS,
@@ -71,8 +79,12 @@ from .const import (
     CONF_SAVING_SESSION_IMPORT_BASELINE,
     CONF_SCAN_INTERVAL,
     CONF_SIMULATION_STRATEGY,
+    CONF_SITE_IMPORT_LIMIT,
     CONF_SOLAR_POWER,
+    CONF_STALE_DATA_SECONDS,
+    CONF_SYSTEM_COMMISSIONED,
     CONF_SYSTEM_COST,
+    CONF_VIRTUAL_SCENARIO,
     DEFAULT_OPTIONS,
     DOMAIN,
     ENTITY_MAPPING_KEYS,
@@ -155,6 +167,9 @@ OPTIONS_SCHEMA = vol.Schema(
         vol.Required(CONF_EXPORT_LIMIT): vol.All(
             vol.Coerce(float), vol.Range(min=0, max=100)
         ),
+        vol.Required(CONF_SITE_IMPORT_LIMIT): vol.All(
+            vol.Coerce(float), vol.Range(min=0, max=100)
+        ),
         vol.Required(CONF_BATTERY_EXPORT_ENABLED): bool,
         vol.Required(CONF_SAVING_SESSION_ENABLED): bool,
         vol.Required(CONF_PROPOSAL_SOLAR_ENABLED): bool,
@@ -193,6 +208,48 @@ OPTIONS_SCHEMA = vol.Schema(
         vol.Required(CONF_ROI_FORECAST_YEARS): vol.All(
             vol.Coerce(int), vol.Range(min=1, max=40)
         ),
+        vol.Required(CONF_OPERATING_MODE): vol.In(
+            {
+                "observe": "Observe only",
+                "simulate": "Virtual KH7 simulation",
+                "shadow": "Real readings, calculate commands, send nothing",
+                "control": "Live control (blocked until commissioned backend)",
+            }
+        ),
+        vol.Required(CONF_VIRTUAL_SCENARIO): vol.In(
+            {
+                "normal": "Normal grid-connected day",
+                "sunny_high_solar": "Sunny high-solar test",
+                "cloudy_low_solar": "Cloudy low-solar test",
+                "high_house_load": "High whole-house load test",
+                "power_down_active": "Active Power Down test",
+                "grid_outage_daylight": "Whole-house outage in daylight",
+                "grid_outage_night": "Whole-house outage at night",
+                "grid_outage_high_load": "Whole-house EPS overload test",
+                "grid_flapping": "Grid restoration stability hold",
+            }
+        ),
+        vol.Required(CONF_CONTROL_ENABLED): bool,
+        vol.Required(CONF_SYSTEM_COMMISSIONED): bool,
+        vol.Required(CONF_EMERGENCY_STOP): bool,
+        vol.Required(CONF_STALE_DATA_SECONDS): vol.All(
+            vol.Coerce(int), vol.Range(min=30, max=3600)
+        ),
+        vol.Required(CONF_GRID_STABILITY_SECONDS): vol.All(
+            vol.Coerce(int), vol.Range(min=30, max=1800)
+        ),
+        vol.Required(CONF_EPS_LIMIT): vol.All(
+            vol.Coerce(float), vol.Range(min=0.1, max=100)
+        ),
+        vol.Required(CONF_EPS_WARNING_PERCENT): vol.All(
+            vol.Coerce(float), vol.Range(min=1, max=99)
+        ),
+        vol.Required(CONF_EPS_CRITICAL_PERCENT): vol.All(
+            vol.Coerce(float), vol.Range(min=2, max=100)
+        ),
+        vol.Required(CONF_ISLAND_RESERVE_PERCENT): vol.All(
+            vol.Coerce(float), vol.Range(min=0, max=95)
+        ),
         vol.Required(CONF_SIMULATION_STRATEGY): vol.In(
             {
                 "paced_export": "Pace battery export until next cheap period",
@@ -206,7 +263,7 @@ OPTIONS_SCHEMA = vol.Schema(
 class KEMSConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Handle automatic and manual KEMS setup."""
 
-    VERSION = 9
+    VERSION = 11
     MINOR_VERSION = 0
 
     def __init__(self) -> None:

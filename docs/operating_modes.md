@@ -1,17 +1,38 @@
-# Analysis strategies
+# KEMS operating modes and priorities
 
-KEMS 0.3 contains analysis strategies, not control modes.
+## User-selectable modes
 
-## Export first
+- **Observe** — source monitoring and learning only.
+- **Simulate** — run proposal-system and virtual KH7 control planning.
+- **Shadow** — calculate desired commands from readings but send nothing.
+- **Control** — reserved for the commissioned backend; real writes are hard-blocked in 0.7.0-alpha3.
 
-During cheap periods, the simulation powers the house from the grid and charges the battery. Outside cheap periods, it exports solar and uses the simulated battery for house load before allowing residual grid import. This reflects Kyle's planned tariff-arbitrage policy.
+## Normal strategy
 
-## Solar self-use first
+During confirmed cheap periods, the plan supplies the home from the grid and charges the battery within the 7kW KH7 limit. Outside cheap periods, it protects forecast home demand and paces surplus battery export toward the next cheap period. Simulated export income remains fixed at 12p/kWh.
 
-Outside cheap periods, solar supplies house load first. Surplus solar is exported, and the battery supplies remaining load before residual grid import.
+## Power Down priority
 
-Both strategies are simulations only.
+A joined Power Down session before the next recharge can reduce ordinary export so energy remains available to supply the house and maximise safe session export.
 
-## Confirmed cheap periods
+## Whole-house island priority
 
-KEMS treats normal Octopus off-peak as cheap. An extra Intelligent dispatch slot is confirmed only when the Octopus slot is active and Ohme reports that the EV is charging.
+When the grid is unavailable, financial optimisation is suspended:
+
+1. solar powers the whole house;
+2. surplus solar charges the battery;
+3. battery supplies only the solar shortfall;
+4. EV charging and grid export are disabled;
+5. the higher island reserve replaces the normal 10% export target;
+6. normal planning resumes only after the grid-restoration stability hold.
+
+## Priority order
+
+1. Emergency stop
+2. Whole-house island/EPS operation
+3. Stale-data, inverter, EPS, and battery protection
+4. Power Down session
+5. Confirmed cheap charging
+6. Home-energy reserve
+7. Paced 12p export
+8. Normal self-use

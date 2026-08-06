@@ -1,13 +1,15 @@
-# Control boundary
+# Control boundary — 0.7.0-alpha3
 
-This release is intentionally read-only.
+This release contains a complete hardware-independent control planner and virtual KH7 scenario lab, but remains safe to install before the inverter exists.
 
-It does not:
+It calculates desired work mode, charge/discharge/export power, SOC limits, whole-house island routing, EPS warnings, Power Down behaviour, and fail-safe actions.
 
-- call Home Assistant services belonging to Octopus, Ohme, or FoxESS Modbus;
-- write Modbus registers;
-- approve or start an Ohme charge;
-- change inverter work mode, reserve, charge periods, or power limits;
-- create automations that operate energy hardware.
+It still does **not**:
 
-A future Control phase should use a separate policy layer, explicit opt-in, simulation comparison, safety constraints, audit logging, and a global kill switch.
+- call FoxESS Modbus services or write registers;
+- approve/start Ohme charging;
+- change Octopus enrolment;
+- electrically create island mode;
+- permit commands when the real backend is unavailable.
+
+`binary_sensor.kems_control_commands_permitted` remains off in alpha3. The real backend will be added only after installation-day entity/service mapping, sign validation, command verification, and controlled outage testing.

@@ -7,7 +7,7 @@
     "step": {
       "user": {
         "title": "Set up KEMS",
-        "description": "KEMS will scan Home Assistant for compatible Octopus electricity and gas, Ohme, and FoxESS Modbus entities. KEMS remains read-only."
+        "description": "KEMS will scan Home Assistant for compatible Octopus electricity and gas, Ohme, and FoxESS Modbus entities. The Control Lab calculates safe desired behaviour but real hardware writes remain blocked."
       },
       "confirm": {
         "title": "Set up KEMS automatically",
@@ -169,8 +169,8 @@
   "options": {
     "step": {
       "init": {
-        "title": "KEMS KH7 proposal, paced export, gas, ROI, and lifetime settings",
-        "description": "These settings affect read-only analysis, simulation, ROI, and the permanent lifetime ledger. KEMS never writes to Octopus, Ohme, or FoxESS Modbus.",
+        "title": "KEMS KH7 simulation, Control Lab, island safety, ROI, and lifetime settings",
+        "description": "Configure monitoring, proposal simulation, virtual/shadow control planning, whole-house island safeguards, ROI, and the permanent ledger. Version 0.7.0-alpha3 does not send real FoxESS or charger commands.",
         "data": {
           "scan_interval_seconds": "Observation interval (seconds)",
           "history_days": "Learning history retention (days)",
@@ -184,6 +184,7 @@
           "export_rate_pence": "Fixed export rate (p/kWh)",
           "inverter_ac_limit_kw": "Inverter AC limit (kW)",
           "export_limit_kw": "Assumed export limit (kW)",
+          "site_import_limit_kw": "Site import limit (kW, 0 = not configured)",
           "battery_export_enabled": "Simulate exporting surplus battery energy",
           "proposal_solar_enabled": "Use proposal solar model when live PV is unavailable",
           "proposal_solar_factor": "Proposal solar/weather factor (0.0-2.0)",
@@ -200,7 +201,18 @@
           "battery_degradation_percent": "Annual battery/value degradation (%)",
           "discount_rate_percent": "Financial discount rate (%)",
           "roi_forecast_years": "ROI forecast horizon (years)",
-          "saving_session_enabled": "Use joined Octoplus Power Down sessions"
+          "saving_session_enabled": "Use joined Octoplus Power Down sessions",
+          "operating_mode": "Control Lab operating mode",
+          "virtual_scenario": "Virtual KH7 test scenario",
+          "control_enabled": "Master control opt-in",
+          "system_commissioned": "System commissioning confirmed",
+          "emergency_stop": "Emergency stop latched",
+          "stale_data_seconds": "Control data stale timeout (seconds)",
+          "grid_stability_seconds": "Grid-restoration stability hold (seconds)",
+          "eps_limit_kw": "Whole-house EPS continuous limit (kW)",
+          "eps_warning_percent": "EPS warning threshold (%)",
+          "eps_critical_percent": "EPS critical threshold (%)",
+          "island_reserve_percent": "Island conservation threshold (%)"
         },
         "data_description": {
           "scan_interval_seconds": "KEMS reads Home Assistant state only; minimum 30 seconds.",
@@ -214,6 +226,7 @@
           "discharge_efficiency": "Simulation assumption; the proposal does not guarantee conversion efficiency.",
           "export_rate_pence": "Fixed 12p/kWh export rate used for every simulated export interval. Intelligent Octopus Flux rates are intentionally ignored.",
           "export_limit_kw": "Separate DNO/grid export limit. Runtime export is also capped by the 7kW inverter limit.",
+          "site_import_limit_kw": "Installer-confirmed whole-site import limit based on the main fuse and gateway configuration. This is separate from the KH7 7kW output limit; use 0 until confirmed.",
           "battery_export_enabled": "Preserve forecast house demand, then spread remaining battery export across the hours until the next cheap period.",
           "proposal_solar_enabled": "Models 21 x 460W panels, 9.66kWp, three roof orientations, and the proposal monthly generation baseline.",
           "proposal_solar_factor": "Scale the proposal baseline for cloud/weather sensitivity; 1.0 uses the proposal average.",
@@ -231,7 +244,18 @@
           "discount_rate_percent": "Used to calculate discounted net value. The proposal benchmark used 6.75%.",
           "roi_forecast_years": "Number of years included in the predicted net-value calculation.",
           "inverter_ac_limit_kw": "Combined simulated solar and battery AC output cannot exceed the revised Fox ESS KH7 7kW limit.",
-          "saving_session_enabled": "Hold battery energy before a joined session, cover the home, and maximise permitted export during the higher-reward window. KEMS remains read-only and does not join sessions itself."
+          "saving_session_enabled": "Hold battery energy before a joined session, cover the home, and maximise permitted export during the higher-reward window. KEMS remains read-only and does not join sessions itself.",
+          "operating_mode": "Observe, virtual simulation, shadow planning, or control. Real control remains hard-blocked in alpha3.",
+          "virtual_scenario": "Inject normal, solar, cloud, high-load, Power Down, outage, overload, or unstable-grid conditions.",
+          "control_enabled": "Records explicit control opt-in only. It cannot permit real writes until a verified backend exists.",
+          "system_commissioned": "Leave off before the installer has commissioned the KH7 and KEMS has verified all readings and limits.",
+          "emergency_stop": "When enabled, KEMS plans zero charge/discharge/export commands and blocks all future writes.",
+          "stale_data_seconds": "Fail-safe age after which desired control commands are withdrawn.",
+          "grid_stability_seconds": "How long a restored grid must remain stable before normal planning may resume.",
+          "eps_limit_kw": "Use the installer-confirmed whole-house EPS continuous limit. The pre-install default is 7kW.",
+          "eps_warning_percent": "Whole-house island-load level that raises an early warning.",
+          "eps_critical_percent": "Whole-house island-load level that raises a critical warning.",
+          "island_reserve_percent": "Warning threshold for reducing discretionary load during a whole-house outage. The normal battery reserve remains the emergency discharge floor."
         }
       }
     }

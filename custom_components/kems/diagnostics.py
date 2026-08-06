@@ -99,7 +99,13 @@ async def async_get_config_entry_diagnostics(
         "simulation": asdict(data.simulation),
         "whole_home": asdict(data.whole_home),
         "lifetime": data.lifetime.to_dict(),
+        "periods": {
+            period_name: totals.to_dict()
+            for period_name, totals in data.periods.items()
+        },
         "roi": asdict(data.roi),
+        "control": asdict(data.control),
+        "last_power_down": data.last_power_down.to_dict(),
         "quality": asdict(data.quality),
         "history_samples": data.history_samples,
         "last_update_success": coordinator.last_update_success,

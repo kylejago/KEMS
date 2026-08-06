@@ -1,5 +1,53 @@
 # Changelog
 
+## 0.7.0-alpha3 hotfix — simulated period reconciliation
+
+- Made the persisted daily ledger authoritative for all simulated lifetime totals.
+- Corrected Month, Year, and All-time export, battery-export, and export-income differences caused when intraday simulation forecasts revised downward.
+- Reconciles stored alpha3 totals immediately on load and after every accumulation update without changing actual observed totals.
+- Added regression coverage for daily-ledger summation and downward simulated-export revisions.
+- Real FoxESS writes remain disabled.
+
+## 0.7.0-alpha3 — KH7 topology, retained Power Down results, and accumulator repair
+
+- Separated the 7kW battery charge/discharge limits, 7kW combined KH7 AC output limit, 7kW island/EPS limit, and an independently configurable whole-site import limit.
+- Modelled grid bypass correctly so a 2kW home plus 7kW battery charge is a valid 9kW site import when the installer-confirmed site limit permits it.
+- Enforced `solar AC + battery AC <= 7kW` during paced export, Power Down, high-solar operation, island operation, and restoration planning.
+- Restricted EPS utilisation and warning thresholds to islanded operation; grid-connected demand now uses bypass/site-import diagnostics instead.
+- Added battery-charge, total KH7 output, grid-bypass, total-site-import, limit, and headroom entities for clearer dashboards.
+- Persisted a separate last-completed Power Down result after Octopus removes the live event, including SOC, planned energy, maximum output, reward estimates, EV blocking, and completion status.
+- Repaired the lifetime accumulator so observed electricity, gas, import/export, and bill evidence accumulate before commissioning while actual system-created value remains commissioning-gated.
+- Added native Today, Week, Month, Year, and All-time summaries with separate actual/simulated totals and explicit incomplete-day reporting.
+- Prevented a mid-day commissioning change from claiming modelled value created before the physical system was commissioned.
+- Added an alpha2 ledger migration that rebuilds recoverable observed totals from retained history without double-counting the temporary single-import-source mapping.
+- Added accumulator health, rollover, historical-repair, site-limit, KH7-headroom, EPS-status, and retained Power Down diagnostics.
+- Expanded the deterministic safety suite from 12 to 15 checks and added topology, site-import, high-solar, and island-cap regression tests.
+- Real FoxESS writes remain hard-blocked: backend available, commands permitted, system commissioned, and control enable all remain off by default.
+
+## 0.7.0-alpha2 — validated scenario fixes
+
+- Blocked EV charging during active Power Down sessions so EV demand cannot reduce the rewardable net reduction.
+- Split island battery protection into a 20% conservation threshold and a 10% emergency hardware floor.
+- Continued whole-house battery support below the conservation threshold while estimating runtime down to the emergency floor.
+- Stopped simulated battery discharge once the emergency floor is reached.
+- Added explicit virtual-scenario solar and house-load entities so the Control Lab displays injected scenario inputs rather than the normal time-based simulation.
+- Added island battery status, conservation-threshold, emergency-floor, and conservation-active diagnostics.
+- Removed the aggregate header toggle from the interactive controls card to prevent accidental simultaneous switch changes.
+- Added regression coverage for Power Down EV blocking, low-SOC island runtime, emergency-floor protection, and Control Lab entity selection.
+- Real FoxESS writes remain hard-blocked; alpha2 is safe to run before hardware installation.
+
+## 0.7.0-alpha1 — pre-installation control lab
+
+- Added hardware-independent Observe, Simulate, Shadow, and Control planning modes.
+- Added a virtual KH7 scenario lab for normal operation, high/low solar, high load, active Power Down, daylight/night grid outage, and unstable grid restoration.
+- Added whole-house island planning: solar to house first, surplus solar to battery, battery only for the shortfall, no export, and EV charging blocked.
+- Added EPS load, headroom, utilisation, warning/critical thresholds, outage-runtime estimate, and five-minute grid-restoration hold planning.
+- Added desired work mode, charge, battery-to-home, battery-export, total-discharge, minimum-SOC, operating-reason, blocked-reason, and next-action entities.
+- Added stale-data and emergency-stop fail-safe plans plus a 12-check built-in control preflight.
+- Added a dedicated Control Lab dashboard and 11 control regression tests.
+- Real FoxESS writes remain hard-blocked; alpha1 is safe to run before hardware installation.
+
+
 ## 0.6.0-beta1
 
 - Consolidated all alpha1–alpha5 monitoring and simulation work into the first main-branch beta.

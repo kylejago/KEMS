@@ -102,6 +102,9 @@ views:
                   - entity: sensor.kems_simulated_battery_power
                     name: Battery power now
                     icon: mdi:battery-charging
+                  - entity: sensor.kems_simulated_battery_charging_power
+                    name: Battery charging now
+                    icon: mdi:battery-charging-high
                   - entity: sensor.kems_simulated_battery_to_home_power
                     name: Battery to home now
                     icon: mdi:home-battery-outline
@@ -111,6 +114,15 @@ views:
                   - entity: sensor.kems_simulated_battery_state_of_charge
                     name: Battery state of charge
                     icon: mdi:battery
+                  - entity: sensor.kems_simulated_total_kh7_ac_output
+                    name: Total KH7 AC output
+                    icon: mdi:sine-wave
+                  - entity: sensor.kems_simulated_grid_bypass_power
+                    name: Grid bypass / pass-through
+                    icon: mdi:transmission-tower-import
+                  - entity: sensor.kems_simulated_total_site_import
+                    name: Total site import
+                    icon: mdi:home-import-outline
 
                   - type: section
                     label: Paced battery export
