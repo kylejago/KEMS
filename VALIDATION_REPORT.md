@@ -5,7 +5,7 @@ Branch: `release/0.7.0-alpha4-user-settings`
 
 Validated in the build environment:
 
-- `107 passed` with pytest.
+- `108 passed` with pytest.
 - All 42 shipped Python modules parsed and compiled successfully.
 - Home Assistant manifest and English translations parsed successfully.
 - `git diff --check` reports no whitespace errors.
@@ -17,6 +17,7 @@ Validated in the build environment:
 - Overnight cheap periods that cross midnight resolve correctly.
 - Confirmed Intelligent extra slots use the cheap rate only when the Intelligent slot and active EV charging agree.
 - The options flow is split into six focused pages and preserves settings from other pages when one category is saved.
+- The settings menu includes explicit fallback labels, so stale frontend translation caches cannot produce blank menu rows.
 - Battery, inverter, site-import, solar/export, ROI, monitoring, Control Lab, and EPS settings remain available.
 - Alpha3 accumulator repair, period reconciliation, KH7 topology, and 15/15 control preflight behaviour remain covered by the suite.
 - No Python bytecode, `__pycache__`, or pytest cache directories are included.
