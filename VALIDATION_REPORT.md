@@ -5,7 +5,7 @@ Branch: `release/0.7.0-alpha3`
 
 Validated in the build environment:
 
-- `97 passed` with pytest.
+- `99 passed` with pytest.
 - Corrected the alpha3 lifetime-history rebuild by importing `collections.defaultdict`.
 - 61 Python source/test files parsed and compiled successfully.
 - 2 JSON files parsed successfully.
@@ -21,6 +21,7 @@ Validated in the build environment:
 - Last-completed Power Down results persist independently from the live Octopus event entity.
 - Observed electricity, gas, import/export, and billing evidence accumulate before commissioning, while actual physical-system value remains commissioning-gated.
 - Today, Week, Month, Year, and All-time summaries preserve separate actual and simulated totals and mark incomplete historical days explicitly.
+- Simulated lifetime and All-time values are reconciled from the same persisted daily ledger used by Month and Year, including legitimate downward intraday forecast revisions.
 - Mid-day commissioning does not claim pre-installation system value.
 - No Python bytecode, `__pycache__`, or pytest cache directories are included.
 - 111 shipped files are covered by `FILE_MANIFEST.sha256`.

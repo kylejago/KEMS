@@ -14,6 +14,8 @@ from .lifetime_accounting import (
     COMMISSIONED_VALUE_KEYS,
     OBSERVED_LIFETIME_KEYS,
     SIGNED_LIFETIME_KEYS,
+    SIMULATED_LIFETIME_KEYS,
+    reconciled_simulated_lifetime_values,
     should_accumulate_lifetime_value,
 )
 from .models import (
@@ -46,6 +48,8 @@ from .whole_home import WholeHomeEngine
 __all__ = [
     "should_accumulate_lifetime_value",
     "SIGNED_LIFETIME_KEYS",
+    "SIMULATED_LIFETIME_KEYS",
+    "reconciled_simulated_lifetime_values",
     "OBSERVED_LIFETIME_KEYS",
     "COMMISSIONED_VALUE_KEYS",
     "AdviceEngine",
