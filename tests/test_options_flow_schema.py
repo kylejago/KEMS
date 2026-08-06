@@ -107,3 +107,13 @@ def test_manual_setup_can_run_without_live_import_rate_entity() -> None:
     assert "require_import_rate=not manual" in source
     assert "MANUAL_TARIFF_SCHEMA" in source
     assert "options=self._initial_options" in source
+
+
+def test_number_selectors_use_home_assistant_supported_steps() -> None:
+    """Number selector steps must be 'any' or at least 0.001 in HA 2026.8."""
+    source = CONFIG_FLOW.read_text(encoding="utf-8")
+
+    assert 'step: float | Literal["any"]' in source
+    assert "0.0001" not in source
+    assert '_number(0, 200, "any", "p/kWh")' in source
+    assert '_number(1, 20, "any", "kWh/m³")' in source

@@ -5,7 +5,7 @@ Branch: `release/0.7.0-alpha4-user-settings`
 
 Validated in the build environment:
 
-- `106 passed` with pytest.
+- `107 passed` with pytest.
 - All 42 shipped Python modules parsed and compiled successfully.
 - Home Assistant manifest and English translations parsed successfully.
 - `git diff --check` reports no whitespace errors.
@@ -13,6 +13,7 @@ Validated in the build environment:
 - Automatic mode prefers live Home Assistant tariff values and uses editable manual values only when a live field is unavailable.
 - Manual mode works without a current-import-rate entity.
 - Manual day, off-peak, standing-charge, export-rate, start-time, and end-time settings are persisted through the config-entry options flow.
+- High-precision tariff and gas-conversion fields use Home Assistant 2026.8-compatible `step: any` number selectors.
 - Overnight cheap periods that cross midnight resolve correctly.
 - Confirmed Intelligent extra slots use the cheap rate only when the Intelligent slot and active EV charging agree.
 - The options flow is split into six focused pages and preserves settings from other pages when one category is saved.

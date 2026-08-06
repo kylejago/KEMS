@@ -11,7 +11,8 @@
 - Allowed manual-tariff installations to run without a current-import-rate entity.
 - Split battery, solar/export, financial, monitoring, and Control Lab settings into focused pages with descriptive selectors and units.
 - Added alpha3-to-alpha4 migration defaults without changing existing automatic Octopus behaviour.
-- Added tariff-resolution and UI-schema regression coverage; 104 tests pass.
+- Fixed Home Assistant 2026.8 config-flow import failure by using supported high-precision number-selector steps.
+- Added tariff-resolution and UI-schema regression coverage; 107 tests pass.
 - Real FoxESS and charger writes remain disabled.
 
 ## 0.7.0-alpha3 hotfix — simulated period reconciliation
