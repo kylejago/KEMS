@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal
 
 import voluptuous as vol
 from homeassistant import config_entries
@@ -119,7 +119,7 @@ BINARY_KEYS = {
 def _number(
     minimum: float,
     maximum: float,
-    step: float,
+    step: float | Literal["any"],
     unit: str | None = None,
 ):
     """Return a boxed Home Assistant number selector."""
@@ -191,9 +191,9 @@ def _entity_schema(
 
 
 MANUAL_TARIFF_FIELDS = {
-    vol.Required(CONF_MANUAL_DAY_RATE): _number(0, 200, 0.0001, "p/kWh"),
-    vol.Required(CONF_MANUAL_OFFPEAK_RATE): _number(0, 200, 0.0001, "p/kWh"),
-    vol.Required(CONF_MANUAL_STANDING_CHARGE): _number(0, 500, 0.0001, "p/day"),
+    vol.Required(CONF_MANUAL_DAY_RATE): _number(0, 200, "any", "p/kWh"),
+    vol.Required(CONF_MANUAL_OFFPEAK_RATE): _number(0, 200, "any", "p/kWh"),
+    vol.Required(CONF_MANUAL_STANDING_CHARGE): _number(0, 500, "any", "p/day"),
     vol.Required(CONF_EXPORT_RATE): _number(0, 200, 0.01, "p/kWh"),
     vol.Required(CONF_MANUAL_OFFPEAK_START): TIME_SELECTOR,
     vol.Required(CONF_MANUAL_OFFPEAK_END): TIME_SELECTOR,
@@ -260,7 +260,7 @@ MONITORING_SCHEMA = vol.Schema(
     {
         vol.Required(CONF_SCAN_INTERVAL): _number(30, 3600, 1, "seconds"),
         vol.Required(CONF_HISTORY_DAYS): _number(1, 365, 1, "days"),
-        vol.Required(CONF_GAS_KWH_PER_M3): _number(1, 20, 0.0001, "kWh/m³"),
+        vol.Required(CONF_GAS_KWH_PER_M3): _number(1, 20, "any", "kWh/m³"),
     }
 )
 
