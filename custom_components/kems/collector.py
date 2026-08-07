@@ -36,12 +36,12 @@ class Collector:
 
     def collect(self) -> Snapshot:
         """Create a complete whole-home monitoring snapshot."""
+        now = dt_util.now()
         octopus = self._octopus.get_state()
         gas = self._gas.get_state()
         ohme = self._ohme.get_state()
-        foxess = self._foxess.get_state()
-        octoplus = self._octoplus.get_state()
-        now = dt_util.now()
+        foxess = self._foxess.get_state(now)
+        octoplus = self._octoplus.get_state(now)
         tariff = resolve_tariff(
             settings=self._settings.tariff,
             now=now,
@@ -106,4 +106,7 @@ class Collector:
             raw_grid_import_kw=foxess.raw_grid_import_kw,
             raw_grid_export_kw=foxess.raw_grid_export_kw,
             grid_flow_mode=foxess.grid_flow_mode,
+            source_age_seconds=foxess.source_age_seconds,
+            stale_fields=foxess.stale_fields,
+            source_data_age_seconds=foxess.source_data_age_seconds,
         )

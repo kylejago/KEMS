@@ -422,6 +422,8 @@ SENSORS: tuple[KEMSSensorEntityDescription, ...] = (
             "configured_sources": data.quality.configured,
             "available_sources": data.quality.available,
             "missing_fields": list(data.quality.missing_fields),
+            "stale_fields": list(data.quality.stale_fields),
+            "max_source_age_seconds": data.quality.max_source_age_seconds,
         },
     ),
     KEMSSensorEntityDescription(

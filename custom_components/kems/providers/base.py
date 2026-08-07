@@ -30,6 +30,53 @@ class HomeAssistantStateReader:
             return None
         return self._hass.states.get(entity_id)
 
+    def _report_age_seconds(
+        self,
+        entity_id: str | None,
+        now: datetime | None = None,
+    ) -> float | None:
+        """Return seconds since Home Assistant last received this source."""
+        state = self._state(entity_id)
+        if state is None:
+            return None
+        reported = getattr(state, "last_reported", None) or state.last_updated
+        if reported.tzinfo is None:
+            reported = reported.replace(tzinfo=UTC)
+        reference = now or dt_util.now()
+        return max((reference - reported).total_seconds(), 0.0)
+
+    def _source_is_fresh(
+        self,
+        entity_id: str | None,
+        max_age_seconds: int,
+        now: datetime | None = None,
+    ) -> bool:
+        """Return whether a configured source has reported recently enough."""
+        age = self._report_age_seconds(entity_id, now)
+        return age is not None and age <= max(max_age_seconds, 30)
+
+    def _fresh_float(
+        self,
+        entity_id: str | None,
+        max_age_seconds: int,
+        now: datetime | None = None,
+    ) -> float | None:
+        """Read a number only when the source has reported recently."""
+        if not self._source_is_fresh(entity_id, max_age_seconds, now):
+            return None
+        return self._float(entity_id)
+
+    def _fresh_power_kw(
+        self,
+        entity_id: str | None,
+        max_age_seconds: int,
+        now: datetime | None = None,
+    ) -> float | None:
+        """Read power only when the source has reported recently."""
+        if not self._source_is_fresh(entity_id, max_age_seconds, now):
+            return None
+        return self._power_kw(entity_id)
+
     def _text(self, entity_id: str | None) -> str | None:
         """Read a non-empty text state."""
         state = self._state(entity_id)

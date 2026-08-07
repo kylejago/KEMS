@@ -21,6 +21,10 @@ KEMS automatically discovers and can manually map:
 
 Before FoxESS is installed, KEMS automatically uses the Octopus electricity current-demand sensor for both house load and grid import. FoxESS sources take priority automatically when they become available.
 
+### Live-source freshness protection
+
+Instantaneous house/grid/battery/solar observations are checked against Home Assistant's latest source report timestamp. If a configured live source has not reported within the Control Lab stale-data timeout (180 seconds by default), KEMS treats that reading as unavailable instead of repeatedly integrating the frozen value. Intervals touching stale live data are excluded from energy/cost accumulation, affected reporting periods are marked incomplete, Data Quality falls and identifies the stale logical fields, and the control planner enters its stale-data fail-safe. Diagnostics include each source's report time and age. Once the upstream sensor reports again, KEMS resumes automatically.
+
 ## Home Assistant setup and settings UI
 
 Initial setup now asks whether KEMS should use automatic tariff entities or a manual tariff. After setup, open **Settings → Devices & services → KEMS → Configure** to edit one clear category at a time:
