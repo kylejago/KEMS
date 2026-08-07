@@ -47,8 +47,9 @@ class ControlEngine:
     ) -> ControlState:
         """Return an explainable plan for virtual or shadow operation."""
         inputs = self._inputs(snapshot, simulation, config)
-        age = max((now - snapshot.timestamp).total_seconds(), 0.0)
-        fresh = age <= max(config.stale_data_seconds, 30)
+        snapshot_age = max((now - snapshot.timestamp).total_seconds(), 0.0)
+        age = max(snapshot_age, snapshot.source_data_age_seconds or 0.0)
+        fresh = age <= max(config.stale_data_seconds, 30) and not snapshot.stale_fields
         passed, total = run_preflight_suite(config)
 
         island_active = inputs.island_active or not inputs.grid_available
@@ -167,7 +168,11 @@ class ControlEngine:
                 desired_ev_charging_allowed=False,
                 desired_grid_export_allowed=False,
                 plan_safe=False,
-                blocked_reason="Required source data is stale",
+                blocked_reason=(
+                    "Required source data is stale: " + ", ".join(snapshot.stale_fields)
+                    if snapshot.stale_fields
+                    else "Required source data is stale"
+                ),
                 next_action="Wait for fresh Modbus and tariff data",
             )
 

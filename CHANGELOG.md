@@ -1,3 +1,14 @@
+## 0.7.0-alpha4 hotfix — stale live-source protection
+
+- Detects stale live power/SOC sources using Home Assistant `State.last_reported`.
+- Uses the existing configurable stale-data timeout (default 180 seconds).
+- Stops integrating frozen power values into consumption, cost, learning and simulation totals.
+- Marks reporting periods incomplete when stale/missing intervals reduce day coverage.
+- Lowers Data Quality and exposes the exact stale logical fields and source ages.
+- Makes Control Data Fresh fail safe from underlying source age, not merely the new KEMS snapshot timestamp.
+- Adds source report timestamps/ages to diagnostics for troubleshooting connectivity outages.
+- Real hardware writes remain unavailable.
+
 ## 0.7.0-alpha4
 
 - Fixed blank settings-menu labels when Home Assistant or the browser retained an older custom-integration translation bundle.

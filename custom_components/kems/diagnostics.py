@@ -8,6 +8,7 @@ from typing import Any
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_registry as er
+from homeassistant.util import dt as dt_util
 
 from .coordinator import KEMSCoordinator
 
@@ -17,6 +18,8 @@ def _state_payload(hass: HomeAssistant, entity_id: str) -> dict[str, Any]:
     state = hass.states.get(entity_id)
     if state is None:
         return {"state": None, "available": False}
+    last_reported = getattr(state, "last_reported", None) or state.last_updated
+    report_age = max((dt_util.now() - last_reported).total_seconds(), 0.0)
     return {
         "state": state.state,
         "available": state.state not in {"unknown", "unavailable"},
@@ -24,6 +27,9 @@ def _state_payload(hass: HomeAssistant, entity_id: str) -> dict[str, Any]:
         "device_class": state.attributes.get("device_class"),
         "state_class": state.attributes.get("state_class"),
         "friendly_name": state.attributes.get("friendly_name"),
+        "last_updated": state.last_updated.isoformat(),
+        "last_reported": last_reported.isoformat(),
+        "report_age_seconds": round(report_age, 1),
     }
 
 
@@ -68,6 +74,14 @@ async def async_get_config_entry_diagnostics(
             "summary": coordinator.source_validation.summary(),
         },
         "source_entity_states": source_states,
+        "source_freshness": {
+            "stale_timeout_seconds": coordinator.settings.control.stale_data_seconds,
+            "max_dynamic_source_age_seconds": (data.snapshot.source_data_age_seconds),
+            "stale_fields": list(data.snapshot.stale_fields),
+            "dynamic_field_ages_seconds": dict(
+                sorted(data.snapshot.source_age_seconds.items())
+            ),
+        },
         "kems_entity_states": dict(sorted(kems_entities.items())),
         "options": dict(entry.options),
         "phase": data.phase,

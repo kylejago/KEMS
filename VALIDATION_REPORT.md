@@ -25,3 +25,18 @@ Validated in the build environment:
 - `pyproject.toml`, the Home Assistant manifest, and runtime constants identify `0.7.0-alpha4` / `0.7.0a4`.
 
 Black, Ruff, and pre-commit are not installed in this isolated build environment. Run the repository's normal development checks after applying the patch and before merging.
+
+## Alpha4 stale-source protection hotfix
+
+The live-source freshness hotfix treats configured instantaneous FoxESS/grid power
+and battery SOC observations as unavailable when Home Assistant has not received a
+report within the configured stale-data timeout. KEMS records the source age and
+stale logical fields in each snapshot, excludes intervals touching stale live data
+from simulation/accounting, and uses the underlying source age for the control
+fail-safe. Diagnostics expose `last_reported`, report age, and a `source_freshness`
+summary. Real hardware writes remain blocked.
+
+Hotfix verification: **115 tests passed**, repository-wide Python AST parsing passed,
+`git diff --check` passed, and the release checksum manifest was regenerated and
+verified. Black/Ruff/pre-commit were not available in the isolated build runtime
+and should still be run in the normal Windows development environment.

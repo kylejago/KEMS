@@ -38,7 +38,12 @@ from .models import (
     WholeHomeSummary,
 )
 from .ohme import interpret_charger_status
-from .periods import period_value_keys, period_value_kwargs, summarise_period_records
+from .periods import (
+    PERIOD_DATA_COMPLETE_KEY,
+    period_value_keys,
+    period_value_kwargs,
+    summarise_period_records,
+)
 from .quality import assess_quality
 from .roi import ROIEngine
 from .simulation import SimulationEngine
@@ -69,6 +74,7 @@ __all__ = [
     "LearningEngine",
     "LifetimeLedger",
     "PeriodTotals",
+    "PERIOD_DATA_COMPLETE_KEY",
     "PowerDownResult",
     "ProposalSystemProfile",
     "ROIConfig",

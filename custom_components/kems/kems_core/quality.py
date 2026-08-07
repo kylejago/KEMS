@@ -22,9 +22,16 @@ def assess_quality(snapshot: Snapshot, configured_fields: set[str]) -> DataQuali
     configured = sorted(configured_fields & snapshot_fields)
     available = [name for name in configured if getattr(snapshot, name) is not None]
     missing = tuple(name for name in configured if name not in available)
+    stale = tuple(name for name in configured if name in set(snapshot.stale_fields))
 
     if not configured:
-        return DataQuality(score=0.0, configured=0, available=0)
+        return DataQuality(
+            score=0.0,
+            configured=0,
+            available=0,
+            stale_fields=stale,
+            max_source_age_seconds=snapshot.source_data_age_seconds,
+        )
 
     score = 100 * len(available) / len(configured)
     important_missing = sum(
@@ -36,4 +43,6 @@ def assess_quality(snapshot: Snapshot, configured_fields: set[str]) -> DataQuali
         configured=len(configured),
         available=len(available),
         missing_fields=missing,
+        stale_fields=stale,
+        max_source_age_seconds=snapshot.source_data_age_seconds,
     )

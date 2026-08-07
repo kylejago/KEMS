@@ -77,7 +77,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         octopus=OctopusProvider(hass, entities),
         gas=GasProvider(hass, entities, settings.gas_kwh_per_m3),
         ohme=OhmeProvider(hass, entities),
-        foxess=FoxESSProvider(hass, entities),
+        foxess=FoxESSProvider(
+            hass,
+            entities,
+            stale_data_seconds=settings.control.stale_data_seconds,
+        ),
         octoplus=OctoplusProvider(hass, entities),
         settings=settings,
     )

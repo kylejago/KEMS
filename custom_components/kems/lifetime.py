@@ -11,6 +11,7 @@ from homeassistant.helpers.storage import Store
 
 from .const import DOMAIN, SIMULATION_LEDGER_VERSION, STORAGE_NAMESPACE
 from .kems_core import (
+    PERIOD_DATA_COMPLETE_KEY,
     GasEngine,
     GasSummary,
     LifetimeLedger,
@@ -264,7 +265,10 @@ class LifetimeLedgerRecorder:
                 self._tracking_values
             )
             self._ledger.last_daily_rollover = self._tracking_date
-            if self._tracking_values:
+            previous_complete = bool(self._tracking_values) and (
+                self._tracking_values.get(PERIOD_DATA_COMPLETE_KEY, 1.0) >= 0.5
+            )
+            if previous_complete:
                 self._ledger.accumulation_days_complete += 1
             else:
                 self._ledger.accumulation_days_incomplete += 1
@@ -277,6 +281,8 @@ class LifetimeLedgerRecorder:
             and current_date >= config.commissioning_date
         )
         for key, current in values.items():
+            if key == PERIOD_DATA_COMPLETE_KEY:
+                continue
             previous = previous_values.get(key, 0.0)
             delta = current - previous
             if key not in SIGNED_VALUE_KEYS:
@@ -299,6 +305,9 @@ class LifetimeLedgerRecorder:
     ) -> dict[str, float]:
         """Return current-day cumulative values with missing data as zero."""
         return {
+            PERIOD_DATA_COMPLETE_KEY: (
+                1.0 if simulation.data_coverage >= 99.9 else 0.0
+            ),
             "house_consumption_kwh": simulation.actual_house_consumption_kwh or 0.0,
             "ev_energy_kwh": simulation.actual_ev_energy_kwh or 0.0,
             "grid_import_kwh": simulation.actual_grid_import_kwh or 0.0,
@@ -462,7 +471,10 @@ class LifetimeLedgerRecorder:
             days_included=self._ledger.observed_days,
             complete_days=self._ledger.accumulation_days_complete,
             incomplete_days=self._ledger.accumulation_days_incomplete,
-            data_complete=not self._ledger.historical_repair_required,
+            data_complete=(
+                not self._ledger.historical_repair_required
+                and self._ledger.accumulation_days_incomplete == 0
+            ),
             **period_value_kwargs(values),
         )
 
