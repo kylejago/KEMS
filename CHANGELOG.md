@@ -1,3 +1,12 @@
+## 0.7.0-alpha4 hotfix — actual lifetime reconciliation
+
+- Makes the persisted daily ledger authoritative for observed/pre-install lifetime energy and billing totals, matching the simulated-ledger approach.
+- Corrects stale-source high-water contamination such as frozen live-demand intervals that were later excluded from a day.
+- Reconciles house consumption, grid import/export, solar/battery energy, gas, import/export cost and simulated totals on load and every update.
+- Deliberately leaves commissioned-only actual system-value counters on their existing commissioning-gated accumulation path.
+- Keeps incomplete-day flags intact rather than silently treating repaired history as complete.
+- Real hardware writes remain unavailable.
+
 ## 0.7.0-alpha4 hotfix — stale live-source protection
 
 - Detects stale live power/SOC sources using Home Assistant `State.last_reported`.

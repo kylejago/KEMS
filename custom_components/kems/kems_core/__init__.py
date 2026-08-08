@@ -15,6 +15,7 @@ from .lifetime_accounting import (
     OBSERVED_LIFETIME_KEYS,
     SIGNED_LIFETIME_KEYS,
     SIMULATED_LIFETIME_KEYS,
+    reconciled_observed_lifetime_values,
     reconciled_simulated_lifetime_values,
     should_accumulate_lifetime_value,
 )
@@ -54,6 +55,7 @@ __all__ = [
     "should_accumulate_lifetime_value",
     "SIGNED_LIFETIME_KEYS",
     "SIMULATED_LIFETIME_KEYS",
+    "reconciled_observed_lifetime_values",
     "reconciled_simulated_lifetime_values",
     "OBSERVED_LIFETIME_KEYS",
     "COMMISSIONED_VALUE_KEYS",

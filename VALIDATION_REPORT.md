@@ -5,7 +5,7 @@ Branch: `release/0.7.0-alpha4-user-settings`
 
 Validated in the build environment:
 
-- `108 passed` with pytest.
+- `117 passed` with pytest.
 - All 42 shipped Python modules parsed and compiled successfully.
 - Home Assistant manifest and English translations parsed successfully.
 - `git diff --check` reports no whitespace errors.
@@ -40,3 +40,23 @@ Hotfix verification: **115 tests passed**, repository-wide Python AST parsing pa
 `git diff --check` passed, and the release checksum manifest was regenerated and
 verified. Black/Ruff/pre-commit were not available in the isolated build runtime
 and should still be run in the normal Windows development environment.
+
+## Alpha4 actual-lifetime reconciliation hotfix
+
+The observed/pre-install lifetime energy and billing totals now rebuild from the
+persisted per-day ledger plus the current-day tracking record. This removes stale
+high-water contamination left by source failures that were detected after an
+interval had already been accumulated. Commissioned-only actual system-value
+fields are intentionally excluded so a mid-day commissioning boundary cannot be
+retroactively moved to the start of the day.
+
+Regression coverage includes the live diagnostic failure shape where the period
+ledger resolves to 191.270 kWh while a stale all-time high-water value remained at
+195.278 kWh. The reconciler returns the authoritative 191.270 kWh and corresponding
+3,938.82 p import cost.
+
+Final hotfix verification: **117 tests passed**. Repository-wide Python AST parsing,
+JSON parsing, whitespace checks, ZIP extraction/CRC checks, and checksum-manifest
+verification are performed for the release artifact. Black/Ruff/pre-commit are not
+available in the isolated build runtime and should still be run in the normal
+Windows development environment after applying the patch.

@@ -1,6 +1,7 @@
 """Regression tests for pre-installation lifetime accounting."""
 
 from kems_core import (
+    reconciled_observed_lifetime_values,
     reconciled_simulated_lifetime_values,
     should_accumulate_lifetime_value,
 )
@@ -84,3 +85,35 @@ def test_simulated_lifetime_reconciliation_allows_downward_revision() -> None:
 
     assert totals["simulated_grid_export_kwh"] == 43.169
     assert totals["simulated_grid_export_kwh"] < stale_high_water
+
+
+def test_observed_lifetime_reconciles_to_daily_ledger_after_stale_source() -> None:
+    stale_lifetime_high_water = 195.278
+    totals = reconciled_observed_lifetime_values(
+        [
+            {
+                "house_consumption_kwh": 150.0,
+                "grid_import_kwh": 150.0,
+                "import_cost_pence": 3000.0,
+            }
+        ],
+        {
+            "house_consumption_kwh": 41.27,
+            "grid_import_kwh": 41.27,
+            "import_cost_pence": 938.82,
+        },
+    )
+
+    assert round(totals["house_consumption_kwh"], 3) == 191.27
+    assert round(totals["grid_import_kwh"], 3) == 191.27
+    assert round(totals["import_cost_pence"], 2) == 3938.82
+    assert totals["house_consumption_kwh"] < stale_lifetime_high_water
+
+
+def test_observed_reconciliation_does_not_rebuild_commissioned_value() -> None:
+    totals = reconciled_observed_lifetime_values(
+        [{"actual_system_value_pence": 123.0, "house_consumption_kwh": 1.0}],
+    )
+
+    assert "actual_system_value_pence" not in totals
+    assert totals["house_consumption_kwh"] == 1.0

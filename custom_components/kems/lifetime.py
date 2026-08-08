@@ -23,7 +23,7 @@ from .kems_core import (
     Snapshot,
     period_value_keys,
     period_value_kwargs,
-    reconciled_simulated_lifetime_values,
+    reconciled_observed_lifetime_values,
     summarise_period_records,
 )
 from .kems_core.lifetime_accounting import (
@@ -106,7 +106,7 @@ class LifetimeLedgerRecorder:
             self._tracking_values["simulated_system_value_pence"] = 0.0
         self._simulation_ledger_version = SIMULATION_LEDGER_VERSION
         if not self._repair_required:
-            self._reconcile_simulated_totals()
+            self._reconcile_observed_totals()
         maintenance_date = data.get("maintenance_date")
         if isinstance(maintenance_date, str):
             self._maintenance_date = date.fromisoformat(maintenance_date)
@@ -295,7 +295,7 @@ class LifetimeLedgerRecorder:
 
         self._tracking_date = current_date
         self._tracking_values = values
-        self._reconcile_simulated_totals()
+        self._reconcile_observed_totals()
         self._ledger.last_updated = now
 
     @staticmethod
@@ -366,9 +366,9 @@ class LifetimeLedgerRecorder:
         if should_accumulate_lifetime_value(key, installed):
             setattr(self._ledger, key, getattr(self._ledger, key) + delta)
 
-    def _reconcile_simulated_totals(self) -> None:
-        """Make simulated lifetime totals match the persisted daily ledger."""
-        values = reconciled_simulated_lifetime_values(
+    def _reconcile_observed_totals(self) -> None:
+        """Make observed lifetime totals match the persisted daily ledger."""
+        values = reconciled_observed_lifetime_values(
             self._daily_records.values(),
             self._tracking_values if self._tracking_date is not None else None,
         )
