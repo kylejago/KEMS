@@ -1,14 +1,14 @@
-# Start here — KEMS 0.7.0-alpha3 Control Lab
+# Start here — KEMS 0.7.0-alpha4 guided setup
 
-Apply this package over the current 0.7.0-alpha2 integration branch. It preserves all existing KEMS observation and simulation data.
+Apply this package over the current alpha3 code. It preserves existing KEMS observation, lifetime, and simulation data.
 
 ## Development branch
 
 ```text
-release/0.7.0-alpha3
+release/0.7.0-alpha4-user-settings
 ```
 
-Create it from the latest `develop` branch, copy the package into the repository root while preserving `.git`, then run:
+Create it from the latest `develop` branch, apply the patch, then run:
 
 ```powershell
 .\.venv\Scripts\Activate.ps1
@@ -19,24 +19,18 @@ python -m pytest
 python -m pre_commit run --all-files
 ```
 
-Expected pytest result: `97 passed`.
+Expected pytest result: `106 passed`.
 
 Commit:
 
 ```text
-feat: build KEMS 0.7.0-alpha3 KH7 topology
+feat: add guided setup and editable tariff UI
 ```
 
-Push this release branch for live Home Assistant testing. Do not merge into `main` until the alpha3 Control Lab matrix passes.
-
-Safe pre-install settings:
+After installing in Home Assistant, restart and open:
 
 ```text
-Operating mode: Simulate
-Virtual scenario: Normal
-Master control enabled: Off
-System commissioned: Off
-Emergency stop: Off
+Settings → Devices & services → KEMS → Configure
 ```
 
-Real FoxESS writes are hard-blocked in this alpha even if Control is selected.
+Verify the Tariff and prices page first. Existing users should remain in Automatic mode and continue using live Octopus rates. Real FoxESS writes remain blocked.

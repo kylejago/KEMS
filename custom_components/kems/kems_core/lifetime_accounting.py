@@ -51,6 +51,45 @@ SIMULATED_LIFETIME_KEYS = frozenset(
 )
 
 
+def _reconciled_values(
+    keys: Iterable[str],
+    daily_records: Iterable[Mapping[str, float]],
+    tracking_values: Mapping[str, float] | None = None,
+) -> dict[str, float]:
+    """Sum selected lifetime values from the authoritative daily ledger."""
+    key_set = frozenset(keys)
+    totals = {key: 0.0 for key in key_set}
+    records = list(daily_records)
+    if tracking_values is not None:
+        records.append(tracking_values)
+    for values in records:
+        for key in key_set:
+            value = values.get(key)
+            if isinstance(value, (int, float)):
+                totals[key] += float(value)
+    return totals
+
+
+def reconciled_observed_lifetime_values(
+    daily_records: Iterable[Mapping[str, float]],
+    tracking_values: Mapping[str, float] | None = None,
+) -> dict[str, float]:
+    """Rebuild observed/pre-install lifetime totals from stored day values.
+
+    Instantaneous source failures can cause a current-day cumulative total to be
+    revised downward once bad intervals are identified. The daily ledger is the
+    authoritative record, so rebuilding these values prevents an earlier
+    high-water mark from remaining permanently in all-time totals. Commissioned
+    value fields are intentionally excluded because their accumulation starts at
+    commissioning rather than necessarily at the start of a calendar day.
+    """
+    return _reconciled_values(
+        OBSERVED_LIFETIME_KEYS,
+        daily_records,
+        tracking_values,
+    )
+
+
 def reconciled_simulated_lifetime_values(
     daily_records: Iterable[Mapping[str, float]],
     tracking_values: Mapping[str, float] | None = None,
@@ -61,16 +100,11 @@ def reconciled_simulated_lifetime_values(
     pacing are recalculated. Rebuilding from stored day values avoids keeping
     a stale intraday high-water mark in the lifetime ledger.
     """
-    totals = {key: 0.0 for key in SIMULATED_LIFETIME_KEYS}
-    records = list(daily_records)
-    if tracking_values is not None:
-        records.append(tracking_values)
-    for values in records:
-        for key in SIMULATED_LIFETIME_KEYS:
-            value = values.get(key)
-            if isinstance(value, (int, float)):
-                totals[key] += float(value)
-    return totals
+    return _reconciled_values(
+        SIMULATED_LIFETIME_KEYS,
+        daily_records,
+        tracking_values,
+    )
 
 
 COMMISSIONED_VALUE_KEYS = frozenset(

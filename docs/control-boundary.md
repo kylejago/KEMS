@@ -1,4 +1,4 @@
-# Control boundary — 0.7.0-alpha3
+# Control boundary — 0.7.0-alpha4
 
 This release contains a complete hardware-independent control planner and virtual KH7 scenario lab, but remains safe to install before the inverter exists.
 

@@ -10,6 +10,8 @@ from .providers.gas import GasProvider
 from .providers.octoplus import OctoplusProvider
 from .providers.octopus import OctopusProvider
 from .providers.ohme import OhmeProvider
+from .settings import KEMSSettings
+from .tariff import resolve_tariff
 
 
 class Collector:
@@ -22,6 +24,7 @@ class Collector:
         ohme: OhmeProvider,
         foxess: FoxESSProvider,
         octoplus: OctoplusProvider,
+        settings: KEMSSettings,
     ) -> None:
         """Initialise the collector."""
         self._octopus = octopus
@@ -29,25 +32,41 @@ class Collector:
         self._ohme = ohme
         self._foxess = foxess
         self._octoplus = octoplus
+        self._settings = settings
 
     def collect(self) -> Snapshot:
         """Create a complete whole-home monitoring snapshot."""
+        now = dt_util.now()
         octopus = self._octopus.get_state()
         gas = self._gas.get_state()
         ohme = self._ohme.get_state()
-        foxess = self._foxess.get_state()
-        octoplus = self._octoplus.get_state()
+        foxess = self._foxess.get_state(now)
+        octoplus = self._octoplus.get_state(now)
+        tariff = resolve_tariff(
+            settings=self._settings.tariff,
+            now=now,
+            live_current_import_rate=octopus.current_import_rate,
+            live_next_import_rate=octopus.next_import_rate,
+            live_current_export_rate=octopus.current_export_rate,
+            live_standing_charge=octopus.electricity_standing_charge,
+            live_off_peak=octopus.off_peak,
+            live_intelligent_slot=octopus.intelligent_slot,
+            live_next_offpeak_start=octopus.next_offpeak_start,
+            live_offpeak_end=octopus.offpeak_end,
+            ev_charging=ohme.charging,
+            fallback_export_rate=self._settings.simulation.export_rate_pence,
+        )
 
         return Snapshot(
-            timestamp=dt_util.now(),
-            current_import_rate=octopus.current_import_rate,
-            next_import_rate=octopus.next_import_rate,
-            current_export_rate=octopus.current_export_rate,
-            electricity_standing_charge=octopus.electricity_standing_charge,
-            off_peak=octopus.off_peak,
-            intelligent_slot=octopus.intelligent_slot,
-            next_offpeak_start=octopus.next_offpeak_start,
-            offpeak_end=octopus.offpeak_end,
+            timestamp=now,
+            current_import_rate=tariff.current_import_rate,
+            next_import_rate=tariff.next_import_rate,
+            current_export_rate=tariff.current_export_rate,
+            electricity_standing_charge=tariff.electricity_standing_charge,
+            off_peak=tariff.off_peak,
+            intelligent_slot=tariff.intelligent_slot,
+            next_offpeak_start=tariff.next_offpeak_start,
+            offpeak_end=tariff.offpeak_end,
             saving_session_joined=octoplus.joined,
             saving_session_active=octoplus.active,
             saving_session_id=octoplus.event_id,
@@ -87,4 +106,7 @@ class Collector:
             raw_grid_import_kw=foxess.raw_grid_import_kw,
             raw_grid_export_kw=foxess.raw_grid_export_kw,
             grid_flow_mode=foxess.grid_flow_mode,
+            source_age_seconds=foxess.source_age_seconds,
+            stale_fields=foxess.stale_fields,
+            source_data_age_seconds=foxess.source_data_age_seconds,
         )

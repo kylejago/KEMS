@@ -23,7 +23,7 @@ def test_manifest_stays_a_hub() -> None:
     source = MANIFEST.read_text(encoding="utf-8")
 
     assert '"integration_type": "hub"' in source
-    assert '"version": "0.7.0-alpha3"' in source
+    assert '"version": "0.7.0-alpha4"' in source
 
 
 def test_options_flow_includes_kh7_inverter_limit_and_paced_strategy() -> None:
@@ -32,7 +32,7 @@ def test_options_flow_includes_kh7_inverter_limit_and_paced_strategy() -> None:
     assert "CONF_INVERTER_LIMIT" in source
     assert "CONF_SITE_IMPORT_LIMIT" in source
     assert '"paced_export"' in source
-    assert "VERSION = 11" in source
+    assert "VERSION = 12" in source
 
 
 def test_options_flow_includes_power_down_sources_and_toggle() -> None:
@@ -75,3 +75,62 @@ def test_site_import_limit_is_an_option_not_a_source_mapping() -> None:
     ]
 
     assert "CONF_SITE_IMPORT_LIMIT" not in provider_block
+
+
+def test_options_flow_has_friendly_category_menu_and_tariff_editor() -> None:
+    """Users should configure KEMS through small named pages, not one huge form."""
+    source = CONFIG_FLOW.read_text(encoding="utf-8")
+    for token in (
+        "MENU_OPTIONS = {",
+        '"tariff"',
+        '"battery"',
+        '"solar"',
+        '"financial"',
+        '"monitoring"',
+        '"control"',
+        "CONF_TARIFF_MODE",
+        "CONF_MANUAL_DAY_RATE",
+        "CONF_MANUAL_OFFPEAK_RATE",
+        "CONF_MANUAL_STANDING_CHARGE",
+        "CONF_MANUAL_OFFPEAK_START",
+        "CONF_MANUAL_OFFPEAK_END",
+        "TIME_SELECTOR",
+        "async_show_menu",
+    ):
+        assert token in source
+
+
+def test_options_menu_has_explicit_fallback_labels() -> None:
+    """Menu labels must not disappear when frontend translations are stale."""
+    source = CONFIG_FLOW.read_text(encoding="utf-8")
+
+    for label in (
+        "Tariff and prices",
+        "Battery, inverter and grid limits",
+        "Solar, export and Power Down",
+        "System cost and ROI",
+        "Monitoring and history",
+        "Control Lab and EPS safety",
+    ):
+        assert label in source
+
+    assert "menu_options=self.MENU_OPTIONS" in source
+
+
+def test_manual_setup_can_run_without_live_import_rate_entity() -> None:
+    """Friends and family must be able to use a fully manual tariff."""
+    source = CONFIG_FLOW.read_text(encoding="utf-8")
+    assert 'manual = self._initial_options[CONF_TARIFF_MODE] == "manual"' in source
+    assert "require_import_rate=not manual" in source
+    assert "MANUAL_TARIFF_SCHEMA" in source
+    assert "options=self._initial_options" in source
+
+
+def test_number_selectors_use_home_assistant_supported_steps() -> None:
+    """Number selector steps must be 'any' or at least 0.001 in HA 2026.8."""
+    source = CONFIG_FLOW.read_text(encoding="utf-8")
+
+    assert 'step: float | Literal["any"]' in source
+    assert "0.0001" not in source
+    assert '_number(0, 200, "any", "p/kWh")' in source
+    assert '_number(1, 20, "any", "kWh/m³")' in source

@@ -83,6 +83,28 @@ def test_period_aggregation_marks_missing_historical_days() -> None:
     assert totals.data_complete is False
 
 
+def test_period_aggregation_marks_stale_current_day_incomplete() -> None:
+    """A current day with excluded stale intervals must not claim completeness."""
+    from kems_core import PERIOD_DATA_COMPLETE_KEY, summarise_period_records
+
+    totals = summarise_period_records(
+        {
+            "2026-08-07": {
+                "grid_import_kwh": 4.0,
+                PERIOD_DATA_COMPLETE_KEY: 0.0,
+            }
+        },
+        date(2026, 8, 7),
+        date(2026, 8, 7),
+        current_day=date(2026, 8, 7),
+    )
+
+    assert totals.grid_import_kwh == 4.0
+    assert totals.complete_days == 0
+    assert totals.incomplete_days == 0
+    assert totals.data_complete is False
+
+
 def test_power_down_result_round_trip_preserves_completed_session() -> None:
     """The retained event result must survive Home Assistant restarts."""
     result = PowerDownResult(

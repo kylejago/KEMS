@@ -7,6 +7,9 @@ from datetime import date
 
 from .models import PeriodTotals
 
+PERIOD_DATA_COMPLETE_KEY = "__data_complete"
+
+
 _PERIOD_METADATA_FIELDS = frozenset(
     {
         "start_date",
@@ -58,18 +61,27 @@ def summarise_period_records(
                 totals[key] += value
 
     selected_days = {day for day, _ in selected}
+
+    def record_complete(values: dict[str, float]) -> bool:
+        if not values:
+            return False
+        return values.get(PERIOD_DATA_COMPLETE_KEY, 1.0) >= 0.5
+
     complete_days = sum(
-        1 for day, values in selected if day != current_day and bool(values)
+        1 for day, values in selected if day != current_day and record_complete(values)
     )
     incomplete_days = sum(
-        1 for day, values in selected if day != current_day and not values
+        1
+        for day, values in selected
+        if day != current_day and not record_complete(values)
     )
+    data_complete = all(record_complete(values) for _, values in selected)
     return PeriodTotals(
         start_date=start,
         end_date=end,
         days_included=len(selected_days),
         complete_days=complete_days,
         incomplete_days=incomplete_days,
-        data_complete=incomplete_days == 0,
+        data_complete=data_complete,
         **period_value_kwargs(totals),
     )

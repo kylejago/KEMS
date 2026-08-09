@@ -1,6 +1,6 @@
 # KEMS — Kyle Energy Management System
 
-KEMS 0.7.0-alpha3 is the pre-installation control-development lab for Home Assistant. It extends the 0.6.0-beta1 baseline into:
+KEMS 0.7.0-alpha4 is the pre-installation control-development lab for Home Assistant. It extends the 0.6.0-beta1 baseline into:
 
 **Observe → Learn → Advise → Simulate → Shadow → Control**
 
@@ -21,6 +21,23 @@ KEMS automatically discovers and can manually map:
 
 Before FoxESS is installed, KEMS automatically uses the Octopus electricity current-demand sensor for both house load and grid import. FoxESS sources take priority automatically when they become available.
 
+### Live-source freshness protection
+
+Instantaneous house/grid/battery/solar observations are checked against Home Assistant's latest source report timestamp. If a configured live source has not reported within the Control Lab stale-data timeout (180 seconds by default), KEMS treats that reading as unavailable instead of repeatedly integrating the frozen value. Intervals touching stale live data are excluded from energy/cost accumulation, affected reporting periods are marked incomplete, Data Quality falls and identifies the stale logical fields, and the control planner enters its stale-data fail-safe. Diagnostics include each source's report time and age. Once the upstream sensor reports again, KEMS resumes automatically.
+
+## Home Assistant setup and settings UI
+
+Initial setup now asks whether KEMS should use automatic tariff entities or a manual tariff. After setup, open **Settings → Devices & services → KEMS → Configure** to edit one clear category at a time:
+
+- Tariff and prices
+- Battery, inverter and grid limits
+- Solar, export and Power Down
+- System cost and ROI
+- Monitoring and history
+- Control Lab and EPS safety
+
+Each category preserves the other settings and reloads KEMS safely after saving. Source entity mappings remain available through **Reconfigure**.
+
 ## Proposal system simulation
 
 The supplied proposal is represented as:
@@ -37,15 +54,14 @@ The supplied proposal is represented as:
 
 When live FoxESS solar data is unavailable, the simulation uses a three-array proposal solar curve. Once FoxESS Modbus is available, live solar replaces the proposal estimate automatically.
 
-## Current tariff model
+## User-configurable tariff model
 
-This feature is configured for:
+KEMS now includes a Home Assistant **Configure** menu with a dedicated **Tariff and prices** page. Users can choose:
 
-- **Intelligent Octopus Go** import pricing read live from Home Assistant
-- normal off-peak periods reported by Octopus
-- extra Intelligent dispatch slots accepted as cheap only when Octopus reports a slot **and Ohme reports active charging**
-- **Fixed export at 12 p/kWh all day** for every simulated export interval
-- Intelligent Octopus Flux/time-of-use export rates are intentionally ignored
+- **Automatic mode** — follow live Home Assistant tariff entities, with editable manual values used only when a live value is unavailable.
+- **Manual mode** — always use the entered day rate, off-peak rate, standing charge, export rate, and cheap-period start/end times.
+
+The manual schedule supports overnight periods that cross midnight. Confirmed Intelligent extra slots remain cheap only when the Intelligent slot source is active **and** the EV charger reports active charging. Export income continues to use the user-configured fixed export rate rather than Intelligent Octopus Flux/time-of-use export pricing.
 
 The combined simulated solar and battery AC output is capped at the KH7 limit of 7kW. A separate editable grid-export limit remains available for the final DNO approval.
 

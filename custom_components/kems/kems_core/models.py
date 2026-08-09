@@ -62,6 +62,12 @@ class Snapshot:
     raw_grid_export_kw: float | None = None
     grid_flow_mode: str = "no_grid_source"
 
+    # Freshness metadata is recorded alongside the observation so that stale
+    # live power sources cannot silently become valid-looking history.
+    source_age_seconds: dict[str, float] = field(default_factory=dict)
+    stale_fields: tuple[str, ...] = ()
+    source_data_age_seconds: float | None = None
+
     @property
     def cheap_period_confirmed(self) -> bool:
         """Return whether a usable cheap period is confirmed."""
@@ -73,6 +79,7 @@ class Snapshot:
         """Return a JSON-serialisable representation."""
         data = asdict(self)
         data["timestamp"] = self.timestamp.isoformat()
+        data["stale_fields"] = list(self.stale_fields)
         for key in (
             "next_offpeak_start",
             "offpeak_end",
@@ -102,6 +109,9 @@ class Snapshot:
             value = values.get(key)
             if isinstance(value, str):
                 values[key] = datetime.fromisoformat(value)
+        stale_fields = values.get("stale_fields")
+        if isinstance(stale_fields, list):
+            values["stale_fields"] = tuple(str(item) for item in stale_fields)
         known = cls.__dataclass_fields__
         return cls(**{key: value for key, value in values.items() if key in known})
 
@@ -630,6 +640,8 @@ class DataQuality:
     configured: int
     available: int
     missing_fields: tuple[str, ...] = ()
+    stale_fields: tuple[str, ...] = ()
+    max_source_age_seconds: float | None = None
 
 
 @dataclass(frozen=True, slots=True)

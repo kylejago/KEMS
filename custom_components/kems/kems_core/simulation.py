@@ -96,6 +96,14 @@ class SimulationEngine:
                 continue
             intervals += 1
 
+            # Do not integrate a frozen live reading across the next history
+            # interval. Requiring both ends to be usable deliberately leaves a
+            # small gap rather than inventing energy from a stale power value.
+            if current.stale_fields or following.stale_fields:
+                continue
+            if _load_kw(following) is None:
+                continue
+
             rate = current.current_import_rate
             load_kw = _load_kw(current)
             if rate is None or load_kw is None:

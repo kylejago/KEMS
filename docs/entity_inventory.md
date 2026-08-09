@@ -1,4 +1,4 @@
-# Entity inventory — v0.7.0-alpha3
+# Entity inventory — v0.7.0-alpha4
 
 KEMS creates source-mirror entities only when the matching source is configured. Derived analysis and proposal-simulation entities are created automatically and may be `unknown` until enough observations exist.
 

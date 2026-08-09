@@ -1,4 +1,43 @@
+## 0.7.0-alpha4 hotfix — actual lifetime reconciliation
+
+- Makes the persisted daily ledger authoritative for observed/pre-install lifetime energy and billing totals, matching the simulated-ledger approach.
+- Corrects stale-source high-water contamination such as frozen live-demand intervals that were later excluded from a day.
+- Reconciles house consumption, grid import/export, solar/battery energy, gas, import/export cost and simulated totals on load and every update.
+- Deliberately leaves commissioned-only actual system-value counters on their existing commissioning-gated accumulation path.
+- Keeps incomplete-day flags intact rather than silently treating repaired history as complete.
+- Real hardware writes remain unavailable.
+
+## 0.7.0-alpha4 hotfix — stale live-source protection
+
+- Detects stale live power/SOC sources using Home Assistant `State.last_reported`.
+- Uses the existing configurable stale-data timeout (default 180 seconds).
+- Stops integrating frozen power values into consumption, cost, learning and simulation totals.
+- Marks reporting periods incomplete when stale/missing intervals reduce day coverage.
+- Lowers Data Quality and exposes the exact stale logical fields and source ages.
+- Makes Control Data Fresh fail safe from underlying source age, not merely the new KEMS snapshot timestamp.
+- Adds source report timestamps/ages to diagnostics for troubleshooting connectivity outages.
+- Real hardware writes remain unavailable.
+
+## 0.7.0-alpha4
+
+- Fixed blank settings-menu labels when Home Assistant or the browser retained an older custom-integration translation bundle.
+
 # Changelog
+
+## 0.7.0-alpha4 — guided setup and editable tariff UI
+
+- Replaced the single oversized options form with a six-page Home Assistant Configure menu.
+- Added automatic tariff mode with user-editable day-rate, off-peak-rate, standing-charge, export-rate, and cheap-period fallback values.
+- Added manual tariff mode for users without a supported live tariff integration.
+- Added local-time cheap-period start/end controls with correct overnight handling across midnight.
+- Preserved confirmed Intelligent extra-slot safety: the cheap rate is used only when the Intelligent slot and active EV charging agree.
+- Added guided first-time setup for automatic versus manual tariff selection.
+- Allowed manual-tariff installations to run without a current-import-rate entity.
+- Split battery, solar/export, financial, monitoring, and Control Lab settings into focused pages with descriptive selectors and units.
+- Added alpha3-to-alpha4 migration defaults without changing existing automatic Octopus behaviour.
+- Fixed Home Assistant 2026.8 config-flow import failure by using supported high-precision number-selector steps.
+- Added tariff-resolution and UI-schema regression coverage; 107 tests pass.
+- Real FoxESS and charger writes remain disabled.
 
 ## 0.7.0-alpha3 hotfix — simulated period reconciliation
 
