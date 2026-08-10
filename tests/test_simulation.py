@@ -910,3 +910,218 @@ def test_simulation_exposes_eps_limit_separately_from_grid_output_limit() -> Non
     assert result.inverter_limit_kw == 7.0
     assert result.eps_output_limit_kw == 6.5
     assert result.site_import_limit_kw == 12.0
+
+
+def test_awaiting_export_tariff_uses_solar_then_battery_and_never_exports() -> None:
+    """No-export mode must self-consume PV and disable deliberate export."""
+    start = datetime(2026, 8, 10, 12, 0, tzinfo=UTC)
+    cheap_start = start + timedelta(hours=11, minutes=30)
+    records = [
+        Snapshot(
+            timestamp=start + timedelta(minutes=15 * index),
+            current_import_rate=28.3,
+            current_export_rate=12.0,
+            house_load_kw=1.0,
+            grid_import_kw=1.0,
+            solar_power_kw=4.0,
+            off_peak=False,
+            next_offpeak_start=cheap_start,
+        )
+        for index in range(4)
+    ]
+    result = SimulationEngine().simulate_today(
+        records,
+        start + timedelta(minutes=46),
+        SimulationConfig(
+            battery_capacity_kwh=20.0,
+            battery_initial_percent=40.0,
+            battery_reserve_percent=10.0,
+            proposal_solar_enabled=False,
+            export_rate_pence=12.0,
+            export_tariff_status="awaiting",
+            battery_export_enabled=True,
+            strategy="paced_export",
+        ),
+        forecast_energy_until_offpeak_kwh=5.0,
+        current_snapshot=records[-1],
+    )
+
+    assert result.no_export_mode_active is True
+    assert result.export_tariff_active is False
+    assert result.export_tariff_status == "awaiting"
+    assert result.effective_export_rate_pence == 0.0
+    assert result.strategy == "self_use"
+    assert result.battery_export_enabled is False
+    assert result.simulated_grid_export_kwh == 0.0
+    assert result.simulated_battery_export_kwh == 0.0
+    assert result.current_simulated_grid_export_kw == 0.0
+    assert result.current_simulated_battery_export_power_kw == 0.0
+    assert result.current_simulated_solar_to_battery_power_kw is not None
+    assert result.current_simulated_solar_to_battery_power_kw > 0.0
+
+
+def test_awaiting_export_tariff_cheap_period_uses_solar_aware_charge_target() -> None:
+    """Cheap charging should stop at a forecast target rather than always 100%."""
+    start = datetime(2026, 8, 10, 0, 0, tzinfo=UTC)
+    next_cheap = start + timedelta(hours=23, minutes=30)
+    records = [
+        Snapshot(
+            timestamp=start + timedelta(minutes=30 * index),
+            current_import_rate=3.49,
+            house_load_kw=0.5,
+            grid_import_kw=0.5,
+            off_peak=True,
+            next_offpeak_start=next_cheap,
+        )
+        for index in range(5)
+    ]
+    result = SimulationEngine().simulate_today(
+        records,
+        start + timedelta(hours=2, minutes=1),
+        SimulationConfig(
+            battery_capacity_kwh=56.42,
+            battery_initial_percent=10.0,
+            battery_reserve_percent=10.0,
+            max_charge_kw=7.0,
+            max_discharge_kw=7.0,
+            proposal_solar_enabled=True,
+            export_tariff_status="awaiting",
+            export_rate_pence=12.0,
+        ),
+        forecast_energy_until_offpeak_kwh=18.0,
+        current_snapshot=records[-1],
+    )
+
+    assert result.overnight_charge_target_percent is not None
+    assert 10.0 < result.overnight_charge_target_percent < 100.0
+    assert result.overnight_charge_target_kwh is not None
+    assert result.forecast_home_until_next_cheap_kwh == 18.0
+    assert result.forecast_solar_until_next_cheap_kwh is not None
+    assert result.forecast_solar_credit_kwh is not None
+    assert result.current_simulated_grid_export_kw == 0.0
+    assert result.current_simulated_battery_export_power_kw == 0.0
+
+
+def test_awaiting_export_tariff_target_excludes_remaining_cheap_home_load() -> None:
+    """Overnight target should cover demand after cheap power, not during it."""
+    start = datetime(2026, 8, 10, 0, 0, tzinfo=UTC)
+    cheap_end = start + timedelta(hours=5, minutes=30)
+    next_cheap = start + timedelta(hours=23, minutes=30)
+    records = [
+        Snapshot(
+            timestamp=start + timedelta(minutes=30 * index),
+            current_import_rate=3.49,
+            house_load_kw=1.0,
+            grid_import_kw=1.0,
+            off_peak=True,
+            offpeak_end=cheap_end,
+            next_offpeak_start=next_cheap,
+        )
+        for index in range(3)
+    ]
+    result = SimulationEngine().simulate_today(
+        records,
+        start + timedelta(hours=1, minutes=1),
+        SimulationConfig(
+            battery_capacity_kwh=56.42,
+            battery_initial_percent=10.0,
+            battery_reserve_percent=10.0,
+            max_charge_kw=7.0,
+            proposal_solar_enabled=False,
+            export_tariff_status="awaiting",
+        ),
+        forecast_energy_until_offpeak_kwh=23.5,
+        current_snapshot=records[-1],
+    )
+
+    # At the 01:00 current snapshot, 4.5 cheap hours remain. Their 4.5 kWh
+    # should be removed from the learned 23.5 kWh forecast before setting the
+    # battery target, because that demand will be served by cheap grid power.
+    assert result.forecast_home_until_next_cheap_kwh == 19.0
+    assert result.overnight_charge_target_kwh is not None
+    assert result.overnight_charge_target_kwh < 30.0
+
+
+def test_export_tariff_active_preserves_alpha4_paced_export_behaviour() -> None:
+    """The new status switch must not alter alpha4 behaviour when active."""
+    start = datetime(2026, 8, 10, 12, 0, tzinfo=UTC)
+    cheap_start = start + timedelta(hours=10)
+    records = [
+        Snapshot(
+            timestamp=start + timedelta(minutes=30 * index),
+            current_import_rate=28.3,
+            house_load_kw=0.0,
+            grid_import_kw=0.0,
+            off_peak=False,
+            next_offpeak_start=cheap_start,
+        )
+        for index in range(3)
+    ]
+    result = SimulationEngine().simulate_today(
+        records,
+        start + timedelta(hours=1),
+        SimulationConfig(
+            battery_capacity_kwh=10.0,
+            battery_initial_percent=100.0,
+            battery_reserve_percent=10.0,
+            proposal_solar_enabled=False,
+            export_tariff_status="active",
+            export_rate_pence=12.0,
+            battery_export_enabled=True,
+            strategy="paced_export",
+        ),
+        forecast_energy_until_offpeak_kwh=2.0,
+        current_snapshot=records[-1],
+    )
+    assert result.export_tariff_active is True
+    assert result.effective_export_rate_pence == 12.0
+    assert result.strategy == "paced_export"
+    assert result.battery_export_enabled is True
+    assert result.target_battery_export_power_kw is not None
+    assert result.target_battery_export_power_kw > 0.0
+
+
+def test_awaiting_export_tariff_power_down_does_not_reenable_export() -> None:
+    """No-export status must override Power Down export optimisation."""
+    start = datetime(2026, 8, 12, 18, 0, tzinfo=UTC)
+    end = start + timedelta(hours=2)
+    next_cheap = start + timedelta(hours=5, minutes=30)
+    records = [
+        Snapshot(
+            timestamp=start + timedelta(minutes=15 * index),
+            current_import_rate=28.3,
+            house_load_kw=1.5,
+            grid_import_kw=1.5,
+            solar_power_kw=0.5,
+            off_peak=False,
+            next_offpeak_start=next_cheap,
+            saving_session_joined=True,
+            saving_session_active=True,
+            saving_session_start=start,
+            saving_session_end=end,
+            saving_session_octopoints_per_kwh=16.0,
+            saving_session_import_baseline_total_kwh=3.0,
+        )
+        for index in range(4)
+    ]
+    result = SimulationEngine().simulate_today(
+        records,
+        start + timedelta(minutes=46),
+        SimulationConfig(
+            battery_capacity_kwh=20.0,
+            battery_initial_percent=80.0,
+            battery_reserve_percent=10.0,
+            proposal_solar_enabled=False,
+            export_tariff_status="awaiting",
+            battery_export_enabled=True,
+            saving_session_enabled=True,
+        ),
+        forecast_energy_until_offpeak_kwh=4.0,
+        current_snapshot=records[-1],
+    )
+
+    assert result.saving_session_active is True
+    assert result.saving_session_export_target_kw == 0.0
+    assert result.current_simulated_grid_export_kw == 0.0
+    assert result.current_simulated_battery_export_power_kw == 0.0
+    assert result.battery_reserved_for_saving_session is False

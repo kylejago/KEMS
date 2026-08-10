@@ -104,6 +104,18 @@ BINARY_SENSORS: tuple[KEMSBinarySensorEntityDescription, ...] = (
         is_on_fn=lambda data: data.simulation.proposal_solar_active,
     ),
     KEMSBinarySensorEntityDescription(
+        key="export_tariff_active",
+        name="Export tariff active",
+        icon="mdi:cash-check",
+        is_on_fn=lambda data: data.simulation.export_tariff_active,
+    ),
+    KEMSBinarySensorEntityDescription(
+        key="no_export_mode_active",
+        name="No-export mode active",
+        icon="mdi:transmission-tower-off",
+        is_on_fn=lambda data: data.simulation.no_export_mode_active,
+    ),
+    KEMSBinarySensorEntityDescription(
         key="battery_export_simulated",
         name="Battery export enabled in simulation",
         icon="mdi:battery-arrow-down-outline",

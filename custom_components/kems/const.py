@@ -4,7 +4,7 @@ from __future__ import annotations
 
 DOMAIN = "kems"
 NAME = "KEMS"
-VERSION = "0.7.0-alpha4"
+VERSION = "0.7.0-alpha5"
 
 DEFAULT_SCAN_INTERVAL_SECONDS = 60
 DEFAULT_HISTORY_DAYS = 90
@@ -98,6 +98,7 @@ CONF_MAX_DISCHARGE = "max_discharge_kw"
 CONF_CHARGE_EFFICIENCY = "charge_efficiency"
 CONF_DISCHARGE_EFFICIENCY = "discharge_efficiency"
 CONF_EXPORT_RATE = "export_rate_pence"
+CONF_EXPORT_TARIFF_STATUS = "export_tariff_status"
 CONF_INVERTER_LIMIT = "inverter_ac_limit_kw"
 CONF_EXPORT_LIMIT = "export_limit_kw"
 CONF_SITE_IMPORT_LIMIT = "site_import_limit_kw"
@@ -150,6 +151,7 @@ DEFAULT_OPTIONS = {
     CONF_CHARGE_EFFICIENCY: 0.95,
     CONF_DISCHARGE_EFFICIENCY: 0.95,
     CONF_EXPORT_RATE: 12.0,
+    CONF_EXPORT_TARIFF_STATUS: "active",
     CONF_INVERTER_LIMIT: 7.0,
     CONF_EXPORT_LIMIT: 7.0,
     CONF_SITE_IMPORT_LIMIT: 0.0,

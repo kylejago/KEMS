@@ -88,7 +88,7 @@ def test_manifest_classifies_kems_as_hub() -> None:
 
     manifest = json.loads((INTEGRATION / "manifest.json").read_text(encoding="utf-8"))
     assert manifest["integration_type"] == "hub"
-    assert manifest["version"] == "0.7.0-alpha4"
+    assert manifest["version"] == "0.7.0-alpha5"
 
 
 def test_alpha4_preserves_history_and_versions_simulation_ledger() -> None:
@@ -115,7 +115,7 @@ def test_entry_migration_applies_kh7_paced_export_defaults() -> None:
     source = (INTEGRATION / "__init__.py").read_text(encoding="utf-8")
     config_flow = (INTEGRATION / "config_flow.py").read_text(encoding="utf-8")
 
-    assert "VERSION = 12" in config_flow
+    assert "VERSION = 13" in config_flow
     assert "options[CONF_INVERTER_LIMIT] = 7.0" in source
     assert "options[CONF_MAX_CHARGE] = 7.0" in source
     assert "options[CONF_MAX_DISCHARGE] = 7.0" in source
@@ -153,3 +153,10 @@ def test_alpha4_migration_preserves_live_tariff_and_adds_manual_fallback() -> No
     assert "options.setdefault(CONF_MANUAL_OFFPEAK_RATE, 3.4933)" in source
     assert 'CONF_MANUAL_OFFPEAK_START: "23:30:00"' in const_source
     assert 'CONF_MANUAL_OFFPEAK_END: "05:30:00"' in const_source
+
+
+def test_alpha5_migration_preserves_existing_export_behaviour() -> None:
+    """Alpha4 users must not silently switch to no-export mode."""
+    source = (INTEGRATION / "__init__.py").read_text(encoding="utf-8")
+    assert 'options.setdefault(CONF_EXPORT_TARIFF_STATUS, "active")' in source
+    assert "version=13" in source

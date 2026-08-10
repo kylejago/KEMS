@@ -177,7 +177,11 @@ def resolve_tariff(
         ),
         off_peak=(live_off_peak if live_off_peak is not None else manual_offpeak),
         intelligent_slot=intelligent_slot,
-        next_offpeak_start=(live_next_offpeak_start or manual_next_start),
+        next_offpeak_start=(
+            live_next_offpeak_start
+            if live_next_offpeak_start is not None and live_next_offpeak_start > now
+            else manual_next_start
+        ),
         offpeak_end=live_offpeak_end or manual_end,
         source="automatic" if used_live else "manual_fallback",
     )
