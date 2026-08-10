@@ -25,3 +25,13 @@ def test_legacy_options_are_clamped_to_kh7_paced_export() -> None:
     assert unsafe_eps_clamp not in settings_source
     assert 'else "paced_export"' in settings_source
     assert "CONF_EXPORT_RATE: 12.0" in const_source
+
+
+def test_alpha5_exposes_export_tariff_status_and_safe_default() -> None:
+    """Existing users keep paid-export behaviour until they choose awaiting."""
+    settings_source = SETTINGS.read_text(encoding="utf-8")
+    const_source = CONST.read_text(encoding="utf-8")
+
+    assert 'CONF_EXPORT_TARIFF_STATUS = "export_tariff_status"' in const_source
+    assert 'CONF_EXPORT_TARIFF_STATUS: "active"' in const_source
+    assert 'if str(values[CONF_EXPORT_TARIFF_STATUS]) == "awaiting"' in settings_source

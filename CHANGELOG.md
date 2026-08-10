@@ -1,3 +1,14 @@
+## 0.7.0-alpha5 — awaiting export tariff / no-export live readiness
+
+- Added an explicit Export tariff status: Active or Not active / awaiting export tariff.
+- Awaiting mode values export at 0p/kWh and overrides normal export settings without deleting the configured future export rate.
+- Forces self-consumption-first simulation: solar → home → battery, then battery → home, with deliberate grid export disabled.
+- Adds solar-aware cheap-period charging targets so the battery retains forecast home cover while leaving conservative PV headroom.
+- Power Down remains visible but no battery/export reserve is created while paid export is unavailable; reduction can still come from avoiding import.
+- Added export-tariff/no-export status, solar-to-battery flow and overnight charge-target diagnostics.
+- Control Lab mirrors the policy in shadow planning but real hardware writes remain hard-blocked.
+- Existing alpha4 users migrate with Export tariff status = Active so behaviour does not silently change.
+
 ## 0.7.0-alpha4 hotfix — actual lifetime reconciliation
 
 - Makes the persisted daily ledger authoritative for observed/pre-install lifetime energy and billing totals, matching the simulated-ledger approach.

@@ -186,6 +186,7 @@ class SimulationConfig:
     charge_efficiency: float = 0.95
     discharge_efficiency: float = 0.95
     export_rate_pence: float = 12.0
+    export_tariff_status: str = "active"
     inverter_limit_kw: float = 7.0
     export_limit_kw: float = 7.0
     eps_output_limit_kw: float = 7.0
@@ -238,6 +239,7 @@ class SimulationState:
     current_simulated_grid_export_kw: float | None = None
     current_simulated_battery_power_kw: float | None = None
     current_simulated_battery_charge_power_kw: float | None = None
+    current_simulated_solar_to_battery_power_kw: float | None = None
     current_simulated_battery_to_home_power_kw: float | None = None
     current_simulated_battery_export_power_kw: float | None = None
     current_simulated_total_kh7_output_kw: float | None = None
@@ -272,6 +274,14 @@ class SimulationState:
     battery_reserved_for_saving_session: bool = False
     battery_export_reduced_for_saving_session: bool = False
     effective_export_rate_pence: float | None = None
+    export_tariff_status: str = "active"
+    export_tariff_active: bool = True
+    no_export_mode_active: bool = False
+    overnight_charge_target_percent: float | None = None
+    overnight_charge_target_kwh: float | None = None
+    forecast_home_until_next_cheap_kwh: float | None = None
+    forecast_solar_until_next_cheap_kwh: float | None = None
+    forecast_solar_credit_kwh: float | None = None
     inverter_limit_kw: float | None = None
     export_limit_kw: float | None = None
     battery_charge_limit_kw: float | None = None

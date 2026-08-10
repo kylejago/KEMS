@@ -23,7 +23,7 @@ def test_manifest_stays_a_hub() -> None:
     source = MANIFEST.read_text(encoding="utf-8")
 
     assert '"integration_type": "hub"' in source
-    assert '"version": "0.7.0-alpha4"' in source
+    assert '"version": "0.7.0-alpha5"' in source
 
 
 def test_options_flow_includes_kh7_inverter_limit_and_paced_strategy() -> None:
@@ -32,7 +32,7 @@ def test_options_flow_includes_kh7_inverter_limit_and_paced_strategy() -> None:
     assert "CONF_INVERTER_LIMIT" in source
     assert "CONF_SITE_IMPORT_LIMIT" in source
     assert '"paced_export"' in source
-    assert "VERSION = 12" in source
+    assert "VERSION = 13" in source
 
 
 def test_options_flow_includes_power_down_sources_and_toggle() -> None:
@@ -134,3 +134,11 @@ def test_number_selectors_use_home_assistant_supported_steps() -> None:
     assert "0.0001" not in source
     assert '_number(0, 200, "any", "p/kWh")' in source
     assert '_number(1, 20, "any", "kWh/m³")' in source
+
+
+def test_alpha5_tariff_page_exposes_export_tariff_status() -> None:
+    """The user can switch between awaiting and active export tariff states."""
+    source = CONFIG_FLOW.read_text(encoding="utf-8")
+    assert "CONF_EXPORT_TARIFF_STATUS" in source
+    assert "Not active / awaiting export tariff" in source
+    assert "Active - export is paid" in source

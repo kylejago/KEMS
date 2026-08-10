@@ -207,13 +207,36 @@ class ControlEngine:
             )
 
         if inputs.cheap_period:
+            if simulation.no_export_mode_active:
+                if simulation.current_simulated_grid_bypass_power_kw is not None:
+                    planned_house_grid = max(
+                        simulation.current_simulated_grid_bypass_power_kw,
+                        0.0,
+                    )
+                else:
+                    solar_to_home = min(
+                        inputs.solar_power_kw,
+                        inputs.house_load_kw,
+                        config.inverter_limit_kw,
+                    )
+                    planned_house_grid = max(
+                        inputs.house_load_kw - solar_to_home,
+                        0.0,
+                    )
+            else:
+                planned_house_grid = inputs.house_load_kw
             available_site_headroom = (
                 config.max_charge_kw
                 if config.site_import_limit_kw is None
-                else max(config.site_import_limit_kw - inputs.house_load_kw, 0.0)
+                else max(config.site_import_limit_kw - planned_house_grid, 0.0)
             )
-            desired_charge = min(config.max_charge_kw, available_site_headroom)
-            planned_site_import = inputs.house_load_kw + desired_charge
+            requested_charge = (
+                max(simulation.current_simulated_battery_charge_power_kw or 0.0, 0.0)
+                if simulation.no_export_mode_active
+                else config.max_charge_kw
+            )
+            desired_charge = min(requested_charge, available_site_headroom)
+            planned_site_import = planned_house_grid + desired_charge
             planned_site_headroom = (
                 None
                 if config.site_import_limit_kw is None
@@ -225,13 +248,17 @@ class ControlEngine:
             )
             return _control_state(
                 base,
-                operating_reason="confirmed_cheap_charge",
+                operating_reason=(
+                    "awaiting_export_tariff_charge"
+                    if simulation.no_export_mode_active
+                    else "confirmed_cheap_charge"
+                ),
                 desired_work_mode="Force Charge",
                 desired_charge_power_kw=round(desired_charge, 3),
                 desired_min_soc_percent=config.normal_reserve_percent,
                 desired_ev_charging_allowed=True,
                 desired_grid_export_allowed=False,
-                grid_bypass_power_kw=round(inputs.house_load_kw, 3),
+                grid_bypass_power_kw=round(planned_house_grid, 3),
                 total_site_import_kw=round(planned_site_import, 3),
                 site_import_headroom_kw=planned_site_headroom,
                 site_import_limit_exceeded=not safe,
@@ -242,13 +269,81 @@ class ControlEngine:
                     else _backend_block_reason(config)
                 ),
                 next_action=(
-                    "Charge battery at the available site-import headroom "
+                    "Charge only to the solar-aware no-export target and "
+                    "supply the remaining home demand from cheap grid power"
+                    if simulation.no_export_mode_active
+                    else "Charge battery at the available site-import headroom "
                     "and supply home from grid"
                 ),
             )
 
         house = inputs.house_load_kw
         solar_output = min(max(inputs.solar_power_kw, 0.0), config.inverter_limit_kw)
+
+        if simulation.no_export_mode_active:
+            solar_to_home = min(solar_output, house)
+            battery_home = max(
+                simulation.current_simulated_battery_to_home_power_kw or 0.0,
+                0.0,
+            )
+            battery_home = min(
+                battery_home,
+                config.max_discharge_kw,
+                max(config.inverter_limit_kw - solar_to_home, 0.0),
+            )
+            grid_import = max(
+                (
+                    simulation.current_simulated_grid_import_kw
+                    if simulation.current_simulated_grid_import_kw is not None
+                    else house - solar_to_home - battery_home
+                ),
+                0.0,
+            )
+            total_output = solar_to_home + battery_home
+            site_headroom = (
+                None
+                if config.site_import_limit_kw is None
+                else round(config.site_import_limit_kw - grid_import, 3)
+            )
+            site_exceeded = bool(site_headroom is not None and site_headroom < -1e-6)
+            safe = (
+                total_output <= config.inverter_limit_kw + 1e-6
+                and battery_home <= config.max_discharge_kw + 1e-6
+                and not site_exceeded
+            )
+            return _control_state(
+                base,
+                operating_reason=(
+                    "awaiting_export_tariff_power_down"
+                    if inputs.saving_session_active
+                    else "awaiting_export_tariff"
+                ),
+                desired_work_mode="Self Use",
+                desired_battery_to_home_power_kw=round(battery_home, 3),
+                desired_battery_export_power_kw=0.0,
+                desired_total_discharge_power_kw=round(battery_home, 3),
+                desired_min_soc_percent=config.normal_reserve_percent,
+                desired_ev_charging_allowed=not inputs.saving_session_active,
+                desired_grid_export_allowed=False,
+                total_kh7_ac_output_kw=round(total_output, 3),
+                kh7_output_headroom_kw=round(
+                    max(config.inverter_limit_kw - total_output, 0.0), 3
+                ),
+                grid_bypass_power_kw=round(grid_import, 3),
+                total_site_import_kw=round(grid_import, 3),
+                site_import_headroom_kw=site_headroom,
+                site_import_limit_exceeded=site_exceeded,
+                plan_safe=safe,
+                blocked_reason=(
+                    "Configured site-import limit exceeded"
+                    if site_exceeded
+                    else _backend_block_reason(config)
+                ),
+                next_action=(
+                    "Use solar and battery for the home; keep deliberate grid "
+                    "export disabled until the export tariff is active"
+                ),
+            )
         battery_output_headroom = max(config.inverter_limit_kw - solar_output, 0.0)
         battery_output_limit = min(config.max_discharge_kw, battery_output_headroom)
         battery_home = min(
@@ -524,7 +619,7 @@ def _valid_scenario(value: str) -> str:
 
 
 def _backend_block_reason(config: ControlConfig) -> str:
-    """Explain why alpha3 will not issue a real inverter write."""
+    """Explain why alpha5 will not issue a real inverter write."""
     if config.operating_mode == "simulate":
         return "Virtual backend only"
     if config.operating_mode == "shadow":
@@ -535,7 +630,7 @@ def _backend_block_reason(config: ControlConfig) -> str:
         return "System has not been commissioned"
     if not config.control_enabled:
         return "Master control enable is off"
-    return "Real FoxESS control backend is intentionally unavailable in alpha3"
+    return "Real FoxESS control backend is intentionally unavailable in alpha5"
 
 
 def run_preflight_suite(config: ControlConfig) -> tuple[int, int]:

@@ -1,4 +1,4 @@
-# KEMS 0.7.0-alpha4 pre-installation Control Lab
+# KEMS 0.7.0-alpha5 pre-installation Control Lab
 
 This development build adds:
 
@@ -15,5 +15,5 @@ This development build adds:
 Manifest version:
 
 ```json
-"version": "0.7.0-alpha4"
+"version": "0.7.0-alpha5"
 ```

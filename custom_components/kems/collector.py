@@ -61,7 +61,11 @@ class Collector:
             timestamp=now,
             current_import_rate=tariff.current_import_rate,
             next_import_rate=tariff.next_import_rate,
-            current_export_rate=tariff.current_export_rate,
+            current_export_rate=(
+                tariff.current_export_rate
+                if self._settings.simulation.export_tariff_status == "active"
+                else 0.0
+            ),
             electricity_standing_charge=tariff.electricity_standing_charge,
             off_peak=tariff.off_peak,
             intelligent_slot=tariff.intelligent_slot,

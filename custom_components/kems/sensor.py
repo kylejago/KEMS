@@ -104,6 +104,9 @@ def _simulation_attributes(data: KEMSData) -> Mapping[str, Any]:
         "current_simulated_battery_charge_power_kw": (
             simulation.current_simulated_battery_charge_power_kw
         ),
+        "current_simulated_solar_to_battery_power_kw": (
+            simulation.current_simulated_solar_to_battery_power_kw
+        ),
         "current_simulated_battery_to_home_power_kw": (
             simulation.current_simulated_battery_to_home_power_kw
         ),
@@ -186,6 +189,18 @@ def _simulation_attributes(data: KEMSData) -> Mapping[str, Any]:
         "actual_system_value_pence": simulation.actual_system_value_pence,
         "simulated_system_value_pence": simulation.simulated_system_value_pence,
         "effective_export_rate_pence": simulation.effective_export_rate_pence,
+        "export_tariff_status": simulation.export_tariff_status,
+        "export_tariff_active": simulation.export_tariff_active,
+        "no_export_mode_active": simulation.no_export_mode_active,
+        "overnight_charge_target_percent": (simulation.overnight_charge_target_percent),
+        "overnight_charge_target_kwh": simulation.overnight_charge_target_kwh,
+        "forecast_home_until_next_cheap_kwh": (
+            simulation.forecast_home_until_next_cheap_kwh
+        ),
+        "forecast_solar_until_next_cheap_kwh": (
+            simulation.forecast_solar_until_next_cheap_kwh
+        ),
+        "forecast_solar_credit_kwh": simulation.forecast_solar_credit_kwh,
         "inverter_limit_kw": simulation.inverter_limit_kw,
         "export_limit_kw": simulation.export_limit_kw,
         "battery_charge_limit_kw": simulation.battery_charge_limit_kw,
@@ -476,6 +491,14 @@ SENSORS: tuple[KEMSSensorEntityDescription, ...] = (
         suggested_display_precision=2,
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda data: data.simulation.effective_export_rate_pence,
+    ),
+    KEMSSensorEntityDescription(
+        key="export_tariff_status",
+        name="Export tariff status",
+        icon="mdi:transmission-tower-export",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda data: data.simulation.export_tariff_status,
+        attributes_fn=_simulation_attributes,
     ),
     KEMSSensorEntityDescription(
         key="next_offpeak_start",
@@ -817,6 +840,18 @@ SENSORS: tuple[KEMSSensorEntityDescription, ...] = (
         value_fn=lambda data: data.simulation.simulated_battery_soc,
     ),
     KEMSSensorEntityDescription(
+        key="simulated_solar_to_battery_power",
+        name="Simulated solar to battery power",
+        icon="mdi:solar-power-variant-outline",
+        device_class=SensorDeviceClass.POWER,
+        native_unit_of_measurement=UnitOfPower.KILO_WATT,
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=2,
+        value_fn=lambda data: (
+            data.simulation.current_simulated_solar_to_battery_power_kw
+        ),
+    ),
+    KEMSSensorEntityDescription(
         key="simulated_battery_to_home_power",
         name="Simulated battery to home power",
         icon="mdi:home-battery-outline",
@@ -868,6 +903,35 @@ SENSORS: tuple[KEMSSensorEntityDescription, ...] = (
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
         suggested_display_precision=2,
         value_fn=lambda data: data.simulation.reserved_for_home_kwh,
+    ),
+    KEMSSensorEntityDescription(
+        key="overnight_charge_target_soc",
+        name="Overnight charge target SOC",
+        icon="mdi:battery-charging-medium",
+        native_unit_of_measurement=PERCENTAGE,
+        suggested_display_precision=0,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda data: data.simulation.overnight_charge_target_percent,
+    ),
+    KEMSSensorEntityDescription(
+        key="overnight_charge_target_energy",
+        name="Overnight charge target energy",
+        icon="mdi:battery-charging-outline",
+        device_class=SensorDeviceClass.ENERGY,
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        suggested_display_precision=2,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda data: data.simulation.overnight_charge_target_kwh,
+    ),
+    KEMSSensorEntityDescription(
+        key="forecast_solar_until_next_cheap",
+        name="Forecast solar until next cheap period",
+        icon="mdi:weather-sunny",
+        device_class=SensorDeviceClass.ENERGY,
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        suggested_display_precision=2,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda data: data.simulation.forecast_solar_until_next_cheap_kwh,
     ),
     KEMSSensorEntityDescription(
         key="hours_until_next_cheap_period",

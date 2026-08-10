@@ -1,6 +1,6 @@
 # KEMS — Kyle Energy Management System
 
-KEMS 0.7.0-alpha4 is the pre-installation control-development lab for Home Assistant. It extends the 0.6.0-beta1 baseline into:
+KEMS 0.7.0-alpha5 is the pre-installation control-development lab for Home Assistant. It extends the 0.6.0-beta1 baseline into:
 
 **Observe → Learn → Advise → Simulate → Shadow → Control**
 
@@ -53,6 +53,10 @@ The supplied proposal is represented as:
 - proposal monthly generation targets and 0.938 shading factor
 
 When live FoxESS solar data is unavailable, the simulation uses a three-array proposal solar curve. Once FoxESS Modbus is available, live solar replaces the proposal estimate automatically.
+
+## Awaiting Export Tariff / no-export mode
+
+Alpha5 separates the future export rate from whether an export tariff is actually active. Set **Export tariff status** to **Not active / awaiting export tariff** while commissioning or waiting for an export tariff. KEMS then values export at 0p/kWh, disables deliberate battery export, uses solar for the home first, stores surplus solar in the battery, curtails remaining simulated surplus, and uses battery energy for the remaining home load. During confirmed cheap periods it charges only toward a conservative solar-aware target rather than automatically filling the battery, leaving headroom for the following day's PV. Real FoxESS writes remain disabled; this behaviour is available for simulation/shadow validation first.
 
 ## User-configurable tariff model
 
