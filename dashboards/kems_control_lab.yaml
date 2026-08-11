@@ -10,7 +10,7 @@ views:
           - type: markdown
             content: |
               # KEMS pre-installation control lab
-              This page shows desired behaviour only. **0.7.0-alpha5 cannot send real FoxESS commands.**
+              This page shows desired behaviour only. **0.7.0-alpha6 cannot send real FoxESS commands.**
           - type: entities
             title: Interactive lab controls
             show_header_toggle: false

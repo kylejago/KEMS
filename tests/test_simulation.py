@@ -1125,3 +1125,74 @@ def test_awaiting_export_tariff_power_down_does_not_reenable_export() -> None:
     assert result.current_simulated_grid_export_kw == 0.0
     assert result.current_simulated_battery_export_power_kw == 0.0
     assert result.battery_reserved_for_saving_session is False
+
+
+def test_simulation_exposes_tariff_and_solar_flow_breakdown() -> None:
+    """Scenario comparison needs auditable cheap/day and PV routing totals."""
+    start = datetime(2026, 8, 11, 0, 0, tzinfo=UTC)
+    records = [
+        Snapshot(
+            timestamp=start,
+            current_import_rate=3.5,
+            off_peak=True,
+            house_load_kw=1.0,
+            grid_import_kw=1.0,
+            solar_power_kw=0.0,
+        ),
+        Snapshot(
+            timestamp=start + timedelta(minutes=30),
+            current_import_rate=28.0,
+            off_peak=False,
+            house_load_kw=1.0,
+            grid_import_kw=1.0,
+            solar_power_kw=2.0,
+        ),
+        Snapshot(
+            timestamp=start + timedelta(hours=1),
+            current_import_rate=28.0,
+            off_peak=False,
+            house_load_kw=1.0,
+            grid_import_kw=1.0,
+            solar_power_kw=2.0,
+        ),
+    ]
+
+    result = SimulationEngine().simulate_today(
+        records,
+        start + timedelta(hours=1, minutes=1),
+        SimulationConfig(
+            battery_capacity_kwh=10.0,
+            battery_initial_percent=10.0,
+            battery_reserve_percent=10.0,
+            max_charge_kw=5.0,
+            max_discharge_kw=5.0,
+            export_rate_pence=12.0,
+            proposal_solar_enabled=False,
+            battery_export_enabled=False,
+        ),
+    )
+
+    assert result.simulated_grid_import_kwh is not None
+    assert result.simulated_cheap_import_kwh is not None
+    assert result.simulated_day_import_kwh is not None
+    assert (
+        abs(
+            result.simulated_grid_import_kwh
+            - result.simulated_cheap_import_kwh
+            - result.simulated_day_import_kwh
+        )
+        <= 0.002
+    )
+    assert result.simulated_import_cost_pence is not None
+    assert result.simulated_cheap_import_cost_pence is not None
+    assert result.simulated_day_import_cost_pence is not None
+    assert (
+        abs(
+            result.simulated_import_cost_pence
+            - result.simulated_cheap_import_cost_pence
+            - result.simulated_day_import_cost_pence
+        )
+        <= 0.02
+    )
+    assert result.simulated_solar_generation_kwh is not None
+    assert result.simulated_solar_export_kwh is not None

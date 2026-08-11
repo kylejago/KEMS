@@ -341,7 +341,7 @@
           "island_reserve_percent": "Island conservation threshold (%)"
         },
         "data_description": {
-          "operating_mode": "Observe, virtual simulation, shadow planning, or control. Real control remains hard-blocked in alpha5.",
+          "operating_mode": "Observe, virtual simulation, shadow planning, or control. Real control remains hard-blocked in alpha6.",
           "virtual_scenario": "Inject normal, solar, cloud, high-load, Power Down, outage, overload, or unstable-grid conditions.",
           "control_enabled": "Records explicit control opt-in only. It cannot permit real writes until a verified backend exists.",
           "system_commissioned": "Leave off before the installer has commissioned the KH7 and KEMS has verified all readings and limits.",

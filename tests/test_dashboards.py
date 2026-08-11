@@ -13,7 +13,7 @@ DASHBOARDS = ROOT / "dashboards"
 def test_all_dashboard_yaml_is_valid() -> None:
     """Every shipped dashboard should parse as YAML."""
     files = sorted(DASHBOARDS.glob("*.yaml"))
-    assert len(files) == 10
+    assert len(files) == 12
     for path in files:
         content = yaml.safe_load(path.read_text(encoding="utf-8"))
         assert isinstance(content, dict)
@@ -105,3 +105,28 @@ def test_control_lab_dashboard_exposes_island_and_write_boundary() -> None:
     assert "sensor.kems_virtual_scenario_house_load" in text
     assert "sensor.kems_simulated_solar_power" not in text
     assert "sensor.kems_simulated_house_load_power" not in text
+
+
+def test_compare_dashboards_ship_five_parallel_scenarios() -> None:
+    """The comparison views must expose every alpha6 what-if scenario."""
+    for name in (
+        "kems_compare_builtin.yaml",
+        "kems_compare_advanced.yaml",
+    ):
+        text = (DASHBOARDS / name).read_text(encoding="utf-8")
+        assert "sensor.kems_compare_no_system_cost_today" in text
+        assert "sensor.kems_compare_solar_only_cost_today" in text
+        assert "sensor.kems_compare_solar_and_battery_cost_today" in text
+        assert "sensor.kems_compare_kems_no_export_cost_today" in text
+        assert "sensor.kems_compare_full_kems_cost_today" in text
+        assert "sensor.kems_scenario_comparison_7_days" in text
+        assert "sensor.kems_scenario_comparison_30_days" in text
+
+
+def test_advanced_compare_dashboard_uses_replay_timeline() -> None:
+    """ApexCharts should render the replayed midnight-to-now cost curves."""
+    text = (DASHBOARDS / "kems_compare_advanced.yaml").read_text(encoding="utf-8")
+    assert "custom:apexcharts-card" in text
+    assert "entity.attributes.timeline" in text
+    assert "no_system_cost_pence" in text
+    assert "kems_full_cost_pence" in text

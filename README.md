@@ -1,6 +1,6 @@
 # KEMS — Kyle Energy Management System
 
-KEMS 0.7.0-alpha5 is the pre-installation control-development lab for Home Assistant. It extends the 0.6.0-beta1 baseline into:
+KEMS 0.7.0-alpha6 is the pre-installation control-development lab for Home Assistant. It extends the 0.6.0-beta1 baseline into:
 
 **Observe → Learn → Advise → Simulate → Shadow → Control**
 
@@ -56,7 +56,23 @@ When live FoxESS solar data is unavailable, the simulation uses a three-array pr
 
 ## Awaiting Export Tariff / no-export mode
 
-Alpha5 separates the future export rate from whether an export tariff is actually active. Set **Export tariff status** to **Not active / awaiting export tariff** while commissioning or waiting for an export tariff. KEMS then values export at 0p/kWh, disables deliberate battery export, uses solar for the home first, stores surplus solar in the battery, curtails remaining simulated surplus, and uses battery energy for the remaining home load. During confirmed cheap periods it charges only toward a conservative solar-aware target rather than automatically filling the battery, leaving headroom for the following day's PV. Real FoxESS writes remain disabled; this behaviour is available for simulation/shadow validation first.
+Alpha6 retains the alpha5 separation of the future export rate from whether an export tariff is actually active. Set **Export tariff status** to **Not active / awaiting export tariff** while commissioning or waiting for an export tariff. KEMS then values export at 0p/kWh, disables deliberate battery export, uses solar for the home first, stores surplus solar in the battery, curtails remaining simulated surplus, and uses battery energy for the remaining home load. During confirmed cheap periods it charges only toward a conservative solar-aware target rather than automatically filling the battery, leaving headroom for the following day's PV. Real FoxESS writes remain disabled; this behaviour is available for simulation/shadow validation first.
+
+## What-if scenario comparison
+
+Alpha6 adds an independent replay engine for **What would today have looked like?** analysis. KEMS evaluates the same retained demand and tariff observations through five parallel scenarios without changing the active operating strategy:
+
+- **No system** — the whole home is supplied from the grid.
+- **Solar only** — solar supplies the home first and surplus is valued at the configured paid export rate.
+- **Solar + battery** — conventional self-use: solar → home → battery, battery → home, no tariff-aware grid charging.
+- **KEMS no-export** — the alpha5 awaiting-export strategy with solar-aware cheap charging and deliberate export disabled.
+- **Full KEMS smart control** — paid export, cheap charging, home reserve, paced battery export and Power Down optimisation.
+
+Each scenario exposes total cost including the daily standing charge, import/export, cheap/day import split, solar and battery routing, end SOC, and saving versus the No system baseline. The saving breakdown reconciles to reduced day-rate import, change in cheap-rate import, export income and Power Down income.
+
+KEMS also exposes Yesterday, 7-day and 30-day retained-history rollups. The Today comparison includes a cumulative cost timeline sampled from midnight to the latest retained observation so the web interface or ApexCharts dashboard can graph all five scenarios on the same axes.
+
+The shipped dashboards are `kems_compare_builtin.yaml` and `kems_compare_advanced.yaml`. The advanced version uses ApexCharts and Mushroom; the built-in version requires no custom frontend cards.
 
 ## User-configurable tariff model
 

@@ -88,7 +88,7 @@ def test_manifest_classifies_kems_as_hub() -> None:
 
     manifest = json.loads((INTEGRATION / "manifest.json").read_text(encoding="utf-8"))
     assert manifest["integration_type"] == "hub"
-    assert manifest["version"] == "0.7.0-alpha5"
+    assert manifest["version"] == "0.7.0-alpha6"
 
 
 def test_alpha4_preserves_history_and_versions_simulation_ledger() -> None:

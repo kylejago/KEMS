@@ -33,6 +33,10 @@ from .models import (
     PowerDownResult,
     ROIConfig,
     ROIState,
+    ScenarioComparisonState,
+    ScenarioPeriodComparison,
+    ScenarioSummary,
+    ScenarioTimelinePoint,
     SimulationConfig,
     SimulationState,
     Snapshot,
@@ -47,6 +51,10 @@ from .periods import (
 )
 from .quality import assess_quality
 from .roi import ROIEngine
+from .scenario_comparison import (
+    SCENARIO_KEYS,
+    ScenarioComparisonEngine,
+)
 from .simulation import SimulationEngine
 from .system_profile import FOXHOLE_PROPOSAL_PROFILE, ProposalSystemProfile, SolarArray
 from .whole_home import WholeHomeEngine
@@ -82,6 +90,12 @@ __all__ = [
     "ROIConfig",
     "ROIEngine",
     "ROIState",
+    "SCENARIO_KEYS",
+    "ScenarioComparisonEngine",
+    "ScenarioComparisonState",
+    "ScenarioPeriodComparison",
+    "ScenarioSummary",
+    "ScenarioTimelinePoint",
     "SimulationConfig",
     "SimulationEngine",
     "SimulationState",
