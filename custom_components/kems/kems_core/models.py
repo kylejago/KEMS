@@ -342,6 +342,21 @@ class ScenarioSummary:
     battery_export_kwh: float = 0.0
     ending_soc_percent: float | None = None
 
+    # Current/recent power routing for live visualisations such as the
+    # 16x16 KEMS panel. These are instantaneous kW values from the latest
+    # replay snapshot, not period totals.
+    current_house_load_kw: float | None = None
+    current_solar_power_kw: float | None = None
+    current_grid_import_kw: float | None = None
+    current_grid_export_kw: float | None = None
+    current_solar_to_home_kw: float | None = None
+    current_solar_to_battery_kw: float | None = None
+    current_solar_export_kw: float | None = None
+    current_grid_to_battery_kw: float | None = None
+    current_battery_to_home_kw: float | None = None
+    current_battery_export_kw: float | None = None
+    current_battery_soc_percent: float | None = None
+
     def to_dict(self) -> dict[str, Any]:
         """Return a stable JSON-compatible summary."""
         return asdict(self)

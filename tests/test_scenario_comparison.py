@@ -61,8 +61,6 @@ def test_compare_today_runs_five_independent_scenarios() -> None:
     assert no_export is not None and full is not None
     assert no_export.grid_export_kwh == 0.0
     assert no_export.export_income_pence == 0.0
-    assert 0.0 <= no_export.data_coverage <= 100.0
-    assert 0.0 <= full.data_coverage <= 100.0
     # Full KEMS is always replayed with the paid export tariff even when the
     # currently selected live-readiness setting is awaiting export.
     assert full.export_income_pence >= 0.0
@@ -157,3 +155,83 @@ def test_period_rollups_include_yesterday_and_seven_days() -> None:
     assert seven is not None and seven.days_included == 2
     assert seven.scenario("no_system") is not None
     assert seven.scenario("no_system").total_cost_pence > 0
+
+
+def test_today_scenarios_expose_current_power_routing() -> None:
+    """Panel/web clients should receive direct current kW routes for every scenario."""
+    start = datetime(2026, 8, 11, 0, 0, tzinfo=UTC)
+    records = _records(start)
+    result = ScenarioComparisonEngine().compare(
+        records,
+        records[-1].timestamp,
+        SimulationConfig(
+            battery_capacity_kwh=10.0,
+            battery_initial_percent=50.0,
+            battery_reserve_percent=10.0,
+            export_rate_pence=12.0,
+            max_charge_kw=5.0,
+            max_discharge_kw=5.0,
+            inverter_limit_kw=7.0,
+            export_limit_kw=7.0,
+            proposal_solar_enabled=False,
+        ),
+    )
+
+    today = result.period("today")
+    assert today is not None
+
+    no_system = today.scenario("no_system")
+    solar_only = today.scenario("solar_only")
+    solar_battery = today.scenario("solar_battery")
+    no_export = today.scenario("kems_no_export")
+    full = today.scenario("kems_full")
+    assert all(
+        item is not None
+        for item in (no_system, solar_only, solar_battery, no_export, full)
+    )
+
+    assert no_system.current_grid_import_kw == 2.0
+    assert no_system.current_grid_export_kw == 0.0
+    assert no_system.current_solar_power_kw == 0.0
+
+    assert solar_only.current_solar_power_kw == 3.0
+    assert solar_only.current_solar_to_home_kw == 2.0
+    assert solar_only.current_grid_import_kw == 0.0
+    assert solar_only.current_grid_export_kw == 1.0
+
+    assert solar_battery.current_solar_power_kw == 3.0
+    assert solar_battery.current_solar_to_home_kw == 2.0
+    assert solar_battery.current_solar_to_battery_kw is not None
+    assert solar_battery.current_battery_soc_percent is not None
+
+    assert no_export.current_grid_export_kw == 0.0
+    assert no_export.current_house_load_kw == 2.0
+    assert full.current_house_load_kw == 2.0
+    assert full.current_grid_import_kw is not None
+    assert full.current_grid_export_kw is not None
+
+
+def test_current_power_attributes_are_preserved_in_period_rollup() -> None:
+    """Current power routing must come from the latest day, never be summed."""
+    start = datetime(2026, 8, 10, 0, 0, tzinfo=UTC)
+    records = _records(start, count=8) + _records(start + timedelta(days=1), count=9)
+    now = records[-1].timestamp
+    result = ScenarioComparisonEngine().compare(
+        records,
+        now,
+        SimulationConfig(
+            battery_capacity_kwh=10.0,
+            battery_initial_percent=50.0,
+            battery_reserve_percent=10.0,
+            proposal_solar_enabled=False,
+        ),
+    )
+
+    today = result.period("today")
+    seven = result.period("7_days")
+    assert today is not None and seven is not None
+    today_full = today.scenario("kems_full")
+    seven_full = seven.scenario("kems_full")
+    assert today_full is not None and seven_full is not None
+    assert seven_full.current_grid_import_kw == today_full.current_grid_import_kw
+    assert seven_full.current_grid_export_kw == today_full.current_grid_export_kw

@@ -370,6 +370,17 @@ class ScenarioComparisonEngine:
             basic["battery_charge"] += stored_from_solar
             basic["battery_to_home"] += battery_to_home
 
+        # Build an instantaneous/recent power plan from the newest retained
+        # snapshot using each scenario's current replay state. This is separate
+        # from the cumulative kWh totals above and is intended for live displays.
+        current_plans = self._simple_current_plans(
+            day_records[-1] if day_records else None,
+            config,
+            battery_kwh=battery_kwh,
+            reserve_kwh=reserve_kwh,
+            capacity=capacity,
+        )
+
         summaries: dict[str, ScenarioSummary] = {}
         for key in names:
             item = acc[key]
@@ -407,6 +418,21 @@ class ScenarioComparisonEngine:
                 battery_solar_charge_kwh=round(item["solar_to_battery"], 3),
                 battery_to_home_kwh=round(item["battery_to_home"], 3),
                 battery_export_kwh=round(item["battery_export"], 3),
+                current_house_load_kw=current_plans[key]["house"],
+                current_solar_power_kw=current_plans[key]["solar"],
+                current_grid_import_kw=current_plans[key]["grid_import"],
+                current_grid_export_kw=current_plans[key]["grid_export"],
+                current_solar_to_home_kw=current_plans[key]["solar_to_home"],
+                current_solar_to_battery_kw=current_plans[key]["solar_to_battery"],
+                current_solar_export_kw=current_plans[key]["solar_export"],
+                current_grid_to_battery_kw=current_plans[key]["grid_to_battery"],
+                current_battery_to_home_kw=current_plans[key]["battery_to_home"],
+                current_battery_export_kw=current_plans[key]["battery_export"],
+                current_battery_soc_percent=(
+                    round(100 * battery_kwh / capacity, 1)
+                    if key == SCENARIO_SOLAR_BATTERY
+                    else None
+                ),
                 ending_soc_percent=(
                     round(100 * battery_kwh / capacity, 1)
                     if key == SCENARIO_SOLAR_BATTERY
@@ -415,6 +441,122 @@ class ScenarioComparisonEngine:
             )
 
         return summaries, round(100 * battery_kwh / capacity, 1)
+
+    def _simple_current_plans(
+        self,
+        snapshot: Snapshot | None,
+        config: SimulationConfig,
+        *,
+        battery_kwh: float,
+        reserve_kwh: float,
+        capacity: float,
+    ) -> dict[str, dict[str, float | None]]:
+        """Return latest-snapshot power routing for the three simple scenarios."""
+        empty = {
+            "house": None,
+            "solar": None,
+            "grid_import": None,
+            "grid_export": None,
+            "solar_to_home": None,
+            "solar_to_battery": None,
+            "solar_export": None,
+            "grid_to_battery": None,
+            "battery_to_home": None,
+            "battery_export": None,
+        }
+        if snapshot is None or snapshot.stale_fields:
+            return {
+                SCENARIO_NO_SYSTEM: dict(empty),
+                SCENARIO_SOLAR_ONLY: dict(empty),
+                SCENARIO_SOLAR_BATTERY: dict(empty),
+            }
+
+        load = _load_kw(snapshot)
+        if load is None:
+            return {
+                SCENARIO_NO_SYSTEM: dict(empty),
+                SCENARIO_SOLAR_ONLY: dict(empty),
+                SCENARIO_SOLAR_BATTERY: dict(empty),
+            }
+
+        load = max(load, 0.0)
+        solar = max(self._simulation._simulated_solar_power(snapshot, config), 0.0)
+        inverter_limit = max(config.inverter_limit_kw, 0.0)
+        export_limit = min(max(config.export_limit_kw, 0.0), inverter_limit)
+
+        no_system = {
+            "house": round(load, 3),
+            "solar": 0.0,
+            "grid_import": round(load, 3),
+            "grid_export": 0.0,
+            "solar_to_home": 0.0,
+            "solar_to_battery": 0.0,
+            "solar_export": 0.0,
+            "grid_to_battery": 0.0,
+            "battery_to_home": 0.0,
+            "battery_export": 0.0,
+        }
+
+        solar_to_home = min(solar, load, inverter_limit)
+        solar_only_import = max(load - solar_to_home, 0.0)
+        solar_surplus = max(solar - solar_to_home, 0.0)
+        solar_export = min(solar_surplus, export_limit)
+        solar_only = {
+            "house": round(load, 3),
+            "solar": round(solar, 3),
+            "grid_import": round(solar_only_import, 3),
+            "grid_export": round(solar_export, 3),
+            "solar_to_home": round(solar_to_home, 3),
+            "solar_to_battery": 0.0,
+            "solar_export": round(solar_export, 3),
+            "grid_to_battery": 0.0,
+            "battery_to_home": 0.0,
+            "battery_export": 0.0,
+        }
+
+        basic_solar_to_home = min(solar, load, inverter_limit)
+        net_load = max(load - basic_solar_to_home, 0.0)
+        available_ac = max(battery_kwh - reserve_kwh, 0.0) * max(
+            config.discharge_efficiency, 0.01
+        )
+        battery_to_home = min(
+            net_load,
+            max(config.max_discharge_kw, 0.0),
+            available_ac,
+            max(inverter_limit - basic_solar_to_home, 0.0),
+        )
+        grid_import = max(net_load - battery_to_home, 0.0)
+        solar_surplus = max(solar - basic_solar_to_home, 0.0)
+        solar_to_battery = min(
+            solar_surplus,
+            max(config.max_charge_kw, 0.0),
+            max(capacity - battery_kwh, 0.0) / max(config.charge_efficiency, 0.01),
+        )
+        remaining_solar = max(solar_surplus - solar_to_battery, 0.0)
+        inverter_used = basic_solar_to_home + battery_to_home
+        basic_export = min(
+            remaining_solar,
+            export_limit,
+            max(inverter_limit - inverter_used, 0.0),
+        )
+        solar_battery = {
+            "house": round(load, 3),
+            "solar": round(solar, 3),
+            "grid_import": round(grid_import, 3),
+            "grid_export": round(basic_export, 3),
+            "solar_to_home": round(basic_solar_to_home, 3),
+            "solar_to_battery": round(solar_to_battery, 3),
+            "solar_export": round(basic_export, 3),
+            "grid_to_battery": 0.0,
+            "battery_to_home": round(battery_to_home, 3),
+            "battery_export": 0.0,
+        }
+
+        return {
+            SCENARIO_NO_SYSTEM: no_system,
+            SCENARIO_SOLAR_ONLY: solar_only,
+            SCENARIO_SOLAR_BATTERY: solar_battery,
+        }
 
     @staticmethod
     def _add_import(
@@ -443,13 +585,49 @@ class ScenarioComparisonEngine:
         """Convert the main KEMS simulation result to a comparison summary."""
         standing = _standing_charge(day_records)
         energy_net = state.simulated_cost_pence or 0.0
+
+        # SimulationState already carries the current KEMS routing plan. Preserve
+        # it on the scenario summary so Home Assistant clients can display
+        # instantaneous flows instead of trying to differentiate cumulative kWh.
+        current_house = _round(state.current_simulated_house_load_kw)
+        current_solar = _round(state.current_simulated_solar_power_kw)
+        current_grid_import = _round(state.current_simulated_grid_import_kw)
+        current_grid_export = _round(state.current_simulated_grid_export_kw)
+        current_grid_to_battery = _round(
+            state.current_simulated_battery_charge_power_kw
+        )
+        current_solar_to_battery = _round(
+            state.current_simulated_solar_to_battery_power_kw
+        )
+        current_battery_to_home = _round(
+            state.current_simulated_battery_to_home_power_kw
+        )
+        current_battery_export = _round(state.current_simulated_battery_export_power_kw)
+
+        # Split grid export into its solar and battery components. Then solve
+        # the home balance for solar-to-home after removing any grid-to-battery
+        # charging from total site import.
+        grid_export_value = current_grid_export or 0.0
+        battery_export_value = current_battery_export or 0.0
+        current_solar_export = round(
+            max(grid_export_value - battery_export_value, 0.0), 3
+        )
+        house_value = current_house or 0.0
+        battery_home_value = current_battery_to_home or 0.0
+        grid_import_value = current_grid_import or 0.0
+        grid_charge_value = current_grid_to_battery or 0.0
+        house_grid_value = max(grid_import_value - grid_charge_value, 0.0)
+        current_solar_to_home = round(
+            max(house_value - battery_home_value - house_grid_value, 0.0), 3
+        )
+
         return ScenarioSummary(
             key=key,
             label=SCENARIO_LABELS[key],
             description=SCENARIO_DESCRIPTIONS[key],
             ready=state.ready,
             samples=state.samples,
-            data_coverage=round(state.data_coverage, 1),
+            data_coverage=round(state.data_coverage * 100, 1),
             import_cost_pence=_round(state.simulated_import_cost_pence, 2) or 0.0,
             cheap_import_cost_pence=(
                 _round(state.simulated_cheap_import_cost_pence, 2) or 0.0
@@ -482,6 +660,17 @@ class ScenarioComparisonEngine:
             battery_to_home_kwh=_round(state.simulated_battery_to_home_kwh) or 0.0,
             battery_export_kwh=_round(state.simulated_battery_export_kwh) or 0.0,
             ending_soc_percent=_round(state.simulated_battery_soc, 1),
+            current_house_load_kw=current_house,
+            current_solar_power_kw=current_solar,
+            current_grid_import_kw=current_grid_import,
+            current_grid_export_kw=current_grid_export,
+            current_solar_to_home_kw=current_solar_to_home,
+            current_solar_to_battery_kw=current_solar_to_battery,
+            current_solar_export_kw=current_solar_export,
+            current_grid_to_battery_kw=current_grid_to_battery,
+            current_battery_to_home_kw=current_battery_to_home,
+            current_battery_export_kw=current_battery_export,
+            current_battery_soc_percent=_round(state.simulated_battery_soc, 1),
         )
 
     @staticmethod
@@ -578,14 +767,26 @@ class ScenarioComparisonEngine:
         weighted_coverage = sum(
             item.data_coverage * max(item.samples, 1) for item in parts
         ) / sum(max(item.samples, 1) for item in parts)
+        latest = parts[-1]
         return ScenarioSummary(
             key=key,
-            label=parts[-1].label,
-            description=parts[-1].description,
+            label=latest.label,
+            description=latest.description,
             ready=all(item.ready for item in parts),
             samples=samples,
             data_coverage=round(weighted_coverage, 1),
-            ending_soc_percent=parts[-1].ending_soc_percent,
+            ending_soc_percent=latest.ending_soc_percent,
+            current_house_load_kw=latest.current_house_load_kw,
+            current_solar_power_kw=latest.current_solar_power_kw,
+            current_grid_import_kw=latest.current_grid_import_kw,
+            current_grid_export_kw=latest.current_grid_export_kw,
+            current_solar_to_home_kw=latest.current_solar_to_home_kw,
+            current_solar_to_battery_kw=latest.current_solar_to_battery_kw,
+            current_solar_export_kw=latest.current_solar_export_kw,
+            current_grid_to_battery_kw=latest.current_grid_to_battery_kw,
+            current_battery_to_home_kw=latest.current_battery_to_home_kw,
+            current_battery_export_kw=latest.current_battery_export_kw,
+            current_battery_soc_percent=latest.current_battery_soc_percent,
             **values,
         )
 
