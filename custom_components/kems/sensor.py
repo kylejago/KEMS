@@ -76,6 +76,47 @@ def _advice_attributes(data: KEMSData) -> Mapping[str, Any]:
     }
 
 
+def _scenario_attributes(
+    data: KEMSData,
+    scenario_key: str,
+    period_key: str = "today",
+) -> Mapping[str, Any]:
+    """Expose one complete what-if scenario result."""
+    scenario = data.scenarios.scenario(scenario_key, period_key)
+    return {} if scenario is None else scenario.to_dict()
+
+
+def _scenario_cost(
+    data: KEMSData,
+    scenario_key: str,
+    period_key: str = "today",
+) -> float | None:
+    """Return total electricity cost including the standing charge."""
+    scenario = data.scenarios.scenario(scenario_key, period_key)
+    return None if scenario is None else round(scenario.total_cost_pence, 2)
+
+
+def _scenario_period_attributes(
+    data: KEMSData,
+    period_key: str,
+) -> Mapping[str, Any]:
+    """Expose one complete comparison period."""
+    period = data.scenarios.period(period_key)
+    return {} if period is None else period.to_dict()
+
+
+def _scenario_period_state(data: KEMSData, period_key: str) -> str:
+    """Return the cheapest ready scenario label for a comparison period."""
+    period = data.scenarios.period(period_key)
+    cheapest = period.cheapest if period is not None else None
+    return cheapest.label if cheapest is not None else "Unavailable"
+
+
+def _scenario_comparison_attributes(data: KEMSData) -> Mapping[str, Any]:
+    """Expose all replay periods and the full today chart timeline."""
+    return data.scenarios.to_dict()
+
+
 def _simulation_attributes(data: KEMSData) -> Mapping[str, Any]:
     """Expose the complete proposal simulation comparison."""
     simulation = data.simulation
@@ -85,6 +126,10 @@ def _simulation_attributes(data: KEMSData) -> Mapping[str, Any]:
         "actual_import_cost_pence": simulation.actual_import_cost_pence,
         "actual_export_income_pence": simulation.actual_export_income_pence,
         "simulated_import_cost_pence": simulation.simulated_import_cost_pence,
+        "simulated_cheap_import_cost_pence": (
+            simulation.simulated_cheap_import_cost_pence
+        ),
+        "simulated_day_import_cost_pence": (simulation.simulated_day_import_cost_pence),
         "simulated_export_income_pence": simulation.simulated_export_income_pence,
         "actual_house_consumption_kwh": simulation.actual_house_consumption_kwh,
         "actual_ev_energy_kwh": simulation.actual_ev_energy_kwh,
@@ -94,8 +139,14 @@ def _simulation_attributes(data: KEMSData) -> Mapping[str, Any]:
         "actual_grid_import_kwh": simulation.actual_grid_import_kwh,
         "actual_grid_export_kwh": simulation.actual_grid_export_kwh,
         "simulated_grid_import_kwh": simulation.simulated_grid_import_kwh,
+        "simulated_cheap_import_kwh": simulation.simulated_cheap_import_kwh,
+        "simulated_day_import_kwh": simulation.simulated_day_import_kwh,
         "simulated_grid_export_kwh": simulation.simulated_grid_export_kwh,
         "simulated_solar_generation_kwh": simulation.simulated_solar_generation_kwh,
+        "simulated_solar_to_home_kwh": simulation.simulated_solar_to_home_kwh,
+        "simulated_solar_to_battery_kwh": (simulation.simulated_solar_to_battery_kwh),
+        "simulated_solar_export_kwh": simulation.simulated_solar_export_kwh,
+        "simulated_grid_to_battery_kwh": (simulation.simulated_grid_to_battery_kwh),
         "simulated_solar_curtailed_kwh": simulation.simulated_solar_curtailed_kwh,
         "simulated_battery_charge_kwh": simulation.simulated_battery_charge_kwh,
         "simulated_battery_to_home_kwh": simulation.simulated_battery_to_home_kwh,
@@ -732,6 +783,82 @@ SENSORS: tuple[KEMSSensorEntityDescription, ...] = (
         native_unit_of_measurement="p",
         suggested_display_precision=2,
         value_fn=lambda data: data.simulation.saving_pence,
+    ),
+    KEMSSensorEntityDescription(
+        key="scenario_comparison_today",
+        name="Scenario comparison today",
+        icon="mdi:compare-horizontal",
+        value_fn=lambda data: _scenario_period_state(data, "today"),
+        attributes_fn=_scenario_comparison_attributes,
+    ),
+    KEMSSensorEntityDescription(
+        key="compare_no_system_cost_today",
+        name="Compare no system cost today",
+        icon="mdi:transmission-tower-import",
+        native_unit_of_measurement="p",
+        suggested_display_precision=2,
+        value_fn=lambda data: _scenario_cost(data, "no_system"),
+        attributes_fn=lambda data: _scenario_attributes(data, "no_system"),
+    ),
+    KEMSSensorEntityDescription(
+        key="compare_solar_only_cost_today",
+        name="Compare solar only cost today",
+        icon="mdi:solar-power",
+        native_unit_of_measurement="p",
+        suggested_display_precision=2,
+        value_fn=lambda data: _scenario_cost(data, "solar_only"),
+        attributes_fn=lambda data: _scenario_attributes(data, "solar_only"),
+    ),
+    KEMSSensorEntityDescription(
+        key="compare_solar_battery_cost_today",
+        name="Compare solar and battery cost today",
+        icon="mdi:home-battery-outline",
+        native_unit_of_measurement="p",
+        suggested_display_precision=2,
+        value_fn=lambda data: _scenario_cost(data, "solar_battery"),
+        attributes_fn=lambda data: _scenario_attributes(data, "solar_battery"),
+    ),
+    KEMSSensorEntityDescription(
+        key="compare_kems_no_export_cost_today",
+        name="Compare KEMS no-export cost today",
+        icon="mdi:shield-home-outline",
+        native_unit_of_measurement="p",
+        suggested_display_precision=2,
+        value_fn=lambda data: _scenario_cost(data, "kems_no_export"),
+        attributes_fn=lambda data: _scenario_attributes(data, "kems_no_export"),
+    ),
+    KEMSSensorEntityDescription(
+        key="compare_kems_full_cost_today",
+        name="Compare full KEMS cost today",
+        icon="mdi:brain",
+        native_unit_of_measurement="p",
+        suggested_display_precision=2,
+        value_fn=lambda data: _scenario_cost(data, "kems_full"),
+        attributes_fn=lambda data: _scenario_attributes(data, "kems_full"),
+    ),
+    KEMSSensorEntityDescription(
+        key="scenario_comparison_yesterday",
+        name="Scenario comparison yesterday",
+        icon="mdi:history",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda data: _scenario_period_state(data, "yesterday"),
+        attributes_fn=lambda data: _scenario_period_attributes(data, "yesterday"),
+    ),
+    KEMSSensorEntityDescription(
+        key="scenario_comparison_7_days",
+        name="Scenario comparison 7 days",
+        icon="mdi:calendar-week",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda data: _scenario_period_state(data, "7_days"),
+        attributes_fn=lambda data: _scenario_period_attributes(data, "7_days"),
+    ),
+    KEMSSensorEntityDescription(
+        key="scenario_comparison_30_days",
+        name="Scenario comparison 30 days",
+        icon="mdi:calendar-month",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda data: _scenario_period_state(data, "30_days"),
+        attributes_fn=lambda data: _scenario_period_attributes(data, "30_days"),
     ),
     KEMSSensorEntityDescription(
         key="actual_grid_import_today",

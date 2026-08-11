@@ -1,38 +1,45 @@
-# Start here — KEMS 0.7.0-alpha5 no-export live readiness
+# Start here — KEMS 0.7.0-alpha6 scenario comparison
 
-Alpha5 builds on the released/reconciled alpha4 baseline. It adds an explicit **Export tariff status** and a safe **Not active / awaiting export tariff** policy for the period after installation but before a paid export tariff is live.
+Alpha6 builds on the proven alpha5 no-export/live-readiness behaviour and adds a parallel **What would today have looked like?** replay engine. The active KEMS strategy is not changed by comparison replay.
 
 ## Development branch
 
 ```text
-release/0.7.0-alpha5-no-export-live-readiness
+release/0.7.0-alpha6-scenario-comparison
 ```
 
-Create it from the latest `develop`, apply the supplied patch, then run:
+Create the branch from the latest `develop`, apply the alpha6 overlay/patch, then run:
 
 ```powershell
 .\.venv\Scripts\Activate.ps1
 python -m pip install -r requirements-dev.txt
 python -m black .
-python -m ruff check . --fix
+python -m ruff check .
 python -m pytest
 python -m pre_commit run --all-files
 ```
 
-Expected pytest result from the supplied build: `129 passed` before any formatter-only changes.
+The supplied build passes **136 pytest tests** before local Black/Ruff execution.
 
-Commit:
+## New comparison scenarios
 
-```text
-feat: add awaiting export tariff mode
-```
+KEMS now replays the same retained demand and tariff observations through:
 
-After installing in Home Assistant, restart and open:
+1. No system — grid supplies the whole home.
+2. Solar only — solar self-consumption plus paid surplus export, no battery.
+3. Solar + battery — conventional tariff-unaware self-use, no grid charging.
+4. KEMS no-export — solar-aware cheap charging and self-use with deliberate export disabled.
+5. Full KEMS smart control — paid export, cheap charging, home reserve, paced battery export and Power Down optimisation.
 
-```text
-Settings → Devices & services → KEMS → Configure → Tariff and prices
-```
+Today, Yesterday, 7-day and 30-day summaries are exposed. The Today payload also includes a replay timeline for cumulative-cost graphs. Daily standing charge is included in scenario total cost; it cancels out when comparing savings.
 
-Set **Export tariff status** to **Not active / awaiting export tariff** to test the new policy. KEMS should then report a 0p/kWh effective export rate, no deliberate battery/grid export, self-use planning, solar-to-battery charging, and a solar-aware overnight target during a confirmed cheap period.
+## Dashboards
 
-Real FoxESS writes remain blocked in alpha5.
+- `dashboards/kems_compare_builtin.yaml` — standard Home Assistant cards only.
+- `dashboards/kems_compare_advanced.yaml` — full replay graphs using ApexCharts plus Mushroom summary cards.
+
+The advanced dashboard needs **ApexCharts Card** and **Mushroom** from HACS.
+
+## Safety
+
+Alpha6 remains simulation/shadow only. Real FoxESS writes are still hard-blocked until the commissioned backend is mapped and verified.

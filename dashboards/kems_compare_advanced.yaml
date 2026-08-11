@@ -1,0 +1,169 @@
+title: KEMS Compare Advanced
+
+views:
+  - title: Compare
+    path: compare
+    icon: mdi:compare-horizontal
+    cards:
+      - type: markdown
+        content: |
+          # What would today have looked like?
+          Five parallel replays use the same retained demand/tariff observations. **KEMS no-export** always models the awaiting-export strategy and **Full KEMS** always models paid export/paced control, regardless of the mode currently selected for the live-readiness simulation.
+
+      - type: grid
+        columns: 5
+        square: false
+        cards:
+          - type: custom:mushroom-entity-card
+            entity: sensor.kems_compare_no_system_cost_today
+            name: No system
+            icon: mdi:transmission-tower-import
+          - type: custom:mushroom-entity-card
+            entity: sensor.kems_compare_solar_only_cost_today
+            name: Solar only
+            icon: mdi:solar-power
+          - type: custom:mushroom-entity-card
+            entity: sensor.kems_compare_solar_and_battery_cost_today
+            name: Solar + battery
+            icon: mdi:home-battery-outline
+          - type: custom:mushroom-entity-card
+            entity: sensor.kems_compare_kems_no_export_cost_today
+            name: KEMS no-export
+            icon: mdi:shield-home-outline
+          - type: custom:mushroom-entity-card
+            entity: sensor.kems_compare_full_kems_cost_today
+            name: Full KEMS
+            icon: mdi:brain
+
+      - type: custom:apexcharts-card
+        header:
+          show: true
+          title: Cumulative cost today — full replay
+          show_states: false
+        graph_span: 24h
+        span:
+          start: day
+        yaxis:
+          - decimals: 2
+        series:
+          - entity: sensor.kems_scenario_comparison_today
+            name: No system
+            type: line
+            data_generator: |
+              return (entity.attributes.timeline || []).map(p => [new Date(p.timestamp).getTime(), p.no_system_cost_pence / 100]);
+          - entity: sensor.kems_scenario_comparison_today
+            name: Solar only
+            type: line
+            data_generator: |
+              return (entity.attributes.timeline || []).map(p => [new Date(p.timestamp).getTime(), p.solar_only_cost_pence / 100]);
+          - entity: sensor.kems_scenario_comparison_today
+            name: Solar + battery
+            type: line
+            data_generator: |
+              return (entity.attributes.timeline || []).map(p => [new Date(p.timestamp).getTime(), p.solar_battery_cost_pence / 100]);
+          - entity: sensor.kems_scenario_comparison_today
+            name: KEMS no-export
+            type: line
+            data_generator: |
+              return (entity.attributes.timeline || []).map(p => [new Date(p.timestamp).getTime(), p.kems_no_export_cost_pence / 100]);
+          - entity: sensor.kems_scenario_comparison_today
+            name: Full KEMS
+            type: line
+            data_generator: |
+              return (entity.attributes.timeline || []).map(p => [new Date(p.timestamp).getTime(), p.kems_full_cost_pence / 100]);
+
+      - type: custom:apexcharts-card
+        header:
+          show: true
+          title: Saving versus no system today
+          show_states: false
+        graph_span: 24h
+        span:
+          start: day
+        yaxis:
+          - decimals: 2
+        series:
+          - entity: sensor.kems_scenario_comparison_today
+            name: Solar only saving
+            type: line
+            data_generator: |
+              return (entity.attributes.timeline || []).map(p => [new Date(p.timestamp).getTime(), (p.no_system_cost_pence - p.solar_only_cost_pence) / 100]);
+          - entity: sensor.kems_scenario_comparison_today
+            name: Solar + battery saving
+            type: line
+            data_generator: |
+              return (entity.attributes.timeline || []).map(p => [new Date(p.timestamp).getTime(), (p.no_system_cost_pence - p.solar_battery_cost_pence) / 100]);
+          - entity: sensor.kems_scenario_comparison_today
+            name: KEMS no-export saving
+            type: line
+            data_generator: |
+              return (entity.attributes.timeline || []).map(p => [new Date(p.timestamp).getTime(), (p.no_system_cost_pence - p.kems_no_export_cost_pence) / 100]);
+          - entity: sensor.kems_scenario_comparison_today
+            name: Full KEMS saving
+            type: line
+            data_generator: |
+              return (entity.attributes.timeline || []).map(p => [new Date(p.timestamp).getTime(), (p.no_system_cost_pence - p.kems_full_cost_pence) / 100]);
+
+      - type: markdown
+        title: Today — energy and money
+        content: |
+          {% set entities = [
+            ('No system', 'sensor.kems_compare_no_system_cost_today'),
+            ('Solar only', 'sensor.kems_compare_solar_only_cost_today'),
+            ('Solar + battery', 'sensor.kems_compare_solar_and_battery_cost_today'),
+            ('KEMS no-export', 'sensor.kems_compare_kems_no_export_cost_today'),
+            ('Full KEMS', 'sensor.kems_compare_full_kems_cost_today')
+          ] %}
+          | Scenario | Cost | Saving | Cheap import | Day import | Export | Solar | Battery charge | Battery → home | Battery export |
+          |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+          {% for label, entity in entities %}
+          | {{ label }} | £{{ '%.2f' | format((states(entity)|float(0))/100) }} | £{{ '%.2f' | format((state_attr(entity, 'saving_vs_no_system_pence')|float(0))/100) }} | {{ state_attr(entity, 'cheap_grid_import_kwh')|float(0)|round(2) }} | {{ state_attr(entity, 'day_grid_import_kwh')|float(0)|round(2) }} | {{ state_attr(entity, 'grid_export_kwh')|float(0)|round(2) }} | {{ state_attr(entity, 'solar_generation_kwh')|float(0)|round(2) }} | {{ state_attr(entity, 'battery_charge_kwh')|float(0)|round(2) }} | {{ state_attr(entity, 'battery_to_home_kwh')|float(0)|round(2) }} | {{ state_attr(entity, 'battery_export_kwh')|float(0)|round(2) }} |
+          {% endfor %}
+
+      - type: grid
+        columns: 2
+        square: false
+        cards:
+          - type: markdown
+            title: Full KEMS saving breakdown
+            content: |
+              {% set e = 'sensor.kems_compare_full_kems_cost_today' %}
+              **Day-rate import reduction:** £{{ '%.2f' | format((state_attr(e, 'day_rate_import_reduction_pence')|float(0))/100) }}<br>
+              **Cheap-rate import change:** £{{ '%.2f' | format((state_attr(e, 'cheap_rate_import_change_pence')|float(0))/100) }}<br>
+              **Export income:** £{{ '%.2f' | format((state_attr(e, 'export_income_pence')|float(0))/100) }}<br>
+              **Power Down income:** £{{ '%.2f' | format((state_attr(e, 'power_down_income_pence')|float(0))/100) }}<br>
+              **Total saving:** £{{ '%.2f' | format((state_attr(e, 'saving_vs_no_system_pence')|float(0))/100) }}
+          - type: markdown
+            title: Full KEMS battery / solar routing
+            content: |
+              {% set e = 'sensor.kems_compare_full_kems_cost_today' %}
+              **Solar → home:** {{ state_attr(e, 'solar_to_home_kwh')|float(0)|round(2) }} kWh<br>
+              **Solar → battery:** {{ state_attr(e, 'solar_to_battery_kwh')|float(0)|round(2) }} kWh<br>
+              **Solar → grid:** {{ state_attr(e, 'solar_export_kwh')|float(0)|round(2) }} kWh<br>
+              **Grid → battery:** {{ state_attr(e, 'battery_grid_charge_kwh')|float(0)|round(2) }} kWh<br>
+              **Battery → home:** {{ state_attr(e, 'battery_to_home_kwh')|float(0)|round(2) }} kWh<br>
+              **Battery → grid:** {{ state_attr(e, 'battery_export_kwh')|float(0)|round(2) }} kWh<br>
+              **End SOC:** {{ state_attr(e, 'ending_soc_percent') }}%
+
+  - title: History
+    path: history
+    icon: mdi:calendar-range
+    cards:
+      - type: markdown
+        title: 7-day comparison
+        content: |
+          {% set scenarios = state_attr('sensor.kems_scenario_comparison_7_days', 'scenarios') or [] %}
+          | Scenario | Cost | Saving | Import | Export | Solar |
+          |---|---:|---:|---:|---:|---:|
+          {% for s in scenarios %}
+          | {{ s.label }} | £{{ '%.2f' | format((s.total_cost_pence|float(0))/100) }} | £{{ '%.2f' | format((s.saving_vs_no_system_pence|float(0))/100) }} | {{ s.grid_import_kwh|float(0)|round(1) }} kWh | {{ s.grid_export_kwh|float(0)|round(1) }} kWh | {{ s.solar_generation_kwh|float(0)|round(1) }} kWh |
+          {% endfor %}
+      - type: markdown
+        title: 30-day retained-history comparison
+        content: |
+          {% set scenarios = state_attr('sensor.kems_scenario_comparison_30_days', 'scenarios') or [] %}
+          | Scenario | Cost | Saving | Import | Export | Solar |
+          |---|---:|---:|---:|---:|---:|
+          {% for s in scenarios %}
+          | {{ s.label }} | £{{ '%.2f' | format((s.total_cost_pence|float(0))/100) }} | £{{ '%.2f' | format((s.saving_vs_no_system_pence|float(0))/100) }} | {{ s.grid_import_kwh|float(0)|round(1) }} kWh | {{ s.grid_export_kwh|float(0)|round(1) }} kWh | {{ s.solar_generation_kwh|float(0)|round(1) }} kWh |
+          {% endfor %}

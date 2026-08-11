@@ -1,3 +1,16 @@
+## 0.7.0-alpha6 — parallel scenario comparison
+
+- Added a dedicated what-if replay engine that evaluates five independent system designs from the same retained observations: No system, Solar only, Solar + battery, KEMS no-export, and Full KEMS smart control.
+- Comparison replay is independent of the currently selected export-tariff/live-readiness mode, so no-export can remain active while paid-export Full KEMS is still modelled in parallel.
+- Added exact today cost, import/export, solar routing, battery routing, end-SOC, standing-charge and saving-vs-baseline summaries for every scenario.
+- Added an explainable saving decomposition: reduced day-rate import, change in cheap-rate import, export income, and Power Down income.
+- Added cumulative midnight-to-now cost timeline data for graphing all five scenarios on the same chart.
+- Added Yesterday, 7-day and 30-day retained-history scenario rollups.
+- Added smart-simulation cheap/day import-cost splits and solar/grid-to-battery flow accounting used by the comparison engine and diagnostics.
+- Added built-in and ApexCharts/Mushroom Compare dashboards.
+- Full KEMS and no-export comparison batteries are carried independently across retained days, keeping scenario histories isolated from one another.
+- Real FoxESS writes remain hard-blocked.
+
 ## 0.7.0-alpha5 — awaiting export tariff / no-export live readiness
 
 - Added an explicit Export tariff status: Active or Not active / awaiting export tariff.

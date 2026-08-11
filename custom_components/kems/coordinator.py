@@ -22,6 +22,7 @@ from .kems_core import (
     LearningEngine,
     LifetimeLedger,
     ROIEngine,
+    ScenarioComparisonEngine,
     SimulationEngine,
     WholeHomeEngine,
     assess_quality,
@@ -61,6 +62,7 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
         self._gas = GasEngine()
         self._advice = AdviceEngine()
         self._simulation = SimulationEngine()
+        self._scenarios = ScenarioComparisonEngine()
         self._whole_home = WholeHomeEngine()
         self._control = ControlEngine()
         self._lifetime = LifetimeLedgerRecorder(hass, entry.entry_id)
@@ -111,6 +113,12 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                 learned.predicted_energy_until_offpeak_kwh,
                 current_snapshot=snapshot,
             )
+            scenarios = self._scenarios.compare(
+                records,
+                now,
+                self.settings.simulation,
+                learned.predicted_energy_until_offpeak_kwh,
+            )
             whole_home = self._whole_home.summarise(snapshot, simulation, gas)
             stored_lifetime = await self._lifetime.async_update(
                 simulation,
@@ -153,6 +161,7 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                 gas=gas,
                 advice=advice,
                 simulation=simulation,
+                scenarios=scenarios,
                 whole_home=whole_home,
                 lifetime=lifetime,
                 roi=roi,

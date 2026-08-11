@@ -111,6 +111,7 @@ async def async_get_config_entry_diagnostics(
             "items": [item.to_dict() for item in data.advice.items],
         },
         "simulation": asdict(data.simulation),
+        "scenarios": data.scenarios.to_dict(),
         "whole_home": asdict(data.whole_home),
         "lifetime": data.lifetime.to_dict(),
         "periods": {

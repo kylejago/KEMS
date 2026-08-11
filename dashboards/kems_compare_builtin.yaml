@@ -1,0 +1,122 @@
+title: KEMS Compare
+
+views:
+  - title: Today
+    path: today
+    icon: mdi:compare-horizontal
+    cards:
+      - type: markdown
+        content: |
+          # What would today have looked like?
+          KEMS replays the **same retained house demand and tariff data** through five independent system designs. Costs below include the daily electricity standing charge. The comparison does not change the active KEMS operating strategy.
+
+      - type: grid
+        columns: 5
+        square: false
+        cards:
+          - type: tile
+            entity: sensor.kems_compare_no_system_cost_today
+            name: No system
+            icon: mdi:transmission-tower-import
+          - type: tile
+            entity: sensor.kems_compare_solar_only_cost_today
+            name: Solar only
+            icon: mdi:solar-power
+          - type: tile
+            entity: sensor.kems_compare_solar_and_battery_cost_today
+            name: Solar + battery
+            icon: mdi:home-battery-outline
+          - type: tile
+            entity: sensor.kems_compare_kems_no_export_cost_today
+            name: KEMS no-export
+            icon: mdi:shield-home-outline
+          - type: tile
+            entity: sensor.kems_compare_full_kems_cost_today
+            name: Full KEMS
+            icon: mdi:brain
+
+      - type: history-graph
+        title: Cumulative scenario cost today
+        hours_to_show: 24
+        entities:
+          - entity: sensor.kems_compare_no_system_cost_today
+            name: No system
+          - entity: sensor.kems_compare_solar_only_cost_today
+            name: Solar only
+          - entity: sensor.kems_compare_solar_and_battery_cost_today
+            name: Solar + battery
+          - entity: sensor.kems_compare_kems_no_export_cost_today
+            name: KEMS no-export
+          - entity: sensor.kems_compare_full_kems_cost_today
+            name: Full KEMS
+
+      - type: markdown
+        title: Energy and cost detail
+        content: |
+          {% set entities = [
+            ('No system', 'sensor.kems_compare_no_system_cost_today'),
+            ('Solar only', 'sensor.kems_compare_solar_only_cost_today'),
+            ('Solar + battery', 'sensor.kems_compare_solar_and_battery_cost_today'),
+            ('KEMS no-export', 'sensor.kems_compare_kems_no_export_cost_today'),
+            ('Full KEMS', 'sensor.kems_compare_full_kems_cost_today')
+          ] %}
+          | Scenario | Total | Saving | Import | Export | Solar | Battery → home | End SOC |
+          |---|---:|---:|---:|---:|---:|---:|---:|
+          {% for label, entity in entities %}
+          | {{ label }} | £{{ '%.2f' | format((states(entity)|float(0))/100) }} | £{{ '%.2f' | format((state_attr(entity, 'saving_vs_no_system_pence')|float(0))/100) }} | {{ state_attr(entity, 'grid_import_kwh')|float(0)|round(2) }} kWh | {{ state_attr(entity, 'grid_export_kwh')|float(0)|round(2) }} kWh | {{ state_attr(entity, 'solar_generation_kwh')|float(0)|round(2) }} kWh | {{ state_attr(entity, 'battery_to_home_kwh')|float(0)|round(2) }} kWh | {% if state_attr(entity, 'ending_soc_percent') is not none %}{{ state_attr(entity, 'ending_soc_percent') }}%{% else %}—{% endif %} |
+          {% endfor %}
+
+      - type: markdown
+        title: Where the Full KEMS saving comes from
+        content: |
+          {% set e = 'sensor.kems_compare_full_kems_cost_today' %}
+          | Component | Value |
+          |---|---:|
+          | Reduced day-rate import | £{{ '%.2f' | format((state_attr(e, 'day_rate_import_reduction_pence')|float(0))/100) }} |
+          | Change in cheap-rate import | £{{ '%.2f' | format((state_attr(e, 'cheap_rate_import_change_pence')|float(0))/100) }} |
+          | Export income | £{{ '%.2f' | format((state_attr(e, 'export_income_pence')|float(0))/100) }} |
+          | Power Down income | £{{ '%.2f' | format((state_attr(e, 'power_down_income_pence')|float(0))/100) }} |
+          | **Total saving vs no system** | **£{{ '%.2f' | format((state_attr(e, 'saving_vs_no_system_pence')|float(0))/100) }}** |
+
+          A negative **change in cheap-rate import** is deliberate: it represents extra cheap electricity bought for battery charging. Full KEMS should recover more than that through avoided day-rate import and export/reward income.
+
+      - type: entities
+        title: Comparison replay status
+        show_header_toggle: false
+        entities:
+          - entity: sensor.kems_scenario_comparison_today
+            name: Cheapest today
+          - entity: sensor.kems_scenario_comparison_yesterday
+            name: Cheapest yesterday
+          - entity: sensor.kems_scenario_comparison_7_days
+            name: Cheapest over 7 days
+          - entity: sensor.kems_scenario_comparison_30_days
+            name: Cheapest over 30 days
+
+  - title: 7 days
+    path: 7-days
+    icon: mdi:calendar-week
+    cards:
+      - type: markdown
+        title: Last 7 days — scenario comparison
+        content: |
+          {% set scenarios = state_attr('sensor.kems_scenario_comparison_7_days', 'scenarios') or [] %}
+          | Scenario | Cost | Saving vs no system | Grid import | Grid export | Solar | Battery → home |
+          |---|---:|---:|---:|---:|---:|---:|
+          {% for s in scenarios %}
+          | {{ s.label }} | £{{ '%.2f' | format((s.total_cost_pence|float(0))/100) }} | £{{ '%.2f' | format((s.saving_vs_no_system_pence|float(0))/100) }} | {{ s.grid_import_kwh|float(0)|round(1) }} kWh | {{ s.grid_export_kwh|float(0)|round(1) }} kWh | {{ s.solar_generation_kwh|float(0)|round(1) }} kWh | {{ s.battery_to_home_kwh|float(0)|round(1) }} kWh |
+          {% endfor %}
+
+  - title: 30 days
+    path: 30-days
+    icon: mdi:calendar-month
+    cards:
+      - type: markdown
+        title: Last 30 retained days — scenario comparison
+        content: |
+          {% set scenarios = state_attr('sensor.kems_scenario_comparison_30_days', 'scenarios') or [] %}
+          | Scenario | Cost | Saving vs no system | Grid import | Grid export | Solar | Battery → home |
+          |---|---:|---:|---:|---:|---:|---:|
+          {% for s in scenarios %}
+          | {{ s.label }} | £{{ '%.2f' | format((s.total_cost_pence|float(0))/100) }} | £{{ '%.2f' | format((s.saving_vs_no_system_pence|float(0))/100) }} | {{ s.grid_import_kwh|float(0)|round(1) }} kWh | {{ s.grid_export_kwh|float(0)|round(1) }} kWh | {{ s.solar_generation_kwh|float(0)|round(1) }} kWh | {{ s.battery_to_home_kwh|float(0)|round(1) }} kWh |
+          {% endfor %}

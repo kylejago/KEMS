@@ -69,6 +69,8 @@ class SimulationEngine:
         actual_import_cost = 0.0
         actual_export_income = 0.0
         simulated_import_cost = 0.0
+        simulated_cheap_import_cost = 0.0
+        simulated_day_import_cost = 0.0
         simulated_export_income = 0.0
         simulated_saving_session_bonus = 0.0
         actual_house = 0.0
@@ -80,8 +82,14 @@ class SimulationEngine:
         actual_export = 0.0
         baseline_import_cost = 0.0
         simulated_import = 0.0
+        simulated_cheap_import = 0.0
+        simulated_day_import = 0.0
         simulated_export = 0.0
         simulated_solar = 0.0
+        simulated_solar_to_home = 0.0
+        simulated_solar_to_battery = 0.0
+        simulated_solar_export = 0.0
+        simulated_grid_to_battery = 0.0
         simulated_curtailment = 0.0
         battery_charge = 0.0
         battery_to_home = 0.0
@@ -156,6 +164,10 @@ class SimulationEngine:
             interval_export = 0.0
             interval_curtailment = 0.0
             interval_saving_session_bonus = 0.0
+            interval_solar_to_home = 0.0
+            interval_solar_to_battery = 0.0
+            interval_solar_export = 0.0
+            interval_grid_to_battery = 0.0
             inverter_capacity = max(config.inverter_limit_kw, 0.0) * hours
             export_capacity = min(
                 max(config.export_limit_kw, 0.0) * hours,
@@ -186,6 +198,7 @@ class SimulationEngine:
                 )
 
                 solar_to_home = min(actual_house_kwh, solar_used)
+                interval_solar_to_home = solar_to_home
                 battery_to_home_interval = min(
                     max(actual_house_kwh - solar_to_home, 0.0),
                     battery_output,
@@ -193,6 +206,7 @@ class SimulationEngine:
                 supplied_home = solar_to_home + battery_to_home_interval
                 interval_import = max(actual_house_kwh - supplied_home, 0.0)
                 solar_export = max(solar_used - solar_to_home, 0.0)
+                interval_solar_export = solar_export
                 battery_export_interval = max(
                     battery_output - battery_to_home_interval,
                     0.0,
@@ -221,6 +235,7 @@ class SimulationEngine:
                         actual_house_kwh,
                         inverter_capacity,
                     )
+                    interval_solar_to_home = solar_to_home
                     house_grid_kwh = max(actual_house_kwh - solar_to_home, 0.0)
                     solar_surplus_kwh = max(solar_energy - solar_to_home, 0.0)
                     forecast_required = self._no_export_requirement_after_cheap(
@@ -244,8 +259,12 @@ class SimulationEngine:
                         max(config.max_charge_kw, 0.0) * hours,
                         charge_room_input_kwh,
                     )
-                    battery_kwh += solar_charge_input_kwh * config.charge_efficiency
-                    battery_charge += solar_charge_input_kwh * config.charge_efficiency
+                    stored_from_solar = (
+                        solar_charge_input_kwh * config.charge_efficiency
+                    )
+                    battery_kwh += stored_from_solar
+                    battery_charge += stored_from_solar
+                    interval_solar_to_battery = stored_from_solar
                     remaining_charge_power_kwh = max(
                         max(config.max_charge_kw, 0.0) * hours - solar_charge_input_kwh,
                         0.0,
@@ -262,8 +281,10 @@ class SimulationEngine:
                         / max(config.charge_efficiency, 0.01),
                         site_charge_headroom_kwh,
                     )
-                    battery_kwh += grid_charge_input_kwh * config.charge_efficiency
-                    battery_charge += grid_charge_input_kwh * config.charge_efficiency
+                    stored_from_grid = grid_charge_input_kwh * config.charge_efficiency
+                    battery_kwh += stored_from_grid
+                    battery_charge += stored_from_grid
+                    interval_grid_to_battery = stored_from_grid
                     interval_import = house_grid_kwh + grid_charge_input_kwh
                     interval_export = 0.0
                     interval_curtailment = max(
@@ -284,13 +305,16 @@ class SimulationEngine:
                         / max(config.charge_efficiency, 0.01),
                         site_charge_headroom_kwh,
                     )
-                    battery_kwh += charge_input_kwh * config.charge_efficiency
-                    battery_charge += charge_input_kwh * config.charge_efficiency
+                    stored_from_grid = charge_input_kwh * config.charge_efficiency
+                    battery_kwh += stored_from_grid
+                    battery_charge += stored_from_grid
+                    interval_grid_to_battery = stored_from_grid
                     interval_import = house_grid_kwh + charge_input_kwh
                     interval_export, interval_curtailment = self._limit_export(
                         solar_energy,
                         export_capacity,
                     )
+                    interval_solar_export = interval_export
             elif no_export_mode:
                 # Awaiting an export tariff: use PV locally, charge the battery
                 # with surplus PV, discharge only for the home, and curtail any
@@ -300,6 +324,7 @@ class SimulationEngine:
                     actual_house_kwh,
                     inverter_capacity,
                 )
+                interval_solar_to_home = solar_to_home
                 net_load_kwh = max(actual_house_kwh - solar_to_home, 0.0)
                 solar_surplus_kwh = max(solar_energy - solar_to_home, 0.0)
                 solar_charge_input_kwh = min(
@@ -308,8 +333,10 @@ class SimulationEngine:
                     max(capacity - battery_kwh, 0.0)
                     / max(config.charge_efficiency, 0.01),
                 )
-                battery_kwh += solar_charge_input_kwh * config.charge_efficiency
-                battery_charge += solar_charge_input_kwh * config.charge_efficiency
+                stored_from_solar = solar_charge_input_kwh * config.charge_efficiency
+                battery_kwh += stored_from_solar
+                battery_charge += stored_from_solar
+                interval_solar_to_battery = stored_from_solar
                 interval_curtailment = max(
                     solar_surplus_kwh - solar_charge_input_kwh,
                     0.0,
@@ -334,6 +361,7 @@ class SimulationEngine:
                         actual_house_kwh,
                         inverter_capacity,
                     )
+                    interval_solar_to_home = solar_to_home
                     net_load_kwh = actual_house_kwh - solar_to_home
                     solar_export_request = max(solar_energy - solar_to_home, 0.0)
                     inverter_used = solar_to_home
@@ -368,6 +396,7 @@ class SimulationEngine:
                     solar_export_request,
                     solar_export_capacity,
                 )
+                interval_solar_export = solar_export
                 interval_export = solar_export
                 interval_curtailment += solar_curtailed
                 inverter_used += solar_export
@@ -431,7 +460,17 @@ class SimulationEngine:
 
             battery_kwh = min(max(battery_kwh, reserve_kwh), capacity)
             simulated_import += interval_import
+            if current.cheap_period_confirmed:
+                simulated_cheap_import += interval_import
+                simulated_cheap_import_cost += interval_import * rate
+            else:
+                simulated_day_import += interval_import
+                simulated_day_import_cost += interval_import * rate
             simulated_export += interval_export
+            simulated_solar_to_home += interval_solar_to_home
+            simulated_solar_to_battery += interval_solar_to_battery
+            simulated_solar_export += interval_solar_export
+            simulated_grid_to_battery += interval_grid_to_battery
             simulated_curtailment += interval_curtailment
             simulated_import_cost += interval_import * rate
             simulated_export_income += interval_export * export_rate
@@ -474,6 +513,8 @@ class SimulationEngine:
             actual_import_cost_pence=round(actual_import_cost, 2),
             actual_export_income_pence=round(actual_export_income, 2),
             simulated_import_cost_pence=round(simulated_import_cost, 2),
+            simulated_cheap_import_cost_pence=round(simulated_cheap_import_cost, 2),
+            simulated_day_import_cost_pence=round(simulated_day_import_cost, 2),
             simulated_export_income_pence=round(simulated_export_income, 2),
             actual_house_consumption_kwh=round(actual_house, 3),
             actual_ev_energy_kwh=round(actual_ev, 3),
@@ -483,8 +524,14 @@ class SimulationEngine:
             actual_grid_import_kwh=round(actual_import, 3),
             actual_grid_export_kwh=round(actual_export, 3),
             simulated_grid_import_kwh=round(simulated_import, 3),
+            simulated_cheap_import_kwh=round(simulated_cheap_import, 3),
+            simulated_day_import_kwh=round(simulated_day_import, 3),
             simulated_grid_export_kwh=round(simulated_export, 3),
             simulated_solar_generation_kwh=round(simulated_solar, 3),
+            simulated_solar_to_home_kwh=round(simulated_solar_to_home, 3),
+            simulated_solar_to_battery_kwh=round(simulated_solar_to_battery, 3),
+            simulated_solar_export_kwh=round(simulated_solar_export, 3),
+            simulated_grid_to_battery_kwh=round(simulated_grid_to_battery, 3),
             simulated_solar_curtailed_kwh=round(simulated_curtailment, 3),
             simulated_battery_charge_kwh=round(battery_charge, 3),
             simulated_battery_to_home_kwh=round(battery_to_home, 3),

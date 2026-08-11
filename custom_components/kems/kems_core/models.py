@@ -211,6 +211,8 @@ class SimulationState:
     actual_import_cost_pence: float | None = None
     actual_export_income_pence: float | None = None
     simulated_import_cost_pence: float | None = None
+    simulated_cheap_import_cost_pence: float | None = None
+    simulated_day_import_cost_pence: float | None = None
     simulated_export_income_pence: float | None = None
     actual_house_consumption_kwh: float | None = None
     actual_ev_energy_kwh: float | None = None
@@ -220,8 +222,14 @@ class SimulationState:
     actual_grid_import_kwh: float | None = None
     actual_grid_export_kwh: float | None = None
     simulated_grid_import_kwh: float | None = None
+    simulated_cheap_import_kwh: float | None = None
+    simulated_day_import_kwh: float | None = None
     simulated_grid_export_kwh: float | None = None
     simulated_solar_generation_kwh: float | None = None
+    simulated_solar_to_home_kwh: float | None = None
+    simulated_solar_to_battery_kwh: float | None = None
+    simulated_solar_export_kwh: float | None = None
+    simulated_grid_to_battery_kwh: float | None = None
     simulated_solar_curtailed_kwh: float | None = None
     simulated_battery_charge_kwh: float | None = None
     simulated_battery_to_home_kwh: float | None = None
@@ -294,6 +302,131 @@ class SimulationState:
     proposal_solar_active: bool = False
     battery_export_enabled: bool = False
     data_coverage: float = 0.0
+
+
+@dataclass(frozen=True, slots=True)
+class ScenarioSummary:
+    """One what-if energy/cost result for a comparable system design."""
+
+    key: str
+    label: str
+    description: str = ""
+    ready: bool = False
+    samples: int = 0
+    data_coverage: float = 0.0
+    import_cost_pence: float = 0.0
+    cheap_import_cost_pence: float = 0.0
+    day_import_cost_pence: float = 0.0
+    export_income_pence: float = 0.0
+    power_down_income_pence: float = 0.0
+    standing_charge_pence: float = 0.0
+    energy_net_cost_pence: float = 0.0
+    total_cost_pence: float = 0.0
+    saving_vs_no_system_pence: float = 0.0
+    day_rate_import_reduction_pence: float = 0.0
+    cheap_rate_import_change_pence: float = 0.0
+    house_consumption_kwh: float = 0.0
+    grid_import_kwh: float = 0.0
+    cheap_grid_import_kwh: float = 0.0
+    day_grid_import_kwh: float = 0.0
+    grid_export_kwh: float = 0.0
+    solar_generation_kwh: float = 0.0
+    solar_to_home_kwh: float = 0.0
+    solar_to_battery_kwh: float = 0.0
+    solar_export_kwh: float = 0.0
+    solar_curtailed_kwh: float = 0.0
+    battery_charge_kwh: float = 0.0
+    battery_grid_charge_kwh: float = 0.0
+    battery_solar_charge_kwh: float = 0.0
+    battery_to_home_kwh: float = 0.0
+    battery_export_kwh: float = 0.0
+    ending_soc_percent: float | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        """Return a stable JSON-compatible summary."""
+        return asdict(self)
+
+
+@dataclass(frozen=True, slots=True)
+class ScenarioPeriodComparison:
+    """Scenario results aggregated across one reporting period."""
+
+    key: str
+    label: str
+    start_date: date
+    end_date: date
+    days_included: int
+    scenarios: tuple[ScenarioSummary, ...] = ()
+
+    def scenario(self, key: str) -> ScenarioSummary | None:
+        """Return one named scenario from the period."""
+        return next((item for item in self.scenarios if item.key == key), None)
+
+    @property
+    def cheapest(self) -> ScenarioSummary | None:
+        """Return the cheapest ready scenario in the period."""
+        ready = [item for item in self.scenarios if item.ready]
+        return min(ready, key=lambda item: item.total_cost_pence) if ready else None
+
+    def to_dict(self) -> dict[str, Any]:
+        """Return JSON-compatible period comparison data."""
+        return {
+            "key": self.key,
+            "label": self.label,
+            "start_date": self.start_date.isoformat(),
+            "end_date": self.end_date.isoformat(),
+            "days_included": self.days_included,
+            "cheapest_scenario": self.cheapest.key if self.cheapest else None,
+            "scenarios": [item.to_dict() for item in self.scenarios],
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class ScenarioTimelinePoint:
+    """One cumulative-cost point shared by all today scenarios."""
+
+    timestamp: datetime
+    no_system_cost_pence: float
+    solar_only_cost_pence: float
+    solar_battery_cost_pence: float
+    kems_no_export_cost_pence: float
+    kems_full_cost_pence: float
+
+    def to_dict(self) -> dict[str, Any]:
+        """Return JSON-compatible chart data."""
+        values = asdict(self)
+        values["timestamp"] = self.timestamp.isoformat()
+        return values
+
+
+@dataclass(frozen=True, slots=True)
+class ScenarioComparisonState:
+    """Complete parallel what-if comparison payload."""
+
+    generated_at: datetime
+    periods: dict[str, ScenarioPeriodComparison] = field(default_factory=dict)
+    timeline: tuple[ScenarioTimelinePoint, ...] = ()
+
+    def period(self, key: str = "today") -> ScenarioPeriodComparison | None:
+        """Return one reporting period."""
+        return self.periods.get(key)
+
+    def scenario(
+        self,
+        scenario_key: str,
+        period_key: str = "today",
+    ) -> ScenarioSummary | None:
+        """Return one scenario from one period."""
+        period = self.period(period_key)
+        return period.scenario(scenario_key) if period else None
+
+    def to_dict(self) -> dict[str, Any]:
+        """Return JSON-compatible scenario data for diagnostics and web use."""
+        return {
+            "generated_at": self.generated_at.isoformat(),
+            "periods": {key: value.to_dict() for key, value in self.periods.items()},
+            "timeline": [item.to_dict() for item in self.timeline],
+        }
 
 
 @dataclass(frozen=True, slots=True)
@@ -663,6 +796,7 @@ class KEMSData:
     gas: GasSummary
     advice: AdviceState
     simulation: SimulationState
+    scenarios: ScenarioComparisonState
     whole_home: WholeHomeSummary
     lifetime: LifetimeLedger
     roi: ROIState

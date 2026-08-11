@@ -619,7 +619,7 @@ def _valid_scenario(value: str) -> str:
 
 
 def _backend_block_reason(config: ControlConfig) -> str:
-    """Explain why alpha5 will not issue a real inverter write."""
+    """Explain why alpha6 will not issue a real inverter write."""
     if config.operating_mode == "simulate":
         return "Virtual backend only"
     if config.operating_mode == "shadow":
@@ -630,7 +630,7 @@ def _backend_block_reason(config: ControlConfig) -> str:
         return "System has not been commissioned"
     if not config.control_enabled:
         return "Master control enable is off"
-    return "Real FoxESS control backend is intentionally unavailable in alpha5"
+    return "Real FoxESS control backend is intentionally unavailable in alpha6"
 
 
 def run_preflight_suite(config: ControlConfig) -> tuple[int, int]:
