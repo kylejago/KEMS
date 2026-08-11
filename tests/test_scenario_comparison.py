@@ -61,6 +61,8 @@ def test_compare_today_runs_five_independent_scenarios() -> None:
     assert no_export is not None and full is not None
     assert no_export.grid_export_kwh == 0.0
     assert no_export.export_income_pence == 0.0
+    assert 0.0 <= no_export.data_coverage <= 100.0
+    assert 0.0 <= full.data_coverage <= 100.0
     # Full KEMS is always replayed with the paid export tariff even when the
     # currently selected live-readiness setting is awaiting export.
     assert full.export_income_pence >= 0.0

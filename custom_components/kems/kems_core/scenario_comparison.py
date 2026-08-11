@@ -449,7 +449,7 @@ class ScenarioComparisonEngine:
             description=SCENARIO_DESCRIPTIONS[key],
             ready=state.ready,
             samples=state.samples,
-            data_coverage=round(state.data_coverage * 100, 1),
+            data_coverage=round(state.data_coverage, 1),
             import_cost_pence=_round(state.simulated_import_cost_pence, 2) or 0.0,
             cheap_import_cost_pence=(
                 _round(state.simulated_cheap_import_cost_pence, 2) or 0.0
