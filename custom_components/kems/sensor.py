@@ -96,6 +96,38 @@ def _scenario_cost(
     return None if scenario is None else round(scenario.total_cost_pence, 2)
 
 
+def _scenario_flow_state(
+    data: KEMSData,
+    scenario_key: str,
+    period_key: str = "today",
+) -> str:
+    """Expose compact current-flow values as one ESPHome-friendly state."""
+    scenario = data.scenarios.scenario(scenario_key, period_key)
+    if scenario is None:
+        return "H=-1,S=-1,GI=-1,GE=-1,SH=-1,SB=-1,SE=-1,GB=-1,BH=-1,BE=-1,SOC=-1"
+
+    def value(item: float | None, digits: int = 3) -> str:
+        if item is None:
+            return "-1"
+        return f"{float(item):.{digits}f}"
+
+    return ",".join(
+        (
+            f"H={value(scenario.current_house_load_kw)}",
+            f"S={value(scenario.current_solar_power_kw)}",
+            f"GI={value(scenario.current_grid_import_kw)}",
+            f"GE={value(scenario.current_grid_export_kw)}",
+            f"SH={value(scenario.current_solar_to_home_kw)}",
+            f"SB={value(scenario.current_solar_to_battery_kw)}",
+            f"SE={value(scenario.current_solar_export_kw)}",
+            f"GB={value(scenario.current_grid_to_battery_kw)}",
+            f"BH={value(scenario.current_battery_to_home_kw)}",
+            f"BE={value(scenario.current_battery_export_kw)}",
+            f"SOC={value(scenario.current_battery_soc_percent, 1)}",
+        )
+    )
+
+
 def _scenario_period_attributes(
     data: KEMSData,
     period_key: str,
@@ -835,6 +867,41 @@ SENSORS: tuple[KEMSSensorEntityDescription, ...] = (
         suggested_display_precision=2,
         value_fn=lambda data: _scenario_cost(data, "kems_full"),
         attributes_fn=lambda data: _scenario_attributes(data, "kems_full"),
+    ),
+    KEMSSensorEntityDescription(
+        key="compare_no_system_flow_now",
+        name="Compare no system flow now",
+        icon="mdi:transmission-tower-import",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda data: _scenario_flow_state(data, "no_system"),
+    ),
+    KEMSSensorEntityDescription(
+        key="compare_solar_only_flow_now",
+        name="Compare solar only flow now",
+        icon="mdi:solar-power",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda data: _scenario_flow_state(data, "solar_only"),
+    ),
+    KEMSSensorEntityDescription(
+        key="compare_solar_battery_flow_now",
+        name="Compare solar and battery flow now",
+        icon="mdi:home-battery-outline",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda data: _scenario_flow_state(data, "solar_battery"),
+    ),
+    KEMSSensorEntityDescription(
+        key="compare_kems_no_export_flow_now",
+        name="Compare KEMS no-export flow now",
+        icon="mdi:shield-home-outline",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda data: _scenario_flow_state(data, "kems_no_export"),
+    ),
+    KEMSSensorEntityDescription(
+        key="compare_kems_full_flow_now",
+        name="Compare full KEMS flow now",
+        icon="mdi:brain",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda data: _scenario_flow_state(data, "kems_full"),
     ),
     KEMSSensorEntityDescription(
         key="scenario_comparison_yesterday",

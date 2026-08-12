@@ -50,7 +50,12 @@ class SimulationEngine:
         )
         live_snapshot = current_snapshot or (today[-1] if today else None)
         if len(today) < 2:
-            return self._empty_current_state(live_snapshot, config)
+            return self._empty_current_state(
+                live_snapshot,
+                today,
+                config,
+                forecast_energy_until_offpeak_kwh,
+            )
 
         capacity = max(config.battery_capacity_kwh, 0.1)
         reserve_kwh = capacity * config.battery_reserve_percent / 100
@@ -478,7 +483,12 @@ class SimulationEngine:
 
         coverage = covered / intervals if intervals else 0.0
         if covered == 0:
-            return SimulationState(samples=len(today), data_coverage=0.0)
+            return self._empty_current_state(
+                live_snapshot,
+                today,
+                config,
+                forecast_energy_until_offpeak_kwh,
+            )
 
         current_plan = self._current_plan(
             live_snapshot or today[-1],
@@ -660,24 +670,71 @@ class SimulationEngine:
     def _empty_current_state(
         self,
         snapshot: Snapshot | None,
+        records: list[Snapshot],
         config: SimulationConfig,
+        forecast_energy_until_offpeak_kwh: float | None = None,
     ) -> SimulationState:
-        """Expose proposal solar immediately, before two history samples exist."""
+        """Expose a complete current plan before history is ready."""
         if snapshot is None:
             return SimulationState()
-        solar = self._simulated_solar_power(snapshot, config)
-        session = self._saving_session_plan(snapshot, [snapshot], config)
+
+        capacity = max(config.battery_capacity_kwh, 0.1)
+        reserve_kwh = capacity * config.battery_reserve_percent / 100
+        starting_soc = (
+            snapshot.battery_soc
+            if snapshot.battery_soc is not None
+            else config.battery_initial_percent
+        )
+        battery_kwh = capacity * min(max(starting_soc, 0.0), 100.0) / 100
+        battery_kwh = min(max(battery_kwh, reserve_kwh), capacity)
+
+        current_plan = self._current_plan(
+            snapshot,
+            records or [snapshot],
+            battery_kwh,
+            reserve_kwh,
+            capacity,
+            config,
+            forecast_energy_until_offpeak_kwh,
+        )
+        session = self._saving_session_plan(snapshot, records or [snapshot], config)
+
         return SimulationState(
-            samples=1,
-            current_simulated_house_load_kw=_load_kw(snapshot),
-            current_simulated_solar_power_kw=solar,
-            current_simulated_battery_charge_power_kw=0.0,
-            current_simulated_total_kh7_output_kw=round(
-                min(solar, config.inverter_limit_kw),
-                3,
+            samples=max(len(records), 1),
+            data_coverage=0.0,
+            simulated_battery_soc=round(100 * battery_kwh / capacity, 1),
+            current_simulated_house_load_kw=current_plan["house"],
+            current_simulated_solar_power_kw=current_plan["solar"],
+            current_simulated_grid_import_kw=current_plan["grid_import"],
+            current_simulated_grid_export_kw=current_plan["grid_export"],
+            current_simulated_battery_power_kw=current_plan["battery"],
+            current_simulated_battery_charge_power_kw=current_plan["battery_charge"],
+            current_simulated_battery_to_home_power_kw=current_plan["battery_to_home"],
+            current_simulated_battery_export_power_kw=current_plan["battery_export"],
+            current_simulated_total_kh7_output_kw=current_plan["total_kh7_output"],
+            current_simulated_grid_bypass_power_kw=current_plan["grid_bypass"],
+            current_simulated_total_site_import_kw=current_plan["total_site_import"],
+            current_simulated_solar_to_battery_power_kw=current_plan.get(
+                "solar_to_battery", 0.0
             ),
-            current_simulated_grid_bypass_power_kw=_load_kw(snapshot),
-            current_simulated_total_site_import_kw=_load_kw(snapshot),
+            effective_export_rate_pence=(
+                config.export_rate_pence if self._export_tariff_active(config) else 0.0
+            ),
+            export_tariff_status=config.export_tariff_status,
+            export_tariff_active=self._export_tariff_active(config),
+            no_export_mode_active=not self._export_tariff_active(config),
+            inverter_limit_kw=config.inverter_limit_kw,
+            export_limit_kw=min(config.export_limit_kw, config.inverter_limit_kw),
+            battery_charge_limit_kw=config.max_charge_kw,
+            battery_discharge_limit_kw=config.max_discharge_kw,
+            eps_output_limit_kw=config.eps_output_limit_kw,
+            site_import_limit_kw=config.site_import_limit_kw,
+            site_import_headroom_kw=current_plan["site_import_headroom"],
+            site_import_limit_exceeded=bool(current_plan["site_import_exceeded"]),
+            strategy=self._effective_strategy(config),
+            proposal_solar_active=config.proposal_solar_enabled
+            and snapshot.solar_power_kw is None,
+            battery_export_enabled=self._battery_export_enabled(config),
             saving_session_joined=bool(session["saving_session_joined"]),
             saving_session_active=bool(session["saving_session_active"]),
             saving_session_start=session["saving_session_start"],
@@ -719,31 +776,6 @@ class SimulationEngine:
             battery_export_reduced_for_saving_session=bool(
                 session["battery_export_reduced_for_saving_session"]
             ),
-            effective_export_rate_pence=(
-                config.export_rate_pence if self._export_tariff_active(config) else 0.0
-            ),
-            export_tariff_status=config.export_tariff_status,
-            export_tariff_active=self._export_tariff_active(config),
-            no_export_mode_active=not self._export_tariff_active(config),
-            inverter_limit_kw=config.inverter_limit_kw,
-            export_limit_kw=min(config.export_limit_kw, config.inverter_limit_kw),
-            battery_charge_limit_kw=config.max_charge_kw,
-            battery_discharge_limit_kw=config.max_discharge_kw,
-            eps_output_limit_kw=config.eps_output_limit_kw,
-            site_import_limit_kw=config.site_import_limit_kw,
-            site_import_headroom_kw=(
-                None
-                if config.site_import_limit_kw is None or _load_kw(snapshot) is None
-                else round(config.site_import_limit_kw - (_load_kw(snapshot) or 0.0), 3)
-            ),
-            site_import_limit_exceeded=bool(
-                config.site_import_limit_kw is not None
-                and (_load_kw(snapshot) or 0.0) > config.site_import_limit_kw
-            ),
-            strategy=self._effective_strategy(config),
-            proposal_solar_active=config.proposal_solar_enabled
-            and snapshot.solar_power_kw is None,
-            battery_export_enabled=self._battery_export_enabled(config),
         )
 
     def _battery_energy_at_day_start(

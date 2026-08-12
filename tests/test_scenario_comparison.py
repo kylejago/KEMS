@@ -235,3 +235,33 @@ def test_current_power_attributes_are_preserved_in_period_rollup() -> None:
     assert today_full is not None and seven_full is not None
     assert seven_full.current_grid_import_kw == today_full.current_grid_import_kw
     assert seven_full.current_grid_export_kw == today_full.current_grid_export_kw
+
+
+def test_full_kems_current_flow_survives_early_day_not_ready_state() -> None:
+    """Keep Full-KEMS current routing available during the first daily samples."""
+    start = datetime(2026, 8, 12, 0, 0, tzinfo=UTC)
+    records = _records(start, count=2)
+    result = ScenarioComparisonEngine().compare(
+        records,
+        records[-1].timestamp,
+        SimulationConfig(
+            battery_capacity_kwh=10.0,
+            battery_initial_percent=20.0,
+            battery_reserve_percent=10.0,
+            max_charge_kw=5.0,
+            max_discharge_kw=5.0,
+            inverter_limit_kw=7.0,
+            export_limit_kw=7.0,
+            export_rate_pence=12.0,
+            proposal_solar_enabled=False,
+        ),
+    )
+
+    today = result.period("today")
+    assert today is not None
+    full = today.scenario("kems_full")
+    assert full is not None
+    assert full.ready is False
+    assert full.current_house_load_kw == 2.0
+    assert full.current_grid_import_kw is not None
+    assert full.current_grid_to_battery_kw is not None
