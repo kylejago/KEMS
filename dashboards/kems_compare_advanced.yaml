@@ -8,7 +8,7 @@ views:
       - type: markdown
         content: |
           # What would today have looked like?
-          Six parallel replays use the same retained demand/tariff observations. The first five are financial comparisons; **Full Island Mode** is resilience-only and is excluded from cheapest-scenario ranking. **KEMS no-export** always models the awaiting-export strategy and **Full KEMS** always models paid export/paced control, regardless of the mode currently selected for the live-readiness simulation.
+          Six parallel replays use the same retained demand/tariff observations. The first five are financial comparisons; **Full Island Mode** is resilience-only and is excluded from cheapest-scenario ranking. Island Mode includes a sudden-outage replay plus a prepared-outage calculation that finds the minimum energy-secure starting SOC and adds a 5% safety margin. **KEMS no-export** always models the awaiting-export strategy and **Full KEMS** always models paid export/paced control, regardless of the mode currently selected for the live-readiness simulation.
 
       - type: grid
         columns: 3
@@ -38,6 +38,31 @@ views:
             entity: sensor.kems_compare_full_island_mode_today
             name: Full Island Mode
             icon: mdi:transmission-tower-off
+
+      - type: grid
+        columns: 5
+        square: false
+        cards:
+          - type: custom:mushroom-entity-card
+            entity: sensor.kems_compare_full_island_prepared_status_today
+            name: Prepared result
+            icon: mdi:weather-lightning-rainy
+          - type: custom:mushroom-entity-card
+            entity: sensor.kems_compare_full_island_required_starting_soc_today
+            name: Required SOC
+            icon: mdi:battery-alert-variant-outline
+          - type: custom:mushroom-entity-card
+            entity: sensor.kems_compare_full_island_prepared_target_soc_today
+            name: Prepared target
+            icon: mdi:battery-arrow-up-outline
+          - type: custom:mushroom-entity-card
+            entity: sensor.kems_compare_full_island_prepared_load_served_today
+            name: Prepared load served
+            icon: mdi:home-lightning-bolt
+          - type: custom:mushroom-entity-card
+            entity: sensor.kems_compare_full_island_prepared_unserved_energy_today
+            name: Prepared shortfall
+            icon: mdi:home-alert
 
       - type: custom:apexcharts-card
         header:
@@ -191,18 +216,22 @@ views:
               **Battery → grid:** {{ state_attr(e, 'battery_export_kwh')|float(0)|round(2) }} kWh<br>
               **End SOC:** {{ state_attr(e, 'ending_soc_percent') }}%
           - type: markdown
-            title: Full Island Mode resilience
+            title: Full Island Mode — sudden vs prepared
             content: |
               {% set e = 'sensor.kems_compare_full_island_mode_today' %}
-              **Grid:** unavailable<br>
-              **Outage result:** {{ states(e) }}<br>
-              **Load served:** {{ state_attr(e, 'load_served_percent')|float(0)|round(1) }}%<br>
-              **Unserved energy:** {{ state_attr(e, 'unserved_load_kwh')|float(0)|round(3) }} kWh<br>
-              **Start / minimum / end SOC:** {{ state_attr(e, 'starting_soc_percent')|float(0)|round(1) }}% / {{ state_attr(e, 'minimum_soc_percent')|float(0)|round(1) }}% / {{ state_attr(e, 'ending_soc_percent')|float(0)|round(1) }}%<br>
-              **EPS-limited shortfall:** {{ state_attr(e, 'eps_limited_unserved_kwh')|float(0)|round(3) }} kWh<br>
-              **Energy-limited shortfall:** {{ state_attr(e, 'energy_limited_unserved_kwh')|float(0)|round(3) }} kWh<br>
-              **First shortfall:** {{ state_attr(e, 'first_shortfall_at') or '—' }}<br>
-              **Estimated runtime remaining:** {% if state_attr(e, 'estimated_remaining_runtime_hours') is not none %}{{ state_attr(e, 'estimated_remaining_runtime_hours')|float(0)|round(1) }} h{% else %}—{% endif %}
+              **Grid:** unavailable in both replays<br><br>
+              **Sudden outage**<br>
+              Result: **{{ states(e) }}** · load served {{ state_attr(e, 'load_served_percent')|float(0)|round(1) }}%<br>
+              Start / min / end SOC: {{ state_attr(e, 'starting_soc_percent')|float(0)|round(1) }}% / {{ state_attr(e, 'minimum_soc_percent')|float(0)|round(1) }}% / {{ state_attr(e, 'ending_soc_percent')|float(0)|round(1) }}%<br>
+              Unserved: {{ state_attr(e, 'unserved_load_kwh')|float(0)|round(3) }} kWh · EPS {{ state_attr(e, 'eps_limited_unserved_kwh')|float(0)|round(3) }} · energy {{ state_attr(e, 'energy_limited_unserved_kwh')|float(0)|round(3) }} kWh<br>
+              First shortfall: {{ state_attr(e, 'first_shortfall_at') or '—' }}<br><br>
+              **Prepared outage**<br>
+              Result: **{{ state_attr(e, 'prepared_outage_status') or 'unavailable' }}** · load served {{ state_attr(e, 'prepared_load_served_percent')|float(0)|round(1) }}%<br>
+              Required SOC: {% if state_attr(e, 'required_starting_soc_percent') is not none %}{{ state_attr(e, 'required_starting_soc_percent')|float(0)|round(1) }}%{% else %}not achievable from SOC alone{% endif %}<br>
+              Recommended target: {{ state_attr(e, 'recommended_prepared_soc_percent')|float(0)|round(1) }}% · prepared start {{ state_attr(e, 'prepared_starting_soc_percent')|float(0)|round(1) }}%<br>
+              Prepared end SOC: {{ state_attr(e, 'prepared_ending_soc_percent')|float(0)|round(1) }}%<br>
+              Unserved: {{ state_attr(e, 'prepared_unserved_load_kwh')|float(0)|round(3) }} kWh · EPS {{ state_attr(e, 'prepared_eps_limited_unserved_kwh')|float(0)|round(3) }} · energy {{ state_attr(e, 'prepared_energy_limited_unserved_kwh')|float(0)|round(3) }} kWh<br>
+              Required-SOC status: `{{ state_attr(e, 'required_starting_soc_status') or 'unavailable' }}`
 
   - title: History
     path: history
@@ -221,7 +250,7 @@ views:
           {% endfor %}
 
           {% for s in scenarios %}{% if s.key == 'full_island' %}
-          **Full Island Mode:** {{ s.outage_status }} · {{ s.load_served_percent|float(0)|round(1) }}% load served · {{ s.unserved_load_kwh|float(0)|round(2) }} kWh unserved · end SOC {{ s.ending_soc_percent|float(0)|round(1) }}%
+          **Full Island Mode:** sudden {{ s.outage_status }} · {{ s.load_served_percent|float(0)|round(1) }}% served · prepared {{ s.prepared_outage_status }} · {{ s.prepared_load_served_percent|float(0)|round(1) }}% served · required SOC {% if s.required_starting_soc_percent is not none %}{{ s.required_starting_soc_percent|float(0)|round(1) }}%{% else %}not achievable{% endif %}
           {% endif %}{% endfor %}
       - type: markdown
         title: 30-day retained-history comparison
@@ -236,5 +265,5 @@ views:
           {% endfor %}
 
           {% for s in scenarios %}{% if s.key == 'full_island' %}
-          **Full Island Mode:** {{ s.outage_status }} · {{ s.load_served_percent|float(0)|round(1) }}% load served · {{ s.unserved_load_kwh|float(0)|round(2) }} kWh unserved · end SOC {{ s.ending_soc_percent|float(0)|round(1) }}%
+          **Full Island Mode:** sudden {{ s.outage_status }} · {{ s.load_served_percent|float(0)|round(1) }}% served · prepared {{ s.prepared_outage_status }} · {{ s.prepared_load_served_percent|float(0)|round(1) }}% served · required SOC {% if s.required_starting_soc_percent is not none %}{{ s.required_starting_soc_percent|float(0)|round(1) }}%{% else %}not achievable{% endif %}
           {% endif %}{% endfor %}

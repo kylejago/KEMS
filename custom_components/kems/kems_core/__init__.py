@@ -49,6 +49,10 @@ from .periods import (
     period_value_kwargs,
     summarise_period_records,
 )
+from .power_down_audit import (
+    PowerDownAuditState,
+    finalise_power_down_audit,
+)
 from .quality import assess_quality
 from .roi import ROIEngine
 from .scenario_comparison import (
@@ -85,6 +89,7 @@ __all__ = [
     "LifetimeLedger",
     "PeriodTotals",
     "PERIOD_DATA_COMPLETE_KEY",
+    "PowerDownAuditState",
     "PowerDownResult",
     "ProposalSystemProfile",
     "ROIConfig",
@@ -112,4 +117,5 @@ __all__ = [
     "period_value_kwargs",
     "summarise_period_records",
     "interpret_charger_status",
+    "finalise_power_down_audit",
 ]

@@ -360,6 +360,25 @@ class ScenarioSummary:
     estimated_remaining_runtime_hours: float | None = None
     battery_energy_above_floor_kwh: float | None = None
 
+    # Prepared-outage resilience. This is the same solar/battery/EPS system,
+    # but KEMS is assumed to have advance notice and may pre-charge before the
+    # replay starts. It remains non-financial and separate from cheapest ranking.
+    required_starting_soc_percent: float | None = None
+    required_starting_soc_status: str | None = None
+    recommended_prepared_soc_percent: float | None = None
+    prepared_starting_soc_percent: float | None = None
+    prepared_soc_margin_percent: float | None = None
+    prepared_outage_survived: bool | None = None
+    prepared_outage_status: str | None = None
+    prepared_load_served_kwh: float | None = None
+    prepared_unserved_load_kwh: float | None = None
+    prepared_load_served_percent: float | None = None
+    prepared_ending_soc_percent: float | None = None
+    prepared_minimum_soc_percent: float | None = None
+    prepared_eps_limited_unserved_kwh: float | None = None
+    prepared_energy_limited_unserved_kwh: float | None = None
+    prepared_first_shortfall_at: str | None = None
+
     # Current/recent power routing for live visualisations such as the
     # 16x16 KEMS panel. These are instantaneous kW values from the latest
     # replay snapshot, not period totals.
@@ -794,6 +813,9 @@ class PowerDownResult:
     fixed_export_income_pence: float | None = None
     combined_income_pence: float | None = None
     ev_successfully_blocked: bool = False
+    active_samples_observed: int = 0
+    plan_safe_throughout: bool | None = None
+    island_override_observed: bool | None = None
     completed_successfully: bool = False
     completion_reason: str = "unavailable"
 

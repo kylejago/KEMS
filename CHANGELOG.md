@@ -5,6 +5,9 @@
 - Added exact today cost, import/export, solar routing, battery routing, end-SOC, standing-charge and saving-vs-baseline summaries for every scenario.
 - Added an explainable saving decomposition: reduced day-rate import, change in cheap-rate import, export income, and Power Down income.
 - Added a resilience-only full-island replay with grid import/export forced to zero, EPS output limits, emergency-floor protection, outage survival, unserved energy and first-shortfall reporting; it is excluded from cheapest-scenario financial ranking.
+- Added prepared-outage resilience on top of Full Island Mode: KEMS now finds the minimum starting SOC needed to eliminate energy-limited shortfall, adds a 5% preparation margin, and replays the outage from that prepared target without pretending a larger EPS or load-shedding capability exists.
+- Prepared resilience explicitly distinguishes an unavoidable EPS-limit shortfall from an energy-capacity shortfall, and reports when even 100% SOC cannot cover the requested outage period.
+- Fixed Power Down completion auditing so joined/pre-session samples no longer permanently fail the EV-block check; safety evidence is now accumulated only while the session is actually active, with explicit plan, EV, island-override, and no-active-sample completion reasons.
 - Added cumulative midnight-to-now cost timeline data for the five financial scenarios, plus island SOC/load-served/unserved-energy/status timeline data.
 - Added Yesterday, 7-day and 30-day retained-history scenario rollups.
 - Added smart-simulation cheap/day import-cost splits and solar/grid-to-battery flow accounting used by the comparison engine and diagnostics.

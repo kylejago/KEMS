@@ -62,6 +62,8 @@ def test_compare_today_runs_six_independent_scenarios() -> None:
     assert no_export is not None and full is not None
     assert no_export.grid_export_kwh == 0.0
     assert no_export.export_income_pence == 0.0
+    assert 0.0 <= no_export.data_coverage <= 100.0
+    assert 0.0 <= full.data_coverage <= 100.0
     # Full KEMS is always replayed with the paid export tariff even when the
     # currently selected live-readiness setting is awaiting export.
     assert full.export_income_pence >= 0.0
@@ -253,7 +255,7 @@ def test_current_power_attributes_are_preserved_in_period_rollup() -> None:
 
 
 def test_full_kems_current_flow_survives_early_day_not_ready_state() -> None:
-    """Keep Full-KEMS current routing available during the first daily samples."""
+    """Full-KEMS routing should stay available during early-day samples."""
     start = datetime(2026, 8, 12, 0, 0, tzinfo=UTC)
     records = _records(start, count=2)
     result = ScenarioComparisonEngine().compare(
@@ -384,3 +386,125 @@ def test_full_island_starts_today_from_previous_full_kems_soc() -> None:
     assert previous_full is not None and previous_full.ending_soc_percent is not None
     assert island is not None and island.starting_soc_percent is not None
     assert island.starting_soc_percent == previous_full.ending_soc_percent
+
+
+def test_prepared_island_calculates_required_soc_and_survives_energy_shortfall() -> (
+    None
+):
+    """Advance notice should turn a low-SOC sudden failure into a prepared survival."""
+    start = datetime(2026, 8, 11, 0, 0, tzinfo=UTC)
+    records = [
+        Snapshot(
+            timestamp=start + timedelta(minutes=30 * index),
+            current_import_rate=28.3036,
+            electricity_standing_charge=53.70435,
+            house_load_kw=1.0,
+            grid_import_kw=1.0,
+            solar_power_kw=0.0,
+        )
+        for index in range(13)
+    ]
+    result = ScenarioComparisonEngine().compare(
+        records,
+        records[-1].timestamp,
+        SimulationConfig(
+            battery_capacity_kwh=10.0,
+            battery_initial_percent=10.0,
+            battery_reserve_percent=10.0,
+            island_reserve_percent=20.0,
+            max_discharge_kw=7.0,
+            eps_output_limit_kw=7.0,
+            proposal_solar_enabled=False,
+        ),
+    )
+
+    island = result.scenario("full_island")
+    assert island is not None and island.ready
+    assert island.outage_survived is False
+    assert island.required_starting_soc_status == "ready"
+    assert island.required_starting_soc_percent is not None
+    assert island.recommended_prepared_soc_percent is not None
+    assert (
+        island.recommended_prepared_soc_percent >= island.required_starting_soc_percent
+    )
+    assert island.prepared_outage_survived is True
+    assert island.prepared_outage_status == "survived"
+    assert island.prepared_load_served_percent == 100.0
+    assert island.prepared_unserved_load_kwh == 0.0
+
+
+def test_prepared_island_separates_eps_limit_from_energy_security() -> None:
+    """More battery cannot remove a whole-house load spike above the EPS rating."""
+    start = datetime(2026, 8, 11, 12, 0, tzinfo=UTC)
+    records = [
+        Snapshot(
+            timestamp=start + timedelta(minutes=15 * index),
+            current_import_rate=28.3036,
+            electricity_standing_charge=53.70435,
+            house_load_kw=9.0,
+            grid_import_kw=9.0,
+            solar_power_kw=0.0,
+        )
+        for index in range(9)
+    ]
+    result = ScenarioComparisonEngine().compare(
+        records,
+        records[-1].timestamp,
+        SimulationConfig(
+            battery_capacity_kwh=20.0,
+            battery_initial_percent=10.0,
+            battery_reserve_percent=10.0,
+            island_reserve_percent=20.0,
+            max_discharge_kw=7.0,
+            eps_output_limit_kw=7.0,
+            proposal_solar_enabled=False,
+        ),
+    )
+
+    island = result.scenario("full_island")
+    assert island is not None and island.ready
+    assert island.required_starting_soc_status == "eps_limit_only"
+    assert island.required_starting_soc_percent is not None
+    assert island.prepared_outage_survived is False
+    assert island.prepared_outage_status == "eps_limited"
+    assert island.prepared_energy_limited_unserved_kwh == 0.0
+    assert island.prepared_eps_limited_unserved_kwh > 0.0
+
+
+def test_prepared_island_reports_when_100_percent_still_lacks_energy() -> None:
+    """Required SOC must not claim success when even a full battery is insufficient."""
+    start = datetime(2026, 8, 11, 0, 0, tzinfo=UTC)
+    records = [
+        Snapshot(
+            timestamp=start + timedelta(hours=index),
+            current_import_rate=28.3036,
+            electricity_standing_charge=53.70435,
+            house_load_kw=2.0,
+            grid_import_kw=2.0,
+            solar_power_kw=0.0,
+        )
+        for index in range(13)
+    ]
+    result = ScenarioComparisonEngine().compare(
+        records,
+        records[-1].timestamp,
+        SimulationConfig(
+            battery_capacity_kwh=10.0,
+            battery_initial_percent=10.0,
+            battery_reserve_percent=10.0,
+            island_reserve_percent=20.0,
+            max_discharge_kw=7.0,
+            eps_output_limit_kw=7.0,
+            proposal_solar_enabled=False,
+        ),
+    )
+
+    island = result.scenario("full_island")
+    assert island is not None and island.ready
+    assert island.required_starting_soc_percent is None
+    assert island.required_starting_soc_status == "insufficient_energy_even_at_100"
+    assert island.recommended_prepared_soc_percent == 100.0
+    assert island.prepared_starting_soc_percent == 100.0
+    assert island.prepared_outage_survived is False
+    assert island.prepared_outage_status == "shortfall"
+    assert island.prepared_energy_limited_unserved_kwh > 0.0
