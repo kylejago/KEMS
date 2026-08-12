@@ -508,3 +508,59 @@ def test_prepared_island_reports_when_100_percent_still_lacks_energy() -> None:
     assert island.prepared_outage_survived is False
     assert island.prepared_outage_status == "shortfall"
     assert island.prepared_energy_limited_unserved_kwh > 0.0
+
+
+def test_current_flow_uses_live_snapshot_between_history_samples() -> None:
+    """Current routes should not wait for the five-minute history interval."""
+    start = datetime(2026, 8, 12, 12, 0, tzinfo=UTC)
+    records = _records(start)
+    records[-1].stale_fields = ("house_load_kw",)
+    current = Snapshot(
+        timestamp=records[-1].timestamp + timedelta(minutes=1),
+        current_import_rate=28.3036,
+        electricity_standing_charge=53.70435,
+        off_peak=False,
+        house_load_kw=4.0,
+        grid_import_kw=4.0,
+        grid_export_kw=0.0,
+        solar_power_kw=1.0,
+        next_offpeak_start=start + timedelta(days=1),
+    )
+    result = ScenarioComparisonEngine().compare(
+        records,
+        current.timestamp,
+        SimulationConfig(
+            battery_capacity_kwh=10.0,
+            battery_initial_percent=50.0,
+            battery_reserve_percent=10.0,
+            export_rate_pence=12.0,
+            max_charge_kw=5.0,
+            max_discharge_kw=5.0,
+            inverter_limit_kw=7.0,
+            eps_output_limit_kw=7.0,
+            export_limit_kw=7.0,
+            proposal_solar_enabled=False,
+        ),
+        current_snapshot=current,
+    )
+
+    today = result.period("today")
+    assert today is not None
+    no_system = today.scenario("no_system")
+    solar_only = today.scenario("solar_only")
+    full = today.scenario("kems_full")
+    island = today.scenario("full_island")
+    assert no_system is not None
+    assert solar_only is not None
+    assert full is not None
+    assert island is not None
+
+    assert no_system.samples == len(records)
+    assert no_system.current_house_load_kw == 4.0
+    assert no_system.current_grid_import_kw == 4.0
+    assert solar_only.current_solar_power_kw == 1.0
+    assert full.current_house_load_kw == 4.0
+    assert full.current_grid_import_kw is not None
+    assert island.current_house_load_kw == 4.0
+    assert island.current_grid_import_kw == 0.0
+    assert island.current_grid_export_kw == 0.0

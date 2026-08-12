@@ -118,6 +118,7 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                 now,
                 self.settings.simulation,
                 learned.predicted_energy_until_offpeak_kwh,
+                current_snapshot=snapshot,
             )
             whole_home = self._whole_home.summarise(snapshot, simulation, gas)
             stored_lifetime = await self._lifetime.async_update(

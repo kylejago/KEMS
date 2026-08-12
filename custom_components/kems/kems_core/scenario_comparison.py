@@ -108,6 +108,7 @@ class ScenarioComparisonEngine:
         now: datetime,
         config: SimulationConfig,
         forecast_energy_until_offpeak_kwh: float | None = None,
+        current_snapshot: Snapshot | None = None,
     ) -> ScenarioComparisonState:
         """Build today, yesterday, 7-day and 30-day scenario comparisons."""
         ordered = sorted(records, key=lambda item: item.timestamp)
@@ -152,10 +153,16 @@ class ScenarioComparisonEngine:
                 forecast_energy_until_offpeak_kwh if is_current_day else None
             )
 
+            display_snapshot = (
+                current_snapshot
+                if is_current_day and current_snapshot is not None
+                else day_records[-1]
+            )
             simple, basic_soc = self._simple_day_scenarios(
                 day_records,
                 config,
                 initial_basic_soc_percent=basic_soc,
+                current_snapshot=display_snapshot,
             )
             no_export_state = self._simulation.simulate_today(
                 day_records,
@@ -168,7 +175,7 @@ class ScenarioComparisonEngine:
                     strategy="self_use",
                 ),
                 learned_forecast,
-                current_snapshot=day_records[-1],
+                current_snapshot=display_snapshot,
             )
             full_state = self._simulation.simulate_today(
                 day_records,
@@ -181,7 +188,7 @@ class ScenarioComparisonEngine:
                     strategy="paced_export",
                 ),
                 learned_forecast,
-                current_snapshot=day_records[-1],
+                current_snapshot=display_snapshot,
             )
             no_export_summary = self._summary_from_simulation(
                 SCENARIO_KEMS_NO_EXPORT,
@@ -213,6 +220,7 @@ class ScenarioComparisonEngine:
             grouped,
             day_summaries,
             config,
+            current_snapshot=current_snapshot,
         )
         current_day = grouped.get(now.date(), [])
         timeline: tuple[ScenarioTimelinePoint, ...] = ()
@@ -253,6 +261,7 @@ class ScenarioComparisonEngine:
         config: SimulationConfig,
         *,
         initial_basic_soc_percent: float,
+        current_snapshot: Snapshot | None = None,
     ) -> tuple[dict[str, ScenarioSummary], float]:
         """Replay no-system, solar-only and conventional self-use together."""
         day_records = sorted(day_records, key=lambda item: item.timestamp)
@@ -390,7 +399,7 @@ class ScenarioComparisonEngine:
         # snapshot using each scenario's current replay state. This is separate
         # from the cumulative kWh totals above and is intended for live displays.
         current_plans = self._simple_current_plans(
-            day_records[-1] if day_records else None,
+            current_snapshot or (day_records[-1] if day_records else None),
             config,
             battery_kwh=battery_kwh,
             reserve_kwh=reserve_kwh,
@@ -580,6 +589,8 @@ class ScenarioComparisonEngine:
         grouped: dict[date, list[Snapshot]],
         daily: dict[date, dict[str, ScenarioSummary]],
         config: SimulationConfig,
+        *,
+        current_snapshot: Snapshot | None = None,
     ) -> dict[str, ScenarioPeriodComparison]:
         """Append a non-financial full-grid-outage replay to every period."""
         result: dict[str, ScenarioPeriodComparison] = {}
@@ -605,6 +616,7 @@ class ScenarioComparisonEngine:
                 records,
                 config,
                 initial_soc_percent=initial_soc,
+                current_snapshot=(current_snapshot if key == "today" else None),
             )
             result[key] = replace(
                 period,
@@ -618,12 +630,14 @@ class ScenarioComparisonEngine:
         config: SimulationConfig,
         *,
         initial_soc_percent: float,
+        current_snapshot: Snapshot | None = None,
     ) -> ScenarioSummary:
         """Add advance-preparation resilience to the sudden-outage replay."""
         sudden = self._island_replay(
             records,
             config,
             initial_soc_percent=initial_soc_percent,
+            current_snapshot=current_snapshot,
         )
         if not sudden.ready:
             return replace(
@@ -734,6 +748,7 @@ class ScenarioComparisonEngine:
         config: SimulationConfig,
         *,
         initial_soc_percent: float,
+        current_snapshot: Snapshot | None = None,
     ) -> ScenarioSummary:
         """Replay a complete grid outage using only proposal/live solar and battery."""
         ordered = sorted(records, key=lambda item: item.timestamp)
@@ -852,8 +867,8 @@ class ScenarioComparisonEngine:
         current_solar_to_home: float | None = None
         current_solar_to_battery: float | None = None
         current_battery_to_home: float | None = None
-        if ordered:
-            latest = ordered[-1]
+        latest = current_snapshot or (ordered[-1] if ordered else None)
+        if latest is not None:
             latest_load = _load_kw(latest)
             if not latest.stale_fields and latest_load is not None:
                 current_house = max(latest_load, 0.0)
