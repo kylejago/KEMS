@@ -107,8 +107,8 @@ def test_control_lab_dashboard_exposes_island_and_write_boundary() -> None:
     assert "sensor.kems_simulated_house_load_power" not in text
 
 
-def test_compare_dashboards_ship_five_parallel_scenarios() -> None:
-    """The comparison views must expose every alpha6 what-if scenario."""
+def test_compare_dashboards_ship_six_parallel_scenarios() -> None:
+    """The comparison views must expose every alpha6 financial and island scenario."""
     for name in (
         "kems_compare_builtin.yaml",
         "kems_compare_advanced.yaml",
@@ -119,6 +119,7 @@ def test_compare_dashboards_ship_five_parallel_scenarios() -> None:
         assert "sensor.kems_compare_solar_and_battery_cost_today" in text
         assert "sensor.kems_compare_kems_no_export_cost_today" in text
         assert "sensor.kems_compare_full_kems_cost_today" in text
+        assert "sensor.kems_compare_full_island_mode_today" in text
         assert "sensor.kems_scenario_comparison_7_days" in text
         assert "sensor.kems_scenario_comparison_30_days" in text
 
@@ -130,3 +131,6 @@ def test_advanced_compare_dashboard_uses_replay_timeline() -> None:
     assert "entity.attributes.timeline" in text
     assert "no_system_cost_pence" in text
     assert "kems_full_cost_pence" in text
+    assert "island_load_served_percent" in text
+    assert "island_unserved_load_kwh" in text
+    assert "island_soc_percent" in text

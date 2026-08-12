@@ -60,17 +60,20 @@ Alpha6 retains the alpha5 separation of the future export rate from whether an e
 
 ## What-if scenario comparison
 
-Alpha6 adds an independent replay engine for **What would today have looked like?** analysis. KEMS evaluates the same retained demand and tariff observations through five parallel scenarios without changing the active operating strategy:
+Alpha6 adds an independent replay engine for **What would today have looked like?** analysis. KEMS evaluates the same retained demand and tariff observations through six parallel scenarios without changing the active operating strategy:
 
 - **No system** — the whole home is supplied from the grid.
 - **Solar only** — solar supplies the home first and surplus is valued at the configured paid export rate.
 - **Solar + battery** — conventional self-use: solar → home → battery, battery → home, no tariff-aware grid charging.
 - **KEMS no-export** — the alpha5 awaiting-export strategy with solar-aware cheap charging and deliberate export disabled.
 - **Full KEMS smart control** — paid export, cheap charging, home reserve, paced battery export and Power Down optimisation.
+- **Full island mode — grid down** — the grid is unavailable for the whole replay period; solar and battery alone must serve the house through the EPS limit, with no import or export possible.
 
-Each scenario exposes total cost including the daily standing charge, import/export, cheap/day import split, solar and battery routing, end SOC, and saving versus the No system baseline. The saving breakdown reconciles to reduced day-rate import, change in cheap-rate import, export income and Power Down income.
+The first five scenarios expose total cost including the daily standing charge, import/export, cheap/day import split, solar and battery routing, end SOC, and saving versus the No system baseline. The saving breakdown reconciles to reduced day-rate import, change in cheap-rate import, export income and Power Down income.
 
-KEMS also exposes Yesterday, 7-day and 30-day retained-history rollups. The Today comparison includes a cumulative cost timeline sampled from midnight to the latest retained observation so the web interface or ApexCharts dashboard can graph all five scenarios on the same axes.
+Full island mode is deliberately **not** included in the cheapest-scenario calculation because a grid outage is a resilience test, not a zero-cost tariff. It reports load served, unserved energy, outage survival, starting/minimum/ending SOC, EPS-limited shortfall, energy-limited shortfall, first shortfall time and an estimated remaining runtime. The replay starts from the SOC Full KEMS had immediately before the selected outage period when that prior-day state is available.
+
+KEMS also exposes Yesterday, 7-day and 30-day retained-history rollups. The Today comparison keeps the five financial cumulative-cost lines and adds island load-served, unserved-energy, SOC and survival status timeline data for resilience graphs.
 
 The shipped dashboards are `kems_compare_builtin.yaml` and `kems_compare_advanced.yaml`. The advanced version uses ApexCharts and Mushroom; the built-in version requires no custom frontend cards.
 

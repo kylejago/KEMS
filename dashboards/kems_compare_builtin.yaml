@@ -8,10 +8,10 @@ views:
       - type: markdown
         content: |
           # What would today have looked like?
-          KEMS replays the **same retained house demand and tariff data** through five independent system designs. Costs below include the daily electricity standing charge. The comparison does not change the active KEMS operating strategy.
+          KEMS replays the **same retained house demand and tariff data** through six independent system designs. The first five are financial comparisons; Full Island Mode is a resilience replay and is excluded from cheapest-scenario ranking. The comparison does not change the active KEMS operating strategy.
 
       - type: grid
-        columns: 5
+        columns: 3
         square: false
         cards:
           - type: tile
@@ -34,6 +34,10 @@ views:
             entity: sensor.kems_compare_full_kems_cost_today
             name: Full KEMS
             icon: mdi:brain
+          - type: tile
+            entity: sensor.kems_compare_full_island_mode_today
+            name: Full Island Mode
+            icon: mdi:transmission-tower-off
 
       - type: history-graph
         title: Cumulative scenario cost today
@@ -67,6 +71,26 @@ views:
           {% endfor %}
 
       - type: markdown
+        title: Full Island Mode — grid completely down
+        content: |
+          {% set e = 'sensor.kems_compare_full_island_mode_today' %}
+          This scenario assumes **grid import and export are impossible for the entire replay**. It is a resilience test, not a financial scenario.
+
+          | Resilience metric | Result |
+          |---|---:|
+          | Outage result | **{{ states(e) }}** |
+          | Load served | {{ state_attr(e, 'load_served_percent')|float(0)|round(1) }}% |
+          | Energy served | {{ state_attr(e, 'load_served_kwh')|float(0)|round(2) }} kWh |
+          | Unserved energy | {{ state_attr(e, 'unserved_load_kwh')|float(0)|round(3) }} kWh |
+          | Starting SOC | {{ state_attr(e, 'starting_soc_percent')|float(0)|round(1) }}% |
+          | Minimum SOC | {{ state_attr(e, 'minimum_soc_percent')|float(0)|round(1) }}% |
+          | Ending SOC | {{ state_attr(e, 'ending_soc_percent')|float(0)|round(1) }}% |
+          | EPS-limited shortfall | {{ state_attr(e, 'eps_limited_unserved_kwh')|float(0)|round(3) }} kWh |
+          | Energy-limited shortfall | {{ state_attr(e, 'energy_limited_unserved_kwh')|float(0)|round(3) }} kWh |
+          | First shortfall | {{ state_attr(e, 'first_shortfall_at') or '—' }} |
+          | Estimated runtime remaining | {% if state_attr(e, 'estimated_remaining_runtime_hours') is not none %}{{ state_attr(e, 'estimated_remaining_runtime_hours')|float(0)|round(1) }} h{% else %}—{% endif %} |
+
+      - type: markdown
         title: Where the Full KEMS saving comes from
         content: |
           {% set e = 'sensor.kems_compare_full_kems_cost_today' %}
@@ -92,6 +116,8 @@ views:
             name: Cheapest over 7 days
           - entity: sensor.kems_scenario_comparison_30_days
             name: Cheapest over 30 days
+          - entity: sensor.kems_compare_full_island_mode_today
+            name: Island resilience today
 
   - title: 7 days
     path: 7-days
@@ -104,8 +130,14 @@ views:
           | Scenario | Cost | Saving vs no system | Grid import | Grid export | Solar | Battery → home |
           |---|---:|---:|---:|---:|---:|---:|
           {% for s in scenarios %}
+          {% if s.financially_comparable %}
           | {{ s.label }} | £{{ '%.2f' | format((s.total_cost_pence|float(0))/100) }} | £{{ '%.2f' | format((s.saving_vs_no_system_pence|float(0))/100) }} | {{ s.grid_import_kwh|float(0)|round(1) }} kWh | {{ s.grid_export_kwh|float(0)|round(1) }} kWh | {{ s.solar_generation_kwh|float(0)|round(1) }} kWh | {{ s.battery_to_home_kwh|float(0)|round(1) }} kWh |
+          {% endif %}
           {% endfor %}
+
+          {% for s in scenarios %}{% if s.key == 'full_island' %}
+          **Full Island Mode:** {{ s.outage_status }} · {{ s.load_served_percent|float(0)|round(1) }}% load served · {{ s.unserved_load_kwh|float(0)|round(2) }} kWh unserved · end SOC {{ s.ending_soc_percent|float(0)|round(1) }}%
+          {% endif %}{% endfor %}
 
   - title: 30 days
     path: 30-days
@@ -118,5 +150,11 @@ views:
           | Scenario | Cost | Saving vs no system | Grid import | Grid export | Solar | Battery → home |
           |---|---:|---:|---:|---:|---:|---:|
           {% for s in scenarios %}
+          {% if s.financially_comparable %}
           | {{ s.label }} | £{{ '%.2f' | format((s.total_cost_pence|float(0))/100) }} | £{{ '%.2f' | format((s.saving_vs_no_system_pence|float(0))/100) }} | {{ s.grid_import_kwh|float(0)|round(1) }} kWh | {{ s.grid_export_kwh|float(0)|round(1) }} kWh | {{ s.solar_generation_kwh|float(0)|round(1) }} kWh | {{ s.battery_to_home_kwh|float(0)|round(1) }} kWh |
+          {% endif %}
           {% endfor %}
+
+          {% for s in scenarios %}{% if s.key == 'full_island' %}
+          **Full Island Mode:** {{ s.outage_status }} · {{ s.load_served_percent|float(0)|round(1) }}% load served · {{ s.unserved_load_kwh|float(0)|round(2) }} kWh unserved · end SOC {{ s.ending_soc_percent|float(0)|round(1) }}%
+          {% endif %}{% endfor %}

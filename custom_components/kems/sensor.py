@@ -128,6 +128,27 @@ def _scenario_flow_state(
     )
 
 
+def _island_status(data: KEMSData, period_key: str = "today") -> str:
+    """Return a human-friendly result for the full-grid-outage replay."""
+    scenario = data.scenarios.scenario("full_island", period_key)
+    if scenario is None or not scenario.ready:
+        return "Unavailable"
+    return "Survived" if scenario.outage_survived else "Shortfall"
+
+
+def _island_metric(
+    data: KEMSData,
+    attribute: str,
+    period_key: str = "today",
+) -> float | None:
+    """Return one numeric full-island replay metric."""
+    scenario = data.scenarios.scenario("full_island", period_key)
+    if scenario is None or not scenario.ready:
+        return None
+    value = getattr(scenario, attribute, None)
+    return None if value is None else float(value)
+
+
 def _scenario_period_attributes(
     data: KEMSData,
     period_key: str,
@@ -869,6 +890,39 @@ SENSORS: tuple[KEMSSensorEntityDescription, ...] = (
         attributes_fn=lambda data: _scenario_attributes(data, "kems_full"),
     ),
     KEMSSensorEntityDescription(
+        key="compare_full_island_mode_today",
+        name="Compare full island mode today",
+        icon="mdi:transmission-tower-off",
+        value_fn=_island_status,
+        attributes_fn=lambda data: _scenario_attributes(data, "full_island"),
+    ),
+    KEMSSensorEntityDescription(
+        key="compare_full_island_load_served_today",
+        name="Compare full island load served today",
+        icon="mdi:home-lightning-bolt-outline",
+        native_unit_of_measurement="%",
+        suggested_display_precision=1,
+        value_fn=lambda data: _island_metric(data, "load_served_percent"),
+        attributes_fn=lambda data: _scenario_attributes(data, "full_island"),
+    ),
+    KEMSSensorEntityDescription(
+        key="compare_full_island_unserved_energy_today",
+        name="Compare full island unserved energy today",
+        icon="mdi:home-alert-outline",
+        device_class=SensorDeviceClass.ENERGY,
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        suggested_display_precision=3,
+        value_fn=lambda data: _island_metric(data, "unserved_load_kwh"),
+    ),
+    KEMSSensorEntityDescription(
+        key="compare_full_island_ending_soc_today",
+        name="Compare full island ending SOC today",
+        icon="mdi:battery-heart-variant",
+        native_unit_of_measurement="%",
+        suggested_display_precision=1,
+        value_fn=lambda data: _island_metric(data, "ending_soc_percent"),
+    ),
+    KEMSSensorEntityDescription(
         key="compare_no_system_flow_now",
         name="Compare no system flow now",
         icon="mdi:transmission-tower-import",
@@ -902,6 +956,13 @@ SENSORS: tuple[KEMSSensorEntityDescription, ...] = (
         icon="mdi:brain",
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda data: _scenario_flow_state(data, "kems_full"),
+    ),
+    KEMSSensorEntityDescription(
+        key="compare_full_island_flow_now",
+        name="Compare full island flow now",
+        icon="mdi:transmission-tower-off",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda data: _scenario_flow_state(data, "full_island"),
     ),
     KEMSSensorEntityDescription(
         key="scenario_comparison_yesterday",
