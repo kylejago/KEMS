@@ -149,6 +149,19 @@ def _island_metric(
     return None if value is None else float(value)
 
 
+def _prepared_island_status(data: KEMSData, period_key: str = "today") -> str:
+    """Return a human-friendly prepared-outage resilience result."""
+    scenario = data.scenarios.scenario("full_island", period_key)
+    if scenario is None or not scenario.ready:
+        return "Unavailable"
+    return {
+        "survived": "Survived",
+        "eps_limited": "EPS limited",
+        "shortfall": "Shortfall",
+        "unavailable": "Unavailable",
+    }.get(scenario.prepared_outage_status or "unavailable", "Unavailable")
+
+
 def _scenario_period_attributes(
     data: KEMSData,
     period_key: str,
@@ -921,6 +934,46 @@ SENSORS: tuple[KEMSSensorEntityDescription, ...] = (
         native_unit_of_measurement="%",
         suggested_display_precision=1,
         value_fn=lambda data: _island_metric(data, "ending_soc_percent"),
+    ),
+    KEMSSensorEntityDescription(
+        key="compare_full_island_prepared_status_today",
+        name="Compare full island prepared status today",
+        icon="mdi:weather-lightning-rainy",
+        value_fn=_prepared_island_status,
+        attributes_fn=lambda data: _scenario_attributes(data, "full_island"),
+    ),
+    KEMSSensorEntityDescription(
+        key="compare_full_island_required_starting_soc_today",
+        name="Compare full island required starting SOC today",
+        icon="mdi:battery-alert-variant-outline",
+        native_unit_of_measurement="%",
+        suggested_display_precision=1,
+        value_fn=lambda data: _island_metric(data, "required_starting_soc_percent"),
+    ),
+    KEMSSensorEntityDescription(
+        key="compare_full_island_prepared_target_soc_today",
+        name="Compare full island prepared target SOC today",
+        icon="mdi:battery-arrow-up-outline",
+        native_unit_of_measurement="%",
+        suggested_display_precision=1,
+        value_fn=lambda data: _island_metric(data, "recommended_prepared_soc_percent"),
+    ),
+    KEMSSensorEntityDescription(
+        key="compare_full_island_prepared_load_served_today",
+        name="Compare full island prepared load served today",
+        icon="mdi:home-lightning-bolt",
+        native_unit_of_measurement="%",
+        suggested_display_precision=1,
+        value_fn=lambda data: _island_metric(data, "prepared_load_served_percent"),
+    ),
+    KEMSSensorEntityDescription(
+        key="compare_full_island_prepared_unserved_energy_today",
+        name="Compare full island prepared unserved energy today",
+        icon="mdi:home-alert",
+        device_class=SensorDeviceClass.ENERGY,
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        suggested_display_precision=3,
+        value_fn=lambda data: _island_metric(data, "prepared_unserved_load_kwh"),
     ),
     KEMSSensorEntityDescription(
         key="compare_no_system_flow_now",

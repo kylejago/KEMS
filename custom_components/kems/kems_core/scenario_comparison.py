@@ -79,6 +79,9 @@ PERIOD_SPECS: tuple[tuple[str, int], ...] = (
 
 TIMELINE_STEP_MINUTES = 30
 MAX_TIMELINE_POINTS = 49
+PREPARED_SOC_MARGIN_PERCENT = 5.0
+ISLAND_ENERGY_TOLERANCE_KWH = 0.001
+REQUIRED_SOC_SEARCH_STEPS = 10
 
 
 def _standing_charge(day_records: list[Snapshot]) -> float:
@@ -105,6 +108,7 @@ class ScenarioComparisonEngine:
         now: datetime,
         config: SimulationConfig,
         forecast_energy_until_offpeak_kwh: float | None = None,
+        current_snapshot: Snapshot | None = None,
     ) -> ScenarioComparisonState:
         """Build today, yesterday, 7-day and 30-day scenario comparisons."""
         ordered = sorted(records, key=lambda item: item.timestamp)
@@ -149,10 +153,16 @@ class ScenarioComparisonEngine:
                 forecast_energy_until_offpeak_kwh if is_current_day else None
             )
 
+            display_snapshot = (
+                current_snapshot
+                if is_current_day and current_snapshot is not None
+                else day_records[-1]
+            )
             simple, basic_soc = self._simple_day_scenarios(
                 day_records,
                 config,
                 initial_basic_soc_percent=basic_soc,
+                current_snapshot=display_snapshot,
             )
             no_export_state = self._simulation.simulate_today(
                 day_records,
@@ -165,7 +175,7 @@ class ScenarioComparisonEngine:
                     strategy="self_use",
                 ),
                 learned_forecast,
-                current_snapshot=day_records[-1],
+                current_snapshot=display_snapshot,
             )
             full_state = self._simulation.simulate_today(
                 day_records,
@@ -178,7 +188,7 @@ class ScenarioComparisonEngine:
                     strategy="paced_export",
                 ),
                 learned_forecast,
-                current_snapshot=day_records[-1],
+                current_snapshot=display_snapshot,
             )
             no_export_summary = self._summary_from_simulation(
                 SCENARIO_KEMS_NO_EXPORT,
@@ -210,6 +220,7 @@ class ScenarioComparisonEngine:
             grouped,
             day_summaries,
             config,
+            current_snapshot=current_snapshot,
         )
         current_day = grouped.get(now.date(), [])
         timeline: tuple[ScenarioTimelinePoint, ...] = ()
@@ -250,6 +261,7 @@ class ScenarioComparisonEngine:
         config: SimulationConfig,
         *,
         initial_basic_soc_percent: float,
+        current_snapshot: Snapshot | None = None,
     ) -> tuple[dict[str, ScenarioSummary], float]:
         """Replay no-system, solar-only and conventional self-use together."""
         day_records = sorted(day_records, key=lambda item: item.timestamp)
@@ -387,7 +399,7 @@ class ScenarioComparisonEngine:
         # snapshot using each scenario's current replay state. This is separate
         # from the cumulative kWh totals above and is intended for live displays.
         current_plans = self._simple_current_plans(
-            day_records[-1] if day_records else None,
+            current_snapshot or (day_records[-1] if day_records else None),
             config,
             battery_kwh=battery_kwh,
             reserve_kwh=reserve_kwh,
@@ -577,6 +589,8 @@ class ScenarioComparisonEngine:
         grouped: dict[date, list[Snapshot]],
         daily: dict[date, dict[str, ScenarioSummary]],
         config: SimulationConfig,
+        *,
+        current_snapshot: Snapshot | None = None,
     ) -> dict[str, ScenarioPeriodComparison]:
         """Append a non-financial full-grid-outage replay to every period."""
         result: dict[str, ScenarioPeriodComparison] = {}
@@ -602,6 +616,7 @@ class ScenarioComparisonEngine:
                 records,
                 config,
                 initial_soc_percent=initial_soc,
+                current_snapshot=(current_snapshot if key == "today" else None),
             )
             result[key] = replace(
                 period,
@@ -615,6 +630,125 @@ class ScenarioComparisonEngine:
         config: SimulationConfig,
         *,
         initial_soc_percent: float,
+        current_snapshot: Snapshot | None = None,
+    ) -> ScenarioSummary:
+        """Add advance-preparation resilience to the sudden-outage replay."""
+        sudden = self._island_replay(
+            records,
+            config,
+            initial_soc_percent=initial_soc_percent,
+            current_snapshot=current_snapshot,
+        )
+        if not sudden.ready:
+            return replace(
+                sudden,
+                required_starting_soc_status="unavailable",
+                prepared_outage_status="unavailable",
+            )
+
+        maximum = self._island_replay(
+            records,
+            config,
+            initial_soc_percent=100.0,
+        )
+        if not maximum.ready:
+            return replace(
+                sudden,
+                required_starting_soc_status="unavailable",
+                prepared_outage_status="unavailable",
+            )
+
+        floor = sudden.emergency_floor_percent or 0.0
+        required_soc: float | None
+        required_status: str
+        if maximum.energy_limited_unserved_kwh > ISLAND_ENERGY_TOLERANCE_KWH:
+            required_soc = None
+            required_status = "insufficient_energy_even_at_100"
+            recommended_target = 100.0
+        else:
+            low = min(max(floor, 0.0), 100.0)
+            low_result = self._island_replay(
+                records,
+                config,
+                initial_soc_percent=low,
+            )
+            if low_result.energy_limited_unserved_kwh <= ISLAND_ENERGY_TOLERANCE_KWH:
+                required_soc = low
+            else:
+                high = 100.0
+                for _ in range(REQUIRED_SOC_SEARCH_STEPS):
+                    midpoint = (low + high) / 2
+                    midpoint_result = self._island_replay(
+                        records,
+                        config,
+                        initial_soc_percent=midpoint,
+                    )
+                    if (
+                        midpoint_result.energy_limited_unserved_kwh
+                        <= ISLAND_ENERGY_TOLERANCE_KWH
+                    ):
+                        high = midpoint
+                    else:
+                        low = midpoint
+                required_soc = high
+            required_soc = round(required_soc, 1)
+            recommended_target = min(
+                required_soc + PREPARED_SOC_MARGIN_PERCENT,
+                100.0,
+            )
+            required_status = (
+                "ready"
+                if maximum.eps_limited_unserved_kwh <= ISLAND_ENERGY_TOLERANCE_KWH
+                else "eps_limit_only"
+            )
+
+        prepared_start = max(
+            sudden.starting_soc_percent or floor,
+            recommended_target,
+        )
+        prepared = self._island_replay(
+            records,
+            config,
+            initial_soc_percent=prepared_start,
+        )
+        if not prepared.ready:
+            prepared_status = "unavailable"
+        elif prepared.outage_survived:
+            prepared_status = "survived"
+        elif (
+            prepared.energy_limited_unserved_kwh <= ISLAND_ENERGY_TOLERANCE_KWH
+            and prepared.eps_limited_unserved_kwh > ISLAND_ENERGY_TOLERANCE_KWH
+        ):
+            prepared_status = "eps_limited"
+        else:
+            prepared_status = "shortfall"
+
+        return replace(
+            sudden,
+            required_starting_soc_percent=required_soc,
+            required_starting_soc_status=required_status,
+            recommended_prepared_soc_percent=round(recommended_target, 1),
+            prepared_starting_soc_percent=round(prepared_start, 1),
+            prepared_soc_margin_percent=PREPARED_SOC_MARGIN_PERCENT,
+            prepared_outage_survived=prepared.outage_survived,
+            prepared_outage_status=prepared_status,
+            prepared_load_served_kwh=prepared.load_served_kwh,
+            prepared_unserved_load_kwh=prepared.unserved_load_kwh,
+            prepared_load_served_percent=prepared.load_served_percent,
+            prepared_ending_soc_percent=prepared.ending_soc_percent,
+            prepared_minimum_soc_percent=prepared.minimum_soc_percent,
+            prepared_eps_limited_unserved_kwh=(prepared.eps_limited_unserved_kwh),
+            prepared_energy_limited_unserved_kwh=(prepared.energy_limited_unserved_kwh),
+            prepared_first_shortfall_at=prepared.first_shortfall_at,
+        )
+
+    def _island_replay(
+        self,
+        records: list[Snapshot],
+        config: SimulationConfig,
+        *,
+        initial_soc_percent: float,
+        current_snapshot: Snapshot | None = None,
     ) -> ScenarioSummary:
         """Replay a complete grid outage using only proposal/live solar and battery."""
         ordered = sorted(records, key=lambda item: item.timestamp)
@@ -733,8 +867,8 @@ class ScenarioComparisonEngine:
         current_solar_to_home: float | None = None
         current_solar_to_battery: float | None = None
         current_battery_to_home: float | None = None
-        if ordered:
-            latest = ordered[-1]
+        latest = current_snapshot or (ordered[-1] if ordered else None)
+        if latest is not None:
             latest_load = _load_kw(latest)
             if not latest.stale_fields and latest_load is not None:
                 current_house = max(latest_load, 0.0)
@@ -921,7 +1055,7 @@ class ScenarioComparisonEngine:
             description=SCENARIO_DESCRIPTIONS[key],
             ready=state.ready,
             samples=state.samples,
-            data_coverage=round(state.data_coverage * 100, 1),
+            data_coverage=round(state.data_coverage, 1),
             import_cost_pence=_round(state.simulated_import_cost_pence, 2) or 0.0,
             cheap_import_cost_pence=(
                 _round(state.simulated_cheap_import_cost_pence, 2) or 0.0
@@ -1198,7 +1332,7 @@ class ScenarioComparisonEngine:
                     ),
                     prefix,
                 )
-                island = self._island_period_scenario(
+                island = self._island_replay(
                     prefix,
                     config,
                     initial_soc_percent=(

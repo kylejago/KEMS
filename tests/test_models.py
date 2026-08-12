@@ -117,6 +117,9 @@ def test_power_down_result_round_trip_preserves_completed_session() -> None:
         planned_export_kwh=5.5,
         maximum_inverter_output_kw=7.0,
         ev_successfully_blocked=True,
+        active_samples_observed=17,
+        plan_safe_throughout=True,
+        island_override_observed=False,
         completed_successfully=True,
         completion_reason="completed",
     )

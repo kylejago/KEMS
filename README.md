@@ -71,9 +71,11 @@ Alpha6 adds an independent replay engine for **What would today have looked like
 
 The first five scenarios expose total cost including the daily standing charge, import/export, cheap/day import split, solar and battery routing, end SOC, and saving versus the No system baseline. The saving breakdown reconciles to reduced day-rate import, change in cheap-rate import, export income and Power Down income.
 
-Full island mode is deliberately **not** included in the cheapest-scenario calculation because a grid outage is a resilience test, not a zero-cost tariff. It reports load served, unserved energy, outage survival, starting/minimum/ending SOC, EPS-limited shortfall, energy-limited shortfall, first shortfall time and an estimated remaining runtime. The replay starts from the SOC Full KEMS had immediately before the selected outage period when that prior-day state is available.
+Full island mode is deliberately **not** included in the cheapest-scenario calculation because a grid outage is a resilience test, not a zero-cost tariff. It reports load served, unserved energy, outage survival, starting/minimum/ending SOC, EPS-limited shortfall, energy-limited shortfall, first shortfall time and an estimated remaining runtime. The sudden-outage replay starts from the SOC Full KEMS had immediately before the selected outage period when that prior-day state is available.
 
-KEMS also exposes Yesterday, 7-day and 30-day retained-history rollups. The Today comparison keeps the five financial cumulative-cost lines and adds island load-served, unserved-energy, SOC and survival status timeline data for resilience graphs.
+The same island result also includes a **prepared outage** calculation. KEMS first checks whether 100% SOC plus the replayed solar can remove all energy-limited shortfall, then uses a binary search to find the minimum energy-secure starting SOC and adds a 5% safety margin. The prepared replay starts at no less than that target, but never assumes more than the configured EPS output. This means the result can explicitly say **EPS limited** when the battery contains enough energy but a whole-house load spike still exceeds the EPS rating, or **insufficient energy even at 100%** when no starting SOC can cover the full outage period.
+
+KEMS also exposes Yesterday, 7-day and 30-day retained-history rollups. The Today comparison keeps the five financial cumulative-cost lines and adds island load-served, unserved-energy, SOC and survival status timeline data for resilience graphs. Prepared-outage headline sensors expose the required SOC, recommended target, prepared load served and remaining shortfall.
 
 The shipped dashboards are `kems_compare_builtin.yaml` and `kems_compare_advanced.yaml`. The advanced version uses ApexCharts and Mushroom; the built-in version requires no custom frontend cards.
 
@@ -101,6 +103,8 @@ For a joined event before the next cheap recharge, KEMS protects enough stored e
 - the normal 10% battery reserve.
 
 During the event, solar and battery output are combined up to the 7kW inverter limit. The home is supplied first and the remaining output is exported. After the event, KEMS returns to ordinary paced export and recalculates the plan toward the next cheap period.
+
+Power Down completion auditing only judges EV blocking, plan safety and island overrides while the session is actually active. A joined/pre-session observation therefore cannot poison the final EV-block result before the event starts. The retained result also records how many active samples were observed and exposes a specific completion reason when an active safety check fails.
 
 Reward calculations use **8 Octopoints = 1p**. Normal export income remains fixed at 12p/kWh and is reported separately from the estimated Power Down bonus. The optional Power Down import baseline is disabled by default in BottlecapDave's integration; enable it for a bonus estimate. When an export baseline exists, KEMS calculates the net baseline as import minus export.
 
@@ -171,6 +175,12 @@ Gas is observed rather than optimised. The simulated whole-home comparison chang
 - `sensor.kems_island_emergency_floor`
 - `binary_sensor.kems_island_battery_conservation_active`
 - `sensor.kems_estimated_outage_runtime`
+- `sensor.kems_compare_full_island_mode_today`
+- `sensor.kems_compare_full_island_prepared_status_today`
+- `sensor.kems_compare_full_island_required_starting_soc_today`
+- `sensor.kems_compare_full_island_prepared_target_soc_today`
+- `sensor.kems_compare_full_island_prepared_load_served_today`
+- `sensor.kems_compare_full_island_prepared_unserved_energy_today`
 - `sensor.kems_control_operating_reason`
 - `sensor.kems_control_blocked_reason`
 - `sensor.kems_control_next_action`
