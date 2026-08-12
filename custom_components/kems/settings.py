@@ -148,6 +148,7 @@ class KEMSSettings:
                     values[CONF_BATTERY_POWER_POSITIVE_IS_DISCHARGE]
                 ),
                 saving_session_enabled=bool(values[CONF_SAVING_SESSION_ENABLED]),
+                island_reserve_percent=float(values[CONF_ISLAND_RESERVE_PERCENT]),
                 strategy=(
                     "self_use"
                     if str(values[CONF_SIMULATION_STRATEGY]) == "self_use"

@@ -197,6 +197,7 @@ class SimulationConfig:
     battery_power_positive_is_discharge: bool = True
     strategy: str = "paced_export"
     saving_session_enabled: bool = True
+    island_reserve_percent: float = 20.0
 
 
 @dataclass(frozen=True, slots=True)
@@ -306,7 +307,7 @@ class SimulationState:
 
 @dataclass(frozen=True, slots=True)
 class ScenarioSummary:
-    """One what-if energy/cost result for a comparable system design."""
+    """One what-if financial or resilience result for a system design."""
 
     key: str
     label: str
@@ -341,6 +342,23 @@ class ScenarioSummary:
     battery_to_home_kwh: float = 0.0
     battery_export_kwh: float = 0.0
     ending_soc_percent: float | None = None
+    financially_comparable: bool = True
+    grid_available: bool = True
+    outage_survived: bool | None = None
+    outage_status: str | None = None
+    outage_duration_hours: float = 0.0
+    load_served_kwh: float = 0.0
+    unserved_load_kwh: float = 0.0
+    load_served_percent: float | None = None
+    starting_soc_percent: float | None = None
+    minimum_soc_percent: float | None = None
+    conservation_threshold_percent: float | None = None
+    emergency_floor_percent: float | None = None
+    eps_limited_unserved_kwh: float = 0.0
+    energy_limited_unserved_kwh: float = 0.0
+    first_shortfall_at: str | None = None
+    estimated_remaining_runtime_hours: float | None = None
+    battery_energy_above_floor_kwh: float | None = None
 
     # Current/recent power routing for live visualisations such as the
     # 16x16 KEMS panel. These are instantaneous kW values from the latest
@@ -380,7 +398,11 @@ class ScenarioPeriodComparison:
     @property
     def cheapest(self) -> ScenarioSummary | None:
         """Return the cheapest ready scenario in the period."""
-        ready = [item for item in self.scenarios if item.ready]
+        ready = [
+            item
+            for item in self.scenarios
+            if item.ready and item.financially_comparable
+        ]
         return min(ready, key=lambda item: item.total_cost_pence) if ready else None
 
     def to_dict(self) -> dict[str, Any]:
@@ -398,7 +420,7 @@ class ScenarioPeriodComparison:
 
 @dataclass(frozen=True, slots=True)
 class ScenarioTimelinePoint:
-    """One cumulative-cost point shared by all today scenarios."""
+    """One today replay point for financial-cost and island-resilience charts."""
 
     timestamp: datetime
     no_system_cost_pence: float
@@ -406,6 +428,10 @@ class ScenarioTimelinePoint:
     solar_battery_cost_pence: float
     kems_no_export_cost_pence: float
     kems_full_cost_pence: float
+    island_load_served_percent: float | None = None
+    island_unserved_load_kwh: float | None = None
+    island_soc_percent: float | None = None
+    island_status: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         """Return JSON-compatible chart data."""

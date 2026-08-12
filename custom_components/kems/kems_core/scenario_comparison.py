@@ -27,13 +27,15 @@ SCENARIO_SOLAR_ONLY = "solar_only"
 SCENARIO_SOLAR_BATTERY = "solar_battery"
 SCENARIO_KEMS_NO_EXPORT = "kems_no_export"
 SCENARIO_KEMS_FULL = "kems_full"
-SCENARIO_KEYS = (
+SCENARIO_FULL_ISLAND = "full_island"
+FINANCIAL_SCENARIO_KEYS = (
     SCENARIO_NO_SYSTEM,
     SCENARIO_SOLAR_ONLY,
     SCENARIO_SOLAR_BATTERY,
     SCENARIO_KEMS_NO_EXPORT,
     SCENARIO_KEMS_FULL,
 )
+SCENARIO_KEYS = (*FINANCIAL_SCENARIO_KEYS, SCENARIO_FULL_ISLAND)
 
 SCENARIO_LABELS = {
     SCENARIO_NO_SYSTEM: "No system",
@@ -41,6 +43,7 @@ SCENARIO_LABELS = {
     SCENARIO_SOLAR_BATTERY: "Solar + battery",
     SCENARIO_KEMS_NO_EXPORT: "KEMS no-export",
     SCENARIO_KEMS_FULL: "Full KEMS smart control",
+    SCENARIO_FULL_ISLAND: "Full island mode — grid down",
 }
 
 SCENARIO_DESCRIPTIONS = {
@@ -60,6 +63,10 @@ SCENARIO_DESCRIPTIONS = {
     SCENARIO_KEMS_FULL: (
         "Full KEMS tariff-aware control with cheap charging, home reserve, solar "
         "export, paced battery export and Power Down optimisation."
+    ),
+    SCENARIO_FULL_ISLAND: (
+        "Grid unavailable for the whole replay period. Solar and battery alone "
+        "serve the house through the EPS limit, with no import or export possible."
     ),
 }
 
@@ -198,6 +205,12 @@ class ScenarioComparisonEngine:
             }
 
         periods = self._build_periods(day_summaries, now.date())
+        periods = self._add_island_periods(
+            periods,
+            grouped,
+            day_summaries,
+            config,
+        )
         current_day = grouped.get(now.date(), [])
         timeline: tuple[ScenarioTimelinePoint, ...] = ()
         if len(current_day) >= 2:
@@ -558,6 +571,287 @@ class ScenarioComparisonEngine:
             SCENARIO_SOLAR_BATTERY: solar_battery,
         }
 
+    def _add_island_periods(
+        self,
+        periods: dict[str, ScenarioPeriodComparison],
+        grouped: dict[date, list[Snapshot]],
+        daily: dict[date, dict[str, ScenarioSummary]],
+        config: SimulationConfig,
+    ) -> dict[str, ScenarioPeriodComparison]:
+        """Append a non-financial full-grid-outage replay to every period."""
+        result: dict[str, ScenarioPeriodComparison] = {}
+        for key, period in periods.items():
+            records = sorted(
+                (
+                    record
+                    for day, day_records in grouped.items()
+                    if period.start_date <= day <= period.end_date
+                    for record in day_records
+                ),
+                key=lambda item: item.timestamp,
+            )
+            previous_day = period.start_date - timedelta(days=1)
+            previous_full = daily.get(previous_day, {}).get(SCENARIO_KEMS_FULL)
+            initial_soc = (
+                previous_full.ending_soc_percent
+                if previous_full is not None
+                and previous_full.ending_soc_percent is not None
+                else config.battery_initial_percent
+            )
+            island = self._island_period_scenario(
+                records,
+                config,
+                initial_soc_percent=initial_soc,
+            )
+            result[key] = replace(
+                period,
+                scenarios=(*period.scenarios, island),
+            )
+        return result
+
+    def _island_period_scenario(
+        self,
+        records: list[Snapshot],
+        config: SimulationConfig,
+        *,
+        initial_soc_percent: float,
+    ) -> ScenarioSummary:
+        """Replay a complete grid outage using only proposal/live solar and battery."""
+        ordered = sorted(records, key=lambda item: item.timestamp)
+        capacity = max(config.battery_capacity_kwh, 0.1)
+        normal_reserve_percent = min(
+            max(config.battery_reserve_percent, 0.0),
+            100.0,
+        )
+        island_reserve_percent = min(
+            max(config.island_reserve_percent, 0.0),
+            100.0,
+        )
+        emergency_floor_percent = min(
+            normal_reserve_percent,
+            island_reserve_percent,
+        )
+        conservation_threshold_percent = max(
+            island_reserve_percent,
+            emergency_floor_percent,
+        )
+        floor_kwh = capacity * emergency_floor_percent / 100
+        starting_soc_percent = min(
+            max(initial_soc_percent, emergency_floor_percent),
+            100.0,
+        )
+        battery_kwh = min(
+            max(capacity * starting_soc_percent / 100, floor_kwh),
+            capacity,
+        )
+        min_battery_kwh = battery_kwh
+
+        house = 0.0
+        served = 0.0
+        unserved = 0.0
+        solar = 0.0
+        solar_to_home = 0.0
+        solar_to_battery = 0.0
+        curtailed = 0.0
+        battery_charge = 0.0
+        battery_to_home = 0.0
+        eps_limited = 0.0
+        post_solar_demand = 0.0
+        covered = 0
+        intervals = 0
+        outage_hours = 0.0
+        first_shortfall_at: str | None = None
+
+        for current, following in zip(ordered, ordered[1:], strict=False):
+            hours = _interval_hours(current.timestamp, following.timestamp)
+            if hours <= 0:
+                continue
+            intervals += 1
+            if current.stale_fields or following.stale_fields:
+                continue
+            load_kw = _load_kw(current)
+            if load_kw is None or _load_kw(following) is None:
+                continue
+            covered += 1
+            outage_hours += hours
+
+            load_kwh = load_kw * hours
+            solar_kwh = self._simulation._simulated_solar_power(current, config) * hours
+            eps_limit_kwh = max(config.eps_output_limit_kw, 0.0) * hours
+            discharge_limit_kwh = max(config.max_discharge_kw, 0.0) * hours
+            charge_limit_kwh = max(config.max_charge_kw, 0.0) * hours
+
+            direct_solar = min(solar_kwh, load_kwh, eps_limit_kwh)
+            remaining_load = max(load_kwh - direct_solar, 0.0)
+            available_battery_ac = max(battery_kwh - floor_kwh, 0.0) * max(
+                config.discharge_efficiency,
+                0.01,
+            )
+            available_eps = max(eps_limit_kwh - direct_solar, 0.0)
+            discharge = min(
+                remaining_load,
+                discharge_limit_kwh,
+                available_battery_ac,
+                available_eps,
+            )
+            battery_kwh -= discharge / max(config.discharge_efficiency, 0.01)
+
+            interval_served = direct_solar + discharge
+            interval_unserved = max(load_kwh - interval_served, 0.0)
+            if interval_unserved > 1e-6 and first_shortfall_at is None:
+                first_shortfall_at = current.timestamp.isoformat()
+
+            surplus_solar = max(solar_kwh - direct_solar, 0.0)
+            charge_input = min(
+                surplus_solar,
+                charge_limit_kwh,
+                max(capacity - battery_kwh, 0.0) / max(config.charge_efficiency, 0.01),
+            )
+            stored = charge_input * max(config.charge_efficiency, 0.01)
+            battery_kwh += stored
+            interval_curtailed = max(surplus_solar - charge_input, 0.0)
+
+            battery_kwh = min(max(battery_kwh, floor_kwh), capacity)
+            min_battery_kwh = min(min_battery_kwh, battery_kwh)
+            house += load_kwh
+            served += interval_served
+            unserved += interval_unserved
+            solar += solar_kwh
+            solar_to_home += direct_solar
+            solar_to_battery += stored
+            curtailed += interval_curtailed
+            battery_charge += stored
+            battery_to_home += discharge
+            eps_limited += min(
+                interval_unserved,
+                max(load_kwh - eps_limit_kwh, 0.0),
+            )
+            post_solar_demand += max(load_kwh - min(solar_kwh, load_kwh), 0.0)
+
+        current_house: float | None = None
+        current_solar: float | None = None
+        current_solar_to_home: float | None = None
+        current_solar_to_battery: float | None = None
+        current_battery_to_home: float | None = None
+        if ordered:
+            latest = ordered[-1]
+            latest_load = _load_kw(latest)
+            if not latest.stale_fields and latest_load is not None:
+                current_house = max(latest_load, 0.0)
+                current_solar = max(
+                    self._simulation._simulated_solar_power(latest, config),
+                    0.0,
+                )
+                eps_limit = max(config.eps_output_limit_kw, 0.0)
+                current_solar_to_home = min(
+                    current_solar,
+                    current_house,
+                    eps_limit,
+                )
+                remaining_load = max(current_house - current_solar_to_home, 0.0)
+                available_battery_ac = max(battery_kwh - floor_kwh, 0.0) * max(
+                    config.discharge_efficiency,
+                    0.01,
+                )
+                current_battery_to_home = min(
+                    remaining_load,
+                    max(config.max_discharge_kw, 0.0),
+                    available_battery_ac,
+                    max(eps_limit - current_solar_to_home, 0.0),
+                )
+                solar_surplus = max(current_solar - current_solar_to_home, 0.0)
+                current_solar_to_battery = min(
+                    solar_surplus,
+                    max(config.max_charge_kw, 0.0),
+                    max(capacity - battery_kwh, 0.0)
+                    / max(config.charge_efficiency, 0.01),
+                )
+
+        coverage = covered / intervals if intervals else 0.0
+        load_served_percent = 100.0 if house <= 1e-9 else 100.0 * served / house
+        energy_limited = max(unserved - eps_limited, 0.0)
+        outage_survived = covered >= 3 and unserved <= 0.001
+        ending_soc = 100.0 * battery_kwh / capacity
+        minimum_soc = 100.0 * min_battery_kwh / capacity
+        battery_above_floor = max(battery_kwh - floor_kwh, 0.0)
+        average_post_solar_kw = (
+            post_solar_demand / outage_hours if outage_hours > 1e-9 else 0.0
+        )
+        remaining_runtime = None
+        if average_post_solar_kw > 0.05:
+            remaining_runtime = (
+                battery_above_floor
+                * max(config.discharge_efficiency, 0.01)
+                / average_post_solar_kw
+            )
+
+        return ScenarioSummary(
+            key=SCENARIO_FULL_ISLAND,
+            label=SCENARIO_LABELS[SCENARIO_FULL_ISLAND],
+            description=SCENARIO_DESCRIPTIONS[SCENARIO_FULL_ISLAND],
+            ready=covered >= 3,
+            samples=len(ordered),
+            data_coverage=round(coverage * 100, 1),
+            import_cost_pence=0.0,
+            cheap_import_cost_pence=0.0,
+            day_import_cost_pence=0.0,
+            export_income_pence=0.0,
+            power_down_income_pence=0.0,
+            standing_charge_pence=0.0,
+            energy_net_cost_pence=0.0,
+            total_cost_pence=0.0,
+            house_consumption_kwh=round(house, 3),
+            grid_import_kwh=0.0,
+            cheap_grid_import_kwh=0.0,
+            day_grid_import_kwh=0.0,
+            grid_export_kwh=0.0,
+            solar_generation_kwh=round(solar, 3),
+            solar_to_home_kwh=round(solar_to_home, 3),
+            solar_to_battery_kwh=round(solar_to_battery, 3),
+            solar_export_kwh=0.0,
+            solar_curtailed_kwh=round(curtailed, 3),
+            battery_charge_kwh=round(battery_charge, 3),
+            battery_grid_charge_kwh=0.0,
+            battery_solar_charge_kwh=round(solar_to_battery, 3),
+            battery_to_home_kwh=round(battery_to_home, 3),
+            battery_export_kwh=0.0,
+            ending_soc_percent=round(ending_soc, 1),
+            financially_comparable=False,
+            grid_available=False,
+            outage_survived=outage_survived if covered >= 3 else None,
+            outage_status=(
+                "survived"
+                if outage_survived
+                else "shortfall" if covered >= 3 else "unavailable"
+            ),
+            outage_duration_hours=round(outage_hours, 2),
+            load_served_kwh=round(served, 3),
+            unserved_load_kwh=round(unserved, 3),
+            load_served_percent=round(load_served_percent, 1),
+            starting_soc_percent=round(starting_soc_percent, 1),
+            minimum_soc_percent=round(minimum_soc, 1),
+            conservation_threshold_percent=round(conservation_threshold_percent, 1),
+            emergency_floor_percent=round(emergency_floor_percent, 1),
+            eps_limited_unserved_kwh=round(eps_limited, 3),
+            energy_limited_unserved_kwh=round(energy_limited, 3),
+            first_shortfall_at=first_shortfall_at,
+            estimated_remaining_runtime_hours=(
+                round(remaining_runtime, 2) if remaining_runtime is not None else None
+            ),
+            battery_energy_above_floor_kwh=round(battery_above_floor, 3),
+            current_house_load_kw=_round(current_house),
+            current_solar_power_kw=_round(current_solar),
+            current_grid_import_kw=0.0 if current_house is not None else None,
+            current_grid_export_kw=0.0 if current_house is not None else None,
+            current_solar_to_home_kw=_round(current_solar_to_home),
+            current_solar_to_battery_kw=_round(current_solar_to_battery),
+            current_solar_export_kw=0.0 if current_house is not None else None,
+            current_grid_to_battery_kw=0.0 if current_house is not None else None,
+            current_battery_to_home_kw=_round(current_battery_to_home),
+            current_battery_export_kw=0.0 if current_house is not None else None,
+            current_battery_soc_percent=round(ending_soc, 1),
+        )
+
     @staticmethod
     def _add_import(
         acc: dict[str, float | int],
@@ -683,6 +977,13 @@ class ScenarioComparisonEngine:
         cheap_change = (
             baseline.cheap_import_cost_pence - summary.cheap_import_cost_pence
         )
+        if not summary.financially_comparable:
+            return replace(
+                summary,
+                saving_vs_no_system_pence=0.0,
+                day_rate_import_reduction_pence=0.0,
+                cheap_rate_import_change_pence=0.0,
+            )
         saving = baseline.total_cost_pence - summary.total_cost_pence
         return replace(
             summary,
@@ -710,7 +1011,7 @@ class ScenarioComparisonEngine:
                 label = "7 days" if key == "7_days" else "30 days"
             included_dates = sorted(day for day in daily if start <= day <= end)
             scenario_summaries: list[ScenarioSummary] = []
-            for scenario_key in SCENARIO_KEYS:
+            for scenario_key in FINANCIAL_SCENARIO_KEYS:
                 parts = [daily[day][scenario_key] for day in included_dates]
                 if parts:
                     scenario_summaries.append(
@@ -826,7 +1127,25 @@ class ScenarioComparisonEngine:
             prefix = records[: index + 1]
             timestamp = min(prefix[-1].timestamp, now)
             if len(prefix) < 2:
-                costs = {key: standing for key in SCENARIO_KEYS}
+                costs = {key: standing for key in FINANCIAL_SCENARIO_KEYS}
+                island = ScenarioSummary(
+                    key=SCENARIO_FULL_ISLAND,
+                    label=SCENARIO_LABELS[SCENARIO_FULL_ISLAND],
+                    financially_comparable=False,
+                    grid_available=False,
+                    outage_status="unavailable",
+                    load_served_percent=100.0,
+                    starting_soc_percent=(
+                        previous_full_soc
+                        if previous_full_soc is not None
+                        else config.battery_initial_percent
+                    ),
+                    ending_soc_percent=(
+                        previous_full_soc
+                        if previous_full_soc is not None
+                        else config.battery_initial_percent
+                    ),
+                )
             else:
                 simple, _ = self._simple_day_scenarios(
                     prefix,
@@ -879,6 +1198,15 @@ class ScenarioComparisonEngine:
                     ),
                     prefix,
                 )
+                island = self._island_period_scenario(
+                    prefix,
+                    config,
+                    initial_soc_percent=(
+                        previous_full_soc
+                        if previous_full_soc is not None
+                        else config.battery_initial_percent
+                    ),
+                )
                 costs = {
                     SCENARIO_NO_SYSTEM: simple[SCENARIO_NO_SYSTEM].total_cost_pence,
                     SCENARIO_SOLAR_ONLY: simple[SCENARIO_SOLAR_ONLY].total_cost_pence,
@@ -896,6 +1224,10 @@ class ScenarioComparisonEngine:
                     solar_battery_cost_pence=round(costs[SCENARIO_SOLAR_BATTERY], 2),
                     kems_no_export_cost_pence=round(costs[SCENARIO_KEMS_NO_EXPORT], 2),
                     kems_full_cost_pence=round(costs[SCENARIO_KEMS_FULL], 2),
+                    island_load_served_percent=island.load_served_percent,
+                    island_unserved_load_kwh=island.unserved_load_kwh,
+                    island_soc_percent=island.ending_soc_percent,
+                    island_status=island.outage_status,
                 )
             )
         return tuple(result)
