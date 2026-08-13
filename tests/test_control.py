@@ -325,3 +325,37 @@ def test_awaiting_export_tariff_cheap_control_uses_solar_for_house_headroom() ->
     assert state.desired_charge_power_kw == 4.0
     assert state.total_site_import_kw == 5.0
     assert state.site_import_limit_exceeded is False
+
+
+def test_stale_intelligent_slot_does_not_authorise_cheap_charge() -> None:
+    """A stale extra-slot signal must not put the controller in cheap charge."""
+    snapshot = Snapshot(
+        timestamp=NOW,
+        current_import_rate=3.5,
+        off_peak=False,
+        intelligent_slot=True,
+        ev_charging=True,
+        house_load_kw=2.0,
+        grid_import_kw=2.0,
+        tariff_source_age_seconds={"intelligent_slot": 301.0},
+        tariff_stale_fields=("intelligent_slot",),
+    )
+    simulation = SimulationState(
+        ready=True,
+        simulated_battery_soc=50.0,
+        current_simulated_house_load_kw=2.0,
+        current_simulated_solar_power_kw=0.0,
+    )
+
+    state = ControlEngine().plan(
+        snapshot,
+        simulation,
+        NOW,
+        ControlConfig(),
+    )
+
+    assert snapshot.cheap_period_confirmed is False
+    assert state.desired_charge_power_kw == 0.0
+    assert state.operating_reason != "confirmed_cheap_charge"
+    assert state.data_fresh is True
+    assert state.plan_safe is True

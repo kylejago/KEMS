@@ -75,7 +75,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     entities = KEMSEntities.from_entry_data(enriched)
     settings = KEMSSettings.from_options(entry.options)
     collector = Collector(
-        octopus=OctopusProvider(hass, entities),
+        octopus=OctopusProvider(
+            hass,
+            entities,
+            stale_data_seconds=settings.control.stale_data_seconds,
+        ),
         gas=GasProvider(hass, entities, settings.gas_kwh_per_m3),
         ohme=OhmeProvider(hass, entities),
         foxess=FoxESSProvider(

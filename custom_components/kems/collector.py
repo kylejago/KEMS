@@ -37,7 +37,7 @@ class Collector:
     def collect(self) -> Snapshot:
         """Create a complete whole-home monitoring snapshot."""
         now = dt_util.now()
-        octopus = self._octopus.get_state()
+        octopus = self._octopus.get_state(now)
         gas = self._gas.get_state()
         ohme = self._ohme.get_state()
         foxess = self._foxess.get_state(now)
@@ -113,4 +113,7 @@ class Collector:
             source_age_seconds=foxess.source_age_seconds,
             stale_fields=foxess.stale_fields,
             source_data_age_seconds=foxess.source_data_age_seconds,
+            tariff_source_age_seconds=octopus.source_age_seconds,
+            tariff_stale_fields=octopus.stale_fields,
+            tariff_source_data_age_seconds=octopus.source_data_age_seconds,
         )
