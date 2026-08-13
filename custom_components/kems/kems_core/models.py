@@ -68,11 +68,30 @@ class Snapshot:
     stale_fields: tuple[str, ...] = ()
     source_data_age_seconds: float | None = None
 
+    # Tariff freshness is tracked separately from fast power telemetry. A stale
+    # tariff hint is ignored/fallen back independently rather than making fresh
+    # Modbus or meter data look stale.
+    tariff_source_age_seconds: dict[str, float] = field(default_factory=dict)
+    tariff_stale_fields: tuple[str, ...] = ()
+    tariff_source_data_age_seconds: float | None = None
+
+    @property
+    def intelligent_slot_source_fresh(self) -> bool | None:
+        """Return freshness of the configured Intelligent-slot source."""
+        if "intelligent_slot" not in self.tariff_source_age_seconds:
+            return None
+        return "intelligent_slot" not in self.tariff_stale_fields
+
     @property
     def cheap_period_confirmed(self) -> bool:
-        """Return whether a usable cheap period is confirmed."""
+        """Return whether a fresh, usable cheap period is confirmed."""
+        intelligent_fresh = "intelligent_slot" not in self.tariff_stale_fields
+        # off_peak may already be the safe manual-schedule fallback produced by
+        # tariff resolution after a stale live off-peak source was discarded.
         return self.off_peak is True or (
-            self.intelligent_slot is True and self.ev_charging is True
+            self.intelligent_slot is True
+            and intelligent_fresh
+            and self.ev_charging is True
         )
 
     def to_dict(self) -> dict[str, Any]:
@@ -80,6 +99,7 @@ class Snapshot:
         data = asdict(self)
         data["timestamp"] = self.timestamp.isoformat()
         data["stale_fields"] = list(self.stale_fields)
+        data["tariff_stale_fields"] = list(self.tariff_stale_fields)
         for key in (
             "next_offpeak_start",
             "offpeak_end",
@@ -112,6 +132,11 @@ class Snapshot:
         stale_fields = values.get("stale_fields")
         if isinstance(stale_fields, list):
             values["stale_fields"] = tuple(str(item) for item in stale_fields)
+        tariff_stale_fields = values.get("tariff_stale_fields")
+        if isinstance(tariff_stale_fields, list):
+            values["tariff_stale_fields"] = tuple(
+                str(item) for item in tariff_stale_fields
+            )
         known = cls.__dataclass_fields__
         return cls(**{key: value for key, value in values.items() if key in known})
 

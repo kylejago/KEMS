@@ -64,6 +64,13 @@ BINARY_SENSORS: tuple[KEMSBinarySensorEntityDescription, ...] = (
         is_on_fn=lambda data: data.snapshot.intelligent_slot,
     ),
     KEMSBinarySensorEntityDescription(
+        key="intelligent_slot_source_fresh",
+        name="Intelligent slot source fresh",
+        icon="mdi:shield-clock-outline",
+        source_key=CONF_INTELLIGENT_SLOT,
+        is_on_fn=lambda data: data.snapshot.intelligent_slot_source_fresh,
+    ),
+    KEMSBinarySensorEntityDescription(
         key="cheap_period_confirmed",
         name="Cheap period confirmed",
         icon="mdi:cash-check",

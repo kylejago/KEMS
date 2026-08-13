@@ -81,6 +81,17 @@ async def async_get_config_entry_diagnostics(
             "dynamic_field_ages_seconds": dict(
                 sorted(data.snapshot.source_age_seconds.items())
             ),
+            "max_tariff_source_age_seconds": (
+                data.snapshot.tariff_source_data_age_seconds
+            ),
+            "tariff_stale_fields": list(data.snapshot.tariff_stale_fields),
+            "tariff_field_ages_seconds": dict(
+                sorted(data.snapshot.tariff_source_age_seconds.items())
+            ),
+            "intelligent_slot_source_fresh": (
+                data.snapshot.intelligent_slot_source_fresh
+            ),
+            "cheap_period_confirmed": data.snapshot.cheap_period_confirmed,
         },
         "kems_entity_states": dict(sorted(kems_entities.items())),
         "options": dict(entry.options),

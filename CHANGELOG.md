@@ -1,5 +1,7 @@
 ## 0.7.0-alpha6 — parallel scenario comparison
 
+- Added source-specific tariff freshness gating so stale Intelligent-slot signals cannot authorise cheap charging; tariff inputs now fail back independently without making fresh power telemetry stale.
+
 - Added a dedicated what-if replay engine that evaluates six independent system designs from the same retained observations: No system, Solar only, Solar + battery, KEMS no-export, Full KEMS smart control, and Full island mode — grid down.
 - Comparison replay is independent of the currently selected export-tariff/live-readiness mode, so no-export can remain active while paid-export Full KEMS is still modelled in parallel.
 - Added exact today cost, import/export, solar routing, battery routing, end-SOC, standing-charge and saving-vs-baseline summaries for every scenario.
