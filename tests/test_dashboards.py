@@ -125,6 +125,10 @@ def test_compare_dashboards_ship_six_parallel_scenarios() -> None:
         assert "sensor.kems_compare_full_island_prepared_target_soc_today" in text
         assert "sensor.kems_compare_full_island_prepared_load_served_today" in text
         assert "sensor.kems_compare_full_island_prepared_unserved_energy_today" in text
+        assert "sensor.kems_compare_full_island_eps_demand_today" in text
+        assert "sensor.kems_compare_full_island_ev_energy_shed_today" in text
+        assert "ev_energy_intentionally_shed_kwh" in text
+        assert "island_demand_kwh" in text
         assert "sensor.kems_scenario_comparison_7_days" in text
         assert "sensor.kems_scenario_comparison_30_days" in text
 

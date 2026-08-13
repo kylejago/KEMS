@@ -65,8 +65,9 @@ SCENARIO_DESCRIPTIONS = {
         "export, paced battery export and Power Down optimisation."
     ),
     SCENARIO_FULL_ISLAND: (
-        "Grid unavailable for the whole replay period. Solar and battery alone "
-        "serve the house through the EPS limit, with no import or export possible."
+        "Grid unavailable for the whole replay period. EV charging is deliberately "
+        "shed, then solar and battery serve the remaining house demand through the "
+        "EPS limit with no import or export possible."
     ),
 }
 
@@ -94,6 +95,17 @@ def _standing_charge(day_records: list[Snapshot]) -> float:
 
 def _round(value: float | None, digits: int = 3) -> float | None:
     return None if value is None else round(value, digits)
+
+
+def _island_load_components(snapshot: Snapshot) -> tuple[float | None, float]:
+    """Return EPS-backed demand and EV power intentionally shed in island mode."""
+    recorded_load = _load_kw(snapshot)
+    if recorded_load is None:
+        return None, 0.0
+    recorded_load = max(recorded_load, 0.0)
+    ev_power = max(snapshot.ev_power_kw or 0.0, 0.0)
+    ev_shed = min(ev_power, recorded_load)
+    return max(recorded_load - ev_shed, 0.0), ev_shed
 
 
 class ScenarioComparisonEngine:
@@ -781,6 +793,8 @@ class ScenarioComparisonEngine:
         min_battery_kwh = battery_kwh
 
         house = 0.0
+        island_demand = 0.0
+        ev_energy_shed = 0.0
         served = 0.0
         unserved = 0.0
         solar = 0.0
@@ -803,13 +817,17 @@ class ScenarioComparisonEngine:
             intervals += 1
             if current.stale_fields or following.stale_fields:
                 continue
-            load_kw = _load_kw(current)
-            if load_kw is None or _load_kw(following) is None:
+            recorded_load_kw = _load_kw(current)
+            load_kw, ev_shed_kw = _island_load_components(current)
+            following_load_kw, _ = _island_load_components(following)
+            if recorded_load_kw is None or load_kw is None or following_load_kw is None:
                 continue
             covered += 1
             outage_hours += hours
 
+            recorded_load_kwh = max(recorded_load_kw, 0.0) * hours
             load_kwh = load_kw * hours
+            ev_shed_kwh = ev_shed_kw * hours
             solar_kwh = self._simulation._simulated_solar_power(current, config) * hours
             eps_limit_kwh = max(config.eps_output_limit_kw, 0.0) * hours
             discharge_limit_kwh = max(config.max_discharge_kw, 0.0) * hours
@@ -847,7 +865,9 @@ class ScenarioComparisonEngine:
 
             battery_kwh = min(max(battery_kwh, floor_kwh), capacity)
             min_battery_kwh = min(min_battery_kwh, battery_kwh)
-            house += load_kwh
+            house += recorded_load_kwh
+            island_demand += load_kwh
+            ev_energy_shed += ev_shed_kwh
             served += interval_served
             unserved += interval_unserved
             solar += solar_kwh
@@ -863,15 +883,17 @@ class ScenarioComparisonEngine:
             post_solar_demand += max(load_kwh - min(solar_kwh, load_kwh), 0.0)
 
         current_house: float | None = None
+        current_ev_shed: float | None = None
         current_solar: float | None = None
         current_solar_to_home: float | None = None
         current_solar_to_battery: float | None = None
         current_battery_to_home: float | None = None
         latest = current_snapshot or (ordered[-1] if ordered else None)
         if latest is not None:
-            latest_load = _load_kw(latest)
+            latest_load, latest_ev_shed = _island_load_components(latest)
             if not latest.stale_fields and latest_load is not None:
-                current_house = max(latest_load, 0.0)
+                current_house = latest_load
+                current_ev_shed = latest_ev_shed
                 current_solar = max(
                     self._simulation._simulated_solar_power(latest, config),
                     0.0,
@@ -902,7 +924,9 @@ class ScenarioComparisonEngine:
                 )
 
         coverage = covered / intervals if intervals else 0.0
-        load_served_percent = 100.0 if house <= 1e-9 else 100.0 * served / house
+        load_served_percent = (
+            100.0 if island_demand <= 1e-9 else 100.0 * served / island_demand
+        )
         energy_limited = max(unserved - eps_limited, 0.0)
         outage_survived = covered >= 3 and unserved <= 0.001
         ending_soc = 100.0 * battery_kwh / capacity
@@ -973,7 +997,11 @@ class ScenarioComparisonEngine:
                 round(remaining_runtime, 2) if remaining_runtime is not None else None
             ),
             battery_energy_above_floor_kwh=round(battery_above_floor, 3),
+            island_demand_kwh=round(island_demand, 3),
+            ev_energy_intentionally_shed_kwh=round(ev_energy_shed, 3),
+            ev_charging_allowed_in_island=False,
             current_house_load_kw=_round(current_house),
+            current_ev_shed_kw=_round(current_ev_shed),
             current_solar_power_kw=_round(current_solar),
             current_grid_import_kw=0.0 if current_house is not None else None,
             current_grid_export_kw=0.0 if current_house is not None else None,

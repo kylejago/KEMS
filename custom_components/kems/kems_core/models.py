@@ -360,6 +360,13 @@ class ScenarioSummary:
     estimated_remaining_runtime_hours: float | None = None
     battery_energy_above_floor_kwh: float | None = None
 
+    # Island-only load shedding. Recorded whole-home demand remains in
+    # house_consumption_kwh for apples-to-apples reporting, while EV demand is
+    # deliberately removed from the EPS load and reported separately.
+    island_demand_kwh: float = 0.0
+    ev_energy_intentionally_shed_kwh: float = 0.0
+    ev_charging_allowed_in_island: bool | None = None
+
     # Prepared-outage resilience. This is the same solar/battery/EPS system,
     # but KEMS is assumed to have advance notice and may pre-charge before the
     # replay starts. It remains non-financial and separate from cheapest ranking.
@@ -383,6 +390,7 @@ class ScenarioSummary:
     # 16x16 KEMS panel. These are instantaneous kW values from the latest
     # replay snapshot, not period totals.
     current_house_load_kw: float | None = None
+    current_ev_shed_kw: float | None = None
     current_solar_power_kw: float | None = None
     current_grid_import_kw: float | None = None
     current_grid_export_kw: float | None = None
