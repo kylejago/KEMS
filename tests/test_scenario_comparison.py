@@ -255,7 +255,7 @@ def test_current_power_attributes_are_preserved_in_period_rollup() -> None:
 
 
 def test_full_kems_current_flow_survives_early_day_not_ready_state() -> None:
-    """Full-KEMS routing should stay available during early-day samples."""
+    """Keep Full-KEMS current routing available during the first daily samples."""
     start = datetime(2026, 8, 12, 0, 0, tzinfo=UTC)
     records = _records(start, count=2)
     result = ScenarioComparisonEngine().compare(
@@ -564,3 +564,55 @@ def test_current_flow_uses_live_snapshot_between_history_samples() -> None:
     assert island.current_house_load_kw == 4.0
     assert island.current_grid_import_kw == 0.0
     assert island.current_grid_export_kw == 0.0
+
+
+def test_island_mode_sheds_ev_before_eps_and_shortfall_accounting() -> None:
+    """EV charging is intentional load shedding, not an island-mode failure."""
+    start = datetime(2026, 8, 13, 0, 0, tzinfo=UTC)
+    records = [
+        Snapshot(
+            timestamp=start + timedelta(minutes=15 * index),
+            current_import_rate=3.4933,
+            electricity_standing_charge=53.70435,
+            off_peak=True,
+            house_load_kw=8.0,
+            grid_import_kw=8.0,
+            grid_export_kw=0.0,
+            solar_power_kw=0.0,
+            ev_connected=True,
+            ev_charging=True,
+            ev_power_kw=7.0,
+        )
+        for index in range(9)
+    ]
+    result = ScenarioComparisonEngine().compare(
+        records,
+        records[-1].timestamp,
+        SimulationConfig(
+            battery_capacity_kwh=20.0,
+            battery_initial_percent=100.0,
+            battery_reserve_percent=10.0,
+            island_reserve_percent=20.0,
+            max_discharge_kw=7.0,
+            eps_output_limit_kw=7.0,
+            proposal_solar_enabled=False,
+        ),
+        current_snapshot=records[-1],
+    )
+
+    island = result.scenario("full_island")
+    assert island is not None and island.ready
+    assert island.house_consumption_kwh == 16.0
+    assert island.ev_energy_intentionally_shed_kwh == 14.0
+    assert island.island_demand_kwh == 2.0
+    assert island.ev_charging_allowed_in_island is False
+    assert island.load_served_kwh == 2.0
+    assert island.unserved_load_kwh == 0.0
+    assert island.eps_limited_unserved_kwh == 0.0
+    assert island.energy_limited_unserved_kwh == 0.0
+    assert island.load_served_percent == 100.0
+    assert island.outage_survived is True
+    assert island.required_starting_soc_status == "ready"
+    assert island.prepared_outage_status == "survived"
+    assert island.current_house_load_kw == 1.0
+    assert island.current_ev_shed_kw == 7.0

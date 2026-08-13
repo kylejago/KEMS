@@ -67,11 +67,11 @@ Alpha6 adds an independent replay engine for **What would today have looked like
 - **Solar + battery** — conventional self-use: solar → home → battery, battery → home, no tariff-aware grid charging.
 - **KEMS no-export** — the alpha5 awaiting-export strategy with solar-aware cheap charging and deliberate export disabled.
 - **Full KEMS smart control** — paid export, cheap charging, home reserve, paced battery export and Power Down optimisation.
-- **Full island mode — grid down** — the grid is unavailable for the whole replay period; solar and battery alone must serve the house through the EPS limit, with no import or export possible.
+- **Full island mode — grid down** — the grid is unavailable for the whole replay period; EV charging is deliberately blocked, then solar and battery must serve the remaining house demand through the EPS limit, with no import or export possible.
 
 The first five scenarios expose total cost including the daily standing charge, import/export, cheap/day import split, solar and battery routing, end SOC, and saving versus the No system baseline. The saving breakdown reconciles to reduced day-rate import, change in cheap-rate import, export income and Power Down income.
 
-Full island mode is deliberately **not** included in the cheapest-scenario calculation because a grid outage is a resilience test, not a zero-cost tariff. It reports load served, unserved energy, outage survival, starting/minimum/ending SOC, EPS-limited shortfall, energy-limited shortfall, first shortfall time and an estimated remaining runtime. The sudden-outage replay starts from the SOC Full KEMS had immediately before the selected outage period when that prior-day state is available.
+Full island mode is deliberately **not** included in the cheapest-scenario calculation because a grid outage is a resilience test, not a zero-cost tariff. Recorded whole-home demand remains visible, but EV charging is forced off before the EPS replay; the removed EV energy is reported separately as intentionally shed and does not count as unserved load. KEMS then reports island/EPS demand, load served, unserved energy, outage survival, starting/minimum/ending SOC, EPS-limited shortfall, energy-limited shortfall, first shortfall time and an estimated remaining runtime. The sudden-outage replay starts from the SOC Full KEMS had immediately before the selected outage period when that prior-day state is available.
 
 The same island result also includes a **prepared outage** calculation. KEMS first checks whether 100% SOC plus the replayed solar can remove all energy-limited shortfall, then uses a binary search to find the minimum energy-secure starting SOC and adds a 5% safety margin. The prepared replay starts at no less than that target, but never assumes more than the configured EPS output. This means the result can explicitly say **EPS limited** when the battery contains enough energy but a whole-house load spike still exceeds the EPS rating, or **insufficient energy even at 100%** when no starting SOC can cover the full outage period.
 
@@ -176,6 +176,8 @@ Gas is observed rather than optimised. The simulated whole-home comparison chang
 - `binary_sensor.kems_island_battery_conservation_active`
 - `sensor.kems_estimated_outage_runtime`
 - `sensor.kems_compare_full_island_mode_today`
+- `sensor.kems_compare_full_island_eps_demand_today`
+- `sensor.kems_compare_full_island_ev_energy_shed_today`
 - `sensor.kems_compare_full_island_prepared_status_today`
 - `sensor.kems_compare_full_island_required_starting_soc_today`
 - `sensor.kems_compare_full_island_prepared_target_soc_today`

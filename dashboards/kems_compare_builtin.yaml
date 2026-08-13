@@ -8,7 +8,7 @@ views:
       - type: markdown
         content: |
           # What would today have looked like?
-          KEMS replays the **same retained house demand and tariff data** through six independent system designs. The first five are financial comparisons; Full Island Mode is a resilience replay and is excluded from cheapest-scenario ranking. Island Mode now shows both a **sudden outage** using the battery SOC KEMS actually carried into the period and a **prepared outage** where advance notice allows KEMS to pre-charge to the minimum energy-secure target plus a 5% safety margin. The comparison does not change the active KEMS operating strategy.
+          KEMS replays the **same retained house demand and tariff data** through six independent system designs. The first five are financial comparisons; Full Island Mode is a resilience replay and is excluded from cheapest-scenario ranking. Island Mode deliberately blocks EV charging and removes that energy from EPS demand, then shows both a **sudden outage** using the battery SOC KEMS actually carried into the period and a **prepared outage** where advance notice allows KEMS to pre-charge to the minimum energy-secure target plus a 5% safety margin. The comparison does not change the active KEMS operating strategy.
 
       - type: grid
         columns: 3
@@ -74,11 +74,15 @@ views:
         title: Full Island Mode — grid completely down
         content: |
           {% set e = 'sensor.kems_compare_full_island_mode_today' %}
-          This scenario assumes **grid import and export are impossible for the entire replay**. It is a resilience test, not a financial scenario.
+          This scenario assumes **grid import and export are impossible for the entire replay**. EV charging is deliberately blocked and reported as intentionally shed energy rather than an outage failure. It is a resilience test, not a financial scenario.
 
           | Resilience metric | Result |
           |---|---:|
           | Outage result | **{{ states(e) }}** |
+          | Recorded whole-home demand | {{ state_attr(e, 'house_consumption_kwh')|float(0)|round(3) }} kWh |
+          | EV energy intentionally shed | {{ state_attr(e, 'ev_energy_intentionally_shed_kwh')|float(0)|round(3) }} kWh |
+          | Island / EPS demand | {{ state_attr(e, 'island_demand_kwh')|float(0)|round(3) }} kWh |
+          | EV charging in island mode | **BLOCKED** |
           | Load served | {{ state_attr(e, 'load_served_percent')|float(0)|round(1) }}% |
           | Energy served | {{ state_attr(e, 'load_served_kwh')|float(0)|round(2) }} kWh |
           | Unserved energy | {{ state_attr(e, 'unserved_load_kwh')|float(0)|round(3) }} kWh |
@@ -94,7 +98,7 @@ views:
         title: Prepared outage — KEMS has advance warning
         content: |
           {% set e = 'sensor.kems_compare_full_island_mode_today' %}
-          This uses the **same solar, battery and 7 kW EPS system**, but KEMS is allowed to prepare the battery before the outage starts. It does not assume load shedding or a larger inverter.
+          This uses the **same solar, battery and 7 kW EPS system**, but KEMS is allowed to prepare the battery before the outage starts. EV charging remains deliberately blocked in both sudden and prepared replays; no other load is shed and no larger inverter is assumed.
 
           | Prepared resilience metric | Result |
           |---|---:|
@@ -116,6 +120,10 @@ views:
         title: Prepared outage headline
         show_header_toggle: false
         entities:
+          - entity: sensor.kems_compare_full_island_eps_demand_today
+            name: Island / EPS demand
+          - entity: sensor.kems_compare_full_island_ev_energy_shed_today
+            name: EV energy intentionally shed
           - entity: sensor.kems_compare_full_island_prepared_status_today
             name: Prepared outage result
           - entity: sensor.kems_compare_full_island_required_starting_soc_today

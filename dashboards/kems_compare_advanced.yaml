@@ -8,7 +8,7 @@ views:
       - type: markdown
         content: |
           # What would today have looked like?
-          Six parallel replays use the same retained demand/tariff observations. The first five are financial comparisons; **Full Island Mode** is resilience-only and is excluded from cheapest-scenario ranking. Island Mode includes a sudden-outage replay plus a prepared-outage calculation that finds the minimum energy-secure starting SOC and adds a 5% safety margin. **KEMS no-export** always models the awaiting-export strategy and **Full KEMS** always models paid export/paced control, regardless of the mode currently selected for the live-readiness simulation.
+          Six parallel replays use the same retained demand/tariff observations. The first five are financial comparisons; **Full Island Mode** is resilience-only and is excluded from cheapest-scenario ranking. Island Mode deliberately blocks EV charging and excludes that energy from EPS demand, then runs a sudden-outage replay plus a prepared-outage calculation that finds the minimum energy-secure starting SOC and adds a 5% safety margin. **KEMS no-export** always models the awaiting-export strategy and **Full KEMS** always models paid export/paced control, regardless of the mode currently selected for the live-readiness simulation.
 
       - type: grid
         columns: 3
@@ -38,6 +38,19 @@ views:
             entity: sensor.kems_compare_full_island_mode_today
             name: Full Island Mode
             icon: mdi:transmission-tower-off
+
+      - type: grid
+        columns: 2
+        square: false
+        cards:
+          - type: custom:mushroom-entity-card
+            entity: sensor.kems_compare_full_island_eps_demand_today
+            name: Island / EPS demand
+            icon: mdi:home-lightning-bolt
+          - type: custom:mushroom-entity-card
+            entity: sensor.kems_compare_full_island_ev_energy_shed_today
+            name: EV energy intentionally shed
+            icon: mdi:ev-station-off
 
       - type: grid
         columns: 5
@@ -219,7 +232,9 @@ views:
             title: Full Island Mode — sudden vs prepared
             content: |
               {% set e = 'sensor.kems_compare_full_island_mode_today' %}
-              **Grid:** unavailable in both replays<br><br>
+              **Grid:** unavailable in both replays<br>
+              **EV charging:** BLOCKED<br>
+              Recorded demand: {{ state_attr(e, 'house_consumption_kwh')|float(0)|round(3) }} kWh · EV intentionally shed {{ state_attr(e, 'ev_energy_intentionally_shed_kwh')|float(0)|round(3) }} kWh · island/EPS demand {{ state_attr(e, 'island_demand_kwh')|float(0)|round(3) }} kWh<br><br>
               **Sudden outage**<br>
               Result: **{{ states(e) }}** · load served {{ state_attr(e, 'load_served_percent')|float(0)|round(1) }}%<br>
               Start / min / end SOC: {{ state_attr(e, 'starting_soc_percent')|float(0)|round(1) }}% / {{ state_attr(e, 'minimum_soc_percent')|float(0)|round(1) }}% / {{ state_attr(e, 'ending_soc_percent')|float(0)|round(1) }}%<br>
