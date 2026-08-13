@@ -11,6 +11,11 @@ from homeassistant.util import dt as dt_util
 from .base import HomeAssistantStateReader
 from .entity_map import KEMSEntities
 
+DEFAULT_INTELLIGENT_STALE_DATA_SECONDS = 360
+INTELLIGENT_SOURCE_FIELDS = frozenset(
+    {"intelligent_slot", "next_offpeak_start", "offpeak_end"}
+)
+
 
 @dataclass(frozen=True, slots=True)
 class OctopusState:
@@ -37,11 +42,17 @@ class OctopusProvider(HomeAssistantStateReader):
         hass: HomeAssistant,
         entities: KEMSEntities,
         stale_data_seconds: int = 180,
+        intelligent_stale_data_seconds: int = DEFAULT_INTELLIGENT_STALE_DATA_SECONDS,
     ) -> None:
         """Initialise the provider."""
         super().__init__(hass)
         self._entities = entities
         self._stale_data_seconds = max(int(stale_data_seconds), 30)
+        self._intelligent_stale_data_seconds = max(
+            int(intelligent_stale_data_seconds),
+            self._stale_data_seconds,
+            30,
+        )
 
     def get_state(self, now: datetime | None = None) -> OctopusState:
         """Return tariff data while rejecting individually stale sources."""
@@ -57,7 +68,12 @@ class OctopusProvider(HomeAssistantStateReader):
 
         def source_is_usable(logical_name: str, entity_id: str | None) -> bool:
             age = age_for(logical_name, entity_id)
-            if age is not None and age > self._stale_data_seconds:
+            timeout = (
+                self._intelligent_stale_data_seconds
+                if logical_name in INTELLIGENT_SOURCE_FIELDS
+                else self._stale_data_seconds
+            )
+            if age is not None and age > timeout:
                 stale.add(logical_name)
                 return False
             return True

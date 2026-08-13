@@ -11,6 +11,7 @@ from homeassistant.helpers import entity_registry as er
 from homeassistant.util import dt as dt_util
 
 from .coordinator import KEMSCoordinator
+from .providers.octopus import DEFAULT_INTELLIGENT_STALE_DATA_SECONDS
 
 
 def _state_payload(hass: HomeAssistant, entity_id: str) -> dict[str, Any]:
@@ -76,6 +77,10 @@ async def async_get_config_entry_diagnostics(
         "source_entity_states": source_states,
         "source_freshness": {
             "stale_timeout_seconds": coordinator.settings.control.stale_data_seconds,
+            "intelligent_source_stale_timeout_seconds": max(
+                coordinator.settings.control.stale_data_seconds,
+                DEFAULT_INTELLIGENT_STALE_DATA_SECONDS,
+            ),
             "max_dynamic_source_age_seconds": (data.snapshot.source_data_age_seconds),
             "stale_fields": list(data.snapshot.stale_fields),
             "dynamic_field_ages_seconds": dict(

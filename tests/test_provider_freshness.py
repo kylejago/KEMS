@@ -231,10 +231,12 @@ def _octopus_entities(**overrides):
     return SimpleNamespace(**values)
 
 
-def test_octopus_provider_rejects_stale_intelligent_slot(monkeypatch) -> None:
-    """A stale positive Intelligent-slot state must never remain authoritative."""
+def test_octopus_provider_rejects_intelligent_slot_after_360_seconds(
+    monkeypatch,
+) -> None:
+    """An Intelligent-slot report older than 360 seconds must fail closed."""
     octopus, State = _load_octopus_provider(monkeypatch)
-    stale_slot = State("on", last_reported=NOW - timedelta(minutes=5))
+    stale_slot = State("on", last_reported=NOW - timedelta(seconds=361))
     states = {"binary_sensor.slot": stale_slot}
     hass = SimpleNamespace(states=SimpleNamespace(get=states.get))
 
@@ -245,14 +247,16 @@ def test_octopus_provider_rejects_stale_intelligent_slot(monkeypatch) -> None:
     ).get_state(NOW)
 
     assert state.intelligent_slot is False
-    assert state.source_age_seconds["intelligent_slot"] == 300.0
+    assert state.source_age_seconds["intelligent_slot"] == 361.0
     assert state.stale_fields == ("intelligent_slot",)
 
 
-def test_octopus_provider_accepts_recent_intelligent_slot(monkeypatch) -> None:
-    """A recently reported Intelligent slot remains usable for confirmation."""
+def test_octopus_provider_accepts_intelligent_slot_at_359_seconds(
+    monkeypatch,
+) -> None:
+    """A 359-second-old Intelligent slot remains within its source window."""
     octopus, State = _load_octopus_provider(monkeypatch)
-    recent_slot = State("on", last_reported=NOW - timedelta(seconds=45))
+    recent_slot = State("on", last_reported=NOW - timedelta(seconds=359))
     states = {"binary_sensor.slot": recent_slot}
     hass = SimpleNamespace(states=SimpleNamespace(get=states.get))
 
@@ -263,5 +267,37 @@ def test_octopus_provider_accepts_recent_intelligent_slot(monkeypatch) -> None:
     ).get_state(NOW)
 
     assert state.intelligent_slot is True
-    assert state.source_age_seconds["intelligent_slot"] == 45.0
+    assert state.source_age_seconds["intelligent_slot"] == 359.0
     assert state.stale_fields == ()
+
+
+def test_octopus_provider_keeps_fast_tariff_sources_at_180_seconds(
+    monkeypatch,
+) -> None:
+    """Only Intelligent integration fields receive the longer freshness window."""
+    octopus, State = _load_octopus_provider(monkeypatch)
+    reported = NOW - timedelta(seconds=181)
+    states = {
+        "binary_sensor.slot": State("on", last_reported=reported),
+        "binary_sensor.off_peak": State("off", last_reported=reported),
+        "sensor.next_start": State(
+            "2026-08-13T22:30:00+00:00",
+            last_reported=reported,
+        ),
+    }
+    hass = SimpleNamespace(states=SimpleNamespace(get=states.get))
+
+    state = octopus.OctopusProvider(
+        hass,
+        _octopus_entities(
+            intelligent_slot="binary_sensor.slot",
+            off_peak="binary_sensor.off_peak",
+            next_offpeak_start="sensor.next_start",
+        ),
+        stale_data_seconds=180,
+    ).get_state(NOW)
+
+    assert state.intelligent_slot is True
+    assert state.next_offpeak_start is not None
+    assert state.off_peak is None
+    assert state.stale_fields == ("off_peak",)
