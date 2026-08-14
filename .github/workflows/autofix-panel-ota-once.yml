@@ -1,0 +1,34 @@
+name: Autofix panel OTA once
+
+on:
+  push:
+    branches:
+      - feature/managed-panel-auto-ota
+
+permissions:
+  contents: write
+
+jobs:
+  autofix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Install tools
+        run: python -m pip install black==26.5.1 ruff==0.16.0
+      - name: Apply formatting and lint fixes
+        run: |
+          python -m ruff check --fix custom_components/kems/dashboard.py tests/test_managed_panel.py
+          python -m black custom_components/kems/dashboard.py tests/test_managed_panel.py
+      - name: Commit fixes when needed
+        run: |
+          if git diff --quiet; then
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add custom_components/kems/dashboard.py tests/test_managed_panel.py
+          git commit -m "Format automatic panel OTA support"
+          git push
