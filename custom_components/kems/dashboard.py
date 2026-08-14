@@ -18,6 +18,7 @@ MANAGED_DASHBOARD_FILENAME = "kems_master_dashboard.yaml"
 PACKAGED_DASHBOARD_PATH = Path(__file__).with_name(MANAGED_DASHBOARD_FILENAME)
 
 MANAGED_PANEL_FILENAME = "kems16x16.yaml"
+MANAGED_PANEL_HEADER = b"# KEMS-MANAGED-ESPHOME-PANEL"
 PACKAGED_PANEL_PATH = Path(__file__).with_name(MANAGED_PANEL_FILENAME)
 
 SUPERVISOR_BASE_URL = "http://supervisor"
@@ -44,6 +45,16 @@ def _sync_dashboard_file(source: Path, target: Path) -> bool:
     temporary.write_bytes(source_bytes)
     os.replace(temporary, target)
     return True
+
+
+def _panel_is_kems_managed(target: Path) -> bool:
+    """Return whether the existing panel has already adopted KEMS management."""
+    if not target.exists():
+        return False
+    try:
+        return target.read_bytes().startswith(MANAGED_PANEL_HEADER)
+    except OSError:
+        return False
 
 
 def _sync_existing_panel_file(source: Path, target: Path) -> bool:
@@ -118,13 +129,9 @@ async def _async_queue_esphome_install(hass: HomeAssistant, ingress_port: int) -
     message_id = "kems-managed-panel-auto-ota"
 
     try:
-        async with session.ws_connect(
-            websocket_url,
-            heartbeat=30,
-            receive_timeout=15,
-        ) as websocket:
-            hello = await websocket.receive_json()
-            if hello.get("requires_auth") is True:
+        async with session.ws_connect(websocket_url, heartbeat=30) as websocket:
+            hello = await asyncio.wait_for(websocket.receive_json(), timeout=15)
+            if isinstance(hello, dict) and hello.get("requires_auth") is True:
                 raise PanelAutoOTAError(
                     "ESPHome trusted ingress unexpectedly requested authentication"
                 )
@@ -141,9 +148,11 @@ async def _async_queue_esphome_install(hass: HomeAssistant, ingress_port: int) -
             )
 
             while True:
-                message = await websocket.receive(timeout=15)
+                message = await asyncio.wait_for(websocket.receive(), timeout=15)
                 if message.type == WSMsgType.TEXT:
                     payload = message.json()
+                    if not isinstance(payload, dict):
+                        continue
                     if payload.get("message_id") != message_id:
                         continue
                     if "error" in payload:
@@ -206,11 +215,7 @@ async def async_auto_install_managed_panel(hass: HomeAssistant) -> None:
     )
 
 
-async def async_sync_managed_dashboard(
-    hass: HomeAssistant,
-    *,
-    panel_auto_ota_enabled: bool = False,
-) -> bool:
+async def async_sync_managed_dashboard(hass: HomeAssistant) -> bool:
     """Synchronise the shipped dashboard and any opted-in KEMS panel config."""
     dashboard_target = Path(hass.config.path(MANAGED_DASHBOARD_FILENAME))
     dashboard_changed = await hass.async_add_executor_job(
@@ -222,6 +227,10 @@ async def async_sync_managed_dashboard(
         LOGGER.info("Updated managed KEMS dashboard at %s", dashboard_target)
 
     panel_target = Path(hass.config.path("esphome", MANAGED_PANEL_FILENAME))
+    panel_was_managed = await hass.async_add_executor_job(
+        _panel_is_kems_managed,
+        panel_target,
+    )
     try:
         panel_changed = await hass.async_add_executor_job(
             _sync_existing_panel_file,
@@ -234,22 +243,22 @@ async def async_sync_managed_dashboard(
         )
         panel_changed = False
 
-    if panel_changed:
-        if panel_auto_ota_enabled:
-            LOGGER.warning(
-                "Updated managed KEMS 16x16 ESPHome config at %s; queuing "
-                "automatic compile and wireless install",
-                panel_target,
-            )
-            hass.async_create_task(
-                async_auto_install_managed_panel(hass),
-                "KEMS managed 16x16 panel automatic OTA",
-            )
-        else:
-            LOGGER.warning(
-                "Updated managed KEMS 16x16 ESPHome config at %s; automatic OTA "
-                "is disabled, so install kems16x16 wirelessly from ESPHome",
-                panel_target,
-            )
+    if panel_changed and panel_was_managed:
+        LOGGER.warning(
+            "Updated managed KEMS 16x16 ESPHome config at %s; queuing automatic "
+            "compile and wireless install",
+            panel_target,
+        )
+        hass.async_create_task(
+            async_auto_install_managed_panel(hass),
+            "KEMS managed 16x16 panel automatic OTA",
+        )
+    elif panel_changed:
+        LOGGER.warning(
+            "Updated KEMS 16x16 ESPHome config at %s. This is its first managed "
+            "adoption, so install it wirelessly once in ESPHome; subsequent managed "
+            "changes will install automatically.",
+            panel_target,
+        )
 
     return dashboard_changed or panel_changed
