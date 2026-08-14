@@ -19,6 +19,7 @@ from .history import HistoryRecorder
 from .kems_core import (
     AdviceEngine,
     ControlEngine,
+    ForecastObservation,
     ForecastPlanningEngine,
     ForecastValidationState,
     GasEngine,
@@ -89,6 +90,11 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
     def forecast_validation_state(self) -> ForecastValidationState:
         """Return the latest retained forecast-vs-actual validation state."""
         return self._forecast_validation.state
+
+    @property
+    def forecast_validation_observations(self) -> list[ForecastObservation]:
+        """Return retained pre-target-day forecast evidence for diagnostics."""
+        return self._forecast_validation.forecasts
 
     async def _async_setup(self) -> None:
         """Load retained learning history and permanent supporting ledgers."""
