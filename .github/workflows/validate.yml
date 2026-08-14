@@ -36,7 +36,7 @@ jobs:
       - name: Commit packaged dashboard when required
         shell: bash
         run: |
-          if git diff --quiet; then
+          if [ -z "$(git status --porcelain -- custom_components/kems/kems_master_dashboard.yaml)" ]; then
             echo "Packaged dashboard already current"
           else
             git config user.name "github-actions[bot]"
