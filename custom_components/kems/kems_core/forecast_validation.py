@@ -309,19 +309,13 @@ class ForecastValidationEngine:
         house_coverage = min(house_minutes / (24 * 60) * 100.0, 100.0)
         grid_coverage = min(grid_minutes / (24 * 60) * 100.0, 100.0)
         actual_solar = (
-            round(solar_kwh, 3)
-            if solar_coverage >= MIN_DAY_COVERAGE_PERCENT
-            else None
+            round(solar_kwh, 3) if solar_coverage >= MIN_DAY_COVERAGE_PERCENT else None
         )
         actual_house = (
-            round(house_kwh, 3)
-            if house_coverage >= MIN_DAY_COVERAGE_PERCENT
-            else None
+            round(house_kwh, 3) if house_coverage >= MIN_DAY_COVERAGE_PERCENT else None
         )
         battery_values = [
-            float(item.battery_soc)
-            for item in records
-            if item.battery_soc is not None
+            float(item.battery_soc) for item in records if item.battery_soc is not None
         ]
 
         return ForecastValidationDay(
