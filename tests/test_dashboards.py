@@ -13,11 +13,25 @@ DASHBOARDS = ROOT / "dashboards"
 def test_all_dashboard_yaml_is_valid() -> None:
     """Every shipped dashboard should parse as YAML."""
     files = sorted(DASHBOARDS.glob("*.yaml"))
-    assert len(files) == 12
+    assert len(files) == 13
     for path in files:
         content = yaml.safe_load(path.read_text(encoding="utf-8"))
         assert isinstance(content, dict)
         assert content.get("views")
+
+
+def test_master_dashboard_uses_current_alpha7_entities() -> None:
+    """The master view should use validated Alpha 7 IDs and learning sensors."""
+    text = (DASHBOARDS / "kems_master_dashboard.yaml").read_text(encoding="utf-8")
+    assert "sensor.kems_forecast_minimum_pre_cheap_soc" in text
+    assert "sensor.kems_forecast_minimum_precheap_soc" not in text
+    assert "sensor.kems_forecast_validation_status" in text
+    assert "sensor.kems_forecast_validation_fused_solar_mae" in text
+    assert "sensor.kems_forecast_validation_house_mae" in text
+    assert "states.sensor" in text
+    assert "states.binary_sensor" in text
+    assert "states.select" in text
+    assert "states.switch" in text
 
 
 def test_comparison_dashboards_include_live_and_simulated_flows() -> None:

@@ -6,7 +6,7 @@ from kems_core import LifetimeLedger, ROIConfig, ROIEngine, SimulationState
 
 
 def test_pre_install_roi_annualises_simulated_value() -> None:
-    """Retained simulated value should produce a transparent ROI forecast."""
+    """Retained non-export value should still annualise transparently."""
     now = datetime(2026, 8, 1, 12, 0, tzinfo=UTC)
     ledger = LifetimeLedger(
         first_observation=now - timedelta(days=29),
@@ -29,6 +29,64 @@ def test_pre_install_roi_annualises_simulated_value() -> None:
     assert result.predicted_payback_years is not None
     assert result.predicted_payback_date is not None
     assert result.predicted_net_value_gbp is not None
+
+
+def test_summer_export_income_uses_full_year_solar_shape() -> None:
+    """A strong August export month must not be multiplied straight by 365."""
+    now = datetime(2026, 8, 31, 12, 0, tzinfo=UTC)
+    ledger = LifetimeLedger(
+        first_observation=datetime(2026, 8, 1, 12, 0, tzinfo=UTC),
+        last_updated=now,
+        observed_days=31,
+        simulated_system_value_pence=20000.0,
+        simulated_export_income_pence=10000.0,
+        simulated_solar_generation_kwh=900.0,
+        simulated_grid_export_kwh=450.0,
+    )
+    simulation = SimulationState(
+        effective_export_rate_pence=12.0,
+        export_tariff_active=True,
+    )
+
+    result = ROIEngine().evaluate(
+        ledger,
+        simulation,
+        now,
+        ROIConfig(system_cost_gbp=20000.0),
+    )
+
+    naive_annual_gbp = 200.0 / 30.0 * 365.0
+    assert result.ready is True
+    assert result.predicted_annual_saving_gbp is not None
+    assert result.predicted_annual_saving_gbp < naive_annual_gbp
+    assert result.predicted_annual_saving_gbp > 1200.0
+
+
+def test_awaiting_export_tariff_excludes_historical_export_income() -> None:
+    """Old simulated export earnings cannot inflate ROI before a paid tariff exists."""
+    now = datetime(2026, 8, 31, 12, 0, tzinfo=UTC)
+    ledger = LifetimeLedger(
+        first_observation=datetime(2026, 8, 1, 12, 0, tzinfo=UTC),
+        last_updated=now,
+        observed_days=31,
+        simulated_system_value_pence=20000.0,
+        simulated_export_income_pence=10000.0,
+        simulated_solar_generation_kwh=900.0,
+        simulated_grid_export_kwh=450.0,
+    )
+
+    result = ROIEngine().evaluate(
+        ledger,
+        SimulationState(
+            effective_export_rate_pence=0.0,
+            export_tariff_active=False,
+        ),
+        now,
+        ROIConfig(system_cost_gbp=20000.0),
+    )
+
+    assert result.ready is True
+    assert result.predicted_annual_saving_gbp == 1216.67
 
 
 def test_paid_back_system_switches_to_profit_mode() -> None:

@@ -52,8 +52,9 @@ def test_active_plan_failure_and_island_override_are_explicit() -> None:
     assert finalise_power_down_audit(island) == (False, "island_safety_override")
 
 
-def test_session_without_active_sample_is_not_marked_successful() -> None:
+def test_session_without_active_sample_is_inconclusive() -> None:
+    """Missing evidence must never be presented to the user as a failed event."""
     assert finalise_power_down_audit(PowerDownAuditState()) == (
-        False,
-        "session_activity_not_observed",
+        None,
+        "insufficient_active_samples",
     )

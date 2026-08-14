@@ -974,11 +974,11 @@ class PowerDownResult:
     bonus_pence: float | None = None
     fixed_export_income_pence: float | None = None
     combined_income_pence: float | None = None
-    ev_successfully_blocked: bool = False
+    ev_successfully_blocked: bool | None = False
     active_samples_observed: int = 0
     plan_safe_throughout: bool | None = None
     island_override_observed: bool | None = None
-    completed_successfully: bool = False
+    completed_successfully: bool | None = False
     completion_reason: str = "unavailable"
 
     def to_dict(self) -> dict[str, Any]:
