@@ -33,4 +33,29 @@ def test_kems_startup_refreshes_only_an_existing_panel_config() -> None:
     assert "if not target.exists():" in sync
     assert "_sync_existing_panel_file" in sync
     assert "os.replace(temporary, target)" in sync
-    assert "compile/install kems16x16 in ESPHome" in sync
+
+
+def test_adopted_managed_panel_queues_automatic_esphome_ota() -> None:
+    """Only a previously managed panel should automatically compile and flash."""
+    sync = (ROOT / "custom_components" / "kems" / "dashboard.py").read_text(
+        encoding="utf-8"
+    )
+    assert 'MANAGED_PANEL_HEADER = b"# KEMS-MANAGED-ESPHOME-PANEL"' in sync
+    assert "_panel_is_kems_managed" in sync
+    assert "panel_changed and panel_was_managed" in sync
+    assert '"command": "firmware/install"' in sync
+    assert '"configuration": MANAGED_PANEL_FILENAME' in sync
+    assert '"port": "OTA"' in sync
+    assert "SUPERVISOR_TOKEN" in sync
+    assert "ws://127.0.0.1:{ingress_port}/ws" in sync
+    assert "async_auto_install_managed_panel" in sync
+
+
+def test_first_managed_adoption_still_requires_one_manual_flash() -> None:
+    """A pre-managed local file must not be automatically flashed on adoption."""
+    sync = (ROOT / "custom_components" / "kems" / "dashboard.py").read_text(
+        encoding="utf-8"
+    )
+    assert "elif panel_changed:" in sync
+    assert "first managed" in sync
+    assert "subsequent managed" in sync
