@@ -13,12 +13,14 @@ from homeassistant.util import dt as dt_util
 from .collector import Collector
 from .const import NAME
 from .entity_discovery import SourceValidationResult
+from .forecast_validation import ForecastValidationRecorder
 from .forecasting import SolarForecastCoordinator
 from .history import HistoryRecorder
 from .kems_core import (
     AdviceEngine,
     ControlEngine,
     ForecastPlanningEngine,
+    ForecastValidationState,
     GasEngine,
     KEMSData,
     LearningEngine,
@@ -63,6 +65,7 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
         self._learning = LearningEngine()
         self._forecast = SolarForecastCoordinator(hass, settings.forecast)
         self._forecast_planning = ForecastPlanningEngine()
+        self._forecast_validation = ForecastValidationRecorder(hass, entry.entry_id)
         self._gas = GasEngine()
         self._advice = AdviceEngine()
         self._simulation = SimulationEngine()
@@ -82,9 +85,15 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
             always_update=False,
         )
 
+    @property
+    def forecast_validation_state(self) -> ForecastValidationState:
+        """Return the latest retained forecast-vs-actual validation state."""
+        return self._forecast_validation.state
+
     async def _async_setup(self) -> None:
-        """Load retained learning history and the permanent lifetime ledger."""
+        """Load retained learning history and permanent supporting ledgers."""
         await self._history.async_load()
+        await self._forecast_validation.async_load()
         await self._lifetime.async_load()
         await self._power_down.async_load()
         await self._lifetime.async_bootstrap(
@@ -129,9 +138,18 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                 cheap_window_hours=self._cheap_window_hours(),
             )
             self._annotate_snapshot_with_forecast(snapshot, forecast_plan)
+            captured = await self._forecast_validation.async_capture(
+                now,
+                forecast,
+                forecast_plan,
+                planning_learned,
+            )
+            if captured:
+                await self._forecast_validation.async_save()
 
             await self._history.async_record(snapshot)
             records = self._history.records
+            self._forecast_validation.analyse(records, now)
             learned = self._learning.analyse(records, now)
             gas = self._gas.summarise(records, now)
             advice = self._advice.evaluate(
@@ -251,8 +269,9 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
         snapshot.forecast_confidence_percent = plan.confidence_percent
 
     async def async_shutdown(self) -> None:
-        """Flush learning history before unloading."""
+        """Flush retained KEMS state before unloading."""
         await self._history.async_save()
+        await self._forecast_validation.async_save()
         await self._lifetime.async_save()
         await self._power_down.async_save()
 
