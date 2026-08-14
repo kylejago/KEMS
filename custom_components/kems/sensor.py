@@ -96,6 +96,20 @@ def _scenario_cost(
     return None if scenario is None else round(scenario.total_cost_pence, 2)
 
 
+def _forecast_plan_attributes(data: KEMSData) -> Mapping[str, Any]:
+    """Expose the full explainable Full KEMS Forecast decision."""
+    return {
+        **data.forecast_plan.to_dict(),
+        "forecast": data.forecast.to_dict(),
+    }
+
+
+def _forecast_metric(data: KEMSData, attribute: str) -> float | None:
+    """Return one numeric forecast-planning metric."""
+    value = getattr(data.forecast_plan, attribute, None)
+    return None if value is None else float(value)
+
+
 def _scenario_flow_state(
     data: KEMSData,
     scenario_key: str,
@@ -903,6 +917,92 @@ SENSORS: tuple[KEMSSensorEntityDescription, ...] = (
         attributes_fn=lambda data: _scenario_attributes(data, "kems_full"),
     ),
     KEMSSensorEntityDescription(
+        key="compare_kems_forecast_cost_today",
+        name="Compare Full KEMS Forecast cost today",
+        icon="mdi:weather-partly-cloudy",
+        native_unit_of_measurement="p",
+        suggested_display_precision=2,
+        value_fn=lambda data: _scenario_cost(data, "kems_forecast"),
+        attributes_fn=lambda data: _scenario_attributes(data, "kems_forecast"),
+    ),
+    KEMSSensorEntityDescription(
+        key="full_kems_forecast_status",
+        name="Full KEMS Forecast status",
+        icon="mdi:weather-partly-cloudy",
+        value_fn=lambda data: data.forecast_plan.state,
+        attributes_fn=_forecast_plan_attributes,
+    ),
+    KEMSSensorEntityDescription(
+        key="forecast_solar_tomorrow",
+        name="Forecast solar tomorrow",
+        icon="mdi:solar-power",
+        device_class=SensorDeviceClass.ENERGY,
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        suggested_display_precision=2,
+        value_fn=lambda data: data.forecast.expected_solar_tomorrow_kwh,
+        attributes_fn=_forecast_plan_attributes,
+    ),
+    KEMSSensorEntityDescription(
+        key="forecast_house_demand_tomorrow",
+        name="Forecast house demand tomorrow",
+        icon="mdi:home-lightning-bolt-outline",
+        device_class=SensorDeviceClass.ENERGY,
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        suggested_display_precision=2,
+        value_fn=lambda data: data.forecast_plan.expected_house_tomorrow_kwh,
+    ),
+    KEMSSensorEntityDescription(
+        key="forecast_required_morning_soc",
+        name="Forecast required morning SOC",
+        icon="mdi:battery-check-outline",
+        native_unit_of_measurement=PERCENTAGE,
+        suggested_display_precision=1,
+        value_fn=lambda data: _forecast_metric(data, "required_morning_soc_percent"),
+    ),
+    KEMSSensorEntityDescription(
+        key="forecast_maximum_overnight_soc",
+        name="Forecast maximum overnight SOC",
+        icon="mdi:battery-clock-outline",
+        native_unit_of_measurement=PERCENTAGE,
+        suggested_display_precision=1,
+        value_fn=lambda data: _forecast_metric(data, "maximum_overnight_soc_percent"),
+    ),
+    KEMSSensorEntityDescription(
+        key="forecast_minimum_precheap_soc",
+        name="Forecast minimum pre-cheap SOC",
+        icon="mdi:battery-lock",
+        native_unit_of_measurement=PERCENTAGE,
+        suggested_display_precision=1,
+        value_fn=lambda data: _forecast_metric(data, "minimum_precheap_soc_percent"),
+    ),
+    KEMSSensorEntityDescription(
+        key="forecast_solar_recovery_target",
+        name="Forecast solar recovery target",
+        icon="mdi:battery-charging-high",
+        native_unit_of_measurement=PERCENTAGE,
+        suggested_display_precision=1,
+        value_fn=lambda data: _forecast_metric(data, "solar_recovery_target_percent"),
+    ),
+    KEMSSensorEntityDescription(
+        key="forecast_recharge_shortfall",
+        name="Forecast recharge shortfall",
+        icon="mdi:battery-alert-variant-outline",
+        device_class=SensorDeviceClass.ENERGY,
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        suggested_display_precision=2,
+        value_fn=lambda data: _forecast_metric(data, "recharge_shortfall_kwh"),
+    ),
+    KEMSSensorEntityDescription(
+        key="forecast_additional_cheap_time_required",
+        name="Forecast additional cheap time required",
+        icon="mdi:clock-plus-outline",
+        native_unit_of_measurement="h",
+        suggested_display_precision=2,
+        value_fn=lambda data: _forecast_metric(
+            data, "additional_cheap_time_required_hours"
+        ),
+    ),
+    KEMSSensorEntityDescription(
         key="compare_full_island_mode_today",
         name="Compare full island mode today",
         icon="mdi:transmission-tower-off",
@@ -1027,6 +1127,13 @@ SENSORS: tuple[KEMSSensorEntityDescription, ...] = (
         icon="mdi:brain",
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda data: _scenario_flow_state(data, "kems_full"),
+    ),
+    KEMSSensorEntityDescription(
+        key="compare_kems_forecast_flow_now",
+        name="Compare Full KEMS Forecast flow now",
+        icon="mdi:weather-partly-cloudy",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda data: _scenario_flow_state(data, "kems_forecast"),
     ),
     KEMSSensorEntityDescription(
         key="compare_full_island_flow_now",

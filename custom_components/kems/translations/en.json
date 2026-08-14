@@ -205,7 +205,8 @@
           "solar": "Solar, export and Power Down",
           "financial": "System cost and ROI",
           "monitoring": "Monitoring and history",
-          "control": "Control Lab and EPS safety"
+          "control": "Control Lab and EPS safety",
+          "forecast": "Forecast and reserve planning"
         }
       },
       "tariff": {
@@ -352,6 +353,28 @@
           "eps_warning_percent": "Whole-house island-load level that raises an early warning.",
           "eps_critical_percent": "Whole-house island-load level that raises a critical warning.",
           "island_reserve_percent": "Warning threshold for reducing discretionary load during a whole-house outage. The normal battery reserve remains the emergency discharge floor."
+        }
+      },
+      "forecast": {
+        "title": "Forecast and reserve planning",
+        "description": "Full KEMS Forecast stays profit-first and only protects energy when Forecast.Solar, Open-Meteo and the learned house profile predict a genuine future shortfall. Full KEMS itself is unchanged.",
+        "data": {
+          "forecast_enabled": "Enable Full KEMS Forecast planning",
+          "forecast_open_meteo_enabled": "Use Open-Meteo irradiance cross-check",
+          "forecast_open_meteo_refresh_minutes": "Open-Meteo refresh interval",
+          "forecast_performance_ratio": "Open-Meteo PV performance ratio",
+          "forecast_reserve_safety_margin_percent": "Forecast reserve safety margin",
+          "forecast_watch_margin_kwh": "Watch-state energy margin",
+          "forecast_recovery_margin_kwh": "Solar recovery trigger margin"
+        },
+        "data_description": {
+          "forecast_enabled": "Adds the Full KEMS Forecast comparison. It never enables real control and does not alter the existing Full KEMS scenario.",
+          "forecast_open_meteo_enabled": "Uses free Open-Meteo UKMO tilted irradiance as an independent check and hourly solar shape. Forecast.Solar remains the primary production forecast when available.",
+          "forecast_open_meteo_refresh_minutes": "Defaults to 30 minutes. Cached data is reused between updates and after temporary network failures.",
+          "forecast_performance_ratio": "Converts Open-Meteo tilted irradiance into a conservative PV estimate before the shared 7kW inverter cap. Default 0.85.",
+          "forecast_reserve_safety_margin_percent": "Extra battery capacity kept above the calculated energy need. Default 5%.",
+          "forecast_watch_margin_kwh": "If the predicted morning energy margin falls within this amount KEMS reports Watch but does not restrict export. Default 3kWh.",
+          "forecast_recovery_margin_kwh": "Minimum predicted same-day deficit before spare solar is diverted to the battery. Default 1kWh."
         }
       }
     }

@@ -27,6 +27,7 @@ SCENARIO_SOLAR_ONLY = "solar_only"
 SCENARIO_SOLAR_BATTERY = "solar_battery"
 SCENARIO_KEMS_NO_EXPORT = "kems_no_export"
 SCENARIO_KEMS_FULL = "kems_full"
+SCENARIO_KEMS_FORECAST = "kems_forecast"
 SCENARIO_FULL_ISLAND = "full_island"
 FINANCIAL_SCENARIO_KEYS = (
     SCENARIO_NO_SYSTEM,
@@ -34,6 +35,7 @@ FINANCIAL_SCENARIO_KEYS = (
     SCENARIO_SOLAR_BATTERY,
     SCENARIO_KEMS_NO_EXPORT,
     SCENARIO_KEMS_FULL,
+    SCENARIO_KEMS_FORECAST,
 )
 SCENARIO_KEYS = (*FINANCIAL_SCENARIO_KEYS, SCENARIO_FULL_ISLAND)
 
@@ -43,6 +45,7 @@ SCENARIO_LABELS = {
     SCENARIO_SOLAR_BATTERY: "Solar + battery",
     SCENARIO_KEMS_NO_EXPORT: "KEMS no-export",
     SCENARIO_KEMS_FULL: "Full KEMS smart control",
+    SCENARIO_KEMS_FORECAST: "Full KEMS Forecast",
     SCENARIO_FULL_ISLAND: "Full island mode — grid down",
 }
 
@@ -63,6 +66,10 @@ SCENARIO_DESCRIPTIONS = {
     SCENARIO_KEMS_FULL: (
         "Full KEMS tariff-aware control with cheap charging, home reserve, solar "
         "export, paced battery export and Power Down optimisation."
+    ),
+    SCENARIO_KEMS_FORECAST: (
+        "Full KEMS profit-first control plus forecast-aware minimum battery retention "
+        "and solar recovery when tomorrow would otherwise require day-rate import."
     ),
     SCENARIO_FULL_ISLAND: (
         "Grid unavailable for the whole replay period. EV charging is deliberately "
@@ -155,6 +162,7 @@ class ScenarioComparisonEngine:
         basic_soc = min(max(config.battery_initial_percent, 0.0), 100.0)
         no_export_soc = basic_soc
         full_soc = basic_soc
+        forecast_soc = basic_soc
         day_summaries: dict[date, dict[str, ScenarioSummary]] = {}
 
         for day in dates:
@@ -202,6 +210,20 @@ class ScenarioComparisonEngine:
                 learned_forecast,
                 current_snapshot=display_snapshot,
             )
+            forecast_state = self._simulation.simulate_today(
+                day_records,
+                day_now,
+                replace(
+                    config,
+                    battery_initial_percent=forecast_soc,
+                    export_tariff_status="active",
+                    battery_export_enabled=True,
+                    strategy="paced_export",
+                    forecast_aware=True,
+                ),
+                learned_forecast,
+                current_snapshot=display_snapshot,
+            )
             no_export_summary = self._summary_from_simulation(
                 SCENARIO_KEMS_NO_EXPORT,
                 no_export_state,
@@ -212,13 +234,20 @@ class ScenarioComparisonEngine:
                 full_state,
                 day_records,
             )
+            forecast_summary = self._summary_from_simulation(
+                SCENARIO_KEMS_FORECAST,
+                forecast_state,
+                day_records,
+            )
             no_export_soc = no_export_summary.ending_soc_percent or no_export_soc
             full_soc = full_summary.ending_soc_percent or full_soc
+            forecast_soc = forecast_summary.ending_soc_percent or forecast_soc
 
             summaries = {
                 **simple,
                 SCENARIO_KEMS_NO_EXPORT: no_export_summary,
                 SCENARIO_KEMS_FULL: full_summary,
+                SCENARIO_KEMS_FORECAST: forecast_summary,
             }
             baseline = summaries[SCENARIO_NO_SYSTEM]
             day_summaries[day] = {
@@ -257,6 +286,11 @@ class ScenarioComparisonEngine:
                 previous_full_soc=(
                     previous.get(SCENARIO_KEMS_FULL).ending_soc_percent
                     if previous.get(SCENARIO_KEMS_FULL)
+                    else config.battery_initial_percent
+                ),
+                previous_forecast_soc=(
+                    previous.get(SCENARIO_KEMS_FORECAST).ending_soc_percent
+                    if previous.get(SCENARIO_KEMS_FORECAST)
                     else config.battery_initial_percent
                 ),
             )
@@ -1077,6 +1111,13 @@ class ScenarioComparisonEngine:
             max(house_value - battery_home_value - house_grid_value, 0.0), 3
         )
 
+        forecast_records = (
+            [item for item in day_records if item.forecast_protection_state is not None]
+            if key == SCENARIO_KEMS_FORECAST
+            else []
+        )
+        latest_forecast = forecast_records[-1] if forecast_records else None
+
         return ScenarioSummary(
             key=key,
             label=SCENARIO_LABELS[key],
@@ -1116,6 +1157,35 @@ class ScenarioComparisonEngine:
             battery_to_home_kwh=_round(state.simulated_battery_to_home_kwh) or 0.0,
             battery_export_kwh=_round(state.simulated_battery_export_kwh) or 0.0,
             ending_soc_percent=_round(state.simulated_battery_soc, 1),
+            forecast_samples=len(forecast_records),
+            forecast_protection_state=(
+                latest_forecast.forecast_protection_state if latest_forecast else None
+            ),
+            forecast_required_morning_soc_percent=(
+                latest_forecast.forecast_required_morning_soc_percent
+                if latest_forecast
+                else None
+            ),
+            forecast_minimum_precheap_soc_percent=(
+                latest_forecast.forecast_minimum_precheap_soc_percent
+                if latest_forecast
+                else None
+            ),
+            forecast_solar_recovery_target_percent=(
+                latest_forecast.forecast_solar_recovery_target_percent
+                if latest_forecast
+                else None
+            ),
+            forecast_recharge_target_feasible=(
+                latest_forecast.forecast_recharge_target_feasible
+                if latest_forecast
+                else None
+            ),
+            forecast_recharge_shortfall_kwh=(
+                latest_forecast.forecast_recharge_shortfall_kwh
+                if latest_forecast
+                else None
+            ),
             current_house_load_kw=current_house,
             current_solar_power_kw=current_solar,
             current_grid_import_kw=current_grid_import,
@@ -1239,6 +1309,21 @@ class ScenarioComparisonEngine:
             samples=samples,
             data_coverage=round(weighted_coverage, 1),
             ending_soc_percent=latest.ending_soc_percent,
+            forecast_samples=sum(item.forecast_samples for item in parts),
+            forecast_protection_state=latest.forecast_protection_state,
+            forecast_required_morning_soc_percent=(
+                latest.forecast_required_morning_soc_percent
+            ),
+            forecast_minimum_precheap_soc_percent=(
+                latest.forecast_minimum_precheap_soc_percent
+            ),
+            forecast_solar_recovery_target_percent=(
+                latest.forecast_solar_recovery_target_percent
+            ),
+            forecast_recharge_target_feasible=(
+                latest.forecast_recharge_target_feasible
+            ),
+            forecast_recharge_shortfall_kwh=latest.forecast_recharge_shortfall_kwh,
             current_house_load_kw=latest.current_house_load_kw,
             current_solar_power_kw=latest.current_solar_power_kw,
             current_grid_import_kw=latest.current_grid_import_kw,
@@ -1263,6 +1348,7 @@ class ScenarioComparisonEngine:
         previous_basic_soc: float | None,
         previous_no_export_soc: float | None,
         previous_full_soc: float | None,
+        previous_forecast_soc: float | None,
     ) -> tuple[ScenarioTimelinePoint, ...]:
         """Return a replay timeline sampled every 30 minutes plus the latest point."""
         records = sorted(day_records, key=lambda item: item.timestamp)
@@ -1360,6 +1446,28 @@ class ScenarioComparisonEngine:
                     ),
                     prefix,
                 )
+                forecast_summary = self._summary_from_simulation(
+                    SCENARIO_KEMS_FORECAST,
+                    self._simulation.simulate_today(
+                        prefix,
+                        timestamp,
+                        replace(
+                            config,
+                            battery_initial_percent=(
+                                previous_forecast_soc
+                                if previous_forecast_soc is not None
+                                else config.battery_initial_percent
+                            ),
+                            export_tariff_status="active",
+                            battery_export_enabled=True,
+                            strategy="paced_export",
+                            forecast_aware=True,
+                        ),
+                        forecast,
+                        current_snapshot=prefix[-1],
+                    ),
+                    prefix,
+                )
                 island = self._island_replay(
                     prefix,
                     config,
@@ -1377,6 +1485,7 @@ class ScenarioComparisonEngine:
                     ),
                     SCENARIO_KEMS_NO_EXPORT: no_export.total_cost_pence,
                     SCENARIO_KEMS_FULL: full.total_cost_pence,
+                    SCENARIO_KEMS_FORECAST: forecast_summary.total_cost_pence,
                 }
             result.append(
                 ScenarioTimelinePoint(
@@ -1386,6 +1495,7 @@ class ScenarioComparisonEngine:
                     solar_battery_cost_pence=round(costs[SCENARIO_SOLAR_BATTERY], 2),
                     kems_no_export_cost_pence=round(costs[SCENARIO_KEMS_NO_EXPORT], 2),
                     kems_full_cost_pence=round(costs[SCENARIO_KEMS_FULL], 2),
+                    kems_forecast_cost_pence=round(costs[SCENARIO_KEMS_FORECAST], 2),
                     island_load_served_percent=island.load_served_percent,
                     island_unserved_load_kwh=island.unserved_load_kwh,
                     island_soc_percent=island.ending_soc_percent,

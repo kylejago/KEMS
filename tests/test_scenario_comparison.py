@@ -26,7 +26,7 @@ def _records(start: datetime, count: int = 9) -> list[Snapshot]:
     return records
 
 
-def test_compare_today_runs_six_independent_scenarios() -> None:
+def test_compare_today_runs_seven_independent_scenarios() -> None:
     """Changing the live export setting must not disable hypothetical replays."""
     start = datetime(2026, 8, 11, 0, 0, tzinfo=UTC)
     records = _records(start)
@@ -55,6 +55,7 @@ def test_compare_today_runs_six_independent_scenarios() -> None:
         "solar_battery",
         "kems_no_export",
         "kems_full",
+        "kems_forecast",
         "full_island",
     ]
     no_export = today.scenario("kems_no_export")
@@ -135,6 +136,7 @@ def test_today_timeline_contains_all_scenario_cost_lines() -> None:
         "solar_battery_cost_pence",
         "kems_no_export_cost_pence",
         "kems_full_cost_pence",
+        "kems_forecast_cost_pence",
     ):
         assert isinstance(last[key], float)
     assert isinstance(last["island_load_served_percent"], float)
@@ -616,3 +618,80 @@ def test_island_mode_sheds_ev_before_eps_and_shortfall_accounting() -> None:
     assert island.prepared_outage_status == "survived"
     assert island.current_house_load_kw == 1.0
     assert island.current_ev_shed_kw == 7.0
+
+
+def test_full_kems_forecast_matches_full_kems_without_recorded_forecast() -> None:
+    """Historical data from before alpha7 must not be rewritten by today's forecast."""
+    start = datetime(2026, 8, 11, 0, 0, tzinfo=UTC)
+    result = ScenarioComparisonEngine().compare(
+        _records(start, count=13),
+        start + timedelta(hours=3),
+        SimulationConfig(
+            battery_capacity_kwh=10.0,
+            battery_initial_percent=80.0,
+            battery_reserve_percent=10.0,
+            export_rate_pence=12.0,
+            proposal_solar_enabled=False,
+        ),
+    )
+    today = result.period("today")
+    assert today is not None
+    full = today.scenario("kems_full")
+    forecast = today.scenario("kems_forecast")
+    assert full is not None and forecast is not None
+    assert forecast.total_cost_pence == full.total_cost_pence
+    assert forecast.grid_import_kwh == full.grid_import_kwh
+    assert forecast.grid_export_kwh == full.grid_export_kwh
+    assert forecast.forecast_samples == 0
+
+
+def test_full_kems_forecast_uses_solar_recovery_only_in_new_scenario() -> None:
+    """Forecast recovery may store PV while ordinary Full KEMS remains unchanged."""
+    start = datetime(2026, 8, 11, 12, 0, tzinfo=UTC)
+    records = []
+    for index in range(3):
+        records.append(
+            Snapshot(
+                timestamp=start + timedelta(minutes=15 * index),
+                current_import_rate=28.3036,
+                electricity_standing_charge=53.7,
+                off_peak=False,
+                house_load_kw=2.0,
+                grid_import_kw=2.0,
+                solar_power_kw=6.0,
+                next_offpeak_start=start + timedelta(hours=11, minutes=30),
+                forecast_protection_state="recovery",
+                forecast_solar_recovery_target_percent=90.0,
+                forecast_minimum_precheap_soc_percent=10.0,
+                forecast_required_morning_soc_percent=80.0,
+                forecast_recharge_target_feasible=True,
+                forecast_recharge_shortfall_kwh=0.0,
+            )
+        )
+    result = ScenarioComparisonEngine().compare(
+        records,
+        records[-1].timestamp,
+        SimulationConfig(
+            battery_capacity_kwh=10.0,
+            battery_initial_percent=50.0,
+            battery_reserve_percent=10.0,
+            export_rate_pence=12.0,
+            export_tariff_status="active",
+            max_charge_kw=5.0,
+            max_discharge_kw=5.0,
+            inverter_limit_kw=7.0,
+            export_limit_kw=7.0,
+            proposal_solar_enabled=False,
+        ),
+        current_snapshot=records[-1],
+    )
+    today = result.period("today")
+    assert today is not None
+    full = today.scenario("kems_full")
+    forecast = today.scenario("kems_forecast")
+    assert full is not None and forecast is not None
+    assert forecast.forecast_samples == 3
+    assert forecast.forecast_protection_state == "recovery"
+    assert (forecast.current_solar_to_battery_kw or 0.0) > 0.0
+    assert (forecast.current_solar_to_home_kw or 0.0) > 0.0
+    assert (full.current_solar_to_battery_kw or 0.0) == 0.0

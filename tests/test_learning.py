@@ -28,3 +28,5 @@ def test_learning_builds_profile_and_confidence() -> None:
     assert learned.ready is True
     assert learned.confidence > 0
     assert learned.average_import_rate_pence == 28.3
+    assert learned.predicted_house_energy_tomorrow_kwh is not None
+    assert len(learned.predicted_house_tomorrow_hourly_kwh) == 24
