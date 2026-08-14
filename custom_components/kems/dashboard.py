@@ -178,7 +178,7 @@ async def _async_queue_esphome_install(hass: HomeAssistant, ingress_port: int) -
                         "ESPHome Device Builder closed the connection before queuing "
                         "the panel install"
                     )
-    except (ClientError, asyncio.TimeoutError) as err:
+    except (TimeoutError, ClientError) as err:
         raise PanelAutoOTAError(
             f"Unable to reach ESPHome Device Builder: {err}"
         ) from err
