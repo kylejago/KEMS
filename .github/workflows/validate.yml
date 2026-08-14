@@ -9,17 +9,12 @@ on:
       - "fix/**"
   pull_request:
 
-permissions:
-  contents: write
-
 jobs:
   validate:
     runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.head_ref || github.ref_name }}
 
       - uses: actions/setup-python@v5
         with:
@@ -30,21 +25,8 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -r requirements-dev.txt
 
-      - name: Generate packaged dashboard copy
-        run: python scripts/sync_packaged_dashboard.py
-
-      - name: Commit packaged dashboard when required
-        shell: bash
-        run: |
-          if [ -z "$(git status --porcelain -- custom_components/kems/kems_master_dashboard.yaml)" ]; then
-            echo "Packaged dashboard already current"
-          else
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add custom_components/kems/kems_master_dashboard.yaml
-            git commit -m "Package managed KEMS dashboard [generated]"
-            git push
-          fi
+      - name: Packaged dashboard is current
+        run: python scripts/sync_packaged_dashboard.py --check
 
       - name: Black
         run: python -m black --check .
