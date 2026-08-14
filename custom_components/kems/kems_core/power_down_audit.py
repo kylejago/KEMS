@@ -38,10 +38,16 @@ class PowerDownAuditState:
         )
 
 
-def finalise_power_down_audit(state: PowerDownAuditState) -> tuple[bool, str]:
-    """Return completion status and an explicit audit reason."""
+def finalise_power_down_audit(
+    state: PowerDownAuditState,
+) -> tuple[bool | None, str]:
+    """Return success/failure/inconclusive status plus an explicit reason.
+
+    No active samples means KEMS has no evidence about what happened during the
+    session. That is deliberately *inconclusive* rather than a false failure.
+    """
     if state.active_samples_observed <= 0:
-        return False, "session_activity_not_observed"
+        return None, "insufficient_active_samples"
     if state.island_override_observed:
         return False, "island_safety_override"
     if not state.plan_safe_throughout:
