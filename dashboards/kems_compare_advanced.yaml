@@ -8,7 +8,7 @@ views:
       - type: markdown
         content: |
           # What would today have looked like?
-          Six parallel replays use the same retained demand/tariff observations. The first five are financial comparisons; **Full Island Mode** is resilience-only and is excluded from cheapest-scenario ranking. Island Mode deliberately blocks EV charging and excludes that energy from EPS demand, then runs a sudden-outage replay plus a prepared-outage calculation that finds the minimum energy-secure starting SOC and adds a 5% safety margin. **KEMS no-export** always models the awaiting-export strategy and **Full KEMS** always models paid export/paced control, regardless of the mode currently selected for the live-readiness simulation.
+          Seven parallel replays use the same retained demand/tariff observations. The first six are financial comparisons; **Full Island Mode** is resilience-only and is excluded from cheapest-scenario ranking. Island Mode deliberately blocks EV charging and excludes that energy from EPS demand, then runs a sudden-outage replay plus a prepared-outage calculation that finds the minimum energy-secure starting SOC and adds a 5% safety margin. **KEMS no-export** always models the awaiting-export strategy, **Full KEMS** remains the paid-export/paced-control profit benchmark, and **Full KEMS Forecast** adds only the minimum forward-looking reserve protection needed to avoid predicted unnecessary day-rate import.
 
       - type: grid
         columns: 3
@@ -35,9 +35,34 @@ views:
             name: Full KEMS
             icon: mdi:brain
           - type: custom:mushroom-entity-card
+            entity: sensor.kems_compare_full_kems_forecast_cost_today
+            name: Full KEMS Forecast
+            icon: mdi:weather-partly-cloudy
+          - type: custom:mushroom-entity-card
             entity: sensor.kems_compare_full_island_mode_today
             name: Full Island Mode
             icon: mdi:transmission-tower-off
+
+      - type: grid
+        columns: 4
+        square: false
+        cards:
+          - type: custom:mushroom-entity-card
+            entity: sensor.kems_full_kems_forecast_status
+            name: Forecast state
+            icon: mdi:weather-partly-cloudy
+          - type: custom:mushroom-entity-card
+            entity: sensor.kems_forecast_solar_tomorrow
+            name: Solar tomorrow
+            icon: mdi:solar-power
+          - type: custom:mushroom-entity-card
+            entity: sensor.kems_forecast_required_morning_soc
+            name: Required morning SOC
+            icon: mdi:battery-check-outline
+          - type: custom:mushroom-entity-card
+            entity: sensor.kems_forecast_minimum_precheap_soc
+            name: Minimum pre-cheap SOC
+            icon: mdi:battery-lock
 
       - type: grid
         columns: 2
@@ -113,6 +138,11 @@ views:
             type: line
             data_generator: |
               return (entity.attributes.timeline || []).map(p => [new Date(p.timestamp).getTime(), p.kems_full_cost_pence / 100]);
+          - entity: sensor.kems_scenario_comparison_today
+            name: Full KEMS Forecast
+            type: line
+            data_generator: |
+              return (entity.attributes.timeline || []).map(p => [new Date(p.timestamp).getTime(), p.kems_forecast_cost_pence / 100]);
 
       - type: custom:apexcharts-card
         header:
@@ -145,6 +175,11 @@ views:
             type: line
             data_generator: |
               return (entity.attributes.timeline || []).map(p => [new Date(p.timestamp).getTime(), (p.no_system_cost_pence - p.kems_full_cost_pence) / 100]);
+          - entity: sensor.kems_scenario_comparison_today
+            name: Full KEMS Forecast saving
+            type: line
+            data_generator: |
+              return (entity.attributes.timeline || []).map(p => [new Date(p.timestamp).getTime(), (p.no_system_cost_pence - p.kems_forecast_cost_pence) / 100]);
 
       - type: custom:apexcharts-card
         header:
@@ -196,7 +231,8 @@ views:
             ('Solar only', 'sensor.kems_compare_solar_only_cost_today'),
             ('Solar + battery', 'sensor.kems_compare_solar_and_battery_cost_today'),
             ('KEMS no-export', 'sensor.kems_compare_kems_no_export_cost_today'),
-            ('Full KEMS', 'sensor.kems_compare_full_kems_cost_today')
+            ('Full KEMS', 'sensor.kems_compare_full_kems_cost_today'),
+            ('Full KEMS Forecast', 'sensor.kems_compare_full_kems_forecast_cost_today')
           ] %}
           | Scenario | Cost | Saving | Cheap import | Day import | Export | Solar | Battery charge | Battery → home | Battery export |
           |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|

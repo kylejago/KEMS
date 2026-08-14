@@ -386,7 +386,46 @@ class SimulationEngine:
                 interval_import = max(net_load_kwh - delivered, 0.0)
                 interval_export = 0.0
             else:
-                if effective_strategy == "self_use":
+                recovery_target_kwh = self._forecast_recovery_target_kwh(
+                    current,
+                    config,
+                    capacity,
+                )
+                recovery_active = (
+                    recovery_target_kwh is not None
+                    and battery_kwh + 0.001 < recovery_target_kwh
+                )
+                if recovery_active:
+                    # Full KEMS Forecast only: while a genuine forecast deficit
+                    # exists, use solar for the home first, then refill the battery
+                    # only to the calculated recovery target. Any remaining solar
+                    # is exported normally. Full KEMS is untouched.
+                    solar_to_home = min(
+                        solar_energy,
+                        actual_house_kwh,
+                        inverter_capacity,
+                    )
+                    interval_solar_to_home = solar_to_home
+                    net_load_kwh = max(actual_house_kwh - solar_to_home, 0.0)
+                    solar_surplus_kwh = max(solar_energy - solar_to_home, 0.0)
+                    solar_charge_input_kwh = min(
+                        solar_surplus_kwh,
+                        max(config.max_charge_kw, 0.0) * hours,
+                        max(recovery_target_kwh - battery_kwh, 0.0)
+                        / max(config.charge_efficiency, 0.01),
+                    )
+                    stored_from_solar = (
+                        solar_charge_input_kwh * config.charge_efficiency
+                    )
+                    battery_kwh += stored_from_solar
+                    battery_charge += stored_from_solar
+                    interval_solar_to_battery = stored_from_solar
+                    solar_export_request = max(
+                        solar_surplus_kwh - solar_charge_input_kwh,
+                        0.0,
+                    )
+                    inverter_used = solar_to_home
+                elif effective_strategy == "self_use":
                     solar_to_home = min(
                         solar_energy,
                         actual_house_kwh,
@@ -448,6 +487,13 @@ class SimulationEngine:
                         today,
                         config,
                     )
+                    forecast_floor_kwh = self._forecast_export_floor_kwh(
+                        current,
+                        config,
+                        capacity,
+                        reserve_kwh,
+                    )
+                    required_stored += max(forecast_floor_kwh - reserve_kwh, 0.0)
                     surplus_stored = max(
                         battery_kwh - reserve_kwh - required_stored,
                         0.0,
@@ -928,6 +974,38 @@ class SimulationEngine:
         if not cls._export_tariff_active(config):
             return "self_use"
         return "self_use" if config.strategy == "self_use" else "paced_export"
+
+    @staticmethod
+    def _forecast_export_floor_kwh(
+        snapshot: Snapshot,
+        config: SimulationConfig,
+        capacity: float,
+        reserve_kwh: float,
+    ) -> float:
+        """Return the forecast-only absolute stored-energy floor for export."""
+        if not config.forecast_aware:
+            return reserve_kwh
+        target = snapshot.forecast_minimum_precheap_soc_percent
+        if target is None:
+            return reserve_kwh
+        return min(
+            max(capacity * max(float(target), 0.0) / 100.0, reserve_kwh),
+            capacity,
+        )
+
+    @staticmethod
+    def _forecast_recovery_target_kwh(
+        snapshot: Snapshot,
+        config: SimulationConfig,
+        capacity: float,
+    ) -> float | None:
+        """Return a solar-recovery target only for Full KEMS Forecast."""
+        if not config.forecast_aware:
+            return None
+        target = snapshot.forecast_solar_recovery_target_percent
+        if target is None:
+            return None
+        return min(max(capacity * float(target) / 100.0, 0.0), capacity)
 
     @classmethod
     def _battery_export_enabled(cls, config: SimulationConfig) -> bool:
@@ -1812,12 +1890,43 @@ class SimulationEngine:
                 **self._saving_session_plan(snapshot, today, config),
             }
 
-        if self._effective_strategy(config) == "self_use":
+        recovery_target_kwh = self._forecast_recovery_target_kwh(
+            snapshot,
+            config,
+            capacity,
+        )
+        recovery_active = (
+            recovery_target_kwh is not None
+            and battery_kwh + 0.001 < recovery_target_kwh
+        )
+        current_solar_to_battery = 0.0
+        if recovery_active:
+            solar_to_home = min(solar, load, inverter_limit)
+            solar_surplus = max(solar - solar_to_home, 0.0)
+            current_solar_to_battery = min(
+                solar_surplus,
+                max(config.max_charge_kw, 0.0),
+                max(recovery_target_kwh - battery_kwh, 0.0)
+                / max(config.charge_efficiency, 0.01),
+            )
+            battery_kwh = min(
+                battery_kwh
+                + current_solar_to_battery * max(config.charge_efficiency, 0.01),
+                capacity,
+            )
+            net_load = max(load - solar_to_home, 0.0)
+            inverter_used = solar_to_home
+            solar_export_request = max(
+                solar_surplus - current_solar_to_battery,
+                0.0,
+            )
+        elif self._effective_strategy(config) == "self_use":
             solar_to_home = min(solar, load, inverter_limit)
             net_load = load - solar_to_home
             inverter_used = solar_to_home
             solar_export_request = max(solar - solar_to_home, 0.0)
         else:
+            solar_to_home = 0.0
             net_load = load
             inverter_used = 0.0
             solar_export_request = solar
@@ -1854,9 +1963,21 @@ class SimulationEngine:
             config,
         )
         session_extra_ac = session_extra_stored * config.discharge_efficiency
-        exportable_without_session = max(available_ac - required_home_energy, 0.0)
+        forecast_floor_kwh = self._forecast_export_floor_kwh(
+            snapshot,
+            config,
+            capacity,
+            reserve_kwh,
+        )
+        forecast_extra_ac = max(forecast_floor_kwh - reserve_kwh, 0.0) * (
+            config.discharge_efficiency
+        )
+        exportable_without_session = max(
+            available_ac - required_home_energy - forecast_extra_ac,
+            0.0,
+        )
         exportable_battery = max(
-            available_ac - required_home_energy - session_extra_ac,
+            available_ac - required_home_energy - session_extra_ac - forecast_extra_ac,
             0.0,
         )
         surplus_stored = exportable_battery / max(
@@ -1879,7 +2000,10 @@ class SimulationEngine:
         )
 
         projected_stored = battery_kwh - (
-            reserved_for_home + exportable_battery + session_extra_ac
+            reserved_for_home
+            + exportable_battery
+            + session_extra_ac
+            + forecast_extra_ac
         ) / max(config.discharge_efficiency, 0.01)
         projected_soc = 100 * max(projected_stored, reserve_kwh) / capacity
         export_paused = bool(
@@ -1895,7 +2019,8 @@ class SimulationEngine:
             "grid_import": round(grid_import, 3),
             "grid_export": round(solar_export + battery_export_kw, 3),
             "battery": round(home_from_battery + battery_export_kw, 3),
-            "battery_charge": 0.0,
+            "battery_charge": round(current_solar_to_battery, 3),
+            "solar_to_battery": round(current_solar_to_battery, 3),
             "battery_to_home": round(home_from_battery, 3),
             "battery_export": round(battery_export_kw, 3),
             "target_battery_export": round(target_export_kw, 3),

@@ -85,6 +85,7 @@ def test_options_flow_has_friendly_category_menu_and_tariff_editor() -> None:
         '"tariff"',
         '"battery"',
         '"solar"',
+        '"forecast"',
         '"financial"',
         '"monitoring"',
         '"control"',
@@ -108,6 +109,7 @@ def test_options_menu_has_explicit_fallback_labels() -> None:
         "Tariff and prices",
         "Battery, inverter and grid limits",
         "Solar, export and Power Down",
+        "Forecast and reserve planning",
         "System cost and ROI",
         "Monitoring and history",
         "Control Lab and EPS safety",
@@ -142,3 +144,20 @@ def test_alpha5_tariff_page_exposes_export_tariff_status() -> None:
     assert "CONF_EXPORT_TARIFF_STATUS" in source
     assert "Not active / awaiting export tariff" in source
     assert "Active - export is paid" in source
+
+
+def test_options_flow_exposes_full_kems_forecast_settings() -> None:
+    """Forecast reserve controls must be editable without touching Full KEMS."""
+    source = CONFIG_FLOW.read_text(encoding="utf-8")
+    for token in (
+        "FORECAST_SCHEMA",
+        "CONF_FORECAST_ENABLED",
+        "CONF_FORECAST_OPEN_METEO_ENABLED",
+        "CONF_FORECAST_OPEN_METEO_REFRESH_MINUTES",
+        "CONF_FORECAST_PERFORMANCE_RATIO",
+        "CONF_FORECAST_RESERVE_SAFETY_MARGIN_PERCENT",
+        "CONF_FORECAST_WATCH_MARGIN_KWH",
+        "CONF_FORECAST_RECOVERY_MARGIN_KWH",
+        "async_step_forecast",
+    ):
+        assert token in source

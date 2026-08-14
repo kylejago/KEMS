@@ -32,6 +32,7 @@ Initial setup now asks whether KEMS should use automatic tariff entities or a ma
 - Tariff and prices
 - Battery, inverter and grid limits
 - Solar, export and Power Down
+- Forecast and reserve planning
 - System cost and ROI
 - Monitoring and history
 - Control Lab and EPS safety
@@ -60,24 +61,35 @@ Alpha6 retains the alpha5 separation of the future export rate from whether an e
 
 ## What-if scenario comparison
 
-Alpha6 adds an independent replay engine for **What would today have looked like?** analysis. KEMS evaluates the same retained demand and tariff observations through six parallel scenarios without changing the active operating strategy:
+KEMS evaluates the same retained demand and tariff observations through seven parallel scenarios without changing the active operating strategy:
 
 - **No system** — the whole home is supplied from the grid.
 - **Solar only** — solar supplies the home first and surplus is valued at the configured paid export rate.
 - **Solar + battery** — conventional self-use: solar → home → battery, battery → home, no tariff-aware grid charging.
 - **KEMS no-export** — the alpha5 awaiting-export strategy with solar-aware cheap charging and deliberate export disabled.
 - **Full KEMS smart control** — paid export, cheap charging, home reserve, paced battery export and Power Down optimisation.
+- **Full KEMS Forecast** — the same profit-first Full KEMS policy, with minimum forecast reserve protection and solar recovery only when the forward energy model predicts otherwise unnecessary day-rate import.
 - **Full island mode — grid down** — the grid is unavailable for the whole replay period; EV charging is deliberately blocked, then solar and battery must serve the remaining house demand through the EPS limit, with no import or export possible.
 
-The first five scenarios expose total cost including the daily standing charge, import/export, cheap/day import split, solar and battery routing, end SOC, and saving versus the No system baseline. The saving breakdown reconciles to reduced day-rate import, change in cheap-rate import, export income and Power Down income.
+The first six financial scenarios expose total cost including the daily standing charge, import/export, cheap/day import split, solar and battery routing, end SOC, and saving versus the No system baseline. The saving breakdown reconciles to reduced day-rate import, change in cheap-rate import, export income and Power Down income.
 
 Full island mode is deliberately **not** included in the cheapest-scenario calculation because a grid outage is a resilience test, not a zero-cost tariff. Recorded whole-home demand remains visible, but EV charging is forced off before the EPS replay; the removed EV energy is reported separately as intentionally shed and does not count as unserved load. KEMS then reports island/EPS demand, load served, unserved energy, outage survival, starting/minimum/ending SOC, EPS-limited shortfall, energy-limited shortfall, first shortfall time and an estimated remaining runtime. The sudden-outage replay starts from the SOC Full KEMS had immediately before the selected outage period when that prior-day state is available.
 
 The same island result also includes a **prepared outage** calculation. KEMS first checks whether 100% SOC plus the replayed solar can remove all energy-limited shortfall, then uses a binary search to find the minimum energy-secure starting SOC and adds a 5% safety margin. The prepared replay starts at no less than that target, but never assumes more than the configured EPS output. This means the result can explicitly say **EPS limited** when the battery contains enough energy but a whole-house load spike still exceeds the EPS rating, or **insufficient energy even at 100%** when no starting SOC can cover the full outage period.
 
-KEMS also exposes Yesterday, 7-day and 30-day retained-history rollups. The Today comparison keeps the five financial cumulative-cost lines and adds island load-served, unserved-energy, SOC and survival status timeline data for resilience graphs. Prepared-outage headline sensors expose the required SOC, recommended target, prepared load served and remaining shortfall.
+KEMS also exposes Yesterday, 7-day and 30-day retained-history rollups. The Today comparison keeps six financial cumulative-cost lines and adds island load-served, unserved-energy, SOC and survival status timeline data for resilience graphs. Prepared-outage headline sensors expose the required SOC, recommended target, prepared load served and remaining shortfall.
 
 The shipped dashboards are `kems_compare_builtin.yaml` and `kems_compare_advanced.yaml`. The advanced version uses ApexCharts and Mushroom; the built-in version requires no custom frontend cards.
+
+### Full KEMS Forecast
+
+Full KEMS itself remains the aggressive profit benchmark. Full KEMS Forecast adds a separate forward-looking scenario that combines Forecast.Solar with an independent Open-Meteo UKMO tilted-irradiance check and KEMS' learned house-demand profile. It calculates the physical overnight charging ceiling, the battery SOC actually required for the following day, a minimum pre-cheap SOC when the normal cheap window cannot meet that requirement, and an intraday solar-recovery target when spare PV would otherwise be exported before a predicted energy shortfall.
+
+The planner is deliberately energy-driven rather than weather-label-driven: rain or cloud alone never blocks export. If the projected morning SOC is sufficient for the learned demand and fused solar forecast, Full KEMS Forecast stays in **normal** mode and behaves like Full KEMS. A narrow but still safe margin becomes **watch** with no export restriction. A genuine overnight recharge deficit becomes **protect**, retaining only the calculated extra stored energy. A same-day forecast deficit becomes **recovery**, routing solar to the home and battery only until the calculated target is restored, then resuming normal export. The plan is recalculated continuously as SOC, demand and forecasts change.
+
+Open-Meteo uses the proposal's East, West and South array geometry independently and combines their hourly global-tilted-irradiance estimates behind the shared 7kW inverter limit. Forecast.Solar remains the primary daily-production forecast when available; Open-Meteo supplies the independent weather/irradiance check and hourly shape. If either provider is temporarily unavailable, KEMS degrades to the other provider or reports the forecast scenario unavailable without affecting the existing Full KEMS simulation or any control safety gate.
+
+Weather data is provided by Open-Meteo.com. The selected UK Met Office forecast data is accessed through Open-Meteo and remains subject to the applicable attribution/share-alike terms; KEMS exposes provider attribution with the forecast diagnostics.
 
 ## User-configurable tariff model
 

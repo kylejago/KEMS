@@ -49,6 +49,13 @@ from .const import (
     CONF_EXPORT_LIMIT,
     CONF_EXPORT_RATE,
     CONF_EXPORT_TARIFF_STATUS,
+    CONF_FORECAST_ENABLED,
+    CONF_FORECAST_OPEN_METEO_ENABLED,
+    CONF_FORECAST_OPEN_METEO_REFRESH_MINUTES,
+    CONF_FORECAST_PERFORMANCE_RATIO,
+    CONF_FORECAST_RECOVERY_MARGIN_KWH,
+    CONF_FORECAST_RESERVE_SAFETY_MARGIN_PERCENT,
+    CONF_FORECAST_WATCH_MARGIN_KWH,
     CONF_GAS_COST_TODAY,
     CONF_GAS_CURRENT_RATE,
     CONF_GAS_KWH_PER_M3,
@@ -247,6 +254,22 @@ SOLAR_SCHEMA = vol.Schema(
             ]
         ),
         vol.Required(CONF_SAVING_SESSION_ENABLED): BOOLEAN_SELECTOR,
+    }
+)
+
+FORECAST_SCHEMA = vol.Schema(
+    {
+        vol.Required(CONF_FORECAST_ENABLED): BOOLEAN_SELECTOR,
+        vol.Required(CONF_FORECAST_OPEN_METEO_ENABLED): BOOLEAN_SELECTOR,
+        vol.Required(CONF_FORECAST_OPEN_METEO_REFRESH_MINUTES): _number(
+            15, 180, 1, "min"
+        ),
+        vol.Required(CONF_FORECAST_PERFORMANCE_RATIO): _number(0.5, 1.1, 0.01),
+        vol.Required(CONF_FORECAST_RESERVE_SAFETY_MARGIN_PERCENT): _number(
+            0, 30, 0.1, "%"
+        ),
+        vol.Required(CONF_FORECAST_WATCH_MARGIN_KWH): _number(0, 20, 0.1, "kWh"),
+        vol.Required(CONF_FORECAST_RECOVERY_MARGIN_KWH): _number(0, 10, 0.1, "kWh"),
     }
 )
 
@@ -575,6 +598,7 @@ class KEMSOptionsFlow(OptionsFlowWithReload):
         "tariff": "Tariff and prices",
         "battery": "Battery, inverter and grid limits",
         "solar": "Solar, export and Power Down",
+        "forecast": "Forecast and reserve planning",
         "financial": "System cost and ROI",
         "monitoring": "Monitoring and history",
         "control": "Control Lab and EPS safety",
@@ -635,6 +659,15 @@ class KEMSOptionsFlow(OptionsFlowWithReload):
         if user_input is not None:
             return self._save_options(user_input)
         return self._show_category("solar", SOLAR_SCHEMA)
+
+    async def async_step_forecast(
+        self,
+        user_input: dict[str, Any] | None = None,
+    ):
+        """Configure Full KEMS Forecast and reserve planning."""
+        if user_input is not None:
+            return self._save_options(user_input)
+        return self._show_category("forecast", FORECAST_SCHEMA)
 
     async def async_step_financial(
         self,

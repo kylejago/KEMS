@@ -7,6 +7,15 @@
 - Caches completed day-start replays by configuration/history boundary so normal coordinator updates do not reprocess the full retained history every minute.
 - Added regression coverage for the former 57.9% overstatement case and the first-sample-after-midnight reset.
 - Real FoxESS writes remain hard-blocked.
+- Added **Full KEMS Forecast** as a seventh parallel profile and sixth financial scenario while leaving Full KEMS unchanged as the profit-first benchmark.
+- Added Forecast.Solar auto-discovery plus a direct, cached Open-Meteo UKMO multi-array tilted-irradiance provider for the proposed East/West/South PV geometry.
+- Added conservative forecast fusion, provider agreement/confidence reporting, and hourly solar-shape scaling to the fused production total.
+- Added learned remaining-today, tomorrow-total and 24-hour house-demand forecasts.
+- Added physical recharge feasibility: overnight charge capacity, maximum achievable morning SOC, full-charge feasibility, additional cheap time to full, forecast-required morning SOC, recharge shortfall and minimum pre-cheap SOC.
+- Added hourly forward energy simulation so late-arriving winter solar cannot hide a morning battery shortfall behind a reassuring daily total.
+- Added Normal, Watch, Protect and Recovery forecast states. Protect retains only the calculated battery energy needed to avoid predicted day-rate import; Recovery uses solar for home/battery only until the reserve target is restored, then resumes Full KEMS export behaviour.
+- Forecast decisions are stamped onto retained snapshots so historical Full KEMS Forecast replay uses the decision actually known at the time rather than applying today's forecast retrospectively.
+- Added forecast settings, diagnostics, scenario cost/flow carriers and explainable Home Assistant sensors. Open-Meteo failures use cached data and never disable normal KEMS analysis.
 
 ## 0.7.0-alpha6 — parallel scenario comparison
 
