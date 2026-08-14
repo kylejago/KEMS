@@ -5,7 +5,7 @@
 - **Observe** — source monitoring and learning only.
 - **Simulate** — run proposal-system and virtual KH7 control planning.
 - **Shadow** — calculate desired commands from readings but send nothing.
-- **Control** — reserved for the commissioned backend; real writes are hard-blocked in 0.7.0-alpha4.
+- **Control** — reserved for the commissioned backend; real writes are hard-blocked in 0.7.0-alpha6.
 
 ## Normal strategy
 

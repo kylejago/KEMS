@@ -1,36 +1,45 @@
-# Start here — KEMS 0.7.0-alpha4 guided setup
+# Start here — KEMS 0.7.0-alpha6 scenario comparison
 
-Apply this package over the current alpha3 code. It preserves existing KEMS observation, lifetime, and simulation data.
+Alpha6 builds on the proven alpha5 no-export/live-readiness behaviour and adds a parallel **What would today have looked like?** replay engine. The active KEMS strategy is not changed by comparison replay.
 
 ## Development branch
 
 ```text
-release/0.7.0-alpha4-user-settings
+release/0.7.0-alpha6-scenario-comparison
 ```
 
-Create it from the latest `develop` branch, apply the patch, then run:
+Create the branch from the latest `develop`, apply the alpha6 overlay/patch, then run:
 
 ```powershell
 .\.venv\Scripts\Activate.ps1
 python -m pip install -r requirements-dev.txt
 python -m black .
-python -m ruff check . --fix
+python -m ruff check .
 python -m pytest
 python -m pre_commit run --all-files
 ```
 
-Expected pytest result: `106 passed`.
+The supplied build passes **136 pytest tests** before local Black/Ruff execution.
 
-Commit:
+## New comparison scenarios
 
-```text
-feat: add guided setup and editable tariff UI
-```
+KEMS now replays the same retained demand and tariff observations through:
 
-After installing in Home Assistant, restart and open:
+1. No system — grid supplies the whole home.
+2. Solar only — solar self-consumption plus paid surplus export, no battery.
+3. Solar + battery — conventional tariff-unaware self-use, no grid charging.
+4. KEMS no-export — solar-aware cheap charging and self-use with deliberate export disabled.
+5. Full KEMS smart control — paid export, cheap charging, home reserve, paced battery export and Power Down optimisation.
 
-```text
-Settings → Devices & services → KEMS → Configure
-```
+Today, Yesterday, 7-day and 30-day summaries are exposed. The Today payload also includes a replay timeline for cumulative-cost graphs. Daily standing charge is included in scenario total cost; it cancels out when comparing savings.
 
-Verify the Tariff and prices page first. Existing users should remain in Automatic mode and continue using live Octopus rates. Real FoxESS writes remain blocked.
+## Dashboards
+
+- `dashboards/kems_compare_builtin.yaml` — standard Home Assistant cards only.
+- `dashboards/kems_compare_advanced.yaml` — full replay graphs using ApexCharts plus Mushroom summary cards.
+
+The advanced dashboard needs **ApexCharts Card** and **Mushroom** from HACS.
+
+## Safety
+
+Alpha6 remains simulation/shadow only. Real FoxESS writes are still hard-blocked until the commissioned backend is mapped and verified.

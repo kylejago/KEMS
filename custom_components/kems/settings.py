@@ -28,6 +28,7 @@ from .const import (
     CONF_EPS_WARNING_PERCENT,
     CONF_EXPORT_LIMIT,
     CONF_EXPORT_RATE,
+    CONF_EXPORT_TARIFF_STATUS,
     CONF_GAS_KWH_PER_M3,
     CONF_GRANTS_REBATES,
     CONF_GRID_STABILITY_SECONDS,
@@ -123,6 +124,11 @@ class KEMSSettings:
                 charge_efficiency=float(values[CONF_CHARGE_EFFICIENCY]),
                 discharge_efficiency=float(values[CONF_DISCHARGE_EFFICIENCY]),
                 export_rate_pence=float(values[CONF_EXPORT_RATE]),
+                export_tariff_status=(
+                    "awaiting"
+                    if str(values[CONF_EXPORT_TARIFF_STATUS]) == "awaiting"
+                    else "active"
+                ),
                 inverter_limit_kw=max(
                     float(values[CONF_INVERTER_LIMIT]),
                     0.1,
@@ -142,6 +148,7 @@ class KEMSSettings:
                     values[CONF_BATTERY_POWER_POSITIVE_IS_DISCHARGE]
                 ),
                 saving_session_enabled=bool(values[CONF_SAVING_SESSION_ENABLED]),
+                island_reserve_percent=float(values[CONF_ISLAND_RESERVE_PERCENT]),
                 strategy=(
                     "self_use"
                     if str(values[CONF_SIMULATION_STRATEGY]) == "self_use"

@@ -112,3 +112,33 @@ def test_confirmed_intelligent_slot_uses_manual_cheap_rate() -> None:
 
     assert result.current_import_rate == 3.5
     assert result.off_peak is True
+
+
+def test_automatic_tariff_replaces_past_live_next_start_during_active_window() -> None:
+    """An active-period start must not masquerade as the next charge window."""
+    automatic = TariffSettings(
+        mode="automatic",
+        day_rate_pence=28.3,
+        offpeak_rate_pence=3.5,
+        standing_charge_pence=53.7,
+        offpeak_start=time(23, 30),
+        offpeak_end=time(5, 30),
+        intelligent_slots_enabled=True,
+    )
+    now = datetime(2026, 8, 10, 23, 45, tzinfo=LONDON)
+    result = resolve_tariff(
+        settings=automatic,
+        now=now,
+        live_current_import_rate=3.5,
+        live_next_import_rate=28.3,
+        live_current_export_rate=None,
+        live_standing_charge=53.7,
+        live_off_peak=True,
+        live_intelligent_slot=False,
+        live_next_offpeak_start=datetime(2026, 8, 10, 23, 30, tzinfo=LONDON),
+        live_offpeak_end=datetime(2026, 8, 11, 5, 30, tzinfo=LONDON),
+        ev_charging=False,
+        fallback_export_rate=12.0,
+    )
+
+    assert result.next_offpeak_start == datetime(2026, 8, 11, 23, 30, tzinfo=LONDON)

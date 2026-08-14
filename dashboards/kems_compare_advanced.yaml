@@ -1,0 +1,284 @@
+title: KEMS Compare Advanced
+
+views:
+  - title: Compare
+    path: compare
+    icon: mdi:compare-horizontal
+    cards:
+      - type: markdown
+        content: |
+          # What would today have looked like?
+          Six parallel replays use the same retained demand/tariff observations. The first five are financial comparisons; **Full Island Mode** is resilience-only and is excluded from cheapest-scenario ranking. Island Mode deliberately blocks EV charging and excludes that energy from EPS demand, then runs a sudden-outage replay plus a prepared-outage calculation that finds the minimum energy-secure starting SOC and adds a 5% safety margin. **KEMS no-export** always models the awaiting-export strategy and **Full KEMS** always models paid export/paced control, regardless of the mode currently selected for the live-readiness simulation.
+
+      - type: grid
+        columns: 3
+        square: false
+        cards:
+          - type: custom:mushroom-entity-card
+            entity: sensor.kems_compare_no_system_cost_today
+            name: No system
+            icon: mdi:transmission-tower-import
+          - type: custom:mushroom-entity-card
+            entity: sensor.kems_compare_solar_only_cost_today
+            name: Solar only
+            icon: mdi:solar-power
+          - type: custom:mushroom-entity-card
+            entity: sensor.kems_compare_solar_and_battery_cost_today
+            name: Solar + battery
+            icon: mdi:home-battery-outline
+          - type: custom:mushroom-entity-card
+            entity: sensor.kems_compare_kems_no_export_cost_today
+            name: KEMS no-export
+            icon: mdi:shield-home-outline
+          - type: custom:mushroom-entity-card
+            entity: sensor.kems_compare_full_kems_cost_today
+            name: Full KEMS
+            icon: mdi:brain
+          - type: custom:mushroom-entity-card
+            entity: sensor.kems_compare_full_island_mode_today
+            name: Full Island Mode
+            icon: mdi:transmission-tower-off
+
+      - type: grid
+        columns: 2
+        square: false
+        cards:
+          - type: custom:mushroom-entity-card
+            entity: sensor.kems_compare_full_island_eps_demand_today
+            name: Island / EPS demand
+            icon: mdi:home-lightning-bolt
+          - type: custom:mushroom-entity-card
+            entity: sensor.kems_compare_full_island_ev_energy_shed_today
+            name: EV energy intentionally shed
+            icon: mdi:ev-station-off
+
+      - type: grid
+        columns: 5
+        square: false
+        cards:
+          - type: custom:mushroom-entity-card
+            entity: sensor.kems_compare_full_island_prepared_status_today
+            name: Prepared result
+            icon: mdi:weather-lightning-rainy
+          - type: custom:mushroom-entity-card
+            entity: sensor.kems_compare_full_island_required_starting_soc_today
+            name: Required SOC
+            icon: mdi:battery-alert-variant-outline
+          - type: custom:mushroom-entity-card
+            entity: sensor.kems_compare_full_island_prepared_target_soc_today
+            name: Prepared target
+            icon: mdi:battery-arrow-up-outline
+          - type: custom:mushroom-entity-card
+            entity: sensor.kems_compare_full_island_prepared_load_served_today
+            name: Prepared load served
+            icon: mdi:home-lightning-bolt
+          - type: custom:mushroom-entity-card
+            entity: sensor.kems_compare_full_island_prepared_unserved_energy_today
+            name: Prepared shortfall
+            icon: mdi:home-alert
+
+      - type: custom:apexcharts-card
+        header:
+          show: true
+          title: Cumulative cost today — full replay
+          show_states: false
+        graph_span: 24h
+        span:
+          start: day
+        yaxis:
+          - decimals: 2
+        series:
+          - entity: sensor.kems_scenario_comparison_today
+            name: No system
+            type: line
+            data_generator: |
+              return (entity.attributes.timeline || []).map(p => [new Date(p.timestamp).getTime(), p.no_system_cost_pence / 100]);
+          - entity: sensor.kems_scenario_comparison_today
+            name: Solar only
+            type: line
+            data_generator: |
+              return (entity.attributes.timeline || []).map(p => [new Date(p.timestamp).getTime(), p.solar_only_cost_pence / 100]);
+          - entity: sensor.kems_scenario_comparison_today
+            name: Solar + battery
+            type: line
+            data_generator: |
+              return (entity.attributes.timeline || []).map(p => [new Date(p.timestamp).getTime(), p.solar_battery_cost_pence / 100]);
+          - entity: sensor.kems_scenario_comparison_today
+            name: KEMS no-export
+            type: line
+            data_generator: |
+              return (entity.attributes.timeline || []).map(p => [new Date(p.timestamp).getTime(), p.kems_no_export_cost_pence / 100]);
+          - entity: sensor.kems_scenario_comparison_today
+            name: Full KEMS
+            type: line
+            data_generator: |
+              return (entity.attributes.timeline || []).map(p => [new Date(p.timestamp).getTime(), p.kems_full_cost_pence / 100]);
+
+      - type: custom:apexcharts-card
+        header:
+          show: true
+          title: Saving versus no system today
+          show_states: false
+        graph_span: 24h
+        span:
+          start: day
+        yaxis:
+          - decimals: 2
+        series:
+          - entity: sensor.kems_scenario_comparison_today
+            name: Solar only saving
+            type: line
+            data_generator: |
+              return (entity.attributes.timeline || []).map(p => [new Date(p.timestamp).getTime(), (p.no_system_cost_pence - p.solar_only_cost_pence) / 100]);
+          - entity: sensor.kems_scenario_comparison_today
+            name: Solar + battery saving
+            type: line
+            data_generator: |
+              return (entity.attributes.timeline || []).map(p => [new Date(p.timestamp).getTime(), (p.no_system_cost_pence - p.solar_battery_cost_pence) / 100]);
+          - entity: sensor.kems_scenario_comparison_today
+            name: KEMS no-export saving
+            type: line
+            data_generator: |
+              return (entity.attributes.timeline || []).map(p => [new Date(p.timestamp).getTime(), (p.no_system_cost_pence - p.kems_no_export_cost_pence) / 100]);
+          - entity: sensor.kems_scenario_comparison_today
+            name: Full KEMS saving
+            type: line
+            data_generator: |
+              return (entity.attributes.timeline || []).map(p => [new Date(p.timestamp).getTime(), (p.no_system_cost_pence - p.kems_full_cost_pence) / 100]);
+
+      - type: custom:apexcharts-card
+        header:
+          show: true
+          title: Full Island Mode — resilience today
+          show_states: false
+        graph_span: 24h
+        span:
+          start: day
+        yaxis:
+          - min: 0
+            max: 100
+            decimals: 1
+        series:
+          - entity: sensor.kems_scenario_comparison_today
+            name: Battery SOC
+            type: line
+            data_generator: |
+              return (entity.attributes.timeline || []).filter(p => p.island_soc_percent !== null).map(p => [new Date(p.timestamp).getTime(), p.island_soc_percent]);
+          - entity: sensor.kems_scenario_comparison_today
+            name: Load served
+            type: line
+            data_generator: |
+              return (entity.attributes.timeline || []).filter(p => p.island_load_served_percent !== null).map(p => [new Date(p.timestamp).getTime(), p.island_load_served_percent]);
+
+      - type: custom:apexcharts-card
+        header:
+          show: true
+          title: Full Island Mode — cumulative unserved energy
+          show_states: false
+        graph_span: 24h
+        span:
+          start: day
+        yaxis:
+          - min: 0
+            decimals: 3
+        series:
+          - entity: sensor.kems_scenario_comparison_today
+            name: Unserved energy
+            type: line
+            data_generator: |
+              return (entity.attributes.timeline || []).filter(p => p.island_unserved_load_kwh !== null).map(p => [new Date(p.timestamp).getTime(), p.island_unserved_load_kwh]);
+
+      - type: markdown
+        title: Today — energy and money
+        content: |
+          {% set entities = [
+            ('No system', 'sensor.kems_compare_no_system_cost_today'),
+            ('Solar only', 'sensor.kems_compare_solar_only_cost_today'),
+            ('Solar + battery', 'sensor.kems_compare_solar_and_battery_cost_today'),
+            ('KEMS no-export', 'sensor.kems_compare_kems_no_export_cost_today'),
+            ('Full KEMS', 'sensor.kems_compare_full_kems_cost_today')
+          ] %}
+          | Scenario | Cost | Saving | Cheap import | Day import | Export | Solar | Battery charge | Battery → home | Battery export |
+          |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+          {% for label, entity in entities %}
+          | {{ label }} | £{{ '%.2f' | format((states(entity)|float(0))/100) }} | £{{ '%.2f' | format((state_attr(entity, 'saving_vs_no_system_pence')|float(0))/100) }} | {{ state_attr(entity, 'cheap_grid_import_kwh')|float(0)|round(2) }} | {{ state_attr(entity, 'day_grid_import_kwh')|float(0)|round(2) }} | {{ state_attr(entity, 'grid_export_kwh')|float(0)|round(2) }} | {{ state_attr(entity, 'solar_generation_kwh')|float(0)|round(2) }} | {{ state_attr(entity, 'battery_charge_kwh')|float(0)|round(2) }} | {{ state_attr(entity, 'battery_to_home_kwh')|float(0)|round(2) }} | {{ state_attr(entity, 'battery_export_kwh')|float(0)|round(2) }} |
+          {% endfor %}
+
+      - type: grid
+        columns: 3
+        square: false
+        cards:
+          - type: markdown
+            title: Full KEMS saving breakdown
+            content: |
+              {% set e = 'sensor.kems_compare_full_kems_cost_today' %}
+              **Day-rate import reduction:** £{{ '%.2f' | format((state_attr(e, 'day_rate_import_reduction_pence')|float(0))/100) }}<br>
+              **Cheap-rate import change:** £{{ '%.2f' | format((state_attr(e, 'cheap_rate_import_change_pence')|float(0))/100) }}<br>
+              **Export income:** £{{ '%.2f' | format((state_attr(e, 'export_income_pence')|float(0))/100) }}<br>
+              **Power Down income:** £{{ '%.2f' | format((state_attr(e, 'power_down_income_pence')|float(0))/100) }}<br>
+              **Total saving:** £{{ '%.2f' | format((state_attr(e, 'saving_vs_no_system_pence')|float(0))/100) }}
+          - type: markdown
+            title: Full KEMS battery / solar routing
+            content: |
+              {% set e = 'sensor.kems_compare_full_kems_cost_today' %}
+              **Solar → home:** {{ state_attr(e, 'solar_to_home_kwh')|float(0)|round(2) }} kWh<br>
+              **Solar → battery:** {{ state_attr(e, 'solar_to_battery_kwh')|float(0)|round(2) }} kWh<br>
+              **Solar → grid:** {{ state_attr(e, 'solar_export_kwh')|float(0)|round(2) }} kWh<br>
+              **Grid → battery:** {{ state_attr(e, 'battery_grid_charge_kwh')|float(0)|round(2) }} kWh<br>
+              **Battery → home:** {{ state_attr(e, 'battery_to_home_kwh')|float(0)|round(2) }} kWh<br>
+              **Battery → grid:** {{ state_attr(e, 'battery_export_kwh')|float(0)|round(2) }} kWh<br>
+              **End SOC:** {{ state_attr(e, 'ending_soc_percent') }}%
+          - type: markdown
+            title: Full Island Mode — sudden vs prepared
+            content: |
+              {% set e = 'sensor.kems_compare_full_island_mode_today' %}
+              **Grid:** unavailable in both replays<br>
+              **EV charging:** BLOCKED<br>
+              Recorded demand: {{ state_attr(e, 'house_consumption_kwh')|float(0)|round(3) }} kWh · EV intentionally shed {{ state_attr(e, 'ev_energy_intentionally_shed_kwh')|float(0)|round(3) }} kWh · island/EPS demand {{ state_attr(e, 'island_demand_kwh')|float(0)|round(3) }} kWh<br><br>
+              **Sudden outage**<br>
+              Result: **{{ states(e) }}** · load served {{ state_attr(e, 'load_served_percent')|float(0)|round(1) }}%<br>
+              Start / min / end SOC: {{ state_attr(e, 'starting_soc_percent')|float(0)|round(1) }}% / {{ state_attr(e, 'minimum_soc_percent')|float(0)|round(1) }}% / {{ state_attr(e, 'ending_soc_percent')|float(0)|round(1) }}%<br>
+              Unserved: {{ state_attr(e, 'unserved_load_kwh')|float(0)|round(3) }} kWh · EPS {{ state_attr(e, 'eps_limited_unserved_kwh')|float(0)|round(3) }} · energy {{ state_attr(e, 'energy_limited_unserved_kwh')|float(0)|round(3) }} kWh<br>
+              First shortfall: {{ state_attr(e, 'first_shortfall_at') or '—' }}<br><br>
+              **Prepared outage**<br>
+              Result: **{{ state_attr(e, 'prepared_outage_status') or 'unavailable' }}** · load served {{ state_attr(e, 'prepared_load_served_percent')|float(0)|round(1) }}%<br>
+              Required SOC: {% if state_attr(e, 'required_starting_soc_percent') is not none %}{{ state_attr(e, 'required_starting_soc_percent')|float(0)|round(1) }}%{% else %}not achievable from SOC alone{% endif %}<br>
+              Recommended target: {{ state_attr(e, 'recommended_prepared_soc_percent')|float(0)|round(1) }}% · prepared start {{ state_attr(e, 'prepared_starting_soc_percent')|float(0)|round(1) }}%<br>
+              Prepared end SOC: {{ state_attr(e, 'prepared_ending_soc_percent')|float(0)|round(1) }}%<br>
+              Unserved: {{ state_attr(e, 'prepared_unserved_load_kwh')|float(0)|round(3) }} kWh · EPS {{ state_attr(e, 'prepared_eps_limited_unserved_kwh')|float(0)|round(3) }} · energy {{ state_attr(e, 'prepared_energy_limited_unserved_kwh')|float(0)|round(3) }} kWh<br>
+              Required-SOC status: `{{ state_attr(e, 'required_starting_soc_status') or 'unavailable' }}`
+
+  - title: History
+    path: history
+    icon: mdi:calendar-range
+    cards:
+      - type: markdown
+        title: 7-day comparison
+        content: |
+          {% set scenarios = state_attr('sensor.kems_scenario_comparison_7_days', 'scenarios') or [] %}
+          | Scenario | Cost | Saving | Import | Export | Solar |
+          |---|---:|---:|---:|---:|---:|
+          {% for s in scenarios %}
+          {% if s.financially_comparable %}
+          | {{ s.label }} | £{{ '%.2f' | format((s.total_cost_pence|float(0))/100) }} | £{{ '%.2f' | format((s.saving_vs_no_system_pence|float(0))/100) }} | {{ s.grid_import_kwh|float(0)|round(1) }} kWh | {{ s.grid_export_kwh|float(0)|round(1) }} kWh | {{ s.solar_generation_kwh|float(0)|round(1) }} kWh |
+          {% endif %}
+          {% endfor %}
+
+          {% for s in scenarios %}{% if s.key == 'full_island' %}
+          **Full Island Mode:** sudden {{ s.outage_status }} · {{ s.load_served_percent|float(0)|round(1) }}% served · prepared {{ s.prepared_outage_status }} · {{ s.prepared_load_served_percent|float(0)|round(1) }}% served · required SOC {% if s.required_starting_soc_percent is not none %}{{ s.required_starting_soc_percent|float(0)|round(1) }}%{% else %}not achievable{% endif %}
+          {% endif %}{% endfor %}
+      - type: markdown
+        title: 30-day retained-history comparison
+        content: |
+          {% set scenarios = state_attr('sensor.kems_scenario_comparison_30_days', 'scenarios') or [] %}
+          | Scenario | Cost | Saving | Import | Export | Solar |
+          |---|---:|---:|---:|---:|---:|
+          {% for s in scenarios %}
+          {% if s.financially_comparable %}
+          | {{ s.label }} | £{{ '%.2f' | format((s.total_cost_pence|float(0))/100) }} | £{{ '%.2f' | format((s.saving_vs_no_system_pence|float(0))/100) }} | {{ s.grid_import_kwh|float(0)|round(1) }} kWh | {{ s.grid_export_kwh|float(0)|round(1) }} kWh | {{ s.solar_generation_kwh|float(0)|round(1) }} kWh |
+          {% endif %}
+          {% endfor %}
+
+          {% for s in scenarios %}{% if s.key == 'full_island' %}
+          **Full Island Mode:** sudden {{ s.outage_status }} · {{ s.load_served_percent|float(0)|round(1) }}% served · prepared {{ s.prepared_outage_status }} · {{ s.prepared_load_served_percent|float(0)|round(1) }}% served · required SOC {% if s.required_starting_soc_percent is not none %}{{ s.required_starting_soc_percent|float(0)|round(1) }}%{% else %}not achievable{% endif %}
+          {% endif %}{% endfor %}

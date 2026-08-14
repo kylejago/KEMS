@@ -68,11 +68,30 @@ class Snapshot:
     stale_fields: tuple[str, ...] = ()
     source_data_age_seconds: float | None = None
 
+    # Tariff freshness is tracked separately from fast power telemetry. A stale
+    # tariff hint is ignored/fallen back independently rather than making fresh
+    # Modbus or meter data look stale.
+    tariff_source_age_seconds: dict[str, float] = field(default_factory=dict)
+    tariff_stale_fields: tuple[str, ...] = ()
+    tariff_source_data_age_seconds: float | None = None
+
+    @property
+    def intelligent_slot_source_fresh(self) -> bool | None:
+        """Return freshness of the configured Intelligent-slot source."""
+        if "intelligent_slot" not in self.tariff_source_age_seconds:
+            return None
+        return "intelligent_slot" not in self.tariff_stale_fields
+
     @property
     def cheap_period_confirmed(self) -> bool:
-        """Return whether a usable cheap period is confirmed."""
+        """Return whether a fresh, usable cheap period is confirmed."""
+        intelligent_fresh = "intelligent_slot" not in self.tariff_stale_fields
+        # off_peak may already be the safe manual-schedule fallback produced by
+        # tariff resolution after a stale live off-peak source was discarded.
         return self.off_peak is True or (
-            self.intelligent_slot is True and self.ev_charging is True
+            self.intelligent_slot is True
+            and intelligent_fresh
+            and self.ev_charging is True
         )
 
     def to_dict(self) -> dict[str, Any]:
@@ -80,6 +99,7 @@ class Snapshot:
         data = asdict(self)
         data["timestamp"] = self.timestamp.isoformat()
         data["stale_fields"] = list(self.stale_fields)
+        data["tariff_stale_fields"] = list(self.tariff_stale_fields)
         for key in (
             "next_offpeak_start",
             "offpeak_end",
@@ -112,6 +132,11 @@ class Snapshot:
         stale_fields = values.get("stale_fields")
         if isinstance(stale_fields, list):
             values["stale_fields"] = tuple(str(item) for item in stale_fields)
+        tariff_stale_fields = values.get("tariff_stale_fields")
+        if isinstance(tariff_stale_fields, list):
+            values["tariff_stale_fields"] = tuple(
+                str(item) for item in tariff_stale_fields
+            )
         known = cls.__dataclass_fields__
         return cls(**{key: value for key, value in values.items() if key in known})
 
@@ -186,6 +211,7 @@ class SimulationConfig:
     charge_efficiency: float = 0.95
     discharge_efficiency: float = 0.95
     export_rate_pence: float = 12.0
+    export_tariff_status: str = "active"
     inverter_limit_kw: float = 7.0
     export_limit_kw: float = 7.0
     eps_output_limit_kw: float = 7.0
@@ -196,6 +222,7 @@ class SimulationConfig:
     battery_power_positive_is_discharge: bool = True
     strategy: str = "paced_export"
     saving_session_enabled: bool = True
+    island_reserve_percent: float = 20.0
 
 
 @dataclass(frozen=True, slots=True)
@@ -210,6 +237,8 @@ class SimulationState:
     actual_import_cost_pence: float | None = None
     actual_export_income_pence: float | None = None
     simulated_import_cost_pence: float | None = None
+    simulated_cheap_import_cost_pence: float | None = None
+    simulated_day_import_cost_pence: float | None = None
     simulated_export_income_pence: float | None = None
     actual_house_consumption_kwh: float | None = None
     actual_ev_energy_kwh: float | None = None
@@ -219,8 +248,14 @@ class SimulationState:
     actual_grid_import_kwh: float | None = None
     actual_grid_export_kwh: float | None = None
     simulated_grid_import_kwh: float | None = None
+    simulated_cheap_import_kwh: float | None = None
+    simulated_day_import_kwh: float | None = None
     simulated_grid_export_kwh: float | None = None
     simulated_solar_generation_kwh: float | None = None
+    simulated_solar_to_home_kwh: float | None = None
+    simulated_solar_to_battery_kwh: float | None = None
+    simulated_solar_export_kwh: float | None = None
+    simulated_grid_to_battery_kwh: float | None = None
     simulated_solar_curtailed_kwh: float | None = None
     simulated_battery_charge_kwh: float | None = None
     simulated_battery_to_home_kwh: float | None = None
@@ -238,6 +273,7 @@ class SimulationState:
     current_simulated_grid_export_kw: float | None = None
     current_simulated_battery_power_kw: float | None = None
     current_simulated_battery_charge_power_kw: float | None = None
+    current_simulated_solar_to_battery_power_kw: float | None = None
     current_simulated_battery_to_home_power_kw: float | None = None
     current_simulated_battery_export_power_kw: float | None = None
     current_simulated_total_kh7_output_kw: float | None = None
@@ -272,6 +308,14 @@ class SimulationState:
     battery_reserved_for_saving_session: bool = False
     battery_export_reduced_for_saving_session: bool = False
     effective_export_rate_pence: float | None = None
+    export_tariff_status: str = "active"
+    export_tariff_active: bool = True
+    no_export_mode_active: bool = False
+    overnight_charge_target_percent: float | None = None
+    overnight_charge_target_kwh: float | None = None
+    forecast_home_until_next_cheap_kwh: float | None = None
+    forecast_solar_until_next_cheap_kwh: float | None = None
+    forecast_solar_credit_kwh: float | None = None
     inverter_limit_kw: float | None = None
     export_limit_kw: float | None = None
     battery_charge_limit_kw: float | None = None
@@ -284,6 +328,198 @@ class SimulationState:
     proposal_solar_active: bool = False
     battery_export_enabled: bool = False
     data_coverage: float = 0.0
+
+
+@dataclass(frozen=True, slots=True)
+class ScenarioSummary:
+    """One what-if financial or resilience result for a system design."""
+
+    key: str
+    label: str
+    description: str = ""
+    ready: bool = False
+    samples: int = 0
+    data_coverage: float = 0.0
+    import_cost_pence: float = 0.0
+    cheap_import_cost_pence: float = 0.0
+    day_import_cost_pence: float = 0.0
+    export_income_pence: float = 0.0
+    power_down_income_pence: float = 0.0
+    standing_charge_pence: float = 0.0
+    energy_net_cost_pence: float = 0.0
+    total_cost_pence: float = 0.0
+    saving_vs_no_system_pence: float = 0.0
+    day_rate_import_reduction_pence: float = 0.0
+    cheap_rate_import_change_pence: float = 0.0
+    house_consumption_kwh: float = 0.0
+    grid_import_kwh: float = 0.0
+    cheap_grid_import_kwh: float = 0.0
+    day_grid_import_kwh: float = 0.0
+    grid_export_kwh: float = 0.0
+    solar_generation_kwh: float = 0.0
+    solar_to_home_kwh: float = 0.0
+    solar_to_battery_kwh: float = 0.0
+    solar_export_kwh: float = 0.0
+    solar_curtailed_kwh: float = 0.0
+    battery_charge_kwh: float = 0.0
+    battery_grid_charge_kwh: float = 0.0
+    battery_solar_charge_kwh: float = 0.0
+    battery_to_home_kwh: float = 0.0
+    battery_export_kwh: float = 0.0
+    ending_soc_percent: float | None = None
+    financially_comparable: bool = True
+    grid_available: bool = True
+    outage_survived: bool | None = None
+    outage_status: str | None = None
+    outage_duration_hours: float = 0.0
+    load_served_kwh: float = 0.0
+    unserved_load_kwh: float = 0.0
+    load_served_percent: float | None = None
+    starting_soc_percent: float | None = None
+    minimum_soc_percent: float | None = None
+    conservation_threshold_percent: float | None = None
+    emergency_floor_percent: float | None = None
+    eps_limited_unserved_kwh: float = 0.0
+    energy_limited_unserved_kwh: float = 0.0
+    first_shortfall_at: str | None = None
+    estimated_remaining_runtime_hours: float | None = None
+    battery_energy_above_floor_kwh: float | None = None
+
+    # Island-only load shedding. Recorded whole-home demand remains in
+    # house_consumption_kwh for apples-to-apples reporting, while EV demand is
+    # deliberately removed from the EPS load and reported separately.
+    island_demand_kwh: float = 0.0
+    ev_energy_intentionally_shed_kwh: float = 0.0
+    ev_charging_allowed_in_island: bool | None = None
+
+    # Prepared-outage resilience. This is the same solar/battery/EPS system,
+    # but KEMS is assumed to have advance notice and may pre-charge before the
+    # replay starts. It remains non-financial and separate from cheapest ranking.
+    required_starting_soc_percent: float | None = None
+    required_starting_soc_status: str | None = None
+    recommended_prepared_soc_percent: float | None = None
+    prepared_starting_soc_percent: float | None = None
+    prepared_soc_margin_percent: float | None = None
+    prepared_outage_survived: bool | None = None
+    prepared_outage_status: str | None = None
+    prepared_load_served_kwh: float | None = None
+    prepared_unserved_load_kwh: float | None = None
+    prepared_load_served_percent: float | None = None
+    prepared_ending_soc_percent: float | None = None
+    prepared_minimum_soc_percent: float | None = None
+    prepared_eps_limited_unserved_kwh: float | None = None
+    prepared_energy_limited_unserved_kwh: float | None = None
+    prepared_first_shortfall_at: str | None = None
+
+    # Current/recent power routing for live visualisations such as the
+    # 16x16 KEMS panel. These are instantaneous kW values from the latest
+    # replay snapshot, not period totals.
+    current_house_load_kw: float | None = None
+    current_ev_shed_kw: float | None = None
+    current_solar_power_kw: float | None = None
+    current_grid_import_kw: float | None = None
+    current_grid_export_kw: float | None = None
+    current_solar_to_home_kw: float | None = None
+    current_solar_to_battery_kw: float | None = None
+    current_solar_export_kw: float | None = None
+    current_grid_to_battery_kw: float | None = None
+    current_battery_to_home_kw: float | None = None
+    current_battery_export_kw: float | None = None
+    current_battery_soc_percent: float | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        """Return a stable JSON-compatible summary."""
+        return asdict(self)
+
+
+@dataclass(frozen=True, slots=True)
+class ScenarioPeriodComparison:
+    """Scenario results aggregated across one reporting period."""
+
+    key: str
+    label: str
+    start_date: date
+    end_date: date
+    days_included: int
+    scenarios: tuple[ScenarioSummary, ...] = ()
+
+    def scenario(self, key: str) -> ScenarioSummary | None:
+        """Return one named scenario from the period."""
+        return next((item for item in self.scenarios if item.key == key), None)
+
+    @property
+    def cheapest(self) -> ScenarioSummary | None:
+        """Return the cheapest ready scenario in the period."""
+        ready = [
+            item
+            for item in self.scenarios
+            if item.ready and item.financially_comparable
+        ]
+        return min(ready, key=lambda item: item.total_cost_pence) if ready else None
+
+    def to_dict(self) -> dict[str, Any]:
+        """Return JSON-compatible period comparison data."""
+        return {
+            "key": self.key,
+            "label": self.label,
+            "start_date": self.start_date.isoformat(),
+            "end_date": self.end_date.isoformat(),
+            "days_included": self.days_included,
+            "cheapest_scenario": self.cheapest.key if self.cheapest else None,
+            "scenarios": [item.to_dict() for item in self.scenarios],
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class ScenarioTimelinePoint:
+    """One today replay point for financial-cost and island-resilience charts."""
+
+    timestamp: datetime
+    no_system_cost_pence: float
+    solar_only_cost_pence: float
+    solar_battery_cost_pence: float
+    kems_no_export_cost_pence: float
+    kems_full_cost_pence: float
+    island_load_served_percent: float | None = None
+    island_unserved_load_kwh: float | None = None
+    island_soc_percent: float | None = None
+    island_status: str | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        """Return JSON-compatible chart data."""
+        values = asdict(self)
+        values["timestamp"] = self.timestamp.isoformat()
+        return values
+
+
+@dataclass(frozen=True, slots=True)
+class ScenarioComparisonState:
+    """Complete parallel what-if comparison payload."""
+
+    generated_at: datetime
+    periods: dict[str, ScenarioPeriodComparison] = field(default_factory=dict)
+    timeline: tuple[ScenarioTimelinePoint, ...] = ()
+
+    def period(self, key: str = "today") -> ScenarioPeriodComparison | None:
+        """Return one reporting period."""
+        return self.periods.get(key)
+
+    def scenario(
+        self,
+        scenario_key: str,
+        period_key: str = "today",
+    ) -> ScenarioSummary | None:
+        """Return one scenario from one period."""
+        period = self.period(period_key)
+        return period.scenario(scenario_key) if period else None
+
+    def to_dict(self) -> dict[str, Any]:
+        """Return JSON-compatible scenario data for diagnostics and web use."""
+        return {
+            "generated_at": self.generated_at.isoformat(),
+            "periods": {key: value.to_dict() for key, value in self.periods.items()},
+            "timeline": [item.to_dict() for item in self.timeline],
+        }
 
 
 @dataclass(frozen=True, slots=True)
@@ -610,6 +846,9 @@ class PowerDownResult:
     fixed_export_income_pence: float | None = None
     combined_income_pence: float | None = None
     ev_successfully_blocked: bool = False
+    active_samples_observed: int = 0
+    plan_safe_throughout: bool | None = None
+    island_override_observed: bool | None = None
     completed_successfully: bool = False
     completion_reason: str = "unavailable"
 
@@ -653,6 +892,7 @@ class KEMSData:
     gas: GasSummary
     advice: AdviceState
     simulation: SimulationState
+    scenarios: ScenarioComparisonState
     whole_home: WholeHomeSummary
     lifetime: LifetimeLedger
     roi: ROIState

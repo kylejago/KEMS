@@ -1,4 +1,4 @@
-# Entity inventory — v0.7.0-alpha4
+# Entity inventory — v0.7.0-alpha6
 
 KEMS creates source-mirror entities only when the matching source is configured. Derived analysis and proposal-simulation entities are created automatically and may be `unknown` until enough observations exist.
 
@@ -67,6 +67,20 @@ KEMS creates source-mirror entities only when the matching source is configured.
 - simulated solar generation and curtailment
 - simulated battery charged, delivered to home, and exported
 - avoided day-rate grid import
+
+## Compare — parallel what-if scenarios
+
+- `sensor.kems_scenario_comparison_today` — cheapest ready scenario as state, with all Today scenario summaries and the cumulative replay timeline as attributes
+- `sensor.kems_compare_no_system_cost_today`
+- `sensor.kems_compare_solar_only_cost_today`
+- `sensor.kems_compare_solar_and_battery_cost_today`
+- `sensor.kems_compare_kems_no_export_cost_today`
+- `sensor.kems_compare_full_kems_cost_today`
+- `sensor.kems_scenario_comparison_yesterday`
+- `sensor.kems_scenario_comparison_7_days`
+- `sensor.kems_scenario_comparison_30_days`
+
+Each cost sensor includes import/export cost, cheap/day import split, standing charge, solar routing, battery routing, end SOC and the exact saving breakdown versus the No system baseline.
 
 ## Native period summaries
 

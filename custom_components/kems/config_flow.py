@@ -48,6 +48,7 @@ from .const import (
     CONF_EV_STATUS,
     CONF_EXPORT_LIMIT,
     CONF_EXPORT_RATE,
+    CONF_EXPORT_TARIFF_STATUS,
     CONF_GAS_COST_TODAY,
     CONF_GAS_CURRENT_RATE,
     CONF_GAS_KWH_PER_M3,
@@ -151,6 +152,13 @@ def _select(options: list[tuple[str, str]]):
 BOOLEAN_SELECTOR = selector({"boolean": {}})
 TIME_SELECTOR = selector({"time": {}})
 
+EXPORT_TARIFF_STATUS_SELECTOR = _select(
+    [
+        ("active", "Active - export is paid"),
+        ("awaiting", "Not active / awaiting export tariff"),
+    ]
+)
+
 TARIFF_MODE_SELECTOR = _select(
     [
         (
@@ -194,6 +202,7 @@ MANUAL_TARIFF_FIELDS = {
     vol.Required(CONF_MANUAL_DAY_RATE): _number(0, 200, "any", "p/kWh"),
     vol.Required(CONF_MANUAL_OFFPEAK_RATE): _number(0, 200, "any", "p/kWh"),
     vol.Required(CONF_MANUAL_STANDING_CHARGE): _number(0, 500, "any", "p/day"),
+    vol.Required(CONF_EXPORT_TARIFF_STATUS): EXPORT_TARIFF_STATUS_SELECTOR,
     vol.Required(CONF_EXPORT_RATE): _number(0, 200, 0.01, "p/kWh"),
     vol.Required(CONF_MANUAL_OFFPEAK_START): TIME_SELECTOR,
     vol.Required(CONF_MANUAL_OFFPEAK_END): TIME_SELECTOR,
@@ -303,7 +312,7 @@ CONTROL_SCHEMA = vol.Schema(
 class KEMSConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Handle automatic and manual KEMS setup."""
 
-    VERSION = 12
+    VERSION = 13
     MINOR_VERSION = 0
 
     def __init__(self) -> None:

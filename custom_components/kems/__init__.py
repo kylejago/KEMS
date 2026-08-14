@@ -13,6 +13,7 @@ from .const import (
     CONF_EV_POWER,
     CONF_EXPORT_LIMIT,
     CONF_EXPORT_RATE,
+    CONF_EXPORT_TARIFF_STATUS,
     CONF_INTELLIGENT_SLOTS_ENABLED,
     CONF_INVERTER_LIMIT,
     CONF_MANUAL_DAY_RATE,
@@ -74,7 +75,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     entities = KEMSEntities.from_entry_data(enriched)
     settings = KEMSSettings.from_options(entry.options)
     collector = Collector(
-        octopus=OctopusProvider(hass, entities),
+        octopus=OctopusProvider(
+            hass,
+            entities,
+            stale_data_seconds=settings.control.stale_data_seconds,
+        ),
         gas=GasProvider(hass, entities, settings.gas_kwh_per_m3),
         ohme=OhmeProvider(hass, entities),
         foxess=FoxESSProvider(
@@ -112,7 +117,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
 async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Migrate earlier KEMS config entries to the current schema."""
-    if entry.version > 12:
+    if entry.version > 13:
         return False
 
     data = dict(entry.data)
@@ -152,11 +157,16 @@ async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         options.setdefault(CONF_MANUAL_OFFPEAK_END, "05:30:00")
         options.setdefault(CONF_INTELLIGENT_SLOTS_ENABLED, True)
 
+    if entry.version < 13:
+        # Alpha5 separates export-tariff availability from the configured
+        # future export rate. Existing installations retain alpha4 behaviour.
+        options.setdefault(CONF_EXPORT_TARIFF_STATUS, "active")
+
     hass.config_entries.async_update_entry(
         entry,
         data=data,
         options=options,
-        version=12,
+        version=13,
         minor_version=0,
     )
     return True

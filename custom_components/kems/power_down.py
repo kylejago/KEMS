@@ -9,7 +9,14 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.storage import Store
 
 from .const import DOMAIN, STORAGE_NAMESPACE
-from .kems_core import ControlState, PowerDownResult, SimulationState, Snapshot
+from .kems_core import (
+    ControlState,
+    PowerDownAuditState,
+    PowerDownResult,
+    SimulationState,
+    Snapshot,
+    finalise_power_down_audit,
+)
 
 STORAGE_VERSION = 1
 
@@ -99,9 +106,10 @@ class PowerDownHistoryRecorder:
                     "combined_income_pence": (
                         simulation.estimated_saving_session_total_income_pence
                     ),
-                    "ev_successfully_blocked": not control.desired_ev_charging_allowed,
-                    "plan_safe": control.plan_safe,
-                    "island_override": control.island_mode_active,
+                    "active_samples_observed": 0,
+                    "ev_successfully_blocked": True,
+                    "plan_safe_throughout": True,
+                    "island_override_observed": False,
                 }
             else:
                 self._pending["finishing_simulated_soc_percent"] = (
@@ -110,17 +118,6 @@ class PowerDownHistoryRecorder:
                 self._pending["maximum_inverter_output_kw"] = max(
                     float(self._pending.get("maximum_inverter_output_kw") or 0.0),
                     control.total_kh7_ac_output_kw,
-                )
-                self._pending["ev_successfully_blocked"] = bool(
-                    self._pending.get("ev_successfully_blocked", True)
-                    and not control.desired_ev_charging_allowed
-                )
-                self._pending["plan_safe"] = bool(
-                    self._pending.get("plan_safe", True) and control.plan_safe
-                )
-                self._pending["island_override"] = bool(
-                    self._pending.get("island_override", False)
-                    or control.island_mode_active
                 )
                 for pending_key, value in (
                     (
@@ -144,22 +141,70 @@ class PowerDownHistoryRecorder:
                     if value is not None:
                         self._pending[pending_key] = value
 
+            active_now = bool(
+                session_start <= now < session_end
+                and (snapshot.saving_session_active or simulation.saving_session_active)
+            )
+            audit = PowerDownAuditState(
+                active_samples_observed=int(
+                    self._pending.get("active_samples_observed", 0) or 0
+                ),
+                ev_successfully_blocked=bool(
+                    self._pending.get("ev_successfully_blocked", True)
+                ),
+                plan_safe_throughout=bool(
+                    self._pending.get(
+                        "plan_safe_throughout",
+                        self._pending.get("plan_safe", True),
+                    )
+                ),
+                island_override_observed=bool(
+                    self._pending.get(
+                        "island_override_observed",
+                        self._pending.get("island_override", False),
+                    )
+                ),
+            ).observe(
+                session_active=active_now,
+                desired_ev_charging_allowed=control.desired_ev_charging_allowed,
+                plan_safe=control.plan_safe,
+                island_mode_active=control.island_mode_active,
+            )
+            self._pending.update(
+                {
+                    "active_samples_observed": audit.active_samples_observed,
+                    "ev_successfully_blocked": audit.ev_successfully_blocked,
+                    "plan_safe_throughout": audit.plan_safe_throughout,
+                    "island_override_observed": audit.island_override_observed,
+                }
+            )
+
         if self._pending is not None:
             pending_end = datetime.fromisoformat(str(self._pending["session_end"]))
             if now >= pending_end:
-                island_override = bool(self._pending.get("island_override", False))
-                plan_safe = bool(self._pending.get("plan_safe", False))
-                ev_blocked = bool(self._pending.get("ev_successfully_blocked", False))
-                completed = plan_safe and ev_blocked and not island_override
-                reason = (
-                    "island_safety_override"
-                    if island_override
-                    else "completed" if completed else "plan_or_ev_safety_check_failed"
+                audit = PowerDownAuditState(
+                    active_samples_observed=int(
+                        self._pending.get("active_samples_observed", 0) or 0
+                    ),
+                    ev_successfully_blocked=bool(
+                        self._pending.get("ev_successfully_blocked", False)
+                    ),
+                    plan_safe_throughout=bool(
+                        self._pending.get("plan_safe_throughout", False)
+                    ),
+                    island_override_observed=bool(
+                        self._pending.get("island_override_observed", False)
+                    ),
                 )
+                completed, reason = finalise_power_down_audit(audit)
                 self._last = PowerDownResult.from_dict(
                     {
                         **self._pending,
                         "available": True,
+                        "active_samples_observed": audit.active_samples_observed,
+                        "ev_successfully_blocked": audit.ev_successfully_blocked,
+                        "plan_safe_throughout": audit.plan_safe_throughout,
+                        "island_override_observed": audit.island_override_observed,
                         "completed_successfully": completed,
                         "completion_reason": reason,
                     }

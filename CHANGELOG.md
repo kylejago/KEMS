@@ -1,3 +1,35 @@
+## 0.7.0-alpha6 — parallel scenario comparison
+
+- Added source-specific tariff freshness gating so stale Intelligent-slot signals cannot authorise cheap charging; tariff inputs now fail back independently without making fresh power telemetry stale.
+- Tuned the slower Octopus Intelligent slot/schedule sources to a 360-second freshness window while retaining the normal 180-second timeout for live power and fast tariff inputs.
+
+- Added a dedicated what-if replay engine that evaluates six independent system designs from the same retained observations: No system, Solar only, Solar + battery, KEMS no-export, Full KEMS smart control, and Full island mode — grid down.
+- Comparison replay is independent of the currently selected export-tariff/live-readiness mode, so no-export can remain active while paid-export Full KEMS is still modelled in parallel.
+- Added exact today cost, import/export, solar routing, battery routing, end-SOC, standing-charge and saving-vs-baseline summaries for every scenario.
+- Added an explainable saving decomposition: reduced day-rate import, change in cheap-rate import, export income, and Power Down income.
+- Added a resilience-only full-island replay with grid import/export forced to zero, EPS output limits, emergency-floor protection, outage survival, unserved energy and first-shortfall reporting; it is excluded from cheapest-scenario financial ranking.
+- Full Island Mode now deliberately blocks EV charging before EPS replay, reports that EV energy as intentionally shed rather than unserved house load, and measures resilience against the remaining island/EPS demand.
+- Added prepared-outage resilience on top of Full Island Mode: KEMS now finds the minimum starting SOC needed to eliminate energy-limited shortfall, adds a 5% preparation margin, and replays the outage from that prepared target without pretending a larger EPS or any non-EV load-shedding capability exists.
+- Prepared resilience explicitly distinguishes an unavoidable EPS-limit shortfall from an energy-capacity shortfall, and reports when even 100% SOC cannot cover the requested outage period.
+- Fixed Power Down completion auditing so joined/pre-session samples no longer permanently fail the EV-block check; safety evidence is now accumulated only while the session is actually active, with explicit plan, EV, island-override, and no-active-sample completion reasons.
+- Added cumulative midnight-to-now cost timeline data for the five financial scenarios, plus island SOC/load-served/unserved-energy/status timeline data.
+- Added Yesterday, 7-day and 30-day retained-history scenario rollups.
+- Added smart-simulation cheap/day import-cost splits and solar/grid-to-battery flow accounting used by the comparison engine and diagnostics.
+- Added built-in and ApexCharts/Mushroom Compare dashboards.
+- Full KEMS and no-export comparison batteries are carried independently across retained days, keeping scenario histories isolated from one another.
+- Real FoxESS writes remain hard-blocked.
+
+## 0.7.0-alpha5 — awaiting export tariff / no-export live readiness
+
+- Added an explicit Export tariff status: Active or Not active / awaiting export tariff.
+- Awaiting mode values export at 0p/kWh and overrides normal export settings without deleting the configured future export rate.
+- Forces self-consumption-first simulation: solar → home → battery, then battery → home, with deliberate grid export disabled.
+- Adds solar-aware cheap-period charging targets so the battery retains forecast home cover while leaving conservative PV headroom.
+- Power Down remains visible but no battery/export reserve is created while paid export is unavailable; reduction can still come from avoiding import.
+- Added export-tariff/no-export status, solar-to-battery flow and overnight charge-target diagnostics.
+- Control Lab mirrors the policy in shadow planning but real hardware writes remain hard-blocked.
+- Existing alpha4 users migrate with Export tariff status = Active so behaviour does not silently change.
+
 ## 0.7.0-alpha4 hotfix — actual lifetime reconciliation
 
 - Makes the persisted daily ledger authoritative for observed/pre-install lifetime energy and billing totals, matching the simulated-ledger approach.

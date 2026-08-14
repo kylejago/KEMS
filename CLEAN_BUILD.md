@@ -1,7 +1,13 @@
-# KEMS 0.7.0-alpha4 in-place development upgrade
+# KEMS 0.7.0-alpha6 clean build
 
-This build preserves all 0.6.0-beta1 observation history, learning data, source mappings, simulation totals, Power Down planning, and ROI state.
+This build is based on the final 0.7.0-alpha5 source and adds the parallel scenario-comparison engine, scenario sensors, diagnostics and Compare dashboards.
 
-It adds new options and calculated entities for the Control Lab. Existing config entries migrate to schema version 11 and receive safe defaults automatically.
+Expected validation from the supplied source:
 
-No real inverter or charger service calls are made. The real control backend is intentionally unavailable until the KH7 is installed and commissioned.
+- 136 pytest tests pass.
+- All dashboard YAML parses.
+- All Python source parses.
+- No Python cache files are shipped.
+- `FILE_MANIFEST.sha256` is regenerated after the final source tree is frozen.
+
+Run local Black, Ruff and pre-commit before merging the release branch to `develop`.

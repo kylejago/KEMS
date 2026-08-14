@@ -174,7 +174,8 @@
           "export_rate_pence": "Export rate",
           "manual_offpeak_start": "Off-peak starts",
           "manual_offpeak_end": "Off-peak ends",
-          "intelligent_slots_enabled": "Use confirmed Intelligent extra slots"
+          "intelligent_slots_enabled": "Use confirmed Intelligent extra slots",
+          "export_tariff_status": "Export tariff status"
         },
         "data_description": {
           "tariff_mode": "Manual is selected for this setup.",
@@ -184,7 +185,8 @@
           "export_rate_pence": "Fixed payment received per exported kWh.",
           "manual_offpeak_start": "Local Home Assistant time.",
           "manual_offpeak_end": "Local Home Assistant time. Overnight periods are supported.",
-          "intelligent_slots_enabled": "Requires the Intelligent slot and EV charging sources to confirm an extra slot safely."
+          "intelligent_slots_enabled": "Requires the Intelligent slot and EV charging sources to confirm an extra slot safely.",
+          "export_tariff_status": "Choose Not active while you are waiting for an export tariff. KEMS will value export at 0p and avoid deliberate grid export."
         }
       }
     },
@@ -217,17 +219,19 @@
           "export_rate_pence": "Fixed export rate (p/kWh)",
           "manual_offpeak_start": "Off-peak starts",
           "manual_offpeak_end": "Off-peak ends",
-          "intelligent_slots_enabled": "Use confirmed Intelligent extra slots"
+          "intelligent_slots_enabled": "Use confirmed Intelligent extra slots",
+          "export_tariff_status": "Export tariff status"
         },
         "data_description": {
           "tariff_mode": "Automatic follows configured Home Assistant tariff entities. When a live value is unavailable, KEMS uses the manual fallback values below. Manual always uses the values below.",
           "manual_day_rate_pence": "Price paid outside the normal cheap period.",
           "manual_offpeak_rate_pence": "Price paid during the normal cheap period and confirmed Intelligent extra slots.",
           "manual_standing_charge_pence": "Daily electricity standing charge in pence.",
-          "export_rate_pence": "Fixed 12p/kWh export rate used for every simulated export interval. Intelligent Octopus Flux rates are intentionally ignored.",
+          "export_rate_pence": "Payment received per exported kWh once Export tariff status is Active. While awaiting an export tariff KEMS uses 0p/kWh regardless of this future rate.",
           "manual_offpeak_start": "Start of the normal cheap period in local Home Assistant time.",
           "manual_offpeak_end": "End of the normal cheap period. Overnight periods are supported.",
-          "intelligent_slots_enabled": "Allow a live Intelligent slot plus active EV charging to confirm an extra cheap period."
+          "intelligent_slots_enabled": "Allow a live Intelligent slot plus active EV charging to confirm an extra cheap period.",
+          "export_tariff_status": "Not active switches KEMS to no-export self-use planning: battery export is disabled, export value becomes 0p, solar serves the home then battery, and overnight charging leaves forecast solar headroom."
         }
       },
       "battery": {
@@ -262,7 +266,7 @@
       },
       "solar": {
         "title": "Solar, export and Power Down",
-        "description": "Configure the solar estimate, battery export strategy and Octoplus Power Down simulation.",
+        "description": "Configure the solar estimate, normal export strategy and Octoplus Power Down simulation. Export settings are automatically overridden while the export tariff is not active.",
         "data": {
           "proposal_solar_enabled": "Use proposal solar model when live PV is unavailable",
           "proposal_solar_factor": "Proposal solar/weather factor (0.0-2.0)",
@@ -273,8 +277,8 @@
         "data_description": {
           "proposal_solar_enabled": "Models 21 x 460W panels, 9.66kWp, three roof orientations, and the proposal monthly generation baseline.",
           "proposal_solar_factor": "Scale the proposal baseline for cloud/weather sensitivity; 1.0 uses the proposal average.",
-          "battery_export_enabled": "Preserve forecast house demand, then spread remaining battery export across the hours until the next cheap period.",
-          "simulation_strategy": "Paced export targets the configured reserve at the next cheap-period start instead of exporting the battery early in the day.",
+          "battery_export_enabled": "Used only while the export tariff is Active. In Awaiting Export Tariff mode KEMS always disables deliberate battery export.",
+          "simulation_strategy": "Used while the export tariff is Active. Awaiting Export Tariff mode automatically uses self-consumption-first planning.",
           "saving_session_enabled": "Hold battery energy before a joined session, cover the home, and maximise permitted export during the higher-reward window. KEMS remains read-only and does not join sessions itself."
         }
       },
@@ -337,7 +341,7 @@
           "island_reserve_percent": "Island conservation threshold (%)"
         },
         "data_description": {
-          "operating_mode": "Observe, virtual simulation, shadow planning, or control. Real control remains hard-blocked in alpha3.",
+          "operating_mode": "Observe, virtual simulation, shadow planning, or control. Real control remains hard-blocked in alpha6.",
           "virtual_scenario": "Inject normal, solar, cloud, high-load, Power Down, outage, overload, or unstable-grid conditions.",
           "control_enabled": "Records explicit control opt-in only. It cannot permit real writes until a verified backend exists.",
           "system_commissioned": "Leave off before the installer has commissioned the KH7 and KEMS has verified all readings and limits.",

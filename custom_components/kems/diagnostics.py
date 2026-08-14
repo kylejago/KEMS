@@ -11,6 +11,7 @@ from homeassistant.helpers import entity_registry as er
 from homeassistant.util import dt as dt_util
 
 from .coordinator import KEMSCoordinator
+from .providers.octopus import DEFAULT_INTELLIGENT_STALE_DATA_SECONDS
 
 
 def _state_payload(hass: HomeAssistant, entity_id: str) -> dict[str, Any]:
@@ -76,11 +77,26 @@ async def async_get_config_entry_diagnostics(
         "source_entity_states": source_states,
         "source_freshness": {
             "stale_timeout_seconds": coordinator.settings.control.stale_data_seconds,
+            "intelligent_source_stale_timeout_seconds": max(
+                coordinator.settings.control.stale_data_seconds,
+                DEFAULT_INTELLIGENT_STALE_DATA_SECONDS,
+            ),
             "max_dynamic_source_age_seconds": (data.snapshot.source_data_age_seconds),
             "stale_fields": list(data.snapshot.stale_fields),
             "dynamic_field_ages_seconds": dict(
                 sorted(data.snapshot.source_age_seconds.items())
             ),
+            "max_tariff_source_age_seconds": (
+                data.snapshot.tariff_source_data_age_seconds
+            ),
+            "tariff_stale_fields": list(data.snapshot.tariff_stale_fields),
+            "tariff_field_ages_seconds": dict(
+                sorted(data.snapshot.tariff_source_age_seconds.items())
+            ),
+            "intelligent_slot_source_fresh": (
+                data.snapshot.intelligent_slot_source_fresh
+            ),
+            "cheap_period_confirmed": data.snapshot.cheap_period_confirmed,
         },
         "kems_entity_states": dict(sorted(kems_entities.items())),
         "options": dict(entry.options),
@@ -111,6 +127,7 @@ async def async_get_config_entry_diagnostics(
             "items": [item.to_dict() for item in data.advice.items],
         },
         "simulation": asdict(data.simulation),
+        "scenarios": data.scenarios.to_dict(),
         "whole_home": asdict(data.whole_home),
         "lifetime": data.lifetime.to_dict(),
         "periods": {

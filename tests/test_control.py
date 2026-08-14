@@ -263,3 +263,99 @@ def test_island_stops_battery_at_emergency_floor() -> None:
     assert state.estimated_outage_runtime_hours == 0.0
     assert state.island_battery_status == "emergency_floor"
     assert "emergency floor" in state.next_action.lower()
+
+
+def test_awaiting_export_tariff_control_forces_self_use_and_zero_export() -> None:
+    """Shadow/live planner must never request grid export before tariff activation."""
+    state = ControlEngine().plan(
+        _snapshot(house_load_kw=2.0),
+        _simulation(
+            no_export_mode_active=True,
+            export_tariff_active=False,
+            current_simulated_solar_power_kw=1.0,
+            current_simulated_battery_to_home_power_kw=1.0,
+            current_simulated_grid_import_kw=0.0,
+            current_simulated_grid_export_kw=0.0,
+            target_battery_export_power_kw=0.0,
+        ),
+        NOW,
+        ControlConfig(),
+    )
+    assert state.operating_reason == "awaiting_export_tariff"
+    assert state.desired_work_mode == "Self Use"
+    assert state.desired_battery_export_power_kw == 0.0
+    assert state.desired_grid_export_allowed is False
+    assert state.total_site_import_kw == 0.0
+
+
+def test_awaiting_export_tariff_cheap_control_honours_smart_charge_request() -> None:
+    """Control should use the simulation's reduced overnight grid-charge target."""
+    state = ControlEngine().plan(
+        _snapshot(off_peak=True, house_load_kw=1.0),
+        _simulation(
+            no_export_mode_active=True,
+            export_tariff_active=False,
+            current_simulated_battery_charge_power_kw=2.5,
+            current_simulated_total_site_import_kw=3.5,
+        ),
+        NOW,
+        ControlConfig(),
+    )
+    assert state.operating_reason == "awaiting_export_tariff_charge"
+    assert state.desired_charge_power_kw == 2.5
+    assert state.desired_grid_export_allowed is False
+
+
+def test_awaiting_export_tariff_cheap_control_uses_solar_for_house_headroom() -> None:
+    """Solar-serving house load should leave more site headroom for cheap charging."""
+    state = ControlEngine().plan(
+        _snapshot(off_peak=True, house_load_kw=3.0),
+        _simulation(
+            no_export_mode_active=True,
+            export_tariff_active=False,
+            current_simulated_house_load_kw=3.0,
+            current_simulated_solar_power_kw=2.0,
+            current_simulated_battery_charge_power_kw=4.0,
+            current_simulated_grid_bypass_power_kw=None,
+        ),
+        NOW,
+        ControlConfig(site_import_limit_kw=5.0),
+    )
+    assert state.grid_bypass_power_kw == 1.0
+    assert state.desired_charge_power_kw == 4.0
+    assert state.total_site_import_kw == 5.0
+    assert state.site_import_limit_exceeded is False
+
+
+def test_stale_intelligent_slot_does_not_authorise_cheap_charge() -> None:
+    """A stale extra-slot signal must not put the controller in cheap charge."""
+    snapshot = Snapshot(
+        timestamp=NOW,
+        current_import_rate=3.5,
+        off_peak=False,
+        intelligent_slot=True,
+        ev_charging=True,
+        house_load_kw=2.0,
+        grid_import_kw=2.0,
+        tariff_source_age_seconds={"intelligent_slot": 301.0},
+        tariff_stale_fields=("intelligent_slot",),
+    )
+    simulation = SimulationState(
+        ready=True,
+        simulated_battery_soc=50.0,
+        current_simulated_house_load_kw=2.0,
+        current_simulated_solar_power_kw=0.0,
+    )
+
+    state = ControlEngine().plan(
+        snapshot,
+        simulation,
+        NOW,
+        ControlConfig(),
+    )
+
+    assert snapshot.cheap_period_confirmed is False
+    assert state.desired_charge_power_kw == 0.0
+    assert state.operating_reason != "confirmed_cheap_charge"
+    assert state.data_fresh is True
+    assert state.plan_safe is True

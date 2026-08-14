@@ -12,6 +12,9 @@ MAX_INTERVAL_HOURS = 0.5
 MAX_CHEAP_PERIOD_LOOKAHEAD_HOURS = 24.0
 RECENT_LOAD_WINDOW_HOURS = 1.0
 HOME_RESERVE_SAFETY_FACTOR = 1.10
+NO_EXPORT_SOLAR_CREDIT_FACTOR = 0.50
+NO_EXPORT_MAX_SOLAR_CREDIT_OF_HOME = 0.50
+SOLAR_FORECAST_STEP_MINUTES = 15
 
 
 def _interval_hours(current: datetime, following: datetime) -> float:
@@ -47,7 +50,12 @@ class SimulationEngine:
         )
         live_snapshot = current_snapshot or (today[-1] if today else None)
         if len(today) < 2:
-            return self._empty_current_state(live_snapshot, config)
+            return self._empty_current_state(
+                live_snapshot,
+                today,
+                config,
+                forecast_energy_until_offpeak_kwh,
+            )
 
         capacity = max(config.battery_capacity_kwh, 0.1)
         reserve_kwh = capacity * config.battery_reserve_percent / 100
@@ -66,6 +74,8 @@ class SimulationEngine:
         actual_import_cost = 0.0
         actual_export_income = 0.0
         simulated_import_cost = 0.0
+        simulated_cheap_import_cost = 0.0
+        simulated_day_import_cost = 0.0
         simulated_export_income = 0.0
         simulated_saving_session_bonus = 0.0
         actual_house = 0.0
@@ -77,8 +87,14 @@ class SimulationEngine:
         actual_export = 0.0
         baseline_import_cost = 0.0
         simulated_import = 0.0
+        simulated_cheap_import = 0.0
+        simulated_day_import = 0.0
         simulated_export = 0.0
         simulated_solar = 0.0
+        simulated_solar_to_home = 0.0
+        simulated_solar_to_battery = 0.0
+        simulated_solar_export = 0.0
+        simulated_grid_to_battery = 0.0
         simulated_curtailment = 0.0
         battery_charge = 0.0
         battery_to_home = 0.0
@@ -86,7 +102,13 @@ class SimulationEngine:
         avoided_day_import = 0.0
         covered = 0
         intervals = 0
-        effective_export_rate = max(config.export_rate_pence, 0.0)
+        export_tariff_active = self._export_tariff_active(config)
+        no_export_mode = not export_tariff_active
+        effective_strategy = self._effective_strategy(config)
+        effective_battery_export_enabled = self._battery_export_enabled(config)
+        effective_export_rate = (
+            max(config.export_rate_pence, 0.0) if export_tariff_active else 0.0
+        )
 
         for index, (current, following) in enumerate(
             zip(today, today[1:], strict=False)
@@ -147,13 +169,17 @@ class SimulationEngine:
             interval_export = 0.0
             interval_curtailment = 0.0
             interval_saving_session_bonus = 0.0
+            interval_solar_to_home = 0.0
+            interval_solar_to_battery = 0.0
+            interval_solar_export = 0.0
+            interval_grid_to_battery = 0.0
             inverter_capacity = max(config.inverter_limit_kw, 0.0) * hours
             export_capacity = min(
                 max(config.export_limit_kw, 0.0) * hours,
                 inverter_capacity,
             )
 
-            if self._saving_session_active(current, config):
+            if self._saving_session_active(current, config) and export_tariff_active:
                 useful_output = min(
                     inverter_capacity,
                     actual_house_kwh + export_capacity,
@@ -177,6 +203,7 @@ class SimulationEngine:
                 )
 
                 solar_to_home = min(actual_house_kwh, solar_used)
+                interval_solar_to_home = solar_to_home
                 battery_to_home_interval = min(
                     max(actual_house_kwh - solar_to_home, 0.0),
                     battery_output,
@@ -184,6 +211,7 @@ class SimulationEngine:
                 supplied_home = solar_to_home + battery_to_home_interval
                 interval_import = max(actual_house_kwh - supplied_home, 0.0)
                 solar_export = max(solar_used - solar_to_home, 0.0)
+                interval_solar_export = solar_export
                 battery_export_interval = max(
                     battery_output - battery_to_home_interval,
                     0.0,
@@ -206,39 +234,145 @@ class SimulationEngine:
                     or 0.0
                 )
             elif current.cheap_period_confirmed:
-                house_grid_kwh = actual_house_kwh
-                site_charge_headroom_kwh = float("inf")
-                if config.site_import_limit_kw is not None:
-                    site_charge_headroom_kwh = max(
-                        config.site_import_limit_kw * hours - house_grid_kwh,
-                        0.0,
-                    )
-                charge_input_kwh = min(
-                    max(config.max_charge_kw, 0.0) * hours,
-                    max(capacity - battery_kwh, 0.0)
-                    / max(config.charge_efficiency, 0.01),
-                    site_charge_headroom_kwh,
-                )
-                battery_kwh += charge_input_kwh * config.charge_efficiency
-                battery_charge += charge_input_kwh * config.charge_efficiency
-                interval_import = house_grid_kwh + charge_input_kwh
-                interval_export, interval_curtailment = self._limit_export(
-                    solar_energy,
-                    export_capacity,
-                )
-            else:
-                if config.strategy == "self_use":
+                if no_export_mode:
                     solar_to_home = min(
                         solar_energy,
                         actual_house_kwh,
                         inverter_capacity,
                     )
+                    interval_solar_to_home = solar_to_home
+                    house_grid_kwh = max(actual_house_kwh - solar_to_home, 0.0)
+                    solar_surplus_kwh = max(solar_energy - solar_to_home, 0.0)
+                    forecast_required = self._no_export_requirement_after_cheap(
+                        today,
+                        index + 1,
+                        config,
+                        forecast_energy_until_offpeak_kwh,
+                    )
+                    target_stored_kwh = self._no_export_charge_target_stored_kwh(
+                        forecast_required,
+                        reserve_kwh,
+                        capacity,
+                        config,
+                    )
+                    charge_room_input_kwh = max(
+                        target_stored_kwh - battery_kwh,
+                        0.0,
+                    ) / max(config.charge_efficiency, 0.01)
+                    solar_charge_input_kwh = min(
+                        solar_surplus_kwh,
+                        max(config.max_charge_kw, 0.0) * hours,
+                        charge_room_input_kwh,
+                    )
+                    stored_from_solar = (
+                        solar_charge_input_kwh * config.charge_efficiency
+                    )
+                    battery_kwh += stored_from_solar
+                    battery_charge += stored_from_solar
+                    interval_solar_to_battery = stored_from_solar
+                    remaining_charge_power_kwh = max(
+                        max(config.max_charge_kw, 0.0) * hours - solar_charge_input_kwh,
+                        0.0,
+                    )
+                    site_charge_headroom_kwh = float("inf")
+                    if config.site_import_limit_kw is not None:
+                        site_charge_headroom_kwh = max(
+                            config.site_import_limit_kw * hours - house_grid_kwh,
+                            0.0,
+                        )
+                    grid_charge_input_kwh = min(
+                        remaining_charge_power_kwh,
+                        max(target_stored_kwh - battery_kwh, 0.0)
+                        / max(config.charge_efficiency, 0.01),
+                        site_charge_headroom_kwh,
+                    )
+                    stored_from_grid = grid_charge_input_kwh * config.charge_efficiency
+                    battery_kwh += stored_from_grid
+                    battery_charge += stored_from_grid
+                    interval_grid_to_battery = stored_from_grid
+                    interval_import = house_grid_kwh + grid_charge_input_kwh
+                    interval_export = 0.0
+                    interval_curtailment = max(
+                        solar_surplus_kwh - solar_charge_input_kwh,
+                        0.0,
+                    )
+                else:
+                    house_grid_kwh = actual_house_kwh
+                    site_charge_headroom_kwh = float("inf")
+                    if config.site_import_limit_kw is not None:
+                        site_charge_headroom_kwh = max(
+                            config.site_import_limit_kw * hours - house_grid_kwh,
+                            0.0,
+                        )
+                    charge_input_kwh = min(
+                        max(config.max_charge_kw, 0.0) * hours,
+                        max(capacity - battery_kwh, 0.0)
+                        / max(config.charge_efficiency, 0.01),
+                        site_charge_headroom_kwh,
+                    )
+                    stored_from_grid = charge_input_kwh * config.charge_efficiency
+                    battery_kwh += stored_from_grid
+                    battery_charge += stored_from_grid
+                    interval_grid_to_battery = stored_from_grid
+                    interval_import = house_grid_kwh + charge_input_kwh
+                    interval_export, interval_curtailment = self._limit_export(
+                        solar_energy,
+                        export_capacity,
+                    )
+                    interval_solar_export = interval_export
+            elif no_export_mode:
+                # Awaiting an export tariff: use PV locally, charge the battery
+                # with surplus PV, discharge only for the home, and curtail any
+                # remaining surplus instead of assigning it export value.
+                solar_to_home = min(
+                    solar_energy,
+                    actual_house_kwh,
+                    inverter_capacity,
+                )
+                interval_solar_to_home = solar_to_home
+                net_load_kwh = max(actual_house_kwh - solar_to_home, 0.0)
+                solar_surplus_kwh = max(solar_energy - solar_to_home, 0.0)
+                solar_charge_input_kwh = min(
+                    solar_surplus_kwh,
+                    max(config.max_charge_kw, 0.0) * hours,
+                    max(capacity - battery_kwh, 0.0)
+                    / max(config.charge_efficiency, 0.01),
+                )
+                stored_from_solar = solar_charge_input_kwh * config.charge_efficiency
+                battery_kwh += stored_from_solar
+                battery_charge += stored_from_solar
+                interval_solar_to_battery = stored_from_solar
+                interval_curtailment = max(
+                    solar_surplus_kwh - solar_charge_input_kwh,
+                    0.0,
+                )
+
+                available_to_load = max(battery_kwh - reserve_kwh, 0.0)
+                delivered = min(
+                    net_load_kwh,
+                    max(config.max_discharge_kw, 0.0) * hours,
+                    max(inverter_capacity - solar_to_home, 0.0),
+                    available_to_load * config.discharge_efficiency,
+                )
+                battery_kwh -= delivered / max(config.discharge_efficiency, 0.01)
+                battery_to_home += delivered
+                avoided_day_import += delivered
+                interval_import = max(net_load_kwh - delivered, 0.0)
+                interval_export = 0.0
+            else:
+                if effective_strategy == "self_use":
+                    solar_to_home = min(
+                        solar_energy,
+                        actual_house_kwh,
+                        inverter_capacity,
+                    )
+                    interval_solar_to_home = solar_to_home
                     net_load_kwh = actual_house_kwh - solar_to_home
                     solar_export_request = max(solar_energy - solar_to_home, 0.0)
                     inverter_used = solar_to_home
                 else:
-                    # Kyle's preferred policy: power the home from battery and
-                    # export available solar, subject to the KH7 AC limit.
+                    # Export-tariff-active policy: power the home from battery
+                    # and export available solar, subject to the KH7 AC limit.
                     net_load_kwh = actual_house_kwh
                     solar_export_request = solar_energy
                     inverter_used = 0.0
@@ -267,11 +401,12 @@ class SimulationEngine:
                     solar_export_request,
                     solar_export_capacity,
                 )
+                interval_solar_export = solar_export
                 interval_export = solar_export
                 interval_curtailment += solar_curtailed
                 inverter_used += solar_export
 
-                if config.battery_export_enabled:
+                if effective_battery_export_enabled:
                     forecast_required = self._remaining_load_requirement(
                         today,
                         index + 1,
@@ -317,9 +452,30 @@ class SimulationEngine:
                     battery_export += exported_from_battery
                     interval_export += exported_from_battery
 
+            if no_export_mode and self._saving_session_active(current, config):
+                interval_saving_session_bonus = (
+                    self._saving_session_interval_bonus_pence(
+                        current,
+                        hours,
+                        interval_import,
+                        0.0,
+                    )
+                    or 0.0
+                )
+
             battery_kwh = min(max(battery_kwh, reserve_kwh), capacity)
             simulated_import += interval_import
+            if current.cheap_period_confirmed:
+                simulated_cheap_import += interval_import
+                simulated_cheap_import_cost += interval_import * rate
+            else:
+                simulated_day_import += interval_import
+                simulated_day_import_cost += interval_import * rate
             simulated_export += interval_export
+            simulated_solar_to_home += interval_solar_to_home
+            simulated_solar_to_battery += interval_solar_to_battery
+            simulated_solar_export += interval_solar_export
+            simulated_grid_to_battery += interval_grid_to_battery
             simulated_curtailment += interval_curtailment
             simulated_import_cost += interval_import * rate
             simulated_export_income += interval_export * export_rate
@@ -327,7 +483,12 @@ class SimulationEngine:
 
         coverage = covered / intervals if intervals else 0.0
         if covered == 0:
-            return SimulationState(samples=len(today), data_coverage=0.0)
+            return self._empty_current_state(
+                live_snapshot,
+                today,
+                config,
+                forecast_energy_until_offpeak_kwh,
+            )
 
         current_plan = self._current_plan(
             live_snapshot or today[-1],
@@ -362,6 +523,8 @@ class SimulationEngine:
             actual_import_cost_pence=round(actual_import_cost, 2),
             actual_export_income_pence=round(actual_export_income, 2),
             simulated_import_cost_pence=round(simulated_import_cost, 2),
+            simulated_cheap_import_cost_pence=round(simulated_cheap_import_cost, 2),
+            simulated_day_import_cost_pence=round(simulated_day_import_cost, 2),
             simulated_export_income_pence=round(simulated_export_income, 2),
             actual_house_consumption_kwh=round(actual_house, 3),
             actual_ev_energy_kwh=round(actual_ev, 3),
@@ -371,8 +534,14 @@ class SimulationEngine:
             actual_grid_import_kwh=round(actual_import, 3),
             actual_grid_export_kwh=round(actual_export, 3),
             simulated_grid_import_kwh=round(simulated_import, 3),
+            simulated_cheap_import_kwh=round(simulated_cheap_import, 3),
+            simulated_day_import_kwh=round(simulated_day_import, 3),
             simulated_grid_export_kwh=round(simulated_export, 3),
             simulated_solar_generation_kwh=round(simulated_solar, 3),
+            simulated_solar_to_home_kwh=round(simulated_solar_to_home, 3),
+            simulated_solar_to_battery_kwh=round(simulated_solar_to_battery, 3),
+            simulated_solar_export_kwh=round(simulated_solar_export, 3),
+            simulated_grid_to_battery_kwh=round(simulated_grid_to_battery, 3),
             simulated_solar_curtailed_kwh=round(simulated_curtailment, 3),
             simulated_battery_charge_kwh=round(battery_charge, 3),
             simulated_battery_to_home_kwh=round(battery_to_home, 3),
@@ -466,6 +635,23 @@ class SimulationEngine:
                 "battery_export_reduced_for_saving_session"
             ],
             effective_export_rate_pence=round(effective_export_rate, 4),
+            export_tariff_status=config.export_tariff_status,
+            export_tariff_active=export_tariff_active,
+            no_export_mode_active=no_export_mode,
+            overnight_charge_target_percent=current_plan.get(
+                "overnight_charge_target_percent"
+            ),
+            overnight_charge_target_kwh=current_plan.get("overnight_charge_target_kwh"),
+            forecast_home_until_next_cheap_kwh=current_plan.get(
+                "forecast_home_until_next_cheap_kwh"
+            ),
+            forecast_solar_until_next_cheap_kwh=current_plan.get(
+                "forecast_solar_until_next_cheap_kwh"
+            ),
+            forecast_solar_credit_kwh=current_plan.get("forecast_solar_credit_kwh"),
+            current_simulated_solar_to_battery_power_kw=current_plan.get(
+                "solar_to_battery", 0.0
+            ),
             inverter_limit_kw=config.inverter_limit_kw,
             export_limit_kw=min(config.export_limit_kw, config.inverter_limit_kw),
             battery_charge_limit_kw=config.max_charge_kw,
@@ -474,34 +660,81 @@ class SimulationEngine:
             site_import_limit_kw=config.site_import_limit_kw,
             site_import_headroom_kw=current_plan["site_import_headroom"],
             site_import_limit_exceeded=bool(current_plan["site_import_exceeded"]),
-            strategy=config.strategy,
+            strategy=effective_strategy,
             proposal_solar_active=config.proposal_solar_enabled
             and all(item.solar_power_kw is None for item in today),
-            battery_export_enabled=config.battery_export_enabled,
+            battery_export_enabled=effective_battery_export_enabled,
             data_coverage=round(100 * coverage, 1),
         )
 
     def _empty_current_state(
         self,
         snapshot: Snapshot | None,
+        records: list[Snapshot],
         config: SimulationConfig,
+        forecast_energy_until_offpeak_kwh: float | None = None,
     ) -> SimulationState:
-        """Expose proposal solar immediately, before two history samples exist."""
+        """Expose a complete current plan before history is ready."""
         if snapshot is None:
             return SimulationState()
-        solar = self._simulated_solar_power(snapshot, config)
-        session = self._saving_session_plan(snapshot, [snapshot], config)
+
+        capacity = max(config.battery_capacity_kwh, 0.1)
+        reserve_kwh = capacity * config.battery_reserve_percent / 100
+        starting_soc = (
+            snapshot.battery_soc
+            if snapshot.battery_soc is not None
+            else config.battery_initial_percent
+        )
+        battery_kwh = capacity * min(max(starting_soc, 0.0), 100.0) / 100
+        battery_kwh = min(max(battery_kwh, reserve_kwh), capacity)
+
+        current_plan = self._current_plan(
+            snapshot,
+            records or [snapshot],
+            battery_kwh,
+            reserve_kwh,
+            capacity,
+            config,
+            forecast_energy_until_offpeak_kwh,
+        )
+        session = self._saving_session_plan(snapshot, records or [snapshot], config)
+
         return SimulationState(
-            samples=1,
-            current_simulated_house_load_kw=_load_kw(snapshot),
-            current_simulated_solar_power_kw=solar,
-            current_simulated_battery_charge_power_kw=0.0,
-            current_simulated_total_kh7_output_kw=round(
-                min(solar, config.inverter_limit_kw),
-                3,
+            samples=max(len(records), 1),
+            data_coverage=0.0,
+            simulated_battery_soc=round(100 * battery_kwh / capacity, 1),
+            current_simulated_house_load_kw=current_plan["house"],
+            current_simulated_solar_power_kw=current_plan["solar"],
+            current_simulated_grid_import_kw=current_plan["grid_import"],
+            current_simulated_grid_export_kw=current_plan["grid_export"],
+            current_simulated_battery_power_kw=current_plan["battery"],
+            current_simulated_battery_charge_power_kw=current_plan["battery_charge"],
+            current_simulated_battery_to_home_power_kw=current_plan["battery_to_home"],
+            current_simulated_battery_export_power_kw=current_plan["battery_export"],
+            current_simulated_total_kh7_output_kw=current_plan["total_kh7_output"],
+            current_simulated_grid_bypass_power_kw=current_plan["grid_bypass"],
+            current_simulated_total_site_import_kw=current_plan["total_site_import"],
+            current_simulated_solar_to_battery_power_kw=current_plan.get(
+                "solar_to_battery", 0.0
             ),
-            current_simulated_grid_bypass_power_kw=_load_kw(snapshot),
-            current_simulated_total_site_import_kw=_load_kw(snapshot),
+            effective_export_rate_pence=(
+                config.export_rate_pence if self._export_tariff_active(config) else 0.0
+            ),
+            export_tariff_status=config.export_tariff_status,
+            export_tariff_active=self._export_tariff_active(config),
+            no_export_mode_active=not self._export_tariff_active(config),
+            inverter_limit_kw=config.inverter_limit_kw,
+            export_limit_kw=min(config.export_limit_kw, config.inverter_limit_kw),
+            battery_charge_limit_kw=config.max_charge_kw,
+            battery_discharge_limit_kw=config.max_discharge_kw,
+            eps_output_limit_kw=config.eps_output_limit_kw,
+            site_import_limit_kw=config.site_import_limit_kw,
+            site_import_headroom_kw=current_plan["site_import_headroom"],
+            site_import_limit_exceeded=bool(current_plan["site_import_exceeded"]),
+            strategy=self._effective_strategy(config),
+            proposal_solar_active=config.proposal_solar_enabled
+            and snapshot.solar_power_kw is None,
+            battery_export_enabled=self._battery_export_enabled(config),
             saving_session_joined=bool(session["saving_session_joined"]),
             saving_session_active=bool(session["saving_session_active"]),
             saving_session_start=session["saving_session_start"],
@@ -543,26 +776,6 @@ class SimulationEngine:
             battery_export_reduced_for_saving_session=bool(
                 session["battery_export_reduced_for_saving_session"]
             ),
-            effective_export_rate_pence=config.export_rate_pence,
-            inverter_limit_kw=config.inverter_limit_kw,
-            export_limit_kw=min(config.export_limit_kw, config.inverter_limit_kw),
-            battery_charge_limit_kw=config.max_charge_kw,
-            battery_discharge_limit_kw=config.max_discharge_kw,
-            eps_output_limit_kw=config.eps_output_limit_kw,
-            site_import_limit_kw=config.site_import_limit_kw,
-            site_import_headroom_kw=(
-                None
-                if config.site_import_limit_kw is None or _load_kw(snapshot) is None
-                else round(config.site_import_limit_kw - (_load_kw(snapshot) or 0.0), 3)
-            ),
-            site_import_limit_exceeded=bool(
-                config.site_import_limit_kw is not None
-                and (_load_kw(snapshot) or 0.0) > config.site_import_limit_kw
-            ),
-            strategy=config.strategy,
-            proposal_solar_active=config.proposal_solar_enabled
-            and snapshot.solar_power_kw is None,
-            battery_export_enabled=config.battery_export_enabled,
         )
 
     def _battery_energy_at_day_start(
@@ -645,6 +858,184 @@ class SimulationEngine:
             max(config.inverter_limit_kw, 0.0),
         )
 
+    @staticmethod
+    def _export_tariff_active(config: SimulationConfig) -> bool:
+        """Return whether exported energy currently has an active tariff."""
+        return config.export_tariff_status == "active"
+
+    @classmethod
+    def _effective_strategy(cls, config: SimulationConfig) -> str:
+        """Force self-use planning while no export tariff is active."""
+        if not cls._export_tariff_active(config):
+            return "self_use"
+        return "self_use" if config.strategy == "self_use" else "paced_export"
+
+    @classmethod
+    def _battery_export_enabled(cls, config: SimulationConfig) -> bool:
+        """Return the effective deliberate battery-export permission."""
+        return bool(config.battery_export_enabled and cls._export_tariff_active(config))
+
+    def _future_solar_forecast_kwh(
+        self,
+        snapshot: Snapshot,
+        config: SimulationConfig,
+        *,
+        start: datetime | None = None,
+    ) -> float:
+        """Estimate proposal PV energy from ``start`` to the next cheap period."""
+        target = snapshot.next_offpeak_start
+        cursor = start or snapshot.timestamp
+        if (
+            target is None
+            or cursor < snapshot.timestamp
+            or target <= cursor
+            or target - cursor > timedelta(hours=24)
+            or not config.proposal_solar_enabled
+        ):
+            return 0.0
+        total = 0.0
+        step = timedelta(minutes=SOLAR_FORECAST_STEP_MINUTES)
+        while cursor < target:
+            following = min(cursor + step, target)
+            hours = max((following - cursor).total_seconds() / 3600, 0.0)
+            power = min(
+                FOXHOLE_PROPOSAL_PROFILE.estimate_power_kw(
+                    cursor,
+                    config.proposal_solar_factor,
+                ),
+                max(config.inverter_limit_kw, 0.0),
+            )
+            total += max(power, 0.0) * hours
+            cursor = following
+        return total
+
+    @staticmethod
+    def _active_cheap_end(snapshot: Snapshot) -> datetime | None:
+        """Return the future end of the currently active cheap period."""
+        end = snapshot.offpeak_end
+        if (
+            not snapshot.cheap_period_confirmed
+            or end is None
+            or end <= snapshot.timestamp
+            or end - snapshot.timestamp > timedelta(hours=12)
+        ):
+            return None
+        return end
+
+    def _no_export_home_forecast(
+        self,
+        snapshot: Snapshot,
+        records: list[Snapshot],
+        config: SimulationConfig,
+        forecast_energy_until_offpeak_kwh: float | None,
+        *,
+        exclude_active_cheap: bool = False,
+    ) -> tuple[float, str, float, float, float]:
+        """Return conservative net home demand and transparent forecast inputs."""
+        remaining_hours = self._hours_until_next_cheap(snapshot)
+        if remaining_hours is None:
+            return 0.0, "unavailable", 0.0, 0.0, 0.0
+
+        forecast_start = snapshot.timestamp
+        active_cheap_end = (
+            self._active_cheap_end(snapshot) if exclude_active_cheap else None
+        )
+        if active_cheap_end is not None:
+            forecast_start = active_cheap_end
+        forecast_hours = max(
+            (snapshot.next_offpeak_start - forecast_start).total_seconds() / 3600,
+            0.0,
+        )
+
+        recent_load = self._recent_average_load_kw(records, snapshot)
+        current_load = _load_kw(snapshot)
+        fallback_load = recent_load if recent_load is not None else current_load
+
+        if forecast_energy_until_offpeak_kwh is not None:
+            home = max(forecast_energy_until_offpeak_kwh, 0.0)
+            source = "learned_profile"
+            if active_cheap_end is not None and fallback_load is not None:
+                cheap_hours_remaining = max(
+                    (active_cheap_end - snapshot.timestamp).total_seconds() / 3600,
+                    0.0,
+                )
+                home = max(home - fallback_load * cheap_hours_remaining, 0.0)
+        elif fallback_load is not None:
+            home = fallback_load * forecast_hours
+            source = "recent_average" if recent_load is not None else "current_load"
+        else:
+            return 0.0, "unavailable", 0.0, 0.0, 0.0
+
+        solar = self._future_solar_forecast_kwh(
+            snapshot,
+            config,
+            start=forecast_start,
+        )
+        solar_credit = min(
+            solar * NO_EXPORT_SOLAR_CREDIT_FACTOR,
+            home * NO_EXPORT_MAX_SOLAR_CREDIT_OF_HOME,
+        )
+        net_required = max(home - solar_credit, 0.0) * HOME_RESERVE_SAFETY_FACTOR
+        return net_required, source, home, solar, solar_credit
+
+    @staticmethod
+    def _no_export_charge_target_stored_kwh(
+        required_home_ac_kwh: float,
+        reserve_kwh: float,
+        capacity: float,
+        config: SimulationConfig,
+    ) -> float:
+        """Return stored-energy target that covers forecast home demand."""
+        target = reserve_kwh + max(required_home_ac_kwh, 0.0) / max(
+            config.discharge_efficiency,
+            0.01,
+        )
+        return min(max(target, reserve_kwh), capacity)
+
+    def _no_export_requirement_after_cheap(
+        self,
+        today: list[Snapshot],
+        start_index: int,
+        config: SimulationConfig,
+        forecast_energy_until_offpeak_kwh: float | None,
+    ) -> float:
+        """Estimate net home energy after the active cheap period ends."""
+        known = 0.0
+        for current, following in zip(
+            today[start_index:],
+            today[start_index + 1 :],
+            strict=False,
+        ):
+            if current.cheap_period_confirmed:
+                continue
+            hours = _interval_hours(current.timestamp, following.timestamp)
+            load = _load_kw(current)
+            if load is None:
+                continue
+            solar = self._simulated_solar_power(current, config)
+            known += max(load - solar, 0.0) * hours
+
+        if today:
+            latest = today[-1]
+            if not latest.cheap_period_confirmed:
+                tail, _source = self._home_energy_requirement(
+                    latest,
+                    today,
+                    config,
+                    forecast_energy_until_offpeak_kwh,
+                )
+                known += tail
+            elif forecast_energy_until_offpeak_kwh is not None:
+                tail, _source, _home, _solar, _credit = self._no_export_home_forecast(
+                    latest,
+                    today,
+                    config,
+                    forecast_energy_until_offpeak_kwh,
+                    exclude_active_cheap=True,
+                )
+                known += tail
+        return known
+
     def _remaining_load_requirement(
         self,
         today: list[Snapshot],
@@ -667,7 +1058,7 @@ class SimulationEngine:
             load = _load_kw(current)
             if load is None:
                 continue
-            if config.strategy == "self_use":
+            if self._effective_strategy(config) == "self_use":
                 solar = self._simulated_solar_power(current, config)
                 load = max(load - solar, 0.0)
             known += load * hours
@@ -741,9 +1132,18 @@ class SimulationEngine:
                 required = current_load * remaining_hours
                 source = "current_load"
 
+        if not self._export_tariff_active(config):
+            net, source, _home, _solar, _credit = self._no_export_home_forecast(
+                snapshot,
+                records,
+                config,
+                forecast_energy_until_offpeak_kwh,
+            )
+            return net, source
+
         if config.strategy == "self_use":
-            # This is deliberately conservative: only subtract current modelled
-            # solar from the fallback, never future solar that may not arrive.
+            # Preserve alpha4 behaviour for users who explicitly choose self-use
+            # while a paid export tariff is active.
             current_solar = self._simulated_solar_power(snapshot, config)
             required = max(required - current_solar * remaining_hours, 0.0)
 
@@ -818,6 +1218,8 @@ class SimulationEngine:
         config: SimulationConfig,
     ) -> float:
         """Return stored energy reserved for high-value session export only."""
+        if not self._export_tariff_active(config):
+            return 0.0
         if not self._saving_session_relevant_before_cheap(snapshot, config):
             return 0.0
         duration = self._saving_session_duration_hours(snapshot)
@@ -913,15 +1315,20 @@ class SimulationEngine:
         bonus_rate = max(points, 0.0) / 8.0 if points is not None else None
         baseline, baseline_source = self._saving_session_baseline(snapshot)
         relevant = self._saving_session_relevant_before_cheap(snapshot, config)
+        export_allowed = self._export_tariff_active(config)
         export_target = (
             self._saving_session_export_target_kw(snapshot, records, config)
-            if joined and duration is not None
-            else None
+            if joined and duration is not None and export_allowed
+            else 0.0 if joined and duration is not None else None
         )
-        reserve = self._saving_session_total_reserve_stored_kwh(
-            snapshot,
-            records,
-            config,
+        reserve = (
+            self._saving_session_total_reserve_stored_kwh(
+                snapshot,
+                records,
+                config,
+            )
+            if export_allowed
+            else None
         )
         estimated_export = (
             export_target * duration
@@ -939,7 +1346,8 @@ class SimulationEngine:
             else None
         )
         export_income = (
-            estimated_export * max(config.export_rate_pence, 0.0)
+            estimated_export
+            * (max(config.export_rate_pence, 0.0) if export_allowed else 0.0)
             if estimated_export is not None
             else None
         )
@@ -996,7 +1404,9 @@ class SimulationEngine:
             "estimated_saving_session_total_income_pence": (
                 round(total_income, 2) if total_income is not None else None
             ),
-            "battery_reserved_for_saving_session": relevant and reserve is not None,
+            "battery_reserved_for_saving_session": (
+                export_allowed and relevant and reserve is not None
+            ),
             "battery_export_reduced_for_saving_session": reduced,
         }
 
@@ -1124,7 +1534,10 @@ class SimulationEngine:
         inverter_limit = max(config.inverter_limit_kw, 0.0)
         export_limit = min(max(config.export_limit_kw, 0.0), inverter_limit)
 
-        if self._saving_session_active(snapshot, config):
+        export_tariff_active = self._export_tariff_active(config)
+        no_export_mode = not export_tariff_active
+
+        if self._saving_session_active(snapshot, config) and export_tariff_active:
             return self._current_saving_session_plan(
                 snapshot,
                 today,
@@ -1135,6 +1548,91 @@ class SimulationEngine:
             )
 
         if snapshot.cheap_period_confirmed:
+            if no_export_mode:
+                (
+                    required_home,
+                    reserve_source,
+                    forecast_home,
+                    forecast_solar,
+                    solar_credit,
+                ) = self._no_export_home_forecast(
+                    snapshot,
+                    today,
+                    config,
+                    forecast_energy_until_offpeak_kwh,
+                    exclude_active_cheap=True,
+                )
+                target_stored = self._no_export_charge_target_stored_kwh(
+                    required_home,
+                    reserve_kwh,
+                    capacity,
+                    config,
+                )
+                solar_to_home = min(solar, load, inverter_limit)
+                solar_surplus = max(solar - solar_to_home, 0.0)
+                solar_to_battery = min(
+                    solar_surplus,
+                    config.max_charge_kw,
+                    max(target_stored - battery_kwh, 0.0)
+                    / max(config.charge_efficiency, 0.01),
+                )
+                battery_after_solar = min(
+                    battery_kwh + solar_to_battery * config.charge_efficiency,
+                    capacity,
+                )
+                house_grid = max(load - solar_to_home, 0.0)
+                site_headroom = (
+                    float("inf")
+                    if config.site_import_limit_kw is None
+                    else max(config.site_import_limit_kw - house_grid, 0.0)
+                )
+                charge_kw = min(
+                    max(config.max_charge_kw - solar_to_battery, 0.0),
+                    max(target_stored - battery_after_solar, 0.0)
+                    / max(config.charge_efficiency, 0.01),
+                    site_headroom,
+                )
+                total_site_import = house_grid + charge_kw
+                site_import_headroom, site_import_exceeded = self._site_import_status(
+                    total_site_import,
+                    config,
+                )
+                return {
+                    "house": round(load, 3),
+                    "solar": round(solar, 3),
+                    "grid_import": round(total_site_import, 3),
+                    "grid_export": 0.0,
+                    "battery": round(
+                        -(charge_kw + solar_to_battery) * config.charge_efficiency,
+                        3,
+                    ),
+                    "battery_charge": round(charge_kw, 3),
+                    "solar_to_battery": round(solar_to_battery, 3),
+                    "battery_to_home": 0.0,
+                    "battery_export": 0.0,
+                    "target_battery_export": 0.0,
+                    "total_kh7_output": round(solar_to_home, 3),
+                    "grid_bypass": round(house_grid, 3),
+                    "total_site_import": round(total_site_import, 3),
+                    "site_import_headroom": site_import_headroom,
+                    "site_import_exceeded": site_import_exceeded,
+                    "exportable_battery": 0.0,
+                    "reserved_for_home": round(required_home, 3),
+                    "hours_until_cheap": 0.0,
+                    "projected_soc_at_cheap": round(100 * battery_kwh / capacity, 1),
+                    "reserve_source": reserve_source,
+                    "projected_grid_import": 0.0,
+                    "export_paused_for_home": False,
+                    "overnight_charge_target_percent": round(
+                        100 * target_stored / capacity, 1
+                    ),
+                    "overnight_charge_target_kwh": round(target_stored, 3),
+                    "forecast_home_until_next_cheap_kwh": round(forecast_home, 3),
+                    "forecast_solar_until_next_cheap_kwh": round(forecast_solar, 3),
+                    "forecast_solar_credit_kwh": round(solar_credit, 3),
+                    **self._saving_session_plan(snapshot, today, config),
+                }
+
             site_headroom = (
                 float("inf")
                 if config.site_import_limit_kw is None
@@ -1176,7 +1674,86 @@ class SimulationEngine:
                 **self._saving_session_plan(snapshot, today, config),
             }
 
-        if config.strategy == "self_use":
+        if no_export_mode:
+            solar_to_home = min(solar, load, inverter_limit)
+            solar_surplus = max(solar - solar_to_home, 0.0)
+            solar_to_battery = min(
+                solar_surplus,
+                config.max_charge_kw,
+                max(capacity - battery_kwh, 0.0) / max(config.charge_efficiency, 0.01),
+            )
+            net_load = max(load - solar_to_home, 0.0)
+            available_ac = max(battery_kwh - reserve_kwh, 0.0) * (
+                config.discharge_efficiency
+            )
+            home_from_battery = min(
+                net_load,
+                config.max_discharge_kw,
+                available_ac,
+                max(inverter_limit - solar_to_home, 0.0),
+            )
+            grid_import = max(net_load - home_from_battery, 0.0)
+            (
+                required_home_energy,
+                reserve_source,
+                forecast_home,
+                forecast_solar,
+                solar_credit,
+            ) = self._no_export_home_forecast(
+                snapshot,
+                today,
+                config,
+                forecast_energy_until_offpeak_kwh,
+            )
+            reserved_for_home = min(required_home_energy, available_ac)
+            projected_grid_import = max(required_home_energy - available_ac, 0.0)
+            projected_stored = battery_kwh - reserved_for_home / max(
+                config.discharge_efficiency,
+                0.01,
+            )
+            projected_soc = 100 * max(projected_stored, reserve_kwh) / capacity
+            total_output = solar_to_home + home_from_battery
+            return {
+                "house": round(load, 3),
+                "solar": round(solar, 3),
+                "grid_import": round(grid_import, 3),
+                "grid_export": 0.0,
+                "battery": round(
+                    home_from_battery - solar_to_battery * config.charge_efficiency,
+                    3,
+                ),
+                "battery_charge": 0.0,
+                "solar_to_battery": round(solar_to_battery, 3),
+                "battery_to_home": round(home_from_battery, 3),
+                "battery_export": 0.0,
+                "target_battery_export": 0.0,
+                "total_kh7_output": round(total_output, 3),
+                "grid_bypass": round(grid_import, 3),
+                "total_site_import": round(grid_import, 3),
+                "site_import_headroom": self._site_import_status(grid_import, config)[
+                    0
+                ],
+                "site_import_exceeded": self._site_import_status(grid_import, config)[
+                    1
+                ],
+                "exportable_battery": 0.0,
+                "reserved_for_home": round(reserved_for_home, 3),
+                "hours_until_cheap": (
+                    round(self._hours_until_next_cheap(snapshot), 2)
+                    if self._hours_until_next_cheap(snapshot) is not None
+                    else None
+                ),
+                "projected_soc_at_cheap": round(projected_soc, 1),
+                "reserve_source": reserve_source,
+                "projected_grid_import": round(projected_grid_import, 3),
+                "export_paused_for_home": False,
+                "forecast_home_until_next_cheap_kwh": round(forecast_home, 3),
+                "forecast_solar_until_next_cheap_kwh": round(forecast_solar, 3),
+                "forecast_solar_credit_kwh": round(solar_credit, 3),
+                **self._saving_session_plan(snapshot, today, config),
+            }
+
+        if self._effective_strategy(config) == "self_use":
             solar_to_home = min(solar, load, inverter_limit)
             net_load = load - solar_to_home
             inverter_used = solar_to_home
@@ -1229,7 +1806,7 @@ class SimulationEngine:
         )
         remaining_hours = self._hours_until_next_cheap(snapshot)
         target_export_kw = 0.0
-        if config.battery_export_enabled:
+        if self._battery_export_enabled(config):
             target_export_kw = self._paced_export_target_kw(
                 surplus_stored,
                 remaining_hours,
@@ -1247,7 +1824,7 @@ class SimulationEngine:
         ) / max(config.discharge_efficiency, 0.01)
         projected_soc = 100 * max(projected_stored, reserve_kwh) / capacity
         export_paused = bool(
-            config.battery_export_enabled
+            self._battery_export_enabled(config)
             and remaining_hours is not None
             and required_home_energy > 0
             and exportable_without_session <= 0.001

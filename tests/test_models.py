@@ -40,6 +40,47 @@ def test_extra_intelligent_slot_requires_ohme_charging_confirmation() -> None:
     )
 
 
+def test_stale_intelligent_slot_cannot_confirm_a_cheap_period() -> None:
+    """A stale extra-slot signal must fail closed even while the EV charges."""
+    snapshot = Snapshot(
+        off_peak=False,
+        intelligent_slot=True,
+        ev_charging=True,
+        tariff_source_age_seconds={"intelligent_slot": 301.0},
+        tariff_stale_fields=("intelligent_slot",),
+    )
+
+    assert snapshot.intelligent_slot_source_fresh is False
+    assert snapshot.cheap_period_confirmed is False
+
+
+def test_manual_offpeak_fallback_remains_usable_when_live_source_was_stale() -> None:
+    """A safe resolved schedule may still confirm the standard cheap window."""
+    snapshot = Snapshot(
+        off_peak=True,
+        tariff_source_age_seconds={"off_peak": 301.0},
+        tariff_stale_fields=("off_peak",),
+    )
+
+    assert snapshot.cheap_period_confirmed is True
+
+
+def test_snapshot_round_trip_preserves_tariff_freshness_metadata() -> None:
+    """Tariff safety metadata must survive persisted-history round trips."""
+    snapshot = Snapshot(
+        timestamp=datetime(2026, 8, 13, 12, 0, tzinfo=UTC),
+        tariff_source_age_seconds={"intelligent_slot": 301.0},
+        tariff_stale_fields=("intelligent_slot",),
+        tariff_source_data_age_seconds=301.0,
+    )
+
+    restored = Snapshot.from_dict(snapshot.to_dict())
+
+    assert restored.tariff_source_age_seconds == {"intelligent_slot": 301.0}
+    assert restored.tariff_stale_fields == ("intelligent_slot",)
+    assert restored.tariff_source_data_age_seconds == 301.0
+
+
 def test_period_totals_keep_actual_and_simulated_values_separate() -> None:
     """Native reporting summaries must not mix physical and modelled costs."""
     totals = PeriodTotals(
@@ -117,6 +158,9 @@ def test_power_down_result_round_trip_preserves_completed_session() -> None:
         planned_export_kwh=5.5,
         maximum_inverter_output_kw=7.0,
         ev_successfully_blocked=True,
+        active_samples_observed=17,
+        plan_safe_throughout=True,
+        island_override_observed=False,
         completed_successfully=True,
         completion_reason="completed",
     )

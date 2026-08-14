@@ -76,6 +76,113 @@ def _advice_attributes(data: KEMSData) -> Mapping[str, Any]:
     }
 
 
+def _scenario_attributes(
+    data: KEMSData,
+    scenario_key: str,
+    period_key: str = "today",
+) -> Mapping[str, Any]:
+    """Expose one complete what-if scenario result."""
+    scenario = data.scenarios.scenario(scenario_key, period_key)
+    return {} if scenario is None else scenario.to_dict()
+
+
+def _scenario_cost(
+    data: KEMSData,
+    scenario_key: str,
+    period_key: str = "today",
+) -> float | None:
+    """Return total electricity cost including the standing charge."""
+    scenario = data.scenarios.scenario(scenario_key, period_key)
+    return None if scenario is None else round(scenario.total_cost_pence, 2)
+
+
+def _scenario_flow_state(
+    data: KEMSData,
+    scenario_key: str,
+    period_key: str = "today",
+) -> str:
+    """Expose compact current-flow values as one ESPHome-friendly state."""
+    scenario = data.scenarios.scenario(scenario_key, period_key)
+    if scenario is None:
+        return "H=-1,S=-1,GI=-1,GE=-1,SH=-1,SB=-1,SE=-1,GB=-1,BH=-1,BE=-1,SOC=-1"
+
+    def value(item: float | None, digits: int = 3) -> str:
+        if item is None:
+            return "-1"
+        return f"{float(item):.{digits}f}"
+
+    return ",".join(
+        (
+            f"H={value(scenario.current_house_load_kw)}",
+            f"S={value(scenario.current_solar_power_kw)}",
+            f"GI={value(scenario.current_grid_import_kw)}",
+            f"GE={value(scenario.current_grid_export_kw)}",
+            f"SH={value(scenario.current_solar_to_home_kw)}",
+            f"SB={value(scenario.current_solar_to_battery_kw)}",
+            f"SE={value(scenario.current_solar_export_kw)}",
+            f"GB={value(scenario.current_grid_to_battery_kw)}",
+            f"BH={value(scenario.current_battery_to_home_kw)}",
+            f"BE={value(scenario.current_battery_export_kw)}",
+            f"SOC={value(scenario.current_battery_soc_percent, 1)}",
+        )
+    )
+
+
+def _island_status(data: KEMSData, period_key: str = "today") -> str:
+    """Return a human-friendly result for the full-grid-outage replay."""
+    scenario = data.scenarios.scenario("full_island", period_key)
+    if scenario is None or not scenario.ready:
+        return "Unavailable"
+    return "Survived" if scenario.outage_survived else "Shortfall"
+
+
+def _island_metric(
+    data: KEMSData,
+    attribute: str,
+    period_key: str = "today",
+) -> float | None:
+    """Return one numeric full-island replay metric."""
+    scenario = data.scenarios.scenario("full_island", period_key)
+    if scenario is None or not scenario.ready:
+        return None
+    value = getattr(scenario, attribute, None)
+    return None if value is None else float(value)
+
+
+def _prepared_island_status(data: KEMSData, period_key: str = "today") -> str:
+    """Return a human-friendly prepared-outage resilience result."""
+    scenario = data.scenarios.scenario("full_island", period_key)
+    if scenario is None or not scenario.ready:
+        return "Unavailable"
+    return {
+        "survived": "Survived",
+        "eps_limited": "EPS limited",
+        "shortfall": "Shortfall",
+        "unavailable": "Unavailable",
+    }.get(scenario.prepared_outage_status or "unavailable", "Unavailable")
+
+
+def _scenario_period_attributes(
+    data: KEMSData,
+    period_key: str,
+) -> Mapping[str, Any]:
+    """Expose one complete comparison period."""
+    period = data.scenarios.period(period_key)
+    return {} if period is None else period.to_dict()
+
+
+def _scenario_period_state(data: KEMSData, period_key: str) -> str:
+    """Return the cheapest ready scenario label for a comparison period."""
+    period = data.scenarios.period(period_key)
+    cheapest = period.cheapest if period is not None else None
+    return cheapest.label if cheapest is not None else "Unavailable"
+
+
+def _scenario_comparison_attributes(data: KEMSData) -> Mapping[str, Any]:
+    """Expose all replay periods and the full today chart timeline."""
+    return data.scenarios.to_dict()
+
+
 def _simulation_attributes(data: KEMSData) -> Mapping[str, Any]:
     """Expose the complete proposal simulation comparison."""
     simulation = data.simulation
@@ -85,6 +192,10 @@ def _simulation_attributes(data: KEMSData) -> Mapping[str, Any]:
         "actual_import_cost_pence": simulation.actual_import_cost_pence,
         "actual_export_income_pence": simulation.actual_export_income_pence,
         "simulated_import_cost_pence": simulation.simulated_import_cost_pence,
+        "simulated_cheap_import_cost_pence": (
+            simulation.simulated_cheap_import_cost_pence
+        ),
+        "simulated_day_import_cost_pence": (simulation.simulated_day_import_cost_pence),
         "simulated_export_income_pence": simulation.simulated_export_income_pence,
         "actual_house_consumption_kwh": simulation.actual_house_consumption_kwh,
         "actual_ev_energy_kwh": simulation.actual_ev_energy_kwh,
@@ -94,8 +205,14 @@ def _simulation_attributes(data: KEMSData) -> Mapping[str, Any]:
         "actual_grid_import_kwh": simulation.actual_grid_import_kwh,
         "actual_grid_export_kwh": simulation.actual_grid_export_kwh,
         "simulated_grid_import_kwh": simulation.simulated_grid_import_kwh,
+        "simulated_cheap_import_kwh": simulation.simulated_cheap_import_kwh,
+        "simulated_day_import_kwh": simulation.simulated_day_import_kwh,
         "simulated_grid_export_kwh": simulation.simulated_grid_export_kwh,
         "simulated_solar_generation_kwh": simulation.simulated_solar_generation_kwh,
+        "simulated_solar_to_home_kwh": simulation.simulated_solar_to_home_kwh,
+        "simulated_solar_to_battery_kwh": (simulation.simulated_solar_to_battery_kwh),
+        "simulated_solar_export_kwh": simulation.simulated_solar_export_kwh,
+        "simulated_grid_to_battery_kwh": (simulation.simulated_grid_to_battery_kwh),
         "simulated_solar_curtailed_kwh": simulation.simulated_solar_curtailed_kwh,
         "simulated_battery_charge_kwh": simulation.simulated_battery_charge_kwh,
         "simulated_battery_to_home_kwh": simulation.simulated_battery_to_home_kwh,
@@ -103,6 +220,9 @@ def _simulation_attributes(data: KEMSData) -> Mapping[str, Any]:
         "simulated_battery_soc": simulation.simulated_battery_soc,
         "current_simulated_battery_charge_power_kw": (
             simulation.current_simulated_battery_charge_power_kw
+        ),
+        "current_simulated_solar_to_battery_power_kw": (
+            simulation.current_simulated_solar_to_battery_power_kw
         ),
         "current_simulated_battery_to_home_power_kw": (
             simulation.current_simulated_battery_to_home_power_kw
@@ -186,6 +306,18 @@ def _simulation_attributes(data: KEMSData) -> Mapping[str, Any]:
         "actual_system_value_pence": simulation.actual_system_value_pence,
         "simulated_system_value_pence": simulation.simulated_system_value_pence,
         "effective_export_rate_pence": simulation.effective_export_rate_pence,
+        "export_tariff_status": simulation.export_tariff_status,
+        "export_tariff_active": simulation.export_tariff_active,
+        "no_export_mode_active": simulation.no_export_mode_active,
+        "overnight_charge_target_percent": (simulation.overnight_charge_target_percent),
+        "overnight_charge_target_kwh": simulation.overnight_charge_target_kwh,
+        "forecast_home_until_next_cheap_kwh": (
+            simulation.forecast_home_until_next_cheap_kwh
+        ),
+        "forecast_solar_until_next_cheap_kwh": (
+            simulation.forecast_solar_until_next_cheap_kwh
+        ),
+        "forecast_solar_credit_kwh": simulation.forecast_solar_credit_kwh,
         "inverter_limit_kw": simulation.inverter_limit_kw,
         "export_limit_kw": simulation.export_limit_kw,
         "battery_charge_limit_kw": simulation.battery_charge_limit_kw,
@@ -478,6 +610,14 @@ SENSORS: tuple[KEMSSensorEntityDescription, ...] = (
         value_fn=lambda data: data.simulation.effective_export_rate_pence,
     ),
     KEMSSensorEntityDescription(
+        key="export_tariff_status",
+        name="Export tariff status",
+        icon="mdi:transmission-tower-export",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda data: data.simulation.export_tariff_status,
+        attributes_fn=_simulation_attributes,
+    ),
+    KEMSSensorEntityDescription(
         key="next_offpeak_start",
         name="Next off-peak start",
         device_class=SensorDeviceClass.TIMESTAMP,
@@ -711,6 +851,215 @@ SENSORS: tuple[KEMSSensorEntityDescription, ...] = (
         value_fn=lambda data: data.simulation.saving_pence,
     ),
     KEMSSensorEntityDescription(
+        key="scenario_comparison_today",
+        name="Scenario comparison today",
+        icon="mdi:compare-horizontal",
+        value_fn=lambda data: _scenario_period_state(data, "today"),
+        attributes_fn=_scenario_comparison_attributes,
+    ),
+    KEMSSensorEntityDescription(
+        key="compare_no_system_cost_today",
+        name="Compare no system cost today",
+        icon="mdi:transmission-tower-import",
+        native_unit_of_measurement="p",
+        suggested_display_precision=2,
+        value_fn=lambda data: _scenario_cost(data, "no_system"),
+        attributes_fn=lambda data: _scenario_attributes(data, "no_system"),
+    ),
+    KEMSSensorEntityDescription(
+        key="compare_solar_only_cost_today",
+        name="Compare solar only cost today",
+        icon="mdi:solar-power",
+        native_unit_of_measurement="p",
+        suggested_display_precision=2,
+        value_fn=lambda data: _scenario_cost(data, "solar_only"),
+        attributes_fn=lambda data: _scenario_attributes(data, "solar_only"),
+    ),
+    KEMSSensorEntityDescription(
+        key="compare_solar_battery_cost_today",
+        name="Compare solar and battery cost today",
+        icon="mdi:home-battery-outline",
+        native_unit_of_measurement="p",
+        suggested_display_precision=2,
+        value_fn=lambda data: _scenario_cost(data, "solar_battery"),
+        attributes_fn=lambda data: _scenario_attributes(data, "solar_battery"),
+    ),
+    KEMSSensorEntityDescription(
+        key="compare_kems_no_export_cost_today",
+        name="Compare KEMS no-export cost today",
+        icon="mdi:shield-home-outline",
+        native_unit_of_measurement="p",
+        suggested_display_precision=2,
+        value_fn=lambda data: _scenario_cost(data, "kems_no_export"),
+        attributes_fn=lambda data: _scenario_attributes(data, "kems_no_export"),
+    ),
+    KEMSSensorEntityDescription(
+        key="compare_kems_full_cost_today",
+        name="Compare full KEMS cost today",
+        icon="mdi:brain",
+        native_unit_of_measurement="p",
+        suggested_display_precision=2,
+        value_fn=lambda data: _scenario_cost(data, "kems_full"),
+        attributes_fn=lambda data: _scenario_attributes(data, "kems_full"),
+    ),
+    KEMSSensorEntityDescription(
+        key="compare_full_island_mode_today",
+        name="Compare full island mode today",
+        icon="mdi:transmission-tower-off",
+        value_fn=_island_status,
+        attributes_fn=lambda data: _scenario_attributes(data, "full_island"),
+    ),
+    KEMSSensorEntityDescription(
+        key="compare_full_island_load_served_today",
+        name="Compare full island load served today",
+        icon="mdi:home-lightning-bolt-outline",
+        native_unit_of_measurement="%",
+        suggested_display_precision=1,
+        value_fn=lambda data: _island_metric(data, "load_served_percent"),
+        attributes_fn=lambda data: _scenario_attributes(data, "full_island"),
+    ),
+    KEMSSensorEntityDescription(
+        key="compare_full_island_eps_demand_today",
+        name="Compare full island EPS demand today",
+        icon="mdi:home-lightning-bolt",
+        device_class=SensorDeviceClass.ENERGY,
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        suggested_display_precision=3,
+        value_fn=lambda data: _island_metric(data, "island_demand_kwh"),
+    ),
+    KEMSSensorEntityDescription(
+        key="compare_full_island_ev_energy_shed_today",
+        name="Compare full island EV energy shed today",
+        icon="mdi:ev-station-off",
+        device_class=SensorDeviceClass.ENERGY,
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        suggested_display_precision=3,
+        value_fn=lambda data: _island_metric(data, "ev_energy_intentionally_shed_kwh"),
+    ),
+    KEMSSensorEntityDescription(
+        key="compare_full_island_unserved_energy_today",
+        name="Compare full island unserved energy today",
+        icon="mdi:home-alert-outline",
+        device_class=SensorDeviceClass.ENERGY,
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        suggested_display_precision=3,
+        value_fn=lambda data: _island_metric(data, "unserved_load_kwh"),
+    ),
+    KEMSSensorEntityDescription(
+        key="compare_full_island_ending_soc_today",
+        name="Compare full island ending SOC today",
+        icon="mdi:battery-heart-variant",
+        native_unit_of_measurement="%",
+        suggested_display_precision=1,
+        value_fn=lambda data: _island_metric(data, "ending_soc_percent"),
+    ),
+    KEMSSensorEntityDescription(
+        key="compare_full_island_prepared_status_today",
+        name="Compare full island prepared status today",
+        icon="mdi:weather-lightning-rainy",
+        value_fn=_prepared_island_status,
+        attributes_fn=lambda data: _scenario_attributes(data, "full_island"),
+    ),
+    KEMSSensorEntityDescription(
+        key="compare_full_island_required_starting_soc_today",
+        name="Compare full island required starting SOC today",
+        icon="mdi:battery-alert-variant-outline",
+        native_unit_of_measurement="%",
+        suggested_display_precision=1,
+        value_fn=lambda data: _island_metric(data, "required_starting_soc_percent"),
+    ),
+    KEMSSensorEntityDescription(
+        key="compare_full_island_prepared_target_soc_today",
+        name="Compare full island prepared target SOC today",
+        icon="mdi:battery-arrow-up-outline",
+        native_unit_of_measurement="%",
+        suggested_display_precision=1,
+        value_fn=lambda data: _island_metric(data, "recommended_prepared_soc_percent"),
+    ),
+    KEMSSensorEntityDescription(
+        key="compare_full_island_prepared_load_served_today",
+        name="Compare full island prepared load served today",
+        icon="mdi:home-lightning-bolt",
+        native_unit_of_measurement="%",
+        suggested_display_precision=1,
+        value_fn=lambda data: _island_metric(data, "prepared_load_served_percent"),
+    ),
+    KEMSSensorEntityDescription(
+        key="compare_full_island_prepared_unserved_energy_today",
+        name="Compare full island prepared unserved energy today",
+        icon="mdi:home-alert",
+        device_class=SensorDeviceClass.ENERGY,
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        suggested_display_precision=3,
+        value_fn=lambda data: _island_metric(data, "prepared_unserved_load_kwh"),
+    ),
+    KEMSSensorEntityDescription(
+        key="compare_no_system_flow_now",
+        name="Compare no system flow now",
+        icon="mdi:transmission-tower-import",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda data: _scenario_flow_state(data, "no_system"),
+    ),
+    KEMSSensorEntityDescription(
+        key="compare_solar_only_flow_now",
+        name="Compare solar only flow now",
+        icon="mdi:solar-power",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda data: _scenario_flow_state(data, "solar_only"),
+    ),
+    KEMSSensorEntityDescription(
+        key="compare_solar_battery_flow_now",
+        name="Compare solar and battery flow now",
+        icon="mdi:home-battery-outline",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda data: _scenario_flow_state(data, "solar_battery"),
+    ),
+    KEMSSensorEntityDescription(
+        key="compare_kems_no_export_flow_now",
+        name="Compare KEMS no-export flow now",
+        icon="mdi:shield-home-outline",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda data: _scenario_flow_state(data, "kems_no_export"),
+    ),
+    KEMSSensorEntityDescription(
+        key="compare_kems_full_flow_now",
+        name="Compare full KEMS flow now",
+        icon="mdi:brain",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda data: _scenario_flow_state(data, "kems_full"),
+    ),
+    KEMSSensorEntityDescription(
+        key="compare_full_island_flow_now",
+        name="Compare full island flow now",
+        icon="mdi:transmission-tower-off",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda data: _scenario_flow_state(data, "full_island"),
+    ),
+    KEMSSensorEntityDescription(
+        key="scenario_comparison_yesterday",
+        name="Scenario comparison yesterday",
+        icon="mdi:history",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda data: _scenario_period_state(data, "yesterday"),
+        attributes_fn=lambda data: _scenario_period_attributes(data, "yesterday"),
+    ),
+    KEMSSensorEntityDescription(
+        key="scenario_comparison_7_days",
+        name="Scenario comparison 7 days",
+        icon="mdi:calendar-week",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda data: _scenario_period_state(data, "7_days"),
+        attributes_fn=lambda data: _scenario_period_attributes(data, "7_days"),
+    ),
+    KEMSSensorEntityDescription(
+        key="scenario_comparison_30_days",
+        name="Scenario comparison 30 days",
+        icon="mdi:calendar-month",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda data: _scenario_period_state(data, "30_days"),
+        attributes_fn=lambda data: _scenario_period_attributes(data, "30_days"),
+    ),
+    KEMSSensorEntityDescription(
         key="actual_grid_import_today",
         name="Observed grid import today",
         icon="mdi:transmission-tower-import",
@@ -817,6 +1166,18 @@ SENSORS: tuple[KEMSSensorEntityDescription, ...] = (
         value_fn=lambda data: data.simulation.simulated_battery_soc,
     ),
     KEMSSensorEntityDescription(
+        key="simulated_solar_to_battery_power",
+        name="Simulated solar to battery power",
+        icon="mdi:solar-power-variant-outline",
+        device_class=SensorDeviceClass.POWER,
+        native_unit_of_measurement=UnitOfPower.KILO_WATT,
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=2,
+        value_fn=lambda data: (
+            data.simulation.current_simulated_solar_to_battery_power_kw
+        ),
+    ),
+    KEMSSensorEntityDescription(
         key="simulated_battery_to_home_power",
         name="Simulated battery to home power",
         icon="mdi:home-battery-outline",
@@ -868,6 +1229,35 @@ SENSORS: tuple[KEMSSensorEntityDescription, ...] = (
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
         suggested_display_precision=2,
         value_fn=lambda data: data.simulation.reserved_for_home_kwh,
+    ),
+    KEMSSensorEntityDescription(
+        key="overnight_charge_target_soc",
+        name="Overnight charge target SOC",
+        icon="mdi:battery-charging-medium",
+        native_unit_of_measurement=PERCENTAGE,
+        suggested_display_precision=0,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda data: data.simulation.overnight_charge_target_percent,
+    ),
+    KEMSSensorEntityDescription(
+        key="overnight_charge_target_energy",
+        name="Overnight charge target energy",
+        icon="mdi:battery-charging-outline",
+        device_class=SensorDeviceClass.ENERGY,
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        suggested_display_precision=2,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda data: data.simulation.overnight_charge_target_kwh,
+    ),
+    KEMSSensorEntityDescription(
+        key="forecast_solar_until_next_cheap",
+        name="Forecast solar until next cheap period",
+        icon="mdi:weather-sunny",
+        device_class=SensorDeviceClass.ENERGY,
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        suggested_display_precision=2,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda data: data.simulation.forecast_solar_until_next_cheap_kwh,
     ),
     KEMSSensorEntityDescription(
         key="hours_until_next_cheap_period",
