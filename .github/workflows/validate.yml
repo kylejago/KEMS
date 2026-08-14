@@ -26,7 +26,7 @@ jobs:
           python -m pip install -r requirements-dev.txt
 
       - name: Black
-        run: python -m black --check --diff .
+        run: python -m black --check .
 
       - name: Ruff
         run: python -m ruff check .
