@@ -23,7 +23,6 @@ from .const import (
     CONF_MANUAL_STANDING_CHARGE,
     CONF_MAX_CHARGE,
     CONF_MAX_DISCHARGE,
-    CONF_PANEL_AUTO_OTA_ENABLED,
     CONF_SIMULATION_STRATEGY,
     CONF_SITE_IMPORT_LIMIT,
     CONF_TARIFF_MODE,
@@ -56,12 +55,7 @@ PLATFORMS: list[Platform] = [
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up KEMS from a config entry."""
     try:
-        await async_sync_managed_dashboard(
-            hass,
-            panel_auto_ota_enabled=bool(
-                entry.options.get(CONF_PANEL_AUTO_OTA_ENABLED, False)
-            ),
-        )
+        await async_sync_managed_dashboard(hass)
     except OSError:
         LOGGER.exception("Unable to update the managed KEMS dashboard")
 
