@@ -8,6 +8,12 @@ from .control import (
     run_preflight_suite,
 )
 from .forecast import ForecastPlanningEngine, fuse_solar_forecasts
+from .forecast_validation import (
+    ForecastObservation,
+    ForecastValidationDay,
+    ForecastValidationEngine,
+    ForecastValidationState,
+)
 from .foxess import GridPower, calculate_battery_power_kw, normalise_grid_power
 from .gas import GasEngine
 from .learning import LearningEngine
@@ -85,8 +91,12 @@ __all__ = [
     "DataQuality",
     "ForecastConfig",
     "ForecastHour",
+    "ForecastObservation",
     "ForecastPlanState",
     "ForecastPlanningEngine",
+    "ForecastValidationDay",
+    "ForecastValidationEngine",
+    "ForecastValidationState",
     "FOXHOLE_PROPOSAL_PROFILE",
     "GasEngine",
     "GasSummary",
