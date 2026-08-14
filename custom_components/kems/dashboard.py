@@ -109,7 +109,9 @@ async def _async_esphome_ingress_port(hass: HomeAssistant) -> int:
             ) from err
 
         if info.get("state") != "started":
-            raise PanelAutoOTAError("ESPHome Device Builder is installed but not started")
+            raise PanelAutoOTAError(
+                "ESPHome Device Builder is installed but not started"
+            )
 
         ingress_port = info.get("ingress_port")
         if isinstance(ingress_port, int) and ingress_port > 0:
@@ -201,8 +203,7 @@ async def async_auto_install_managed_panel(hass: HomeAssistant) -> None:
             continue
 
         LOGGER.warning(
-            "KEMS queued automatic ESPHome compile and OTA install for %s "
-            "(job %s)",
+            "KEMS queued automatic ESPHome compile and OTA install for %s " "(job %s)",
             MANAGED_PANEL_FILENAME,
             job_id,
         )
