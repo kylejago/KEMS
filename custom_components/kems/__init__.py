@@ -28,6 +28,7 @@ from .const import (
     CONF_TARIFF_MODE,
 )
 from .coordinator import KEMSCoordinator
+from .dashboard import async_sync_managed_dashboard
 from .entity_discovery import (
     SourceValidationResult,
     async_discover_entities,
@@ -53,6 +54,11 @@ PLATFORMS: list[Platform] = [
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up KEMS from a config entry."""
+    try:
+        await async_sync_managed_dashboard(hass)
+    except OSError:
+        LOGGER.exception("Unable to update the managed KEMS dashboard")
+
     validation = await async_validate_entity_mappings(hass, dict(entry.data))
     discovery = await async_discover_entities(hass)
     enriched = {
