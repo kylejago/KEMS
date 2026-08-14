@@ -221,7 +221,9 @@ class ForecastValidationEngine:
             )
             if mae is not None
         }
-        best_source = min(source_mae, key=source_mae.get) if source_mae else "unavailable"
+        best_source = (
+            min(source_mae, key=source_mae.get) if source_mae else "unavailable"
+        )
 
         fused_pairs = [
             (float(item.fused_solar_kwh), float(item.actual_solar_kwh))
