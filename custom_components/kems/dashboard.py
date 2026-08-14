@@ -2,11 +2,15 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 from pathlib import Path
+from typing import Any
 
+from aiohttp import ClientError, WSMsgType
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 LOGGER = logging.getLogger(__name__)
 
@@ -15,6 +19,18 @@ PACKAGED_DASHBOARD_PATH = Path(__file__).with_name(MANAGED_DASHBOARD_FILENAME)
 
 MANAGED_PANEL_FILENAME = "kems16x16.yaml"
 PACKAGED_PANEL_PATH = Path(__file__).with_name(MANAGED_PANEL_FILENAME)
+
+SUPERVISOR_BASE_URL = "http://supervisor"
+ESPHOME_ADDON_SLUGS = (
+    "5c53de3b_esphome",
+    "5c53de3b_esphome-beta",
+    "5c53de3b_esphome-dev",
+)
+PANEL_AUTO_OTA_RETRY_DELAYS = (5, 15, 30)
+
+
+class PanelAutoOTAError(RuntimeError):
+    """Raised when KEMS cannot queue the managed ESPHome panel install."""
 
 
 def _sync_dashboard_file(source: Path, target: Path) -> bool:
@@ -45,7 +61,156 @@ def _sync_existing_panel_file(source: Path, target: Path) -> bool:
     return True
 
 
-async def async_sync_managed_dashboard(hass: HomeAssistant) -> bool:
+def _supervisor_data(payload: Any) -> dict[str, Any]:
+    """Return the data object from a Supervisor API response."""
+    if not isinstance(payload, dict):
+        return {}
+    data = payload.get("data", payload)
+    return data if isinstance(data, dict) else {}
+
+
+async def _async_esphome_ingress_port(hass: HomeAssistant) -> int:
+    """Discover the trusted ESPHome Device Builder ingress port."""
+    token = os.environ.get("SUPERVISOR_TOKEN")
+    if not token:
+        raise PanelAutoOTAError(
+            "Home Assistant Supervisor is unavailable; automatic panel OTA requires "
+            "Home Assistant OS or Supervised with ESPHome Device Builder"
+        )
+
+    session = async_get_clientsession(hass)
+    headers = {"Authorization": f"Bearer {token}"}
+
+    for slug in ESPHOME_ADDON_SLUGS:
+        url = f"{SUPERVISOR_BASE_URL}/addons/{slug}/info"
+        try:
+            async with session.get(url, headers=headers, timeout=10) as response:
+                if response.status == 404:
+                    continue
+                if response.status != 200:
+                    raise PanelAutoOTAError(
+                        f"Supervisor returned HTTP {response.status} for {slug}"
+                    )
+                info = _supervisor_data(await response.json())
+        except ClientError as err:
+            raise PanelAutoOTAError(
+                f"Unable to query Home Assistant Supervisor: {err}"
+            ) from err
+
+        if info.get("state") != "started":
+            raise PanelAutoOTAError("ESPHome Device Builder is installed but not started")
+
+        ingress_port = info.get("ingress_port")
+        if isinstance(ingress_port, int) and ingress_port > 0:
+            return ingress_port
+
+        raise PanelAutoOTAError(
+            "ESPHome Device Builder does not expose a trusted ingress port"
+        )
+
+    raise PanelAutoOTAError("ESPHome Device Builder add-on was not found")
+
+
+async def _async_queue_esphome_install(hass: HomeAssistant, ingress_port: int) -> str:
+    """Queue compile plus OTA upload in ESPHome Device Builder."""
+    session = async_get_clientsession(hass)
+    websocket_url = f"ws://127.0.0.1:{ingress_port}/ws"
+    message_id = "kems-managed-panel-auto-ota"
+
+    try:
+        async with session.ws_connect(
+            websocket_url,
+            heartbeat=30,
+            receive_timeout=15,
+        ) as websocket:
+            hello = await websocket.receive_json()
+            if hello.get("requires_auth") is True:
+                raise PanelAutoOTAError(
+                    "ESPHome trusted ingress unexpectedly requested authentication"
+                )
+
+            await websocket.send_json(
+                {
+                    "command": "firmware/install",
+                    "message_id": message_id,
+                    "args": {
+                        "configuration": MANAGED_PANEL_FILENAME,
+                        "port": "OTA",
+                    },
+                }
+            )
+
+            while True:
+                message = await websocket.receive(timeout=15)
+                if message.type == WSMsgType.TEXT:
+                    payload = message.json()
+                    if payload.get("message_id") != message_id:
+                        continue
+                    if "error" in payload:
+                        raise PanelAutoOTAError(
+                            f"ESPHome rejected automatic install: {payload['error']}"
+                        )
+                    result = payload.get("result")
+                    if not isinstance(result, dict):
+                        raise PanelAutoOTAError(
+                            "ESPHome returned an invalid firmware/install response"
+                        )
+                    job_id = result.get("job_id")
+                    return str(job_id or "queued")
+
+                if message.type in {
+                    WSMsgType.CLOSE,
+                    WSMsgType.CLOSED,
+                    WSMsgType.ERROR,
+                }:
+                    raise PanelAutoOTAError(
+                        "ESPHome Device Builder closed the connection before queuing "
+                        "the panel install"
+                    )
+    except (ClientError, asyncio.TimeoutError) as err:
+        raise PanelAutoOTAError(
+            f"Unable to reach ESPHome Device Builder: {err}"
+        ) from err
+
+
+async def async_auto_install_managed_panel(hass: HomeAssistant) -> None:
+    """Queue a managed panel compile and wireless install with startup retries."""
+    last_error: Exception | None = None
+
+    for delay in PANEL_AUTO_OTA_RETRY_DELAYS:
+        await asyncio.sleep(delay)
+        try:
+            ingress_port = await _async_esphome_ingress_port(hass)
+            job_id = await _async_queue_esphome_install(hass, ingress_port)
+        except PanelAutoOTAError as err:
+            last_error = err
+            LOGGER.warning(
+                "KEMS automatic 16x16 panel OTA attempt failed; will retry if "
+                "startup time remains: %s",
+                err,
+            )
+            continue
+
+        LOGGER.warning(
+            "KEMS queued automatic ESPHome compile and OTA install for %s "
+            "(job %s)",
+            MANAGED_PANEL_FILENAME,
+            job_id,
+        )
+        return
+
+    LOGGER.error(
+        "KEMS updated %s but could not queue its automatic ESPHome OTA install: %s",
+        MANAGED_PANEL_FILENAME,
+        last_error or "unknown error",
+    )
+
+
+async def async_sync_managed_dashboard(
+    hass: HomeAssistant,
+    *,
+    panel_auto_ota_enabled: bool = False,
+) -> bool:
     """Synchronise the shipped dashboard and any opted-in KEMS panel config."""
     dashboard_target = Path(hass.config.path(MANAGED_DASHBOARD_FILENAME))
     dashboard_changed = await hass.async_add_executor_job(
@@ -70,10 +235,21 @@ async def async_sync_managed_dashboard(hass: HomeAssistant) -> bool:
         panel_changed = False
 
     if panel_changed:
-        LOGGER.warning(
-            "Updated managed KEMS 16x16 ESPHome config at %s; "
-            "compile/install kems16x16 in ESPHome to flash the new firmware",
-            panel_target,
-        )
+        if panel_auto_ota_enabled:
+            LOGGER.warning(
+                "Updated managed KEMS 16x16 ESPHome config at %s; queuing "
+                "automatic compile and wireless install",
+                panel_target,
+            )
+            hass.async_create_task(
+                async_auto_install_managed_panel(hass),
+                "KEMS managed 16x16 panel automatic OTA",
+            )
+        else:
+            LOGGER.warning(
+                "Updated managed KEMS 16x16 ESPHome config at %s; automatic OTA "
+                "is disabled, so install kems16x16 wirelessly from ESPHome",
+                panel_target,
+            )
 
     return dashboard_changed or panel_changed
