@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from statistics import fmean
 
 from .models import SimulationConfig, SimulationState, Snapshot
@@ -35,6 +35,12 @@ def _load_kw(snapshot: Snapshot) -> float | None:
 class SimulationEngine:
     """Compare observed operation with the proposed KEMS strategy."""
 
+    def __init__(self) -> None:
+        """Keep completed day-start replays cheap across coordinator updates."""
+        self._day_start_cache: dict[
+            tuple[datetime, SimulationConfig, int, datetime], float
+        ] = {}
+
     def simulate_today(
         self,
         records: list[Snapshot],
@@ -42,34 +48,47 @@ class SimulationEngine:
         config: SimulationConfig,
         forecast_energy_until_offpeak_kwh: float | None = None,
         current_snapshot: Snapshot | None = None,
+        _day_end_boundary: Snapshot | None = None,
+        _records_by_day: dict[date, list[Snapshot]] | None = None,
     ) -> SimulationState:
         """Simulate the current local day from retained observations."""
-        today = sorted(
-            (record for record in records if record.timestamp.date() == now.date()),
-            key=lambda record: record.timestamp,
-        )
+        records_by_day = _records_by_day
+        if records_by_day is None:
+            records_by_day = {}
+            for record in records:
+                records_by_day.setdefault(record.timestamp.date(), []).append(record)
+            for day_records in records_by_day.values():
+                day_records.sort(key=lambda record: record.timestamp)
+        today = records_by_day.get(now.date(), [])
         live_snapshot = current_snapshot or (today[-1] if today else None)
+        capacity = max(config.battery_capacity_kwh, 0.1)
+        reserve_kwh = capacity * config.battery_reserve_percent / 100
+        battery_kwh: float | None = None
+        if today:
+            initial_soc = today[0].battery_soc
+            if initial_soc is None:
+                battery_kwh = self._battery_energy_at_day_start(
+                    records,
+                    today[0],
+                    capacity,
+                    reserve_kwh,
+                    config,
+                    records_by_day,
+                )
+            else:
+                battery_kwh = capacity * min(max(initial_soc, 0.0), 100.0) / 100
+            battery_kwh = min(max(battery_kwh, reserve_kwh), capacity)
+
         if len(today) < 2:
             return self._empty_current_state(
                 live_snapshot,
                 today,
                 config,
                 forecast_energy_until_offpeak_kwh,
+                battery_kwh=battery_kwh,
             )
 
-        capacity = max(config.battery_capacity_kwh, 0.1)
-        reserve_kwh = capacity * config.battery_reserve_percent / 100
-        initial_soc = today[0].battery_soc
-        if initial_soc is None:
-            battery_kwh = self._battery_energy_at_day_start(
-                records,
-                today[0],
-                capacity,
-                reserve_kwh,
-                config,
-            )
-        else:
-            battery_kwh = capacity * min(max(initial_soc, 0.0), 100.0) / 100
+        assert battery_kwh is not None
 
         actual_import_cost = 0.0
         actual_export_income = 0.0
@@ -110,8 +129,15 @@ class SimulationEngine:
             max(config.export_rate_pence, 0.0) if export_tariff_active else 0.0
         )
 
+        replay_records = today
+        if (
+            _day_end_boundary is not None
+            and _day_end_boundary.timestamp > today[-1].timestamp
+        ):
+            replay_records = [*today, _day_end_boundary]
+
         for index, (current, following) in enumerate(
-            zip(today, today[1:], strict=False)
+            zip(replay_records, replay_records[1:], strict=False)
         ):
             hours = _interval_hours(current.timestamp, following.timestamp)
             if hours <= 0:
@@ -488,6 +514,7 @@ class SimulationEngine:
                 today,
                 config,
                 forecast_energy_until_offpeak_kwh,
+                battery_kwh=battery_kwh,
             )
 
         current_plan = self._current_plan(
@@ -673,6 +700,7 @@ class SimulationEngine:
         records: list[Snapshot],
         config: SimulationConfig,
         forecast_energy_until_offpeak_kwh: float | None = None,
+        battery_kwh: float | None = None,
     ) -> SimulationState:
         """Expose a complete current plan before history is ready."""
         if snapshot is None:
@@ -680,12 +708,13 @@ class SimulationEngine:
 
         capacity = max(config.battery_capacity_kwh, 0.1)
         reserve_kwh = capacity * config.battery_reserve_percent / 100
-        starting_soc = (
-            snapshot.battery_soc
-            if snapshot.battery_soc is not None
-            else config.battery_initial_percent
-        )
-        battery_kwh = capacity * min(max(starting_soc, 0.0), 100.0) / 100
+        if battery_kwh is None:
+            starting_soc = (
+                snapshot.battery_soc
+                if snapshot.battery_soc is not None
+                else config.battery_initial_percent
+            )
+            battery_kwh = capacity * min(max(starting_soc, 0.0), 100.0) / 100
         battery_kwh = min(max(battery_kwh, reserve_kwh), capacity)
 
         current_plan = self._current_plan(
@@ -785,8 +814,9 @@ class SimulationEngine:
         capacity: float,
         reserve_kwh: float,
         config: SimulationConfig,
+        records_by_day: dict[date, list[Snapshot]],
     ) -> float:
-        """Carry the cheap-period charge before midnight into the new day."""
+        """Carry the previous simulated battery state across midnight."""
         initial = (
             capacity
             * min(
@@ -795,41 +825,70 @@ class SimulationEngine:
             )
             / 100
         )
-        previous = sorted(
-            (
-                record
-                for record in records
-                if record.timestamp < first_today.timestamp
-                and (first_today.timestamp - record.timestamp).total_seconds()
-                <= 12 * 3600
-            ),
-            key=lambda record: record.timestamp,
-        )
-        cheap_tail: list[Snapshot] = []
-        for record in reversed(previous):
-            if record.cheap_period_confirmed:
-                cheap_tail.append(record)
-                continue
-            if cheap_tail:
-                break
-            # The latest pre-midnight observation was not cheap, so there is
-            # no cheap session crossing into this local day.
-            break
-        if not cheap_tail:
-            return min(max(initial, reserve_kwh), capacity)
+        initial = min(max(initial, reserve_kwh), capacity)
+        previous_day = first_today.timestamp.date() - timedelta(days=1)
+        previous_day_records = records_by_day.get(previous_day, [])
+        if not previous_day_records:
+            return initial
 
-        battery_kwh = max(reserve_kwh, min(initial, capacity))
-        session = [*reversed(cheap_tail), first_today]
-        for current, following in zip(session, session[1:], strict=False):
-            if not current.cheap_period_confirmed:
-                continue
-            hours = _interval_hours(current.timestamp, following.timestamp)
-            charge_input_kwh = min(
-                min(config.max_charge_kw, config.inverter_limit_kw) * hours,
-                max(capacity - battery_kwh, 0.0) / max(config.charge_efficiency, 0.01),
+        latest_previous = previous_day_records[-1]
+        if (
+            first_today.timestamp - latest_previous.timestamp
+        ).total_seconds() > 12 * 3600:
+            return initial
+        if len(previous_day_records) < 2:
+            if latest_previous.battery_soc is None:
+                return initial
+            observed = (
+                capacity
+                * min(
+                    max(latest_previous.battery_soc, 0.0),
+                    100.0,
+                )
+                / 100
             )
-            battery_kwh += charge_input_kwh * config.charge_efficiency
-        return min(max(battery_kwh, reserve_kwh), capacity)
+            return min(max(observed, reserve_kwh), capacity)
+
+        cache_key = (
+            first_today.timestamp,
+            config,
+            len(previous_day_records),
+            latest_previous.timestamp,
+        )
+        cached = self._day_start_cache.get(cache_key)
+        if cached is not None:
+            return cached
+
+        boundary_gap_hours = (
+            first_today.timestamp - latest_previous.timestamp
+        ).total_seconds() / 3600
+        boundary = (
+            first_today if 0.0 < boundary_gap_hours <= MAX_INTERVAL_HOURS else None
+        )
+        previous_state = self.simulate_today(
+            records,
+            latest_previous.timestamp,
+            config,
+            current_snapshot=latest_previous,
+            _day_end_boundary=boundary,
+            _records_by_day=records_by_day,
+        )
+        if previous_state.simulated_battery_soc is None:
+            return initial
+
+        carried = (
+            capacity
+            * min(
+                max(previous_state.simulated_battery_soc, 0.0),
+                100.0,
+            )
+            / 100
+        )
+        carried = min(max(carried, reserve_kwh), capacity)
+        if len(self._day_start_cache) >= 256:
+            self._day_start_cache.clear()
+        self._day_start_cache[cache_key] = carried
+        return carried
 
     @staticmethod
     def _limit_export(requested_kwh: float, limit_kwh: float) -> tuple[float, float]:

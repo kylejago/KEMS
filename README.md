@@ -1,6 +1,6 @@
 # KEMS — Kyle Energy Management System
 
-KEMS 0.7.0-alpha6 is the pre-installation control-development lab for Home Assistant. It extends the 0.6.0-beta1 baseline into:
+KEMS 0.7.0-alpha7 is the pre-installation control-development lab for Home Assistant. It extends the 0.6.0-beta1 baseline into:
 
 **Observe → Learn → Advise → Simulate → Shadow → Control**
 
