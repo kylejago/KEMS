@@ -47,7 +47,7 @@ def test_adopted_managed_panel_queues_automatic_esphome_ota() -> None:
     assert '"configuration": MANAGED_PANEL_FILENAME' in sync
     assert '"port": "OTA"' in sync
     assert "SUPERVISOR_TOKEN" in sync
-    assert 'ws://127.0.0.1:{ingress_port}/ws' in sync
+    assert "ws://127.0.0.1:{ingress_port}/ws" in sync
     assert "async_auto_install_managed_panel" in sync
 
 
