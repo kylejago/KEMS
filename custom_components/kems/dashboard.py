@@ -64,7 +64,9 @@ async def async_sync_managed_dashboard(hass: HomeAssistant) -> bool:
             panel_target,
         )
     except OSError:
-        LOGGER.exception("Unable to update managed KEMS 16x16 panel at %s", panel_target)
+        LOGGER.exception(
+            "Unable to update managed KEMS 16x16 panel at %s", panel_target
+        )
         panel_changed = False
 
     if panel_changed:
