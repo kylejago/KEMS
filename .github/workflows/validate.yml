@@ -25,6 +25,9 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -r requirements-dev.txt
 
+      - name: Packaged dashboard is current
+        run: python scripts/sync_packaged_dashboard.py --check
+
       - name: Black
         run: python -m black --check .
 
