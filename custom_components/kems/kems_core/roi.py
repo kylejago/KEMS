@@ -50,7 +50,9 @@ def _expected_proposal_generation_kwh(start: datetime, end: datetime) -> float:
         overlap_end = min(end, day_end)
         if overlap_end > overlap_start:
             day_seconds = max((day_end - day_start).total_seconds(), 1.0)
-            overlap_fraction = (overlap_end - overlap_start).total_seconds() / day_seconds
+            overlap_fraction = (
+                overlap_end - overlap_start
+            ).total_seconds() / day_seconds
             daily_target = (
                 FOXHOLE_PROPOSAL_PROFILE.monthly_generation_kwh[cursor.month - 1]
                 / monthrange(cursor.year, cursor.month)[1]
@@ -265,7 +267,9 @@ class ROIEngine:
             ),
             predicted_payback_date=predicted_payback_date,
             predicted_net_value_gbp=(
-                round(predicted_net_value, 2) if predicted_net_value is not None else None
+                round(predicted_net_value, 2)
+                if predicted_net_value is not None
+                else None
             ),
             actual_value_created_today_gbp=(
                 round((simulation.actual_system_value_pence or 0.0) / 100, 2)

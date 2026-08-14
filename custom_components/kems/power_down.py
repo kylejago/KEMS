@@ -235,13 +235,17 @@ class PowerDownHistoryRecorder:
                         "available": True,
                         "active_samples_observed": audit.active_samples_observed,
                         "ev_successfully_blocked": (
-                            audit.ev_successfully_blocked if evidence_available else None
+                            audit.ev_successfully_blocked
+                            if evidence_available
+                            else None
                         ),
                         "plan_safe_throughout": (
                             audit.plan_safe_throughout if evidence_available else None
                         ),
                         "island_override_observed": (
-                            audit.island_override_observed if evidence_available else None
+                            audit.island_override_observed
+                            if evidence_available
+                            else None
                         ),
                         "completed_successfully": completed,
                         "completion_reason": reason,
