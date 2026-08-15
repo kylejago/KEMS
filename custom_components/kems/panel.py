@@ -179,7 +179,10 @@ async def async_verify_panel_firmware(
     detail = (
         f"Panel reported {last_reported!r} instead of {PANEL_CONFIG_VERSION!r}"
         if last_reported is not None
-        else f"Panel did not report {PANEL_CONFIG_VERSION!r} within {timeout_seconds} seconds"
+        else (
+            f"Panel did not report {PANEL_CONFIG_VERSION!r} within "
+            f"{timeout_seconds} seconds"
+        )
     )
     await async_update_panel_health(
         hass,

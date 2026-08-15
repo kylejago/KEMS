@@ -80,7 +80,10 @@ def _source_check(
             key,
             label,
             WAIT,
-            f"Using {platform or 'unknown'} fallback: {entity_id}; waiting for FoxESS Modbus",
+            (
+                f"Using {platform or 'unknown'} fallback: {entity_id}; "
+                "waiting for FoxESS Modbus"
+            ),
         )
     if not _entity_available(hass, entity_id):
         return _check(key, label, FAIL, f"FoxESS source is unavailable: {entity_id}")
@@ -217,7 +220,10 @@ def build_commissioning_snapshot(hass: HomeAssistant, coordinator) -> dict[str, 
                 if data.quality.score >= 95.0 and not data.quality.stale_fields
                 else FAIL
             ),
-            f"{data.quality.score:.0f}% quality; {len(data.quality.stale_fields)} stale field(s)",
+            (
+                f"{data.quality.score:.0f}% quality; "
+                f"{len(data.quality.stale_fields)} stale field(s)"
+            ),
         )
     )
     checks.append(
@@ -399,8 +405,10 @@ def build_commissioning_snapshot(hass: HomeAssistant, coordinator) -> dict[str, 
             "KH7 limits configured",
             PASS if kh7_limits_safe else FAIL,
             (
-                f"inverter={limits['inverter_limit_kw']} kW; charge={limits['battery_charge_limit_kw']} kW; "
-                f"discharge={limits['battery_discharge_limit_kw']} kW; export={limits['export_limit_kw']} kW"
+                f"inverter={limits['inverter_limit_kw']} kW; "
+                f"charge={limits['battery_charge_limit_kw']} kW; "
+                f"discharge={limits['battery_discharge_limit_kw']} kW; "
+                f"export={limits['export_limit_kw']} kW"
             ),
         )
     )
@@ -443,7 +451,8 @@ def build_commissioning_snapshot(hass: HomeAssistant, coordinator) -> dict[str, 
             "Shadow planner",
             PASS if shadow_safe else FAIL,
             (
-                f"preflight={data.control.preflight_passed}/{data.control.preflight_total}; "
+                f"preflight={data.control.preflight_passed}/"
+                f"{data.control.preflight_total}; "
                 f"next={data.control.next_action}"
             ),
         )
@@ -497,7 +506,9 @@ def build_commissioning_snapshot(hass: HomeAssistant, coordinator) -> dict[str, 
             "Panel OTA / firmware",
             PASS if panel["reported_version"] == PANEL_CONFIG_VERSION else WAIT,
             (
-                f"reported={panel['reported_version']}; expected={PANEL_CONFIG_VERSION}; status={panel['status']}"
+                f"reported={panel['reported_version']}; "
+                f"expected={PANEL_CONFIG_VERSION}; "
+                f"status={panel['status']}"
             ),
             required=False,
         )
@@ -533,7 +544,9 @@ def build_commissioning_snapshot(hass: HomeAssistant, coordinator) -> dict[str, 
         "foxess_registered_entity_count": len(foxess_registered),
         "foxess_registered_entities": foxess_registered,
         "foxess_mappings": foxess_mappings,
-        "configured_battery_power_positive_is_discharge": configured_positive_is_discharge,
+        "configured_battery_power_positive_is_discharge": (
+            configured_positive_is_discharge
+        ),
         "detected_battery_power_positive_is_discharge": detected_positive_is_discharge,
         "battery_direction_evidence_samples": direction_samples,
         "battery_direction_confidence_percent": direction_confidence,
@@ -544,9 +557,15 @@ def build_commissioning_snapshot(hass: HomeAssistant, coordinator) -> dict[str, 
             "reason": data.control.operating_reason,
             "desired_work_mode": data.control.desired_work_mode,
             "desired_charge_power_kw": data.control.desired_charge_power_kw,
-            "desired_battery_to_home_power_kw": data.control.desired_battery_to_home_power_kw,
-            "desired_battery_export_power_kw": data.control.desired_battery_export_power_kw,
-            "desired_total_discharge_power_kw": data.control.desired_total_discharge_power_kw,
+            "desired_battery_to_home_power_kw": (
+                data.control.desired_battery_to_home_power_kw
+            ),
+            "desired_battery_export_power_kw": (
+                data.control.desired_battery_export_power_kw
+            ),
+            "desired_total_discharge_power_kw": (
+                data.control.desired_total_discharge_power_kw
+            ),
             "desired_min_soc_percent": data.control.desired_min_soc_percent,
             "desired_ev_charging_allowed": data.control.desired_ev_charging_allowed,
             "desired_grid_export_allowed": data.control.desired_grid_export_allowed,
