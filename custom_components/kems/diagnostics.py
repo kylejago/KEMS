@@ -10,7 +10,9 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_registry as er
 from homeassistant.util import dt as dt_util
 
+from .commissioning import build_commissioning_snapshot
 from .coordinator import KEMSCoordinator
+from .panel import panel_health_snapshot
 from .providers.octopus import DEFAULT_INTELLIGENT_STALE_DATA_SECONDS
 
 
@@ -142,6 +144,8 @@ async def async_get_config_entry_diagnostics(
         },
         "roi": asdict(data.roi),
         "control": asdict(data.control),
+        "commissioning": build_commissioning_snapshot(hass, coordinator),
+        "panel_health": panel_health_snapshot(hass),
         "last_power_down": data.last_power_down.to_dict(),
         "quality": asdict(data.quality),
         "history_samples": data.history_samples,

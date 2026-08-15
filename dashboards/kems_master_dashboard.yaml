@@ -695,6 +695,150 @@ views:
           - sensor.kems_last_power_down_bonus
           - sensor.kems_last_power_down_combined_estimated_income
 
+  - title: Commissioning
+    path: commissioning
+    icon: mdi:clipboard-check-multiple-outline
+    cards:
+      - type: markdown
+        content: |
+          # KEMS Commissioning Readiness
+          This page is deliberately read-only. It verifies the commissioned FoxESS mappings, flow directions, hardware limits, shadow plan and managed panel before KEMS is allowed to progress beyond the control lab.
+
+          **Readiness:** **{{ states('sensor.kems_commissioning_readiness') }}**  
+          **Maximum allowed stage in this build:** {{ state_attr('sensor.kems_commissioning_readiness', 'maximum_allowed_stage') or 'shadow' }}  
+          **Real hardware writes:** **{{ state_attr('sensor.kems_commissioning_readiness', 'real_hardware_writes') or 'blocked' }}**
+
+      - type: grid
+        columns: 4
+        square: false
+        cards:
+          - type: tile
+            entity: sensor.kems_commissioning_readiness
+            name: Commissioning readiness
+          - type: tile
+            entity: sensor.kems_panel_management_status
+            name: Panel / OTA
+          - type: tile
+            entity: sensor.kems_panel_firmware_version
+            name: Panel firmware
+          - type: tile
+            entity: sensor.kems_control_preflight
+            name: Control preflight
+
+      - type: markdown
+        title: Commissioning checklist
+        content: |
+          {% set checks = state_attr('sensor.kems_commissioning_readiness', 'checks') or [] %}
+          | Check | Status | Detail |
+          |---|:---:|---|
+          {% for item in checks %}
+          | {{ item.get('label', item.get('key', '—')) }} | **{{ item.get('status', '—') }}** | {{ item.get('detail', '—') }} |
+          {% endfor %}
+
+          **PASS:** {{ state_attr('sensor.kems_commissioning_readiness', 'pass_count') or 0 }} · **WAIT:** {{ state_attr('sensor.kems_commissioning_readiness', 'wait_count') or 0 }} · **FAIL:** {{ state_attr('sensor.kems_commissioning_readiness', 'fail_count') or 0 }}
+
+      - type: grid
+        columns: 2
+        square: false
+        cards:
+          - type: markdown
+            title: FoxESS discovery / mappings
+            content: |
+              {% set mappings = state_attr('sensor.kems_commissioning_readiness', 'foxess_mappings') or {} %}
+              **Available FoxESS Modbus entities:** {{ state_attr('sensor.kems_commissioning_readiness', 'foxess_registered_entity_count') or 0 }}
+
+              | KEMS source | FoxESS entity |
+              |---|---|
+              {% if mappings %}
+              {% for key, entity in mappings.items() | sort %}
+              | `{{ key }}` | `{{ entity }}` |
+              {% endfor %}
+              {% else %}
+              | — | Waiting for FoxESS commissioning |
+              {% endif %}
+          - type: markdown
+            title: Battery direction verification
+            content: |
+              **Configured positive power means discharge:** {{ state_attr('sensor.kems_commissioning_readiness', 'configured_battery_power_positive_is_discharge') }}  
+              **Detected positive power means discharge:** {{ state_attr('sensor.kems_commissioning_readiness', 'detected_battery_power_positive_is_discharge') }}  
+              **Evidence samples:** {{ state_attr('sensor.kems_commissioning_readiness', 'battery_direction_evidence_samples') or 0 }}  
+              **Confidence:** {{ state_attr('sensor.kems_commissioning_readiness', 'battery_direction_confidence_percent') or 0 }}%
+
+              KEMS learns this from real SOC movement while battery power is above the verification threshold. A mismatch blocks progression to shadow readiness.
+
+      - type: grid
+        columns: 3
+        square: false
+        cards:
+          - type: tile
+            entity: sensor.kems_house_load
+            name: FoxESS / fallback house load
+          - type: tile
+            entity: sensor.kems_solar_power
+            name: Solar power
+          - type: tile
+            entity: sensor.kems_battery_state_of_charge
+            name: Battery SOC
+          - type: tile
+            entity: sensor.kems_battery_power
+            name: Battery power
+          - type: tile
+            entity: sensor.kems_grid_import
+            name: Grid import
+          - type: tile
+            entity: sensor.kems_grid_export
+            name: Grid export
+
+      - type: grid
+        columns: 2
+        square: false
+        cards:
+          - type: entities
+            title: Shadow command — what KEMS would send
+            show_header_toggle: false
+            entities:
+              - sensor.kems_operating_mode
+              - sensor.kems_control_operating_reason
+              - sensor.kems_desired_inverter_work_mode
+              - sensor.kems_desired_battery_charge_power
+              - sensor.kems_desired_battery_to_home_power
+              - sensor.kems_desired_battery_export_power
+              - sensor.kems_desired_total_battery_discharge_power
+              - sensor.kems_desired_minimum_soc
+              - sensor.kems_control_next_action
+              - binary_sensor.kems_control_plan_safe
+              - binary_sensor.kems_control_data_fresh
+              - binary_sensor.kems_control_commands_permitted
+          - type: entities
+            title: Commissioned hardware limits
+            show_header_toggle: false
+            entities:
+              - sensor.kems_kh7_inverter_limit
+              - sensor.kems_kh7_battery_charge_limit
+              - sensor.kems_kh7_battery_discharge_limit
+              - sensor.kems_eps_output_limit
+              - sensor.kems_configured_site_import_limit
+              - sensor.kems_site_import_headroom
+              - sensor.kems_kh7_output_headroom
+
+      - type: markdown
+        title: Managed panel / automatic OTA proof
+        content: |
+          {% set p = state_attr('sensor.kems_panel_management_status', 'expected_version') %}
+          | Panel health | Value |
+          |---|---|
+          | Status | **{{ states('sensor.kems_panel_management_status') }}** |
+          | Managed by KEMS | {{ state_attr('sensor.kems_panel_management_status', 'managed') }} |
+          | Automatic OTA armed | {{ state_attr('sensor.kems_panel_management_status', 'automatic_ota_armed') }} |
+          | Expected firmware | {{ p or '—' }} |
+          | Reported firmware | {{ state_attr('sensor.kems_panel_management_status', 'reported_version') or '—' }} |
+          | Last config sync | {{ state_attr('sensor.kems_panel_management_status', 'last_config_sync') or '—' }} |
+          | Last OTA attempt | {{ state_attr('sensor.kems_panel_management_status', 'last_ota_attempt') or '—' }} |
+          | Last OTA success | {{ state_attr('sensor.kems_panel_management_status', 'last_ota_success') or '—' }} |
+          | ESPHome job ID | {{ state_attr('sensor.kems_panel_management_status', 'esphome_job_id') or '—' }} |
+          | Last OTA result | {{ state_attr('sensor.kems_panel_management_status', 'last_ota_result') or '—' }} |
+          | Last error | {{ state_attr('sensor.kems_panel_management_status', 'last_error') or 'None' }} |
+
   - title: Control & EPS
     path: control-eps
     icon: mdi:shield-home

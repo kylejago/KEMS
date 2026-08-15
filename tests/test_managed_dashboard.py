@@ -28,6 +28,7 @@ def test_managed_master_dashboard_is_valid_builtin_yaml() -> None:
         "simulation",
         "forecast",
         "full-kems-forecast",
+        "commissioning",
         "compare",
         "battery-solar",
         "tariff-ev",
