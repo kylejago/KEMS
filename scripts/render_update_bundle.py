@@ -31,7 +31,15 @@ def validate_bundle(bundle: Any) -> dict[str, Any]:
     components = bundle.get("components")
     if not isinstance(components, dict):
         raise ValueError("Bundle components must be an object")
-    for required in ("kems_core", "dashboard", "panel", "property_web", "pi_agent", "pi_system", "public_web"):
+    for required in (
+        "kems_core",
+        "dashboard",
+        "panel",
+        "property_web",
+        "pi_agent",
+        "pi_system",
+        "public_web",
+    ):
         if required not in components or not isinstance(components[required], dict):
             raise ValueError(f"Bundle component {required} is required")
     core_version = str(components["kems_core"].get("version") or "").strip()
@@ -43,7 +51,9 @@ def validate_bundle(bundle: Any) -> dict[str, Any]:
     property_web = components["property_web"].get("version")
     pi_agent = components["pi_agent"].get("version")
     if property_web and pi_agent and str(property_web) != str(pi_agent):
-        raise ValueError("property_web and pi_agent must share one appliance release version")
+        raise ValueError(
+            "property_web and pi_agent must share one appliance release version"
+        )
     maintenance = bundle.get("maintenance")
     if not isinstance(maintenance, dict):
         raise ValueError("Bundle maintenance must be an object")
@@ -52,7 +62,9 @@ def validate_bundle(bundle: Any) -> dict[str, Any]:
         raise ValueError("maintenance.affected_components must be a list")
     unknown = [key for key in affected if key not in components]
     if unknown:
-        raise ValueError(f"Maintenance references unknown components: {', '.join(unknown)}")
+        raise ValueError(
+            f"Maintenance references unknown components: {', '.join(unknown)}"
+        )
     return bundle
 
 

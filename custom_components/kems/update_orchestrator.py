@@ -37,7 +37,9 @@ INITIAL_CHECK_DELAY_SECONDS = 30
 BUNDLE_REPOSITORY = "kylejago/KEMS"
 BUNDLE_ASSET = "kems-bundle.json"
 BUNDLE_CHECKSUM_ASSET = f"{BUNDLE_ASSET}.sha256"
-GITHUB_RELEASES_URL = f"https://api.github.com/repos/{BUNDLE_REPOSITORY}/releases?per_page=30"
+GITHUB_RELEASES_URL = (
+    f"https://api.github.com/repos/{BUNDLE_REPOSITORY}/releases?per_page=30"
+)
 NOTIFICATION_ID = "kems_update_maintenance"
 EVENT_MAINTENANCE = "kems_maintenance_notice"
 
@@ -152,7 +154,9 @@ def _normalise_version(value: Any) -> str:
 
 def _version_matches(first: Any, second: Any) -> bool:
     """Compare versions while tolerating a conventional leading v."""
-    return bool(first and second) and _normalise_version(first) == _normalise_version(second)
+    return bool(first and second) and _normalise_version(first) == _normalise_version(
+        second
+    )
 
 
 def _validated_bundle(raw: Any) -> dict[str, Any]:
@@ -185,7 +189,9 @@ def _validated_bundle(raw: Any) -> dict[str, Any]:
 def _installed_integration_version() -> str:
     """Read the running KEMS manifest version."""
     try:
-        payload = json.loads(Path(__file__).with_name("manifest.json").read_text("utf-8"))
+        payload = json.loads(
+            Path(__file__).with_name("manifest.json").read_text("utf-8")
+        )
         return str(payload.get("version") or "unknown")
     except (OSError, ValueError, TypeError):
         return "unknown"
@@ -308,7 +314,9 @@ class KEMSUpdateOrchestrator:
                 bundle = await self._async_fetch_bundle()
                 if bundle is None:
                     bundle = self._standalone_bundle_from_update_entity()
-                    self.bundle_source = "home-assistant-update-entity" if bundle else "none"
+                    self.bundle_source = (
+                        "home-assistant-update-entity" if bundle else "none"
+                    )
                 else:
                     self.bundle_source = "github-release-bundle"
                 self.latest_bundle = bundle
@@ -331,12 +339,18 @@ class KEMSUpdateOrchestrator:
             "Accept": "application/vnd.github+json",
             "User-Agent": "KEMS-Home-Assistant-Update-Orchestrator",
         }
-        async with session.get(GITHUB_RELEASES_URL, headers=headers, timeout=15) as response:
+        async with session.get(
+            GITHUB_RELEASES_URL, headers=headers, timeout=15
+        ) as response:
             if response.status >= 400:
-                raise HomeAssistantError(f"GitHub bundle lookup returned HTTP {response.status}")
+                raise HomeAssistantError(
+                    f"GitHub bundle lookup returned HTTP {response.status}"
+                )
             releases = await response.json()
         if not isinstance(releases, list):
-            raise HomeAssistantError("GitHub bundle lookup returned an invalid response")
+            raise HomeAssistantError(
+                "GitHub bundle lookup returned an invalid response"
+            )
         selected: dict[str, Any] | None = None
         manifest_asset: dict[str, Any] | None = None
         checksum_asset: dict[str, Any] | None = None
@@ -346,7 +360,9 @@ class KEMSUpdateOrchestrator:
             if self.policy.channel == "stable" and release.get("prerelease"):
                 continue
             assets = release.get("assets") or []
-            manifest = next((item for item in assets if item.get("name") == BUNDLE_ASSET), None)
+            manifest = next(
+                (item for item in assets if item.get("name") == BUNDLE_ASSET), None
+            )
             checksum = next(
                 (item for item in assets if item.get("name") == BUNDLE_CHECKSUM_ASSET),
                 None,
@@ -367,8 +383,12 @@ class KEMSUpdateOrchestrator:
         async def download(asset: dict[str, Any]) -> bytes:
             url = str(asset.get("browser_download_url") or "")
             if not url:
-                raise HomeAssistantError("KEMS bundle release asset has no download URL")
-            async with session.get(url, headers={"User-Agent": headers["User-Agent"]}, timeout=15) as response:
+                raise HomeAssistantError(
+                    "KEMS bundle release asset has no download URL"
+                )
+            async with session.get(
+                url, headers={"User-Agent": headers["User-Agent"]}, timeout=15
+            ) as response:
                 if response.status >= 400:
                     raise HomeAssistantError(
                         f"KEMS bundle asset download returned HTTP {response.status}"
@@ -533,7 +553,11 @@ class KEMSUpdateOrchestrator:
             return
         if not force and not self.policy.automatic_updates:
             return
-        if not force and bool(pending.get("maintenance", {}).get("required", True)) and not self._in_maintenance_window():
+        if (
+            not force
+            and bool(pending.get("maintenance", {}).get("required", True))
+            and not self._in_maintenance_window()
+        ):
             return
 
         target = str(pending.get("target") or "")
@@ -568,7 +592,9 @@ class KEMSUpdateOrchestrator:
                         "KEMS pre-update backup requested but backup.create_automatic is unavailable"
                     )
             if not self.hass.services.has_service("update", "install"):
-                await self._fail_pending("Home Assistant update.install service is unavailable")
+                await self._fail_pending(
+                    "Home Assistant update.install service is unavailable"
+                )
                 return
             pending["stage"] = "installing"
             self.maintenance = self._maintenance_payload("in_progress", pending)
@@ -637,8 +663,7 @@ class KEMSUpdateOrchestrator:
             if item.required and item.delivery != "external"
         ]
         all_local_current = bool(core_current) and all(
-            item.status in {"current", "not-targeted", "not-installed"}
-            for item in local_required
+            item.status in {"current", "not-targeted"} for item in local_required
         )
         if all_local_current:
             completed = {
@@ -723,7 +748,11 @@ class KEMSUpdateOrchestrator:
         if core_target is None:
             core_status = "not-targeted"
         else:
-            core_status = "current" if _version_matches(running, core_target) else "update-required"
+            core_status = (
+                "current"
+                if _version_matches(running, core_target)
+                else "update-required"
+            )
         statuses.append(
             ComponentStatus(
                 "kems_core",
@@ -755,21 +784,32 @@ class KEMSUpdateOrchestrator:
                 dashboard_status,
                 "kems_core",
                 _component_required(bundle, "dashboard"),
-                "Managed dashboard hash matches packaged YAML" if dashboard_current is True else "",
+                (
+                    "Managed dashboard hash matches packaged YAML"
+                    if dashboard_current is True
+                    else ""
+                ),
             )
         )
 
         panel_target = _component_target(bundle, "panel")
         panel_state = self.hass.states.get("sensor.kems_panel_firmware_version")
         panel_installed = None
-        if panel_state is not None and panel_state.state not in {"unknown", "unavailable"}:
+        if panel_state is not None and panel_state.state not in {
+            "unknown",
+            "unavailable",
+        }:
             panel_installed = panel_state.state
         if panel_target is None:
             panel_status = "not-targeted"
         elif panel_installed is None:
             panel_status = "not-installed"
         else:
-            panel_status = "current" if _version_matches(panel_installed, panel_target) else "verifying"
+            panel_status = (
+                "current"
+                if _version_matches(panel_installed, panel_target)
+                else "verifying"
+            )
         statuses.append(
             ComponentStatus(
                 "panel",
@@ -796,7 +836,9 @@ class KEMSUpdateOrchestrator:
             )
         self.component_status = statuses
 
-    def _maintenance_payload(self, status: str, pending: dict[str, Any]) -> dict[str, Any]:
+    def _maintenance_payload(
+        self, status: str, pending: dict[str, Any]
+    ) -> dict[str, Any]:
         """Build the same notice shape used by every KEMS user surface."""
         maintenance = pending.get("maintenance") or {}
         return {
@@ -805,8 +847,12 @@ class KEMSUpdateOrchestrator:
             "target": pending.get("target"),
             "scheduled_for": pending.get("scheduled_for"),
             "reason": pending.get("reason") or maintenance.get("reason"),
-            "expected_downtime_minutes": maintenance.get("expected_downtime_minutes", 5),
-            "affected_components": list(maintenance.get("affected_components") or ["kems_core"]),
+            "expected_downtime_minutes": maintenance.get(
+                "expected_downtime_minutes", 5
+            ),
+            "affected_components": list(
+                maintenance.get("affected_components") or ["kems_core"]
+            ),
             "home_assistant_restart_required": bool(
                 maintenance.get("home_assistant_restart_required", True)
             ),
@@ -817,7 +863,19 @@ class KEMSUpdateOrchestrator:
     async def _async_notify(self, phase: str, pending: dict[str, Any]) -> None:
         """Publish one persistent notice and one HA event for all user areas."""
         notice = self._maintenance_payload(
-            "completed" if phase == "completed" else "failed" if phase == "failed" else "in_progress" if phase in {"in_progress", "restart"} else "scheduled",
+            (
+                "completed"
+                if phase == "completed"
+                else (
+                    "failed"
+                    if phase == "failed"
+                    else (
+                        "in_progress"
+                        if phase in {"in_progress", "restart"}
+                        else "scheduled"
+                    )
+                )
+            ),
             pending,
         )
         self.hass.bus.async_fire(EVENT_MAINTENANCE, notice)
@@ -827,7 +885,9 @@ class KEMSUpdateOrchestrator:
         when = "the configured maintenance window"
         if scheduled:
             try:
-                when = dt_util.as_local(datetime.fromisoformat(str(scheduled))).strftime("%a %d %b %H:%M")
+                when = dt_util.as_local(
+                    datetime.fromisoformat(str(scheduled))
+                ).strftime("%a %d %b %H:%M")
             except ValueError:
                 pass
         reason = str(notice.get("reason") or "KEMS coordinated update")
@@ -878,7 +938,10 @@ class KEMSUpdateOrchestrator:
             for item in self.component_status
             if item.required and item.delivery != "external"
         ]
-        if any(item.status not in {"current", "not-targeted", "not-installed"} for item in required_local):
+        if any(
+            item.status not in {"current", "not-targeted", "not-installed"}
+            for item in required_local
+        ):
             return "Update available"
         return "Up to date"
 
@@ -889,7 +952,9 @@ class KEMSUpdateOrchestrator:
             "policy": asdict(self.policy),
             "bundle": self.latest_bundle.get("bundle") if self.latest_bundle else None,
             "bundle_source": self.bundle_source,
-            "release": self.latest_bundle.get("release") if self.latest_bundle else None,
+            "release": (
+                self.latest_bundle.get("release") if self.latest_bundle else None
+            ),
             "last_checked": self.last_checked,
             "pending": self.pending,
             "maintenance": self.maintenance,
@@ -949,7 +1014,9 @@ async def async_setup_update_orchestrator(
         async def apply_update(call: ServiceCall) -> None:
             current = _first_orchestrator(hass)
             if current is not None:
-                await current.async_apply_pending(force=bool(call.data.get("force", False)))
+                await current.async_apply_pending(
+                    force=bool(call.data.get("force", False))
+                )
 
         async def cancel_update(_call: ServiceCall) -> None:
             current = _first_orchestrator(hass)
@@ -994,7 +1061,11 @@ def update_orchestrator_snapshot(
 ) -> dict[str, Any]:
     """Return update diagnostics without requiring network I/O."""
     orchestrator = get_update_orchestrator(hass, entry)
-    return orchestrator.snapshot() if orchestrator is not None else {"status": "unavailable"}
+    return (
+        orchestrator.snapshot()
+        if orchestrator is not None
+        else {"status": "unavailable"}
+    )
 
 
 def build_update_sensor_entities(
@@ -1101,7 +1172,9 @@ class _UpdatePolicySwitch(KEMSEntity, SwitchEntity):
     _attr_entity_category = EntityCategory.CONFIG
     policy_key = ""
 
-    def __init__(self, coordinator, orchestrator: KEMSUpdateOrchestrator, key: str) -> None:
+    def __init__(
+        self, coordinator, orchestrator: KEMSUpdateOrchestrator, key: str
+    ) -> None:
         super().__init__(coordinator, key)
         self.orchestrator = orchestrator
 
@@ -1180,7 +1253,9 @@ class _MaintenanceTimeEntity(KEMSEntity, TimeEntity):
     _attr_entity_category = EntityCategory.CONFIG
     policy_key = ""
 
-    def __init__(self, coordinator, orchestrator: KEMSUpdateOrchestrator, key: str) -> None:
+    def __init__(
+        self, coordinator, orchestrator: KEMSUpdateOrchestrator, key: str
+    ) -> None:
         super().__init__(coordinator, key)
         self.orchestrator = orchestrator
 

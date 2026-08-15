@@ -42,7 +42,9 @@ def test_release_bundle_is_checksum_verified_and_public_site_is_reserved() -> No
     assert 'BUNDLE_ASSET = "kems-bundle.json"' in content
     assert 'BUNDLE_CHECKSUM_ASSET = f"{BUNDLE_ASSET}.sha256"' in content
     assert "hashlib.sha256(manifest_bytes).hexdigest()" in content
-    assert 'for key in ("property_web", "pi_agent", "pi_system", "public_web")' in content
+    assert (
+        'for key in ("property_web", "pi_agent", "pi_system", "public_web")' in content
+    )
     assert '"delegated" if target is not None else "not-targeted"' in content
 
 
