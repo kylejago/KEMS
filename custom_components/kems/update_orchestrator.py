@@ -495,23 +495,30 @@ class KEMSUpdateOrchestrator:
             maintenance.get("required")
             or maintenance.get("home_assistant_restart_required", True)
         )
+        automatic = self.policy.automatic_updates
         scheduled_for = None
-        if disruptive:
+        if automatic and disruptive:
             scheduled_for = self._scheduled_time().isoformat()
         self.pending = {
             "bundle": bundle.get("bundle"),
             "target": target,
             "discovered_at": dt_util.now().isoformat(),
             "scheduled_for": scheduled_for,
-            "stage": "scheduled" if disruptive else "ready",
+            "stage": (
+                "available" if not automatic else "scheduled" if disruptive else "ready"
+            ),
             "reason": reason,
             "maintenance": maintenance,
             "source": self.bundle_source,
         }
-        self.maintenance = self._maintenance_payload("scheduled", self.pending)
+        notice_status = "scheduled" if automatic and disruptive else "update_available"
+        self.maintenance = self._maintenance_payload(notice_status, self.pending)
         if self.policy.notify_before_disruption:
-            await self._async_notify("scheduled", self.pending)
-        if self.policy.automatic_updates:
+            await self._async_notify(
+                "scheduled" if automatic and disruptive else "available",
+                self.pending,
+            )
+        if automatic:
             await self._maybe_run_pending()
 
     def _scheduled_time(self) -> datetime:
@@ -537,6 +544,13 @@ class KEMSUpdateOrchestrator:
             return
         disruptive = bool(self.pending.get("maintenance", {}).get("required", True))
         if disruptive and not self._in_maintenance_window():
+            if self.pending.get("stage") != "scheduled":
+                self.pending["stage"] = "scheduled"
+                self.pending["scheduled_for"] = self._scheduled_time().isoformat()
+                self.maintenance = self._maintenance_payload("scheduled", self.pending)
+                if self.policy.notify_before_disruption:
+                    await self._async_notify("scheduled", self.pending)
+                await self._async_save()
             return
         if self.policy.mode == UPDATE_MODE_WINDOW and not self._in_maintenance_window():
             return
@@ -896,7 +910,13 @@ class KEMSUpdateOrchestrator:
         reason = str(notice.get("reason") or "KEMS coordinated update")
         downtime = notice.get("expected_downtime_minutes") or 5
         target = pending.get("target") or notice.get("target") or "the new release"
-        if phase == "completed":
+        if phase == "available":
+            title = "KEMS update available"
+            message = (
+                f"KEMS {target} is available. Automatic updates are disabled, "
+                "so no maintenance has been scheduled."
+            )
+        elif phase == "completed":
             title = "KEMS maintenance complete"
             message = (
                 f"KEMS {target} is active and all required local components "
@@ -947,6 +967,8 @@ class KEMSUpdateOrchestrator:
             stage = str(self.pending.get("stage") or "scheduled")
             if stage in {"installing", "restart_requested", "verifying"}:
                 return "Updating"
+            if stage in {"available", "ready"}:
+                return "Update available"
             return "Update scheduled"
         if self.latest_bundle is None:
             return "Up to date" if self.last_checked else "Checking"
