@@ -11,6 +11,14 @@ from typing import Any
 from aiohttp import ClientError, WSMsgType
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.util import dt as dt_util
+
+from .panel import (
+    async_load_panel_health,
+    async_refresh_reported_panel_version,
+    async_update_panel_health,
+    async_verify_panel_firmware,
+)
 
 LOGGER = logging.getLogger(__name__)
 
@@ -190,11 +198,24 @@ async def async_auto_install_managed_panel(hass: HomeAssistant) -> None:
 
     for delay in PANEL_AUTO_OTA_RETRY_DELAYS:
         await asyncio.sleep(delay)
+        await async_update_panel_health(
+            hass,
+            status="Updating",
+            last_ota_attempt=dt_util.now().isoformat(),
+            last_ota_result="attempting",
+            last_error=None,
+        )
         try:
             ingress_port = await _async_esphome_ingress_port(hass)
             job_id = await _async_queue_esphome_install(hass, ingress_port)
         except PanelAutoOTAError as err:
             last_error = err
+            await async_update_panel_health(
+                hass,
+                status="Updating",
+                last_ota_result="retrying",
+                last_error=str(err),
+            )
             LOGGER.warning(
                 "KEMS automatic 16x16 panel OTA attempt failed; will retry if "
                 "startup time remains: %s",
@@ -202,22 +223,42 @@ async def async_auto_install_managed_panel(hass: HomeAssistant) -> None:
             )
             continue
 
+        await async_update_panel_health(
+            hass,
+            status="Updating",
+            esphome_job_id=job_id,
+            last_ota_result="queued",
+            last_error=None,
+        )
         LOGGER.warning(
-            "KEMS queued automatic ESPHome compile and OTA install for %s " "(job %s)",
+            "KEMS queued automatic ESPHome compile and OTA install for %s (job %s)",
             MANAGED_PANEL_FILENAME,
             job_id,
         )
+        hass.async_create_task(
+            async_verify_panel_firmware(hass),
+            "KEMS managed 16x16 panel OTA verification",
+        )
         return
 
+    error = str(last_error or "unknown error")
+    await async_update_panel_health(
+        hass,
+        status="Failed",
+        last_ota_result="failed",
+        last_error=error,
+    )
     LOGGER.error(
         "KEMS updated %s but could not queue its automatic ESPHome OTA install: %s",
         MANAGED_PANEL_FILENAME,
-        last_error or "unknown error",
+        error,
     )
 
 
 async def async_sync_managed_dashboard(hass: HomeAssistant) -> bool:
     """Synchronise the shipped dashboard and any opted-in KEMS panel config."""
+    await async_load_panel_health(hass)
+
     dashboard_target = Path(hass.config.path(MANAGED_DASHBOARD_FILENAME))
     dashboard_changed = await hass.async_add_executor_job(
         _sync_dashboard_file,
@@ -228,6 +269,7 @@ async def async_sync_managed_dashboard(hass: HomeAssistant) -> bool:
         LOGGER.info("Updated managed KEMS dashboard at %s", dashboard_target)
 
     panel_target = Path(hass.config.path("esphome", MANAGED_PANEL_FILENAME))
+    panel_exists = await hass.async_add_executor_job(panel_target.exists)
     panel_was_managed = await hass.async_add_executor_job(
         _panel_is_kems_managed,
         panel_target,
@@ -244,7 +286,25 @@ async def async_sync_managed_dashboard(hass: HomeAssistant) -> bool:
         )
         panel_changed = False
 
-    if panel_changed and panel_was_managed:
+    if not panel_exists:
+        await async_update_panel_health(
+            hass,
+            status="Not installed",
+            managed=False,
+            automatic_ota_armed=False,
+            reported_version=None,
+            reported_entity_id=None,
+        )
+    elif panel_changed and panel_was_managed:
+        await async_update_panel_health(
+            hass,
+            status="Updating",
+            managed=True,
+            automatic_ota_armed=True,
+            last_config_sync=dt_util.now().isoformat(),
+            last_ota_result="pending",
+            last_error=None,
+        )
         LOGGER.warning(
             "Updated managed KEMS 16x16 ESPHome config at %s; queuing automatic "
             "compile and wireless install",
@@ -255,11 +315,34 @@ async def async_sync_managed_dashboard(hass: HomeAssistant) -> bool:
             "KEMS managed 16x16 panel automatic OTA",
         )
     elif panel_changed:
+        await async_update_panel_health(
+            hass,
+            status="Manual install required",
+            managed=True,
+            automatic_ota_armed=True,
+            last_config_sync=dt_util.now().isoformat(),
+            last_ota_result="manual_install_required",
+            last_error=None,
+        )
         LOGGER.warning(
             "Updated KEMS 16x16 ESPHome config at %s. This is its first managed "
             "adoption, so install it wirelessly once in ESPHome; subsequent managed "
             "changes will install automatically.",
             panel_target,
+        )
+    elif panel_was_managed:
+        await async_update_panel_health(
+            hass,
+            managed=True,
+            automatic_ota_armed=True,
+        )
+        await async_refresh_reported_panel_version(hass)
+    else:
+        await async_update_panel_health(
+            hass,
+            status="Unmanaged",
+            managed=False,
+            automatic_ota_armed=False,
         )
 
     return dashboard_changed or panel_changed
