@@ -6,6 +6,7 @@ import asyncio
 import hashlib
 import json
 import logging
+from contextlib import suppress
 from dataclasses import asdict, dataclass
 from datetime import datetime, time, timedelta
 from pathlib import Path
@@ -66,7 +67,7 @@ class UpdatePolicy:
     channel: str = "alpha"
 
     @classmethod
-    def from_dict(cls, raw: dict[str, Any] | None) -> "UpdatePolicy":
+    def from_dict(cls, raw: dict[str, Any] | None) -> UpdatePolicy:
         """Load a policy while discarding unknown or invalid values."""
         raw = raw or {}
         mode = str(raw.get("mode", UPDATE_MODE_SAFE_FIRST))
@@ -172,9 +173,10 @@ def _validated_bundle(raw: Any) -> dict[str, Any]:
     if not isinstance(components, dict):
         raise ValueError("KEMS bundle has no components object")
     core = components.get("kems_core")
-    if core is not None:
-        if not isinstance(core, dict) or not str(core.get("version", "")).strip():
-            raise ValueError("KEMS bundle kems_core target is invalid")
+    if core is not None and (
+        not isinstance(core, dict) or not str(core.get("version", "")).strip()
+    ):
+        raise ValueError("KEMS bundle kems_core target is invalid")
     maintenance = raw.get("maintenance", {})
     if not isinstance(maintenance, dict):
         raise ValueError("KEMS bundle maintenance section is invalid")
@@ -371,7 +373,8 @@ class KEMSUpdateOrchestrator:
                 continue
             if checksum is None:
                 raise HomeAssistantError(
-                    f"Release {release.get('tag_name')} has a KEMS bundle without its SHA-256 asset"
+                    f"Release {release.get('tag_name')} has a KEMS bundle "
+                    "without its SHA-256 asset"
                 )
             selected = release
             manifest_asset = manifest
@@ -588,9 +591,11 @@ class KEMSUpdateOrchestrator:
                         await self._fail_pending(f"Pre-update backup failed: {error}")
                         return
                 else:
-                    LOGGER.warning(
-                        "KEMS pre-update backup requested but backup.create_automatic is unavailable"
+                    await self._fail_pending(
+                        "Pre-update backup requested, but "
+                        "backup.create_automatic is unavailable"
                     )
+                    return
             if not self.hass.services.has_service("update", "install"):
                 await self._fail_pending(
                     "Home Assistant update.install service is unavailable"
@@ -884,33 +889,45 @@ class KEMSUpdateOrchestrator:
         scheduled = notice.get("scheduled_for")
         when = "the configured maintenance window"
         if scheduled:
-            try:
+            with suppress(ValueError):
                 when = dt_util.as_local(
                     datetime.fromisoformat(str(scheduled))
                 ).strftime("%a %d %b %H:%M")
-            except ValueError:
-                pass
         reason = str(notice.get("reason") or "KEMS coordinated update")
         downtime = notice.get("expected_downtime_minutes") or 5
         target = pending.get("target") or notice.get("target") or "the new release"
         if phase == "completed":
             title = "KEMS maintenance complete"
-            message = f"KEMS {target} is active and all required local components passed verification. Everything is up to date."
+            message = (
+                f"KEMS {target} is active and all required local components "
+                "passed verification. Everything is up to date."
+            )
         elif phase == "failed":
             title = "KEMS maintenance needs attention"
-            message = f"The coordinated update did not complete: {pending.get('error') or self.last_error or reason}"
+            error = pending.get("error") or self.last_error or reason
+            message = f"The coordinated update did not complete: {error}"
         elif phase == "restart_required":
             title = "KEMS update staged — restart approval required"
-            message = f"KEMS {target} is installed. Home Assistant must restart to activate it. Reason: {reason}."
+            message = (
+                f"KEMS {target} is installed. Home Assistant must restart to "
+                f"activate it. Reason: {reason}."
+            )
         elif phase == "restart":
             title = "KEMS maintenance in progress"
-            message = f"Home Assistant is restarting to activate KEMS {target}. Expected interruption: about {downtime} minutes."
+            message = (
+                f"Home Assistant is restarting to activate KEMS {target}. "
+                f"Expected interruption: about {downtime} minutes."
+            )
         elif phase == "in_progress":
             title = "KEMS maintenance in progress"
             message = f"Installing KEMS {target}. Reason: {reason}."
         else:
             title = "Planned KEMS maintenance"
-            message = f"KEMS {target} is scheduled for {when}. Reason: {reason}. Expected interruption: about {downtime} minutes. No action is required."
+            message = (
+                f"KEMS {target} is scheduled for {when}. Reason: {reason}. "
+                f"Expected interruption: about {downtime} minutes. "
+                "No action is required."
+            )
         await self.hass.services.async_call(
             "persistent_notification",
             "create",
