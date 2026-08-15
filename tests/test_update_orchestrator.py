@@ -29,7 +29,7 @@ def test_update_orchestrator_is_opt_in_and_uses_a_maintenance_window() -> None:
 def test_opted_out_release_is_available_not_falsely_scheduled() -> None:
     """Discovery must not imply unattended maintenance before the user opts in."""
     content = ORCHESTRATOR.read_text(encoding="utf-8")
-    assert '"available"\n                if not automatic' in content
+    assert '"available" if not automatic else "scheduled"' in content
     assert 'notice_status = "scheduled" if automatic' in content
     assert 'return "Update available"' in content
     assert "Automatic updates are disabled" in content
