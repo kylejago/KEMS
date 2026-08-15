@@ -95,7 +95,9 @@ def _battery_power_source_check(
     direct = mappings.get(CONF_BATTERY_POWER)
     if direct and _entity_platform(hass, direct) == FOXESS_PLATFORM:
         if _entity_available(hass, direct):
-            return _check("battery_power_mapping", "Battery power mapping", PASS, direct)
+            return _check(
+                "battery_power_mapping", "Battery power mapping", PASS, direct
+            )
         return _check(
             "battery_power_mapping",
             "Battery power mapping",
@@ -133,7 +135,9 @@ def _battery_power_source_check(
     )
 
 
-def _detect_battery_power_convention(records: tuple[Any, ...]) -> tuple[bool | None, int, float]:
+def _detect_battery_power_convention(
+    records: tuple[Any, ...],
+) -> tuple[bool | None, int, float]:
     """Infer whether positive battery power means discharge from SOC movement."""
     recent = records[-360:]
     positive_is_discharge_votes = 0
@@ -208,9 +212,11 @@ def build_commissioning_snapshot(hass: HomeAssistant, coordinator) -> dict[str, 
         _check(
             "data_quality",
             "Data quality",
-            PASS
-            if data.quality.score >= 95.0 and not data.quality.stale_fields
-            else FAIL,
+            (
+                PASS
+                if data.quality.score >= 95.0 and not data.quality.stale_fields
+                else FAIL
+            ),
             f"{data.quality.score:.0f}% quality; {len(data.quality.stale_fields)} stale field(s)",
         )
     )
@@ -218,10 +224,12 @@ def build_commissioning_snapshot(hass: HomeAssistant, coordinator) -> dict[str, 
         _check(
             "tariff_data",
             "Tariff data",
-            PASS
-            if data.snapshot.current_import_rate is not None
-            and not data.snapshot.tariff_stale_fields
-            else FAIL,
+            (
+                PASS
+                if data.snapshot.current_import_rate is not None
+                and not data.snapshot.tariff_stale_fields
+                else FAIL
+            ),
             (
                 f"Current import {data.snapshot.current_import_rate} p/kWh; "
                 f"cheap period confirmed={data.snapshot.cheap_period_confirmed}"
@@ -252,12 +260,20 @@ def build_commissioning_snapshot(hass: HomeAssistant, coordinator) -> dict[str, 
         )
     )
 
-    checks.append(_source_check(hass, mappings, CONF_BATTERY_SOC, "Battery SOC mapping"))
+    checks.append(
+        _source_check(hass, mappings, CONF_BATTERY_SOC, "Battery SOC mapping")
+    )
     battery_power_check = _battery_power_source_check(hass, mappings)
     checks.append(battery_power_check)
-    checks.append(_source_check(hass, mappings, CONF_SOLAR_POWER, "Solar power mapping"))
-    checks.append(_source_check(hass, mappings, CONF_GRID_IMPORT, "Grid import mapping"))
-    checks.append(_source_check(hass, mappings, CONF_GRID_EXPORT, "Grid export mapping"))
+    checks.append(
+        _source_check(hass, mappings, CONF_SOLAR_POWER, "Solar power mapping")
+    )
+    checks.append(
+        _source_check(hass, mappings, CONF_GRID_IMPORT, "Grid import mapping")
+    )
+    checks.append(
+        _source_check(hass, mappings, CONF_GRID_EXPORT, "Grid export mapping")
+    )
     checks.append(_source_check(hass, mappings, CONF_HOUSE_LOAD, "House load mapping"))
 
     records = tuple(getattr(getattr(coordinator, "_history", None), "records", ()))
@@ -285,7 +301,11 @@ def build_commissioning_snapshot(hass: HomeAssistant, coordinator) -> dict[str, 
             ),
         )
     elif detected_positive_is_discharge == configured_positive_is_discharge:
-        convention = "positive = discharge" if detected_positive_is_discharge else "positive = charge"
+        convention = (
+            "positive = discharge"
+            if detected_positive_is_discharge
+            else "positive = charge"
+        )
         battery_direction = _check(
             "battery_power_direction",
             "Battery power direction",
@@ -293,8 +313,16 @@ def build_commissioning_snapshot(hass: HomeAssistant, coordinator) -> dict[str, 
             f"Observed {convention}; {direction_confidence:.1f}% confidence",
         )
     else:
-        observed = "positive = discharge" if detected_positive_is_discharge else "positive = charge"
-        configured = "positive = discharge" if configured_positive_is_discharge else "positive = charge"
+        observed = (
+            "positive = discharge"
+            if detected_positive_is_discharge
+            else "positive = charge"
+        )
+        configured = (
+            "positive = discharge"
+            if configured_positive_is_discharge
+            else "positive = charge"
+        )
         battery_direction = _check(
             "battery_power_direction",
             "Battery power direction",
@@ -304,11 +332,7 @@ def build_commissioning_snapshot(hass: HomeAssistant, coordinator) -> dict[str, 
     checks.append(battery_direction)
 
     grid_mapping_ready = all(
-        next(
-            item["status"] == PASS
-            for item in checks
-            if item["key"] == key
-        )
+        next(item["status"] == PASS for item in checks if item["key"] == key)
         for key in (CONF_GRID_IMPORT, CONF_GRID_EXPORT)
     )
     grid_import = data.snapshot.grid_import_kw
@@ -327,7 +351,11 @@ def build_commissioning_snapshot(hass: HomeAssistant, coordinator) -> dict[str, 
             FAIL,
             "Mapped FoxESS grid values are unavailable after normalisation",
         )
-    elif grid_import < -0.01 or grid_export < -0.01 or (grid_import > 0.2 and grid_export > 0.2):
+    elif (
+        grid_import < -0.01
+        or grid_export < -0.01
+        or (grid_import > 0.2 and grid_export > 0.2)
+    ):
         grid_direction_check = _check(
             "grid_direction",
             "Grid direction / normalisation",
@@ -390,7 +418,11 @@ def build_commissioning_snapshot(hass: HomeAssistant, coordinator) -> dict[str, 
         _check(
             "site_import_limit",
             "Site import limit confirmed",
-            PASS if site_import_limit is not None and float(site_import_limit) > 0 else WAIT,
+            (
+                PASS
+                if site_import_limit is not None and float(site_import_limit) > 0
+                else WAIT
+            ),
             (
                 f"Configured site limit={site_import_limit} kW"
                 if site_import_limit is not None
@@ -421,7 +453,11 @@ def build_commissioning_snapshot(hass: HomeAssistant, coordinator) -> dict[str, 
             "emergency_stop",
             "Emergency stop",
             FAIL if coordinator.settings.control.emergency_stop else PASS,
-            "Emergency stop is engaged" if coordinator.settings.control.emergency_stop else "Available and not engaged",
+            (
+                "Emergency stop is engaged"
+                if coordinator.settings.control.emergency_stop
+                else "Available and not engaged"
+            ),
         )
     )
     checks.append(
@@ -588,7 +624,9 @@ class KEMSPanelFirmwareVersionSensor(KEMSEntity, SensorEntity):
         }
 
 
-def build_commissioning_entities(hass: HomeAssistant, coordinator) -> list[SensorEntity]:
+def build_commissioning_entities(
+    hass: HomeAssistant, coordinator
+) -> list[SensorEntity]:
     """Return KEMS commissioning and panel-health entities."""
     return [
         KEMSCommissioningReadinessSensor(hass, coordinator),

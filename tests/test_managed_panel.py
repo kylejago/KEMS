@@ -80,7 +80,7 @@ def test_managed_panel_reports_firmware_for_ota_verification() -> None:
     content = PACKAGED.read_text(encoding="utf-8")
     assert 'panel_config_version: "0.7.0-alpha7-panel2"' in content
     assert 'name: "Panel Firmware Version"' in content
-    assert 'id: panel_firmware_version' in content
+    assert "id: panel_firmware_version" in content
     assert 'return {"${panel_config_version}"};' in content
 
 

@@ -105,7 +105,10 @@ def find_panel_firmware_state(hass: HomeAssistant) -> State | None:
     for state in hass.states.async_all("sensor"):
         entity_id = state.entity_id.lower()
         friendly_name = str(state.attributes.get("friendly_name", "")).lower()
-        if "panel firmware version" not in friendly_name and "panel_firmware_version" not in entity_id:
+        if (
+            "panel firmware version" not in friendly_name
+            and "panel_firmware_version" not in entity_id
+        ):
             continue
         if "kems16x16" in friendly_name or "kems16x16" in entity_id:
             return state
@@ -122,9 +125,15 @@ async def async_refresh_reported_panel_version(hass: HomeAssistant) -> dict[str,
 
     current = panel_health_snapshot(hass)
     status = current["status"]
-    if panel_state.state == PANEL_CONFIG_VERSION and status not in {"Updating", "Success"}:
+    if panel_state.state == PANEL_CONFIG_VERSION and status not in {
+        "Updating",
+        "Success",
+    }:
         status = "Ready"
-    elif panel_state.state != PANEL_CONFIG_VERSION and status not in {"Updating", "Manual install required"}:
+    elif panel_state.state != PANEL_CONFIG_VERSION and status not in {
+        "Updating",
+        "Manual install required",
+    }:
         status = "Version mismatch"
 
     return await async_update_panel_health(
@@ -147,7 +156,10 @@ async def async_verify_panel_firmware(
 
     while monotonic() < deadline:
         panel_state = find_panel_firmware_state(hass)
-        if panel_state is not None and panel_state.state not in {"unknown", "unavailable"}:
+        if panel_state is not None and panel_state.state not in {
+            "unknown",
+            "unavailable",
+        }:
             last_reported = panel_state.state
             last_entity_id = panel_state.entity_id
             if panel_state.state == PANEL_CONFIG_VERSION:
