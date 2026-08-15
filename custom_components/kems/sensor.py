@@ -42,6 +42,7 @@ from .const import (
 )
 from .entity import KEMSEntity
 from .kems_core import FOXHOLE_PROPOSAL_PROFILE, KEMSData
+from .update_orchestrator import build_update_sensor_entities
 
 ValueFn = Callable[[KEMSData], Any]
 AttributesFn = Callable[[KEMSData], Mapping[str, Any]]
@@ -2612,6 +2613,7 @@ async def async_setup_entry(
         if _source_is_configured(description, mappings)
     ]
     entities.extend(build_commissioning_entities(hass, coordinator))
+    entities.extend(build_update_sensor_entities(hass, coordinator, entry))
     entities.append(KEMSSourceValidationSensor(coordinator))
     entities.extend(
         KEMSForecastValidationSensor(coordinator, description)

@@ -12,6 +12,7 @@ from .const import CONF_OPERATING_MODE, CONF_VIRTUAL_SCENARIO
 from .entity import KEMSEntity
 from .kems_core import OPERATING_MODES, VIRTUAL_SCENARIOS
 from .runtime_options import async_set_runtime_option
+from .update_orchestrator import build_update_select_entities
 
 
 async def async_setup_entry(
@@ -21,12 +22,12 @@ async def async_setup_entry(
 ) -> None:
     """Set up control-lab select entities."""
     coordinator = entry.runtime_data
-    async_add_entities(
-        (
-            KEMSOperatingModeSelect(coordinator),
-            KEMSVirtualScenarioSelect(coordinator),
-        )
-    )
+    entities = [
+        KEMSOperatingModeSelect(coordinator),
+        KEMSVirtualScenarioSelect(coordinator),
+    ]
+    entities.extend(build_update_select_entities(hass, coordinator, entry))
+    async_add_entities(entities)
 
 
 class KEMSOperatingModeSelect(KEMSEntity, SelectEntity):
