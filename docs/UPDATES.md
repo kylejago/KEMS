@@ -18,7 +18,7 @@ A component whose target version has not changed is not updated. A component wit
 
 ## Home Assistant update policy
 
-Automatic updates are opt-in. Once enabled, KEMS checks for a verified bundle periodically. A release that requires a Home Assistant restart is scheduled into the configured maintenance window (03:00–04:00 by default). KEMS can create an automatic Home Assistant backup before installation and can restart Home Assistant inside the window when automatic maintenance restarts are enabled.
+Automatic updates are opt-in. Once enabled, KEMS checks for a verified bundle periodically. A release that requires a Home Assistant restart is scheduled into the configured maintenance window (03:00–04:00 by default). KEMS can create an automatic Home Assistant backup before installation and can restart Home Assistant inside the window when automatic maintenance restarts are enabled. When backup-before-update is enabled, an unavailable or failed backup is a hard safety gate and the software update is not started.
 
 The first release containing the orchestrator is a bootstrap exception: an older installed KEMS cannot automatically install code it does not have yet, so that release still needs one normal/manual KEMS install. Future compatible releases can then install themselves. Automatic updating remains opt-in after that bootstrap install; installing the feature does not silently enable unattended software changes.
 
