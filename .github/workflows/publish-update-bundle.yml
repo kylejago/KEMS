@@ -1,0 +1,41 @@
+name: Publish coordinated update bundle
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Existing GitHub release tag to attach the bundle to
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    env:
+      RELEASE_TAG: ${{ github.event_name == 'release' && github.event.release.tag_name || inputs.release_tag }}
+    steps:
+      - name: Check out release source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.RELEASE_TAG }}
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Render exact component bundle
+        shell: bash
+        run: |
+          VERSION="${RELEASE_TAG#v}"
+          python scripts/render_update_bundle.py --release-version "$VERSION" --output kems-bundle.json
+          sha256sum kems-bundle.json > kems-bundle.json.sha256
+          cat kems-bundle.json
+          cat kems-bundle.json.sha256
+      - name: Attach verified bundle to GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "$RELEASE_TAG" kems-bundle.json kems-bundle.json.sha256 --clobber
