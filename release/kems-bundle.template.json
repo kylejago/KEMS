@@ -1,0 +1,54 @@
+{
+  "schema": 1,
+  "bundle": "__RELEASE_VERSION__",
+  "channel": "alpha",
+  "components": {
+    "kems_core": {
+      "version": "__RELEASE_VERSION__",
+      "required": true,
+      "delivery": "home-assistant-update",
+      "restart": "home_assistant"
+    },
+    "dashboard": {
+      "version": "__RELEASE_VERSION__",
+      "required": true,
+      "delivery": "kems_core"
+    },
+    "panel": {
+      "version": "0.7.0-alpha7-panel2",
+      "required": false,
+      "delivery": "kems_core"
+    },
+    "property_web": {
+      "version": "0.7.0-alpha6-web.8",
+      "required": false,
+      "delivery": "kems_pi"
+    },
+    "pi_agent": {
+      "version": "0.7.0-alpha6-web.8",
+      "required": false,
+      "delivery": "kems_pi"
+    },
+    "pi_system": {
+      "version": null,
+      "required": false,
+      "delivery": "kems_pi"
+    },
+    "public_web": {
+      "version": null,
+      "required": false,
+      "delivery": "public_site"
+    }
+  },
+  "maintenance": {
+    "required": true,
+    "reason": "Activate KEMS __RELEASE_VERSION__ and its managed dashboard",
+    "expected_downtime_minutes": 5,
+    "home_assistant_restart_required": true,
+    "reboot_required": false,
+    "affected_components": [
+      "kems_core",
+      "dashboard"
+    ]
+  }
+}
