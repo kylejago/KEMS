@@ -26,6 +26,15 @@ def test_update_orchestrator_is_opt_in_and_uses_a_maintenance_window() -> None:
     assert "_next_window_start" in content
 
 
+def test_opted_out_release_is_available_not_falsely_scheduled() -> None:
+    """Discovery must not imply unattended maintenance before the user opts in."""
+    content = ORCHESTRATOR.read_text(encoding="utf-8")
+    assert '"available"\n                if not automatic' in content
+    assert 'notice_status = "scheduled" if automatic' in content
+    assert 'return "Update available"' in content
+    assert "Automatic updates are disabled" in content
+
+
 def test_update_orchestrator_installs_exact_kems_target_and_restarts_ha() -> None:
     """KEMS must converge on the bundle target rather than blindly install latest."""
     content = ORCHESTRATOR.read_text(encoding="utf-8")
