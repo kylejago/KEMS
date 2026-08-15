@@ -40,6 +40,22 @@ def test_managed_master_dashboard_is_valid_builtin_yaml() -> None:
     } <= paths
 
 
+def test_full_kems_forecast_view_exposes_operating_detail() -> None:
+    """The dedicated forecast strategy view should expose plan, flow and audit data."""
+    content = yaml.safe_load(PACKAGED.read_text(encoding="utf-8"))
+    view = next(
+        item for item in content["views"] if item["path"] == "full-kems-forecast"
+    )
+    rendered = str(view)
+    assert "sensor.kems_full_kems_forecast_status" in rendered
+    assert "sensor.kems_compare_full_kems_forecast_cost_today" in rendered
+    assert "Current Full KEMS Forecast power routing" in rendered
+    assert "Recharge & reserve decision" in rendered
+    assert "Hourly fused solar / weather outlook" in rendered
+    assert "Forecast protection audit inside the scenario" in rendered
+    assert "Complete Full KEMS Forecast scenario attributes" in rendered
+
+
 def test_kems_setup_syncs_managed_dashboard() -> None:
     """Integration startup must refresh its managed dashboard in /config."""
     setup = (ROOT / "custom_components" / "kems" / "__init__.py").read_text(
