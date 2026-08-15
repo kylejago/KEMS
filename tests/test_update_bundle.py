@@ -23,14 +23,20 @@ def test_release_bundle_renders_exact_core_and_existing_companion_targets() -> N
     assert bundle["components"]["kems_core"]["version"] == "0.7.0-alpha8"
     assert bundle["components"]["dashboard"]["version"] == "0.7.0-alpha8"
     assert bundle["components"]["panel"]["version"] == "0.7.0-alpha7-panel2"
-    assert bundle["components"]["property_web"]["version"] == "0.7.0-alpha6-web.8"
+    assert (
+        bundle["components"]["property_web"]["version"] == "0.7.0-alpha6-web.8"
+    )
     assert bundle["components"]["pi_agent"]["version"] == "0.7.0-alpha6-web.8"
     assert bundle["components"]["public_web"]["version"] is None
 
 
 def test_bundle_contract_rejects_mismatched_appliance_versions() -> None:
     """Property web and its Pi agent must be published as one appliance release."""
-    raw = json.loads(TEMPLATE.read_text(encoding="utf-8").replace("__RELEASE_VERSION__", "0.7.0-alpha8"))
+    raw = json.loads(
+        TEMPLATE.read_text(encoding="utf-8").replace(
+            "__RELEASE_VERSION__", "0.7.0-alpha8"
+        )
+    )
     raw["components"]["pi_agent"]["version"] = "different"
     try:
         module.validate_bundle(raw)
@@ -42,7 +48,11 @@ def test_bundle_contract_rejects_mismatched_appliance_versions() -> None:
 
 def test_bundle_maintenance_only_names_known_components() -> None:
     """A typo in a maintenance scope must fail release validation."""
-    raw = json.loads(TEMPLATE.read_text(encoding="utf-8").replace("__RELEASE_VERSION__", "0.7.0-alpha8"))
+    raw = json.loads(
+        TEMPLATE.read_text(encoding="utf-8").replace(
+            "__RELEASE_VERSION__", "0.7.0-alpha8"
+        )
+    )
     raw["maintenance"]["affected_components"].append("not_a_component")
     try:
         module.validate_bundle(raw)
