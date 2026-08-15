@@ -56,6 +56,20 @@ wifi:
     ssid: "KEMS Panel Fallback"
     password: "kems-panel-setup"
 captive_portal:
+globals:
+  - id: panel_boot_started_ms
+    type: uint32_t
+    restore_value: no
+    initial_value: '0'
+  - id: panel_boot_ha_seen
+    type: bool
+    restore_value: no
+    initial_value: 'false'
+  - id: panel_boot_ha_ready_ms
+    type: uint32_t
+    restore_value: no
+    initial_value: '0'
+
 select:
   - platform: template
     id: panel_display_mode
