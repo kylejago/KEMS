@@ -59,3 +59,17 @@ def test_first_managed_adoption_still_requires_one_manual_flash() -> None:
     assert "elif panel_changed:" in sync
     assert "first managed" in sync
     assert "subsequent managed" in sync
+
+def test_managed_panel_has_startup_and_ota_completion_animation() -> None:
+    """A managed panel should visibly show boot, waiting, success and fault states."""
+    content = PACKAGED.read_text(encoding="utf-8")
+    assert "panel_boot_started_ms" in content
+    assert "panel_boot_ha_seen" in content
+    assert "draw_boot_frame" in content
+    assert "draw_waiting_frame" in content
+    assert "draw_success_frame" in content
+    assert "draw_error_frame" in content
+    assert "boot_elapsed < 3800" in content
+    assert "boot_elapsed < 20000" in content
+    assert "ha_kems_status).has_state()" in content
+

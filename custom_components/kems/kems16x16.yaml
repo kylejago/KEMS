@@ -34,6 +34,10 @@ esphome:
   on_boot:
     priority: -100
     then:
+      - lambda: |-
+          id(panel_boot_started_ms) = millis();
+          id(panel_boot_ha_seen) = false;
+          id(panel_boot_ha_ready_ms) = 0;
       - light.turn_on:
           id: matrix_light
           brightness: 35%
@@ -348,6 +352,116 @@ display:
       auto bool_colour = [&](bool value) -> Color {
         return value ? GREEN : RED;
       };
+
+      // KEMS boot / OTA completion sequence.
+      const uint32_t boot_elapsed = now - id(panel_boot_started_ms);
+      const bool ha_ready =
+        id(ha_kems_status).has_state() &&
+        !id(ha_kems_status).state.empty() &&
+        id(ha_kems_status).state != "unknown" &&
+        id(ha_kems_status).state != "unavailable";
+
+      auto draw_boot_frame = [&](uint32_t elapsed_ms) {
+        const float intro_pulse =
+          0.30f + 0.70f *
+          (0.5f + 0.5f *
+          sinf((float) elapsed_ms * 2.0f * 3.14159265f / 700.0f));
+        rect(7, 7, 10, 10, scale_color(WHITE, intro_pulse));
+        if (elapsed_ms >= 700) {
+          rect(1, 7, 2, 10, BLUE);
+          flow_horizontal(3, 8, 6, 9, BLUE, BLUE, +1);
+        }
+        if (elapsed_ms >= 1400) {
+          rect(7, 1, 10, 2, YELLOW);
+          flow_vertical(8, 3, 9, 6, YELLOW, YELLOW, +1);
+        }
+        if (elapsed_ms >= 2100) {
+          rect(15, 7, 16, 10, GREEN);
+          flow_horizontal(11, 8, 14, 9, GREEN, GREEN, -1);
+        }
+        if (elapsed_ms >= 2800) {
+          rect(7, 15, 10, 16, MAGENTA);
+          flow_vertical(8, 11, 9, 14, MAGENTA, MAGENTA, +1);
+        }
+        if (elapsed_ms >= 3300) {
+          rect(2, 2, 5, 3, GREEN);
+          rect(12, 2, 15, 3, GREEN);
+          rect(2, 12, 5, 13, GREEN);
+          rect(12, 12, 15, 13, GREEN);
+        }
+      };
+
+      auto draw_waiting_frame = [&]() {
+        const float amount =
+          0.15f + 0.85f *
+          (0.5f + 0.5f *
+          sinf((float) now * 2.0f * 3.14159265f / 1400.0f));
+        const Color WAIT = scale_color(ORANGE, amount);
+        rect(7, 7, 10, 10, WAIT);
+        rect(2, 2, 5, 3, scale_color(YELLOW, 0.35f));
+        rect(12, 2, 15, 3, scale_color(YELLOW, 0.35f));
+        rect(2, 12, 5, 13, scale_color(YELLOW, 0.35f));
+        rect(12, 12, 15, 13, scale_color(YELLOW, 0.35f));
+        flow_horizontal(3, 8, 6, 9, ORANGE, ORANGE, +1);
+        flow_vertical(8, 3, 9, 6, ORANGE, ORANGE, +1);
+        flow_horizontal(11, 8, 14, 9, ORANGE, ORANGE, -1);
+        flow_vertical(8, 11, 9, 14, ORANGE, ORANGE, +1);
+      };
+
+      auto draw_success_frame = [&](uint32_t elapsed_ms) {
+        const float amount =
+          0.20f + 0.80f *
+          (0.5f + 0.5f *
+          sinf((float) elapsed_ms * 2.0f * 3.14159265f / 450.0f));
+        const Color OK = scale_color(GREEN, amount);
+        rect(2, 2, 5, 3, OK);
+        rect(12, 2, 15, 3, OK);
+        rect(2, 12, 5, 13, OK);
+        rect(12, 12, 15, 13, OK);
+        rect(7, 7, 10, 10, OK);
+        rect(7, 1, 10, 2, OK);
+        rect(1, 7, 2, 10, OK);
+        rect(15, 7, 16, 10, OK);
+        rect(7, 15, 10, 16, OK);
+      };
+
+      auto draw_error_frame = [&]() {
+        const float amount =
+          0.10f + 0.90f *
+          (0.5f + 0.5f *
+          sinf((float) now * 2.0f * 3.14159265f / 650.0f));
+        const Color WARN = scale_color(RED, amount);
+        rect(2, 2, 5, 3, WARN);
+        rect(12, 2, 15, 3, WARN);
+        rect(2, 12, 5, 13, WARN);
+        rect(12, 12, 15, 13, WARN);
+        rect(7, 7, 10, 10, WARN);
+      };
+
+      if (boot_elapsed < 3800) {
+        it.fill(OFF);
+        draw_boot_frame(boot_elapsed);
+        return;
+      }
+      if (ha_ready && !id(panel_boot_ha_seen)) {
+        id(panel_boot_ha_seen) = true;
+        id(panel_boot_ha_ready_ms) = now;
+      }
+      if (!id(panel_boot_ha_seen)) {
+        it.fill(OFF);
+        if (boot_elapsed < 20000) {
+          draw_waiting_frame();
+        } else {
+          draw_error_frame();
+        }
+        return;
+      }
+      if ((now - id(panel_boot_ha_ready_ms)) < 1500) {
+        it.fill(OFF);
+        draw_success_frame(now - id(panel_boot_ha_ready_ms));
+        return;
+      }
+
       std::string display_mode =
         id(panel_display_mode).current_option().c_str();
       const bool live_mode =
