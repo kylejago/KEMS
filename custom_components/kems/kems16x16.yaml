@@ -4,6 +4,7 @@ substitutions:
   device_name: kems16x16
   friendly_name: "KEMS16x16"
   led_pin: GPIO21
+  panel_config_version: "0.7.0-alpha7-panel2"
   kems_status: sensor.kems_status
   live_battery_soc: sensor.kems_battery_state_of_charge
   live_battery_power: sensor.kems_battery_power
@@ -88,6 +89,13 @@ select:
       - "Full KEMS Forecast"
       - "Full Island Mode"
 text_sensor:
+  - platform: template
+    id: panel_firmware_version
+    name: "Panel Firmware Version"
+    icon: mdi:chip
+    update_interval: 60s
+    lambda: |-
+      return {"${panel_config_version}"};
   - platform: homeassistant
     id: ha_kems_status
     entity_id: ${kems_status}

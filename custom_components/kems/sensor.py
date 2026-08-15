@@ -17,6 +17,7 @@ from homeassistant.const import PERCENTAGE, EntityCategory, UnitOfEnergy, UnitOf
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
+from .commissioning import build_commissioning_entities
 from .const import (
     CONF_BATTERY_CURRENT,
     CONF_BATTERY_POWER,
@@ -2610,6 +2611,7 @@ async def async_setup_entry(
         for description in SENSORS
         if _source_is_configured(description, mappings)
     ]
+    entities.extend(build_commissioning_entities(hass, coordinator))
     entities.append(KEMSSourceValidationSensor(coordinator))
     entities.extend(
         KEMSForecastValidationSensor(coordinator, description)

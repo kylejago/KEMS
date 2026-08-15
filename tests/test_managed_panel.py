@@ -73,3 +73,26 @@ def test_managed_panel_has_startup_and_ota_completion_animation() -> None:
     assert "boot_elapsed < 3800" in content
     assert "boot_elapsed < 20000" in content
     assert "ha_kems_status).has_state()" in content
+
+
+def test_managed_panel_reports_firmware_for_ota_verification() -> None:
+    """The ESP32 must report the exact managed config version after OTA."""
+    content = PACKAGED.read_text(encoding="utf-8")
+    assert 'panel_config_version: "0.7.0-alpha7-panel2"' in content
+    assert 'name: "Panel Firmware Version"' in content
+    assert 'id: panel_firmware_version' in content
+    assert 'return {"${panel_config_version}"};' in content
+
+
+def test_managed_panel_ota_tracks_queue_and_reconnect_health() -> None:
+    """KEMS should distinguish queued OTA from verified firmware success."""
+    sync = (ROOT / "custom_components" / "kems" / "dashboard.py").read_text(
+        encoding="utf-8"
+    )
+    panel_health = (ROOT / "custom_components" / "kems" / "panel.py").read_text(
+        encoding="utf-8"
+    )
+    assert 'last_ota_result="queued"' in sync
+    assert "async_verify_panel_firmware" in sync
+    assert 'PANEL_CONFIG_VERSION = "0.7.0-alpha7-panel2"' in panel_health
+    assert 'status="Success"' in panel_health
