@@ -1,0 +1,19 @@
+check_for_updates:
+  name: Check for updates
+  description: Check the coordinated KEMS release bundle and refresh update/maintenance status.
+
+apply_update:
+  name: Apply coordinated update
+  description: Apply the exact pending KEMS update target. By default maintenance-window and automatic-update safeguards remain active.
+  fields:
+    force:
+      name: Force now
+      description: Bypass the automatic-update opt-in and maintenance-window wait for this manual action.
+      required: false
+      default: false
+      selector:
+        boolean:
+
+cancel_scheduled_update:
+  name: Cancel scheduled update
+  description: Cancel a coordinated update that has not started installing yet.
