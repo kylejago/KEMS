@@ -414,7 +414,11 @@ class KEMSUpdateOrchestrator:
             raise HomeAssistantError(f"Invalid KEMS bundle: {error}") from error
         release_tag = str(selected.get("tag_name") or "").strip()
         core_target = _component_target(bundle, "kems_core")
-        if core_target and release_tag and not _version_matches(core_target, release_tag):
+        if (
+            core_target
+            and release_tag
+            and not _version_matches(core_target, release_tag)
+        ):
             raise HomeAssistantError(
                 f"KEMS bundle targets {core_target}, but release tag is {release_tag}"
             )
@@ -952,7 +956,8 @@ class KEMSUpdateOrchestrator:
                 maintenance.get("home_assistant_restart_required", True)
             ),
             "reboot_required": bool(maintenance.get("reboot_required", False)),
-            "error": pending.get("error") or (self.last_error if status == "failed" else None),
+            "error": pending.get("error")
+            or (self.last_error if status == "failed" else None),
             "updated_at": dt_util.now().isoformat(),
         }
 

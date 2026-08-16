@@ -91,25 +91,31 @@ def test_managed_dashboard_has_update_and_maintenance_view() -> None:
     assert "Recent update history" in content
 
 
-def test_verified_bundle_installs_exact_release_tag_even_if_hacs_advertises_other() -> None:
+def test_verified_bundle_installs_exact_release_tag_even_if_hacs_advertises_other() -> (
+    None
+):
     """A SHA-verified bundle may request its exact HACS tag independently of latest."""
     content = ORCHESTRATOR.read_text(encoding="utf-8")
-    assert 'verified_bundle = pending.get("source") == "github-release-bundle"' in content
+    assert (
+        'verified_bundle = pending.get("source") == "github-release-bundle"' in content
+    )
     assert '"version": install_version' in content
-    assert 'KEMS bundle targets {core_target}, but release tag is {release_tag}' in content
-    assert 'installing the exact release tag' in content
+    assert (
+        "KEMS bundle targets {core_target}, but release tag is {release_tag}" in content
+    )
+    assert "installing the exact release tag" in content
 
 
 def test_failed_update_is_durable_visible_and_pauses_unattended_retries() -> None:
     """Failures must stay visible and require an explicit automatic-update re-enable."""
     content = ORCHESTRATOR.read_text(encoding="utf-8")
     dashboard = DASHBOARD.read_text(encoding="utf-8")
-    assert 'self.policy.automatic_updates = False' in content
-    assert 'def _active_error' in content
+    assert "self.policy.automatic_updates = False" in content
+    assert "def _active_error" in content
     assert '"last_error": self._active_error()' in content
     assert '"error": pending.get("error")' in content
-    assert '**Failure:**' in dashboard
-    assert '| Completed | Bundle | Result | Error |' in dashboard
+    assert "**Failure:**" in dashboard
+    assert "| Completed | Bundle | Result | Error |" in dashboard
 
 
 def test_real_control_is_not_unlocked_by_update_orchestration() -> None:
