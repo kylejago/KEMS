@@ -1,0 +1,160 @@
+name: Apply exact-tag updater fix
+
+on:
+  push:
+    branches:
+      - fix/update-hacs-exact-tag
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/update-hacs-exact-tag
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Patch coordinated updater
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          def replace_once(path: str, old: str, new: str) -> None:
+              file = Path(path)
+              text = file.read_text(encoding='utf-8')
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f'{path}: expected exactly one replacement, found {count}')
+              file.write_text(text.replace(old, new, 1), encoding='utf-8')
+
+          updater = 'custom_components/kems/update_orchestrator.py'
+
+          replace_once(
+              updater,
+              '''        async with self._lock:\n            self.last_error = None\n            try:\n''',
+              '''        async with self._lock:\n            if not (self.pending and self.pending.get("stage") == "failed"):\n                self.last_error = None\n            try:\n''',
+          )
+
+          replace_once(
+              updater,
+              '''        try:\n            bundle = _validated_bundle(json.loads(manifest_bytes))\n        except (ValueError, TypeError, json.JSONDecodeError) as error:\n            raise HomeAssistantError(f"Invalid KEMS bundle: {error}") from error\n        bundle["release"] = {\n            "tag": selected.get("tag_name"),\n''',
+              '''        try:\n            bundle = _validated_bundle(json.loads(manifest_bytes))\n        except (ValueError, TypeError, json.JSONDecodeError) as error:\n            raise HomeAssistantError(f"Invalid KEMS bundle: {error}") from error\n        release_tag = str(selected.get("tag_name") or "").strip()\n        core_target = _component_target(bundle, "kems_core")\n        if core_target and release_tag and not _version_matches(core_target, release_tag):\n            raise HomeAssistantError(\n                f"KEMS bundle targets {core_target}, but release tag is {release_tag}"\n            )\n        bundle["release"] = {\n            "tag": release_tag or None,\n''',
+          )
+
+          replace_once(
+              updater,
+              '''        self.pending = {\n            "bundle": bundle.get("bundle"),\n            "target": target,\n''',
+              '''        self.last_error = None\n        self.pending = {\n            "bundle": bundle.get("bundle"),\n            "target": target,\n            "release_tag": (bundle.get("release") or {}).get("tag"),\n''',
+          )
+
+          replace_once(
+              updater,
+              '''        else:\n            if latest and not _version_matches(latest, target):\n                await self._fail_pending(\n                    f"Home Assistant offers {latest}, but bundle requires {target}"\n                )\n                return\n            if self.policy.backup_before_update:\n''',
+              '''        else:\n            verified_bundle = pending.get("source") == "github-release-bundle"\n            if latest and not _version_matches(latest, target) and not verified_bundle:\n                await self._fail_pending(\n                    f"Home Assistant offers {latest}, but bundle requires {target}"\n                )\n                return\n            if latest and not _version_matches(latest, target) and verified_bundle:\n                LOGGER.info(\n                    "Home Assistant advertises %s, but the verified coordinated "\n                    "bundle requires %s; installing the exact release tag",\n                    latest,\n                    target,\n                )\n            install_version = target\n            if verified_bundle:\n                release_tag = str(pending.get("release_tag") or "").strip()\n                if not release_tag:\n                    release_tag = str(\n                        ((self.latest_bundle or {}).get("release") or {}).get("tag")\n                        or ""\n                    ).strip()\n                if release_tag:\n                    install_version = release_tag\n            if self.policy.backup_before_update:\n''',
+          )
+
+          replace_once(
+              updater,
+              '''                    {"entity_id": state.entity_id, "version": target},\n''',
+              '''                    {"entity_id": state.entity_id, "version": install_version},\n''',
+          )
+
+          replace_once(
+              updater,
+              '''            previous = self.pending\n            self.pending = None\n            self.maintenance = self._maintenance_payload("completed", previous)\n''',
+              '''            previous = self.pending\n            self.pending = None\n            self.last_error = None\n            self.maintenance = self._maintenance_payload("completed", previous)\n''',
+          )
+
+          replace_once(
+              updater,
+              '''            self.last_result = cancelled\n            self.pending = None\n            self.maintenance = {"status": "none"}\n''',
+              '''            self.last_result = cancelled\n            self.pending = None\n            self.last_error = None\n            self.maintenance = {"status": "none"}\n''',
+          )
+
+          replace_once(
+              updater,
+              '''        if self.pending is not None:\n            self.pending["stage"] = "failed"\n            self.pending["error"] = message\n        self.maintenance = self._maintenance_payload("failed", self.pending or failed)\n''',
+              '''        if self.pending is not None:\n            self.pending["stage"] = "failed"\n            self.pending["error"] = message\n        # A failed unattended transaction is a hard pause. The user can inspect\n        # the durable reason and explicitly re-enable automatic updates after the\n        # underlying problem is corrected, rather than KEMS retrying indefinitely.\n        self.policy.automatic_updates = False\n        self.maintenance = self._maintenance_payload("failed", self.pending or failed)\n''',
+          )
+
+          replace_once(
+              updater,
+              '''            "reboot_required": bool(maintenance.get("reboot_required", False)),\n            "updated_at": dt_util.now().isoformat(),\n''',
+              '''            "reboot_required": bool(maintenance.get("reboot_required", False)),\n            "error": pending.get("error") or (self.last_error if status == "failed" else None),\n            "updated_at": dt_util.now().isoformat(),\n''',
+          )
+
+          replace_once(
+              updater,
+              '''    def status_label(self) -> str:\n        """Return the headline Home Assistant status."""\n        if self.last_error:\n            return "Attention required"\n''',
+              '''    def _active_error(self) -> str | None:\n        """Return the durable error for the active failed transaction."""\n        if self.pending and self.pending.get("stage") == "failed":\n            error = self.pending.get("error")\n            if error:\n                return str(error)\n        return self.last_error\n\n    def status_label(self) -> str:\n        """Return the headline Home Assistant status."""\n        if self._active_error():\n            return "Attention required"\n''',
+          )
+
+          replace_once(
+              updater,
+              '''            "last_result": self.last_result,\n            "last_error": self.last_error,\n''',
+              '''            "last_result": self.last_result,\n            "last_error": self._active_error(),\n''',
+          )
+
+          dashboard_old = '''          KEMS now checks one verified release bundle and updates only the components that bundle targets. Home Assistant restarts are held for the maintenance window and announced before they happen.\n\n          **Automatic updates are opt-in.** Turn them on below when you are happy for KEMS to install tested releases unattended.\n'''
+          dashboard_new = '''          KEMS now checks one verified release bundle and updates only the components that bundle targets. Home Assistant restarts are held for the maintenance window and announced before they happen.\n\n          **Automatic updates are opt-in.** Turn them on below when you are happy for KEMS to install tested releases unattended. A failed unattended update pauses automatic updates until you explicitly re-enable them.\n'''
+          current_old = '''          {% set update = states.sensor.kems_update_status %}\n          {% set maintenance = states.sensor.kems_maintenance_status %}\n          **Overall:** {{ update.state | default('Unavailable') }}  \n          **Bundle:** {{ update.attributes.bundle | default('No coordinated bundle published yet', true) }}  \n          **Running KEMS:** {{ update.attributes.running_kems_version | default('Unknown', true) }}  \n          **Last checked:** {{ update.attributes.last_checked | default('Not checked yet', true) }}  \n          **Maintenance:** {{ maintenance.state | default('none') }}  \n          **Scheduled:** {{ maintenance.attributes.scheduled_for | default('Not scheduled', true) }}  \n          **Reason:** {{ maintenance.attributes.reason | default('No maintenance required', true) }}\n'''
+          current_new = '''          {% set update = states.sensor.kems_update_status %}\n          {% set maintenance = states.sensor.kems_maintenance_status %}\n          {% set failure = update.attributes.last_error or maintenance.attributes.error %}\n          **Overall:** {{ update.state | default('Unavailable') }}  \n          **Bundle:** {{ update.attributes.bundle | default('No coordinated bundle published yet', true) }}  \n          **Running KEMS:** {{ update.attributes.running_kems_version | default('Unknown', true) }}  \n          **Last checked:** {{ update.attributes.last_checked | default('Not checked yet', true) }}  \n          **Maintenance:** {{ maintenance.state | default('none') }}  \n          **Scheduled:** {{ maintenance.attributes.scheduled_for | default('Not scheduled', true) }}  \n          **Reason:** {{ maintenance.attributes.reason | default('No maintenance required', true) }}  \n          {% if failure %}**Failure:** ❌ {{ failure }}{% endif %}\n'''
+          history_old = '''          | Completed | Bundle | Result |\n          |---|---|---|\n          {% for item in items | reverse %}\n          | {{ item.completed_at | default('—') }} | {{ item.bundle | default('—') }} | **{{ item.result | default('—') }}** |\n'''
+          history_new = '''          | Completed | Bundle | Result | Error |\n          |---|---|---|---|\n          {% for item in items | reverse %}\n          | {{ item.completed_at | default('—') }} | {{ item.bundle | default('—') }} | **{{ item.result | default('—') }}** | {{ item.error | default('—', true) }} |\n'''
+          for dashboard in ('custom_components/kems/kems_master_dashboard.yaml', 'dashboards/kems_master_dashboard.yaml'):
+              replace_once(dashboard, dashboard_old, dashboard_new)
+              replace_once(dashboard, current_old, current_new)
+              replace_once(dashboard, history_old, history_new)
+
+          replace_once(
+              'custom_components/kems/manifest.json',
+              '"version": "0.7.0-alpha7.1"',
+              '"version": "0.7.0-alpha7.2"',
+          )
+
+          tests = 'tests/test_update_orchestrator.py'
+          replace_once(
+              tests,
+              '''    assert '\"version\": target' in content\n''',
+              '''    assert '\"version\": install_version' in content\n''',
+          )
+          test_file = Path(tests)
+          test_text = test_file.read_text(encoding='utf-8')
+          insertion = '''\n\ndef test_verified_bundle_installs_exact_release_tag_even_if_hacs_advertises_other() -> None:\n    """A SHA-verified bundle may request its exact HACS tag independently of latest."""\n    content = ORCHESTRATOR.read_text(encoding="utf-8")\n    assert 'verified_bundle = pending.get("source") == "github-release-bundle"' in content\n    assert '"version": install_version' in content\n    assert 'KEMS bundle targets {core_target}, but release tag is {release_tag}' in content\n    assert 'installing the exact release tag' in content\n\n\ndef test_failed_update_is_durable_visible_and_pauses_unattended_retries() -> None:\n    """Failures must stay visible and require an explicit automatic-update re-enable."""\n    content = ORCHESTRATOR.read_text(encoding="utf-8")\n    dashboard = DASHBOARD.read_text(encoding="utf-8")\n    assert 'self.policy.automatic_updates = False' in content\n    assert 'def _active_error' in content\n    assert '"last_error": self._active_error()' in content\n    assert '"error": pending.get("error")' in content\n    assert '**Failure:**' in dashboard\n    assert '| Completed | Bundle | Result | Error |' in dashboard\n'''
+          marker = '\n\ndef test_real_control_is_not_unlocked_by_update_orchestration() -> None:\n'
+          if marker not in test_text:
+              raise SystemExit('tests: insertion marker not found')
+          test_text = test_text.replace(marker, insertion + marker, 1)
+          test_file.write_text(test_text, encoding='utf-8')
+
+          # Final guardrails for this patch.
+          updated = Path(updater).read_text(encoding='utf-8')
+          if 'f"Home Assistant offers {latest}, but bundle requires {target}"' not in updated:
+              raise SystemExit('fallback mismatch safety guard unexpectedly removed')
+          if 'and not verified_bundle' not in updated:
+              raise SystemExit('verified-bundle exception was not installed')
+          if Path('custom_components/kems/kems_master_dashboard.yaml').read_bytes() != Path('dashboards/kems_master_dashboard.yaml').read_bytes():
+              raise SystemExit('dashboard copies diverged')
+          PY
+
+          python -m compileall -q custom_components/kems
+          git diff --check
+      - name: Commit fix
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add custom_components/kems/update_orchestrator.py \
+                  custom_components/kems/kems_master_dashboard.yaml \
+                  dashboards/kems_master_dashboard.yaml \
+                  custom_components/kems/manifest.json \
+                  tests/test_update_orchestrator.py
+          git commit -m "Fix coordinated exact-tag installs and failure reporting"
+          git push origin HEAD:fix/update-hacs-exact-tag
