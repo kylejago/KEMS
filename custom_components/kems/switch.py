@@ -10,6 +10,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from .const import CONF_CONTROL_ENABLED, CONF_EMERGENCY_STOP
 from .entity import KEMSEntity
 from .runtime_options import async_set_runtime_option
+from .update_orchestrator import build_update_switch_entities
 
 
 async def async_setup_entry(
@@ -19,12 +20,12 @@ async def async_setup_entry(
 ) -> None:
     """Set up control-lab switches."""
     coordinator = entry.runtime_data
-    async_add_entities(
-        (
-            KEMSEmergencyStopSwitch(coordinator),
-            KEMSMasterControlEnableSwitch(coordinator),
-        )
-    )
+    entities = [
+        KEMSEmergencyStopSwitch(coordinator),
+        KEMSMasterControlEnableSwitch(coordinator),
+    ]
+    entities.extend(build_update_switch_entities(hass, coordinator, entry))
+    async_add_entities(entities)
 
 
 class KEMSEmergencyStopSwitch(KEMSEntity, SwitchEntity):

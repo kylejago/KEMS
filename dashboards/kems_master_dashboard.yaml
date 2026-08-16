@@ -1048,6 +1048,72 @@ views:
           - sensor.kems_typical_daily_gas_usage
           - sensor.kems_gas_cost_today
 
+  - title: Updates
+    path: updates
+    icon: mdi:update
+    cards:
+      - type: markdown
+        content: |
+          # KEMS coordinated updates
+          KEMS now checks one verified release bundle and updates only the components that bundle targets. Home Assistant restarts are held for the maintenance window and announced before they happen.
+
+          **Automatic updates are opt-in.** Turn them on below when you are happy for KEMS to install tested releases unattended.
+      - type: grid
+        columns: 4
+        square: false
+        cards:
+          - type: tile
+            entity: sensor.kems_update_status
+          - type: tile
+            entity: sensor.kems_maintenance_status
+          - type: tile
+            entity: switch.kems_automatic_updates
+          - type: tile
+            entity: switch.kems_automatic_maintenance_restart
+      - type: entities
+        title: Update policy
+        entities:
+          - select.kems_update_mode
+          - time.kems_maintenance_window_start
+          - time.kems_maintenance_window_end
+          - switch.kems_backup_before_update
+          - switch.kems_automatic_updates
+          - switch.kems_automatic_maintenance_restart
+      - type: markdown
+        title: Current bundle and maintenance
+        content: |
+          {% set update = states.sensor.kems_update_status %}
+          {% set maintenance = states.sensor.kems_maintenance_status %}
+          **Overall:** {{ update.state | default('Unavailable') }}  
+          **Bundle:** {{ update.attributes.bundle | default('No coordinated bundle published yet', true) }}  
+          **Running KEMS:** {{ update.attributes.running_kems_version | default('Unknown', true) }}  
+          **Last checked:** {{ update.attributes.last_checked | default('Not checked yet', true) }}  
+          **Maintenance:** {{ maintenance.state | default('none') }}  
+          **Scheduled:** {{ maintenance.attributes.scheduled_for | default('Not scheduled', true) }}  
+          **Reason:** {{ maintenance.attributes.reason | default('No maintenance required', true) }}
+      - type: markdown
+        title: Component verification
+        content: |
+          {% set items = state_attr('sensor.kems_update_status', 'components') or [] %}
+          | Component | Target | Installed | Status |
+          |---|---|---|---|
+          {% for item in items %}
+          | {{ item.key }} | {{ item.target or '—' }} | {{ item.installed or '—' }} | **{{ item.status }}** |
+          {% endfor %}
+      - type: markdown
+        title: Recent update history
+        content: |
+          {% set items = state_attr('sensor.kems_update_status', 'history') or [] %}
+          {% if items %}
+          | Completed | Bundle | Result |
+          |---|---|---|
+          {% for item in items | reverse %}
+          | {{ item.completed_at | default('—') }} | {{ item.bundle | default('—') }} | **{{ item.result | default('—') }}** |
+          {% endfor %}
+          {% else %}
+          No coordinated update has completed yet.
+          {% endif %}
+
   - title: All Entities
     path: all-entities
     icon: mdi:database-eye

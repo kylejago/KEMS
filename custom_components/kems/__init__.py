@@ -41,6 +41,10 @@ from .providers.octoplus import OctoplusProvider
 from .providers.octopus import OctopusProvider
 from .providers.ohme import OhmeProvider
 from .settings import KEMSSettings
+from .update_orchestrator import (
+    async_setup_update_orchestrator,
+    async_unload_update_orchestrator,
+)
 
 LOGGER = logging.getLogger(__name__)
 
@@ -49,6 +53,7 @@ PLATFORMS: list[Platform] = [
     Platform.BINARY_SENSOR,
     Platform.SELECT,
     Platform.SWITCH,
+    Platform.TIME,
 ]
 
 
@@ -107,6 +112,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     await coordinator.async_config_entry_first_refresh()
     entry.runtime_data = coordinator
+    await async_setup_update_orchestrator(hass, entry)
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     LOGGER.info(
         "KEMS initialised with read-only control lab; real hardware writes are blocked"
@@ -117,6 +123,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a KEMS config entry."""
     coordinator: KEMSCoordinator = entry.runtime_data
+    await async_unload_update_orchestrator(hass, entry)
     await coordinator.async_shutdown()
     return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
 

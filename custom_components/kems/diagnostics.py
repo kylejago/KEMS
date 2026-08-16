@@ -14,6 +14,7 @@ from .commissioning import build_commissioning_snapshot
 from .coordinator import KEMSCoordinator
 from .panel import panel_health_snapshot
 from .providers.octopus import DEFAULT_INTELLIGENT_STALE_DATA_SECONDS
+from .update_orchestrator import update_orchestrator_snapshot
 
 
 def _state_payload(hass: HomeAssistant, entity_id: str) -> dict[str, Any]:
@@ -146,6 +147,7 @@ async def async_get_config_entry_diagnostics(
         "control": asdict(data.control),
         "commissioning": build_commissioning_snapshot(hass, coordinator),
         "panel_health": panel_health_snapshot(hass),
+        "updates": update_orchestrator_snapshot(hass, entry),
         "last_power_down": data.last_power_down.to_dict(),
         "quality": asdict(data.quality),
         "history_samples": data.history_samples,
