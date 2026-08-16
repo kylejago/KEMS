@@ -312,7 +312,8 @@ class KEMSUpdateOrchestrator:
         if self._lock.locked() and not force:
             return self.snapshot()
         async with self._lock:
-            self.last_error = None
+            if not (self.pending and self.pending.get("stage") == "failed"):
+                self.last_error = None
             try:
                 bundle = await self._async_fetch_bundle()
                 if bundle is None:
@@ -411,8 +412,18 @@ class KEMSUpdateOrchestrator:
             bundle = _validated_bundle(json.loads(manifest_bytes))
         except (ValueError, TypeError, json.JSONDecodeError) as error:
             raise HomeAssistantError(f"Invalid KEMS bundle: {error}") from error
+        release_tag = str(selected.get("tag_name") or "").strip()
+        core_target = _component_target(bundle, "kems_core")
+        if (
+            core_target
+            and release_tag
+            and not _version_matches(core_target, release_tag)
+        ):
+            raise HomeAssistantError(
+                f"KEMS bundle targets {core_target}, but release tag is {release_tag}"
+            )
         bundle["release"] = {
-            "tag": selected.get("tag_name"),
+            "tag": release_tag or None,
             "name": selected.get("name"),
             "published_at": selected.get("published_at"),
             "prerelease": bool(selected.get("prerelease")),
@@ -516,9 +527,11 @@ class KEMSUpdateOrchestrator:
         scheduled_for = None
         if automatic and disruptive:
             scheduled_for = self._scheduled_time().isoformat()
+        self.last_error = None
         self.pending = {
             "bundle": bundle.get("bundle"),
             "target": target,
+            "release_tag": (bundle.get("release") or {}).get("tag"),
             "discovered_at": dt_util.now().isoformat(),
             "scheduled_for": scheduled_for,
             "stage": (
@@ -604,11 +617,29 @@ class KEMSUpdateOrchestrator:
         if _version_matches(installed, target):
             pending["stage"] = "installed_waiting_restart"
         else:
-            if latest and not _version_matches(latest, target):
+            verified_bundle = pending.get("source") == "github-release-bundle"
+            if latest and not _version_matches(latest, target) and not verified_bundle:
                 await self._fail_pending(
                     f"Home Assistant offers {latest}, but bundle requires {target}"
                 )
                 return
+            if latest and not _version_matches(latest, target) and verified_bundle:
+                LOGGER.info(
+                    "Home Assistant advertises %s, but the verified coordinated "
+                    "bundle requires %s; installing the exact release tag",
+                    latest,
+                    target,
+                )
+            install_version = target
+            if verified_bundle:
+                release_tag = str(pending.get("release_tag") or "").strip()
+                if not release_tag:
+                    release_tag = str(
+                        ((self.latest_bundle or {}).get("release") or {}).get("tag")
+                        or ""
+                    ).strip()
+                if release_tag:
+                    install_version = release_tag
             if self.policy.backup_before_update:
                 if self.hass.services.has_service("backup", "create_automatic"):
                     try:
@@ -640,7 +671,7 @@ class KEMSUpdateOrchestrator:
                 await self.hass.services.async_call(
                     "update",
                     "install",
-                    {"entity_id": state.entity_id, "version": target},
+                    {"entity_id": state.entity_id, "version": install_version},
                     blocking=True,
                 )
             except Exception as error:
@@ -736,6 +767,7 @@ class KEMSUpdateOrchestrator:
             self.history = self.history[-20:]
             previous = self.pending
             self.pending = None
+            self.last_error = None
             self.maintenance = self._maintenance_payload("completed", previous)
             await self._async_notify("completed", previous)
         elif self.pending.get("stage") == "restart_requested":
@@ -762,6 +794,7 @@ class KEMSUpdateOrchestrator:
             self.history.append(cancelled)
             self.last_result = cancelled
             self.pending = None
+            self.last_error = None
             self.maintenance = {"status": "none"}
             await self._async_save()
             self._write_legacy_states()
@@ -783,6 +816,10 @@ class KEMSUpdateOrchestrator:
         if self.pending is not None:
             self.pending["stage"] = "failed"
             self.pending["error"] = message
+        # A failed unattended transaction is a hard pause. The user can inspect
+        # the durable reason and explicitly re-enable automatic updates after the
+        # underlying problem is corrected, rather than KEMS retrying indefinitely.
+        self.policy.automatic_updates = False
         self.maintenance = self._maintenance_payload("failed", self.pending or failed)
         await self._async_notify("failed", self.pending or failed)
         await self._async_save()
@@ -919,6 +956,8 @@ class KEMSUpdateOrchestrator:
                 maintenance.get("home_assistant_restart_required", True)
             ),
             "reboot_required": bool(maintenance.get("reboot_required", False)),
+            "error": pending.get("error")
+            or (self.last_error if status == "failed" else None),
             "updated_at": dt_util.now().isoformat(),
         }
 
@@ -1002,9 +1041,17 @@ class KEMSUpdateOrchestrator:
             blocking=True,
         )
 
+    def _active_error(self) -> str | None:
+        """Return the durable error for the active failed transaction."""
+        if self.pending and self.pending.get("stage") == "failed":
+            error = self.pending.get("error")
+            if error:
+                return str(error)
+        return self.last_error
+
     def status_label(self) -> str:
         """Return the headline Home Assistant status."""
-        if self.last_error:
+        if self._active_error():
             return "Attention required"
         if self.pending:
             stage = str(self.pending.get("stage") or "scheduled")
@@ -1042,7 +1089,7 @@ class KEMSUpdateOrchestrator:
             "pending": self.pending,
             "maintenance": self.maintenance,
             "last_result": self.last_result,
-            "last_error": self.last_error,
+            "last_error": self._active_error(),
             "components": [item.to_dict() for item in self.component_status],
             "history": self.history[-10:],
             "running_kems_version": _installed_integration_version(),

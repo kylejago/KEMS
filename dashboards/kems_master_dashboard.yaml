@@ -1057,7 +1057,7 @@ views:
           # KEMS coordinated updates
           KEMS now checks one verified release bundle and updates only the components that bundle targets. Home Assistant restarts are held for the maintenance window and announced before they happen.
 
-          **Automatic updates are opt-in.** Turn them on below when you are happy for KEMS to install tested releases unattended.
+          **Automatic updates are opt-in.** Turn them on below when you are happy for KEMS to install tested releases unattended. A failed unattended update pauses automatic updates until you explicitly re-enable them.
       - type: grid
         columns: 4
         square: false
@@ -1084,6 +1084,7 @@ views:
         content: |
           {% set update = states.sensor.kems_update_status %}
           {% set maintenance = states.sensor.kems_maintenance_status %}
+          {% set failure = update.attributes.last_error or maintenance.attributes.error %}
           **Overall:** {{ update.state | default('Unavailable') }}  
           **Bundle:** {{ update.attributes.bundle | default('No coordinated bundle published yet', true) }}  
           **Running KEMS:** {{ update.attributes.running_kems_version | default('Unknown', true) }}  
@@ -1091,6 +1092,7 @@ views:
           **Maintenance:** {{ maintenance.state | default('none') }}  
           **Scheduled:** {{ maintenance.attributes.scheduled_for | default('Not scheduled', true) }}  
           **Reason:** {{ maintenance.attributes.reason | default('No maintenance required', true) }}
+          {% if failure %}**Failure:** ❌ {{ failure }}{% endif %}
       - type: markdown
         title: Component verification
         content: |
@@ -1105,10 +1107,10 @@ views:
         content: |
           {% set items = state_attr('sensor.kems_update_status', 'history') or [] %}
           {% if items %}
-          | Completed | Bundle | Result |
-          |---|---|---|
+          | Completed | Bundle | Result | Error |
+          |---|---|---|---|
           {% for item in items | reverse %}
-          | {{ item.completed_at | default('—') }} | {{ item.bundle | default('—') }} | **{{ item.result | default('—') }}** |
+          | {{ item.completed_at | default('—') }} | {{ item.bundle | default('—') }} | **{{ item.result | default('—') }}** | {{ item.error | default('—', true) }} |
           {% endfor %}
           {% else %}
           No coordinated update has completed yet.
