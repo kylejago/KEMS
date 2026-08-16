@@ -27,6 +27,7 @@ from homeassistant.util import dt as dt_util
 
 from .const import DOMAIN
 from .entity import KEMSEntity
+from .versioning import version_is_newer, version_relation
 
 LOGGER = logging.getLogger(__name__)
 
@@ -440,8 +441,8 @@ class KEMSUpdateOrchestrator:
         if state is None:
             return None
         latest = state.attributes.get("latest_version")
-        installed = state.attributes.get("installed_version")
-        if not latest or _version_matches(latest, installed):
+        running = _installed_integration_version()
+        if not latest or not version_is_newer(latest, running):
             return None
         return {
             "schema": 1,
@@ -481,6 +482,22 @@ class KEMSUpdateOrchestrator:
         target = _component_target(bundle, "kems_core")
         current = _installed_integration_version()
         if not target or _version_matches(current, target):
+            return
+        relation = version_relation(target, current)
+        if relation is None:
+            LOGGER.warning(
+                "Ignoring KEMS bundle target %s because running version %s "
+                "cannot be safely ordered",
+                target,
+                current,
+            )
+            return
+        if relation < 0:
+            LOGGER.warning(
+                "Ignoring older KEMS bundle target %s because %s is already running",
+                target,
+                current,
+            )
             return
         if self.pending and _version_matches(self.pending.get("target"), target):
             await self._maybe_run_pending()
@@ -675,7 +692,29 @@ class KEMSUpdateOrchestrator:
                 await self._async_save()
             return
         target = self.pending.get("target")
-        core_current = _version_matches(_installed_integration_version(), target)
+        running = _installed_integration_version()
+        relation = version_relation(target, running)
+        if relation is not None and relation < 0:
+            LOGGER.warning(
+                "Clearing stale KEMS update target %s because %s is already running",
+                target,
+                running,
+            )
+            self.pending = None
+            self.maintenance = {"status": "none"}
+            self.last_error = None
+            if self.hass.services.has_service("persistent_notification", "dismiss"):
+                await self.hass.services.async_call(
+                    "persistent_notification",
+                    "dismiss",
+                    {"notification_id": NOTIFICATION_ID},
+                    blocking=True,
+                )
+            if save:
+                await self._async_save()
+            self._write_legacy_states()
+            return
+        core_current = _version_matches(running, target)
         local_required = [
             item
             for item in self.component_status
@@ -766,12 +805,16 @@ class KEMSUpdateOrchestrator:
         core_target = _component_target(bundle, "kems_core")
         if core_target is None:
             core_status = "not-targeted"
+        elif _version_matches(running, core_target):
+            core_status = "current"
         else:
-            core_status = (
-                "current"
-                if _version_matches(running, core_target)
-                else "update-required"
-            )
+            relation = version_relation(core_target, running)
+            if relation == 1:
+                core_status = "update-required"
+            elif relation == -1:
+                core_status = "ahead-of-target"
+            else:
+                core_status = "version-mismatch"
         statuses.append(
             ComponentStatus(
                 "kems_core",
@@ -978,7 +1021,8 @@ class KEMSUpdateOrchestrator:
             if item.required and item.delivery != "external"
         ]
         if any(
-            item.status not in {"current", "not-targeted", "not-installed"}
+            item.status
+            not in {"current", "not-targeted", "not-installed", "ahead-of-target"}
             for item in required_local
         ):
             return "Update available"
