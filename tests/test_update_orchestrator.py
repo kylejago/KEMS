@@ -99,6 +99,7 @@ def test_verified_bundle_installs_exact_release_tag_even_if_hacs_advertises_othe
     assert (
         'verified_bundle = pending.get("source") == "github-release-bundle"' in content
     )
+    assert "and not verified_bundle" in content
     assert '"version": install_version' in content
     assert (
         "KEMS bundle targets {core_target}, but release tag is {release_tag}" in content
