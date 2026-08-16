@@ -28,6 +28,7 @@ from .const import (
     CONF_TARIFF_MODE,
 )
 from .coordinator import KEMSCoordinator
+from .dashboard import async_sync_managed_dashboard
 from .entity_discovery import (
     SourceValidationResult,
     async_discover_entities,
@@ -40,6 +41,10 @@ from .providers.octoplus import OctoplusProvider
 from .providers.octopus import OctopusProvider
 from .providers.ohme import OhmeProvider
 from .settings import KEMSSettings
+from .update_orchestrator import (
+    async_setup_update_orchestrator,
+    async_unload_update_orchestrator,
+)
 
 LOGGER = logging.getLogger(__name__)
 
@@ -48,11 +53,17 @@ PLATFORMS: list[Platform] = [
     Platform.BINARY_SENSOR,
     Platform.SELECT,
     Platform.SWITCH,
+    Platform.TIME,
 ]
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up KEMS from a config entry."""
+    try:
+        await async_sync_managed_dashboard(hass)
+    except OSError:
+        LOGGER.exception("Unable to update the managed KEMS dashboard")
+
     validation = await async_validate_entity_mappings(hass, dict(entry.data))
     discovery = await async_discover_entities(hass)
     enriched = {
@@ -101,6 +112,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     await coordinator.async_config_entry_first_refresh()
     entry.runtime_data = coordinator
+    await async_setup_update_orchestrator(hass, entry)
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     LOGGER.info(
         "KEMS initialised with read-only control lab; real hardware writes are blocked"
@@ -111,6 +123,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a KEMS config entry."""
     coordinator: KEMSCoordinator = entry.runtime_data
+    await async_unload_update_orchestrator(hass, entry)
     await coordinator.async_shutdown()
     return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
 

@@ -62,6 +62,23 @@ class Snapshot:
     raw_grid_export_kw: float | None = None
     grid_flow_mode: str = "no_grid_source"
 
+    # Forecast-aware planning is captured with each retained observation so the
+    # Full KEMS Forecast scenario can be replayed historically without applying
+    # today's forecast to yesterday. These fields are advisory/simulation-only.
+    forecast_source: str | None = None
+    forecast_expected_solar_remaining_today_kwh: float | None = None
+    forecast_expected_solar_tomorrow_kwh: float | None = None
+    forecast_expected_house_remaining_today_kwh: float | None = None
+    forecast_expected_house_tomorrow_kwh: float | None = None
+    forecast_required_morning_soc_percent: float | None = None
+    forecast_minimum_precheap_soc_percent: float | None = None
+    forecast_solar_recovery_target_percent: float | None = None
+    forecast_maximum_overnight_soc_percent: float | None = None
+    forecast_recharge_shortfall_kwh: float | None = None
+    forecast_recharge_target_feasible: bool | None = None
+    forecast_protection_state: str | None = None
+    forecast_confidence_percent: float | None = None
+
     # Freshness metadata is recorded alongside the observation so that stale
     # live power sources cannot silently become valid-looking history.
     source_age_seconds: dict[str, float] = field(default_factory=dict)
@@ -155,6 +172,9 @@ class LearnedState:
     typical_solar_power_kw: float | None = None
     typical_grid_import_kw: float | None = None
     predicted_energy_until_offpeak_kwh: float | None = None
+    predicted_house_energy_remaining_today_kwh: float | None = None
+    predicted_house_energy_tomorrow_kwh: float | None = None
+    predicted_house_tomorrow_hourly_kwh: tuple[float, ...] = ()
     average_import_rate_pence: float | None = None
     profile_slots: int = 0
 
@@ -223,6 +243,104 @@ class SimulationConfig:
     strategy: str = "paced_export"
     saving_session_enabled: bool = True
     island_reserve_percent: float = 20.0
+    forecast_aware: bool = False
+
+
+@dataclass(frozen=True, slots=True)
+class ForecastHour:
+    """One hourly solar/weather forecast point."""
+
+    timestamp: datetime
+    solar_energy_kwh: float = 0.0
+    cloud_cover_percent: float | None = None
+    precipitation_mm: float | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        """Return JSON-compatible hourly forecast data."""
+        data = asdict(self)
+        data["timestamp"] = self.timestamp.isoformat()
+        return data
+
+
+@dataclass(frozen=True, slots=True)
+class SolarForecastState:
+    """Fused Forecast.Solar and Open-Meteo outlook used by KEMS."""
+
+    ready: bool = False
+    source: str = "unavailable"
+    attribution: str | None = None
+    forecast_solar_available: bool = False
+    forecast_solar_entity_count: int = 0
+    forecast_solar_remaining_today_kwh: float | None = None
+    forecast_solar_tomorrow_kwh: float | None = None
+    open_meteo_available: bool = False
+    open_meteo_remaining_today_kwh: float | None = None
+    open_meteo_tomorrow_kwh: float | None = None
+    expected_solar_remaining_today_kwh: float | None = None
+    expected_solar_tomorrow_kwh: float | None = None
+    agreement_percent: float | None = None
+    confidence_percent: float = 0.0
+    average_cloud_cover_tomorrow_percent: float | None = None
+    precipitation_tomorrow_mm: float | None = None
+    hourly: tuple[ForecastHour, ...] = ()
+    last_updated: datetime | None = None
+    error: str | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        """Return JSON-compatible forecast diagnostics."""
+        data = asdict(self)
+        if self.last_updated is not None:
+            data["last_updated"] = self.last_updated.isoformat()
+        data["hourly"] = [item.to_dict() for item in self.hourly]
+        return data
+
+
+@dataclass(frozen=True, slots=True)
+class ForecastConfig:
+    """Forecast-aware reserve and recharge settings."""
+
+    enabled: bool = True
+    open_meteo_enabled: bool = True
+    open_meteo_refresh_minutes: int = 30
+    performance_ratio: float = 0.85
+    reserve_safety_margin_percent: float = 5.0
+    watch_margin_kwh: float = 3.0
+    recovery_margin_kwh: float = 1.0
+
+
+@dataclass(frozen=True, slots=True)
+class ForecastPlanState:
+    """Explainable recharge feasibility and forecast-protection decision."""
+
+    ready: bool = False
+    state: str = "unavailable"
+    reason: str = "Forecast data is not available yet"
+    forecast_source: str = "unavailable"
+    confidence_percent: float = 0.0
+    expected_solar_remaining_today_kwh: float | None = None
+    expected_solar_tomorrow_kwh: float | None = None
+    expected_house_remaining_today_kwh: float | None = None
+    expected_house_tomorrow_kwh: float | None = None
+    projected_soc_at_cheap_start_percent: float | None = None
+    cheap_window_hours: float | None = None
+    maximum_overnight_soc_percent: float | None = None
+    overnight_charge_capacity_kwh: float | None = None
+    full_charge_feasible: bool | None = None
+    additional_cheap_time_to_full_hours: float | None = None
+    required_morning_soc_percent: float | None = None
+    recharge_target_feasible: bool | None = None
+    recharge_shortfall_kwh: float | None = None
+    additional_cheap_time_required_hours: float | None = None
+    minimum_precheap_soc_percent: float | None = None
+    solar_recovery_target_percent: float | None = None
+    projected_minimum_soc_tomorrow_percent: float | None = None
+    predicted_day_rate_import_kwh: float | None = None
+    battery_retention_required: bool = False
+    solar_recovery_required: bool = False
+
+    def to_dict(self) -> dict[str, Any]:
+        """Return JSON-compatible planning diagnostics."""
+        return asdict(self)
 
 
 @dataclass(frozen=True, slots=True)
@@ -411,6 +529,16 @@ class ScenarioSummary:
     prepared_energy_limited_unserved_kwh: float | None = None
     prepared_first_shortfall_at: str | None = None
 
+    # Full KEMS Forecast audit fields. Historical periods only gain forecast
+    # protection once forecast-bearing snapshots have actually been recorded.
+    forecast_samples: int = 0
+    forecast_protection_state: str | None = None
+    forecast_required_morning_soc_percent: float | None = None
+    forecast_minimum_precheap_soc_percent: float | None = None
+    forecast_solar_recovery_target_percent: float | None = None
+    forecast_recharge_target_feasible: bool | None = None
+    forecast_recharge_shortfall_kwh: float | None = None
+
     # Current/recent power routing for live visualisations such as the
     # 16x16 KEMS panel. These are instantaneous kW values from the latest
     # replay snapshot, not period totals.
@@ -480,6 +608,7 @@ class ScenarioTimelinePoint:
     solar_battery_cost_pence: float
     kems_no_export_cost_pence: float
     kems_full_cost_pence: float
+    kems_forecast_cost_pence: float
     island_load_served_percent: float | None = None
     island_unserved_load_kwh: float | None = None
     island_soc_percent: float | None = None
@@ -845,11 +974,11 @@ class PowerDownResult:
     bonus_pence: float | None = None
     fixed_export_income_pence: float | None = None
     combined_income_pence: float | None = None
-    ev_successfully_blocked: bool = False
+    ev_successfully_blocked: bool | None = False
     active_samples_observed: int = 0
     plan_safe_throughout: bool | None = None
     island_override_observed: bool | None = None
-    completed_successfully: bool = False
+    completed_successfully: bool | None = False
     completion_reason: str = "unavailable"
 
     def to_dict(self) -> dict[str, Any]:
@@ -900,5 +1029,7 @@ class KEMSData:
     control: ControlState
     history_samples: int
     phase: str
+    forecast: SolarForecastState = field(default_factory=SolarForecastState)
+    forecast_plan: ForecastPlanState = field(default_factory=ForecastPlanState)
     last_power_down: PowerDownResult = field(default_factory=PowerDownResult)
     periods: dict[str, PeriodTotals] = field(default_factory=dict)

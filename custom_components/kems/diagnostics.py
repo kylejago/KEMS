@@ -10,8 +10,11 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_registry as er
 from homeassistant.util import dt as dt_util
 
+from .commissioning import build_commissioning_snapshot
 from .coordinator import KEMSCoordinator
+from .panel import panel_health_snapshot
 from .providers.octopus import DEFAULT_INTELLIGENT_STALE_DATA_SECONDS
+from .update_orchestrator import update_orchestrator_snapshot
 
 
 def _state_payload(hass: HomeAssistant, entity_id: str) -> dict[str, Any]:
@@ -127,6 +130,12 @@ async def async_get_config_entry_diagnostics(
             "items": [item.to_dict() for item in data.advice.items],
         },
         "simulation": asdict(data.simulation),
+        "forecast": data.forecast.to_dict(),
+        "forecast_plan": data.forecast_plan.to_dict(),
+        "forecast_validation": coordinator.forecast_validation_state.to_dict(),
+        "forecast_validation_observations": [
+            item.to_dict() for item in coordinator.forecast_validation_observations
+        ],
         "scenarios": data.scenarios.to_dict(),
         "whole_home": asdict(data.whole_home),
         "lifetime": data.lifetime.to_dict(),
@@ -136,6 +145,9 @@ async def async_get_config_entry_diagnostics(
         },
         "roi": asdict(data.roi),
         "control": asdict(data.control),
+        "commissioning": build_commissioning_snapshot(hass, coordinator),
+        "panel_health": panel_health_snapshot(hass),
+        "updates": update_orchestrator_snapshot(hass, entry),
         "last_power_down": data.last_power_down.to_dict(),
         "quality": asdict(data.quality),
         "history_samples": data.history_samples,

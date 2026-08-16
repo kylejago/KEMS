@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import datetime, time, timedelta
 from statistics import fmean
 
 from .models import LearnedState, Snapshot
@@ -83,6 +83,27 @@ class LearningEngine:
             latest.next_offpeak_start,
             fallback_load,
         )
+        local_tz = now.tzinfo
+        tomorrow_date = now.date() + timedelta(days=1)
+        end_today = datetime.combine(tomorrow_date, time.min, tzinfo=local_tz)
+        end_tomorrow = end_today + timedelta(days=1)
+        predicted_remaining_today = self._predict_energy_window(
+            profiles,
+            now,
+            end_today,
+            fallback_load,
+        )
+        predicted_tomorrow = self._predict_energy_window(
+            profiles,
+            end_today,
+            end_tomorrow,
+            fallback_load,
+        )
+        predicted_tomorrow_hourly = self._predict_hourly_energy(
+            profiles,
+            end_today,
+            fallback_load,
+        )
 
         useful_records = sum(
             1
@@ -112,9 +133,27 @@ class LearningEngine:
             typical_solar_power_kw=typical_solar,
             typical_grid_import_kw=typical_grid,
             predicted_energy_until_offpeak_kwh=predicted_until_offpeak,
+            predicted_house_energy_remaining_today_kwh=predicted_remaining_today,
+            predicted_house_energy_tomorrow_kwh=predicted_tomorrow,
+            predicted_house_tomorrow_hourly_kwh=predicted_tomorrow_hourly,
             average_import_rate_pence=_mean(import_rates),
             profile_slots=len(profiles),
         )
+
+    def _predict_hourly_energy(
+        self,
+        profiles: dict[tuple[str, int], _SlotValues],
+        day_start: datetime,
+        fallback_load_kw: float | None,
+    ) -> tuple[float, ...]:
+        """Return 24 learned hourly house-energy values for one local day."""
+        values: list[float] = []
+        for hour in range(24):
+            start = day_start + timedelta(hours=hour)
+            end = start + timedelta(hours=1)
+            energy = self._predict_energy_window(profiles, start, end, fallback_load_kw)
+            values.append(round(float(energy or 0.0), 3))
+        return tuple(values)
 
     def _predict_energy_until_offpeak(
         self,
@@ -128,11 +167,27 @@ class LearningEngine:
             return None
         if next_offpeak_start - now > timedelta(hours=24):
             return None
+        return self._predict_energy_window(
+            profiles,
+            now,
+            next_offpeak_start,
+            fallback_load_kw,
+        )
 
-        cursor = now
+    def _predict_energy_window(
+        self,
+        profiles: dict[tuple[str, int], _SlotValues],
+        start: datetime,
+        end: datetime,
+        fallback_load_kw: float | None,
+    ) -> float | None:
+        """Predict house energy over an arbitrary local-time window."""
+        if end <= start:
+            return 0.0
+        cursor = start
         predicted = 0.0
         seen = 0
-        while cursor < next_offpeak_start:
+        while cursor < end:
             values = profiles.get(_slot_key(cursor))
             load = _mean(values.house_load) if values else None
             if load is None:
@@ -140,10 +195,9 @@ class LearningEngine:
             if load is not None:
                 interval_minutes = min(
                     SLOT_MINUTES,
-                    max((next_offpeak_start - cursor).total_seconds() / 60, 0.0),
+                    max((end - cursor).total_seconds() / 60, 0.0),
                 )
                 predicted += load * interval_minutes / 60
                 seen += 1
             cursor += timedelta(minutes=SLOT_MINUTES)
-
         return round(predicted, 3) if seen else None

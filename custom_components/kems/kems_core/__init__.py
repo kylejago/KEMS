@@ -7,6 +7,13 @@ from .control import (
     ControlEngine,
     run_preflight_suite,
 )
+from .forecast import ForecastPlanningEngine, fuse_solar_forecasts
+from .forecast_validation import (
+    ForecastObservation,
+    ForecastValidationDay,
+    ForecastValidationEngine,
+    ForecastValidationState,
+)
 from .foxess import GridPower, calculate_battery_power_kw, normalise_grid_power
 from .gas import GasEngine
 from .learning import LearningEngine
@@ -25,6 +32,9 @@ from .models import (
     ControlConfig,
     ControlState,
     DataQuality,
+    ForecastConfig,
+    ForecastHour,
+    ForecastPlanState,
     GasSummary,
     KEMSData,
     LearnedState,
@@ -40,6 +50,7 @@ from .models import (
     SimulationConfig,
     SimulationState,
     Snapshot,
+    SolarForecastState,
     WholeHomeSummary,
 )
 from .ohme import interpret_charger_status
@@ -78,6 +89,14 @@ __all__ = [
     "ControlEngine",
     "ControlState",
     "DataQuality",
+    "ForecastConfig",
+    "ForecastHour",
+    "ForecastObservation",
+    "ForecastPlanState",
+    "ForecastPlanningEngine",
+    "ForecastValidationDay",
+    "ForecastValidationEngine",
+    "ForecastValidationState",
     "FOXHOLE_PROPOSAL_PROFILE",
     "GasEngine",
     "GasSummary",
@@ -105,6 +124,7 @@ __all__ = [
     "SimulationEngine",
     "SimulationState",
     "Snapshot",
+    "SolarForecastState",
     "SolarArray",
     "WholeHomeEngine",
     "VIRTUAL_SCENARIOS",
@@ -118,4 +138,5 @@ __all__ = [
     "summarise_period_records",
     "interpret_charger_status",
     "finalise_power_down_audit",
+    "fuse_solar_forecasts",
 ]

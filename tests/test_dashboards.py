@@ -13,11 +13,25 @@ DASHBOARDS = ROOT / "dashboards"
 def test_all_dashboard_yaml_is_valid() -> None:
     """Every shipped dashboard should parse as YAML."""
     files = sorted(DASHBOARDS.glob("*.yaml"))
-    assert len(files) == 12
+    assert len(files) == 13
     for path in files:
         content = yaml.safe_load(path.read_text(encoding="utf-8"))
         assert isinstance(content, dict)
         assert content.get("views")
+
+
+def test_master_dashboard_uses_current_alpha7_entities() -> None:
+    """The master view should use validated Alpha 7 IDs and learning sensors."""
+    text = (DASHBOARDS / "kems_master_dashboard.yaml").read_text(encoding="utf-8")
+    assert "sensor.kems_forecast_minimum_pre_cheap_soc" in text
+    assert "sensor.kems_forecast_minimum_precheap_soc" not in text
+    assert "sensor.kems_forecast_validation_status" in text
+    assert "sensor.kems_forecast_validation_fused_solar_mae" in text
+    assert "sensor.kems_forecast_validation_house_mae" in text
+    assert "states.sensor" in text
+    assert "states.binary_sensor" in text
+    assert "states.select" in text
+    assert "states.switch" in text
 
 
 def test_comparison_dashboards_include_live_and_simulated_flows() -> None:
@@ -107,8 +121,8 @@ def test_control_lab_dashboard_exposes_island_and_write_boundary() -> None:
     assert "sensor.kems_simulated_house_load_power" not in text
 
 
-def test_compare_dashboards_ship_six_parallel_scenarios() -> None:
-    """The comparison views must expose every alpha6 financial and island scenario."""
+def test_compare_dashboards_ship_seven_parallel_scenarios() -> None:
+    """The comparison views must expose all financial and island scenarios."""
     for name in (
         "kems_compare_builtin.yaml",
         "kems_compare_advanced.yaml",
@@ -119,6 +133,8 @@ def test_compare_dashboards_ship_six_parallel_scenarios() -> None:
         assert "sensor.kems_compare_solar_and_battery_cost_today" in text
         assert "sensor.kems_compare_kems_no_export_cost_today" in text
         assert "sensor.kems_compare_full_kems_cost_today" in text
+        assert "sensor.kems_compare_full_kems_forecast_cost_today" in text
+        assert "sensor.kems_full_kems_forecast_status" in text
         assert "sensor.kems_compare_full_island_mode_today" in text
         assert "sensor.kems_compare_full_island_prepared_status_today" in text
         assert "sensor.kems_compare_full_island_required_starting_soc_today" in text
@@ -140,6 +156,7 @@ def test_advanced_compare_dashboard_uses_replay_timeline() -> None:
     assert "entity.attributes.timeline" in text
     assert "no_system_cost_pence" in text
     assert "kems_full_cost_pence" in text
+    assert "kems_forecast_cost_pence" in text
     assert "island_load_served_percent" in text
     assert "island_unserved_load_kwh" in text
     assert "island_soc_percent" in text

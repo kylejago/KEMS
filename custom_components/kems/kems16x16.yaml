@@ -1,0 +1,800 @@
+# KEMS-MANAGED-ESPHOME-PANEL
+# Managed by KEMS. Local edits may be replaced after a KEMS/Home Assistant restart.
+substitutions:
+  device_name: kems16x16
+  friendly_name: "KEMS16x16"
+  led_pin: GPIO21
+  panel_config_version: "0.7.0-alpha7-panel2"
+  kems_status: sensor.kems_status
+  live_battery_soc: sensor.kems_battery_state_of_charge
+  live_battery_power: sensor.kems_battery_power
+  live_grid_import: sensor.kems_grid_import
+  live_grid_export: sensor.kems_grid_export
+  ev_connected: binary_sensor.kems_ev_connected
+  ev_charging: binary_sensor.kems_ev_charging
+  grid_available: binary_sensor.kems_grid_available_for_control
+  cheap_period: binary_sensor.kems_cheap_period_confirmed
+  island_mode: binary_sensor.kems_whole_house_island_mode
+  live_cost_today: sensor.kems_observed_cost_today
+  scenario_no_system: sensor.kems_compare_no_system_cost_today
+  scenario_solar_only: sensor.kems_compare_solar_only_cost_today
+  scenario_solar_battery: sensor.kems_compare_solar_and_battery_cost_today
+  scenario_kems_no_export: sensor.kems_compare_kems_no_export_cost_today
+  scenario_full_kems: sensor.kems_compare_full_kems_cost_today
+  scenario_full_kems_forecast: sensor.kems_compare_full_kems_forecast_cost_today
+  scenario_no_system_flow: sensor.kems_compare_no_system_flow_now
+  scenario_solar_only_flow: sensor.kems_compare_solar_only_flow_now
+  scenario_solar_battery_flow: sensor.kems_compare_solar_and_battery_flow_now
+  scenario_kems_no_export_flow: sensor.kems_compare_kems_no_export_flow_now
+  scenario_full_kems_flow: sensor.kems_compare_full_kems_flow_now
+  scenario_full_kems_forecast_flow: sensor.kems_compare_full_kems_forecast_flow_now
+  scenario_full_island_flow: sensor.kems_compare_full_island_flow_now
+esphome:
+  name: ${device_name}
+  friendly_name: ${friendly_name}
+  on_boot:
+    priority: -100
+    then:
+      - lambda: |-
+          id(panel_boot_started_ms) = millis();
+          id(panel_boot_ha_seen) = false;
+          id(panel_boot_ha_ready_ms) = 0;
+      - light.turn_on:
+          id: matrix_light
+          brightness: 35%
+esp32:
+  variant: esp32
+  framework:
+    type: esp-idf
+logger:
+api:
+ota:
+  - platform: esphome
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  ap:
+    ssid: "KEMS Panel Fallback"
+    password: "kems-panel-setup"
+captive_portal:
+globals:
+  - id: panel_boot_started_ms
+    type: uint32_t
+    restore_value: no
+    initial_value: '0'
+  - id: panel_boot_ha_seen
+    type: bool
+    restore_value: no
+    initial_value: 'false'
+  - id: panel_boot_ha_ready_ms
+    type: uint32_t
+    restore_value: no
+    initial_value: '0'
+
+select:
+  - platform: template
+    id: panel_display_mode
+    name: "Display Mode"
+    icon: mdi:monitor-dashboard
+    optimistic: true
+    restore_value: true
+    initial_option: "Live (actual current KEMS control)"
+    options:
+      - "Live (actual current KEMS control)"
+      - "No system"
+      - "Solar only"
+      - "Solar + battery"
+      - "KEMS no-export"
+      - "Full KEMS"
+      - "Full KEMS Forecast"
+      - "Full Island Mode"
+text_sensor:
+  - platform: template
+    id: panel_firmware_version
+    name: "Panel Firmware Version"
+    icon: mdi:chip
+    update_interval: 60s
+    lambda: |-
+      return {"${panel_config_version}"};
+  - platform: homeassistant
+    id: ha_kems_status
+    entity_id: ${kems_status}
+  - platform: homeassistant
+    id: ha_no_system_flow
+    entity_id: ${scenario_no_system_flow}
+  - platform: homeassistant
+    id: ha_solar_only_flow
+    entity_id: ${scenario_solar_only_flow}
+  - platform: homeassistant
+    id: ha_solar_battery_flow
+    entity_id: ${scenario_solar_battery_flow}
+  - platform: homeassistant
+    id: ha_kems_no_export_flow
+    entity_id: ${scenario_kems_no_export_flow}
+  - platform: homeassistant
+    id: ha_full_kems_flow
+    entity_id: ${scenario_full_kems_flow}
+  - platform: homeassistant
+    id: ha_full_kems_forecast_flow
+    entity_id: ${scenario_full_kems_forecast_flow}
+  - platform: homeassistant
+    id: ha_full_island_flow
+    entity_id: ${scenario_full_island_flow}
+sensor:
+  - platform: homeassistant
+    id: ha_live_battery_soc
+    entity_id: ${live_battery_soc}
+  - platform: homeassistant
+    id: ha_live_battery_power
+    entity_id: ${live_battery_power}
+  - platform: homeassistant
+    id: ha_live_grid_import
+    entity_id: ${live_grid_import}
+  - platform: homeassistant
+    id: ha_live_grid_export
+    entity_id: ${live_grid_export}
+  - platform: homeassistant
+    id: ha_live_cost_today
+    entity_id: ${live_cost_today}
+  - platform: homeassistant
+    id: ha_no_system_cost
+    entity_id: ${scenario_no_system}
+  - platform: homeassistant
+    id: ha_solar_only_cost
+    entity_id: ${scenario_solar_only}
+  - platform: homeassistant
+    id: ha_solar_battery_cost
+    entity_id: ${scenario_solar_battery}
+  - platform: homeassistant
+    id: ha_kems_no_export_cost
+    entity_id: ${scenario_kems_no_export}
+  - platform: homeassistant
+    id: ha_full_kems_cost
+    entity_id: ${scenario_full_kems}
+  - platform: homeassistant
+    id: ha_full_kems_forecast_cost
+    entity_id: ${scenario_full_kems_forecast}
+binary_sensor:
+  - platform: homeassistant
+    id: ha_ev_connected
+    entity_id: ${ev_connected}
+  - platform: homeassistant
+    id: ha_ev_charging
+    entity_id: ${ev_charging}
+  - platform: homeassistant
+    id: ha_grid_available
+    entity_id: ${grid_available}
+  - platform: homeassistant
+    id: ha_cheap_period
+    entity_id: ${cheap_period}
+  - platform: homeassistant
+    id: ha_island_mode
+    entity_id: ${island_mode}
+light:
+  - platform: esp32_rmt_led_strip
+    id: matrix_light
+    name: "Panel Brightness"
+    pin: ${led_pin}
+    num_leds: 256
+    chipset: WS2812
+    rgb_order: GRB
+    restore_mode: ALWAYS_ON
+    default_transition_length: 0s
+display:
+  - platform: addressable_light
+    id: kems_matrix
+    addressable_light_id: matrix_light
+    width: 16
+    height: 16
+    rotation: 0°
+    update_interval: 50ms
+    pixel_mapper: |-
+      int mx = 15 - x;
+      if ((y % 2) == 0) {
+        return (y * 16) + mx;
+      }
+      return (y * 16) + (15 - mx);
+    lambda: |-
+      const uint32_t now = millis();
+      const Color OFF     = Color(0,   0,   0);
+      const Color WHITE   = Color(255, 255, 255);
+      const Color GREEN   = Color(0,   255, 0);
+      const Color RED     = Color(255, 0,   0);
+      const Color BLUE    = Color(0,   80,  255);
+      const Color YELLOW  = Color(255, 190, 0);
+      const Color ORANGE  = Color(255, 80,  0);
+      const Color MAGENTA = Color(255, 0,   180);
+      auto clamp01 = [](float v) -> float {
+        if (v < 0.0f) return 0.0f;
+        if (v > 1.0f) return 1.0f;
+        return v;
+      };
+      auto scale_color = [&](Color c, float amount) -> Color {
+        amount = clamp01(amount);
+        return Color(
+          (uint8_t) (c.r * amount),
+          (uint8_t) (c.g * amount),
+          (uint8_t) (c.b * amount)
+        );
+      };
+      auto hsv = [&](float h, float s, float v) -> Color {
+        h = h - floorf(h);
+        s = clamp01(s);
+        v = clamp01(v);
+        float hh = h * 6.0f;
+        int sector = ((int) floorf(hh)) % 6;
+        float f = hh - floorf(hh);
+        float p = v * (1.0f - s);
+        float q = v * (1.0f - f * s);
+        float t = v * (1.0f - (1.0f - f) * s);
+        float r = 0.0f, g = 0.0f, b = 0.0f;
+        switch (sector) {
+          case 0: r = v; g = t; b = p; break;
+          case 1: r = q; g = v; b = p; break;
+          case 2: r = p; g = v; b = t; break;
+          case 3: r = p; g = q; b = v; break;
+          case 4: r = t; g = p; b = v; break;
+          default: r = v; g = p; b = q; break;
+        }
+        return Color(
+          (uint8_t) (r * 255.0f),
+          (uint8_t) (g * 255.0f),
+          (uint8_t) (b * 255.0f)
+        );
+      };
+      float pulse_amount =
+        0.22f + 0.78f *
+        (0.5f + 0.5f *
+        sinf((float) now * 2.0f * 3.14159265f / 4500.0f));
+      auto pulse = [&](Color c) -> Color {
+        return scale_color(c, pulse_amount);
+      };
+      float rainbow_hue = fmodf((float) now / 40000.0f, 1.0f);
+      Color RAINBOW = hsv(rainbow_hue, 1.0f, 1.0f);
+      auto px = [&](int c, int r, Color color) {
+        it.draw_pixel_at(c - 1, r - 1, color);
+      };
+      auto rect = [&](int c1, int r1, int c2, int r2, Color color) {
+        for (int r = r1; r <= r2; r++) {
+          for (int c = c1; c <= c2; c++) {
+            px(c, r, color);
+          }
+        }
+      };
+      auto horizontal_pair = [&](int c, int r1, int r2,
+                                 Color top_color, Color bottom_color,
+                                 float brightness) {
+        px(c, r1, scale_color(top_color, brightness));
+        px(c, r2, scale_color(bottom_color, brightness));
+      };
+      auto vertical_pair = [&](int r, int c1, int c2,
+                               Color left_color, Color right_color,
+                               float brightness) {
+        px(c1, r, scale_color(left_color, brightness));
+        px(c2, r, scale_color(right_color, brightness));
+      };
+      auto flow_horizontal_dual = [&](int c1, int r1, int c2, int r2,
+                                      Color head_top, Color head_bottom,
+                                      Color trail_top, Color trail_bottom,
+                                      int dir) {
+        rect(c1, r1, c2, r2, OFF);
+        const int width = c2 - c1 + 1;
+        const int phase = (now / 450) % (width + 2);
+        auto physical_index = [&](int travel_index) -> int {
+          return (dir > 0)
+            ? travel_index
+            : (width - 1 - travel_index);
+        };
+        if (phase >= 0 && phase < width) {
+          int index = physical_index(phase);
+          horizontal_pair(
+            c1 + index, r1, r2,
+            head_top, head_bottom,
+            1.00f
+          );
+        }
+        int age1 = phase - 1;
+        if (age1 >= 0 && age1 < width) {
+          int index = physical_index(age1);
+          horizontal_pair(
+            c1 + index, r1, r2,
+            trail_top, trail_bottom,
+            0.66f
+          );
+        }
+        int age2 = phase - 2;
+        if (age2 >= 0 && age2 < width) {
+          int index = physical_index(age2);
+          horizontal_pair(
+            c1 + index, r1, r2,
+            trail_top, trail_bottom,
+            0.33f
+          );
+        }
+      };
+      auto flow_horizontal = [&](int c1, int r1, int c2, int r2,
+                                 Color top_color, Color bottom_color,
+                                 int dir) {
+        flow_horizontal_dual(
+          c1, r1, c2, r2,
+          top_color, bottom_color,
+          top_color, bottom_color,
+          dir
+        );
+      };
+      auto flow_vertical_dual = [&](int c1, int r1, int c2, int r2,
+                                    Color head_left, Color head_right,
+                                    Color trail_left, Color trail_right,
+                                    int dir) {
+        rect(c1, r1, c2, r2, OFF);
+        const int height = r2 - r1 + 1;
+        const int phase = (now / 450) % (height + 2);
+        auto physical_index = [&](int travel_index) -> int {
+          return (dir > 0)
+            ? travel_index
+            : (height - 1 - travel_index);
+        };
+        if (phase >= 0 && phase < height) {
+          int index = physical_index(phase);
+          vertical_pair(
+            r1 + index, c1, c2,
+            head_left, head_right,
+            1.00f
+          );
+        }
+        int age1 = phase - 1;
+        if (age1 >= 0 && age1 < height) {
+          int index = physical_index(age1);
+          vertical_pair(
+            r1 + index, c1, c2,
+            trail_left, trail_right,
+            0.66f
+          );
+        }
+        int age2 = phase - 2;
+        if (age2 >= 0 && age2 < height) {
+          int index = physical_index(age2);
+          vertical_pair(
+            r1 + index, c1, c2,
+            trail_left, trail_right,
+            0.33f
+          );
+        }
+      };
+      auto flow_vertical = [&](int c1, int r1, int c2, int r2,
+                               Color left_color, Color right_color,
+                               int dir) {
+        flow_vertical_dual(
+          c1, r1, c2, r2,
+          left_color, right_color,
+          left_color, right_color,
+          dir
+        );
+      };
+      auto bool_colour = [&](bool value) -> Color {
+        return value ? GREEN : RED;
+      };
+
+      // KEMS boot / OTA completion sequence.
+      const uint32_t boot_elapsed = now - id(panel_boot_started_ms);
+      const bool ha_ready =
+        id(ha_kems_status).has_state() &&
+        !id(ha_kems_status).state.empty() &&
+        id(ha_kems_status).state != "unknown" &&
+        id(ha_kems_status).state != "unavailable";
+
+      auto draw_boot_frame = [&](uint32_t elapsed_ms) {
+        const float intro_pulse =
+          0.30f + 0.70f *
+          (0.5f + 0.5f *
+          sinf((float) elapsed_ms * 2.0f * 3.14159265f / 700.0f));
+        rect(7, 7, 10, 10, scale_color(WHITE, intro_pulse));
+        if (elapsed_ms >= 700) {
+          rect(1, 7, 2, 10, BLUE);
+          flow_horizontal(3, 8, 6, 9, BLUE, BLUE, +1);
+        }
+        if (elapsed_ms >= 1400) {
+          rect(7, 1, 10, 2, YELLOW);
+          flow_vertical(8, 3, 9, 6, YELLOW, YELLOW, +1);
+        }
+        if (elapsed_ms >= 2100) {
+          rect(15, 7, 16, 10, GREEN);
+          flow_horizontal(11, 8, 14, 9, GREEN, GREEN, -1);
+        }
+        if (elapsed_ms >= 2800) {
+          rect(7, 15, 10, 16, MAGENTA);
+          flow_vertical(8, 11, 9, 14, MAGENTA, MAGENTA, +1);
+        }
+        if (elapsed_ms >= 3300) {
+          rect(2, 2, 5, 3, GREEN);
+          rect(12, 2, 15, 3, GREEN);
+          rect(2, 12, 5, 13, GREEN);
+          rect(12, 12, 15, 13, GREEN);
+        }
+      };
+
+      auto draw_waiting_frame = [&]() {
+        const float amount =
+          0.15f + 0.85f *
+          (0.5f + 0.5f *
+          sinf((float) now * 2.0f * 3.14159265f / 1400.0f));
+        const Color WAIT = scale_color(ORANGE, amount);
+        rect(7, 7, 10, 10, WAIT);
+        rect(2, 2, 5, 3, scale_color(YELLOW, 0.35f));
+        rect(12, 2, 15, 3, scale_color(YELLOW, 0.35f));
+        rect(2, 12, 5, 13, scale_color(YELLOW, 0.35f));
+        rect(12, 12, 15, 13, scale_color(YELLOW, 0.35f));
+        flow_horizontal(3, 8, 6, 9, ORANGE, ORANGE, +1);
+        flow_vertical(8, 3, 9, 6, ORANGE, ORANGE, +1);
+        flow_horizontal(11, 8, 14, 9, ORANGE, ORANGE, -1);
+        flow_vertical(8, 11, 9, 14, ORANGE, ORANGE, +1);
+      };
+
+      auto draw_success_frame = [&](uint32_t elapsed_ms) {
+        const float amount =
+          0.20f + 0.80f *
+          (0.5f + 0.5f *
+          sinf((float) elapsed_ms * 2.0f * 3.14159265f / 450.0f));
+        const Color OK = scale_color(GREEN, amount);
+        rect(2, 2, 5, 3, OK);
+        rect(12, 2, 15, 3, OK);
+        rect(2, 12, 5, 13, OK);
+        rect(12, 12, 15, 13, OK);
+        rect(7, 7, 10, 10, OK);
+        rect(7, 1, 10, 2, OK);
+        rect(1, 7, 2, 10, OK);
+        rect(15, 7, 16, 10, OK);
+        rect(7, 15, 10, 16, OK);
+      };
+
+      auto draw_error_frame = [&]() {
+        const float amount =
+          0.10f + 0.90f *
+          (0.5f + 0.5f *
+          sinf((float) now * 2.0f * 3.14159265f / 650.0f));
+        const Color WARN = scale_color(RED, amount);
+        rect(2, 2, 5, 3, WARN);
+        rect(12, 2, 15, 3, WARN);
+        rect(2, 12, 5, 13, WARN);
+        rect(12, 12, 15, 13, WARN);
+        rect(7, 7, 10, 10, WARN);
+      };
+
+      if (boot_elapsed < 3800) {
+        it.fill(OFF);
+        draw_boot_frame(boot_elapsed);
+        return;
+      }
+      if (ha_ready && !id(panel_boot_ha_seen)) {
+        id(panel_boot_ha_seen) = true;
+        id(panel_boot_ha_ready_ms) = now;
+      }
+      if (!id(panel_boot_ha_seen)) {
+        it.fill(OFF);
+        if (boot_elapsed < 20000) {
+          draw_waiting_frame();
+        } else {
+          draw_error_frame();
+        }
+        return;
+      }
+      if ((now - id(panel_boot_ha_ready_ms)) < 1500) {
+        it.fill(OFF);
+        draw_success_frame(now - id(panel_boot_ha_ready_ms));
+        return;
+      }
+
+      std::string display_mode =
+        id(panel_display_mode).current_option().c_str();
+      const bool live_mode =
+        display_mode == "Live (actual current KEMS control)";
+      int selected_scenario = -1;
+      if (display_mode == "No system") {
+        selected_scenario = 0;
+      } else if (display_mode == "Solar only") {
+        selected_scenario = 1;
+      } else if (display_mode == "Solar + battery") {
+        selected_scenario = 2;
+      } else if (display_mode == "KEMS no-export") {
+        selected_scenario = 3;
+      } else if (display_mode == "Full KEMS") {
+        selected_scenario = 4;
+      } else if (display_mode == "Full KEMS Forecast") {
+        selected_scenario = 5;
+      } else if (display_mode == "Full Island Mode") {
+        selected_scenario = 6;
+      }
+      const bool ev_connected = id(ha_ev_connected).state;
+      const bool ev_charging = id(ha_ev_charging).state;
+      const bool grid_available = id(ha_grid_available).state;
+      const bool island_display = selected_scenario == 6;
+      const bool grid_available_for_display =
+        island_display ? false : grid_available;
+      float battery_soc = NAN;
+      float battery_power = NAN;
+      float cost_today = NAN;
+      bool solar_producing = false;
+      bool solar_to_home_active = false;
+      bool grid_importing = false;
+      bool grid_exporting = false;
+      bool battery_charging = false;
+      bool battery_discharging = false;
+      bool export_from_solar = false;
+      bool export_from_battery = false;
+      bool battery_charge_from_grid = false;
+      bool battery_charge_from_solar = false;
+      float live_grid_export_power = NAN;
+      if (live_mode || selected_scenario < 0) {
+        battery_soc = id(ha_live_battery_soc).state;
+        battery_power = id(ha_live_battery_power).state;
+        cost_today = id(ha_live_cost_today).state;
+        float live_grid_import_power = id(ha_live_grid_import).state;
+        live_grid_export_power = id(ha_live_grid_export).state;
+        const float POWER_DEADBAND_KW = 0.03f;
+        grid_importing =
+          !isnan(live_grid_import_power) &&
+          live_grid_import_power > POWER_DEADBAND_KW;
+        grid_exporting =
+          !isnan(live_grid_export_power) &&
+          live_grid_export_power > POWER_DEADBAND_KW;
+        solar_producing = false;
+        solar_to_home_active = false;
+        battery_discharging =
+          !isnan(battery_power) &&
+          battery_power > POWER_DEADBAND_KW;
+        battery_charging =
+          !isnan(battery_power) &&
+          battery_power < -POWER_DEADBAND_KW;
+        if (grid_exporting && battery_discharging &&
+            !isnan(live_grid_export_power) &&
+            !isnan(battery_power)) {
+          float battery_export_component = battery_power;
+          if (battery_export_component > live_grid_export_power) {
+            battery_export_component = live_grid_export_power;
+          }
+          export_from_battery =
+            battery_export_component > POWER_DEADBAND_KW;
+          export_from_solar =
+            (live_grid_export_power - battery_export_component) >
+            POWER_DEADBAND_KW;
+        }
+        battery_charge_from_grid =
+          battery_charging && grid_importing;
+        battery_charge_from_solar = false;
+      } else {
+        const float POWER_DEADBAND_KW = 0.03f;
+        const int s = selected_scenario;
+        float scenario_cost[7] = {
+          id(ha_no_system_cost).state,
+          id(ha_solar_only_cost).state,
+          id(ha_solar_battery_cost).state,
+          id(ha_kems_no_export_cost).state,
+          id(ha_full_kems_cost).state,
+          id(ha_full_kems_forecast_cost).state,
+          NAN
+        };
+        const std::string *flow_state = nullptr;
+        if (s == 0) {
+          flow_state = &id(ha_no_system_flow).state;
+        } else if (s == 1) {
+          flow_state = &id(ha_solar_only_flow).state;
+        } else if (s == 2) {
+          flow_state = &id(ha_solar_battery_flow).state;
+        } else if (s == 3) {
+          flow_state = &id(ha_kems_no_export_flow).state;
+        } else if (s == 4) {
+          flow_state = &id(ha_full_kems_flow).state;
+        } else if (s == 5) {
+          flow_state = &id(ha_full_kems_forecast_flow).state;
+        } else if (s == 6) {
+          flow_state = &id(ha_full_island_flow).state;
+        }
+        cost_today = scenario_cost[s];
+        float house_power = -1.0f;
+        float solar_power = -1.0f;
+        float grid_import_power = -1.0f;
+        float grid_export_power = -1.0f;
+        float solar_home_power = -1.0f;
+        float solar_battery_power = -1.0f;
+        float solar_export_power = -1.0f;
+        float grid_battery_power = -1.0f;
+        float battery_home_power = -1.0f;
+        float battery_export_power = -1.0f;
+        float scenario_soc = -1.0f;
+        if (flow_state != nullptr && !flow_state->empty()) {
+          const char *FLOW_FORMAT =
+            "H=%f,S=%f,GI=%f,GE=%f,SH=%f,SB=%f,"
+            "SE=%f,GB=%f,BH=%f,BE=%f,SOC=%f";
+          const int parsed = sscanf(
+            flow_state->c_str(),
+            FLOW_FORMAT,
+            &house_power,
+            &solar_power,
+            &grid_import_power,
+            &grid_export_power,
+            &solar_home_power,
+            &solar_battery_power,
+            &solar_export_power,
+            &grid_battery_power,
+            &battery_home_power,
+            &battery_export_power,
+            &scenario_soc
+          );
+          if (parsed != 11) {
+            house_power = -1.0f;
+            solar_power = -1.0f;
+            grid_import_power = -1.0f;
+            grid_export_power = -1.0f;
+            solar_home_power = -1.0f;
+            solar_battery_power = -1.0f;
+            solar_export_power = -1.0f;
+            grid_battery_power = -1.0f;
+            battery_home_power = -1.0f;
+            battery_export_power = -1.0f;
+            scenario_soc = -1.0f;
+          }
+        }
+        battery_soc = scenario_soc >= 0.0f ? scenario_soc : NAN;
+        solar_producing =
+          solar_power > POWER_DEADBAND_KW;
+        solar_to_home_active =
+          solar_home_power > POWER_DEADBAND_KW;
+        grid_importing =
+          grid_import_power > POWER_DEADBAND_KW;
+        grid_exporting =
+          grid_export_power > POWER_DEADBAND_KW;
+        battery_charge_from_grid =
+          grid_battery_power > POWER_DEADBAND_KW;
+        battery_charge_from_solar =
+          solar_battery_power > POWER_DEADBAND_KW;
+        battery_charging =
+          battery_charge_from_grid ||
+          battery_charge_from_solar;
+        battery_discharging =
+          battery_home_power > POWER_DEADBAND_KW;
+        export_from_solar =
+          solar_export_power > POWER_DEADBAND_KW;
+        export_from_battery =
+          battery_export_power > POWER_DEADBAND_KW;
+      }
+      const bool solar_bus_active =
+        solar_producing ||
+        solar_to_home_active ||
+        battery_charge_from_solar ||
+        export_from_solar;
+      const bool source_grid_active = grid_importing;
+      const bool source_solar_active = solar_bus_active;
+      const bool source_battery_active = battery_discharging;
+      const bool ev_from_grid =
+        ev_charging && source_grid_active;
+      const bool ev_from_solar =
+        ev_charging && source_solar_active;
+      const bool ev_from_battery =
+        ev_charging && source_battery_active;
+      it.fill(OFF);
+      rect(2, 2, 5, 3, RAINBOW);     // GRID
+      rect(12, 2, 15, 3, RAINBOW);   // COST
+      rect(2, 12, 5, 13, RAINBOW);   // IMPORT
+      rect(12, 12, 15, 13, RAINBOW); // EXPORT
+      rect(7, 7, 10, 10, RAINBOW);
+      if (grid_available_for_display) {
+        rect(2, 4, 3, 5, GREEN);
+      } else {
+        rect(4, 4, 5, 5, RED);
+      }
+      if (!isnan(cost_today)) {
+        if (cost_today < 0.0f) {
+          rect(12, 4, 13, 5, GREEN);
+        } else if (cost_today > 0.0f) {
+          rect(14, 4, 15, 5, RED);
+        }
+      }
+      if (solar_bus_active) {
+        rect(7, 1, 10, 2, pulse(YELLOW));
+        flow_vertical(8, 3, 9, 6, YELLOW, YELLOW, +1);
+      }
+      if (grid_importing) {
+        rect(1, 7, 2, 10, pulse(BLUE));
+        flow_horizontal(3, 8, 6, 9, BLUE, BLUE, +1);
+      } else if (grid_exporting) {
+        rect(1, 7, 2, 10, pulse(BLUE));
+        if (export_from_solar && export_from_battery) {
+          flow_horizontal(3, 8, 6, 9, YELLOW, GREEN, -1);
+        } else if (export_from_solar) {
+          flow_horizontal(3, 8, 6, 9, YELLOW, YELLOW, -1);
+        } else if (export_from_battery) {
+          flow_horizontal(3, 8, 6, 9, GREEN, GREEN, -1);
+        } else {
+          flow_horizontal(3, 8, 6, 9, WHITE, WHITE, -1);
+        }
+      }
+      if (!isnan(battery_soc)) {
+        float soc = battery_soc;
+        if (soc < 0.0f) soc = 0.0f;
+        if (soc > 100.0f) soc = 100.0f;
+        if (soc < 10.0f) {
+          px(15, 10, pulse(RED));
+        } else if (soc < 20.0f) {
+          px(15, 10, ORANGE);
+          px(16, 10, pulse(GREEN));
+        } else if (soc < 30.0f) {
+          rect(15, 10, 16, 10, GREEN);
+          px(15, 9, pulse(GREEN));
+        } else if (soc < 40.0f) {
+          rect(15, 10, 16, 10, GREEN);
+          px(15, 9, GREEN);
+          px(16, 9, pulse(GREEN));
+        } else if (soc < 50.0f) {
+          rect(15, 9, 16, 10, GREEN);
+          px(15, 8, pulse(GREEN));
+        } else if (soc < 60.0f) {
+          rect(15, 9, 16, 10, GREEN);
+          px(15, 8, GREEN);
+          px(16, 8, pulse(GREEN));
+        } else if (soc < 70.0f) {
+          rect(15, 8, 16, 10, GREEN);
+          px(15, 7, pulse(GREEN));
+        } else if (soc < 80.0f) {
+          rect(15, 8, 16, 10, GREEN);
+          px(15, 7, GREEN);
+          px(16, 7, pulse(GREEN));
+        } else if (soc < 90.0f) {
+          rect(15, 7, 16, 8, GREEN);
+          rect(15, 9, 16, 10, pulse(GREEN));
+        } else if (soc < 100.0f) {
+          rect(15, 9, 16, 10, GREEN);
+          rect(15, 7, 16, 8, pulse(GREEN));
+        } else {
+          rect(15, 7, 16, 10, pulse(GREEN));
+        }
+      }
+      if (battery_charging) {
+        if (battery_charge_from_solar && battery_charge_from_grid) {
+          flow_horizontal(11, 8, 14, 9, YELLOW, BLUE, +1);
+        } else if (battery_charge_from_grid) {
+          flow_horizontal(11, 8, 14, 9, BLUE, BLUE, +1);
+        } else if (battery_charge_from_solar) {
+          flow_horizontal(11, 8, 14, 9, YELLOW, YELLOW, +1);
+        } else {
+          flow_horizontal(11, 8, 14, 9, WHITE, WHITE, +1);
+        }
+      } else if (battery_discharging) {
+        flow_horizontal(11, 8, 14, 9, GREEN, GREEN, -1);
+      }
+      if (ev_charging) {
+        rect(7, 15, 10, 16, pulse(MAGENTA));
+        if (ev_from_grid && ev_from_solar && ev_from_battery) {
+          flow_vertical_dual(
+            8, 11, 9, 14,
+            BLUE, GREEN,
+            YELLOW, YELLOW,
+            +1
+          );
+        } else if (ev_from_grid && ev_from_solar) {
+          flow_vertical(8, 11, 9, 14, BLUE, YELLOW, +1);
+        } else if (ev_from_solar && ev_from_battery) {
+          flow_vertical(8, 11, 9, 14, YELLOW, GREEN, +1);
+        } else if (ev_from_grid && ev_from_battery) {
+          flow_vertical(8, 11, 9, 14, BLUE, GREEN, +1);
+        } else if (ev_from_grid) {
+          flow_vertical(8, 11, 9, 14, BLUE, BLUE, +1);
+        } else if (ev_from_solar) {
+          flow_vertical(8, 11, 9, 14, YELLOW, YELLOW, +1);
+        } else if (ev_from_battery) {
+          flow_vertical(8, 11, 9, 14, GREEN, GREEN, +1);
+        } else {
+          flow_vertical(8, 11, 9, 14, MAGENTA, MAGENTA, +1);
+        }
+      } else if (ev_connected) {
+        rect(7, 15, 10, 16, MAGENTA);
+      }
+      if (grid_importing) {
+        rect(2, 14, 3, 15, GREEN);
+      } else {
+        rect(4, 14, 5, 15, RED);
+      }
+      if (grid_exporting) {
+        rect(12, 14, 13, 15, GREEN);
+      } else {
+        rect(14, 14, 15, 15, RED);
+      }

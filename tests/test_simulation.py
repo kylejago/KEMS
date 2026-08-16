@@ -373,6 +373,90 @@ def test_charge_before_midnight_carries_into_new_day_soc() -> None:
     assert result.simulated_battery_charge_kwh < 2.0
 
 
+def test_midnight_carry_uses_previous_simulated_soc_before_cheap_tail() -> None:
+    """Do not reset to configured SOC before replaying the cheap tail."""
+    start = datetime(2026, 8, 2, 22, 0, tzinfo=UTC)
+    cheap_start = datetime(2026, 8, 2, 23, 30, tzinfo=UTC)
+    midnight = datetime(2026, 8, 3, 0, 0, tzinfo=UTC)
+    records: list[Snapshot] = []
+    cursor = start
+    while cursor <= midnight + timedelta(minutes=10):
+        cheap = cursor >= cheap_start
+        records.append(
+            Snapshot(
+                timestamp=cursor,
+                current_import_rate=3.4933 if cheap else 28.3,
+                off_peak=cheap,
+                house_load_kw=7.0,
+                grid_import_kw=7.0,
+            )
+        )
+        cursor += timedelta(minutes=5)
+
+    result = SimulationEngine().simulate_today(
+        records,
+        midnight + timedelta(minutes=10),
+        SimulationConfig(
+            battery_capacity_kwh=56.42,
+            battery_initial_percent=50.0,
+            battery_reserve_percent=10.0,
+            max_charge_kw=7.0,
+            max_discharge_kw=7.0,
+            inverter_limit_kw=7.0,
+            export_limit_kw=7.0,
+            proposal_solar_enabled=False,
+            battery_export_enabled=False,
+            strategy="self_use",
+        ),
+        current_snapshot=records[-1],
+    )
+
+    # The previous day discharged from 50% before the 23:30 cheap window.
+    # The old shortcut incorrectly reset back to 50% at 23:30 and produced
+    # about 57.9%. Physical continuity leaves the battery around 38.3%.
+    assert result.simulated_battery_soc is not None
+    assert 38.1 <= result.simulated_battery_soc <= 38.5
+
+
+def test_midnight_carry_is_available_with_only_one_new_day_sample() -> None:
+    """Expose carried SOC immediately after midnight, before history fills."""
+    start = datetime(2026, 8, 2, 22, 30, tzinfo=UTC)
+    midnight = datetime(2026, 8, 3, 0, 0, tzinfo=UTC)
+    records: list[Snapshot] = []
+    cursor = start
+    while cursor <= midnight:
+        records.append(
+            Snapshot(
+                timestamp=cursor,
+                current_import_rate=3.4933,
+                off_peak=True,
+                house_load_kw=1.0,
+                grid_import_kw=1.0,
+            )
+        )
+        cursor += timedelta(minutes=5)
+
+    result = SimulationEngine().simulate_today(
+        records,
+        midnight,
+        SimulationConfig(
+            battery_capacity_kwh=56.42,
+            battery_initial_percent=10.0,
+            battery_reserve_percent=10.0,
+            max_charge_kw=7.0,
+            max_discharge_kw=7.0,
+            inverter_limit_kw=7.0,
+            export_limit_kw=7.0,
+            proposal_solar_enabled=False,
+        ),
+        current_snapshot=records[-1],
+    )
+
+    assert result.samples == 1
+    assert result.simulated_battery_soc is not None
+    assert result.simulated_battery_soc > 27.0
+
+
 def test_kh7_six_hour_cheap_window_does_not_assume_full_charge() -> None:
     """A KH7 cannot lift 56.42kWh from 10% to 100% in six hours at 7kW."""
     local = ZoneInfo("Europe/London")

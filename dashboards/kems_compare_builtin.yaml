@@ -8,7 +8,7 @@ views:
       - type: markdown
         content: |
           # What would today have looked like?
-          KEMS replays the **same retained house demand and tariff data** through six independent system designs. The first five are financial comparisons; Full Island Mode is a resilience replay and is excluded from cheapest-scenario ranking. Island Mode deliberately blocks EV charging and removes that energy from EPS demand, then shows both a **sudden outage** using the battery SOC KEMS actually carried into the period and a **prepared outage** where advance notice allows KEMS to pre-charge to the minimum energy-secure target plus a 5% safety margin. The comparison does not change the active KEMS operating strategy.
+          KEMS replays the **same retained house demand and tariff data** through seven independent system designs. The first six are financial comparisons; Full Island Mode is a resilience replay and is excluded from cheapest-scenario ranking. Island Mode deliberately blocks EV charging and removes that energy from EPS demand, then shows both a **sudden outage** using the battery SOC KEMS actually carried into the period and a **prepared outage** where advance notice allows KEMS to pre-charge to the minimum energy-secure target plus a 5% safety margin. The comparison does not change the active KEMS operating strategy.
 
       - type: grid
         columns: 3
@@ -35,6 +35,10 @@ views:
             name: Full KEMS
             icon: mdi:brain
           - type: tile
+            entity: sensor.kems_compare_full_kems_forecast_cost_today
+            name: Full KEMS Forecast
+            icon: mdi:weather-partly-cloudy
+          - type: tile
             entity: sensor.kems_compare_full_island_mode_today
             name: Full Island Mode
             icon: mdi:transmission-tower-off
@@ -53,6 +57,8 @@ views:
             name: KEMS no-export
           - entity: sensor.kems_compare_full_kems_cost_today
             name: Full KEMS
+          - entity: sensor.kems_compare_full_kems_forecast_cost_today
+            name: Full KEMS Forecast
 
       - type: markdown
         title: Energy and cost detail
@@ -62,13 +68,37 @@ views:
             ('Solar only', 'sensor.kems_compare_solar_only_cost_today'),
             ('Solar + battery', 'sensor.kems_compare_solar_and_battery_cost_today'),
             ('KEMS no-export', 'sensor.kems_compare_kems_no_export_cost_today'),
-            ('Full KEMS', 'sensor.kems_compare_full_kems_cost_today')
+            ('Full KEMS', 'sensor.kems_compare_full_kems_cost_today'),
+            ('Full KEMS Forecast', 'sensor.kems_compare_full_kems_forecast_cost_today')
           ] %}
           | Scenario | Total | Saving | Import | Export | Solar | Battery → home | End SOC |
           |---|---:|---:|---:|---:|---:|---:|---:|
           {% for label, entity in entities %}
           | {{ label }} | £{{ '%.2f' | format((states(entity)|float(0))/100) }} | £{{ '%.2f' | format((state_attr(entity, 'saving_vs_no_system_pence')|float(0))/100) }} | {{ state_attr(entity, 'grid_import_kwh')|float(0)|round(2) }} kWh | {{ state_attr(entity, 'grid_export_kwh')|float(0)|round(2) }} kWh | {{ state_attr(entity, 'solar_generation_kwh')|float(0)|round(2) }} kWh | {{ state_attr(entity, 'battery_to_home_kwh')|float(0)|round(2) }} kWh | {% if state_attr(entity, 'ending_soc_percent') is not none %}{{ state_attr(entity, 'ending_soc_percent') }}%{% else %}—{% endif %} |
           {% endfor %}
+
+      - type: entities
+        title: Full KEMS Forecast — profit-first protection
+        show_header_toggle: false
+        entities:
+          - entity: sensor.kems_full_kems_forecast_status
+            name: Forecast state
+          - entity: sensor.kems_forecast_solar_tomorrow
+            name: Fused solar tomorrow
+          - entity: sensor.kems_forecast_house_demand_tomorrow
+            name: Expected house demand tomorrow
+          - entity: sensor.kems_forecast_required_morning_soc
+            name: Required morning SOC
+          - entity: sensor.kems_forecast_maximum_overnight_soc
+            name: Maximum overnight SOC
+          - entity: sensor.kems_forecast_minimum_precheap_soc
+            name: Minimum pre-cheap SOC
+          - entity: sensor.kems_forecast_solar_recovery_target
+            name: Solar recovery target
+          - entity: sensor.kems_forecast_recharge_shortfall
+            name: Recharge shortfall
+          - entity: sensor.kems_forecast_additional_cheap_time_required
+            name: Additional cheap time required
 
       - type: markdown
         title: Full Island Mode — grid completely down

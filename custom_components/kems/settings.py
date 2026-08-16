@@ -29,6 +29,13 @@ from .const import (
     CONF_EXPORT_LIMIT,
     CONF_EXPORT_RATE,
     CONF_EXPORT_TARIFF_STATUS,
+    CONF_FORECAST_ENABLED,
+    CONF_FORECAST_OPEN_METEO_ENABLED,
+    CONF_FORECAST_OPEN_METEO_REFRESH_MINUTES,
+    CONF_FORECAST_PERFORMANCE_RATIO,
+    CONF_FORECAST_RECOVERY_MARGIN_KWH,
+    CONF_FORECAST_RESERVE_SAFETY_MARGIN_PERCENT,
+    CONF_FORECAST_WATCH_MARGIN_KWH,
     CONF_GAS_KWH_PER_M3,
     CONF_GRANTS_REBATES,
     CONF_GRID_STABILITY_SECONDS,
@@ -59,7 +66,7 @@ from .const import (
     CONF_VIRTUAL_SCENARIO,
     DEFAULT_OPTIONS,
 )
-from .kems_core import ControlConfig, ROIConfig, SimulationConfig
+from .kems_core import ControlConfig, ForecastConfig, ROIConfig, SimulationConfig
 from .tariff import TariffSettings, parse_time
 
 
@@ -72,6 +79,7 @@ class KEMSSettings:
     gas_kwh_per_m3: float
     tariff: TariffSettings
     simulation: SimulationConfig
+    forecast: ForecastConfig
     roi: ROIConfig
     control: ControlConfig
 
@@ -153,6 +161,25 @@ class KEMSSettings:
                     "self_use"
                     if str(values[CONF_SIMULATION_STRATEGY]) == "self_use"
                     else "paced_export"
+                ),
+            ),
+            forecast=ForecastConfig(
+                enabled=bool(values[CONF_FORECAST_ENABLED]),
+                open_meteo_enabled=bool(values[CONF_FORECAST_OPEN_METEO_ENABLED]),
+                open_meteo_refresh_minutes=max(
+                    int(values[CONF_FORECAST_OPEN_METEO_REFRESH_MINUTES]), 15
+                ),
+                performance_ratio=min(
+                    max(float(values[CONF_FORECAST_PERFORMANCE_RATIO]), 0.1), 1.2
+                ),
+                reserve_safety_margin_percent=max(
+                    float(values[CONF_FORECAST_RESERVE_SAFETY_MARGIN_PERCENT]), 0.0
+                ),
+                watch_margin_kwh=max(
+                    float(values[CONF_FORECAST_WATCH_MARGIN_KWH]), 0.0
+                ),
+                recovery_margin_kwh=max(
+                    float(values[CONF_FORECAST_RECOVERY_MARGIN_KWH]), 0.0
                 ),
             ),
             roi=ROIConfig(

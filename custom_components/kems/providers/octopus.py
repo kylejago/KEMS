@@ -15,6 +15,7 @@ DEFAULT_INTELLIGENT_STALE_DATA_SECONDS = 360
 INTELLIGENT_SOURCE_FIELDS = frozenset(
     {"intelligent_slot", "next_offpeak_start", "offpeak_end"}
 )
+OPTIONAL_TIMESTAMP_FIELDS = frozenset({"next_offpeak_start", "offpeak_end"})
 
 
 @dataclass(frozen=True, slots=True)
@@ -61,6 +62,15 @@ class OctopusProvider(HomeAssistantStateReader):
         stale: set[str] = set()
 
         def age_for(logical_name: str, entity_id: str | None) -> float | None:
+            # Intelligent schedule integrations legitimately publish unknown for
+            # next-start/end timestamps when that boundary is not currently
+            # applicable. Absence is not the same thing as a stale positive
+            # signal, so do not turn an old `unknown` timestamp into a warning.
+            if (
+                logical_name in OPTIONAL_TIMESTAMP_FIELDS
+                and self._datetime(entity_id) is None
+            ):
+                return None
             age = self._report_age_seconds(entity_id, reference)
             if age is not None:
                 ages[logical_name] = round(age, 1)

@@ -43,10 +43,41 @@ class PowerDownHistoryRecorder:
         data = await self._store.async_load()
         if not data:
             return
-        self._last = PowerDownResult.from_dict(data.get("last_result", {}))
+        self._last = self._normalise_legacy_result(
+            PowerDownResult.from_dict(data.get("last_result", {}))
+        )
         pending = data.get("pending")
         if isinstance(pending, dict):
             self._pending = dict(pending)
+
+    @staticmethod
+    def _normalise_legacy_result(result: PowerDownResult) -> PowerDownResult:
+        """Upgrade old zero-sample failures to an evidence-safe result.
+
+        Earlier Alpha 7 builds could persist a failed Power Down result even
+        when KEMS had not observed a single active-session controller sample.
+        Keep the useful session/financial history, but make the safety outcome
+        explicitly inconclusive on load.
+        """
+        if not result.available or result.active_samples_observed > 0:
+            return result
+        if result.completion_reason not in {
+            "session_activity_not_observed",
+            "plan_or_ev_safety_check_failed",
+            "insufficient_active_samples",
+        }:
+            return result
+        values = result.to_dict()
+        values.update(
+            {
+                "ev_successfully_blocked": None,
+                "plan_safe_throughout": None,
+                "island_override_observed": None,
+                "completed_successfully": None,
+                "completion_reason": "insufficient_active_samples",
+            }
+        )
+        return PowerDownResult.from_dict(values)
 
     async def async_update(
         self,
@@ -197,14 +228,25 @@ class PowerDownHistoryRecorder:
                     ),
                 )
                 completed, reason = finalise_power_down_audit(audit)
+                evidence_available = completed is not None
                 self._last = PowerDownResult.from_dict(
                     {
                         **self._pending,
                         "available": True,
                         "active_samples_observed": audit.active_samples_observed,
-                        "ev_successfully_blocked": audit.ev_successfully_blocked,
-                        "plan_safe_throughout": audit.plan_safe_throughout,
-                        "island_override_observed": audit.island_override_observed,
+                        "ev_successfully_blocked": (
+                            audit.ev_successfully_blocked
+                            if evidence_available
+                            else None
+                        ),
+                        "plan_safe_throughout": (
+                            audit.plan_safe_throughout if evidence_available else None
+                        ),
+                        "island_override_observed": (
+                            audit.island_override_observed
+                            if evidence_available
+                            else None
+                        ),
                         "completed_successfully": completed,
                         "completion_reason": reason,
                     }

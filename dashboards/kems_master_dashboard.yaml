@@ -1,0 +1,1149 @@
+title: KEMS Master Dashboard
+
+views:
+  - title: Overview
+    path: overview
+    icon: mdi:home-lightning-bolt
+    cards:
+      - type: markdown
+        content: |
+          # ⚡ KEMS
+          **Status:** {{ states('sensor.kems_status') }}  
+          **Phase:** {{ states('sensor.kems_phase') }}  
+          **Advice:** **{{ states('sensor.kems_advice') }}**
+
+          {{ state_attr('sensor.kems_advice', 'message') or 'KEMS is analysing your home-energy data.' }}
+      - type: grid
+        columns: 4
+        square: false
+        cards:
+          - type: tile
+            entity: sensor.kems_current_import_rate
+            name: Import rate
+          - type: tile
+            entity: sensor.kems_next_import_rate
+            name: Next rate
+          - type: tile
+            entity: binary_sensor.kems_cheap_period_confirmed
+            name: Cheap period
+          - type: tile
+            entity: sensor.kems_full_kems_forecast_status
+            name: Forecast plan
+      - type: grid
+        columns: 4
+        square: false
+        cards:
+          - type: tile
+            entity: sensor.kems_house_load
+            name: House load
+          - type: tile
+            entity: sensor.kems_grid_net_power
+            name: Grid net
+          - type: tile
+            entity: sensor.kems_simulated_battery_state_of_charge
+            name: Sim battery SOC
+          - type: tile
+            entity: sensor.kems_ev_state_of_charge
+            name: EV SOC
+      - type: grid
+        columns: 3
+        square: false
+        cards:
+          - type: tile
+            entity: sensor.kems_observed_cost_today
+            name: Observed electricity
+          - type: tile
+            entity: sensor.kems_simulated_kems_cost_today
+            name: Simulated KEMS
+          - type: tile
+            entity: sensor.kems_simulated_saving_today
+            name: Simulated saving
+      - type: markdown
+        title: Forecast headline
+        content: |
+          **State:** {{ states('sensor.kems_full_kems_forecast_status') }}  
+          **Solar tomorrow:** {{ states('sensor.kems_forecast_solar_tomorrow') }} kWh  
+          **House tomorrow:** {{ states('sensor.kems_forecast_house_demand_tomorrow') }} kWh  
+          **Required morning SOC:** {{ states('sensor.kems_forecast_required_morning_soc') }}%  
+          **Forecast-validation evidence:** {{ states('sensor.kems_forecast_validation_days') }} day(s)
+
+  - title: Live Energy
+    path: live-energy
+    icon: mdi:flash
+    cards:
+      - type: markdown
+        content: |
+          # Live / observed home
+          Optional live solar and battery values remain unavailable until the physical system is commissioned.
+      - type: grid
+        columns: 4
+        square: false
+        cards:
+          - type: tile
+            entity: sensor.kems_house_load
+          - type: tile
+            entity: sensor.kems_grid_import
+          - type: tile
+            entity: sensor.kems_grid_export
+          - type: tile
+            entity: sensor.kems_grid_flow_direction
+      - type: markdown
+        title: Optional live hardware
+        content: |
+          | Reading | Value |
+          |---|---:|
+          | Solar | {{ states('sensor.kems_solar_power') }} kW |
+          | Battery SOC | {{ states('sensor.kems_battery_state_of_charge') }}% |
+          | Battery power | {{ states('sensor.kems_battery_power') }} kW |
+          | Battery data available | {{ states('binary_sensor.kems_battery_data_available') }} |
+      - type: history-graph
+        title: Live power — 24 hours
+        hours_to_show: 24
+        entities:
+          - sensor.kems_house_load
+          - sensor.kems_grid_import
+          - sensor.kems_grid_net_power
+          - sensor.kems_ev_charging_power
+      - type: entities
+        title: Observed today
+        show_header_toggle: false
+        entities:
+          - sensor.kems_observed_grid_import_today
+          - sensor.kems_observed_grid_export_today
+          - sensor.kems_observed_export_income_today
+          - sensor.kems_observed_cost_today
+          - sensor.kems_whole_home_energy_today
+          - sensor.kems_whole_home_observed_cost_today
+
+  - title: Simulation
+    path: simulation
+    icon: mdi:calculator-variant
+    cards:
+      - type: grid
+        columns: 4
+        square: false
+        cards:
+          - type: tile
+            entity: sensor.kems_simulated_house_load_power
+          - type: tile
+            entity: sensor.kems_simulated_solar_power
+          - type: tile
+            entity: sensor.kems_simulated_grid_net_power
+          - type: tile
+            entity: sensor.kems_simulated_battery_power
+      - type: grid
+        columns: 4
+        square: false
+        cards:
+          - type: tile
+            entity: sensor.kems_simulated_battery_state_of_charge
+          - type: tile
+            entity: sensor.kems_simulated_battery_charging_power
+          - type: tile
+            entity: sensor.kems_simulated_battery_to_home_power
+          - type: tile
+            entity: sensor.kems_simulated_battery_export_power
+      - type: history-graph
+        title: Simulated power — 24 hours
+        hours_to_show: 24
+        entities:
+          - sensor.kems_simulated_house_load_power
+          - sensor.kems_simulated_solar_power
+          - sensor.kems_simulated_grid_net_power
+          - sensor.kems_simulated_battery_power
+      - type: grid
+        columns: 2
+        square: false
+        cards:
+          - type: entities
+            title: Energy today
+            entities:
+              - sensor.kems_simulated_grid_import_today
+              - sensor.kems_simulated_grid_export_today
+              - sensor.kems_simulated_solar_generation_today
+              - sensor.kems_simulated_solar_curtailed_today
+              - sensor.kems_simulated_battery_charged_today
+              - sensor.kems_simulated_battery_to_home_today
+              - sensor.kems_simulated_battery_export_today
+              - sensor.kems_avoided_day_rate_import_today
+          - type: entities
+            title: Paced export / reserve
+            entities:
+              - sensor.kems_target_battery_export_power
+              - sensor.kems_exportable_battery_energy_remaining
+              - sensor.kems_battery_energy_reserved_for_home
+              - sensor.kems_home_reserve_forecast_source
+              - sensor.kems_hours_until_next_cheap_period
+              - sensor.kems_projected_soc_at_cheap_period_start
+              - sensor.kems_projected_grid_import_before_cheap_period
+              - binary_sensor.kems_battery_export_paused_for_home_reserve
+
+  - title: Forecast
+    path: forecast
+    icon: mdi:weather-partly-cloudy
+    cards:
+      - type: grid
+        columns: 4
+        square: false
+        cards:
+          - type: tile
+            entity: sensor.kems_full_kems_forecast_status
+          - type: tile
+            entity: sensor.kems_forecast_solar_tomorrow
+          - type: tile
+            entity: sensor.kems_forecast_house_demand_tomorrow
+          - type: tile
+            entity: sensor.kems_forecast_required_morning_soc
+      - type: grid
+        columns: 4
+        square: false
+        cards:
+          - type: tile
+            entity: sensor.kems_forecast_maximum_overnight_soc
+          - type: tile
+            entity: sensor.kems_forecast_minimum_pre_cheap_soc
+          - type: tile
+            entity: sensor.kems_forecast_recharge_shortfall
+          - type: tile
+            entity: sensor.kems_forecast_additional_cheap_time_required
+      - type: markdown
+        title: Planning explanation
+        content: |
+          {% set e = 'sensor.kems_full_kems_forecast_status' %}
+          **State:** {{ states(e) }}  
+          **Reason:** {{ state_attr(e, 'reason') or '—' }}  
+          **Source:** {{ state_attr(e, 'forecast_source') or '—' }}  
+          **Confidence:** {{ state_attr(e, 'confidence_percent') or '—' }}%  
+          **Projected minimum SOC tomorrow:** {{ state_attr(e, 'projected_minimum_soc_tomorrow_percent') or '—' }}%  
+          **Predicted day-rate import:** {{ state_attr(e, 'predicted_day_rate_import_kwh') or 0 }} kWh
+      - type: grid
+        columns: 4
+        square: false
+        cards:
+          - type: tile
+            entity: sensor.kems_forecast_validation_status
+          - type: tile
+            entity: sensor.kems_forecast_validation_days
+          - type: tile
+            entity: sensor.kems_forecast_validation_confidence
+          - type: tile
+            entity: sensor.kems_forecast_validation_best_solar_source
+      - type: grid
+        columns: 4
+        square: false
+        cards:
+          - type: tile
+            entity: sensor.kems_forecast_validation_forecast_solar_mae
+            name: Forecast.Solar MAE
+          - type: tile
+            entity: sensor.kems_forecast_validation_open_meteo_mae
+            name: Open-Meteo MAE
+          - type: tile
+            entity: sensor.kems_forecast_validation_fused_solar_mae
+            name: Fused solar MAE
+          - type: tile
+            entity: sensor.kems_forecast_validation_house_mae
+            name: House MAE
+      - type: entities
+        title: Validation evidence
+        entities:
+          - sensor.kems_forecast_validation_status
+          - sensor.kems_forecast_validation_solar_days
+          - sensor.kems_forecast_validation_house_days
+          - sensor.kems_forecast_validation_correction_factor
+
+  - title: Full KEMS Forecast
+    path: full-kems-forecast
+    icon: mdi:weather-sunny-alert
+    cards:
+      - type: markdown
+        content: |
+          # Full KEMS Forecast
+          This is the forward-looking KEMS strategy intended for normal use once paid export is active. It keeps the profit-first Full KEMS behaviour, but only retains battery energy or solar when the forward model predicts that doing so is necessary to avoid otherwise unnecessary day-rate import.
+
+          **Plan state:** **{{ states('sensor.kems_full_kems_forecast_status') }}**  
+          **Reason:** {{ state_attr('sensor.kems_full_kems_forecast_status', 'reason') or '—' }}  
+          **Forecast source:** {{ state_attr('sensor.kems_full_kems_forecast_status', 'forecast_source') or '—' }}  
+          **Confidence:** {{ state_attr('sensor.kems_full_kems_forecast_status', 'confidence_percent') or '—' }}%  
+          **Export tariff:** {{ states('sensor.kems_export_tariff_status') }}
+
+      - type: grid
+        columns: 4
+        square: false
+        cards:
+          - type: tile
+            entity: sensor.kems_full_kems_forecast_status
+            name: Plan state
+          - type: tile
+            entity: sensor.kems_compare_full_kems_forecast_cost_today
+            name: Forecast cost today
+          - type: tile
+            entity: sensor.kems_forecast_required_morning_soc
+            name: Required morning SOC
+          - type: tile
+            entity: sensor.kems_forecast_solar_recovery_target
+            name: Solar recovery target
+
+      - type: grid
+        columns: 4
+        square: false
+        cards:
+          - type: tile
+            entity: sensor.kems_forecast_solar_tomorrow
+            name: Solar tomorrow
+          - type: tile
+            entity: sensor.kems_forecast_house_demand_tomorrow
+            name: House tomorrow
+          - type: tile
+            entity: sensor.kems_forecast_maximum_overnight_soc
+            name: Maximum overnight SOC
+          - type: tile
+            entity: sensor.kems_forecast_minimum_pre_cheap_soc
+            name: Minimum pre-cheap SOC
+
+      - type: markdown
+        title: Current Full KEMS Forecast power routing
+        content: |
+          {% set e = 'sensor.kems_compare_full_kems_forecast_cost_today' %}
+          | Flow | Power |
+          |---|---:|
+          | House demand | {{ state_attr(e, 'current_house_load_kw') if state_attr(e, 'current_house_load_kw') is not none else '—' }} kW |
+          | Solar generation | {{ state_attr(e, 'current_solar_power_kw') if state_attr(e, 'current_solar_power_kw') is not none else '—' }} kW |
+          | Grid import | {{ state_attr(e, 'current_grid_import_kw') if state_attr(e, 'current_grid_import_kw') is not none else '—' }} kW |
+          | Grid export | {{ state_attr(e, 'current_grid_export_kw') if state_attr(e, 'current_grid_export_kw') is not none else '—' }} kW |
+          | Solar → home | {{ state_attr(e, 'current_solar_to_home_kw') if state_attr(e, 'current_solar_to_home_kw') is not none else '—' }} kW |
+          | Solar → battery | {{ state_attr(e, 'current_solar_to_battery_kw') if state_attr(e, 'current_solar_to_battery_kw') is not none else '—' }} kW |
+          | Solar → export | {{ state_attr(e, 'current_solar_export_kw') if state_attr(e, 'current_solar_export_kw') is not none else '—' }} kW |
+          | Grid → battery | {{ state_attr(e, 'current_grid_to_battery_kw') if state_attr(e, 'current_grid_to_battery_kw') is not none else '—' }} kW |
+          | Battery → home | {{ state_attr(e, 'current_battery_to_home_kw') if state_attr(e, 'current_battery_to_home_kw') is not none else '—' }} kW |
+          | Battery → export | {{ state_attr(e, 'current_battery_export_kw') if state_attr(e, 'current_battery_export_kw') is not none else '—' }} kW |
+          | Scenario battery SOC | {{ state_attr(e, 'current_battery_soc_percent') if state_attr(e, 'current_battery_soc_percent') is not none else '—' }}% |
+
+      - type: history-graph
+        title: Cost in action — 24 hours
+        hours_to_show: 24
+        entities:
+          - sensor.kems_observed_cost_today
+          - sensor.kems_compare_no_system_cost_today
+          - sensor.kems_compare_full_kems_cost_today
+          - sensor.kems_compare_full_kems_forecast_cost_today
+
+      - type: history-graph
+        title: Forecast plan evolution — 24 hours
+        hours_to_show: 24
+        entities:
+          - sensor.kems_forecast_solar_tomorrow
+          - sensor.kems_forecast_house_demand_tomorrow
+          - sensor.kems_forecast_required_morning_soc
+          - sensor.kems_forecast_maximum_overnight_soc
+          - sensor.kems_forecast_minimum_pre_cheap_soc
+          - sensor.kems_forecast_solar_recovery_target
+
+      - type: grid
+        columns: 2
+        square: false
+        cards:
+          - type: markdown
+            title: Recharge & reserve decision
+            content: |
+              {% set e = 'sensor.kems_full_kems_forecast_status' %}
+              | Decision | Value |
+              |---|---:|
+              | Expected solar remaining today | {{ state_attr(e, 'expected_solar_remaining_today_kwh') if state_attr(e, 'expected_solar_remaining_today_kwh') is not none else '—' }} kWh |
+              | Expected solar tomorrow | {{ state_attr(e, 'expected_solar_tomorrow_kwh') if state_attr(e, 'expected_solar_tomorrow_kwh') is not none else '—' }} kWh |
+              | Expected house remaining today | {{ state_attr(e, 'expected_house_remaining_today_kwh') if state_attr(e, 'expected_house_remaining_today_kwh') is not none else '—' }} kWh |
+              | Expected house tomorrow | {{ state_attr(e, 'expected_house_tomorrow_kwh') if state_attr(e, 'expected_house_tomorrow_kwh') is not none else '—' }} kWh |
+              | Projected SOC at cheap start | {{ state_attr(e, 'projected_soc_at_cheap_start_percent') if state_attr(e, 'projected_soc_at_cheap_start_percent') is not none else '—' }}% |
+              | Cheap window | {{ state_attr(e, 'cheap_window_hours') if state_attr(e, 'cheap_window_hours') is not none else '—' }} h |
+              | Overnight charge capacity | {{ state_attr(e, 'overnight_charge_capacity_kwh') if state_attr(e, 'overnight_charge_capacity_kwh') is not none else '—' }} kWh |
+              | Maximum overnight SOC | {{ state_attr(e, 'maximum_overnight_soc_percent') if state_attr(e, 'maximum_overnight_soc_percent') is not none else '—' }}% |
+              | Full charge feasible | {{ state_attr(e, 'full_charge_feasible') if state_attr(e, 'full_charge_feasible') is not none else '—' }} |
+              | Extra cheap time to 100% | {{ state_attr(e, 'additional_cheap_time_to_full_hours') if state_attr(e, 'additional_cheap_time_to_full_hours') is not none else '—' }} h |
+              | Required morning SOC | {{ state_attr(e, 'required_morning_soc_percent') if state_attr(e, 'required_morning_soc_percent') is not none else '—' }}% |
+              | Recharge target feasible | {{ state_attr(e, 'recharge_target_feasible') if state_attr(e, 'recharge_target_feasible') is not none else '—' }} |
+              | Recharge shortfall | {{ state_attr(e, 'recharge_shortfall_kwh') if state_attr(e, 'recharge_shortfall_kwh') is not none else '—' }} kWh |
+              | Extra cheap time required | {{ state_attr(e, 'additional_cheap_time_required_hours') if state_attr(e, 'additional_cheap_time_required_hours') is not none else '—' }} h |
+              | Minimum pre-cheap SOC | {{ state_attr(e, 'minimum_precheap_soc_percent') if state_attr(e, 'minimum_precheap_soc_percent') is not none else '—' }}% |
+              | Solar recovery target | {{ state_attr(e, 'solar_recovery_target_percent') if state_attr(e, 'solar_recovery_target_percent') is not none else '—' }}% |
+              | Projected minimum SOC tomorrow | {{ state_attr(e, 'projected_minimum_soc_tomorrow_percent') if state_attr(e, 'projected_minimum_soc_tomorrow_percent') is not none else '—' }}% |
+              | Predicted day-rate import | {{ state_attr(e, 'predicted_day_rate_import_kwh') if state_attr(e, 'predicted_day_rate_import_kwh') is not none else '—' }} kWh |
+              | Battery retention required | {{ state_attr(e, 'battery_retention_required') }} |
+              | Solar recovery required | {{ state_attr(e, 'solar_recovery_required') }} |
+          - type: markdown
+            title: Forecast providers
+            content: |
+              {% set e = 'sensor.kems_full_kems_forecast_status' %}
+              {% set f = state_attr(e, 'forecast') or {} %}
+              | Forecast | Value |
+              |---|---:|
+              | Ready | {{ f.get('ready', '—') }} |
+              | Source | {{ f.get('source', '—') }} |
+              | Forecast.Solar available | {{ f.get('forecast_solar_available', '—') }} |
+              | Forecast.Solar entities | {{ f.get('forecast_solar_entity_count', '—') }} |
+              | Forecast.Solar remaining today | {{ f.get('forecast_solar_remaining_today_kwh', '—') }} kWh |
+              | Forecast.Solar tomorrow | {{ f.get('forecast_solar_tomorrow_kwh', '—') }} kWh |
+              | Open-Meteo available | {{ f.get('open_meteo_available', '—') }} |
+              | Open-Meteo remaining today | {{ f.get('open_meteo_remaining_today_kwh', '—') }} kWh |
+              | Open-Meteo tomorrow | {{ f.get('open_meteo_tomorrow_kwh', '—') }} kWh |
+              | Fused remaining today | {{ f.get('expected_solar_remaining_today_kwh', '—') }} kWh |
+              | Fused tomorrow | {{ f.get('expected_solar_tomorrow_kwh', '—') }} kWh |
+              | Provider agreement | {{ f.get('agreement_percent', '—') }}% |
+              | Forecast confidence | {{ f.get('confidence_percent', '—') }}% |
+              | Cloud tomorrow | {{ f.get('average_cloud_cover_tomorrow_percent', '—') }}% |
+              | Precipitation tomorrow | {{ f.get('precipitation_tomorrow_mm', '—') }} mm |
+              | Last updated | {{ f.get('last_updated', '—') }} |
+              | Error | {{ f.get('error') or 'None' }} |
+
+      - type: markdown
+        title: Hourly fused solar / weather outlook
+        content: |
+          {% set f = state_attr('sensor.kems_full_kems_forecast_status', 'forecast') or {} %}
+          {% set hours = f.get('hourly', []) %}
+          {% if hours %}
+          | Time | Solar | Cloud | Precipitation |
+          |---|---:|---:|---:|
+          {% for h in hours %}
+          | {{ h.get('timestamp', '—') }} | {{ h.get('solar_energy_kwh', '—') }} kWh | {{ h.get('cloud_cover_percent', '—') }}% | {{ h.get('precipitation_mm', '—') }} mm |
+          {% endfor %}
+          {% else %}
+          No hourly fused forecast is available yet.
+          {% endif %}
+
+      - type: grid
+        columns: 2
+        square: false
+        cards:
+          - type: markdown
+            title: Scenario finances today
+            content: |
+              {% set e = 'sensor.kems_compare_full_kems_forecast_cost_today' %}
+              | Financial result | Value |
+              |---|---:|
+              | Ready | {{ state_attr(e, 'ready') }} |
+              | Samples | {{ state_attr(e, 'samples') }} |
+              | Data coverage | {{ state_attr(e, 'data_coverage') }}% |
+              | Import cost | {{ state_attr(e, 'import_cost_pence') }} p |
+              | Cheap import cost | {{ state_attr(e, 'cheap_import_cost_pence') }} p |
+              | Day import cost | {{ state_attr(e, 'day_import_cost_pence') }} p |
+              | Export income | {{ state_attr(e, 'export_income_pence') }} p |
+              | Power Down income | {{ state_attr(e, 'power_down_income_pence') }} p |
+              | Standing charge | {{ state_attr(e, 'standing_charge_pence') }} p |
+              | Energy net cost | {{ state_attr(e, 'energy_net_cost_pence') }} p |
+              | Total cost | {{ state_attr(e, 'total_cost_pence') }} p |
+              | Saving vs no system | {{ state_attr(e, 'saving_vs_no_system_pence') }} p |
+              | Day-rate import reduction value | {{ state_attr(e, 'day_rate_import_reduction_pence') }} p |
+              | Cheap-rate import change | {{ state_attr(e, 'cheap_rate_import_change_pence') }} p |
+          - type: markdown
+            title: Scenario energy today
+            content: |
+              {% set e = 'sensor.kems_compare_full_kems_forecast_cost_today' %}
+              | Energy result | Value |
+              |---|---:|
+              | House consumption | {{ state_attr(e, 'house_consumption_kwh') }} kWh |
+              | Grid import | {{ state_attr(e, 'grid_import_kwh') }} kWh |
+              | Cheap grid import | {{ state_attr(e, 'cheap_grid_import_kwh') }} kWh |
+              | Day grid import | {{ state_attr(e, 'day_grid_import_kwh') }} kWh |
+              | Grid export | {{ state_attr(e, 'grid_export_kwh') }} kWh |
+              | Solar generation | {{ state_attr(e, 'solar_generation_kwh') }} kWh |
+              | Solar → home | {{ state_attr(e, 'solar_to_home_kwh') }} kWh |
+              | Solar → battery | {{ state_attr(e, 'solar_to_battery_kwh') }} kWh |
+              | Solar → export | {{ state_attr(e, 'solar_export_kwh') }} kWh |
+              | Solar curtailed | {{ state_attr(e, 'solar_curtailed_kwh') }} kWh |
+              | Battery charged | {{ state_attr(e, 'battery_charge_kwh') }} kWh |
+              | Battery grid charge | {{ state_attr(e, 'battery_grid_charge_kwh') }} kWh |
+              | Battery solar charge | {{ state_attr(e, 'battery_solar_charge_kwh') }} kWh |
+              | Battery → home | {{ state_attr(e, 'battery_to_home_kwh') }} kWh |
+              | Battery → export | {{ state_attr(e, 'battery_export_kwh') }} kWh |
+              | Ending SOC | {{ state_attr(e, 'ending_soc_percent') }}% |
+
+      - type: markdown
+        title: Forecast protection audit inside the scenario
+        content: |
+          {% set e = 'sensor.kems_compare_full_kems_forecast_cost_today' %}
+          | Audit field | Value |
+          |---|---:|
+          | Forecast-bearing samples | {{ state_attr(e, 'forecast_samples') }} |
+          | Protection state | {{ state_attr(e, 'forecast_protection_state') or '—' }} |
+          | Required morning SOC | {{ state_attr(e, 'forecast_required_morning_soc_percent') if state_attr(e, 'forecast_required_morning_soc_percent') is not none else '—' }}% |
+          | Minimum pre-cheap SOC | {{ state_attr(e, 'forecast_minimum_precheap_soc_percent') if state_attr(e, 'forecast_minimum_precheap_soc_percent') is not none else '—' }}% |
+          | Solar recovery target | {{ state_attr(e, 'forecast_solar_recovery_target_percent') if state_attr(e, 'forecast_solar_recovery_target_percent') is not none else '—' }}% |
+          | Recharge target feasible | {{ state_attr(e, 'forecast_recharge_target_feasible') if state_attr(e, 'forecast_recharge_target_feasible') is not none else '—' }} |
+          | Recharge shortfall | {{ state_attr(e, 'forecast_recharge_shortfall_kwh') if state_attr(e, 'forecast_recharge_shortfall_kwh') is not none else '—' }} kWh |
+
+      - type: grid
+        columns: 4
+        square: false
+        cards:
+          - type: tile
+            entity: sensor.kems_forecast_validation_status
+          - type: tile
+            entity: sensor.kems_forecast_validation_days
+          - type: tile
+            entity: sensor.kems_forecast_validation_confidence
+          - type: tile
+            entity: sensor.kems_forecast_validation_best_solar_source
+
+      - type: markdown
+        title: Complete plan attributes
+        content: |
+          {% set e = states('sensor.kems_full_kems_forecast_status') %}
+          {% set attrs = states.sensor.kems_full_kems_forecast_status.attributes if states.sensor.kems_full_kems_forecast_status is defined else {} %}
+          | Attribute | Value |
+          |---|---|
+          {% for key, value in attrs.items() | sort %}
+          {% if key not in ['forecast', 'friendly_name', 'icon'] %}
+          | `{{ key }}` | {{ value }} |
+          {% endif %}
+          {% endfor %}
+
+      - type: markdown
+        title: Complete Full KEMS Forecast scenario attributes
+        content: |
+          {% set attrs = states.sensor.kems_compare_full_kems_forecast_cost_today.attributes if states.sensor.kems_compare_full_kems_forecast_cost_today is defined else {} %}
+          | Attribute | Value |
+          |---|---|
+          {% for key, value in attrs.items() | sort %}
+          {% if key not in ['friendly_name', 'icon', 'unit_of_measurement'] %}
+          | `{{ key }}` | {{ value }} |
+          {% endif %}
+          {% endfor %}
+
+  - title: Compare
+    path: compare
+    icon: mdi:compare-horizontal
+    cards:
+      - type: grid
+        columns: 3
+        square: false
+        cards:
+          - type: tile
+            entity: sensor.kems_compare_no_system_cost_today
+          - type: tile
+            entity: sensor.kems_compare_solar_only_cost_today
+          - type: tile
+            entity: sensor.kems_compare_solar_and_battery_cost_today
+          - type: tile
+            entity: sensor.kems_compare_kems_no_export_cost_today
+          - type: tile
+            entity: sensor.kems_compare_full_kems_cost_today
+          - type: tile
+            entity: sensor.kems_compare_full_kems_forecast_cost_today
+      - type: history-graph
+        title: Scenario cost today
+        hours_to_show: 24
+        entities:
+          - sensor.kems_compare_no_system_cost_today
+          - sensor.kems_compare_solar_only_cost_today
+          - sensor.kems_compare_solar_and_battery_cost_today
+          - sensor.kems_compare_kems_no_export_cost_today
+          - sensor.kems_compare_full_kems_cost_today
+          - sensor.kems_compare_full_kems_forecast_cost_today
+      - type: grid
+        columns: 4
+        square: false
+        cards:
+          - type: tile
+            entity: sensor.kems_scenario_comparison_today
+          - type: tile
+            entity: sensor.kems_scenario_comparison_yesterday
+          - type: tile
+            entity: sensor.kems_scenario_comparison_7_days
+          - type: tile
+            entity: sensor.kems_scenario_comparison_30_days
+      - type: entities
+        title: Full island mode
+        entities:
+          - sensor.kems_compare_full_island_mode_today
+          - sensor.kems_compare_full_island_load_served_today
+          - sensor.kems_compare_full_island_eps_demand_today
+          - sensor.kems_compare_full_island_ev_energy_shed_today
+          - sensor.kems_compare_full_island_unserved_energy_today
+          - sensor.kems_compare_full_island_ending_soc_today
+          - sensor.kems_compare_full_island_prepared_status_today
+          - sensor.kems_compare_full_island_required_starting_soc_today
+          - sensor.kems_compare_full_island_prepared_target_soc_today
+          - sensor.kems_compare_full_island_prepared_load_served_today
+          - sensor.kems_compare_full_island_prepared_unserved_energy_today
+
+  - title: Battery & Solar
+    path: battery-solar
+    icon: mdi:solar-power
+    cards:
+      - type: markdown
+        title: Live hardware
+        content: |
+          **Solar:** {{ states('sensor.kems_solar_power') }} kW  
+          **Battery SOC:** {{ states('sensor.kems_battery_state_of_charge') }}%  
+          **Battery power:** {{ states('sensor.kems_battery_power') }} kW
+      - type: entities
+        title: Proposal solar
+        entities:
+          - sensor.kems_system_profile
+          - sensor.kems_proposal_solar_target_today
+          - sensor.kems_simulated_solar_generation_today
+          - sensor.kems_simulated_solar_curtailed_today
+          - binary_sensor.kems_proposal_solar_model_active
+          - sensor.kems_forecast_solar_tomorrow
+      - type: entities
+        title: Proposal battery
+        entities:
+          - sensor.kems_simulated_battery_state_of_charge
+          - sensor.kems_simulated_battery_charged_today
+          - sensor.kems_simulated_battery_to_home_today
+          - sensor.kems_simulated_battery_export_today
+          - sensor.kems_exportable_battery_energy_remaining
+          - sensor.kems_battery_energy_reserved_for_home
+          - binary_sensor.kems_battery_export_enabled_in_simulation
+
+  - title: Tariff & EV
+    path: tariff-ev
+    icon: mdi:ev-station
+    cards:
+      - type: grid
+        columns: 4
+        square: false
+        cards:
+          - type: tile
+            entity: sensor.kems_current_import_rate
+          - type: tile
+            entity: sensor.kems_next_import_rate
+          - type: tile
+            entity: binary_sensor.kems_off_peak
+          - type: tile
+            entity: binary_sensor.kems_intelligent_slot
+      - type: entities
+        title: Tariff state
+        entities:
+          - sensor.kems_next_off_peak_start
+          - sensor.kems_off_peak_end
+          - binary_sensor.kems_cheap_period_confirmed
+          - binary_sensor.kems_intelligent_slot_source_fresh
+          - sensor.kems_export_tariff_status
+          - binary_sensor.kems_export_tariff_active
+          - binary_sensor.kems_no_export_mode_active
+          - sensor.kems_simulation_export_rate
+      - type: grid
+        columns: 4
+        square: false
+        cards:
+          - type: tile
+            entity: binary_sensor.kems_ev_connected
+          - type: tile
+            entity: binary_sensor.kems_ev_charging
+          - type: tile
+            entity: sensor.kems_ev_charging_power
+          - type: tile
+            entity: sensor.kems_ev_state_of_charge
+      - type: tile
+        entity: binary_sensor.kems_grid_import_outside_cheap_period
+        name: Day-rate import watchdog
+
+  - title: Power Down
+    path: power-down
+    icon: mdi:lightning-bolt-circle
+    cards:
+      - type: grid
+        columns: 4
+        square: false
+        cards:
+          - type: tile
+            entity: binary_sensor.kems_power_down_session_joined
+          - type: tile
+            entity: binary_sensor.kems_power_down_session_active
+          - type: tile
+            entity: binary_sensor.kems_battery_reserved_for_power_down_session
+          - type: tile
+            entity: binary_sensor.kems_battery_export_reduced_for_power_down_session
+      - type: grid
+        columns: 2
+        square: false
+        cards:
+          - type: entities
+            title: Session
+            entities:
+              - sensor.kems_next_power_down_session_start
+              - sensor.kems_next_power_down_session_end
+              - sensor.kems_power_down_session_duration
+              - sensor.kems_power_down_session_octopoints_per_kwh
+              - sensor.kems_power_down_session_bonus_rate
+              - sensor.kems_power_down_session_baseline_net_energy
+              - sensor.kems_power_down_session_baseline_source
+              - binary_sensor.kems_power_down_baseline_incomplete
+          - type: entities
+            title: Estimate
+            entities:
+              - sensor.kems_power_down_session_battery_reserve
+              - sensor.kems_power_down_session_export_target
+              - sensor.kems_estimated_power_down_session_export
+              - sensor.kems_estimated_power_down_session_rewardable_reduction
+              - sensor.kems_estimated_power_down_session_bonus
+              - sensor.kems_estimated_power_down_session_export_income
+              - sensor.kems_estimated_power_down_session_total_income
+      - type: entities
+        title: Last completed / observed session
+        entities:
+          - binary_sensor.kems_last_power_down_result_available
+          - binary_sensor.kems_last_power_down_completed_successfully
+          - binary_sensor.kems_last_power_down_ev_successfully_blocked
+          - sensor.kems_last_power_down_result
+          - sensor.kems_last_power_down_start
+          - sensor.kems_last_power_down_end
+          - sensor.kems_last_power_down_starting_simulated_soc
+          - sensor.kems_last_power_down_finishing_simulated_soc
+          - sensor.kems_last_power_down_planned_export
+          - sensor.kems_last_power_down_rewardable_reduction
+          - sensor.kems_last_power_down_bonus
+          - sensor.kems_last_power_down_combined_estimated_income
+
+  - title: Commissioning
+    path: commissioning
+    icon: mdi:clipboard-check-multiple-outline
+    cards:
+      - type: markdown
+        content: |
+          # KEMS Commissioning Readiness
+          This page is deliberately read-only. It verifies the commissioned FoxESS mappings, flow directions, hardware limits, shadow plan and managed panel before KEMS is allowed to progress beyond the control lab.
+
+          **Readiness:** **{{ states('sensor.kems_commissioning_readiness') }}**  
+          **Maximum allowed stage in this build:** {{ state_attr('sensor.kems_commissioning_readiness', 'maximum_allowed_stage') or 'shadow' }}  
+          **Real hardware writes:** **{{ state_attr('sensor.kems_commissioning_readiness', 'real_hardware_writes') or 'blocked' }}**
+
+      - type: grid
+        columns: 4
+        square: false
+        cards:
+          - type: tile
+            entity: sensor.kems_commissioning_readiness
+            name: Commissioning readiness
+          - type: tile
+            entity: sensor.kems_panel_management_status
+            name: Panel / OTA
+          - type: tile
+            entity: sensor.kems_panel_firmware_version
+            name: Panel firmware
+          - type: tile
+            entity: sensor.kems_control_preflight
+            name: Control preflight
+
+      - type: markdown
+        title: Commissioning checklist
+        content: |
+          {% set checks = state_attr('sensor.kems_commissioning_readiness', 'checks') or [] %}
+          | Check | Status | Detail |
+          |---|:---:|---|
+          {% for item in checks %}
+          | {{ item.get('label', item.get('key', '—')) }} | **{{ item.get('status', '—') }}** | {{ item.get('detail', '—') }} |
+          {% endfor %}
+
+          **PASS:** {{ state_attr('sensor.kems_commissioning_readiness', 'pass_count') or 0 }} · **WAIT:** {{ state_attr('sensor.kems_commissioning_readiness', 'wait_count') or 0 }} · **FAIL:** {{ state_attr('sensor.kems_commissioning_readiness', 'fail_count') or 0 }}
+
+      - type: grid
+        columns: 2
+        square: false
+        cards:
+          - type: markdown
+            title: FoxESS discovery / mappings
+            content: |
+              {% set mappings = state_attr('sensor.kems_commissioning_readiness', 'foxess_mappings') or {} %}
+              **Available FoxESS Modbus entities:** {{ state_attr('sensor.kems_commissioning_readiness', 'foxess_registered_entity_count') or 0 }}
+
+              | KEMS source | FoxESS entity |
+              |---|---|
+              {% if mappings %}
+              {% for key, entity in mappings.items() | sort %}
+              | `{{ key }}` | `{{ entity }}` |
+              {% endfor %}
+              {% else %}
+              | — | Waiting for FoxESS commissioning |
+              {% endif %}
+          - type: markdown
+            title: Battery direction verification
+            content: |
+              **Configured positive power means discharge:** {{ state_attr('sensor.kems_commissioning_readiness', 'configured_battery_power_positive_is_discharge') }}  
+              **Detected positive power means discharge:** {{ state_attr('sensor.kems_commissioning_readiness', 'detected_battery_power_positive_is_discharge') }}  
+              **Evidence samples:** {{ state_attr('sensor.kems_commissioning_readiness', 'battery_direction_evidence_samples') or 0 }}  
+              **Confidence:** {{ state_attr('sensor.kems_commissioning_readiness', 'battery_direction_confidence_percent') or 0 }}%
+
+              KEMS learns this from real SOC movement while battery power is above the verification threshold. A mismatch blocks progression to shadow readiness.
+
+      - type: grid
+        columns: 3
+        square: false
+        cards:
+          - type: tile
+            entity: sensor.kems_house_load
+            name: FoxESS / fallback house load
+          - type: tile
+            entity: sensor.kems_solar_power
+            name: Solar power
+          - type: tile
+            entity: sensor.kems_battery_state_of_charge
+            name: Battery SOC
+          - type: tile
+            entity: sensor.kems_battery_power
+            name: Battery power
+          - type: tile
+            entity: sensor.kems_grid_import
+            name: Grid import
+          - type: tile
+            entity: sensor.kems_grid_export
+            name: Grid export
+
+      - type: grid
+        columns: 2
+        square: false
+        cards:
+          - type: entities
+            title: Shadow command — what KEMS would send
+            show_header_toggle: false
+            entities:
+              - sensor.kems_operating_mode
+              - sensor.kems_control_operating_reason
+              - sensor.kems_desired_inverter_work_mode
+              - sensor.kems_desired_battery_charge_power
+              - sensor.kems_desired_battery_to_home_power
+              - sensor.kems_desired_battery_export_power
+              - sensor.kems_desired_total_battery_discharge_power
+              - sensor.kems_desired_minimum_soc
+              - sensor.kems_control_next_action
+              - binary_sensor.kems_control_plan_safe
+              - binary_sensor.kems_control_data_fresh
+              - binary_sensor.kems_control_commands_permitted
+          - type: entities
+            title: Commissioned hardware limits
+            show_header_toggle: false
+            entities:
+              - sensor.kems_kh7_inverter_limit
+              - sensor.kems_kh7_battery_charge_limit
+              - sensor.kems_kh7_battery_discharge_limit
+              - sensor.kems_eps_output_limit
+              - sensor.kems_configured_site_import_limit
+              - sensor.kems_site_import_headroom
+              - sensor.kems_kh7_output_headroom
+
+      - type: markdown
+        title: Managed panel / automatic OTA proof
+        content: |
+          {% set p = state_attr('sensor.kems_panel_management_status', 'expected_version') %}
+          | Panel health | Value |
+          |---|---|
+          | Status | **{{ states('sensor.kems_panel_management_status') }}** |
+          | Managed by KEMS | {{ state_attr('sensor.kems_panel_management_status', 'managed') }} |
+          | Automatic OTA armed | {{ state_attr('sensor.kems_panel_management_status', 'automatic_ota_armed') }} |
+          | Expected firmware | {{ p or '—' }} |
+          | Reported firmware | {{ state_attr('sensor.kems_panel_management_status', 'reported_version') or '—' }} |
+          | Last config sync | {{ state_attr('sensor.kems_panel_management_status', 'last_config_sync') or '—' }} |
+          | Last OTA attempt | {{ state_attr('sensor.kems_panel_management_status', 'last_ota_attempt') or '—' }} |
+          | Last OTA success | {{ state_attr('sensor.kems_panel_management_status', 'last_ota_success') or '—' }} |
+          | ESPHome job ID | {{ state_attr('sensor.kems_panel_management_status', 'esphome_job_id') or '—' }} |
+          | Last OTA result | {{ state_attr('sensor.kems_panel_management_status', 'last_ota_result') or '—' }} |
+          | Last error | {{ state_attr('sensor.kems_panel_management_status', 'last_error') or 'None' }} |
+
+  - title: Control & EPS
+    path: control-eps
+    icon: mdi:shield-home
+    cards:
+      - type: entities
+        title: Control lab
+        entities:
+          - select.kems_operating_mode
+          - select.kems_virtual_scenario
+          - switch.kems_emergency_stop
+          - switch.kems_master_control_enable
+      - type: grid
+        columns: 4
+        square: false
+        cards:
+          - type: tile
+            entity: binary_sensor.kems_control_plan_safe
+          - type: tile
+            entity: binary_sensor.kems_control_data_fresh
+          - type: tile
+            entity: binary_sensor.kems_real_control_backend_available
+          - type: tile
+            entity: binary_sensor.kems_control_commands_permitted
+      - type: grid
+        columns: 2
+        square: false
+        cards:
+          - type: entities
+            title: Desired plan
+            entities:
+              - sensor.kems_operating_mode
+              - sensor.kems_virtual_control_scenario
+              - sensor.kems_control_operating_reason
+              - sensor.kems_desired_inverter_work_mode
+              - sensor.kems_desired_battery_charge_power
+              - sensor.kems_desired_battery_to_home_power
+              - sensor.kems_desired_battery_export_power
+              - sensor.kems_desired_total_battery_discharge_power
+              - sensor.kems_desired_minimum_soc
+              - sensor.kems_control_next_action
+          - type: entities
+            title: EPS / island
+            entities:
+              - binary_sensor.kems_grid_available_for_control
+              - binary_sensor.kems_whole_house_island_mode
+              - sensor.kems_whole_house_eps_load
+              - sensor.kems_eps_headroom
+              - sensor.kems_eps_utilisation
+              - sensor.kems_eps_load_status
+              - binary_sensor.kems_eps_load_warning
+              - binary_sensor.kems_eps_load_critical
+              - sensor.kems_estimated_outage_runtime
+
+  - title: Finance & History
+    path: finance-history
+    icon: mdi:finance
+    cards:
+      - type: grid
+        columns: 4
+        square: false
+        cards:
+          - type: tile
+            entity: sensor.kems_roi_status
+          - type: tile
+            entity: sensor.kems_system_investment
+          - type: tile
+            entity: sensor.kems_predicted_annual_saving
+          - type: tile
+            entity: sensor.kems_roi_confidence
+      - type: entities
+        title: Payback
+        entities:
+          - binary_sensor.kems_system_installed
+          - binary_sensor.kems_system_paid_back
+          - sensor.kems_predicted_payback
+          - sensor.kems_predicted_payback_date
+          - sensor.kems_predicted_net_value
+          - sensor.kems_actual_system_value_today
+          - sensor.kems_actual_system_value_total
+          - sensor.kems_actual_roi
+          - sensor.kems_actual_payback_remaining
+          - sensor.kems_actual_payback_date
+          - sensor.kems_profit_after_payback
+      - type: grid
+        columns: 5
+        square: false
+        cards:
+          - type: tile
+            entity: sensor.kems_today_energy_summary
+          - type: tile
+            entity: sensor.kems_week_energy_summary
+          - type: tile
+            entity: sensor.kems_month_energy_summary
+          - type: tile
+            entity: sensor.kems_year_energy_summary
+          - type: tile
+            entity: sensor.kems_all_time_energy_summary
+      - type: grid
+        columns: 2
+        square: false
+        cards:
+          - type: entities
+            title: Lifetime energy
+            entities:
+              - sensor.kems_lifetime_observed_days
+              - sensor.kems_lifetime_house_electricity
+              - sensor.kems_lifetime_ev_charging
+              - sensor.kems_lifetime_solar_generation
+              - sensor.kems_lifetime_grid_import
+              - sensor.kems_lifetime_grid_export
+              - sensor.kems_lifetime_battery_charge
+              - sensor.kems_lifetime_battery_discharge
+              - sensor.kems_lifetime_gas_consumption
+              - sensor.kems_lifetime_whole_home_energy
+          - type: entities
+            title: Lifetime money
+            entities:
+              - sensor.kems_lifetime_import_cost
+              - sensor.kems_lifetime_export_income
+              - sensor.kems_lifetime_gas_cost
+              - sensor.kems_lifetime_net_energy_cost
+              - sensor.kems_lifetime_avoided_import_value
+              - sensor.kems_lifetime_system_value
+              - sensor.kems_lifetime_simulated_system_value
+
+  - title: Learning & Health
+    path: learning-health
+    icon: mdi:brain
+    cards:
+      - type: grid
+        columns: 4
+        square: false
+        cards:
+          - type: tile
+            entity: sensor.kems_learning_confidence
+          - type: tile
+            entity: binary_sensor.kems_learning_ready
+          - type: tile
+            entity: sensor.kems_data_quality
+          - type: tile
+            entity: sensor.kems_history_samples
+      - type: grid
+        columns: 4
+        square: false
+        cards:
+          - type: tile
+            entity: sensor.kems_forecast_validation_status
+          - type: tile
+            entity: sensor.kems_forecast_validation_days
+          - type: tile
+            entity: sensor.kems_forecast_validation_confidence
+          - type: tile
+            entity: sensor.kems_forecast_validation_best_solar_source
+      - type: entities
+        title: Learned profile
+        entities:
+          - sensor.kems_typical_house_load_now
+          - sensor.kems_typical_solar_power_now
+          - sensor.kems_predicted_energy_until_off_peak
+      - type: entities
+        title: Runtime health
+        entities:
+          - sensor.kems_status
+          - sensor.kems_phase
+          - sensor.kems_source_validation
+          - binary_sensor.kems_accumulator_healthy
+          - binary_sensor.kems_historical_repair_required
+          - sensor.kems_accumulator_status
+          - sensor.kems_last_daily_rollover
+          - sensor.kems_last_successful_accumulation
+          - sensor.kems_accumulation_days_complete
+          - binary_sensor.kems_simulation_ready
+          - binary_sensor.kems_roi_prediction_ready
+          - sensor.kems_control_preflight
+
+  - title: Gas
+    path: gas
+    icon: mdi:fire
+    cards:
+      - type: grid
+        columns: 4
+        square: false
+        cards:
+          - type: tile
+            entity: binary_sensor.kems_gas_data_available
+          - type: tile
+            entity: sensor.kems_gas_current_rate
+          - type: tile
+            entity: sensor.kems_gas_usage_today
+          - type: tile
+            entity: sensor.kems_gas_cost_today
+      - type: entities
+        title: Gas detail
+        entities:
+          - sensor.kems_gas_standing_charge
+          - sensor.kems_gas_usage_this_month
+          - sensor.kems_gas_cost_this_month
+          - sensor.kems_typical_daily_gas_usage
+          - sensor.kems_gas_share_of_whole_home_energy
+          - sensor.kems_lifetime_gas_consumption
+          - sensor.kems_lifetime_gas_cost
+      - type: history-graph
+        title: Gas — 30 days
+        hours_to_show: 720
+        entities:
+          - sensor.kems_gas_usage_today
+          - sensor.kems_typical_daily_gas_usage
+          - sensor.kems_gas_cost_today
+
+  - title: Updates
+    path: updates
+    icon: mdi:update
+    cards:
+      - type: markdown
+        content: |
+          # KEMS coordinated updates
+          KEMS now checks one verified release bundle and updates only the components that bundle targets. Home Assistant restarts are held for the maintenance window and announced before they happen.
+
+          **Automatic updates are opt-in.** Turn them on below when you are happy for KEMS to install tested releases unattended.
+      - type: grid
+        columns: 4
+        square: false
+        cards:
+          - type: tile
+            entity: sensor.kems_update_status
+          - type: tile
+            entity: sensor.kems_maintenance_status
+          - type: tile
+            entity: switch.kems_automatic_updates
+          - type: tile
+            entity: switch.kems_automatic_maintenance_restart
+      - type: entities
+        title: Update policy
+        entities:
+          - select.kems_update_mode
+          - time.kems_maintenance_window_start
+          - time.kems_maintenance_window_end
+          - switch.kems_backup_before_update
+          - switch.kems_automatic_updates
+          - switch.kems_automatic_maintenance_restart
+      - type: markdown
+        title: Current bundle and maintenance
+        content: |
+          {% set update = states.sensor.kems_update_status %}
+          {% set maintenance = states.sensor.kems_maintenance_status %}
+          **Overall:** {{ update.state | default('Unavailable') }}  
+          **Bundle:** {{ update.attributes.bundle | default('No coordinated bundle published yet', true) }}  
+          **Running KEMS:** {{ update.attributes.running_kems_version | default('Unknown', true) }}  
+          **Last checked:** {{ update.attributes.last_checked | default('Not checked yet', true) }}  
+          **Maintenance:** {{ maintenance.state | default('none') }}  
+          **Scheduled:** {{ maintenance.attributes.scheduled_for | default('Not scheduled', true) }}  
+          **Reason:** {{ maintenance.attributes.reason | default('No maintenance required', true) }}
+      - type: markdown
+        title: Component verification
+        content: |
+          {% set items = state_attr('sensor.kems_update_status', 'components') or [] %}
+          | Component | Target | Installed | Status |
+          |---|---|---|---|
+          {% for item in items %}
+          | {{ item.key }} | {{ item.target or '—' }} | {{ item.installed or '—' }} | **{{ item.status }}** |
+          {% endfor %}
+      - type: markdown
+        title: Recent update history
+        content: |
+          {% set items = state_attr('sensor.kems_update_status', 'history') or [] %}
+          {% if items %}
+          | Completed | Bundle | Result |
+          |---|---|---|
+          {% for item in items | reverse %}
+          | {{ item.completed_at | default('—') }} | {{ item.bundle | default('—') }} | **{{ item.result | default('—') }}** |
+          {% endfor %}
+          {% else %}
+          No coordinated update has completed yet.
+          {% endif %}
+
+  - title: All Entities
+    path: all-entities
+    icon: mdi:database-eye
+    cards:
+      - type: markdown
+        content: |
+          # Every KEMS entity currently registered
+          Use this dynamic page if Home Assistant retains an older entity ID or adds a suffix.
+      - type: markdown
+        title: Sensors
+        content: |
+          | Entity | State | Unit |
+          |---|---:|---|
+          {% for item in states.sensor | sort(attribute='entity_id') %}{% if item.entity_id.startswith('sensor.kems_') %}
+          | `{{ item.entity_id }}` | {{ item.state }} | {{ item.attributes.unit_of_measurement | default('', true) }} |
+          {% endif %}{% endfor %}
+      - type: markdown
+        title: Binary sensors
+        content: |
+          | Entity | State |
+          |---|---:|
+          {% for item in states.binary_sensor | sort(attribute='entity_id') %}{% if item.entity_id.startswith('binary_sensor.kems_') %}
+          | `{{ item.entity_id }}` | {{ item.state }} |
+          {% endif %}{% endfor %}
+      - type: markdown
+        title: Selects and switches
+        content: |
+          {% for item in states.select | sort(attribute='entity_id') %}{% if item.entity_id.startswith('select.kems_') %}
+          `{{ item.entity_id }}` — **{{ item.state }}**  
+          {% endif %}{% endfor %}
+          {% for item in states.switch | sort(attribute='entity_id') %}{% if item.entity_id.startswith('switch.kems_') %}
+          `{{ item.entity_id }}` — **{{ item.state }}**  
+          {% endif %}{% endfor %}
