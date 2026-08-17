@@ -20,13 +20,13 @@
       "delivery": "kems_core"
     },
     "property_web": {
-      "version": "0.7.0-alpha6-web.8",
-      "required": false,
+      "version": "0.7.0-alpha6-web.11",
+      "required": true,
       "delivery": "kems_pi"
     },
     "pi_agent": {
-      "version": "0.7.0-alpha6-web.8",
-      "required": false,
+      "version": "0.7.0-alpha6-web.11",
+      "required": true,
       "delivery": "kems_pi"
     },
     "pi_system": {
@@ -42,13 +42,15 @@
   },
   "maintenance": {
     "required": true,
-    "reason": "Activate KEMS __RELEASE_VERSION__ and its managed dashboard",
+    "reason": "Activate KEMS __RELEASE_VERSION__, its managed dashboard and KEMS Pi web.11",
     "expected_downtime_minutes": 5,
     "home_assistant_restart_required": true,
     "reboot_required": false,
     "affected_components": [
       "kems_core",
-      "dashboard"
+      "dashboard",
+      "property_web",
+      "pi_agent"
     ]
   }
 }
