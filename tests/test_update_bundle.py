@@ -23,14 +23,15 @@ def test_release_bundle_renders_exact_core_and_existing_companion_targets() -> N
     assert bundle["components"]["kems_core"]["version"] == "0.7.0-alpha8"
     assert bundle["components"]["dashboard"]["version"] == "0.7.0-alpha8"
     assert bundle["components"]["panel"]["version"] == "0.7.0-alpha7-panel2"
-    assert bundle["components"]["property_web"]["version"] == "0.7.0-alpha6-web.11"
-    assert bundle["components"]["pi_agent"]["version"] == "0.7.0-alpha6-web.11"
+    assert bundle["components"]["property_web"]["version"] == "0.7.0-alpha6-web.12"
+    assert bundle["components"]["pi_agent"]["version"] == "0.7.0-alpha6-web.12"
     assert bundle["components"]["property_web"]["required"] is True
     assert bundle["components"]["pi_agent"]["required"] is True
     assert bundle["components"]["public_web"]["version"] is None
     assert "property_web" in bundle["maintenance"]["affected_components"]
     assert "pi_agent" in bundle["maintenance"]["affected_components"]
     assert bundle["maintenance"]["reboot_required"] is False
+    assert "web.12" in bundle["maintenance"]["reason"]
 
 
 def test_bundle_contract_rejects_mismatched_appliance_versions() -> None:
