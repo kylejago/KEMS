@@ -1,6 +1,9 @@
 {
   "domain": "kems",
   "name": "KEMS",
+  "after_dependencies": [
+    "energy"
+  ],
   "codeowners": [
     "@kylejago"
   ],
