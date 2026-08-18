@@ -15,7 +15,7 @@
       "delivery": "kems_core"
     },
     "panel": {
-      "version": "0.7.0-alpha7-panel2",
+      "version": "0.7.0-alpha7-panel3",
       "required": false,
       "delivery": "kems_core"
     },
