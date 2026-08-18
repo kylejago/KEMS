@@ -112,7 +112,16 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     await coordinator.async_config_entry_first_refresh()
     entry.runtime_data = coordinator
-    await async_setup_update_orchestrator(hass, entry)
+    update_orchestrator = await async_setup_update_orchestrator(hass, entry)
+    if (
+        update_orchestrator.policy.automatic_updates
+        and not update_orchestrator.policy.automatic_restart
+    ):
+        LOGGER.warning(
+            "KEMS repaired a legacy update policy with automatic updates enabled "
+            "but automatic maintenance restart disabled"
+        )
+        await update_orchestrator.async_set_policy(automatic_restart=True)
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     LOGGER.info(
         "KEMS initialised with read-only control lab; real hardware writes are blocked"

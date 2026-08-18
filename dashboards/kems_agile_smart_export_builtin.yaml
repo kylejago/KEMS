@@ -10,10 +10,10 @@ views:
           # Full KEMS Forecast vs Agile Smart Export
           **Agile Smart Export** is a simulation-only strategy using the real Octopus Agile Outgoing half-hour export prices for **Region L**. It never writes to the FoxESS system.
 
-          **Full KEMS Forecast** keeps the normal KEMS forecast-aware fixed-export strategy. **Agile Smart Export** uses the same physical battery, inverter, house-load, solar, reserve and import-safety constraints, but holds exportable energy for the most valuable Agile slots and may store solar when a later Agile slot is worth more after efficiency and battery-wear allowance.
+          **Full KEMS Forecast** keeps the normal forecast-aware fixed-export strategy. **Agile Smart Export** uses the same battery, inverter, house-load, solar, reserve and import-safety limits, but can hold exportable energy for higher-value Agile slots and store solar when exporting it later is worth more after efficiency losses and battery wear.
 
       - type: grid
-        columns: 3
+        columns: 2
         square: false
         cards:
           - type: entity
@@ -26,35 +26,41 @@ views:
             icon: mdi:cash-plus
           - type: entity
             entity: sensor.kems_agile_export_rate_now
-            name: Region L rate now
+            name: Region L Agile rate now
             icon: mdi:chart-line
-          - type: entity
-            entity: sensor.kems_full_kems_forecast_comparison_cost_today
-            name: Full KEMS Forecast
-            icon: mdi:weather-partly-cloudy
-          - type: entity
-            entity: sensor.kems_agile_smart_export_cost_today
-            name: Agile Smart Export
-            icon: mdi:lightning-bolt-circle
           - type: entity
             entity: sensor.kems_agile_price_data_quality
             name: Agile price coverage
             icon: mdi:database-check-outline
 
-      - type: entities
-        title: Today's export result
-        show_header_toggle: false
-        entities:
-          - entity: sensor.kems_agile_smart_export_status
-            name: Smart Export status
-          - entity: sensor.kems_agile_smart_export_plan
-            name: Current Smart Export action
-          - entity: sensor.kems_agile_smart_export_export_income_today
-            name: Agile export income
-          - entity: sensor.kems_agile_smart_export_weighted_rate_today
-            name: Weighted achieved export rate
-          - entity: sensor.kems_agile_advantage_today
-            name: Advantage vs Full KEMS Forecast
+      - type: grid
+        columns: 2
+        square: false
+        cards:
+          - type: entities
+            title: Strategy economics today
+            show_header_toggle: false
+            entities:
+              - entity: sensor.kems_full_kems_forecast_comparison_cost_today
+                name: Full KEMS Forecast
+              - entity: sensor.kems_agile_smart_export_cost_today
+                name: Agile Smart Export
+              - entity: sensor.kems_agile_smart_export_export_income_today
+                name: Agile export income
+              - entity: sensor.kems_agile_smart_export_weighted_rate_today
+                name: Weighted achieved export rate
+          - type: entities
+            title: Smart Export now
+            show_header_toggle: false
+            entities:
+              - entity: sensor.kems_agile_smart_export_status
+                name: Smart Export status
+              - entity: sensor.kems_agile_smart_export_plan
+                name: Current Smart Export action
+              - entity: sensor.kems_agile_export_rate_now
+                name: Current Region L rate
+              - entity: sensor.kems_agile_advantage_today
+                name: Advantage vs Full KEMS Forecast
 
       - type: history-graph
         title: Live Region L Agile export rate
@@ -64,34 +70,55 @@ views:
             name: Agile Outgoing
 
       - type: markdown
+        title: Today's detail
         content: |
           {% set plan = state_attr('sensor.kems_agile_smart_export_plan', 'periods') or {} %}
           {% set today = plan.get('today', {}) %}
           {% set agile = today.get('agile_smart_export', {}) %}
           {% set full = today.get('full_kems_forecast', {}) %}
-          ## Today's detail
           | Metric | Full KEMS Forecast | Agile Smart Export |
           |---|---:|---:|
-          | Net economic cost | {{ '%.2f'|format((full.get('economic_net_cost_pence', 0)|float) / 100) }} | {{ '%.2f'|format((agile.get('economic_net_cost_pence', 0)|float) / 100) }} |
-          | Import cost | {{ '%.2f'|format((full.get('import_cost_pence', 0)|float) / 100) }} | {{ '%.2f'|format((agile.get('import_cost_pence', 0)|float) / 100) }} |
-          | Export income | {{ '%.2f'|format((full.get('export_income_pence', 0)|float) / 100) }} | {{ '%.2f'|format((agile.get('export_income_pence', 0)|float) / 100) }} |
+          | Net economic cost | £{{ '%.2f'|format((full.get('economic_net_cost_pence', 0)|float) / 100) }} | £{{ '%.2f'|format((agile.get('economic_net_cost_pence', 0)|float) / 100) }} |
+          | Import cost | £{{ '%.2f'|format((full.get('import_cost_pence', 0)|float) / 100) }} | £{{ '%.2f'|format((agile.get('import_cost_pence', 0)|float) / 100) }} |
+          | Export income | £{{ '%.2f'|format((full.get('export_income_pence', 0)|float) / 100) }} | £{{ '%.2f'|format((agile.get('export_income_pence', 0)|float) / 100) }} |
           | Grid import | {{ full.get('grid_import_kwh', '—') }} kWh | {{ agile.get('grid_import_kwh', '—') }} kWh |
           | Grid export | {{ full.get('grid_export_kwh', '—') }} kWh | {{ agile.get('grid_export_kwh', '—') }} kWh |
           | Solar export | {{ full.get('solar_export_kwh', '—') }} kWh | {{ agile.get('solar_export_kwh', '—') }} kWh |
           | Solar → battery | {{ full.get('solar_to_battery_kwh', '—') }} kWh | {{ agile.get('solar_to_battery_kwh', '—') }} kWh |
           | Battery → home | {{ full.get('battery_to_home_kwh', '—') }} kWh | {{ agile.get('battery_to_home_kwh', '—') }} kWh |
           | Battery export | {{ full.get('battery_export_kwh', '—') }} kWh | {{ agile.get('battery_export_kwh', '—') }} kWh |
-          | Battery wear allowance | {{ '%.2f'|format((full.get('battery_wear_cost_pence', 0)|float) / 100) }} | {{ '%.2f'|format((agile.get('battery_wear_cost_pence', 0)|float) / 100) }} |
+          | Battery wear allowance | £{{ '%.2f'|format((full.get('battery_wear_cost_pence', 0)|float) / 100) }} | £{{ '%.2f'|format((agile.get('battery_wear_cost_pence', 0)|float) / 100) }} |
 
-          *Currency figures above are shown in pounds. The winner uses net energy cost plus the configured simulation battery-wear allowance.*
+          *The winner uses net energy cost plus the configured simulation battery-wear allowance.*
 
   - title: Agile Price Plan
     path: agile-price-plan
     icon: mdi:chart-timeline-variant
     cards:
+      - type: grid
+        columns: 2
+        square: false
+        cards:
+          - type: entity
+            entity: sensor.kems_agile_price_data_quality
+            name: Price coverage
+            icon: mdi:database-check-outline
+          - type: entity
+            entity: sensor.kems_agile_export_rate_now
+            name: Current Region L rate
+            icon: mdi:chart-line
+          - type: entity
+            entity: sensor.kems_agile_smart_export_status
+            name: Smart Export status
+            icon: mdi:shield-check-outline
+          - type: entity
+            entity: sensor.kems_agile_smart_export_plan
+            name: Current Smart Export action
+            icon: mdi:transmission-tower-export
+
       - type: markdown
+        title: Today — actual Region L Agile prices and Smart Export plan
         content: |
-          ## Today — actual Region L Agile prices and Smart Export plan
           {% set slots = state_attr('sensor.kems_agile_smart_export_plan', 'today_slots') or [] %}
           {% if slots %}
           | Time | Agile p/kWh | Action | Grid export | Battery export | End SOC |
@@ -104,8 +131,8 @@ views:
           {% endif %}
 
       - type: markdown
+        title: Tomorrow — published prices and forecast plan
         content: |
-          ## Tomorrow — published prices and forecast plan
           {% set slots = state_attr('sensor.kems_agile_smart_export_plan', 'tomorrow_slots') or [] %}
           {% if slots %}
           | Time | Agile p/kWh | Planned action | Grid export | Battery export | End SOC |
@@ -114,11 +141,11 @@ views:
           | {{ p.get('label', '') }} | {{ '%.2f'|format(p.get('rate_pence', 0)|float) }} | {{ (p.get('actions') or ['future slot'])|join(', ') }} | {{ p.get('grid_export_kwh') if p.get('grid_export_kwh') is not none else '—' }} | {{ p.get('battery_export_kwh') if p.get('battery_export_kwh') is not none else '—' }} | {{ (p.get('ending_soc_percent') ~ '%') if p.get('ending_soc_percent') is not none else '—' }} |
           {% endfor %}
           {% else %}
-          Tomorrow's Agile slots are not published yet. Octopus normally publishes the following day's Agile prices during the evening publication window.
+          Tomorrow's Agile slots are not published yet. KEMS will populate this table when Octopus publishes the next day's Region L prices.
           {% endif %}
 
       - type: entities
-        title: Price data health
+        title: Price feed diagnostics
         show_header_toggle: false
         entities:
           - sensor.kems_agile_price_data_quality
@@ -130,7 +157,7 @@ views:
     icon: mdi:calendar-range
     cards:
       - type: grid
-        columns: 3
+        columns: 2
         square: false
         cards:
           - type: entity
@@ -140,17 +167,11 @@ views:
             entity: sensor.kems_agile_advantage_yesterday
             name: Yesterday advantage
           - type: entity
-            entity: sensor.kems_agile_smart_export_cost_yesterday
-            name: Agile yesterday
-          - type: entity
             entity: sensor.kems_full_kems_forecast_vs_agile_winner_7_days
             name: 7-day winner
           - type: entity
             entity: sensor.kems_agile_advantage_7_days
             name: 7-day advantage
-          - type: entity
-            entity: sensor.kems_agile_smart_export_cost_7_days
-            name: Agile 7-day cost
           - type: entity
             entity: sensor.kems_full_kems_forecast_vs_agile_winner_30_days
             name: 30-day winner
@@ -158,17 +179,11 @@ views:
             entity: sensor.kems_agile_advantage_30_days
             name: 30-day advantage
           - type: entity
-            entity: sensor.kems_agile_smart_export_cost_30_days
-            name: Agile 30-day cost
-          - type: entity
             entity: sensor.kems_full_kems_forecast_vs_agile_winner_all_time
             name: All-time winner
           - type: entity
             entity: sensor.kems_agile_advantage_all_time
             name: All-time advantage
-          - type: entity
-            entity: sensor.kems_agile_smart_export_cost_all_time
-            name: Agile all-time cost
 
       - type: history-graph
         title: Cumulative Agile advantage
@@ -180,9 +195,9 @@ views:
             name: 7 days
 
       - type: markdown
+        title: Strategy comparison
         content: |
           {% set periods = state_attr('sensor.kems_agile_smart_export_plan', 'periods') or {} %}
-          ## Strategy comparison
           | Period | Winner | Agile advantage | Full KEMS cost | Agile cost | Agile export income | Weighted Agile rate |
           |---|---|---:|---:|---:|---:|---:|
           {% for key in ['today','tomorrow','yesterday','7_days','30_days','all_time'] %}
@@ -190,7 +205,7 @@ views:
           {% set c = p.get('comparison', {}) %}
           {% set f = p.get('full_kems_forecast', {}) %}
           {% set a = p.get('agile_smart_export', {}) %}
-          | {{ p.get('label', key) }} | {{ c.get('winner', 'Unavailable') }} | {{ '%.2f'|format((c.get('agile_advantage_pence', 0)|float) / 100) }} | {{ '%.2f'|format((f.get('economic_net_cost_pence', 0)|float) / 100) }} | {{ '%.2f'|format((a.get('economic_net_cost_pence', 0)|float) / 100) }} | {{ '%.2f'|format((a.get('export_income_pence', 0)|float) / 100) }} | {{ a.get('weighted_achieved_export_rate_pence', '—') }} p/kWh |
+          | {{ p.get('label', key) }} | {{ c.get('winner', 'Unavailable') }} | £{{ '%.2f'|format((c.get('agile_advantage_pence', 0)|float) / 100) }} | £{{ '%.2f'|format((f.get('economic_net_cost_pence', 0)|float) / 100) }} | £{{ '%.2f'|format((a.get('economic_net_cost_pence', 0)|float) / 100) }} | £{{ '%.2f'|format((a.get('export_income_pence', 0)|float) / 100) }} | {{ a.get('weighted_achieved_export_rate_pence', '—') }} p/kWh |
           {% endfor %}
 
   - title: Agile Assumptions
@@ -211,12 +226,22 @@ views:
           - **Tomorrow:** forecast replay uses the KEMS learned hourly house-demand profile plus the KEMS solar forecast. Normal Intelligent off-peak timing/rates are used; unannounced extra Intelligent slots cannot be known in advance.
           - **Safety:** this is **simulation/shadow only**. It creates no FoxESS write commands and does not change the existing control commissioning boundary.
 
-      - type: entities
-        title: Diagnostics
-        show_header_toggle: false
-        entities:
-          - sensor.kems_agile_smart_export_status
-          - sensor.kems_agile_price_data_quality
-          - sensor.kems_agile_export_rate_now
-          - sensor.kems_full_kems_forecast_vs_agile_winner_tomorrow
-          - sensor.kems_agile_advantage_tomorrow
+      - type: grid
+        columns: 2
+        square: false
+        cards:
+          - type: entity
+            entity: sensor.kems_agile_smart_export_status
+            name: Smart Export status
+          - type: entity
+            entity: sensor.kems_agile_price_data_quality
+            name: Price data quality
+          - type: entity
+            entity: sensor.kems_agile_export_rate_now
+            name: Current Region L rate
+          - type: entity
+            entity: sensor.kems_full_kems_forecast_vs_agile_winner_tomorrow
+            name: Tomorrow winner
+          - type: entity
+            entity: sensor.kems_agile_advantage_tomorrow
+            name: Tomorrow Agile advantage
