@@ -31,6 +31,15 @@ def test_agile_runtime_publishes_same_dispatch_fixed_12p_benchmark() -> None:
     assert '"fixed_export_rate_pence": 12.0' in content
 
 
+def test_agile_runtime_makes_solar_first_routing_visible() -> None:
+    """The UI must make home-first PV routing explicit rather than implying cycling."""
+    content = RUNTIME.read_text(encoding="utf-8")
+    assert "_annotate_solar_first_display(state)" in content
+    assert '"sensor.kems_agile_solar_to_home_today"' in content
+    assert '"solar to home first"' in content
+    assert "only surplus solar is considered" in content
+
+
 def test_agile_dashboard_surfaces_history_coverage_and_tariff_benchmark() -> None:
     """The managed UI must expose the new 365-day and tariff-only results."""
     content = DASHBOARD.read_text(encoding="utf-8")
@@ -39,6 +48,16 @@ def test_agile_dashboard_surfaces_history_coverage_and_tariff_benchmark() -> Non
     assert "sensor.kems_agile_vs_fixed_12p_gain_365_days" in content
     assert "sensor.kems_agile_vs_fixed_12p_gain_today" in content
     assert "365/365 valid daily replays" in content
+
+
+def test_agile_dashboard_surfaces_solar_to_home_and_battery_preservation() -> None:
+    """Solar routing must be visible at headline and half-hour plan level."""
+    content = DASHBOARD.read_text(encoding="utf-8")
+    assert "sensor.kems_agile_solar_to_home_today" in content
+    assert "Solar-first battery preservation" in content
+    assert "Solar → home today" in content
+    assert "Solar → home | Solar → battery" in content
+    assert "Solar-first home rule" in content
 
 
 def test_packaged_agile_dashboard_matches_repository_source() -> None:

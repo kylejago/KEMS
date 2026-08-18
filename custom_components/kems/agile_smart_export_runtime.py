@@ -207,7 +207,8 @@ class EfficientAgileSmartExportManager(AgileSmartExportManager):
         return periods
 
     def _publish(self, state: dict[str, Any]) -> None:
-        """Publish 365-day coverage and the same-dispatch 12p tariff benchmark."""
+        """Publish coverage, tariff benchmark, and explicit solar-first routing."""
+        _annotate_solar_first_display(state)
         periods = state.get("periods", {})
         settled_days = sorted(
             day
@@ -233,6 +234,22 @@ class EfficientAgileSmartExportManager(AgileSmartExportManager):
         }
         state["history_coverage"] = history_coverage
         super()._publish(state)
+
+        today = periods.get("today", _empty_period("today", "Today"))
+        today_agile = today.get("agile_smart_export", {})
+        self._set(
+            "sensor.kems_agile_solar_to_home_today",
+            _state(today_agile.get("solar_to_home_kwh")),
+            {
+                "friendly_name": "Agile Smart Export solar to home today",
+                "unit_of_measurement": "kWh",
+                "routing_rule": (
+                    "Outside a confirmed cheap period, solar serves home demand "
+                    "before battery discharge; only surplus solar is considered "
+                    "for storage or export."
+                ),
+            },
+        )
 
         self._set(
             "sensor.kems_agile_history_coverage",
@@ -344,9 +361,50 @@ class EfficientAgileSmartExportManager(AgileSmartExportManager):
             self._hass.states.async_remove(entity_id)
 
 
+def _annotate_solar_first_display(state: dict[str, Any]) -> None:
+    """Make solar-to-home priority explicit in slot and current-action display."""
+    for key in ("today_slots", "tomorrow_slots"):
+        slots = state.get(key)
+        if not isinstance(slots, list):
+            continue
+        for slot in slots:
+            if not isinstance(slot, dict):
+                continue
+            try:
+                solar_home = float(slot.get("solar_to_home_kwh") or 0.0)
+            except (TypeError, ValueError):
+                solar_home = 0.0
+            if solar_home <= 0.0005:
+                continue
+            actions = list(slot.get("actions") or [])
+            if "solar to home first" not in actions:
+                actions.insert(0, "solar to home first")
+            slot["actions"] = actions
+
+    generated_at = state.get("generated_at")
+    if not generated_at:
+        return
+    try:
+        now = datetime.fromisoformat(str(generated_at)).astimezone(UTC)
+    except ValueError:
+        return
+    for slot in state.get("today_slots", []):
+        if not isinstance(slot, dict):
+            continue
+        try:
+            start = datetime.fromisoformat(str(slot["valid_from"])).astimezone(UTC)
+            end = datetime.fromisoformat(str(slot["valid_to"])).astimezone(UTC)
+        except (KeyError, ValueError):
+            continue
+        if start <= now < end:
+            state["current_action"] = ", ".join(slot.get("actions") or ["Hold"])
+            break
+
+
 def _completion_published_ids() -> tuple[str, ...]:
     ids = [
         "sensor.kems_agile_history_coverage",
+        "sensor.kems_agile_solar_to_home_today",
         "sensor.kems_agile_smart_export_cost_365_days",
         "sensor.kems_full_kems_forecast_comparison_cost_365_days",
         "sensor.kems_agile_advantage_365_days",
