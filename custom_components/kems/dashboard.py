@@ -278,7 +278,9 @@ async def async_sync_managed_dashboard(hass: HomeAssistant) -> bool:
     await async_load_panel_health(hass)
 
     dashboard_target = Path(hass.config.path(MANAGED_DASHBOARD_FILENAME))
-    dashboard_bytes = await hass.async_add_executor_job(_combined_master_dashboard_bytes)
+    dashboard_bytes = await hass.async_add_executor_job(
+        _combined_master_dashboard_bytes
+    )
     dashboard_changed = await hass.async_add_executor_job(
         _sync_dashboard_bytes,
         dashboard_bytes,
