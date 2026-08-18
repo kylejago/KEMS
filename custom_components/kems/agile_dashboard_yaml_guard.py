@@ -26,4 +26,6 @@ def install_dashboard_yaml_guard() -> None:
         return repair_agile_live_view_indentation(original())
 
     combined_dashboard_with_yaml_guard._kems_agile_yaml_guard = True
-    dashboard_module._combined_master_dashboard_bytes = combined_dashboard_with_yaml_guard
+    dashboard_module._combined_master_dashboard_bytes = (
+        combined_dashboard_with_yaml_guard
+    )
