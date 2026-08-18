@@ -437,7 +437,9 @@ def install_rolling_replan_patch() -> None:
     update = runtime.EfficientAgileSmartExportManager.async_update
     if not getattr(update, "_kems_rolling_replan", False):
         _async_update_with_rolling._kems_rolling_replan = True
-        runtime.EfficientAgileSmartExportManager.async_update = _async_update_with_rolling
+        runtime.EfficientAgileSmartExportManager.async_update = (
+            _async_update_with_rolling
+        )
 
     publish = runtime.EfficientAgileSmartExportManager._publish
     if not getattr(publish, "_kems_rolling_replan", False):
