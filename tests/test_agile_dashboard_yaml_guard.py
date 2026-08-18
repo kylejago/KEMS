@@ -12,7 +12,9 @@ GUARD = ROOT / "custom_components" / "kems" / "agile_dashboard_yaml_guard.py"
 
 
 def _guard_module():
-    spec = importlib.util.spec_from_file_location("kems_agile_dashboard_yaml_guard", GUARD)
+    spec = importlib.util.spec_from_file_location(
+        "kems_agile_dashboard_yaml_guard", GUARD
+    )
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
@@ -43,7 +45,7 @@ views:
 
 def test_runtime_installs_yaml_guard_after_live_view_patch() -> None:
     """The final dashboard writer must run after the Agile live view is added."""
-    runtime = (ROOT / "custom_components" / "kems" / "agile_smart_export_runtime.py").read_text(
-        encoding="utf-8"
-    )
+    runtime = (
+        ROOT / "custom_components" / "kems" / "agile_smart_export_runtime.py"
+    ).read_text(encoding="utf-8")
     assert "install_live_scenario_patch()\ninstall_dashboard_yaml_guard()" in runtime
