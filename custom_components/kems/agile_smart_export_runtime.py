@@ -27,8 +27,8 @@ from .agile_smart_export_runtime_base import *  # noqa: E402,F403
 
 install_rolling_replan_patch()
 install_live_scenario_patch()
-install_alpha717_dispatch_patch()
 install_dashboard_yaml_guard()
+install_alpha717_dispatch_patch()
 install_alpha714_dashboard_patch()
 install_alpha715_dashboard_patch()
 install_alpha716_dashboard_patch()
