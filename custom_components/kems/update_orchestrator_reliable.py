@@ -84,6 +84,7 @@ async def async_setup_update_orchestrator(
     await orchestrator.async_start()
 
     if not hass.services.has_service(DOMAIN, base.SERVICE_CHECK_UPDATES):
+
         async def check_updates(_call: ServiceCall) -> None:
             current = base._first_orchestrator(hass)
             if current is not None:
