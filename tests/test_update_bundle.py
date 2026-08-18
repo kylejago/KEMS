@@ -22,7 +22,7 @@ def test_release_bundle_renders_exact_core_and_existing_companion_targets() -> N
     assert bundle["bundle"] == "0.7.0-alpha8"
     assert bundle["components"]["kems_core"]["version"] == "0.7.0-alpha8"
     assert bundle["components"]["dashboard"]["version"] == "0.7.0-alpha8"
-    assert bundle["components"]["panel"]["version"] == "0.7.0-alpha7-panel2"
+    assert bundle["components"]["panel"]["version"] == "0.7.0-alpha7-panel3"
     assert bundle["components"]["property_web"]["version"] == "0.7.0-alpha6-web.12"
     assert bundle["components"]["pi_agent"]["version"] == "0.7.0-alpha6-web.12"
     assert bundle["components"]["property_web"]["required"] is True

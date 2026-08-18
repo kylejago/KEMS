@@ -4,7 +4,7 @@ substitutions:
   device_name: kems16x16
   friendly_name: "KEMS16x16"
   led_pin: GPIO21
-  panel_config_version: "0.7.0-alpha7-panel2"
+  panel_config_version: "0.7.0-alpha7-panel3"
   kems_status: sensor.kems_status
   live_battery_soc: sensor.kems_battery_state_of_charge
   live_battery_power: sensor.kems_battery_power
@@ -22,6 +22,7 @@ substitutions:
   scenario_kems_no_export: sensor.kems_compare_kems_no_export_cost_today
   scenario_full_kems: sensor.kems_compare_full_kems_cost_today
   scenario_full_kems_forecast: sensor.kems_compare_full_kems_forecast_cost_today
+  scenario_agile: sensor.kems_agile_smart_export_cost_today
   scenario_no_system_flow: sensor.kems_compare_no_system_flow_now
   scenario_solar_only_flow: sensor.kems_compare_solar_only_flow_now
   scenario_solar_battery_flow: sensor.kems_compare_solar_and_battery_flow_now
@@ -29,6 +30,7 @@ substitutions:
   scenario_full_kems_flow: sensor.kems_compare_full_kems_flow_now
   scenario_full_kems_forecast_flow: sensor.kems_compare_full_kems_forecast_flow_now
   scenario_full_island_flow: sensor.kems_compare_full_island_flow_now
+  scenario_agile_flow: sensor.kems_agile_smart_export_flow_now
 esphome:
   name: ${device_name}
   friendly_name: ${friendly_name}
@@ -87,6 +89,7 @@ select:
       - "KEMS no-export"
       - "Full KEMS"
       - "Full KEMS Forecast"
+      - "Agile Smart Export"
       - "Full Island Mode"
 text_sensor:
   - platform: template
@@ -120,6 +123,9 @@ text_sensor:
   - platform: homeassistant
     id: ha_full_island_flow
     entity_id: ${scenario_full_island_flow}
+  - platform: homeassistant
+    id: ha_agile_flow
+    entity_id: ${scenario_agile_flow}
 sensor:
   - platform: homeassistant
     id: ha_live_battery_soc
@@ -154,6 +160,9 @@ sensor:
   - platform: homeassistant
     id: ha_full_kems_forecast_cost
     entity_id: ${scenario_full_kems_forecast}
+  - platform: homeassistant
+    id: ha_agile_cost
+    entity_id: ${scenario_agile}
 binary_sensor:
   - platform: homeassistant
     id: ha_ev_connected
@@ -503,6 +512,8 @@ display:
         selected_scenario = 5;
       } else if (display_mode == "Full Island Mode") {
         selected_scenario = 6;
+      } else if (display_mode == "Agile Smart Export") {
+        selected_scenario = 7;
       }
       const bool ev_connected = id(ha_ev_connected).state;
       const bool ev_charging = id(ha_ev_charging).state;
@@ -564,14 +575,15 @@ display:
       } else {
         const float POWER_DEADBAND_KW = 0.03f;
         const int s = selected_scenario;
-        float scenario_cost[7] = {
+        float scenario_cost[8] = {
           id(ha_no_system_cost).state,
           id(ha_solar_only_cost).state,
           id(ha_solar_battery_cost).state,
           id(ha_kems_no_export_cost).state,
           id(ha_full_kems_cost).state,
           id(ha_full_kems_forecast_cost).state,
-          NAN
+          NAN,
+          id(ha_agile_cost).state
         };
         const std::string *flow_state = nullptr;
         if (s == 0) {
@@ -588,6 +600,8 @@ display:
           flow_state = &id(ha_full_kems_forecast_flow).state;
         } else if (s == 6) {
           flow_state = &id(ha_full_island_flow).state;
+        } else if (s == 7) {
+          flow_state = &id(ha_agile_flow).state;
         }
         cost_today = scenario_cost[s];
         float house_power = -1.0f;

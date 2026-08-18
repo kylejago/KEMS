@@ -12,7 +12,7 @@ from homeassistant.util import dt as dt_util
 
 from .const import DOMAIN
 
-PANEL_CONFIG_VERSION = "0.7.0-alpha7-panel2"
+PANEL_CONFIG_VERSION = "0.7.0-alpha7-panel3"
 PANEL_HEALTH_STORAGE_VERSION = 1
 PANEL_HEALTH_STORAGE_KEY = "kems.panel_health"
 PANEL_HEALTH_DATA_KEY = "panel_health"
