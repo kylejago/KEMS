@@ -25,9 +25,7 @@ class ReliableKEMSUpdateOrchestrator(base.KEMSUpdateOrchestrator):
         ):
             self.pending.pop("error", None)
             self.last_error = None
-            disruptive = bool(
-                self.pending.get("maintenance", {}).get("required", True)
-            )
+            disruptive = bool(self.pending.get("maintenance", {}).get("required", True))
             self.pending["stage"] = "scheduled" if disruptive else "ready"
             self.pending["scheduled_for"] = (
                 self._scheduled_time().isoformat() if disruptive else None
