@@ -125,6 +125,19 @@ def test_comparison_names_the_lower_economic_cost_strategy() -> None:
     assert agile._comparison(0.0)["winner"] == "Tie"
 
 
+def test_agile_routes_solar_to_home_before_battery_and_surplus_decisions() -> None:
+    """PV must serve the house before battery discharge or surplus storage/export."""
+    source = (INTEGRATION / "agile_smart_export.py").read_text(encoding="utf-8")
+    solar_home = "solar_home = min(solar_kwh, load_kwh, inverter)"
+    remaining_load = "remaining_load = max(load_kwh - solar_home, 0)"
+    solar_surplus = "solar_left = max(solar_kwh - solar_home, 0)"
+    assert solar_home in source
+    assert remaining_load in source
+    assert solar_surplus in source
+    assert source.index(solar_home) < source.index(remaining_load)
+    assert source.index(remaining_load) < source.index(solar_surplus)
+
+
 def test_agile_feature_does_not_import_control_or_foxess_write_code() -> None:
     """The new strategy must stay outside the commissioned write boundary."""
     source = (INTEGRATION / "agile_smart_export.py").read_text(encoding="utf-8")
