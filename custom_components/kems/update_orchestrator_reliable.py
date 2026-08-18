@@ -109,9 +109,9 @@ class ReliableKEMSUpdateOrchestrator(base.KEMSUpdateOrchestrator):
                 "GitHub bundle lookup returned an invalid response"
             )
 
-        candidates: list[
-            tuple[str, dict[str, Any], dict[str, Any], dict[str, Any]]
-        ] = []
+        candidates: list[tuple[str, dict[str, Any], dict[str, Any], dict[str, Any]]] = (
+            []
+        )
         for release in releases:
             if release.get("draft"):
                 continue
