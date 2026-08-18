@@ -54,7 +54,10 @@ def validate_shadow_command(
         _check(
             "export_limit",
             export <= config.export_limit_kw + _EPSILON,
-            f"battery export {export:.3f}kW <= configured {config.export_limit_kw:.3f}kW",
+            (
+                f"battery export {export:.3f}kW <= configured "
+                f"{config.export_limit_kw:.3f}kW"
+            ),
         ),
         _check(
             "inverter_limit",
