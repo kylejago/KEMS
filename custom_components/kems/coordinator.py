@@ -10,7 +10,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
 
-from .agile_smart_export import AgileSmartExportManager
+from .agile_smart_export_runtime import EfficientAgileSmartExportManager
 from .collector import Collector
 from .const import NAME
 from .entity_discovery import SourceValidationResult
@@ -72,7 +72,7 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
         self._advice = AdviceEngine()
         self._simulation = SimulationEngine()
         self._scenarios = ScenarioComparisonEngine()
-        self._agile_smart_export = AgileSmartExportManager(
+        self._agile_smart_export = EfficientAgileSmartExportManager(
             hass,
             entry.entry_id,
             settings.history_days,
