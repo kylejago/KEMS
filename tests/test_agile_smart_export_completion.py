@@ -34,10 +34,31 @@ def test_agile_runtime_publishes_same_dispatch_fixed_12p_benchmark() -> None:
 def test_agile_runtime_makes_solar_first_routing_visible() -> None:
     """The UI must make home-first PV routing explicit rather than implying cycling."""
     content = RUNTIME.read_text(encoding="utf-8")
+    assert "_enrich_slot_routing(" in content
     assert "_annotate_solar_first_display(state)" in content
+    assert '"solar_to_home_kwh"' in content
     assert '"sensor.kems_agile_solar_to_home_today"' in content
     assert '"solar to home first"' in content
     assert "only surplus solar is considered" in content
+
+
+def test_agile_runtime_publishes_panel_compatible_current_flow() -> None:
+    """The ESPHome panel must receive the exact existing compact flow protocol."""
+    content = RUNTIME.read_text(encoding="utf-8")
+    assert '"sensor.kems_agile_smart_export_flow_now"' in content
+    assert '"protocol": "KEMS panel flow v1"' in content
+    assert "AGILE_FLOW_UNAVAILABLE" in content
+    assert 'f"H={power(\'house_load_kwh\'):.3f},"' in content
+    assert 'f"S={power(\'solar_generation_kwh\'):.3f},"' in content
+    assert 'f"GI={power(\'grid_import_kwh\'):.3f},"' in content
+    assert 'f"GE={power(\'grid_export_kwh\'):.3f},"' in content
+    assert 'f"SH={power(\'solar_to_home_kwh\'):.3f},"' in content
+    assert 'f"SB={power(\'solar_to_battery_kwh\'):.3f},"' in content
+    assert 'f"SE={power(\'solar_export_kwh\'):.3f},"' in content
+    assert 'f"GB={power(\'grid_to_battery_kwh\'):.3f},"' in content
+    assert 'f"BH={power(\'battery_to_home_kwh\'):.3f},"' in content
+    assert 'f"BE={power(\'battery_export_kwh\'):.3f},"' in content
+    assert 'f"SOC={float(current_slot[\'ending_soc_percent\']):.1f}"' in content
 
 
 def test_agile_dashboard_surfaces_history_coverage_and_tariff_benchmark() -> None:
