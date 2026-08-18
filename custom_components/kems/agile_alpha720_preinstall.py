@@ -443,7 +443,6 @@ def _overlay_diagnostics(
                 ),
             }
         )
-        current = self._hass.states.get(backfill.ENTITY_ID)
         attributes = dict(self._state)
         self._hass.states.async_set(
             backfill.ENTITY_ID,
