@@ -5,6 +5,8 @@ restoring Solar -> Home into comparison payloads, exposing current battery SOC,
 and making the hypothetical fixed-rate benchmark explicit in the dashboard.
 """
 
+# ruff: noqa: E501
+
 from __future__ import annotations
 
 from dataclasses import replace
