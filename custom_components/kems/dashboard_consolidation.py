@@ -296,11 +296,7 @@ def _cards_body(view_block: str) -> str:
 
 def _section_card(title: str) -> str:
     """Add a compact divider when several former tabs share one final page."""
-    return (
-        "      - type: markdown\n"
-        "        content: |\n"
-        f"          ## {title}\n"
-    )
+    return "      - type: markdown\n" "        content: |\n" f"          ## {title}\n"
 
 
 def _render_view(spec: ViewSpec, source_views: dict[str, str]) -> str:
