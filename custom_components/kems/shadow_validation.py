@@ -97,7 +97,9 @@ class ShadowValidationRecorder:
             else []
         )
         self._decisions = (
-            [dict(item) for item in decisions if isinstance(item, dict)][-MAX_DECISIONS:]
+            [dict(item) for item in decisions if isinstance(item, dict)][
+                -MAX_DECISIONS:
+            ]
             if isinstance(decisions, list)
             else []
         )
@@ -343,9 +345,7 @@ class ShadowValidationRecorder:
                     "actual_hardware_available"
                 ),
                 "comparison_basis": self._state.get("comparison_basis"),
-                "hardware_comparison_note": self._state.get(
-                    "hardware_comparison_note"
-                ),
+                "hardware_comparison_note": self._state.get("hardware_comparison_note"),
                 **common,
             },
         )

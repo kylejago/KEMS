@@ -174,7 +174,9 @@ def _cheap_end(deadline: datetime, tariff: TariffSettings) -> datetime:
     day = local_deadline.date()
     if tariff.offpeak_end <= tariff.offpeak_start:
         day += timedelta(days=1)
-    return datetime.combine(day, tariff.offpeak_end, tzinfo=agile.LONDON).astimezone(UTC)
+    return datetime.combine(day, tariff.offpeak_end, tzinfo=agile.LONDON).astimezone(
+        UTC
+    )
 
 
 def _soc_trajectory(
@@ -272,7 +274,9 @@ def _soc_trajectory(
         )
 
     projected_deadline_soc = round(100 * battery_kwh / capacity, 1)
-    if deadline > now_utc and (not points or points[-1]["timestamp"] != deadline.isoformat()):
+    if deadline > now_utc and (
+        not points or points[-1]["timestamp"] != deadline.isoformat()
+    ):
         points.append(
             {
                 "timestamp": deadline.isoformat(),
@@ -296,8 +300,8 @@ def _soc_trajectory(
     while cursor < charge_end and charge_battery < charge_target_kwh - 1e-6:
         next_point = min(cursor + timedelta(minutes=30), charge_end)
         hours = (next_point - cursor).total_seconds() / 3600.0
-        stored = max(config.max_charge_kw, 0.0) * hours * max(
-            config.charge_efficiency, 0.01
+        stored = (
+            max(config.max_charge_kw, 0.0) * hours * max(config.charge_efficiency, 0.01)
         )
         charge_battery = min(charge_battery + stored, charge_target_kwh, capacity)
         points.append(
