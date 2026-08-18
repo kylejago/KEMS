@@ -141,7 +141,9 @@ def _dispatch_targets(
         return context
 
     effective_kw = float(context.get("effective_discharge_kw") or 0.0)
-    house_kw = min(max(rolling._current_house_headroom_kw(self, config), 0.0), effective_kw)
+    house_kw = min(
+        max(rolling._current_house_headroom_kw(self, config), 0.0), effective_kw
+    )
     remaining_hours = _remaining_current_slot_hours(state, now)
     current_slot = _current_slot(state, now)
     planned_kwh = (
@@ -339,9 +341,7 @@ def install_alpha717_dispatch_patch() -> None:
                     "current_battery_export_target_kw": targets.get(
                         "battery_export_target_kw"
                     ),
-                    "required_average_discharge_kw": targets.get(
-                        "required_average_kw"
-                    ),
+                    "required_average_discharge_kw": targets.get("required_average_kw"),
                     "live_deadline_margin_kwh": targets.get("deadline_margin_kwh"),
                 }
             )
@@ -366,9 +366,9 @@ def install_alpha717_dispatch_patch() -> None:
                     if not isinstance(future, dict):
                         continue
                     try:
-                        end = datetime.fromisoformat(str(future["valid_to"])).astimezone(
-                            UTC
-                        )
+                        end = datetime.fromisoformat(
+                            str(future["valid_to"])
+                        ).astimezone(UTC)
                     except (KeyError, TypeError, ValueError):
                         continue
                     if end <= now_utc:
