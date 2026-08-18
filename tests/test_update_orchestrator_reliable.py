@@ -12,7 +12,10 @@ INIT = ROOT / "custom_components" / "kems" / "__init__.py"
 def test_kems_uses_reliable_orchestrator_setup() -> None:
     """Integration startup must instantiate the reliability-hardened orchestrator."""
     content = INIT.read_text(encoding="utf-8")
-    assert "from .update_orchestrator_reliable import async_setup_update_orchestrator" in content
+    assert (
+        "from .update_orchestrator_reliable import async_setup_update_orchestrator"
+        in content
+    )
 
 
 def test_reliable_orchestrator_waits_for_post_restart_bundle_before_success() -> None:
