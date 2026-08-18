@@ -38,6 +38,7 @@ from .lifetime import LifetimeLedgerRecorder
 from .power_down import PowerDownHistoryRecorder
 from .providers.entity_map import KEMSEntities
 from .settings import KEMSSettings
+from .shadow_validation import ShadowValidationRecorder
 
 LOGGER = logging.getLogger(__name__)
 
@@ -81,6 +82,7 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
         )
         self._whole_home = WholeHomeEngine()
         self._control = ControlEngine()
+        self._shadow_validation = ShadowValidationRecorder(hass, entry.entry_id)
         self._lifetime = LifetimeLedgerRecorder(hass, entry.entry_id)
         self._power_down = PowerDownHistoryRecorder(hass, entry.entry_id)
         self._roi = ROIEngine()
@@ -121,6 +123,7 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
         await self._lifetime.async_load()
         await self._power_down.async_load()
         await self._agile_smart_export.async_load()
+        await self._shadow_validation.async_load()
         await self._lifetime.async_bootstrap(
             self._history.records,
             self._simulation,
@@ -237,6 +240,14 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                 now,
                 self.settings.control,
             )
+            await self._shadow_validation.async_update(
+                snapshot=snapshot,
+                simulation=simulation,
+                control=control,
+                now=now,
+                config=self.settings.control,
+                agile_state=self._agile_smart_export.state,
+            )
             last_power_down = await self._power_down.async_update(
                 snapshot,
                 simulation,
@@ -314,6 +325,7 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
         await self._forecast_validation.async_save()
         await self._lifetime.async_save()
         await self._power_down.async_save()
+        await self._shadow_validation.async_shutdown()
         await self._agile_smart_export.async_shutdown()
         await self._agile_history_backfill.async_shutdown()
 
