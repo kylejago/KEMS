@@ -217,11 +217,17 @@ async def _async_build_evidence(
     house_entity = self._entities.house_load_kw
     if not house_entity:
         return _EvidenceResult(
-            state={"available": False, "reason": "historical house-load source is not configured"}
+            state={
+                "available": False,
+                "reason": "historical house-load source is not configured",
+            }
         )
     if not self._hass.services.has_service("recorder", "get_statistics"):
         return _EvidenceResult(
-            state={"available": False, "reason": "recorder.get_statistics is unavailable"}
+            state={
+                "available": False,
+                "reason": "recorder.get_statistics is unavailable",
+            }
         )
 
     local_now = now.astimezone(backfill.LONDON)
@@ -234,18 +240,22 @@ async def _async_build_evidence(
         if start_day <= item.timestamp.astimezone(backfill.LONDON).date() <= end_day
     }
     missing_days = {
-        start_day + timedelta(days=offset)
-        for offset in range(backfill.TARGET_DAYS)
+        start_day + timedelta(days=offset) for offset in range(backfill.TARGET_DAYS)
     } - covered_days
     if not missing_days:
         return _EvidenceResult(
-            state={"available": False, "reason": "existing KEMS/backfill already covers the rolling window"}
+            state={
+                "available": False,
+                "reason": "existing KEMS/backfill already covers the rolling window",
+            }
         )
 
     sources = {"house_load_kw": house_entity}
     if self._entities.ev_power_kw:
         sources["ev_power_kw"] = self._entities.ev_power_kw
-    start = datetime.combine(start_day, time.min, tzinfo=backfill.LONDON).astimezone(UTC)
+    start = datetime.combine(start_day, time.min, tzinfo=backfill.LONDON).astimezone(
+        UTC
+    )
     end = datetime.combine(today, time.min, tzinfo=backfill.LONDON).astimezone(UTC)
     try:
         response = await self._hass.services.async_call(
@@ -263,7 +273,10 @@ async def _async_build_evidence(
         )
     except (HomeAssistantError, TypeError, ValueError) as err:
         return _EvidenceResult(
-            state={"available": False, "reason": f"house-load statistics query failed: {err}"}
+            state={
+                "available": False,
+                "reason": f"house-load statistics query failed: {err}",
+            }
         )
 
     statistics = response.get("statistics", {}) if isinstance(response, dict) else {}
@@ -364,7 +377,9 @@ async def _async_build_evidence(
         "method": "ha_house_load+open_meteo_proposal_solar",
         "comparison_class": "hypothetical_preinstall_evidence",
     }
-    return _EvidenceResult(tuple(sorted(records, key=lambda item: item.timestamp)), state)
+    return _EvidenceResult(
+        tuple(sorted(records, key=lambda item: item.timestamp)), state
+    )
 
 
 def _overlay_diagnostics(
@@ -519,9 +534,7 @@ def install_alpha720_preinstall_patch() -> None:
         evidence_records = tuple(
             getattr(self, "_kems_alpha720_evidence_records", ()) or ()
         )
-        evidence_state = dict(
-            getattr(self, "_kems_alpha720_evidence_state", {}) or {}
-        )
+        evidence_state = dict(getattr(self, "_kems_alpha720_evidence_state", {}) or {})
         merged = backfill._merge_native_and_backfill(baseline, list(evidence_records))
         _overlay_diagnostics(
             self,
