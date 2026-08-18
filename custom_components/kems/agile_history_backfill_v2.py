@@ -76,9 +76,7 @@ class EnhancedAgileHistoryBackfill(base.AgileHistoryBackfill):
             time.min,
             tzinfo=base.LONDON,
         ).astimezone(UTC)
-        end = datetime.combine(now.date(), time.min, tzinfo=base.LONDON).astimezone(
-            UTC
-        )
+        end = datetime.combine(now.date(), time.min, tzinfo=base.LONDON).astimezone(UTC)
         try:
             response = await self._hass.services.async_call(
                 "recorder",
@@ -108,9 +106,7 @@ class EnhancedAgileHistoryBackfill(base.AgileHistoryBackfill):
         return {
             key: self._source_descriptor(
                 entity_id,
-                statistics.get(entity_id, [])
-                if isinstance(statistics, dict)
-                else [],
+                statistics.get(entity_id, []) if isinstance(statistics, dict) else [],
             )
             for key, entity_id in sources.items()
         }
@@ -123,9 +119,11 @@ class EnhancedAgileHistoryBackfill(base.AgileHistoryBackfill):
         """Return human-readable availability for one configured statistic."""
         state = self._hass.states.get(entity_id)
         attributes = state.attributes if state is not None else {}
-        usable_rows = [item for item in rows if isinstance(item, dict)] if isinstance(
-            rows, list
-        ) else []
+        usable_rows = (
+            [item for item in rows if isinstance(item, dict)]
+            if isinstance(rows, list)
+            else []
+        )
         starts = [str(item.get("start")) for item in usable_rows if item.get("start")]
         return {
             "entity_id": entity_id,
@@ -182,8 +180,7 @@ class EnhancedAgileHistoryBackfill(base.AgileHistoryBackfill):
             if start_day <= item.timestamp.astimezone(base.LONDON).date() < today
         }
         missing_days = {
-            start_day + timedelta(days=offset)
-            for offset in range(base.TARGET_DAYS)
+            start_day + timedelta(days=offset) for offset in range(base.TARGET_DAYS)
         } - native_days
         if not missing_days:
             return False
@@ -389,9 +386,11 @@ def _energy_rows(
     for kind, entity_ids in energy_sources.items():
         for entity_id in entity_ids:
             raw_rows = statistics.get(entity_id, [])
-            usable = [row for row in raw_rows if isinstance(row, dict)] if isinstance(
-                raw_rows, list
-            ) else []
+            usable = (
+                [row for row in raw_rows if isinstance(row, dict)]
+                if isinstance(raw_rows, list)
+                else []
+            )
             starts = [str(row.get("start")) for row in usable if row.get("start")]
             diagnostics[entity_id] = {
                 "kind": kind,
@@ -429,11 +428,7 @@ def _energy_rows(
                 energy_by_kind[kind][timestamp] += max(energy, 0.0)
 
     starts = sorted(
-        {
-            timestamp
-            for values in energy_by_kind.values()
-            for timestamp in values
-        }
+        {timestamp for values in energy_by_kind.values() for timestamp in values}
     )
     rows: dict[str, dict[datetime, float]] = defaultdict(dict)
     for timestamp in starts:
@@ -445,11 +440,7 @@ def _energy_rows(
         battery_discharge = energy_by_kind["battery_discharge"].get(timestamp, 0.0)
         battery_charge = energy_by_kind["battery_charge"].get(timestamp, 0.0)
         house = max(
-            solar
-            + grid_import
-            + battery_discharge
-            - grid_export
-            - battery_charge,
+            solar + grid_import + battery_discharge - grid_export - battery_charge,
             0.0,
         )
         rows["house_load_kw"][timestamp] = house
@@ -482,7 +473,9 @@ def install_enhanced_backfill() -> None:
         return
 
     original_refresh = current
-    target._async_direct_diagnostics = EnhancedAgileHistoryBackfill._async_direct_diagnostics
+    target._async_direct_diagnostics = (
+        EnhancedAgileHistoryBackfill._async_direct_diagnostics
+    )
     target._source_descriptor = EnhancedAgileHistoryBackfill._source_descriptor
     target._async_energy_dashboard_fallback = (
         EnhancedAgileHistoryBackfill._async_energy_dashboard_fallback
