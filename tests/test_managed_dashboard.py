@@ -11,10 +11,7 @@ SOURCE = ROOT / "dashboards" / "kems_master_dashboard.yaml"
 PACKAGED = ROOT / "custom_components" / "kems" / "kems_master_dashboard.yaml"
 AGILE_SOURCE = ROOT / "dashboards" / "kems_agile_smart_export_builtin.yaml"
 AGILE_PACKAGED = (
-    ROOT
-    / "custom_components"
-    / "kems"
-    / "kems_agile_smart_export_dashboard.yaml"
+    ROOT / "custom_components" / "kems" / "kems_agile_smart_export_dashboard.yaml"
 )
 
 
@@ -89,10 +86,7 @@ def test_agile_dashboard_is_synced_to_home_assistant_config() -> None:
     sync = (ROOT / "custom_components" / "kems" / "dashboard.py").read_text(
         encoding="utf-8"
     )
-    assert (
-        'AGILE_DASHBOARD_FILENAME = "kems_agile_smart_export_dashboard.yaml"'
-        in sync
-    )
+    assert 'AGILE_DASHBOARD_FILENAME = "kems_agile_smart_export_dashboard.yaml"' in sync
     assert "hass.config.path(AGILE_DASHBOARD_FILENAME)" in sync
     assert "PACKAGED_AGILE_DASHBOARD_PATH" in sync
 

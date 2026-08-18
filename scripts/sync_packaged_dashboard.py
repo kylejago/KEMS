@@ -13,10 +13,7 @@ DASHBOARD_PAIRS = (
     ),
     (
         ROOT / "dashboards" / "kems_agile_smart_export_builtin.yaml",
-        ROOT
-        / "custom_components"
-        / "kems"
-        / "kems_agile_smart_export_dashboard.yaml",
+        ROOT / "custom_components" / "kems" / "kems_agile_smart_export_dashboard.yaml",
     ),
 )
 

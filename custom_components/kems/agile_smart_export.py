@@ -144,9 +144,9 @@ class AgileSmartExportManager:
         local_now = now.astimezone(LONDON)
         grouped: dict[date, list[Snapshot]] = {}
         for item in sorted(records, key=lambda value: value.timestamp):
-            grouped.setdefault(
-                item.timestamp.astimezone(LONDON).date(), []
-            ).append(item)
+            grouped.setdefault(item.timestamp.astimezone(LONDON).date(), []).append(
+                item
+            )
 
         agile_soc = full_soc = max(
             config.battery_initial_percent,
@@ -170,18 +170,14 @@ class AgileSmartExportManager:
             )
             calculated[day.isoformat()] = result
             agile_soc = float(
-                result["agile_smart_export"].get("ending_soc_percent")
-                or agile_soc
+                result["agile_smart_export"].get("ending_soc_percent") or agile_soc
             )
             full_soc = float(
-                result["full_kems_forecast"].get("ending_soc_percent")
-                or full_soc
+                result["full_kems_forecast"].get("ending_soc_percent") or full_soc
             )
             if day < local_now.date() and result["ready"]:
                 compact = {
-                    key: value
-                    for key, value in result.items()
-                    if key != "slot_plan"
+                    key: value for key, value in result.items() if key != "slot_plan"
                 }
                 if self._daily.get(day.isoformat()) != compact:
                     self._daily[day.isoformat()] = compact
@@ -221,9 +217,7 @@ class AgileSmartExportManager:
         all_days.update(
             {
                 key: {
-                    name: value
-                    for name, value in result.items()
-                    if name != "slot_plan"
+                    name: value for name, value in result.items() if name != "slot_plan"
                 }
                 for key, result in calculated.items()
                 if result["ready"]
@@ -268,11 +262,7 @@ class AgileSmartExportManager:
             ),
             "last_error": self._last_error,
             "generated_at": now.isoformat(),
-            "ready": bool(
-                today
-                and today["ready"]
-                and quality["today_complete"]
-            ),
+            "ready": bool(today and today["ready"] and quality["today_complete"]),
         }
         self._publish(self._state)
         if self._dirty:
@@ -292,9 +282,7 @@ class AgileSmartExportManager:
                     else None
                 ),
                 "last_success": (
-                    self._last_success.isoformat()
-                    if self._last_success
-                    else None
+                    self._last_success.isoformat() if self._last_success else None
                 ),
                 "rates": [item.to_dict() for item in self._rates],
                 "daily": self._daily,
@@ -348,9 +336,7 @@ class AgileSmartExportManager:
                 data = await response.json()
             params = None
             products.extend(
-                item
-                for item in data.get("results", [])
-                if isinstance(item, dict)
+                item for item in data.get("results", []) if isinstance(item, dict)
             )
             url = str(data.get("next")) if data.get("next") else None
 
@@ -360,9 +346,8 @@ class AgileSmartExportManager:
             name = str(item.get("display_name", ""))
             if str(item.get("direction", "")).upper() != "EXPORT":
                 continue
-            if (
-                "AGILE OUTGOING" not in name.upper()
-                and not code.upper().startswith("AGILE-OUTGOING")
+            if "AGILE OUTGOING" not in name.upper() and not code.upper().startswith(
+                "AGILE-OUTGOING"
             ):
                 continue
             start = _maybe_dt(item.get("available_from"))
@@ -371,9 +356,7 @@ class AgileSmartExportManager:
                 continue
             candidates.append(item)
         if not candidates:
-            raise ValueError(
-                "No active Octopus Agile Outgoing product was found"
-            )
+            raise ValueError("No active Octopus Agile Outgoing product was found")
         candidates.sort(
             key=lambda item: _maybe_dt(item.get("available_from"))
             or datetime.min.replace(tzinfo=UTC),
@@ -394,17 +377,11 @@ class AgileSmartExportManager:
         tariff = region.get("direct_debit_monthly")
         if not isinstance(tariff, dict):
             tariff = next(
-                (
-                    value
-                    for value in region.values()
-                    if isinstance(value, dict)
-                ),
+                (value for value in region.values() if isinstance(value, dict)),
                 None,
             )
         if not isinstance(tariff, dict):
-            raise ValueError(
-                f"Agile Outgoing does not expose Region {REGION}"
-            )
+            raise ValueError(f"Agile Outgoing does not expose Region {REGION}")
         rate_url = next(
             (
                 str(link["href"])
@@ -416,9 +393,7 @@ class AgileSmartExportManager:
             None,
         )
         if not tariff.get("code") or not rate_url:
-            raise ValueError(
-                "Region L Agile Outgoing rate endpoint was not found"
-            )
+            raise ValueError("Region L Agile Outgoing rate endpoint was not found")
         self._product_code = product_code
         self._tariff_code = str(tariff["code"])
         self._rate_url = rate_url
@@ -459,10 +434,7 @@ class AgileSmartExportManager:
                 data = await response.json()
             params = None
             for item in data.get("results", []):
-                if (
-                    isinstance(item, dict)
-                    and item.get("valid_to") is not None
-                ):
+                if isinstance(item, dict) and item.get("valid_to") is not None:
                     fetched.append(
                         AgileRate(
                             self._product_code,
@@ -475,8 +447,7 @@ class AgileSmartExportManager:
             url = str(data.get("next")) if data.get("next") else None
         cutoff = now - timedelta(days=retain)
         self._rates = _dedupe(
-            [item for item in self._rates if item.valid_to >= cutoff]
-            + fetched
+            [item for item in self._rates if item.valid_to >= cutoff] + fetched
         )
 
     def _compare_day(
@@ -508,9 +479,9 @@ class AgileSmartExportManager:
             current_snapshot=full_records[-1],
         )
         standing = _standing(records)
-        full_discharge = float(
-            full.simulated_battery_to_home_kwh or 0
-        ) + float(full.simulated_battery_export_kwh or 0)
+        full_discharge = float(full.simulated_battery_to_home_kwh or 0) + float(
+            full.simulated_battery_export_kwh or 0
+        )
         full_wear = full_discharge * BATTERY_WEAR_PENCE_PER_KWH
         full_energy_cost = float(full.simulated_cost_pence or 0) + standing
         full_summary = {
@@ -620,9 +591,7 @@ class AgileSmartExportManager:
         ):
             hours = min(
                 max(
-                    (
-                        following.timestamp - current.timestamp
-                    ).total_seconds(),
+                    (following.timestamp - current.timestamp).total_seconds(),
                     0,
                 )
                 / 3600,
@@ -646,10 +615,7 @@ class AgileSmartExportManager:
             rate = slot.value_inc_vat
             import_rate = float(current.current_import_rate)
             load_kwh = load * hours
-            solar_kwh = (
-                self._simulation._simulated_solar_power(current, config)
-                * hours
-            )
+            solar_kwh = self._simulation._simulated_solar_power(current, config) * hours
             inverter = max(config.inverter_limit_kw, 0) * hours
             export_limit = min(
                 max(config.export_limit_kw, 0) * hours,
@@ -669,8 +635,7 @@ class AgileSmartExportManager:
                     charge = min(
                         solar_left,
                         charge_limit,
-                        max(target - battery, 0)
-                        / max(config.charge_efficiency, 0.01),
+                        max(target - battery, 0) / max(config.charge_efficiency, 0.01),
                     )
                     solar_battery = charge * config.charge_efficiency
                     battery += solar_battery
@@ -680,19 +645,16 @@ class AgileSmartExportManager:
                 grid_charge = min(
                     max(
                         charge_limit
-                        - solar_battery
-                        / max(config.charge_efficiency, 0.01),
+                        - solar_battery / max(config.charge_efficiency, 0.01),
                         0,
                     ),
-                    max(target - battery, 0)
-                    / max(config.charge_efficiency, 0.01),
+                    max(target - battery, 0) / max(config.charge_efficiency, 0.01),
                 )
                 if config.site_import_limit_kw is not None:
                     grid_charge = min(
                         grid_charge,
                         max(
-                            config.site_import_limit_kw * hours
-                            - grid_import,
+                            config.site_import_limit_kw * hours - grid_import,
                             0,
                         ),
                     )
@@ -747,18 +709,13 @@ class AgileSmartExportManager:
                     next_cheap,
                 )
                 stored_value = (
-                    best_future
-                    * config.charge_efficiency
-                    * config.discharge_efficiency
+                    best_future * config.charge_efficiency * config.discharge_efficiency
                     - BATTERY_WEAR_PENCE_PER_KWH
                 )
                 if (
                     solar_left
                     and battery < capacity
-                    and (
-                        battery < floor
-                        or stored_value > rate + 0.001
-                    )
+                    and (battery < floor or stored_value > rate + 0.001)
                 ):
                     charge = min(
                         solar_left,
@@ -770,9 +727,7 @@ class AgileSmartExportManager:
                     battery += solar_battery
                     solar_left -= charge
                     if charge:
-                        actions.append(
-                            "store solar for higher Agile slot"
-                        )
+                        actions.append("store solar for higher Agile slot")
                 inverter_used = solar_home + battery_home
                 if rate > 0:
                     solar_export = min(
@@ -803,11 +758,7 @@ class AgileSmartExportManager:
                     exportable,
                     max(config.max_discharge_kw, 0),
                 )
-                if (
-                    rate > 0
-                    and threshold is not None
-                    and rate + 1e-6 >= threshold
-                ):
+                if rate > 0 and threshold is not None and rate + 1e-6 >= threshold:
                     battery_export = min(
                         exportable,
                         max(export_limit - solar_export, 0),
@@ -819,9 +770,7 @@ class AgileSmartExportManager:
                         0.01,
                     )
                     if battery_export:
-                        actions.append(
-                            "export battery at high Agile price"
-                        )
+                        actions.append("export battery at high Agile price")
 
             battery = min(max(battery, reserve), capacity)
             exported = solar_export + battery_export
@@ -872,9 +821,7 @@ class AgileSmartExportManager:
                 1,
             )
             plan["actions"].extend(
-                action
-                for action in actions
-                if action not in plan["actions"]
+                action for action in actions if action not in plan["actions"]
             )
 
         coverage = covered / intervals if intervals else 0.0
@@ -882,15 +829,8 @@ class AgileSmartExportManager:
             totals["battery_home"] + totals["battery_export"]
         ) * BATTERY_WEAR_PENCE_PER_KWH
         standing = _standing(records)
-        energy_cost = (
-            totals["import_cost"] + standing - totals["income"]
-        )
-        fixed_cost = (
-            totals["import_cost"]
-            + standing
-            - totals["fixed_income"]
-            + wear
-        )
+        energy_cost = totals["import_cost"] + standing - totals["income"]
+        fixed_cost = totals["import_cost"] + standing - totals["fixed_income"] + wear
         weighted = (
             totals["income"] / totals["grid_export"]
             if totals["grid_export"] > 1e-6
@@ -898,11 +838,7 @@ class AgileSmartExportManager:
         )
         values = [item.value_inc_vat for item in rates]
         summary = {
-            "ready": bool(
-                covered >= 3
-                and coverage >= MIN_COVERAGE
-                and rates
-            ),
+            "ready": bool(covered >= 3 and coverage >= MIN_COVERAGE and rates),
             "data_coverage": round(coverage, 4),
             "energy_net_cost_pence": round(energy_cost, 2),
             "economic_net_cost_pence": round(
@@ -946,16 +882,10 @@ class AgileSmartExportManager:
                 round(weighted, 4) if weighted is not None else None
             ),
             "average_agile_rate_pence": (
-                round(sum(values) / len(values), 4)
-                if values
-                else None
+                round(sum(values) / len(values), 4) if values else None
             ),
-            "highest_agile_rate_pence": (
-                round(max(values), 4) if values else None
-            ),
-            "lowest_agile_rate_pence": (
-                round(min(values), 4) if values else None
-            ),
+            "highest_agile_rate_pence": (round(max(values), 4) if values else None),
+            "lowest_agile_rate_pence": (round(min(values), 4) if values else None),
             "ending_soc_percent": round(
                 100 * battery / capacity,
                 1,
@@ -1004,10 +934,14 @@ class AgileSmartExportManager:
         """Protect forecast reserve plus demand needed before cheap power."""
         forecast_floor = reserve
         if current.forecast_minimum_precheap_soc_percent is not None:
-            forecast_floor = capacity * max(
-                float(current.forecast_minimum_precheap_soc_percent),
-                config.battery_reserve_percent,
-            ) / 100
+            forecast_floor = (
+                capacity
+                * max(
+                    float(current.forecast_minimum_precheap_soc_percent),
+                    config.battery_reserve_percent,
+                )
+                / 100
+            )
         needed_ac = 0.0
         reached_cheap = False
         for future, following in zip(
@@ -1020,9 +954,7 @@ class AgileSmartExportManager:
                 break
             hours = min(
                 max(
-                    (
-                        following.timestamp - future.timestamp
-                    ).total_seconds(),
+                    (following.timestamp - future.timestamp).total_seconds(),
                     0,
                 )
                 / 3600,
@@ -1033,22 +965,17 @@ class AgileSmartExportManager:
                 needed_ac += load * hours
         if (
             not reached_cheap
-            and current.forecast_expected_house_remaining_today_kwh
-            is not None
+            and current.forecast_expected_house_remaining_today_kwh is not None
         ):
             needed_ac = max(
                 needed_ac,
-                float(
-                    current.forecast_expected_house_remaining_today_kwh
-                ),
+                float(current.forecast_expected_house_remaining_today_kwh),
             )
         return min(
             max(
                 reserve,
                 forecast_floor,
-                reserve
-                + needed_ac
-                / max(config.discharge_efficiency, 0.01),
+                reserve + needed_ac / max(config.discharge_efficiency, 0.01),
             ),
             capacity,
         )
@@ -1085,18 +1012,10 @@ class AgileSmartExportManager:
                     "grid_import_kwh": plan.get("grid_import_kwh"),
                     "grid_export_kwh": plan.get("grid_export_kwh"),
                     "solar_export_kwh": plan.get("solar_export_kwh"),
-                    "solar_to_battery_kwh": plan.get(
-                        "solar_to_battery_kwh"
-                    ),
-                    "battery_to_home_kwh": plan.get(
-                        "battery_to_home_kwh"
-                    ),
-                    "battery_export_kwh": plan.get(
-                        "battery_export_kwh"
-                    ),
-                    "ending_soc_percent": plan.get(
-                        "ending_soc_percent"
-                    ),
+                    "solar_to_battery_kwh": plan.get("solar_to_battery_kwh"),
+                    "battery_to_home_kwh": plan.get("battery_to_home_kwh"),
+                    "battery_export_kwh": plan.get("battery_export_kwh"),
+                    "ending_soc_percent": plan.get("ending_soc_percent"),
                     "actions": plan.get("actions", ["future slot"]),
                 }
             )
@@ -1162,9 +1081,7 @@ class AgileSmartExportManager:
             time.min,
             tzinfo=LONDON,
         ).astimezone(UTC)
-        load_profile = tuple(
-            learned.predicted_house_tomorrow_hourly_kwh
-        )
+        load_profile = tuple(learned.predicted_house_tomorrow_hourly_kwh)
         typical = max(float(learned.typical_house_load_kw or 0.4), 0.0)
         solar = {
             item.timestamp.astimezone(LONDON).hour: max(
@@ -1188,26 +1105,18 @@ class AgileSmartExportManager:
                 tariff.offpeak_start,
                 tariff.offpeak_end,
             )
-            rate = (
-                tariff.offpeak_rate_pence
-                if cheap
-                else tariff.day_rate_pence
-            )
+            rate = tariff.offpeak_rate_pence if cheap else tariff.day_rate_pence
             records.append(
                 Snapshot(
                     timestamp=local,
                     current_import_rate=rate,
                     next_import_rate=rate,
-                    electricity_standing_charge=(
-                        tariff.standing_charge_pence
-                    ),
+                    electricity_standing_charge=(tariff.standing_charge_pence),
                     off_peak=cheap,
                     intelligent_slot=False,
                     next_offpeak_start=_next_cheap(local, tariff),
                     house_load_kw=house_kw,
-                    solar_power_kw=(
-                        solar.get(local.hour) if solar else None
-                    ),
+                    solar_power_kw=(solar.get(local.hour) if solar else None),
                     forecast_source=plan.forecast_source,
                     forecast_expected_solar_remaining_today_kwh=(
                         plan.expected_solar_tomorrow_kwh
@@ -1227,16 +1136,10 @@ class AgileSmartExportManager:
                     forecast_maximum_overnight_soc_percent=(
                         plan.maximum_overnight_soc_percent
                     ),
-                    forecast_recharge_shortfall_kwh=(
-                        plan.recharge_shortfall_kwh
-                    ),
-                    forecast_recharge_target_feasible=(
-                        plan.recharge_target_feasible
-                    ),
+                    forecast_recharge_shortfall_kwh=(plan.recharge_shortfall_kwh),
+                    forecast_recharge_target_feasible=(plan.recharge_target_feasible),
                     forecast_protection_state=plan.state,
-                    forecast_confidence_percent=(
-                        plan.confidence_percent
-                    ),
+                    forecast_confidence_percent=(plan.confidence_percent),
                 )
             )
             cursor += timedelta(minutes=30)
@@ -1312,10 +1215,7 @@ class AgileSmartExportManager:
                 (
                     f"sensor.kems_full_kems_forecast_comparison_cost_{key}",
                     full.get("economic_net_cost_pence"),
-                    (
-                        "Full KEMS Forecast comparison cost "
-                        f"{period['label']}"
-                    ),
+                    ("Full KEMS Forecast comparison cost " f"{period['label']}"),
                     full,
                 ),
                 (
@@ -1361,9 +1261,7 @@ class AgileSmartExportManager:
             "sensor.kems_agile_smart_export_weighted_rate_today",
             _state(today.get("weighted_achieved_export_rate_pence")),
             {
-                "friendly_name": (
-                    "Agile Smart Export weighted achieved rate today"
-                ),
+                "friendly_name": ("Agile Smart Export weighted achieved rate today"),
                 "unit_of_measurement": "p/kWh",
             },
         )
@@ -1389,87 +1287,51 @@ def _aggregate(
 
     def strategy(name: str) -> dict[str, Any]:
         items = [item[name] for item in ready]
-        export = sum(
-            float(item.get("grid_export_kwh") or 0)
-            for item in items
-        )
-        income = sum(
-            float(item.get("export_income_pence") or 0)
-            for item in items
-        )
+        export = sum(float(item.get("grid_export_kwh") or 0) for item in items)
+        income = sum(float(item.get("export_income_pence") or 0) for item in items)
         result = {
             "ready": True,
             "energy_net_cost_pence": round(
-                sum(
-                    float(item.get("energy_net_cost_pence") or 0)
-                    for item in items
-                ),
+                sum(float(item.get("energy_net_cost_pence") or 0) for item in items),
                 2,
             ),
             "economic_net_cost_pence": round(
-                sum(
-                    float(item.get("economic_net_cost_pence") or 0)
-                    for item in items
-                ),
+                sum(float(item.get("economic_net_cost_pence") or 0) for item in items),
                 2,
             ),
             "import_cost_pence": round(
-                sum(
-                    float(item.get("import_cost_pence") or 0)
-                    for item in items
-                ),
+                sum(float(item.get("import_cost_pence") or 0) for item in items),
                 2,
             ),
             "export_income_pence": round(income, 2),
             "grid_import_kwh": round(
-                sum(
-                    float(item.get("grid_import_kwh") or 0)
-                    for item in items
-                ),
+                sum(float(item.get("grid_import_kwh") or 0) for item in items),
                 3,
             ),
             "grid_export_kwh": round(export, 3),
             "solar_export_kwh": round(
-                sum(
-                    float(item.get("solar_export_kwh") or 0)
-                    for item in items
-                ),
+                sum(float(item.get("solar_export_kwh") or 0) for item in items),
                 3,
             ),
             "solar_to_battery_kwh": round(
-                sum(
-                    float(item.get("solar_to_battery_kwh") or 0)
-                    for item in items
-                ),
+                sum(float(item.get("solar_to_battery_kwh") or 0) for item in items),
                 3,
             ),
             "battery_to_home_kwh": round(
-                sum(
-                    float(item.get("battery_to_home_kwh") or 0)
-                    for item in items
-                ),
+                sum(float(item.get("battery_to_home_kwh") or 0) for item in items),
                 3,
             ),
             "battery_export_kwh": round(
-                sum(
-                    float(item.get("battery_export_kwh") or 0)
-                    for item in items
-                ),
+                sum(float(item.get("battery_export_kwh") or 0) for item in items),
                 3,
             ),
             "battery_wear_cost_pence": round(
-                sum(
-                    float(item.get("battery_wear_cost_pence") or 0)
-                    for item in items
-                ),
+                sum(float(item.get("battery_wear_cost_pence") or 0) for item in items),
                 2,
             ),
             "ending_soc_percent": items[-1].get("ending_soc_percent"),
             "data_coverage": round(
-                sum(
-                    float(item.get("data_coverage") or 0)
-                    for item in items
-                )
+                sum(float(item.get("data_coverage") or 0) for item in items)
                 / len(items),
                 4,
             ),
@@ -1477,24 +1339,14 @@ def _aggregate(
         if name == "agile_smart_export":
             result["fixed_12p_same_dispatch_income_pence"] = round(
                 sum(
-                    float(
-                        item.get(
-                            "fixed_12p_same_dispatch_income_pence"
-                        )
-                        or 0
-                    )
+                    float(item.get("fixed_12p_same_dispatch_income_pence") or 0)
                     for item in items
                 ),
                 2,
             )
             result["gain_vs_fixed_12p_same_dispatch_pence"] = round(
                 sum(
-                    float(
-                        item.get(
-                            "gain_vs_fixed_12p_same_dispatch_pence"
-                        )
-                        or 0
-                    )
+                    float(item.get("gain_vs_fixed_12p_same_dispatch_pence") or 0)
                     for item in items
                 ),
                 2,
@@ -1512,12 +1364,8 @@ def _aggregate(
                 for item in items
                 if item.get("lowest_agile_rate_pence") is not None
             ]
-            result["highest_agile_rate_pence"] = (
-                max(highs) if highs else None
-            )
-            result["lowest_agile_rate_pence"] = (
-                min(lows) if lows else None
-            )
+            result["highest_agile_rate_pence"] = max(highs) if highs else None
+            result["lowest_agile_rate_pence"] = min(lows) if lows else None
         return result
 
     full = strategy("full_kems_forecast")
@@ -1558,11 +1406,7 @@ def _comparison(advantage: float | None) -> dict[str, Any]:
     winner = (
         "Tie"
         if abs(advantage) < 0.01
-        else (
-            "Agile Smart Export"
-            if advantage > 0
-            else "Full KEMS Forecast"
-        )
+        else ("Agile Smart Export" if advantage > 0 else "Full KEMS Forecast")
     )
     return {
         "agile_advantage_pence": round(advantage, 2),
@@ -1578,9 +1422,7 @@ def _quality(
 ) -> dict[str, Any]:
     """Report 46/48/50-slot completeness correctly across UK DST."""
     today_expected = _expected_slots(now.date())
-    tomorrow_expected = _expected_slots(
-        now.date() + timedelta(days=1)
-    )
+    tomorrow_expected = _expected_slots(now.date() + timedelta(days=1))
     tomorrow_complete = len(tomorrow) == tomorrow_expected
     if tomorrow_complete:
         tomorrow_status = "complete"
@@ -1591,11 +1433,7 @@ def _quality(
     else:
         tomorrow_status = "incomplete after publication window"
     return {
-        "status": (
-            "ready"
-            if len(today) == today_expected
-            else "incomplete"
-        ),
+        "status": ("ready" if len(today) == today_expected else "incomplete"),
         "today_count": len(today),
         "today_expected": today_expected,
         "today_complete": len(today) == today_expected,
@@ -1652,8 +1490,7 @@ def _threshold(
         [
             item.value_inc_vat
             for item in rates
-            if start_utc <= item.valid_from < end_utc
-            and item.value_inc_vat > 0
+            if start_utc <= item.valid_from < end_utc and item.value_inc_vat > 0
         ],
         reverse=True,
     )
@@ -1674,9 +1511,7 @@ def _best_rate(
     start_utc = start.astimezone(UTC)
     end_utc = end.astimezone(UTC)
     values = [
-        item.value_inc_vat
-        for item in rates
-        if start_utc <= item.valid_from < end_utc
+        item.value_inc_vat for item in rates if start_utc <= item.valid_from < end_utc
     ]
     return max(values) if values else 0.0
 
@@ -1687,11 +1522,7 @@ def _rate_at(
 ) -> AgileRate | None:
     current = timestamp.astimezone(UTC)
     return next(
-        (
-            item
-            for item in rates
-            if item.valid_from <= current < item.valid_to
-        ),
+        (item for item in rates if item.valid_from <= current < item.valid_to),
         None,
     )
 
@@ -1758,18 +1589,11 @@ def _load(snapshot: Snapshot) -> float | None:
 
 
 def _in_window(value: time, start: time, end: time) -> bool:
-    return (
-        start <= value < end
-        if start < end
-        else value >= start or value < end
-    )
+    return start <= value < end if start < end else value >= start or value < end
 
 
 def _dedupe(rates: list[AgileRate]) -> list[AgileRate]:
-    values = {
-        (item.valid_from, item.valid_to): item
-        for item in rates
-    }
+    values = {(item.valid_from, item.valid_to): item for item in rates}
     return sorted(values.values(), key=lambda item: item.valid_from)
 
 
@@ -1784,10 +1608,7 @@ def _text(value: Any) -> str | None:
 
 def _api_dt(value: datetime) -> str:
     return (
-        value.astimezone(UTC)
-        .replace(microsecond=0)
-        .isoformat()
-        .replace("+00:00", "Z")
+        value.astimezone(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
     )
 
 
@@ -1797,11 +1618,7 @@ def _dt(value: Any) -> datetime:
         if isinstance(value, datetime)
         else datetime.fromisoformat(str(value).replace("Z", "+00:00"))
     )
-    return (
-        parsed
-        if parsed.tzinfo
-        else parsed.replace(tzinfo=UTC)
-    ).astimezone(UTC)
+    return (parsed if parsed.tzinfo else parsed.replace(tzinfo=UTC)).astimezone(UTC)
 
 
 def _maybe_dt(value: Any) -> datetime | None:
