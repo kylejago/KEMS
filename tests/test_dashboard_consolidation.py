@@ -31,7 +31,9 @@ EXPECTED_PATHS = [
 
 def _load_module():
     """Load the pure consolidation helper without importing Home Assistant."""
-    spec = importlib.util.spec_from_file_location("kems_dashboard_consolidation_test", MODULE_PATH)
+    spec = importlib.util.spec_from_file_location(
+        "kems_dashboard_consolidation_test", MODULE_PATH
+    )
     assert spec is not None
     assert spec.loader is not None
     module = importlib.util.module_from_spec(spec)
@@ -117,4 +119,7 @@ def test_consolidation_is_installed_after_all_agile_dashboard_patches() -> None:
     """The final writer must consolidate only after feature views are complete."""
     runtime = RUNTIME.read_text(encoding="utf-8")
     assert "install_live_scenario_patch()\ninstall_dashboard_yaml_guard()" in runtime
-    assert "install_alpha717_dashboard_patch()\ninstall_dashboard_consolidation()" in runtime
+    assert (
+        "install_alpha717_dashboard_patch()\ninstall_dashboard_consolidation()"
+        in runtime
+    )
