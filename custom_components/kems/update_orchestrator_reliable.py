@@ -2,14 +2,15 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, ServiceCall
 
+from . import update_orchestrator as base
 from .const import DOMAIN
 from .dashboard import _combined_master_dashboard_bytes
-from . import update_orchestrator as base
 
 
 class ReliableKEMSUpdateOrchestrator(base.KEMSUpdateOrchestrator):
@@ -56,12 +57,10 @@ class ReliableKEMSUpdateOrchestrator(base.KEMSUpdateOrchestrator):
         await super().async_verify_pending(save=save)
 
     def _dashboard_current(self) -> bool | None:
-        """Verify the installed dashboard against the actual combined managed file."""
-        installed = self.hass.config.path(base.MANAGED_DASHBOARD_FILENAME) if hasattr(base, "MANAGED_DASHBOARD_FILENAME") else self.hass.config.path("kems_master_dashboard.yaml")
+        """Verify the installed dashboard against the combined managed file."""
+        installed = Path(self.hass.config.path("kems_master_dashboard.yaml"))
         try:
-            from pathlib import Path
-
-            return Path(installed).read_bytes() == _combined_master_dashboard_bytes()
+            return installed.read_bytes() == _combined_master_dashboard_bytes()
         except (OSError, ValueError):
             return None
 
