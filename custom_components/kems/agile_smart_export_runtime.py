@@ -24,6 +24,7 @@ from .agile_dashboard_yaml_guard import install_dashboard_yaml_guard  # noqa: E4
 from .agile_rolling_replan import install_rolling_replan_patch  # noqa: E402
 from .agile_smart_export_live import install_live_scenario_patch  # noqa: E402
 from .agile_smart_export_runtime_base import *  # noqa: E402,F403
+from .dashboard_consolidation import install_dashboard_consolidation  # noqa: E402
 
 install_rolling_replan_patch()
 install_live_scenario_patch()
@@ -33,6 +34,7 @@ install_alpha714_dashboard_patch()
 install_alpha715_dashboard_patch()
 install_alpha716_dashboard_patch()
 install_alpha717_dashboard_patch()
+install_dashboard_consolidation()
 
 EfficientAgileSmartExportManager = _base.EfficientAgileSmartExportManager
 
