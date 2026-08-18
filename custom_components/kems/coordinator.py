@@ -10,6 +10,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
 
+from .agile_smart_export import AgileSmartExportManager
 from .collector import Collector
 from .const import NAME
 from .entity_discovery import SourceValidationResult
@@ -71,6 +72,11 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
         self._advice = AdviceEngine()
         self._simulation = SimulationEngine()
         self._scenarios = ScenarioComparisonEngine()
+        self._agile_smart_export = AgileSmartExportManager(
+            hass,
+            entry.entry_id,
+            settings.history_days,
+        )
         self._whole_home = WholeHomeEngine()
         self._control = ControlEngine()
         self._lifetime = LifetimeLedgerRecorder(hass, entry.entry_id)
@@ -96,12 +102,18 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
         """Return retained pre-target-day forecast evidence for diagnostics."""
         return self._forecast_validation.forecasts
 
+    @property
+    def agile_smart_export_state(self) -> dict:
+        """Return live Region L Agile Smart Export comparison diagnostics."""
+        return self._agile_smart_export.state
+
     async def _async_setup(self) -> None:
         """Load retained learning history and permanent supporting ledgers."""
         await self._history.async_load()
         await self._forecast_validation.async_load()
         await self._lifetime.async_load()
         await self._power_down.async_load()
+        await self._agile_smart_export.async_load()
         await self._lifetime.async_bootstrap(
             self._history.records,
             self._simulation,
@@ -177,6 +189,15 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                 self.settings.simulation,
                 learned.predicted_energy_until_offpeak_kwh,
                 current_snapshot=snapshot,
+            )
+            await self._agile_smart_export.async_update(
+                records=records,
+                now=now,
+                config=self.settings.simulation,
+                learned=learned,
+                forecast=forecast,
+                forecast_plan=forecast_plan,
+                tariff=self.settings.tariff,
             )
             whole_home = self._whole_home.summarise(snapshot, simulation, gas)
             stored_lifetime = await self._lifetime.async_update(
@@ -280,6 +301,7 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
         await self._forecast_validation.async_save()
         await self._lifetime.async_save()
         await self._power_down.async_save()
+        await self._agile_smart_export.async_shutdown()
 
     @staticmethod
     def _phase(
