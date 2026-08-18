@@ -29,7 +29,7 @@ jobs:
         run: python scripts/sync_packaged_dashboard.py --check
 
       - name: Black
-        run: python -m black --check .
+        run: python -m black --check --diff .
 
       - name: Ruff
         run: python -m ruff check .

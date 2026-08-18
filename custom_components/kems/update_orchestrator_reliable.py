@@ -2,15 +2,66 @@
 
 from __future__ import annotations
 
+import asyncio
+import hashlib
+import json
 from pathlib import Path
 from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, ServiceCall
+from homeassistant.exceptions import HomeAssistantError
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from . import update_orchestrator as base
 from .const import DOMAIN
-from .dashboard import _combined_master_dashboard_bytes
+from .dashboard import _combined_master_dashboard_bytes, _sync_dashboard_bytes
+
+_UPDATE_DASHBOARD_MARKER = (
+    "          **Automatic updates are opt-in.** Turn them on below when you are happy "
+    "for KEMS to install tested releases unattended. A failed unattended update pauses "
+    "automatic updates until you explicitly re-enable them.\n"
+)
+_UPDATE_DASHBOARD_BUTTON = (
+    "      - type: button\n"
+    "        name: Check for updates\n"
+    "        icon: mdi:refresh\n"
+    "        show_state: false\n"
+    "        tap_action:\n"
+    "          action: perform-action\n"
+    "          perform_action: kems.check_for_updates\n"
+)
+
+
+def _is_leading_v_alias(tag: str) -> bool:
+    """Return whether a release tag is a conventional leading-v alias."""
+    return tag.lower().startswith("v") and len(tag) > 1 and tag[1].isdigit()
+
+
+def _combined_dashboard_with_update_button_bytes() -> bytes:
+    """Return the managed dashboard with a direct update-check button."""
+    content = _combined_master_dashboard_bytes().decode("utf-8")
+    if _UPDATE_DASHBOARD_BUTTON in content:
+        return content.encode()
+    if _UPDATE_DASHBOARD_MARKER not in content:
+        raise ValueError("Managed KEMS Updates view marker is missing")
+    return content.replace(
+        _UPDATE_DASHBOARD_MARKER,
+        _UPDATE_DASHBOARD_MARKER + _UPDATE_DASHBOARD_BUTTON,
+        1,
+    ).encode()
+
+
+async def _async_sync_update_dashboard(hass: HomeAssistant) -> None:
+    """Add reliable update controls without making KEMS startup depend on Lovelace."""
+    target = Path(hass.config.path("kems_master_dashboard.yaml"))
+    try:
+        content = await hass.async_add_executor_job(
+            _combined_dashboard_with_update_button_bytes
+        )
+        await hass.async_add_executor_job(_sync_dashboard_bytes, content, target)
+    except (OSError, ValueError):
+        base.LOGGER.exception("Unable to add KEMS update controls to managed dashboard")
 
 
 class ReliableKEMSUpdateOrchestrator(base.KEMSUpdateOrchestrator):
@@ -36,6 +87,117 @@ class ReliableKEMSUpdateOrchestrator(base.KEMSUpdateOrchestrator):
             )
         await super().async_set_policy(**changes)
 
+    async def _async_fetch_bundle(self) -> dict[str, Any] | None:
+        """Fetch the highest complete canonical KEMS bundle release."""
+        session = async_get_clientsession(self.hass)
+        headers = {
+            "Accept": "application/vnd.github+json",
+            "User-Agent": "KEMS-Home-Assistant-Update-Orchestrator",
+        }
+        async with session.get(
+            base.GITHUB_RELEASES_URL,
+            headers=headers,
+            timeout=15,
+        ) as response:
+            if response.status >= 400:
+                raise HomeAssistantError(
+                    f"GitHub bundle lookup returned HTTP {response.status}"
+                )
+            releases = await response.json()
+        if not isinstance(releases, list):
+            raise HomeAssistantError(
+                "GitHub bundle lookup returned an invalid response"
+            )
+
+        candidates: list[tuple[str, dict[str, Any], dict[str, Any], dict[str, Any]]] = (
+            []
+        )
+        for release in releases:
+            if release.get("draft"):
+                continue
+            if self.policy.channel == "stable" and release.get("prerelease"):
+                continue
+            release_tag = str(release.get("tag_name") or "").strip()
+            if not release_tag or _is_leading_v_alias(release_tag):
+                continue
+            version = base._normalise_version(release_tag)
+            if base.version_relation(version, version) != 0:
+                continue
+            assets = release.get("assets") or []
+            manifest = next(
+                (item for item in assets if item.get("name") == base.BUNDLE_ASSET),
+                None,
+            )
+            checksum = next(
+                (
+                    item
+                    for item in assets
+                    if item.get("name") == base.BUNDLE_CHECKSUM_ASSET
+                ),
+                None,
+            )
+            if manifest is None or checksum is None:
+                continue
+            candidates.append((version, release, manifest, checksum))
+
+        if not candidates:
+            return None
+
+        selected_version, selected, manifest_asset, checksum_asset = candidates[0]
+        for candidate in candidates[1:]:
+            relation = base.version_relation(candidate[0], selected_version)
+            if relation == 1:
+                selected_version, selected, manifest_asset, checksum_asset = candidate
+
+        async def download(asset: dict[str, Any]) -> bytes:
+            url = str(asset.get("browser_download_url") or "")
+            if not url:
+                raise HomeAssistantError(
+                    "KEMS bundle release asset has no download URL"
+                )
+            async with session.get(
+                url,
+                headers={"User-Agent": headers["User-Agent"]},
+                timeout=15,
+            ) as response:
+                if response.status >= 400:
+                    raise HomeAssistantError(
+                        f"KEMS bundle asset download returned HTTP {response.status}"
+                    )
+                return await response.read()
+
+        manifest_bytes, checksum_bytes = await asyncio.gather(
+            download(manifest_asset),
+            download(checksum_asset),
+        )
+        expected = checksum_bytes.decode("utf-8", errors="replace").strip().split()[0]
+        observed = hashlib.sha256(manifest_bytes).hexdigest()
+        if not expected or expected.lower() != observed.lower():
+            raise HomeAssistantError("KEMS bundle SHA-256 verification failed")
+        try:
+            bundle = base._validated_bundle(json.loads(manifest_bytes))
+        except (ValueError, TypeError, json.JSONDecodeError) as error:
+            raise HomeAssistantError(f"Invalid KEMS bundle: {error}") from error
+
+        release_tag = str(selected.get("tag_name") or "").strip()
+        core_target = base._component_target(bundle, "kems_core")
+        if (
+            core_target
+            and release_tag
+            and not base._version_matches(core_target, release_tag)
+        ):
+            raise HomeAssistantError(
+                f"KEMS bundle targets {core_target}, but release tag is {release_tag}"
+            )
+        bundle["release"] = {
+            "tag": release_tag or None,
+            "name": selected.get("name"),
+            "published_at": selected.get("published_at"),
+            "prerelease": bool(selected.get("prerelease")),
+            "sha256": observed,
+        }
+        return bundle
+
     async def _consider_bundle(self, bundle: dict[str, Any]) -> None:
         """Always pass HACS the canonical bundle target, never a leading-v alias."""
         target = base._component_target(bundle, "kems_core")
@@ -58,7 +220,9 @@ class ReliableKEMSUpdateOrchestrator(base.KEMSUpdateOrchestrator):
         """Verify the installed dashboard against the combined managed file."""
         installed = Path(self.hass.config.path("kems_master_dashboard.yaml"))
         try:
-            return installed.read_bytes() == _combined_master_dashboard_bytes()
+            return (
+                installed.read_bytes() == _combined_dashboard_with_update_button_bytes()
+            )
         except (OSError, ValueError):
             return None
 
@@ -77,6 +241,7 @@ async def async_setup_update_orchestrator(
     entry: ConfigEntry,
 ) -> ReliableKEMSUpdateOrchestrator:
     """Set up the reliable orchestrator while preserving the existing public API."""
+    await _async_sync_update_dashboard(hass)
     orchestrator = ReliableKEMSUpdateOrchestrator(hass, entry)
     hass.data.setdefault(base.DATA_KEY, {})[entry.entry_id] = orchestrator
     await orchestrator.async_start()

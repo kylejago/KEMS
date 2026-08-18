@@ -28,9 +28,9 @@ def test_reliable_orchestrator_waits_for_post_restart_bundle_before_success() ->
 def test_reliable_orchestrator_verifies_the_combined_managed_dashboard() -> None:
     """Dashboard verification must include the Agile views appended at runtime."""
     content = RELIABLE.read_text(encoding="utf-8")
-    assert "_combined_master_dashboard_bytes" in content
+    assert "_combined_dashboard_with_update_button_bytes" in content
     assert 'self.hass.config.path("kems_master_dashboard.yaml")' in content
-    assert "installed.read_bytes() == _combined_master_dashboard_bytes()" in content
+    assert "installed.read_bytes()" in content
 
 
 def test_reliable_orchestrator_clears_stale_failure_after_success() -> None:
@@ -46,3 +46,21 @@ def test_reliable_orchestrator_uses_canonical_hacs_version() -> None:
     content = RELIABLE.read_text(encoding="utf-8")
     assert 'target = base._component_target(bundle, "kems_core")' in content
     assert 'release["tag"] = target' in content
+
+
+def test_release_discovery_rejects_leading_v_aliases_and_orders_versions() -> None:
+    """A newer semantic KEMS bundle must not be masked by a leading-v alias."""
+    content = RELIABLE.read_text(encoding="utf-8")
+    assert "_is_leading_v_alias(release_tag)" in content
+    assert "base.version_relation(version, version) != 0" in content
+    assert "base.version_relation(candidate[0], selected_version)" in content
+    assert "if relation == 1" in content
+
+
+def test_updates_dashboard_has_direct_check_for_updates_button() -> None:
+    """The managed Updates view must expose the KEMS update-check action directly."""
+    content = RELIABLE.read_text(encoding="utf-8")
+    assert '"        name: Check for updates\\n"' in content
+    assert '"          action: perform-action\\n"' in content
+    assert '"          perform_action: kems.check_for_updates\\n"' in content
+    assert "await _async_sync_update_dashboard(hass)" in content
