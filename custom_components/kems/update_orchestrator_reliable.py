@@ -61,9 +61,7 @@ async def _async_sync_update_dashboard(hass: HomeAssistant) -> None:
         )
         await hass.async_add_executor_job(_sync_dashboard_bytes, content, target)
     except (OSError, ValueError):
-        base.LOGGER.exception(
-            "Unable to add KEMS update controls to managed dashboard"
-        )
+        base.LOGGER.exception("Unable to add KEMS update controls to managed dashboard")
 
 
 class ReliableKEMSUpdateOrchestrator(base.KEMSUpdateOrchestrator):
@@ -222,7 +220,9 @@ class ReliableKEMSUpdateOrchestrator(base.KEMSUpdateOrchestrator):
         """Verify the installed dashboard against the combined managed file."""
         installed = Path(self.hass.config.path("kems_master_dashboard.yaml"))
         try:
-            return installed.read_bytes() == _combined_dashboard_with_update_button_bytes()
+            return (
+                installed.read_bytes() == _combined_dashboard_with_update_button_bytes()
+            )
         except (OSError, ValueError):
             return None
 
