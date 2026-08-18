@@ -32,6 +32,9 @@ ANALYSIS_REFRESH = timedelta(minutes=5)
 RECENT_RATE_LOOKBACK = timedelta(days=2)
 TWELVE_MONTH_DAYS = 365
 BENCHMARK_PERIODS = (*PUBLISHED_PERIODS, "365_days")
+AGILE_FLOW_UNAVAILABLE = (
+    "H=-1,S=-1,GI=-1,GE=-1,SH=-1,SB=-1,SE=-1,GB=-1,BH=-1,BE=-1,SOC=-1"
+)
 
 
 class EfficientAgileSmartExportManager(AgileSmartExportManager):
@@ -40,6 +43,9 @@ class EfficientAgileSmartExportManager(AgileSmartExportManager):
     def __init__(self, hass: HomeAssistant, entry_id: str, history_days: int) -> None:
         super().__init__(hass, entry_id, history_days)
         self._last_analysis: datetime | None = None
+        self._panel_config: SimulationConfig | None = None
+        self._panel_today_records: list[Snapshot] = []
+        self._panel_tomorrow_records: list[Snapshot] = []
 
     async def async_update(
         self,
@@ -63,7 +69,8 @@ class EfficientAgileSmartExportManager(AgileSmartExportManager):
             return self.state
 
         self._last_analysis = now_utc
-        today = now.astimezone(LONDON).date()
+        local_now = now.astimezone(LONDON)
+        today = local_now.date()
         historical_days = {
             item.timestamp.astimezone(LONDON).date()
             for item in records
@@ -83,6 +90,23 @@ class EfficientAgileSmartExportManager(AgileSmartExportManager):
                 for item in records
                 if item.timestamp.astimezone(LONDON).date() >= cutoff
             ]
+
+        # Keep exactly the records used to render the current/tomorrow Agile
+        # simulation available to _publish(). This lets the dashboard and the
+        # managed panel share one routing result without changing the optimiser.
+        self._panel_config = config
+        self._panel_today_records = [
+            item
+            for item in replay_records
+            if item.timestamp.astimezone(LONDON).date() == today
+        ]
+        self._panel_tomorrow_records = self._tomorrow_records(
+            local_now,
+            learned,
+            forecast,
+            forecast_plan,
+            tariff,
+        )
 
         return await super().async_update(
             records=replay_records,
@@ -207,7 +231,20 @@ class EfficientAgileSmartExportManager(AgileSmartExportManager):
         return periods
 
     def _publish(self, state: dict[str, Any]) -> None:
-        """Publish coverage, tariff benchmark, and explicit solar-first routing."""
+        """Publish coverage, tariff benchmark, solar routing, and panel flow."""
+        if self._panel_config is not None:
+            _enrich_slot_routing(
+                state.get("today_slots"),
+                self._panel_today_records,
+                self._panel_config,
+                self._simulation,
+            )
+            _enrich_slot_routing(
+                state.get("tomorrow_slots"),
+                self._panel_tomorrow_records,
+                self._panel_config,
+                self._simulation,
+            )
         _annotate_solar_first_display(state)
         periods = state.get("periods", {})
         settled_days = sorted(
@@ -234,6 +271,18 @@ class EfficientAgileSmartExportManager(AgileSmartExportManager):
         }
         state["history_coverage"] = history_coverage
         super()._publish(state)
+
+        flow_state, flow_attrs = _agile_flow_payload(state)
+        self._set(
+            "sensor.kems_agile_smart_export_flow_now",
+            flow_state,
+            {
+                "friendly_name": "Agile Smart Export flow now",
+                "mode": "simulation_only",
+                "protocol": "KEMS panel flow v1",
+                **flow_attrs,
+            },
+        )
 
         today = periods.get("today", _empty_period("today", "Today"))
         today_agile = today.get("agile_smart_export", {})
@@ -361,6 +410,117 @@ class EfficientAgileSmartExportManager(AgileSmartExportManager):
             self._hass.states.async_remove(entity_id)
 
 
+def _snapshot_load(snapshot: Snapshot) -> float | None:
+    """Return the house-load value used by the Agile replay."""
+    value = (
+        snapshot.house_load_kw
+        if snapshot.house_load_kw is not None
+        else snapshot.grid_import_kw
+    )
+    return max(float(value), 0.0) if value is not None else None
+
+
+def _enrich_slot_routing(
+    slots_value: Any,
+    records: list[Snapshot],
+    config: SimulationConfig,
+    simulation: Any,
+) -> None:
+    """Add solar-to-home and panel routing fields to Agile half-hour slots."""
+    if not isinstance(slots_value, list) or not slots_value or len(records) < 2:
+        return
+
+    slots: list[tuple[datetime, datetime, dict[str, Any]]] = []
+    for item in slots_value:
+        if not isinstance(item, dict):
+            continue
+        try:
+            start = datetime.fromisoformat(str(item["valid_from"])).astimezone(UTC)
+            end = datetime.fromisoformat(str(item["valid_to"])).astimezone(UTC)
+        except (KeyError, ValueError):
+            continue
+        slots.append((start, end, item))
+    slots.sort(key=lambda value: value[0])
+    if not slots:
+        return
+
+    accum: dict[int, dict[str, float]] = {
+        id(item): {
+            "house": 0.0,
+            "solar": 0.0,
+            "solar_home": 0.0,
+            "cheap_house_grid": 0.0,
+            "covered": 0.0,
+        }
+        for _, _, item in slots
+    }
+    ordered_records = sorted(records, key=lambda value: value.timestamp)
+    slot_index = 0
+    for current, following in zip(ordered_records, ordered_records[1:], strict=False):
+        timestamp = current.timestamp.astimezone(UTC)
+        while slot_index < len(slots) and timestamp >= slots[slot_index][1]:
+            slot_index += 1
+        if slot_index >= len(slots):
+            break
+        start, end, slot = slots[slot_index]
+        if timestamp < start or timestamp >= end:
+            continue
+        seconds = max((following.timestamp - current.timestamp).total_seconds(), 0.0)
+        hours = min(seconds / 3600.0, 0.5)
+        if hours <= 0:
+            continue
+        load = _snapshot_load(current)
+        following_load = _snapshot_load(following)
+        if (
+            current.stale_fields
+            or following.stale_fields
+            or load is None
+            or following_load is None
+            or current.current_import_rate is None
+        ):
+            continue
+
+        load_kwh = load * hours
+        solar_kwh = simulation._simulated_solar_power(current, config) * hours
+        inverter_kwh = max(config.inverter_limit_kw, 0.0) * hours
+        solar_home = (
+            0.0
+            if current.cheap_period_confirmed
+            else min(solar_kwh, load_kwh, inverter_kwh)
+        )
+        values = accum[id(slot)]
+        values["house"] += load_kwh
+        values["solar"] += solar_kwh
+        values["solar_home"] += solar_home
+        if current.cheap_period_confirmed:
+            values["cheap_house_grid"] += load_kwh
+        values["covered"] += 1.0
+
+    for _, _, slot in slots:
+        values = accum[id(slot)]
+        if values["covered"] <= 0:
+            slot.setdefault("house_load_kwh", None)
+            slot.setdefault("solar_generation_kwh", None)
+            slot.setdefault("solar_to_home_kwh", None)
+            slot.setdefault("grid_to_battery_kwh", None)
+            continue
+        slot["house_load_kwh"] = round(values["house"], 3)
+        slot["solar_generation_kwh"] = round(values["solar"], 3)
+        slot["solar_to_home_kwh"] = round(values["solar_home"], 3)
+        grid_import = slot.get("grid_import_kwh")
+        if grid_import is None:
+            slot["grid_to_battery_kwh"] = None
+        else:
+            grid_charge_input = max(
+                float(grid_import) - values["cheap_house_grid"],
+                0.0,
+            )
+            slot["grid_to_battery_kwh"] = round(
+                grid_charge_input * max(config.charge_efficiency, 0.0),
+                3,
+            )
+
+
 def _annotate_solar_first_display(state: dict[str, Any]) -> None:
     """Make solar-to-home priority explicit in slot and current-action display."""
     for key in ("today_slots", "tomorrow_slots"):
@@ -401,10 +561,93 @@ def _annotate_solar_first_display(state: dict[str, Any]) -> None:
             break
 
 
+def _agile_flow_payload(state: dict[str, Any]) -> tuple[str, dict[str, Any]]:
+    """Return the current Agile slot in the panel's compact flow protocol."""
+    generated_at = state.get("generated_at")
+    if not generated_at:
+        return AGILE_FLOW_UNAVAILABLE, {"available": False}
+    try:
+        now = datetime.fromisoformat(str(generated_at)).astimezone(UTC)
+    except ValueError:
+        return AGILE_FLOW_UNAVAILABLE, {"available": False}
+
+    current_slot: dict[str, Any] | None = None
+    start: datetime | None = None
+    end: datetime | None = None
+    for item in state.get("today_slots", []):
+        if not isinstance(item, dict):
+            continue
+        try:
+            candidate_start = datetime.fromisoformat(
+                str(item["valid_from"])
+            ).astimezone(UTC)
+            candidate_end = datetime.fromisoformat(str(item["valid_to"])).astimezone(
+                UTC
+            )
+        except (KeyError, ValueError):
+            continue
+        if candidate_start <= now < candidate_end:
+            current_slot = item
+            start = candidate_start
+            end = candidate_end
+            break
+    if current_slot is None or start is None or end is None:
+        return AGILE_FLOW_UNAVAILABLE, {"available": False}
+
+    hours = max((end - start).total_seconds() / 3600.0, 0.0)
+    if hours <= 0:
+        return AGILE_FLOW_UNAVAILABLE, {"available": False}
+
+    required = (
+        "house_load_kwh",
+        "solar_generation_kwh",
+        "grid_import_kwh",
+        "grid_export_kwh",
+        "solar_to_home_kwh",
+        "solar_to_battery_kwh",
+        "solar_export_kwh",
+        "grid_to_battery_kwh",
+        "battery_to_home_kwh",
+        "battery_export_kwh",
+        "ending_soc_percent",
+    )
+    if any(current_slot.get(name) is None for name in required):
+        return AGILE_FLOW_UNAVAILABLE, {
+            "available": False,
+            "slot": current_slot.get("label"),
+        }
+
+    def power(name: str) -> float:
+        return max(float(current_slot.get(name) or 0.0) / hours, 0.0)
+
+    flow = (
+        f"H={power('house_load_kwh'):.3f},"
+        f"S={power('solar_generation_kwh'):.3f},"
+        f"GI={power('grid_import_kwh'):.3f},"
+        f"GE={power('grid_export_kwh'):.3f},"
+        f"SH={power('solar_to_home_kwh'):.3f},"
+        f"SB={power('solar_to_battery_kwh'):.3f},"
+        f"SE={power('solar_export_kwh'):.3f},"
+        f"GB={power('grid_to_battery_kwh'):.3f},"
+        f"BH={power('battery_to_home_kwh'):.3f},"
+        f"BE={power('battery_export_kwh'):.3f},"
+        f"SOC={float(current_slot['ending_soc_percent']):.1f}"
+    )
+    return flow, {
+        "available": True,
+        "slot": current_slot.get("label"),
+        "valid_from": current_slot.get("valid_from"),
+        "valid_to": current_slot.get("valid_to"),
+        "agile_rate_pence": current_slot.get("rate_pence"),
+        "action": ", ".join(current_slot.get("actions") or ["Hold"]),
+    }
+
+
 def _completion_published_ids() -> tuple[str, ...]:
     ids = [
         "sensor.kems_agile_history_coverage",
         "sensor.kems_agile_solar_to_home_today",
+        "sensor.kems_agile_smart_export_flow_now",
         "sensor.kems_agile_smart_export_cost_365_days",
         "sensor.kems_full_kems_forecast_comparison_cost_365_days",
         "sensor.kems_agile_advantage_365_days",
