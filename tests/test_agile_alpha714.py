@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import importlib.util
 import sys
-from datetime import datetime
+from datetime import datetime, time
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -32,11 +32,25 @@ def _load_deadline_module():
     return module
 
 
+def _tariff():
+    """Return the normal KEMS overnight tariff window used by deadline tests."""
+    from custom_components.kems.tariff import TariffSettings
+
+    return TariffSettings(
+        mode="manual",
+        day_rate_pence=28.3,
+        offpeak_rate_pence=3.49,
+        standing_charge_pence=0.0,
+        offpeak_start=time(23, 30),
+        offpeak_end=time(5, 30),
+        intelligent_slots_enabled=True,
+    )
+
+
 def test_late_766_percent_case_is_physically_unreachable() -> None:
     """The live case that exposed the bug must not be labelled on-track."""
     deadline = _load_deadline_module()
     from custom_components.kems.kems_core import SimulationConfig
-    from custom_components.kems.tariff import TariffSettings
 
     london = ZoneInfo("Europe/London")
     config = SimulationConfig(
@@ -51,7 +65,7 @@ def test_late_766_percent_case_is_physically_unreachable() -> None:
         battery_kwh=56.42 * 0.766,
         timestamp=datetime(2026, 8, 18, 19, 10, tzinfo=london),
         config=config,
-        tariff=TariffSettings(),
+        tariff=_tariff(),
     )
     assert metrics["deadline_target_soc_percent"] == 10.0
     assert metrics["deadline_effective_discharge_kw"] == 7.0
@@ -64,7 +78,6 @@ def test_earlier_lower_soc_case_keeps_price_flexibility() -> None:
     """A feasible battery state should remain free to wait for better prices."""
     deadline = _load_deadline_module()
     from custom_components.kems.kems_core import SimulationConfig
-    from custom_components.kems.tariff import TariffSettings
 
     london = ZoneInfo("Europe/London")
     config = SimulationConfig(
@@ -79,7 +92,7 @@ def test_earlier_lower_soc_case_keeps_price_flexibility() -> None:
         battery_kwh=56.42 * 0.55,
         timestamp=datetime(2026, 8, 18, 15, 0, tzinfo=london),
         config=config,
-        tariff=TariffSettings(),
+        tariff=_tariff(),
     )
     assert metrics["deadline_status"] == "On track"
     assert metrics["deadline_margin_kwh"] > 0
