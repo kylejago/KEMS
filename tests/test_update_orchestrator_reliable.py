@@ -25,6 +25,28 @@ def test_reliable_orchestrator_waits_for_post_restart_bundle_before_success() ->
     assert "await super().async_verify_pending(save=save)" in content
 
 
+def test_reliable_orchestrator_freezes_the_running_process_version() -> None:
+    """New HACS files must not masquerade as code already activated by restart."""
+    content = RELIABLE.read_text(encoding="utf-8")
+    assert "_read_integration_version_from_disk = base._installed_integration_version" in content
+    assert "_RUNNING_INTEGRATION_VERSION = _read_integration_version_from_disk()" in content
+    assert "base._installed_integration_version = _running_integration_version" in content
+    assert 'snapshot["installed_files_kems_version"] = files_version' in content
+    assert 'snapshot["restart_activation_pending"]' in content
+    assert 'item.status = "restart-required"' in content
+
+
+def test_maintenance_clock_edits_cannot_start_an_update_mid_edit() -> None:
+    """Changing start/end times must save and reschedule without running updates."""
+    content = RELIABLE.read_text(encoding="utf-8")
+    assert '_WINDOW_POLICY_KEYS = frozenset({"maintenance_start", "maintenance_end"})' in content
+    assert "if keys and keys <= _WINDOW_POLICY_KEYS:" in content
+    assert "self._window_edit_guard_until = base.dt_util.now() + _WINDOW_EDIT_GUARD" in content
+    assert "self._reschedule_pending_after_window_edit()" in content
+    assert "Never execute while the user may still be editing the window clocks." in content
+    assert "if base.dt_util.now() < guard_until:" in content
+
+
 def test_reliable_orchestrator_verifies_the_combined_managed_dashboard() -> None:
     """Dashboard verification must include the Agile views appended at runtime."""
     content = RELIABLE.read_text(encoding="utf-8")
