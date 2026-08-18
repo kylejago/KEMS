@@ -38,13 +38,15 @@ def _energy_sources_compatible(values: Any) -> dict[str, list[str]]:
     for source in values:
         if not isinstance(source, dict) or source.get("type") != "grid":
             continue
-        _append_nested(result["grid_import"], source.get("flow_from"), "stat_energy_from")
+        _append_nested(
+            result["grid_import"], source.get("flow_from"), "stat_energy_from"
+        )
         _append_nested(result["grid_export"], source.get("flow_to"), "stat_energy_to")
     return result
 
 
 def _reason_label(state: dict[str, Any]) -> str:
-    """Return a short dashboard-safe reason while keeping the full text as an attribute."""
+    """Return a short dashboard-safe reason while preserving full detail."""
     method = str(state.get("backfill_method") or "none")
     reason = str(state.get("energy_fallback_reason") or state.get("reason") or "")
     lowered = reason.lower()
