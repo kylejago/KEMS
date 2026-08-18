@@ -1,26 +1,35 @@
 # KEMS dashboard collection
 
-KEMS ships built-in-card managed dashboards plus the earlier specialist dashboard examples.
+KEMS ships a built-in-card managed master dashboard plus specialist dashboard examples.
 
 ## Recommended: managed KEMS Master Dashboard
 
-`kems_master_dashboard.yaml` is the recommended dashboard for current KEMS Alpha 7 builds. It contains Overview, Live Energy, Simulation, Forecast, Compare, Battery/Solar, Tariff/EV, Power Down, Control/EPS, Finance/History, Learning/Health, Gas and All Entities views.
+`kems_master_dashboard.yaml` is the recommended dashboard for current KEMS Alpha 7 builds. It contains Overview, Live Energy, Simulation, Forecast, Full KEMS Forecast, Compare, Commissioning, Battery/Solar, Tariff/EV, Power Down, Control/EPS, Finance/History, Learning/Health, Gas, Updates and All Entities views.
 
-The master dashboard is also packaged inside `custom_components/kems/` so HACS installs it with the integration. On every KEMS config-entry setup, KEMS compares the packaged dashboard with `/config/kems_master_dashboard.yaml` and atomically refreshes the managed file when the shipped dashboard has changed.
+The master dashboard is packaged inside `custom_components/kems/` so HACS installs it with the integration. On every KEMS config-entry setup, KEMS builds the complete managed master dashboard and atomically refreshes `/config/kems_master_dashboard.yaml` when the shipped dashboard content has changed.
 
-This means a normal KEMS update followed by the required Home Assistant restart also updates the managed dashboard file automatically.
+This means a normal KEMS update followed by the required Home Assistant restart also updates the managed dashboard automatically.
 
-## Managed Full KEMS Forecast vs Agile Smart Export dashboard
+## Full KEMS Forecast vs Agile Smart Export inside the master
 
-`kems_agile_smart_export_builtin.yaml` is the dedicated comparison dashboard for the **Full KEMS Forecast** and **Agile Smart Export** simulations. It is also packaged with KEMS and is automatically copied to `/config/kems_agile_smart_export_dashboard.yaml` during KEMS startup.
+`kems_agile_smart_export_builtin.yaml` contains the dedicated comparison views for **Full KEMS Forecast** and **Agile Smart Export**. KEMS packages those views with the integration and appends them automatically to the managed KEMS Master Dashboard at startup.
 
-The dashboard shows the live Region L Agile Outgoing rate, Octopus price-data completeness, today/tomorrow price slots and planned actions, the winning strategy and margin, import cost, export income, battery/solar routing, weighted achieved Agile export rate, and yesterday/7-day/30-day/all-time comparison results. Agile Smart Export remains simulation-only and does not add a FoxESS write path.
+The master therefore gains these tabs automatically:
 
-Both managed dashboards use only built-in Home Assistant cards and therefore have no HACS frontend-card dependency.
+- **Forecast vs Agile** — live Region L Agile Outgoing rate, price-data completeness, winner/margin, import cost, export income and detailed Full KEMS Forecast vs Agile Smart Export routing.
+- **Agile Price Plan** — today and tomorrow half-hour Agile prices plus the planned Smart Export action, grid export, battery export and ending SOC for each slot.
+- **Agile History** — yesterday, 7-day, 30-day and all-time comparison, including cumulative Agile advantage.
+- **Agile Assumptions** — Region L, 12p fixed benchmark, battery-wear allowance, physical limits and simulation-only safety boundary.
+
+There is **no second Home Assistant dashboard registration required** for Agile Smart Export. Future KEMS updates refresh these views through the same automatically managed master dashboard.
+
+The standalone `kems_agile_smart_export_builtin.yaml` remains in the repository as a specialist/reference dashboard and can still be installed manually if someone specifically wants the comparison separated from the master.
+
+All automatically managed views use only built-in Home Assistant cards and therefore have no HACS frontend-card dependency.
 
 ### One-time Home Assistant registration
 
-Home Assistant must be told once that the managed files are YAML dashboards. Add these entries to `configuration.yaml` (merge them into any existing top-level `lovelace:` block rather than creating a duplicate key):
+Home Assistant only needs the KEMS Master Dashboard registered once. Add this entry to `configuration.yaml` (merge it into any existing top-level `lovelace:` block rather than creating a duplicate key):
 
 ```yaml
 lovelace:
@@ -31,16 +40,9 @@ lovelace:
       title: KEMS
       icon: mdi:home-lightning-bolt
       show_in_sidebar: true
-
-    kems-agile-smart-export:
-      mode: yaml
-      filename: kems_agile_smart_export_dashboard.yaml
-      title: Full KEMS Forecast vs Agile Smart Export
-      icon: mdi:compare-horizontal
-      show_in_sidebar: true
 ```
 
-Restart Home Assistant after adding the dashboard registration. From then on, KEMS owns `/config/kems_master_dashboard.yaml` and `/config/kems_agile_smart_export_dashboard.yaml` and may overwrite them during KEMS startup. Put personal dashboard experiments or customisations in different files.
+Restart Home Assistant after adding the dashboard registration. From then on, KEMS owns `/config/kems_master_dashboard.yaml` and may overwrite it during KEMS startup. Put personal dashboard experiments or customisations in different files.
 
 ## Specialist dashboard files
 
@@ -55,7 +57,7 @@ Restart Home Assistant after adding the dashboard registration. From then on, KE
 - `kems_diagnostics_all_entities.yaml` — dynamic diagnostic page listing current KEMS entities.
 - `kems_compare_builtin.yaml` — built-in parallel scenario comparison.
 - `kems_compare_advanced.yaml` — ApexCharts/Mushroom parallel scenario analysis.
-- `kems_agile_smart_export_builtin.yaml` — managed built-in Full KEMS Forecast vs Agile Smart Export comparison.
+- `kems_agile_smart_export_builtin.yaml` — specialist/reference Full KEMS Forecast vs Agile Smart Export comparison; its views are also embedded automatically in the master dashboard.
 - `kems_control_lab.yaml` — desired control plan, EPS/island routing and hard live-write safety boundary.
 
 ## Advanced dashboard requirements
@@ -67,7 +69,7 @@ Only the legacy/specialist advanced dashboards require additional frontend cards
 - Power Flow Card Plus
 - Button Card
 
-The two managed dashboards do not require any of these.
+The managed master dashboard and the Agile Smart Export specialist dashboard use built-in cards only.
 
 ## Manual installation of a specialist dashboard
 
@@ -81,7 +83,7 @@ The two managed dashboards do not require any of these.
 
 The managed master dashboard targets the current KEMS Alpha 7 entity set and includes a dynamic **All Entities** view. Home Assistant can retain an older entity-registry ID or append a suffix such as `_2`; use the All Entities view and Download diagnostics when investigating a mismatch.
 
-The Agile Smart Export comparison exposes its live simulation states using the `sensor.kems_agile_*` and `sensor.kems_full_kems_forecast_*_comparison_*` namespaces. The complete slot plan and period payload are attached to `sensor.kems_agile_smart_export_plan` for the built-in comparison dashboard.
+The Agile Smart Export comparison exposes its live simulation states using the `sensor.kems_agile_*` and `sensor.kems_full_kems_forecast_*_comparison_*` namespaces. The complete slot plan and period payload are attached to `sensor.kems_agile_smart_export_plan` for the built-in master comparison views.
 
 ## Live hardware not installed yet
 
