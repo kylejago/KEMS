@@ -10,6 +10,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
 
+from .agile_history_backfill import AgileHistoryBackfill
 from .agile_smart_export_runtime import EfficientAgileSmartExportManager
 from .collector import Collector
 from .const import NAME
@@ -72,10 +73,11 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
         self._advice = AdviceEngine()
         self._simulation = SimulationEngine()
         self._scenarios = ScenarioComparisonEngine()
+        self._agile_history_backfill = AgileHistoryBackfill(hass, entities)
         self._agile_smart_export = EfficientAgileSmartExportManager(
             hass,
             entry.entry_id,
-            settings.history_days,
+            max(settings.history_days, 365),
         )
         self._whole_home = WholeHomeEngine()
         self._control = ControlEngine()
@@ -106,6 +108,11 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
     def agile_smart_export_state(self) -> dict:
         """Return live Region L Agile Smart Export comparison diagnostics."""
         return self._agile_smart_export.state
+
+    @property
+    def agile_history_backfill_state(self) -> dict:
+        """Return Home Assistant statistics backfill diagnostics."""
+        return self._agile_history_backfill.state
 
     async def _async_setup(self) -> None:
         """Load retained learning history and permanent supporting ledgers."""
@@ -190,8 +197,14 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                 learned.predicted_energy_until_offpeak_kwh,
                 current_snapshot=snapshot,
             )
+            agile_records = await self._agile_history_backfill.async_records(
+                native_records=records,
+                now=now,
+                tariff=self.settings.tariff,
+                config=self.settings.simulation,
+            )
             await self._agile_smart_export.async_update(
-                records=records,
+                records=agile_records,
                 now=now,
                 config=self.settings.simulation,
                 learned=learned,
@@ -302,6 +315,7 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
         await self._lifetime.async_save()
         await self._power_down.async_save()
         await self._agile_smart_export.async_shutdown()
+        await self._agile_history_backfill.async_shutdown()
 
     @staticmethod
     def _phase(

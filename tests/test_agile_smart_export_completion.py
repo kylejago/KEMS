@@ -5,7 +5,9 @@ from __future__ import annotations
 from pathlib import Path
 
 ROOT = Path(__file__).parents[1]
-RUNTIME = ROOT / "custom_components" / "kems" / "agile_smart_export_runtime.py"
+RUNTIME = ROOT / "custom_components" / "kems" / "agile_smart_export_runtime_base.py"
+RUNTIME_LOADER = ROOT / "custom_components" / "kems" / "agile_smart_export_runtime.py"
+REPORTING = ROOT / "custom_components" / "kems" / "agile_smart_export_reporting.py"
 DASHBOARD = ROOT / "dashboards" / "kems_agile_smart_export_builtin.yaml"
 PACKAGED = (
     ROOT / "custom_components" / "kems" / "kems_agile_smart_export_dashboard.yaml"
@@ -59,6 +61,40 @@ def test_agile_runtime_publishes_panel_compatible_current_flow() -> None:
     assert "f\"BH={power('battery_to_home_kwh'):.3f},\"" in content
     assert "f\"BE={power('battery_export_kwh'):.3f},\"" in content
     assert "f\"SOC={float(current_slot['ending_soc_percent']):.1f}\"" in content
+
+
+def test_agile_solar_to_home_reporting_patch_is_loaded() -> None:
+    """Daily totals and Today's detail must retain Solar -> Home on both strategies."""
+    loader = RUNTIME_LOADER.read_text(encoding="utf-8")
+    reporting = REPORTING.read_text(encoding="utf-8")
+    assert "install_reporting_patch()" in loader
+    assert "aggregate_with_solar_to_home" in reporting
+    assert 'period[strategy_name]["solar_to_home_kwh"]' in reporting
+    assert "full.simulated_solar_to_home_kwh" in reporting
+    assert "| Solar → home |" in reporting
+    assert "_combined_master_dashboard_bytes" in reporting
+
+
+def test_agile_reporting_exposes_live_and_planned_soc() -> None:
+    """Forecast vs Agile must show actual SOC and the current-slot Agile SOC plan."""
+    reporting = REPORTING.read_text(encoding="utf-8")
+    assert "sensor.kems_agile_planned_battery_soc_now" in reporting
+    assert "sensor.kems_battery_state_of_charge" in reporting
+    assert "Live battery SOC" in reporting
+    assert "Agile planned SOC — end of current slot" in reporting
+    assert "ending_soc_percent" in reporting
+    assert "| End battery SOC |" in reporting
+
+
+def test_agile_reporting_labels_12p_as_hypothetical_benchmark() -> None:
+    """The UI must never imply that Agile itself has a fixed 12p export rate."""
+    reporting = REPORTING.read_text(encoding="utf-8")
+    assert "Hypothetical fixed-rate benchmark today" in reporting
+    assert "Hypothetical income at 12p — same dispatch" in reporting
+    assert "Extra income from Agile pricing vs 12p benchmark" in reporting
+    assert "12p is only a hypothetical benchmark" in reporting
+    assert "it is not " in reporting
+    assert "an Agile rate" in reporting
 
 
 def test_agile_dashboard_surfaces_history_coverage_and_tariff_benchmark() -> None:
