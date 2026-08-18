@@ -5,7 +5,9 @@ from __future__ import annotations
 from pathlib import Path
 
 ROOT = Path(__file__).parents[1]
-RUNTIME = ROOT / "custom_components" / "kems" / "agile_smart_export_runtime.py"
+RUNTIME = ROOT / "custom_components" / "kems" / "agile_smart_export_runtime_base.py"
+RUNTIME_LOADER = ROOT / "custom_components" / "kems" / "agile_smart_export_runtime.py"
+REPORTING = ROOT / "custom_components" / "kems" / "agile_smart_export_reporting.py"
 DASHBOARD = ROOT / "dashboards" / "kems_agile_smart_export_builtin.yaml"
 PACKAGED = (
     ROOT / "custom_components" / "kems" / "kems_agile_smart_export_dashboard.yaml"
@@ -59,6 +61,18 @@ def test_agile_runtime_publishes_panel_compatible_current_flow() -> None:
     assert "f\"BH={power('battery_to_home_kwh'):.3f},\"" in content
     assert "f\"BE={power('battery_export_kwh'):.3f},\"" in content
     assert "f\"SOC={float(current_slot['ending_soc_percent']):.1f}\"" in content
+
+
+def test_agile_solar_to_home_reporting_patch_is_loaded() -> None:
+    """Daily totals and Today's detail must retain Solar -> Home on both strategies."""
+    loader = RUNTIME_LOADER.read_text(encoding="utf-8")
+    reporting = REPORTING.read_text(encoding="utf-8")
+    assert "install_reporting_patch()" in loader
+    assert "aggregate_with_solar_to_home" in reporting
+    assert 'period[strategy_name]["solar_to_home_kwh"]' in reporting
+    assert "full.simulated_solar_to_home_kwh" in reporting
+    assert "| Solar → home |" in reporting
+    assert "_combined_master_dashboard_bytes" in reporting
 
 
 def test_agile_dashboard_surfaces_history_coverage_and_tariff_benchmark() -> None:
