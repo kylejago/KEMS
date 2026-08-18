@@ -21,7 +21,8 @@ def _merged_master_content() -> dict:
     agile = AGILE_PACKAGED.read_text(encoding="utf-8")
     marker = "\nviews:\n"
     assert marker in agile
-    merged = f"{master}\n\n{agile.split(marker, 1)[1].lstrip()}"
+    agile_views = agile.split(marker, 1)[1].lstrip("\n")
+    merged = f"{master}\n\n{agile_views}"
     return yaml.safe_load(merged)
 
 
