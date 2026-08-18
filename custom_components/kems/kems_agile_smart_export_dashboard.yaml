@@ -1,8 +1,8 @@
 title: Full KEMS Forecast vs Agile Smart Export
 
 views:
-  - title: Overview
-    path: overview
+  - title: Forecast vs Agile
+    path: forecast-vs-agile
     icon: mdi:compare-horizontal
     cards:
       - type: markdown
@@ -85,8 +85,8 @@ views:
 
           *Currency figures above are shown in pounds. The winner uses net energy cost plus the configured simulation battery-wear allowance.*
 
-  - title: Price Plan
-    path: price-plan
+  - title: Agile Price Plan
+    path: agile-price-plan
     icon: mdi:chart-timeline-variant
     cards:
       - type: markdown
@@ -125,8 +125,8 @@ views:
           - sensor.kems_agile_export_rate_now
           - sensor.kems_agile_smart_export_status
 
-  - title: History
-    path: history
+  - title: Agile History
+    path: agile-history
     icon: mdi:calendar-range
     cards:
       - type: grid
@@ -193,8 +193,8 @@ views:
           | {{ p.get('label', key) }} | {{ c.get('winner', 'Unavailable') }} | {{ '%.2f'|format((c.get('agile_advantage_pence', 0)|float) / 100) }} | {{ '%.2f'|format((f.get('economic_net_cost_pence', 0)|float) / 100) }} | {{ '%.2f'|format((a.get('economic_net_cost_pence', 0)|float) / 100) }} | {{ '%.2f'|format((a.get('export_income_pence', 0)|float) / 100) }} | {{ a.get('weighted_achieved_export_rate_pence', '—') }} p/kWh |
           {% endfor %}
 
-  - title: Assumptions
-    path: assumptions
+  - title: Agile Assumptions
+    path: agile-assumptions
     icon: mdi:information-outline
     cards:
       - type: markdown
