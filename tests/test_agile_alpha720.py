@@ -24,7 +24,10 @@ def test_preinstall_evidence_uses_historical_gti_and_proposal_geometry() -> None
 def test_preinstall_evidence_preserves_native_and_direct_history_priority() -> None:
     source = PREINSTALL.read_text(encoding="utf-8")
     assert "baseline = await original_records(" in source
-    assert "backfill._merge_native_and_backfill(baseline, list(evidence_records))" in source
+    assert (
+        "backfill._merge_native_and_backfill(baseline, list(evidence_records))"
+        in source
+    )
     assert '"native_kems_days": len(native_days)' in source
     assert '"proposal_reconstructed_days": len(reconstructed_days)' in source
     assert '"proposal_solar_reconstruction_used": True' in source
@@ -43,8 +46,13 @@ def test_shadow_diagnostics_are_exported_with_split_readiness() -> None:
     source = DIAGNOSTICS.read_text(encoding="utf-8")
     assert '"shadow_validation": shadow_validation' in source
     assert '"shadow_readiness": shadow_readiness' in source
-    assert '"digital_twin_ready": bool(shadow_validation.get("ready_for_shadow"))' in source
-    assert '"hardware_shadow_ready": bool(commissioning.get("ready_for_shadow"))' in source
+    assert (
+        '"digital_twin_ready": bool(shadow_validation.get("ready_for_shadow"))'
+        in source
+    )
+    assert (
+        '"hardware_shadow_ready": bool(commissioning.get("ready_for_shadow"))' in source
+    )
     assert '"real_hardware_writes"' in source
 
 
