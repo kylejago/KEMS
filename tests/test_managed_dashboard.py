@@ -101,6 +101,33 @@ def test_agile_dashboard_is_builtin_and_has_required_views() -> None:
     assert "sensor.kems_full_kems_forecast_vs_agile_winner_all_time" in rendered
 
 
+def test_agile_headline_layout_is_readable() -> None:
+    """Agile summary cards should not return to the cramped three-column layout."""
+    content = yaml.safe_load(AGILE_PACKAGED.read_text(encoding="utf-8"))
+    forecast = next(
+        item for item in content["views"] if item["path"] == "forecast-vs-agile"
+    )
+    history = next(item for item in content["views"] if item["path"] == "agile-history")
+    forecast_grids = [card for card in forecast["cards"] if card.get("type") == "grid"]
+    history_grids = [card for card in history["cards"] if card.get("type") == "grid"]
+    assert forecast_grids
+    assert history_grids
+    assert all(card.get("columns") == 2 for card in forecast_grids)
+    assert all(card.get("columns") == 2 for card in history_grids)
+
+
+def test_managed_dashboard_readability_pass_widens_summary_cards() -> None:
+    """Managed four/five-column summary grids should render with more width."""
+    sync = (ROOT / "custom_components" / "kems" / "dashboard.py").read_text(
+        encoding="utf-8"
+    )
+    assert "def _dashboard_readability_pass" in sync
+    assert 'columns: 4\\n", "        columns: 2\\n' in sync
+    assert 'columns: 5\\n", "        columns: 3\\n' in sync
+    assert "master = _dashboard_readability_pass(master)" in sync
+    assert "agile_views = _dashboard_readability_pass(agile_views)" in sync
+
+
 def test_agile_dashboard_is_embedded_into_master_config() -> None:
     """Startup should merge Agile views into the one managed master dashboard."""
     sync = (ROOT / "custom_components" / "kems" / "dashboard.py").read_text(
