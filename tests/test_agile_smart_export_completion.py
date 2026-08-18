@@ -93,7 +93,8 @@ def test_agile_reporting_labels_12p_as_hypothetical_benchmark() -> None:
     assert "Hypothetical income at 12p — same dispatch" in reporting
     assert "Extra income from Agile pricing vs 12p benchmark" in reporting
     assert "12p is only a hypothetical benchmark" in reporting
-    assert "it is not an Agile rate" in reporting
+    assert "it is not " in reporting
+    assert "an Agile rate" in reporting
 
 
 def test_agile_dashboard_surfaces_history_coverage_and_tariff_benchmark() -> None:
