@@ -7,7 +7,10 @@ from .agile_smart_export_reporting import install_reporting_patch
 install_reporting_patch()
 
 from . import agile_smart_export_runtime_base as _base  # noqa: E402
+from .agile_smart_export_live import install_live_scenario_patch  # noqa: E402
 from .agile_smart_export_runtime_base import *  # noqa: E402,F403
+
+install_live_scenario_patch()
 
 EfficientAgileSmartExportManager = _base.EfficientAgileSmartExportManager
 
