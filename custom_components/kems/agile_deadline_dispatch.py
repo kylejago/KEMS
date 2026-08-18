@@ -93,9 +93,7 @@ def _deadline_metrics(
         "deadline_max_remaining_discharge_kwh": round(remaining_ac, 3),
         "deadline_margin_kwh": round(margin, 3),
         "deadline_required_average_kw": (
-            round(required_average_kw, 3)
-            if required_average_kw is not None
-            else None
+            round(required_average_kw, 3) if required_average_kw is not None else None
         ),
         "deadline_minimum_reachable_soc_percent": round(minimum_soc, 1),
     }
@@ -183,8 +181,7 @@ def agile_day_with_deadline(
                 charge = min(
                     solar_left,
                     charge_limit,
-                    max(target - battery, 0.0)
-                    / max(config.charge_efficiency, 0.01),
+                    max(target - battery, 0.0) / max(config.charge_efficiency, 0.01),
                 )
                 solar_battery = charge * config.charge_efficiency
                 battery += solar_battery
@@ -193,12 +190,10 @@ def agile_day_with_deadline(
                     actions.append("store solar")
             grid_charge = min(
                 max(
-                    charge_limit
-                    - solar_battery / max(config.charge_efficiency, 0.01),
+                    charge_limit - solar_battery / max(config.charge_efficiency, 0.01),
                     0.0,
                 ),
-                max(target - battery, 0.0)
-                / max(config.charge_efficiency, 0.01),
+                max(target - battery, 0.0) / max(config.charge_efficiency, 0.01),
             )
             if config.site_import_limit_kw is not None:
                 grid_charge = min(
@@ -280,11 +275,12 @@ def agile_day_with_deadline(
                 charge = min(
                     solar_left,
                     charge_limit,
-                    max(capacity - battery, 0.0)
-                    / max(config.charge_efficiency, 0.01),
+                    max(capacity - battery, 0.0) / max(config.charge_efficiency, 0.01),
                 )
                 if battery >= floor:
-                    max_input_by_deadline = max(deadline_margin_before_store, 0.0) / max(
+                    max_input_by_deadline = max(
+                        deadline_margin_before_store, 0.0
+                    ) / max(
                         config.charge_efficiency * efficiency,
                         0.01,
                     )
@@ -341,9 +337,7 @@ def agile_day_with_deadline(
                 max(discharge_limit - battery_home, 0.0),
             )
             price_export = bool(
-                rate > 0
-                and threshold is not None
-                and rate + _EPSILON >= threshold
+                rate > 0 and threshold is not None and rate + _EPSILON >= threshold
             )
             requested_export = available_export if price_export else 0.0
             if mandatory_now > requested_export:
@@ -412,9 +406,7 @@ def agile_day_with_deadline(
     ) * agile.BATTERY_WEAR_PENCE_PER_KWH
     standing = agile._standing(records)
     energy_cost = totals["import_cost"] + standing - totals["income"]
-    fixed_cost = (
-        totals["import_cost"] + standing - totals["fixed_income"] + wear
-    )
+    fixed_cost = totals["import_cost"] + standing - totals["fixed_income"] + wear
     weighted = (
         totals["income"] / totals["grid_export"]
         if totals["grid_export"] > _EPSILON
@@ -525,11 +517,7 @@ def publish_with_deadline(self, state: dict[str, Any]) -> None:
     _ORIGINAL_PUBLISH(self, state)
     periods = state.get("periods", {})
     today = periods.get("today", {}) if isinstance(periods, dict) else {}
-    data = (
-        today.get("agile_smart_export", {})
-        if isinstance(today, dict)
-        else {}
-    )
+    data = today.get("agile_smart_export", {}) if isinstance(today, dict) else {}
     values = (
         (
             "sensor.kems_agile_deadline_target_soc",
@@ -598,9 +586,7 @@ def publish_with_deadline(self, state: dict[str, Any]) -> None:
             "required_average_kw": data.get("deadline_required_average_kw"),
             "effective_discharge_kw": data.get("deadline_effective_discharge_kw"),
             "required_discharge_kwh": data.get("deadline_required_discharge_kwh"),
-            "remaining_capacity_kwh": data.get(
-                "deadline_max_remaining_discharge_kwh"
-            ),
+            "remaining_capacity_kwh": data.get("deadline_max_remaining_discharge_kwh"),
             "margin_kwh": data.get("deadline_margin_kwh"),
             "minimum_reachable_soc_percent": data.get(
                 "deadline_minimum_reachable_soc_percent"
