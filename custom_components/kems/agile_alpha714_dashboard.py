@@ -1,5 +1,7 @@
 """Alpha 7.14 Agile deadline, hardware-SOC and backfill dashboard refinements."""
 
+# ruff: noqa: E501
+
 from __future__ import annotations
 
 from typing import Any
@@ -124,7 +126,10 @@ def _patch_live_view(content: str) -> str:
         _HARDWARE_SOC_SENSOR,
     )
     anchor = "      - type: history-graph\n        title: Agile scenario economics — 24 hours\n"
-    if "title: 10% battery target — cheap-window deadline" not in live and anchor in live:
+    if (
+        "title: 10% battery target — cheap-window deadline" not in live
+        and anchor in live
+    ):
         live = live.replace(anchor, _DEADLINE_CARD + "\n" + anchor, 1)
     return head + live
 
