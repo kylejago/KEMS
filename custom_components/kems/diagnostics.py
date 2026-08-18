@@ -77,16 +77,12 @@ async def async_get_config_entry_diagnostics(
         "digital_twin_status": shadow_validation.get("status"),
         "hardware_shadow_ready": bool(commissioning.get("ready_for_shadow")),
         "hardware_status": commissioning.get("state"),
-        "maximum_allowed_hardware_stage": commissioning.get(
-            "maximum_allowed_stage"
-        ),
+        "maximum_allowed_hardware_stage": commissioning.get("maximum_allowed_stage"),
         "real_hardware_writes": commissioning.get(
             "real_hardware_writes",
             "blocked",
         ),
-        "real_backend_available": bool(
-            shadow_validation.get("real_backend_available")
-        ),
+        "real_backend_available": bool(shadow_validation.get("real_backend_available")),
         "meaning": (
             "Digital-twin shadow validates desired commands against simulation; "
             "hardware shadow additionally requires commissioned FoxESS mappings."
