@@ -115,15 +115,15 @@ def test_runtime_installs_deadline_and_history_before_live_dashboard() -> None:
 
 def test_energy_dashboard_source_mapping_and_house_equation_are_explicit() -> None:
     """Energy-counter fallback must cover grid, solar and battery flows transparently."""
-    source = (INTEGRATION / "agile_history_backfill_v2.py").read_text(
-        encoding="utf-8"
-    )
+    source = (INTEGRATION / "agile_history_backfill_v2.py").read_text(encoding="utf-8")
     assert 'source.get("stat_energy_from")' in source
     assert 'source.get("stat_energy_to")' in source
     assert 'source.get("stat_soc")' in source
     assert '"types": ["change", "mean", "state"]' in source
-    assert "solar\n            + grid_import\n            + battery_discharge" in source
-    assert "- grid_export\n            - battery_charge" in source
+    assert (
+        "solar + grid_import + battery_discharge - grid_export - battery_charge"
+        in source
+    )
     assert "Configured power statistics did not recover older days" in source
 
 
