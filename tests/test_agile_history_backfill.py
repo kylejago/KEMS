@@ -57,7 +57,8 @@ def test_coordinator_uses_backfill_only_for_agile_replay() -> None:
     assert "records=agile_records" in content
     assert "learned = self._learning.analyse(records, now)" in content
     assert (
-        "simulation = self._simulation.simulate_today(\n                records," in content
+        "simulation = self._simulation.simulate_today(\n                records,"
+        in content
     )
 
 
