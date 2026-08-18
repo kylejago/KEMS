@@ -6,14 +6,17 @@ from .agile_smart_export_reporting import install_reporting_patch
 
 install_reporting_patch()
 
+from .agile_alpha715_backfill import install_alpha715_backfill_patch  # noqa: E402
 from .agile_deadline_dispatch import install_deadline_patch  # noqa: E402
 from .agile_history_backfill_v2 import install_enhanced_backfill  # noqa: E402
 
 install_deadline_patch()
 install_enhanced_backfill()
+install_alpha715_backfill_patch()
 
 from . import agile_smart_export_runtime_base as _base  # noqa: E402
 from .agile_alpha714_dashboard import install_alpha714_dashboard_patch  # noqa: E402
+from .agile_alpha715_dashboard import install_alpha715_dashboard_patch  # noqa: E402
 from .agile_dashboard_yaml_guard import install_dashboard_yaml_guard  # noqa: E402
 from .agile_smart_export_live import install_live_scenario_patch  # noqa: E402
 from .agile_smart_export_runtime_base import *  # noqa: E402,F403
@@ -21,6 +24,7 @@ from .agile_smart_export_runtime_base import *  # noqa: E402,F403
 install_live_scenario_patch()
 install_dashboard_yaml_guard()
 install_alpha714_dashboard_patch()
+install_alpha715_dashboard_patch()
 
 EfficientAgileSmartExportManager = _base.EfficientAgileSmartExportManager
 
