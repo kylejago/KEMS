@@ -114,7 +114,7 @@ def test_runtime_installs_deadline_and_history_before_live_dashboard() -> None:
 
 
 def test_energy_dashboard_source_mapping_and_house_equation_are_explicit() -> None:
-    """Energy-counter fallback must cover grid, solar and battery flows transparently."""
+    """Energy fallback must cover grid, solar and battery flows."""
     source = (INTEGRATION / "agile_history_backfill_v2.py").read_text(encoding="utf-8")
     assert 'source.get("stat_energy_from")' in source
     assert 'source.get("stat_energy_to")' in source
