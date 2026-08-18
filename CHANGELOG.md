@@ -96,7 +96,7 @@
 - Corrected Month, Year, and All-time export, battery-export, and export-income differences caused when intraday simulation forecasts revised downward.
 - Reconciles stored alpha3 totals immediately on load and after every accumulation update without changing actual observed totals.
 - Added regression coverage for daily-ledger summation and downward simulated-export revisions.
-- Real hardware writes remain disabled.
+- Real FoxESS writes remain disabled.
 
 ## 0.7.0-alpha3 — KH7 topology, retained Power Down results, and accumulator repair
 
