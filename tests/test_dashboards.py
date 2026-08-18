@@ -117,3 +117,48 @@ def test_control_lab_dashboard_exposes_island_and_write_boundary() -> None:
     assert "show_header_toggle: false" in text
     assert "sensor.kems_virtual_scenario_solar_power" in text
     assert "sensor.kems_virtual_scenario_house_load" in text
+    assert "sensor.kems_simulated_solar_power" not in text
+    assert "sensor.kems_simulated_house_load_power" not in text
+
+
+def test_compare_dashboards_ship_seven_parallel_scenarios() -> None:
+    """The comparison views must expose all financial and island scenarios."""
+    for name in (
+        "kems_compare_builtin.yaml",
+        "kems_compare_advanced.yaml",
+    ):
+        text = (DASHBOARDS / name).read_text(encoding="utf-8")
+        assert "sensor.kems_compare_no_system_cost_today" in text
+        assert "sensor.kems_compare_solar_only_cost_today" in text
+        assert "sensor.kems_compare_solar_and_battery_cost_today" in text
+        assert "sensor.kems_compare_kems_no_export_cost_today" in text
+        assert "sensor.kems_compare_full_kems_cost_today" in text
+        assert "sensor.kems_compare_full_kems_forecast_cost_today" in text
+        assert "sensor.kems_full_kems_forecast_status" in text
+        assert "sensor.kems_compare_full_island_mode_today" in text
+        assert "sensor.kems_compare_full_island_prepared_status_today" in text
+        assert "sensor.kems_compare_full_island_required_starting_soc_today" in text
+        assert "sensor.kems_compare_full_island_prepared_target_soc_today" in text
+        assert "sensor.kems_compare_full_island_prepared_load_served_today" in text
+        assert "sensor.kems_compare_full_island_prepared_unserved_energy_today" in text
+        assert "sensor.kems_compare_full_island_eps_demand_today" in text
+        assert "sensor.kems_compare_full_island_ev_energy_shed_today" in text
+        assert "ev_energy_intentionally_shed_kwh" in text
+        assert "island_demand_kwh" in text
+        assert "sensor.kems_scenario_comparison_7_days" in text
+        assert "sensor.kems_scenario_comparison_30_days" in text
+
+
+def test_advanced_compare_dashboard_uses_replay_timeline() -> None:
+    """ApexCharts should render the replayed midnight-to-now cost curves."""
+    text = (DASHBOARDS / "kems_compare_advanced.yaml").read_text(encoding="utf-8")
+    assert "custom:apexcharts-card" in text
+    assert "entity.attributes.timeline" in text
+    assert "no_system_cost_pence" in text
+    assert "kems_full_cost_pence" in text
+    assert "kems_forecast_cost_pence" in text
+    assert "island_load_served_percent" in text
+    assert "island_unserved_load_kwh" in text
+    assert "island_soc_percent" in text
+    assert "prepared_outage_status" in text
+    assert "required_starting_soc_percent" in text
