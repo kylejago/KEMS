@@ -37,6 +37,13 @@ def _state_payload(hass: HomeAssistant, entity_id: str) -> dict[str, Any]:
     }
 
 
+def _shadow_validation_state(coordinator: KEMSCoordinator) -> dict[str, Any]:
+    """Return alpha7.19+ persistent shadow-validation evidence."""
+    recorder = getattr(coordinator, "_shadow_validation", None)
+    state = getattr(recorder, "state", {}) if recorder is not None else {}
+    return dict(state) if isinstance(state, dict) else {}
+
+
 async def async_get_config_entry_diagnostics(
     hass: HomeAssistant,
     entry: ConfigEntry,
@@ -62,6 +69,29 @@ async def async_get_config_entry_diagnostics(
             hass,
             registry_entry.entity_id,
         )
+
+    commissioning = build_commissioning_snapshot(hass, coordinator)
+    shadow_validation = _shadow_validation_state(coordinator)
+    shadow_readiness = {
+        "digital_twin_ready": bool(shadow_validation.get("ready_for_shadow")),
+        "digital_twin_status": shadow_validation.get("status"),
+        "hardware_shadow_ready": bool(commissioning.get("ready_for_shadow")),
+        "hardware_status": commissioning.get("state"),
+        "maximum_allowed_hardware_stage": commissioning.get(
+            "maximum_allowed_stage"
+        ),
+        "real_hardware_writes": commissioning.get(
+            "real_hardware_writes",
+            "blocked",
+        ),
+        "real_backend_available": bool(
+            shadow_validation.get("real_backend_available")
+        ),
+        "meaning": (
+            "Digital-twin shadow validates desired commands against simulation; "
+            "hardware shadow additionally requires commissioned FoxESS mappings."
+        ),
+    }
 
     return {
         "integration": {
@@ -147,7 +177,9 @@ async def async_get_config_entry_diagnostics(
         },
         "roi": asdict(data.roi),
         "control": asdict(data.control),
-        "commissioning": build_commissioning_snapshot(hass, coordinator),
+        "shadow_validation": shadow_validation,
+        "shadow_readiness": shadow_readiness,
+        "commissioning": commissioning,
         "panel_health": panel_health_snapshot(hass),
         "updates": update_orchestrator_snapshot(hass, entry),
         "last_power_down": data.last_power_down.to_dict(),
