@@ -75,7 +75,7 @@ def test_every_legacy_source_view_is_preserved_or_intentionally_replaced() -> No
     """Consolidation must not silently lose one of the existing feature tabs."""
     module = _load_module()
     source_views = module._split_views(_assembled_source())
-    assert module.EXPECTED_SOURCE_TITLES == set(source_views)
+    assert set(source_views) == module.EXPECTED_SOURCE_TITLES
 
     merged_sources = {
         title for spec in module.FINAL_VIEW_SPECS for title in spec.sources
