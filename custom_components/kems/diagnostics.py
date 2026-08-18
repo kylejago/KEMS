@@ -175,7 +175,7 @@ async def async_get_config_entry_diagnostics(
         "control": asdict(data.control),
         "shadow_validation": shadow_validation,
         "shadow_readiness": shadow_readiness,
-        "commissioning": commissioning,
+        "commissioning": build_commissioning_snapshot(hass, coordinator),
         "panel_health": panel_health_snapshot(hass),
         "updates": update_orchestrator_snapshot(hass, entry),
         "last_power_down": data.last_power_down.to_dict(),
