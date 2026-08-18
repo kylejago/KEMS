@@ -83,27 +83,20 @@ Agile Smart Export will not report the live strategy as ready unless today's pri
 
 ## Dashboard
 
-KEMS ships a managed built-in dashboard named **Full KEMS Forecast vs Agile Smart Export**. It is copied to:
+Agile Smart Export is built directly into the automatically managed **KEMS Master Dashboard**. KEMS packages the specialist comparison views with the integration and appends them to `/config/kems_master_dashboard.yaml` every time the managed dashboard is refreshed.
 
-`/config/kems_agile_smart_export_dashboard.yaml`
+No second Lovelace/YAML dashboard registration is required.
 
-The dashboard includes:
+The master gains four Agile comparison tabs:
 
-- current Region L Agile rate
-- current Smart Export action
-- price-data completeness
-- Full KEMS Forecast and Agile Smart Export net economic cost
-- winner and winning margin
-- import cost and export income
-- grid import/export energy
-- solar export and solar-to-battery energy
-- battery-to-home and battery-export energy
-- battery-wear allowance
-- weighted achieved Agile export rate
-- today and tomorrow slot-by-slot Agile prices and planned dispatch
-- yesterday, 7-day, 30-day, and all-time comparison
+- **Forecast vs Agile** — current Region L Agile rate, data quality, current Smart Export action, Full KEMS Forecast vs Agile Smart Export cost/income/routing and today's winner.
+- **Agile Price Plan** — today and tomorrow half-hour prices, planned actions, grid export, battery export and ending SOC.
+- **Agile History** — yesterday, 7-day, 30-day and all-time winner/advantage history.
+- **Agile Assumptions** — the fixed 12p benchmark, battery-wear allowance, physical constraints and read-only safety boundary.
 
-See `dashboards/README.md` for the one-time Home Assistant YAML dashboard registration.
+The standalone repository file `dashboards/kems_agile_smart_export_builtin.yaml` remains available as a specialist/reference dashboard for anyone who deliberately wants a separate comparison dashboard, but KEMS does not create or register a second managed dashboard file in Home Assistant.
+
+See `dashboards/README.md` for the one-time KEMS Master Dashboard registration.
 
 ## Diagnostics and safety
 
