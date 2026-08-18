@@ -29,7 +29,7 @@ def test_agile_live_dashboard_view_is_managed() -> None:
 def test_agile_live_view_distinguishes_hardware_and_simulated_soc() -> None:
     """Hardware SOC and the shadow-strategy SOC must never be conflated."""
     content = LIVE.read_text(encoding="utf-8")
-    assert 'sensor.kems_agile_simulated_battery_soc_now' in content
+    assert "sensor.kems_agile_simulated_battery_soc_now" in content
     assert "Live hardware battery SOC" in content
     assert "Agile simulated SOC now" in content
     assert 'today.get("agile_smart_export")' in content
