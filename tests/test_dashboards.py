@@ -13,7 +13,7 @@ DASHBOARDS = ROOT / "dashboards"
 def test_all_dashboard_yaml_is_valid() -> None:
     """Every shipped dashboard should parse as YAML."""
     files = sorted(DASHBOARDS.glob("*.yaml"))
-    assert len(files) == 13
+    assert len(files) == 14
     for path in files:
         content = yaml.safe_load(path.read_text(encoding="utf-8"))
         assert isinstance(content, dict)
