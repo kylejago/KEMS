@@ -218,7 +218,9 @@ class AgileHistoryBackfill:
         for entity_id in sources.values():
             state = self._hass.states.get(entity_id)
             result[entity_id] = (
-                state.attributes.get("unit_of_measurement") if state is not None else None
+                state.attributes.get("unit_of_measurement")
+                if state is not None
+                else None
             )
         return result
 
@@ -283,9 +285,7 @@ def _merge_native_and_backfill(
     backfill_records: list[Snapshot],
 ) -> list[Snapshot]:
     """Prefer native KEMS observations for every day where they exist."""
-    native_days = {
-        item.timestamp.astimezone(LONDON).date() for item in native_records
-    }
+    native_days = {item.timestamp.astimezone(LONDON).date() for item in native_records}
     older = [
         item
         for item in backfill_records
