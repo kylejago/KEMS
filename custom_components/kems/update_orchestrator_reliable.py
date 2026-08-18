@@ -5,6 +5,8 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
+from dataclasses import asdict
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -31,6 +33,22 @@ _UPDATE_DASHBOARD_BUTTON = (
     "          action: perform-action\n"
     "          perform_action: kems.check_for_updates\n"
 )
+_WINDOW_POLICY_KEYS = frozenset({"maintenance_start", "maintenance_end"})
+_WINDOW_EDIT_GUARD = timedelta(seconds=30)
+
+# HACS replaces manifest.json while the old Python process is still running. Capture
+# the version at import time so the updater cannot mistake new files on disk for code
+# that has actually been activated by a Home Assistant Core restart.
+_read_integration_version_from_disk = base._installed_integration_version
+_RUNNING_INTEGRATION_VERSION = _read_integration_version_from_disk()
+
+
+def _running_integration_version() -> str:
+    """Return the KEMS version loaded into this Home Assistant Python process."""
+    return _RUNNING_INTEGRATION_VERSION
+
+
+base._installed_integration_version = _running_integration_version
 
 
 def _is_leading_v_alias(tag: str) -> bool:
@@ -67,8 +85,24 @@ async def _async_sync_update_dashboard(hass: HomeAssistant) -> None:
 class ReliableKEMSUpdateOrchestrator(base.KEMSUpdateOrchestrator):
     """Keep coordinated updates restart-safe and verification-accurate."""
 
+    def __init__(self, hass: HomeAssistant, entry: ConfigEntry) -> None:
+        """Initialise reliability state for one Home Assistant runtime."""
+        super().__init__(hass, entry)
+        self._window_edit_guard_until: datetime | None = None
+
     async def async_set_policy(self, **changes: Any) -> None:
-        """Re-arm a corrected failed transaction when automatic updates are enabled."""
+        """Persist policy without letting a partial clock edit start maintenance."""
+        keys = set(changes)
+        if keys and keys <= _WINDOW_POLICY_KEYS:
+            current = asdict(self.policy)
+            current.update(changes)
+            self.policy = base.UpdatePolicy.from_dict(current)
+            self._window_edit_guard_until = base.dt_util.now() + _WINDOW_EDIT_GUARD
+            self._reschedule_pending_after_window_edit()
+            await self._async_save()
+            self._write_legacy_states()
+            return
+
         if (
             changes.get("automatic_updates") is True
             and self.pending
@@ -86,6 +120,33 @@ class ReliableKEMSUpdateOrchestrator(base.KEMSUpdateOrchestrator):
                 self.pending,
             )
         await super().async_set_policy(**changes)
+
+    def _reschedule_pending_after_window_edit(self) -> None:
+        """Recalculate a pending window without executing the transaction."""
+        if not self.pending or not self.policy.automatic_updates:
+            return
+        disruptive = bool(self.pending.get("maintenance", {}).get("required", True))
+        if not disruptive:
+            return
+        stage = str(self.pending.get("stage") or "")
+        if stage in {"installing", "restart_requested", "verifying", "failed"}:
+            return
+        self.pending["scheduled_for"] = self._scheduled_time().isoformat()
+        if stage != "installed_waiting_restart":
+            self.pending["stage"] = "scheduled"
+        self.maintenance = self._maintenance_payload("scheduled", self.pending)
+
+    async def _maybe_run_pending(self) -> None:
+        """Never execute while the user may still be editing the window clocks."""
+        guard_until = self._window_edit_guard_until
+        if guard_until is not None:
+            if base.dt_util.now() < guard_until:
+                self._reschedule_pending_after_window_edit()
+                await self._async_save()
+                self._write_legacy_states()
+                return
+            self._window_edit_guard_until = None
+        await super()._maybe_run_pending()
 
     async def _async_fetch_bundle(self) -> dict[str, Any] | None:
         """Fetch the highest complete canonical KEMS bundle release."""
@@ -216,6 +277,25 @@ class ReliableKEMSUpdateOrchestrator(base.KEMSUpdateOrchestrator):
             return
         await super().async_verify_pending(save=save)
 
+    def _refresh_component_status(self) -> None:
+        """Show files-staged-for-restart separately from genuinely running code."""
+        super()._refresh_component_status()
+        files_version = _read_integration_version_from_disk()
+        for item in self.component_status:
+            if item.key != "kems_core" or not item.target:
+                continue
+            if base._version_matches(
+                files_version, item.target
+            ) and not base._version_matches(
+                _RUNNING_INTEGRATION_VERSION,
+                item.target,
+            ):
+                item.status = "restart-required"
+                item.detail = (
+                    "Target files are installed, but Home Assistant Core has not "
+                    "restarted into them yet"
+                )
+
     def _dashboard_current(self) -> bool | None:
         """Verify the installed dashboard against the combined managed file."""
         installed = Path(self.hass.config.path("kems_master_dashboard.yaml"))
@@ -234,6 +314,18 @@ class ReliableKEMSUpdateOrchestrator(base.KEMSUpdateOrchestrator):
         if status != "failed":
             payload["error"] = None
         return payload
+
+    def snapshot(self) -> dict[str, Any]:
+        """Expose running-versus-on-disk version truth for diagnostics and UI."""
+        snapshot = super().snapshot()
+        files_version = _read_integration_version_from_disk()
+        snapshot["running_kems_version"] = _RUNNING_INTEGRATION_VERSION
+        snapshot["installed_files_kems_version"] = files_version
+        snapshot["restart_activation_pending"] = not base._version_matches(
+            _RUNNING_INTEGRATION_VERSION,
+            files_version,
+        )
+        return snapshot
 
 
 async def async_setup_update_orchestrator(
