@@ -22,8 +22,12 @@ views:
             icon: mdi:trophy-outline
           - type: entity
             entity: sensor.kems_agile_advantage_today
-            name: Agile advantage today
+            name: Agile strategy advantage today
             icon: mdi:cash-plus
+          - type: entity
+            entity: sensor.kems_agile_vs_fixed_12p_gain_today
+            name: Agile tariff gain vs fixed 12p today
+            icon: mdi:compare-horizontal
           - type: entity
             entity: sensor.kems_agile_export_rate_now
             name: Region L Agile rate now
@@ -32,6 +36,10 @@ views:
             entity: sensor.kems_agile_price_data_quality
             name: Agile price coverage
             icon: mdi:database-check-outline
+          - type: entity
+            entity: sensor.kems_agile_history_coverage
+            name: Historical replay coverage
+            icon: mdi:calendar-check-outline
 
       - type: grid
         columns: 2
@@ -50,17 +58,30 @@ views:
               - entity: sensor.kems_agile_smart_export_weighted_rate_today
                 name: Weighted achieved export rate
           - type: entities
-            title: Smart Export now
+            title: Tariff-only benchmark today
             show_header_toggle: false
             entities:
-              - entity: sensor.kems_agile_smart_export_status
-                name: Smart Export status
-              - entity: sensor.kems_agile_smart_export_plan
-                name: Current Smart Export action
+              - entity: sensor.kems_agile_vs_fixed_12p_gain_today
+                name: Agile income gain vs fixed 12p
+              - entity: sensor.kems_fixed_12p_same_dispatch_income_today
+                name: Fixed 12p income on same dispatch
+              - entity: sensor.kems_agile_smart_export_export_income_today
+                name: Actual Agile income on dispatch
               - entity: sensor.kems_agile_export_rate_now
                 name: Current Region L rate
-              - entity: sensor.kems_agile_advantage_today
-                name: Advantage vs Full KEMS Forecast
+
+      - type: entities
+        title: Smart Export now
+        show_header_toggle: false
+        entities:
+          - entity: sensor.kems_agile_smart_export_status
+            name: Smart Export status
+          - entity: sensor.kems_agile_smart_export_plan
+            name: Current Smart Export action
+          - entity: sensor.kems_agile_export_rate_now
+            name: Current Region L rate
+          - entity: sensor.kems_agile_advantage_today
+            name: Advantage vs Full KEMS Forecast
 
       - type: history-graph
         title: Live Region L Agile export rate
@@ -81,6 +102,8 @@ views:
           | Net economic cost | £{{ '%.2f'|format((full.get('economic_net_cost_pence', 0)|float) / 100) }} | £{{ '%.2f'|format((agile.get('economic_net_cost_pence', 0)|float) / 100) }} |
           | Import cost | £{{ '%.2f'|format((full.get('import_cost_pence', 0)|float) / 100) }} | £{{ '%.2f'|format((agile.get('import_cost_pence', 0)|float) / 100) }} |
           | Export income | £{{ '%.2f'|format((full.get('export_income_pence', 0)|float) / 100) }} | £{{ '%.2f'|format((agile.get('export_income_pence', 0)|float) / 100) }} |
+          | Fixed 12p income on Agile dispatch | — | £{{ '%.2f'|format((agile.get('fixed_12p_same_dispatch_income_pence', 0)|float) / 100) }} |
+          | Agile tariff gain vs fixed 12p | — | £{{ '%.2f'|format((agile.get('gain_vs_fixed_12p_same_dispatch_pence', 0)|float) / 100) }} |
           | Grid import | {{ full.get('grid_import_kwh', '—') }} kWh | {{ agile.get('grid_import_kwh', '—') }} kWh |
           | Grid export | {{ full.get('grid_export_kwh', '—') }} kWh | {{ agile.get('grid_export_kwh', '—') }} kWh |
           | Solar export | {{ full.get('solar_export_kwh', '—') }} kWh | {{ agile.get('solar_export_kwh', '—') }} kWh |
@@ -89,7 +112,7 @@ views:
           | Battery export | {{ full.get('battery_export_kwh', '—') }} kWh | {{ agile.get('battery_export_kwh', '—') }} kWh |
           | Battery wear allowance | £{{ '%.2f'|format((full.get('battery_wear_cost_pence', 0)|float) / 100) }} | £{{ '%.2f'|format((agile.get('battery_wear_cost_pence', 0)|float) / 100) }} |
 
-          *The winner uses net energy cost plus the configured simulation battery-wear allowance.*
+          *The strategy winner uses net energy cost plus the configured simulation battery-wear allowance. The fixed-12p comparison uses the exact same Agile dispatch, so it isolates tariff value rather than dispatch changes.*
 
   - title: Agile Price Plan
     path: agile-price-plan
@@ -161,29 +184,49 @@ views:
         square: false
         cards:
           - type: entity
-            entity: sensor.kems_full_kems_forecast_vs_agile_winner_yesterday
-            name: Yesterday winner
+            entity: sensor.kems_agile_history_coverage
+            name: Historical replay coverage
+            icon: mdi:calendar-check-outline
           - type: entity
-            entity: sensor.kems_agile_advantage_yesterday
-            name: Yesterday advantage
+            entity: sensor.kems_full_kems_forecast_vs_agile_winner_365_days
+            name: 365-day winner
+            icon: mdi:trophy-outline
+          - type: entity
+            entity: sensor.kems_agile_advantage_365_days
+            name: 365-day strategy advantage
+          - type: entity
+            entity: sensor.kems_agile_vs_fixed_12p_gain_365_days
+            name: 365-day Agile tariff gain vs 12p
           - type: entity
             entity: sensor.kems_full_kems_forecast_vs_agile_winner_7_days
             name: 7-day winner
           - type: entity
             entity: sensor.kems_agile_advantage_7_days
-            name: 7-day advantage
+            name: 7-day strategy advantage
           - type: entity
             entity: sensor.kems_full_kems_forecast_vs_agile_winner_30_days
             name: 30-day winner
           - type: entity
             entity: sensor.kems_agile_advantage_30_days
-            name: 30-day advantage
+            name: 30-day strategy advantage
           - type: entity
             entity: sensor.kems_full_kems_forecast_vs_agile_winner_all_time
             name: All-time winner
           - type: entity
-            entity: sensor.kems_agile_advantage_all_time
-            name: All-time advantage
+            entity: sensor.kems_agile_vs_fixed_12p_gain_all_time
+            name: All-time Agile tariff gain vs 12p
+
+      - type: markdown
+        title: Historical coverage
+        content: |
+          {% set h = states.sensor.kems_agile_history_coverage %}
+          **Settled replay history:** {{ h.state if h else 'Unavailable' }}  
+          **Earliest settled day:** {{ h.attributes.earliest_settled_day if h else '—' }}  
+          **Latest settled day:** {{ h.attributes.latest_settled_day if h else '—' }}  
+          **Rolling 365-day coverage:** {{ h.attributes.rolling_365_coverage_percent if h else 0 }}%  
+          **12-month result ready:** {{ h.attributes.twelve_month_ready if h else false }}
+
+          KEMS does **not** invent missing historical house-load or strategy observations. The 365-day result becomes authoritative only when this reaches **365/365 valid daily replays**.
 
       - type: history-graph
         title: Cumulative Agile advantage
@@ -195,17 +238,17 @@ views:
             name: 7 days
 
       - type: markdown
-        title: Strategy comparison
+        title: Strategy and tariff comparison
         content: |
           {% set periods = state_attr('sensor.kems_agile_smart_export_plan', 'periods') or {} %}
-          | Period | Winner | Agile advantage | Full KEMS cost | Agile cost | Agile export income | Weighted Agile rate |
-          |---|---|---:|---:|---:|---:|---:|
-          {% for key in ['today','tomorrow','yesterday','7_days','30_days','all_time'] %}
+          | Period | Days | Strategy winner | Agile strategy advantage | Agile tariff gain vs 12p | Full KEMS cost | Agile cost | Agile export income | Weighted Agile rate |
+          |---|---:|---|---:|---:|---:|---:|---:|---:|
+          {% for key in ['today','tomorrow','yesterday','7_days','30_days','365_days','all_time'] %}
           {% set p = periods.get(key, {}) %}
           {% set c = p.get('comparison', {}) %}
           {% set f = p.get('full_kems_forecast', {}) %}
           {% set a = p.get('agile_smart_export', {}) %}
-          | {{ p.get('label', key) }} | {{ c.get('winner', 'Unavailable') }} | £{{ '%.2f'|format((c.get('agile_advantage_pence', 0)|float) / 100) }} | £{{ '%.2f'|format((f.get('economic_net_cost_pence', 0)|float) / 100) }} | £{{ '%.2f'|format((a.get('economic_net_cost_pence', 0)|float) / 100) }} | £{{ '%.2f'|format((a.get('export_income_pence', 0)|float) / 100) }} | {{ a.get('weighted_achieved_export_rate_pence', '—') }} p/kWh |
+          | {{ p.get('label', key) }} | {{ p.get('days_included', '—') }}{% if p.get('days_expected') %}/{{ p.get('days_expected') }}{% endif %} | {{ c.get('winner', 'Unavailable') }} | £{{ '%.2f'|format((c.get('agile_advantage_pence', 0)|float) / 100) }} | £{{ '%.2f'|format((a.get('gain_vs_fixed_12p_same_dispatch_pence', 0)|float) / 100) }} | £{{ '%.2f'|format((f.get('economic_net_cost_pence', 0)|float) / 100) }} | £{{ '%.2f'|format((a.get('economic_net_cost_pence', 0)|float) / 100) }} | £{{ '%.2f'|format((a.get('export_income_pence', 0)|float) / 100) }} | {{ a.get('weighted_achieved_export_rate_pence', '—') }} p/kWh |
           {% endfor %}
 
   - title: Agile Assumptions
@@ -217,7 +260,8 @@ views:
           # Agile Smart Export model boundary
           - **Region:** L
           - **Price source:** live Octopus Agile Outgoing half-hourly export rates, including the product/tariff metadata returned by Octopus.
-          - **Fixed comparison:** 12p/kWh benchmark retained alongside Agile results.
+          - **Fixed comparison:** 12p/kWh benchmark retained alongside Agile results on the **exact same Agile dispatch**, isolating tariff value from strategy changes.
+          - **365-day history:** the rolling 365-day result is explicitly coverage-gated. KEMS will show `x/365` and will not call the full 12-month result ready until all 365 daily replays are valid.
           - **Battery wear allowance:** 2p per discharged kWh for optimisation and headline economic comparison.
           - **Battery/inverter constraints:** uses the active KEMS `SimulationConfig`, including battery capacity, reserve SOC, charge/discharge efficiency, KH7 inverter limit, export limit, charge/discharge limits and configured site-import limit.
           - **Import safety:** Agile Smart Export will not deliberately create avoidable day-rate grid import simply to export the battery later.
@@ -239,6 +283,9 @@ views:
           - type: entity
             entity: sensor.kems_agile_export_rate_now
             name: Current Region L rate
+          - type: entity
+            entity: sensor.kems_agile_history_coverage
+            name: Historical coverage
           - type: entity
             entity: sensor.kems_full_kems_forecast_vs_agile_winner_tomorrow
             name: Tomorrow winner

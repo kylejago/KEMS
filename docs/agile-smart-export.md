@@ -53,12 +53,14 @@ During a confirmed cheap period the house can be supplied by the grid and the ba
 
 ## Fixed 12p benchmark
 
-The existing fixed-export benchmark is retained at **12p/kWh**. Agile Smart Export therefore records both the real Agile export income and what the same simulated export dispatch would have earned at 12p/kWh.
+The fixed-export benchmark is **12p/kWh**. Agile Smart Export records both the real Agile export income and what the **same Agile dispatch** would have earned at 12p/kWh.
 
-This is deliberately separate from the Full KEMS Forecast comparison:
+This deliberately answers a different question from the Full KEMS Forecast comparison:
 
-- **Full KEMS Forecast vs Agile Smart Export** answers which complete strategy was better.
-- **Agile vs 12p on the same dispatch** isolates the effect of the export tariff price on the Agile dispatch.
+- **Full KEMS Forecast vs Agile Smart Export** answers which complete dispatch strategy was better after import cost, export income and battery wear.
+- **Agile tariff vs fixed 12p on the same dispatch** isolates the value of the export tariff itself without changing when or how much energy was exported.
+
+KEMS publishes both values for today, tomorrow, yesterday, 7 days, 30 days, 365 days and all tracked time.
 
 ## Today, tomorrow, and history
 
@@ -69,9 +71,14 @@ KEMS calculates:
 - Yesterday
 - Last 7 days
 - Last 30 days
+- Last 365 days
 - All tracked time
 
 Completed days are persisted so the all-time comparison grows independently of the rolling observation-history window.
+
+The 365-day result is **coverage-gated**. KEMS publishes the exact number of valid replay days as `x/365`, the earliest and latest settled replay dates, and a `twelve_month_ready` flag. It does not invent missing historical house-load, solar, tariff or strategy observations. The 365-day winner is therefore labelled as collecting data until all 365 daily replays are valid.
+
+This distinction matters on an installation that has not yet accumulated a full year of KEMS observations: the shorter and all-time comparisons remain useful, but KEMS will not present a partial sample as an authoritative 12-month result.
 
 Tomorrow uses the KEMS learned hourly house-demand profile and KEMS solar forecast. Because extra Intelligent charging slots are only known when Octopus/Ohme actually schedule them, tomorrow's projection uses the configured normal Intelligent off-peak window rather than inventing future bonus slots.
 
@@ -89,10 +96,10 @@ No second Lovelace/YAML dashboard registration is required.
 
 The master gains four Agile comparison tabs:
 
-- **Forecast vs Agile** — current Region L Agile rate, data quality, current Smart Export action, Full KEMS Forecast vs Agile Smart Export cost/income/routing and today's winner.
+- **Forecast vs Agile** — current Region L Agile rate, data quality, current Smart Export action, Full KEMS Forecast vs Agile Smart Export cost/income/routing, today's strategy winner, and the fixed-12p same-dispatch tariff benchmark.
 - **Agile Price Plan** — today and tomorrow half-hour prices, planned actions, grid export, battery export and ending SOC.
-- **Agile History** — yesterday, 7-day, 30-day and all-time winner/advantage history.
-- **Agile Assumptions** — the fixed 12p benchmark, battery-wear allowance, physical constraints and read-only safety boundary.
+- **Agile History** — historical replay coverage, 7-day, 30-day, 365-day and all-time strategy results plus Agile-vs-fixed-12p tariff value.
+- **Agile Assumptions** — the fixed 12p benchmark, 365-day coverage rule, battery-wear allowance, physical constraints and read-only safety boundary.
 
 The standalone repository file `dashboards/kems_agile_smart_export_builtin.yaml` remains available as a specialist/reference dashboard for anyone who deliberately wants a separate comparison dashboard, but KEMS does not create or register a second managed dashboard file in Home Assistant.
 
@@ -100,6 +107,6 @@ See `dashboards/README.md` for the one-time KEMS Master Dashboard registration.
 
 ## Diagnostics and safety
 
-The KEMS diagnostics payload contains an `agile_smart_export` section with product/tariff discovery, current rate, data quality, period results, price-slot plans, update timestamps, and the last collection error if any.
+The KEMS diagnostics payload contains an `agile_smart_export` section with product/tariff discovery, current rate, data quality, period results, historical coverage, price-slot plans, update timestamps, and the last collection error if any.
 
 The simulation is explicitly labelled `simulation_only`. It never calls the KEMS control backend, does not bypass commissioning, and cannot issue charge/discharge/export commands to FoxESS hardware.
