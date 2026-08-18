@@ -23,11 +23,15 @@ _ROLLING_REPLACEMENT = """          - entity: sensor.kems_agile_rolling_export_p
 _ROUTING_HEADER = "| Flow | Simulated power |"
 _ROUTING_HEADER_REPLACEMENT = "| Flow | Rolling target / simulated power |"
 
-_ROUTING_NOTE = """          **Power basis:** battery/grid export use the current rolling target when available; other flows use the elapsed current-slot simulation average.  
-"""
+_ROUTING_NOTE = (
+    "          **Power basis:** battery/grid export use the current rolling target "
+    "when available; other flows use the elapsed current-slot simulation average.  \n"
+)
 
-_ROUTING_NOTE_MARKER = """          **Current decision:** {{ state_attr(e, 'current_action') or states('sensor.kems_agile_smart_export_plan') }}  
-"""
+_ROUTING_NOTE_MARKER = (
+    "          **Current decision:** {{ state_attr(e, 'current_action') or "
+    "states('sensor.kems_agile_smart_export_plan') }}  \n"
+)
 
 
 def install_alpha717_dashboard_patch() -> None:
