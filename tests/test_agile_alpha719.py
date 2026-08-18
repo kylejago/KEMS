@@ -56,7 +56,7 @@ def test_shadow_runtime_is_audited_but_never_writes_hardware() -> None:
     forbidden = (
         "foxess_modbus.write",
         "async_write_ha_state",
-        "hass.services.async_call(\"foxess",
+        'hass.services.async_call("foxess',
         "hass.services.async_call('foxess',",
     )
     assert not any(value in source.lower() for value in forbidden)
@@ -75,7 +75,10 @@ def test_alpha719_dashboard_keeps_eleven_page_navigation_and_adds_cards() -> Non
 
 def test_alpha719_install_order_preserves_final_dashboard_compositor() -> None:
     source = RUNTIME.read_text(encoding="utf-8")
-    assert "install_alpha717_dashboard_patch()\ninstall_alpha719_validation_patch()" in source
+    assert (
+        "install_alpha717_dashboard_patch()\ninstall_alpha719_validation_patch()"
+        in source
+    )
     assert (
         "install_alpha719_validation_patch()\n"
         "install_dashboard_consolidation()\n"
