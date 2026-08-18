@@ -17,7 +17,10 @@ def _string_constant(path: Path, name: str) -> str:
     for node in tree.body:
         if not isinstance(node, ast.Assign):
             continue
-        if any(isinstance(target, ast.Name) and target.id == name for target in node.targets):
+        if any(
+            isinstance(target, ast.Name) and target.id == name
+            for target in node.targets
+        ):
             value = ast.literal_eval(node.value)
             assert isinstance(value, str)
             return value
