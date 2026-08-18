@@ -58,7 +58,8 @@ def validate_shadow_command(
         ),
         _check(
             "inverter_limit",
-            float(control.total_kh7_ac_output_kw) <= config.inverter_limit_kw + _EPSILON,
+            float(control.total_kh7_ac_output_kw)
+            <= config.inverter_limit_kw + _EPSILON,
             (
                 f"KH7 output {control.total_kh7_ac_output_kw:.3f}kW <= configured "
                 f"{config.inverter_limit_kw:.3f}kW"
@@ -148,9 +149,9 @@ def shadow_plan_vs_outcome(
     observed = {
         "charge_kw": None if charge is None else round(max(float(charge), 0.0), 3),
         "battery_to_home_kw": None if home is None else round(max(float(home), 0.0), 3),
-        "battery_export_kw": None
-        if export is None
-        else round(max(float(export), 0.0), 3),
+        "battery_export_kw": (
+            None if export is None else round(max(float(export), 0.0), 3)
+        ),
         "total_discharge_kw": (
             None
             if home is None and export is None
