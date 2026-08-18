@@ -1,5 +1,7 @@
 """Final KEMS master-dashboard consolidation for the production-style UI."""
 
+# ruff: noqa: E501
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -309,7 +311,7 @@ def _render_view(spec: ViewSpec, source_views: dict[str, str]) -> str:
     ]
     if spec.prefix:
         parts.append(spec.prefix.rstrip() + "\n")
-    for index, source_title in enumerate(spec.sources):
+    for source_title in spec.sources:
         if len(spec.sources) > 1:
             parts.append(_section_card(source_title))
         parts.append(_cards_body(source_views[source_title]))
