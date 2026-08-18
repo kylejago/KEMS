@@ -187,6 +187,25 @@ def install_reporting_patch() -> None:
         if soc_entities not in content and plan_entity in content:
             content = content.replace(plan_entity, plan_entity + soc_entities, 1)
 
+        history_entity = (
+            "          - type: entity\n"
+            "            entity: sensor.kems_agile_history_coverage\n"
+            "            name: Historical replay coverage\n"
+            "            icon: mdi:calendar-check-outline\n"
+        )
+        backfill_entity = (
+            "          - type: entity\n"
+            "            entity: sensor.kems_agile_history_backfill\n"
+            "            name: HA statistics backfill coverage\n"
+            "            icon: mdi:database-clock-outline\n"
+        )
+        if backfill_entity not in content and history_entity in content:
+            content = content.replace(
+                history_entity,
+                history_entity + backfill_entity,
+                1,
+            )
+
         replacements = {
             "Tariff-only benchmark today": "Hypothetical fixed-rate benchmark today",
             "Agile income gain vs fixed 12p": "Extra Agile income vs hypothetical 12p",
@@ -216,6 +235,25 @@ def install_reporting_patch() -> None:
                 battery_export_row + end_soc_row,
                 1,
             )
+
+        old_history = (
+            "          **12-month result ready:** {{ h.attributes.twelve_month_ready if h else false }}\n\n"
+            "          KEMS does **not** invent missing historical house-load or strategy observations. "
+            "The 365-day result becomes authoritative only when this reaches **365/365 valid daily replays**."
+        )
+        new_history = (
+            "          **12-month calculation ready:** {{ h.attributes.twelve_month_ready if h else false }}  \n"
+            "          {% set b = states.sensor.kems_agile_history_backfill %}\n"
+            "          **Native KEMS days:** {{ b.attributes.native_kems_days if b else '—' }}  \n"
+            "          **HA statistics backfilled days:** {{ b.attributes.ha_statistics_backfilled_days if b else '—' }}  \n"
+            "          **Insufficient historical days:** {{ b.attributes.insufficient_days if b else '—' }}  \n"
+            "          **Backfill resolution:** {{ b.attributes.backfill_resolution if b else '—' }}\n\n"
+            "          KEMS does **not** invent missing historical house-load, solar or Intelligent bonus slots. "
+            "Native KEMS days retain the original high-resolution observations and forecast decisions. "
+            "Backfilled days use Home Assistant hourly long-term statistics and the normal configured off-peak "
+            "schedule, so they are clearly labelled as lower-fidelity historical replay rather than native evidence."
+        )
+        content = content.replace(old_history, new_history)
 
         old_note = (
             "*The strategy winner uses net energy cost plus the configured simulation "
