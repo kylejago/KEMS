@@ -26,6 +26,15 @@ def test_update_orchestrator_is_opt_in_and_uses_a_maintenance_window() -> None:
     assert "_next_window_start" in content
 
 
+def test_legacy_unattended_policy_is_repaired_to_allow_maintenance_restart() -> None:
+    """Automatic updates must never remain staged waiting for manual restart."""
+    content = INIT.read_text(encoding="utf-8")
+    assert "update_orchestrator = await async_setup_update_orchestrator" in content
+    assert "update_orchestrator.policy.automatic_updates" in content
+    assert "not update_orchestrator.policy.automatic_restart" in content
+    assert "async_set_policy(automatic_restart=True)" in content
+
+
 def test_opted_out_release_is_available_not_falsely_scheduled() -> None:
     """Discovery must not imply unattended maintenance before the user opts in."""
     content = ORCHESTRATOR.read_text(encoding="utf-8")
