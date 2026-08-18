@@ -39,9 +39,9 @@ install_alpha715_dashboard_patch()
 install_alpha716_dashboard_patch()
 install_alpha717_dashboard_patch()
 install_alpha719_validation_patch()
-install_alpha720_preinstall_patch()
 install_dashboard_consolidation()
 install_alpha719_dashboard_patch()
+install_alpha720_preinstall_patch()
 install_alpha720_dashboard_patch()
 
 EfficientAgileSmartExportManager = _base.EfficientAgileSmartExportManager
