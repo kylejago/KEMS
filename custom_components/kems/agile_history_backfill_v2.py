@@ -472,3 +472,64 @@ def _energy_kwh(value: float, unit: str | None) -> float:
     if text == "mwh":
         return value * 1000.0
     return value
+
+
+def install_enhanced_backfill() -> None:
+    """Upgrade the already-imported backfill class before coordinator creation."""
+    target = base.AgileHistoryBackfill
+    current = target._async_refresh
+    if getattr(current, "_kems_enhanced_backfill", False):
+        return
+
+    original_refresh = current
+    target._async_direct_diagnostics = EnhancedAgileHistoryBackfill._async_direct_diagnostics
+    target._source_descriptor = EnhancedAgileHistoryBackfill._source_descriptor
+    target._async_energy_dashboard_fallback = (
+        EnhancedAgileHistoryBackfill._async_energy_dashboard_fallback
+    )
+    target._energy_units = EnhancedAgileHistoryBackfill._energy_units
+    target._augment_state = EnhancedAgileHistoryBackfill._augment_state
+
+    async def enhanced_refresh(
+        self,
+        *,
+        native_records: list[Snapshot],
+        now: datetime,
+        tariff: TariffSettings,
+        config: SimulationConfig,
+    ) -> None:
+        await original_refresh(
+            self,
+            native_records=native_records,
+            now=now,
+            tariff=tariff,
+            config=config,
+        )
+        diagnostics = await self._async_direct_diagnostics(now)
+        if int(self._state.get("ha_statistics_backfilled_days") or 0) > 0:
+            self._augment_state(
+                {
+                    "backfill_method": "direct_power_statistics",
+                    "energy_fallback_used": False,
+                    "direct_source_diagnostics": diagnostics,
+                }
+            )
+            return
+        recovered = await self._async_energy_dashboard_fallback(
+            native_records=native_records,
+            now=now,
+            tariff=tariff,
+            config=config,
+            direct_diagnostics=diagnostics,
+        )
+        if not recovered:
+            self._augment_state(
+                {
+                    "backfill_method": "none",
+                    "energy_fallback_used": False,
+                    "direct_source_diagnostics": diagnostics,
+                }
+            )
+
+    enhanced_refresh._kems_enhanced_backfill = True
+    target._async_refresh = enhanced_refresh
