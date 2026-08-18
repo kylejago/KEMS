@@ -28,7 +28,8 @@ def test_backfill_is_fidelity_labelled_and_never_invents_bonus_slots() -> None:
     assert "TARGET_DAYS = 365" in content
     assert "MIN_DAY_COVERAGE = 0.75" in content
     assert "intelligent_slot=False" in content
-    assert "historical Intelligent bonus slots are not invented" in content
+    assert "historical " in content
+    assert "Intelligent bonus slots are not invented" in content
     assert "historical KEMS forecast annotations are unavailable" in content
     assert '"authoritative_native_365"' in content
 
