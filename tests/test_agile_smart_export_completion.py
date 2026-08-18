@@ -75,6 +75,27 @@ def test_agile_solar_to_home_reporting_patch_is_loaded() -> None:
     assert "_combined_master_dashboard_bytes" in reporting
 
 
+def test_agile_reporting_exposes_live_and_planned_soc() -> None:
+    """Forecast vs Agile must show actual SOC and the current-slot Agile SOC plan."""
+    reporting = REPORTING.read_text(encoding="utf-8")
+    assert "sensor.kems_agile_planned_battery_soc_now" in reporting
+    assert "sensor.kems_battery_state_of_charge" in reporting
+    assert "Live battery SOC" in reporting
+    assert "Agile planned SOC — end of current slot" in reporting
+    assert "ending_soc_percent" in reporting
+    assert "| End battery SOC |" in reporting
+
+
+def test_agile_reporting_labels_12p_as_hypothetical_benchmark() -> None:
+    """The UI must never imply that Agile itself has a fixed 12p export rate."""
+    reporting = REPORTING.read_text(encoding="utf-8")
+    assert "Hypothetical fixed-rate benchmark today" in reporting
+    assert "Hypothetical income at 12p — same dispatch" in reporting
+    assert "Extra income from Agile pricing vs 12p benchmark" in reporting
+    assert "12p is only a hypothetical benchmark" in reporting
+    assert "it is not an Agile rate" in reporting
+
+
 def test_agile_dashboard_surfaces_history_coverage_and_tariff_benchmark() -> None:
     """The managed UI must expose the new 365-day and tariff-only results."""
     content = DASHBOARD.read_text(encoding="utf-8")
