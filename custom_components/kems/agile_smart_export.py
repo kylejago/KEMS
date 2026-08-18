@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import math
 from dataclasses import dataclass, replace
 from datetime import UTC, date, datetime, time, timedelta
@@ -116,10 +117,8 @@ class AgileSmartExportManager:
         rates: list[AgileRate] = []
         for item in data.get("rates", []):
             if isinstance(item, dict):
-                try:
+                with contextlib.suppress(KeyError, TypeError, ValueError):
                     rates.append(AgileRate.from_dict(item))
-                except (KeyError, TypeError, ValueError):
-                    pass
         self._rates = _dedupe(rates)
         if isinstance(data.get("daily"), dict):
             self._daily = {
