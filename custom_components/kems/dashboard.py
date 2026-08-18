@@ -24,6 +24,8 @@ LOGGER = logging.getLogger(__name__)
 
 MANAGED_DASHBOARD_FILENAME = "kems_master_dashboard.yaml"
 PACKAGED_DASHBOARD_PATH = Path(__file__).with_name(MANAGED_DASHBOARD_FILENAME)
+AGILE_DASHBOARD_FILENAME = "kems_agile_smart_export_dashboard.yaml"
+PACKAGED_AGILE_DASHBOARD_PATH = Path(__file__).with_name(AGILE_DASHBOARD_FILENAME)
 
 MANAGED_PANEL_FILENAME = "kems16x16.yaml"
 MANAGED_PANEL_HEADER = b"# KEMS-MANAGED-ESPHOME-PANEL"
@@ -256,7 +258,7 @@ async def async_auto_install_managed_panel(hass: HomeAssistant) -> None:
 
 
 async def async_sync_managed_dashboard(hass: HomeAssistant) -> bool:
-    """Synchronise the shipped dashboard and any opted-in KEMS panel config."""
+    """Synchronise shipped dashboards and any opted-in KEMS panel config."""
     await async_load_panel_health(hass)
 
     dashboard_target = Path(hass.config.path(MANAGED_DASHBOARD_FILENAME))
@@ -267,6 +269,18 @@ async def async_sync_managed_dashboard(hass: HomeAssistant) -> bool:
     )
     if dashboard_changed:
         LOGGER.info("Updated managed KEMS dashboard at %s", dashboard_target)
+
+    agile_dashboard_target = Path(hass.config.path(AGILE_DASHBOARD_FILENAME))
+    agile_dashboard_changed = await hass.async_add_executor_job(
+        _sync_dashboard_file,
+        PACKAGED_AGILE_DASHBOARD_PATH,
+        agile_dashboard_target,
+    )
+    if agile_dashboard_changed:
+        LOGGER.info(
+            "Updated managed Full KEMS Forecast vs Agile Smart Export dashboard at %s",
+            agile_dashboard_target,
+        )
 
     panel_target = Path(hass.config.path("esphome", MANAGED_PANEL_FILENAME))
     panel_exists = await hass.async_add_executor_job(panel_target.exists)
@@ -345,4 +359,4 @@ async def async_sync_managed_dashboard(hass: HomeAssistant) -> bool:
             automatic_ota_armed=False,
         )
 
-    return dashboard_changed or panel_changed
+    return dashboard_changed or agile_dashboard_changed or panel_changed
