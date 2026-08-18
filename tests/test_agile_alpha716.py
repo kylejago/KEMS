@@ -31,7 +31,7 @@ def test_rolling_replan_runs_on_every_coordinator_scan_without_extra_storage() -
     """Live analysis must see every scan while persistence keeps its normal cadence."""
     source = (INTEGRATION / "agile_rolling_replan.py").read_text(encoding="utf-8")
     assert "runtime.ANALYSIS_REFRESH = timedelta(0)" in source
-    assert 'self._kems_live_snapshot = snapshot' in source
+    assert "self._kems_live_snapshot = snapshot" in source
     assert "_ORIGINAL_HISTORY_RECORD(self, snapshot)" in source
     assert "live.timestamp > records[-1].timestamp" in source
 
@@ -60,9 +60,7 @@ def test_rolling_replan_keeps_best_prices_until_capacity_pressure() -> None:
 
 def test_runtime_installs_rolling_replan_before_live_reporting() -> None:
     """Rolling allocation must exist before the live dashboard consumes the state."""
-    source = (INTEGRATION / "agile_smart_export_runtime.py").read_text(
-        encoding="utf-8"
-    )
+    source = (INTEGRATION / "agile_smart_export_runtime.py").read_text(encoding="utf-8")
     assert "install_rolling_replan_patch()" in source
     assert "install_alpha716_dashboard_patch()" in source
     assert source.index("install_rolling_replan_patch()") < source.index(
