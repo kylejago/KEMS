@@ -62,6 +62,13 @@ def _sync_dashboard_file(source: Path, target: Path) -> bool:
     return _sync_dashboard_bytes(source.read_bytes(), target)
 
 
+def _dashboard_readability_pass(content: str) -> str:
+    """Keep managed dashboard summary cards readable on normal displays."""
+    return content.replace("        columns: 4\n", "        columns: 2\n").replace(
+        "        columns: 5\n", "        columns: 3\n"
+    )
+
+
 def _combined_master_dashboard_bytes() -> bytes:
     """Return the managed master dashboard with Agile comparison views appended."""
     master = PACKAGED_DASHBOARD_PATH.read_text(encoding="utf-8").rstrip()
@@ -70,6 +77,8 @@ def _combined_master_dashboard_bytes() -> bytes:
     if marker not in agile:
         raise ValueError("Packaged Agile Smart Export dashboard has no views section")
     agile_views = agile.split(marker, 1)[1].lstrip("\n")
+    master = _dashboard_readability_pass(master)
+    agile_views = _dashboard_readability_pass(agile_views)
     return f"{master}\n\n{agile_views}".encode()
 
 
