@@ -24,8 +24,9 @@ LOGGER = logging.getLogger(__name__)
 
 MANAGED_DASHBOARD_FILENAME = "kems_master_dashboard.yaml"
 PACKAGED_DASHBOARD_PATH = Path(__file__).with_name(MANAGED_DASHBOARD_FILENAME)
-AGILE_DASHBOARD_FILENAME = "kems_agile_smart_export_dashboard.yaml"
-PACKAGED_AGILE_DASHBOARD_PATH = Path(__file__).with_name(AGILE_DASHBOARD_FILENAME)
+PACKAGED_AGILE_DASHBOARD_PATH = Path(__file__).with_name(
+    "kems_agile_smart_export_dashboard.yaml"
+)
 
 MANAGED_PANEL_FILENAME = "kems16x16.yaml"
 MANAGED_PANEL_HEADER = b"# KEMS-MANAGED-ESPHOME-PANEL"
@@ -44,9 +45,8 @@ class PanelAutoOTAError(RuntimeError):
     """Raised when KEMS cannot queue the managed ESPHome panel install."""
 
 
-def _sync_dashboard_file(source: Path, target: Path) -> bool:
-    """Copy the packaged dashboard atomically when its contents changed."""
-    source_bytes = source.read_bytes()
+def _sync_dashboard_bytes(source_bytes: bytes, target: Path) -> bool:
+    """Write the managed dashboard atomically when its contents changed."""
     if target.exists() and target.read_bytes() == source_bytes:
         return False
 
@@ -55,6 +55,22 @@ def _sync_dashboard_file(source: Path, target: Path) -> bool:
     temporary.write_bytes(source_bytes)
     os.replace(temporary, target)
     return True
+
+
+def _sync_dashboard_file(source: Path, target: Path) -> bool:
+    """Copy one packaged dashboard atomically when its contents changed."""
+    return _sync_dashboard_bytes(source.read_bytes(), target)
+
+
+def _combined_master_dashboard_bytes() -> bytes:
+    """Return the managed master dashboard with Agile comparison views appended."""
+    master = PACKAGED_DASHBOARD_PATH.read_text(encoding="utf-8").rstrip()
+    agile = PACKAGED_AGILE_DASHBOARD_PATH.read_text(encoding="utf-8")
+    marker = "\nviews:\n"
+    if marker not in agile:
+        raise ValueError("Packaged Agile Smart Export dashboard has no views section")
+    agile_views = agile.split(marker, 1)[1].lstrip("\n")
+    return f"{master}\n\n{agile_views}".encode()
 
 
 def _panel_is_kems_managed(target: Path) -> bool:
@@ -258,28 +274,20 @@ async def async_auto_install_managed_panel(hass: HomeAssistant) -> None:
 
 
 async def async_sync_managed_dashboard(hass: HomeAssistant) -> bool:
-    """Synchronise shipped dashboards and any opted-in KEMS panel config."""
+    """Synchronise the managed master dashboard and opted-in KEMS panel config."""
     await async_load_panel_health(hass)
 
     dashboard_target = Path(hass.config.path(MANAGED_DASHBOARD_FILENAME))
+    dashboard_bytes = await hass.async_add_executor_job(_combined_master_dashboard_bytes)
     dashboard_changed = await hass.async_add_executor_job(
-        _sync_dashboard_file,
-        PACKAGED_DASHBOARD_PATH,
+        _sync_dashboard_bytes,
+        dashboard_bytes,
         dashboard_target,
     )
     if dashboard_changed:
-        LOGGER.info("Updated managed KEMS dashboard at %s", dashboard_target)
-
-    agile_dashboard_target = Path(hass.config.path(AGILE_DASHBOARD_FILENAME))
-    agile_dashboard_changed = await hass.async_add_executor_job(
-        _sync_dashboard_file,
-        PACKAGED_AGILE_DASHBOARD_PATH,
-        agile_dashboard_target,
-    )
-    if agile_dashboard_changed:
         LOGGER.info(
-            "Updated managed Full KEMS Forecast vs Agile Smart Export dashboard at %s",
-            agile_dashboard_target,
+            "Updated managed KEMS master dashboard with Agile Smart Export views at %s",
+            dashboard_target,
         )
 
     panel_target = Path(hass.config.path("esphome", MANAGED_PANEL_FILENAME))
@@ -359,4 +367,4 @@ async def async_sync_managed_dashboard(hass: HomeAssistant) -> bool:
             automatic_ota_armed=False,
         )
 
-    return dashboard_changed or agile_dashboard_changed or panel_changed
+    return dashboard_changed or panel_changed
