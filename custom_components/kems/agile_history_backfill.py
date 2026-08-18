@@ -100,11 +100,13 @@ class AgileHistoryBackfill:
 
         if not missing_days or not required_available:
             self._records = []
-            reason = (
-                "native KEMS already covers the rolling window"
-                if not missing_days
-                else "required historical house-load/solar statistics are not configured"
-            )
+            if not missing_days:
+                reason = "native KEMS already covers the rolling window"
+            else:
+                reason = (
+                    "required historical house-load/solar statistics "
+                    "are not configured"
+                )
             self._publish(
                 now=now,
                 native_days=native_days,
@@ -194,7 +196,8 @@ class AgileHistoryBackfill:
             insufficient_days=insufficient_days,
             source_entities=source_entities,
             reason=(
-                "Older replay days recovered from Home Assistant hourly long-term statistics"
+                "Older replay days recovered from Home Assistant hourly "
+                "long-term statistics"
             ),
         )
         self._last_refresh_day = today
@@ -262,7 +265,8 @@ class AgileHistoryBackfill:
                 "Intelligent bonus slots are not invented"
             ),
             "forecast_fidelity": (
-                "historical KEMS forecast annotations are unavailable on backfilled days"
+                "historical KEMS forecast annotations are unavailable "
+                "on backfilled days"
             ),
             "authoritative_native_365": len(native_days) >= TARGET_DAYS,
             "last_refresh": now.isoformat(),
@@ -375,9 +379,12 @@ def _build_day(
             )
         if house is None:
             continue
-        if config.proposal_solar_enabled and source_entities.get("solar_power_kw"):
-            if solar is None:
-                continue
+        if (
+            config.proposal_solar_enabled
+            and source_entities.get("solar_power_kw")
+            and solar is None
+        ):
+            continue
         solar = max(float(solar or 0.0), 0.0)
         local = timestamp.astimezone(LONDON)
         resolved = resolve_tariff(
