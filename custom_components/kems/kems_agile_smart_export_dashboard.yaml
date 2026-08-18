@@ -12,6 +12,8 @@ views:
 
           **Full KEMS Forecast** keeps the normal forecast-aware fixed-export strategy. **Agile Smart Export** uses the same battery, inverter, house-load, solar, reserve and import-safety limits, but can hold exportable energy for higher-value Agile slots and store solar when exporting it later is worth more after efficiency losses and battery wear.
 
+          **Solar-first rule:** outside a confirmed cheap period, available solar supplies the home before the battery is discharged. Only surplus solar is then considered for storage or immediate export, reducing unnecessary battery cycling and preserving stored energy for a later high-value Agile slot where possible.
+
       - type: grid
         columns: 2
         square: false
@@ -78,10 +80,25 @@ views:
             name: Smart Export status
           - entity: sensor.kems_agile_smart_export_plan
             name: Current Smart Export action
+          - entity: sensor.kems_agile_solar_to_home_today
+            name: Solar → home today
           - entity: sensor.kems_agile_export_rate_now
             name: Current Region L rate
           - entity: sensor.kems_agile_advantage_today
             name: Advantage vs Full KEMS Forecast
+
+      - type: markdown
+        title: Solar-first battery preservation
+        content: |
+          {% set periods = state_attr('sensor.kems_agile_smart_export_plan', 'periods') or {} %}
+          {% set today = periods.get('today', {}) %}
+          {% set agile = today.get('agile_smart_export', {}) %}
+          **Solar → home today:** {{ agile.get('solar_to_home_kwh', '—') }} kWh  
+          **Solar → battery today:** {{ agile.get('solar_to_battery_kwh', '—') }} kWh  
+          **Battery → home today:** {{ agile.get('battery_to_home_kwh', '—') }} kWh  
+          **Battery export today:** {{ agile.get('battery_export_kwh', '—') }} kWh
+
+          Outside a confirmed cheap period, Agile always serves house demand from available solar **before** discharging the battery. Only the remaining surplus PV is then compared between immediate export and storage for a later higher-value Agile slot. This prevents KEMS from needlessly charging solar into the battery while discharging battery energy to run the house.
 
       - type: history-graph
         title: Live Region L Agile export rate
@@ -144,10 +161,10 @@ views:
         content: |
           {% set slots = state_attr('sensor.kems_agile_smart_export_plan', 'today_slots') or [] %}
           {% if slots %}
-          | Time | Agile p/kWh | Action | Grid export | Battery export | End SOC |
-          |---|---:|---|---:|---:|---:|
+          | Time | Agile p/kWh | Action | Solar → home | Solar → battery | Grid export | Battery export | End SOC |
+          |---|---:|---|---:|---:|---:|---:|---:|
           {% for p in slots %}
-          | {{ p.get('label', '') }} | {{ '%.2f'|format(p.get('rate_pence', 0)|float) }} | {{ (p.get('actions') or ['future slot'])|join(', ') }} | {{ p.get('grid_export_kwh') if p.get('grid_export_kwh') is not none else '—' }} | {{ p.get('battery_export_kwh') if p.get('battery_export_kwh') is not none else '—' }} | {{ (p.get('ending_soc_percent') ~ '%') if p.get('ending_soc_percent') is not none else '—' }} |
+          | {{ p.get('label', '') }} | {{ '%.2f'|format(p.get('rate_pence', 0)|float) }} | {{ (p.get('actions') or ['future slot'])|join(', ') }} | {{ p.get('solar_to_home_kwh') if p.get('solar_to_home_kwh') is not none else '—' }} | {{ p.get('solar_to_battery_kwh') if p.get('solar_to_battery_kwh') is not none else '—' }} | {{ p.get('grid_export_kwh') if p.get('grid_export_kwh') is not none else '—' }} | {{ p.get('battery_export_kwh') if p.get('battery_export_kwh') is not none else '—' }} | {{ (p.get('ending_soc_percent') ~ '%') if p.get('ending_soc_percent') is not none else '—' }} |
           {% endfor %}
           {% else %}
           No Region L Agile price slots have been loaded yet.
@@ -158,10 +175,10 @@ views:
         content: |
           {% set slots = state_attr('sensor.kems_agile_smart_export_plan', 'tomorrow_slots') or [] %}
           {% if slots %}
-          | Time | Agile p/kWh | Planned action | Grid export | Battery export | End SOC |
-          |---|---:|---|---:|---:|---:|
+          | Time | Agile p/kWh | Planned action | Solar → home | Solar → battery | Grid export | Battery export | End SOC |
+          |---|---:|---|---:|---:|---:|---:|---:|
           {% for p in slots %}
-          | {{ p.get('label', '') }} | {{ '%.2f'|format(p.get('rate_pence', 0)|float) }} | {{ (p.get('actions') or ['future slot'])|join(', ') }} | {{ p.get('grid_export_kwh') if p.get('grid_export_kwh') is not none else '—' }} | {{ p.get('battery_export_kwh') if p.get('battery_export_kwh') is not none else '—' }} | {{ (p.get('ending_soc_percent') ~ '%') if p.get('ending_soc_percent') is not none else '—' }} |
+          | {{ p.get('label', '') }} | {{ '%.2f'|format(p.get('rate_pence', 0)|float) }} | {{ (p.get('actions') or ['future slot'])|join(', ') }} | {{ p.get('solar_to_home_kwh') if p.get('solar_to_home_kwh') is not none else '—' }} | {{ p.get('solar_to_battery_kwh') if p.get('solar_to_battery_kwh') is not none else '—' }} | {{ p.get('grid_export_kwh') if p.get('grid_export_kwh') is not none else '—' }} | {{ p.get('battery_export_kwh') if p.get('battery_export_kwh') is not none else '—' }} | {{ (p.get('ending_soc_percent') ~ '%') if p.get('ending_soc_percent') is not none else '—' }} |
           {% endfor %}
           {% else %}
           Tomorrow's Agile slots are not published yet. KEMS will populate this table when Octopus publishes the next day's Region L prices.
@@ -265,7 +282,8 @@ views:
           - **Battery wear allowance:** 2p per discharged kWh for optimisation and headline economic comparison.
           - **Battery/inverter constraints:** uses the active KEMS `SimulationConfig`, including battery capacity, reserve SOC, charge/discharge efficiency, KH7 inverter limit, export limit, charge/discharge limits and configured site-import limit.
           - **Import safety:** Agile Smart Export will not deliberately create avoidable day-rate grid import simply to export the battery later.
-          - **Solar decision:** surplus PV is stored only when a later Agile opportunity after charge/discharge losses and battery wear is more valuable than exporting now, or when reserve protection requires it.
+          - **Solar-first home rule:** outside a confirmed cheap period, available PV serves house demand before battery discharge. This avoids unnecessary battery cycling and preserves stored energy for a later export opportunity where possible.
+          - **Surplus solar decision:** only PV left after house demand is served is considered for storage. It is stored only when a later Agile opportunity after charge/discharge losses and battery wear is more valuable than exporting now, or when reserve protection requires it.
           - **Negative Agile prices:** KEMS avoids deliberately exporting at a negative rate where storage/curtailment is physically available.
           - **Tomorrow:** forecast replay uses the KEMS learned hourly house-demand profile plus the KEMS solar forecast. Normal Intelligent off-peak timing/rates are used; unannounced extra Intelligent slots cannot be known in advance.
           - **Safety:** this is **simulation/shadow only**. It creates no FoxESS write commands and does not change the existing control commissioning boundary.
