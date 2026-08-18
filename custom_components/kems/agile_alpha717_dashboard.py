@@ -49,7 +49,10 @@ def install_alpha717_dashboard_patch() -> None:
             _ROUTING_HEADER_REPLACEMENT,
             1,
         )
-        if "**Power basis:** battery/grid export use the current rolling target" not in content:
+        if (
+            "**Power basis:** battery/grid export use the current rolling target"
+            not in content
+        ):
             content = content.replace(
                 _ROUTING_NOTE_MARKER,
                 f"{_ROUTING_NOTE}{_ROUTING_NOTE_MARKER}",
