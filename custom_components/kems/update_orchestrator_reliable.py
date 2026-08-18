@@ -284,7 +284,9 @@ class ReliableKEMSUpdateOrchestrator(base.KEMSUpdateOrchestrator):
         for item in self.component_status:
             if item.key != "kems_core" or not item.target:
                 continue
-            if base._version_matches(files_version, item.target) and not base._version_matches(
+            if base._version_matches(
+                files_version, item.target
+            ) and not base._version_matches(
                 _RUNNING_INTEGRATION_VERSION,
                 item.target,
             ):
