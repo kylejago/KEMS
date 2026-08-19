@@ -27,7 +27,10 @@ def test_release_workflow_bundles_from_the_exact_tag() -> None:
 
     assert 'git fetch --force origin "refs/tags/$VERSION:refs/tags/$VERSION"' in content
     assert 'git checkout --detach "$VERSION"' in content
-    assert 'python scripts/render_update_bundle.py \\\n            --release-version "$VERSION"' in content
+    assert (
+        'python scripts/render_update_bundle.py \\\n            --release-version "$VERSION"'
+        in content
+    )
     assert "sha256sum kems-bundle.json > kems-bundle.json.sha256" in content
     assert 'gh release upload "$VERSION"' in content
     assert "--clobber" in content
