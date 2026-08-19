@@ -140,9 +140,7 @@ def _provisional_hold_price_optimised_export(
 ) -> None:
     """Keep the economic plan visible while Alpha7.22 blocks live dispatch."""
     selected_before = [
-        dict(item)
-        for item in plan.get("selected_slots", [])
-        if isinstance(item, dict)
+        dict(item) for item in plan.get("selected_slots", []) if isinstance(item, dict)
     ]
     slot_before: dict[str, dict[str, Any]] = {}
     for slot in state.get("today_slots", []):
@@ -228,9 +226,11 @@ def _provisional_hold_price_optimised_export(
         )
         slot["provisional_planned_battery_export_kwh"] = round(planned_kwh, 3)
         slot["provisional_target_battery_export_kw"] = round(
-            max(_number(before.get("target_kw")) or 0.0, 0.0)
-            if planned_kwh > _EPSILON
-            else 0.0,
+            (
+                max(_number(before.get("target_kw")) or 0.0, 0.0)
+                if planned_kwh > _EPSILON
+                else 0.0
+            ),
             3,
         )
         if planned_kwh > _EPSILON:
@@ -445,8 +445,7 @@ def _soc_trajectory_with_provisional(
         reserve_stored = reserve_ac / max(config.discharge_efficiency, 0.01)
         reserve_soc = 100.0 * reserve_stored / max(config.battery_capacity_kwh, 0.1)
         planned_deadline = max(
-            _number(hold.get("target_soc_percent"))
-            or config.battery_reserve_percent,
+            _number(hold.get("target_soc_percent")) or config.battery_reserve_percent,
             known_plan_deadline - reserve_soc,
         )
 
