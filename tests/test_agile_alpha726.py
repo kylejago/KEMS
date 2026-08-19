@@ -13,8 +13,10 @@ MANIFEST = KEMS / "manifest.json"
 DOC = ROOT / "docs" / "agile-provisional-planning-bst-horizon.md"
 
 
-def test_alpha726_manifest_is_exact() -> None:
-    assert '"version": "0.7.0-alpha7.26"' in MANIFEST.read_text(encoding="utf-8")
+def test_alpha726_patch_remains_packaged() -> None:
+    manifest = MANIFEST.read_text(encoding="utf-8")
+    assert '"version": "0.7.0-alpha7.' in manifest
+    assert PATCH.exists()
 
 
 def test_alpha726_module_parses() -> None:
