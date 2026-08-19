@@ -55,12 +55,20 @@ class KEMSSystemTypeSelect(KEMSEntity, SelectEntity):
     def current_option(self) -> str:
         """Return the friendly configured system type."""
         definition = SYSTEM_TYPE_DEFINITIONS.get(self.coordinator.settings.system_type)
-        return definition.label if definition else SYSTEM_TYPE_DEFINITIONS[SYSTEM_TYPES[-1]].label
+        return (
+            definition.label
+            if definition
+            else SYSTEM_TYPE_DEFINITIONS[SYSTEM_TYPES[-1]].label
+        )
 
     async def async_select_option(self, option: str) -> None:
         """Persist a valid type; Live Data also atomically disables control."""
         selected = next(
-            (key for key, definition in SYSTEM_TYPE_DEFINITIONS.items() if definition.label == option),
+            (
+                key
+                for key, definition in SYSTEM_TYPE_DEFINITIONS.items()
+                if definition.label == option
+            ),
             None,
         )
         if selected is None:
@@ -91,7 +99,10 @@ class KEMSOperatingModeSelect(KEMSEntity, SelectEntity):
         """Persist a simple mode while respecting Live Data capabilities."""
         if option not in USER_MODES:
             raise HomeAssistantError(f"Unsupported KEMS mode: {option}")
-        if self.coordinator.settings.system_type == SYSTEM_TYPE_LIVE_DATA and option != "Live":
+        if (
+            self.coordinator.settings.system_type == SYSTEM_TYPE_LIVE_DATA
+            and option != "Live"
+        ):
             raise HomeAssistantError("Live Data supports Live mode only")
         await async_set_runtime_option(
             self.hass,
