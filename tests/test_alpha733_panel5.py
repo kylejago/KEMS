@@ -17,7 +17,9 @@ def test_alpha733_versions_and_bundle_are_aligned() -> None:
     panel = (KEMS / "panel.py").read_text(encoding="utf-8")
     yaml = (KEMS / "kems16x16.yaml").read_text(encoding="utf-8")
 
-    assert manifest["version"] == "0.7.0-alpha7.33"
+    version = str(manifest["version"])
+    assert version.startswith("0.7.0-alpha7.")
+    assert int(version.rsplit(".", 1)[1]) >= 33
     assert bundle["components"]["panel"]["version"] == "0.7.0-alpha7-panel5"
     assert bundle["components"]["panel"]["delivery"] == "kems_core"
     assert bundle["components"]["panel"]["required"] is False

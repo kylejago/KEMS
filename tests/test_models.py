@@ -19,8 +19,8 @@ def test_snapshot_round_trip() -> None:
     assert restored == snapshot
 
 
-def test_extra_intelligent_slot_requires_ohme_charging_confirmation() -> None:
-    """Extra cheap slots are confirmed by Octopus and active Ohme charging."""
+def test_only_resolved_overnight_window_confirms_a_cheap_period() -> None:
+    """Legacy Intelligent/EV hints must never grant KEMS cheap-period authority."""
     assert Snapshot(off_peak=True).cheap_period_confirmed is True
     assert (
         Snapshot(
@@ -28,7 +28,7 @@ def test_extra_intelligent_slot_requires_ohme_charging_confirmation() -> None:
             intelligent_slot=True,
             ev_charging=True,
         ).cheap_period_confirmed
-        is True
+        is False
     )
     assert (
         Snapshot(
@@ -40,8 +40,8 @@ def test_extra_intelligent_slot_requires_ohme_charging_confirmation() -> None:
     )
 
 
-def test_stale_intelligent_slot_cannot_confirm_a_cheap_period() -> None:
-    """A stale extra-slot signal must fail closed even while the EV charges."""
+def test_stale_intelligent_slot_remains_observational_only() -> None:
+    """Legacy Intelligent freshness may be observed but cannot mark power cheap."""
     snapshot = Snapshot(
         off_peak=False,
         intelligent_slot=True,

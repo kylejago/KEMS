@@ -48,6 +48,9 @@ from .agile_alpha730_current_routing import (  # noqa: E402
 from .agile_alpha731_solar_headroom import (  # noqa: E402
     install_alpha731_solar_headroom_patch,
 )
+from .agile_alpha734_deadline_guard import (  # noqa: E402
+    install_alpha734_deadline_guard_patch,
+)
 from .agile_dashboard_yaml_guard import install_dashboard_yaml_guard  # noqa: E402
 from .agile_rolling_replan import install_rolling_replan_patch  # noqa: E402
 from .agile_smart_export_live import install_live_scenario_patch  # noqa: E402
@@ -77,6 +80,7 @@ install_alpha728_bounded_partial_horizon_patch()
 install_alpha729_live_routing_parity_patch()
 install_alpha730_current_routing_patch()
 install_alpha731_solar_headroom_patch()
+install_alpha734_deadline_guard_patch()
 
 EfficientAgileSmartExportManager = _base.EfficientAgileSmartExportManager
 

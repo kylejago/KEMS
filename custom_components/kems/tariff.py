@@ -16,6 +16,8 @@ class TariffSettings:
     standing_charge_pence: float
     offpeak_start: time
     offpeak_end: time
+    # Retained only so existing config entries/tests deserialize cleanly.
+    # Alpha7.34 deliberately ignores Intelligent/extra-slot cheap control.
     intelligent_slots_enabled: bool
 
 
@@ -112,22 +114,23 @@ def resolve_tariff(
     ev_charging: bool | None,
     fallback_export_rate: float,
 ) -> ResolvedTariff:
-    """Resolve live tariff data with user-controlled manual fallback/override."""
+    """Resolve prices while allowing cheap control only in the overnight window.
+
+    Octopus Intelligent/dispatch signals remain accepted in the call signature for
+    backwards-compatible providers, but they cannot mark daytime power as cheap,
+    move the next cheap deadline, or enable KEMS battery charging.  The configured
+    overnight start/end is the sole control-authoritative cheap window.
+    """
     schedule_offpeak, manual_next_start, manual_end = manual_schedule(
         now,
         settings.offpeak_start,
         settings.offpeak_end,
     )
-    intelligent_slot = (
-        live_intelligent_slot if settings.intelligent_slots_enabled else False
-    )
-    extra_slot_confirmed = intelligent_slot is True and ev_charging is True
-    manual_offpeak = schedule_offpeak or extra_slot_confirmed
     manual_current_rate = (
-        settings.offpeak_rate_pence if manual_offpeak else settings.day_rate_pence
+        settings.offpeak_rate_pence if schedule_offpeak else settings.day_rate_pence
     )
     manual_next_rate = (
-        settings.day_rate_pence if manual_offpeak else settings.offpeak_rate_pence
+        settings.day_rate_pence if schedule_offpeak else settings.offpeak_rate_pence
     )
 
     if settings.mode == "manual":
@@ -136,8 +139,8 @@ def resolve_tariff(
             next_import_rate=manual_next_rate,
             current_export_rate=max(fallback_export_rate, 0.0),
             electricity_standing_charge=settings.standing_charge_pence,
-            off_peak=manual_offpeak,
-            intelligent_slot=intelligent_slot,
+            off_peak=schedule_offpeak,
+            intelligent_slot=False,
             next_offpeak_start=manual_next_start,
             offpeak_end=manual_end,
             source="manual",
@@ -148,10 +151,8 @@ def resolve_tariff(
         for value in (
             live_current_import_rate,
             live_next_import_rate,
+            live_current_export_rate,
             live_standing_charge,
-            live_off_peak,
-            live_next_offpeak_start,
-            live_offpeak_end,
         )
     )
     return ResolvedTariff(
@@ -175,13 +176,9 @@ def resolve_tariff(
             if live_standing_charge is not None
             else settings.standing_charge_pence
         ),
-        off_peak=(live_off_peak if live_off_peak is not None else manual_offpeak),
-        intelligent_slot=intelligent_slot,
-        next_offpeak_start=(
-            live_next_offpeak_start
-            if live_next_offpeak_start is not None and live_next_offpeak_start > now
-            else manual_next_start
-        ),
-        offpeak_end=live_offpeak_end or manual_end,
+        off_peak=schedule_offpeak,
+        intelligent_slot=False,
+        next_offpeak_start=manual_next_start,
+        offpeak_end=manual_end,
         source="automatic" if used_live else "manual_fallback",
     )
