@@ -160,7 +160,6 @@ _BATTERY_SOLAR_PREFIX = """      - type: markdown
         show_header_toggle: false
         entities:
           - sensor.kems_current_import_rate
-          - sensor.kems_current_export_rate
           - binary_sensor.kems_cheap_period_confirmed
           - sensor.kems_export_tariff_status
 """
@@ -217,8 +216,10 @@ _FULL_KEMS_PREFIX = """      - type: markdown
               - sensor.kems_current_import_rate
               - sensor.kems_next_import_rate
               - binary_sensor.kems_cheap_period_confirmed
-              - sensor.kems_ev_status
+              - binary_sensor.kems_ev_connected
+              - binary_sensor.kems_ev_charging
               - sensor.kems_ev_charging_power
+              - sensor.kems_ev_state_of_charge
           - type: entities
             title: Forecast protection
             entities:
@@ -288,8 +289,6 @@ _AGILE_PREFIX = """      - type: markdown
             entities:
               - sensor.kems_agile_smart_export_status
               - sensor.kems_agile_smart_export_plan
-              - sensor.kems_agile_rolling_next_export_slot
-              - sensor.kems_agile_rolling_capacity_margin
 """
 
 _COMPARE_PREFIX = """      - type: markdown
@@ -310,7 +309,7 @@ _COMPARE_PREFIX = """      - type: markdown
           | Grid export kW | {{ states('sensor.kems_grid_export') }} | {{ state_attr(b, 'current_grid_export_kw') or 0 }} | {{ state_attr(f, 'current_grid_export_kw') or 0 }} | {{ state_attr(a, 'current_grid_export_kw') or 0 }} |
           | Solar → home kW | — | {{ state_attr(b, 'current_solar_to_home_kw') or 0 }} | {{ state_attr(f, 'current_solar_to_home_kw') or 0 }} | {{ state_attr(a, 'current_solar_to_home_kw') or 0 }} |
           | Solar → battery kW | — | {{ state_attr(b, 'current_solar_to_battery_kw') or 0 }} | {{ state_attr(f, 'current_solar_to_battery_kw') or 0 }} | {{ state_attr(a, 'current_solar_to_battery_kw') or 0 }} |
-          | Solar export kW | {{ states('sensor.kems_grid_export') }} | {{ state_attr(b, 'current_solar_export_kw') or 0 }} | {{ state_attr(f, 'current_solar_export_kw') or 0 }} | {{ state_attr(a, 'current_solar_export_kw') or 0 }} |
+          | Solar export kW | — | {{ state_attr(b, 'current_solar_export_kw') or 0 }} | {{ state_attr(f, 'current_solar_export_kw') or 0 }} | {{ state_attr(a, 'current_solar_export_kw') or 0 }} |
           | Grid → battery kW | — | {{ state_attr(b, 'current_grid_to_battery_kw') or 0 }} | {{ state_attr(f, 'current_grid_to_battery_kw') or 0 }} | {{ state_attr(a, 'current_grid_to_battery_kw') or 0 }} |
           | Battery → home kW | — | {{ state_attr(b, 'current_battery_to_home_kw') or 0 }} | {{ state_attr(f, 'current_battery_to_home_kw') or 0 }} | {{ state_attr(a, 'current_battery_to_home_kw') or 0 }} |
           | Battery → export kW | — | {{ state_attr(b, 'current_battery_export_kw') or 0 }} | {{ state_attr(f, 'current_battery_export_kw') or 0 }} | {{ state_attr(a, 'current_battery_export_kw') or 0 }} |
