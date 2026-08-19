@@ -138,9 +138,7 @@ def _snapshot(self, state: dict[str, Any]) -> dict[str, Any]:
 
     house = _number(simulation.current_simulated_house_load_kw)
     solar = _number(simulation.current_simulated_solar_power_kw)
-    solar_to_battery = _number(
-        simulation.current_simulated_solar_to_battery_power_kw
-    )
+    solar_to_battery = _number(simulation.current_simulated_solar_to_battery_power_kw)
     base_battery_home = _number(simulation.current_simulated_battery_to_home_power_kw)
     base_battery_export = _number(simulation.current_simulated_battery_export_power_kw)
     base_ac_output = _number(simulation.current_simulated_total_kh7_output_kw)
@@ -204,14 +202,12 @@ def _snapshot(self, state: dict[str, Any]) -> dict[str, Any]:
     grid_import = max(house - base_solar_to_home - candidate_home, 0.0)
     grid_import += grid_to_battery
     grid_export = base_solar_export + candidate_export
-    normalised_ac_output = (
-        max(
-            (base_ac_output or (base_solar_to_home + base_solar_export))
-            - base_battery_home
-            - base_battery_export
-            + candidate_discharge,
-            0.0,
-        )
+    normalised_ac_output = max(
+        (base_ac_output or (base_solar_to_home + base_solar_export))
+        - base_battery_home
+        - base_battery_export
+        + candidate_discharge,
+        0.0,
     )
 
     current_rate = (
@@ -311,9 +307,7 @@ def _publish_with_current_routing(self, state: dict[str, Any]) -> None:
                 "routing_action": snapshot.get("routing_action"),
                 "current_action": snapshot.get("routing_action"),
                 "dispatch_mode": snapshot.get("dispatch_mode"),
-                "current_agile_rate_pence": snapshot.get(
-                    "current_agile_rate_pence"
-                ),
+                "current_agile_rate_pence": snapshot.get("current_agile_rate_pence"),
                 "current_routing_snapshot": snapshot,
             }
         )
@@ -362,7 +356,9 @@ def install_alpha730_current_routing_patch() -> None:
         global alpha730_original_publish
         alpha730_original_publish = publish
         _publish_with_current_routing._kems_alpha730_current_routing = True
-        runtime.EfficientAgileSmartExportManager._publish = _publish_with_current_routing
+        runtime.EfficientAgileSmartExportManager._publish = (
+            _publish_with_current_routing
+        )
 
     original_dashboard = dashboard_module._combined_master_dashboard_bytes
     if getattr(original_dashboard, "_kems_alpha730_current_routing", False):
