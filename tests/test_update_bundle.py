@@ -31,10 +31,9 @@ def test_release_bundle_renders_exact_core_and_existing_companion_targets() -> N
     assert bundle["maintenance"]["affected_components"] == [
         "kems_core",
         "dashboard",
-        "panel",
     ]
     assert bundle["maintenance"]["reboot_required"] is False
-    assert "panel firmware" in bundle["maintenance"]["reason"]
+    assert "managed dashboard" in bundle["maintenance"]["reason"]
 
 
 def test_bundle_contract_rejects_mismatched_appliance_versions() -> None:
