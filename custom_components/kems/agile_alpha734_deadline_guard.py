@@ -350,12 +350,8 @@ def install_alpha734_deadline_guard_patch() -> None:
                     "house_battery_kw": round(house_kw, 3),
                     "battery_export_target_kw": round(export_kw, 3),
                     "battery_discharge_target_kw": round(total_kw, 3),
-                    "deadline_margin_kwh": guard.get(
-                        "solar_aware_deadline_margin_kwh"
-                    ),
-                    "required_average_kw": guard.get(
-                        "required_average_discharge_kw"
-                    ),
+                    "deadline_margin_kwh": guard.get("solar_aware_deadline_margin_kwh"),
+                    "required_average_kw": guard.get("required_average_discharge_kw"),
                     "deadline_guard_escalated_from": current_mode,
                 }
             )
