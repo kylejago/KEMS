@@ -42,7 +42,7 @@
   },
   "maintenance": {
     "required": true,
-    "reason": "Activate KEMS __RELEASE_VERSION__: Agile latest-safe-start protection and overnight-only cheap control",
+    "reason": "Activate KEMS __RELEASE_VERSION__: simplified product types, live-vs-simulated dashboards and Agile overnight handover parity",
     "expected_downtime_minutes": 5,
     "home_assistant_restart_required": true,
     "reboot_required": false,
