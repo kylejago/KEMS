@@ -13,8 +13,11 @@ MANIFEST = KEMS / "manifest.json"
 DOC = ROOT / "docs" / "agile-live-routing-parity.md"
 
 
-def test_alpha729_manifest_is_exact() -> None:
-    assert '"version": "0.7.0-alpha7.29"' in MANIFEST.read_text(encoding="utf-8")
+def test_alpha729_manifest_is_alpha729_or_newer() -> None:
+    manifest = MANIFEST.read_text(encoding="utf-8")
+    assert '"version": "0.7.0-alpha7.' in manifest
+    version = manifest.split('"version": "0.7.0-alpha7.', 1)[1].split('"', 1)[0]
+    assert int(version) >= 29
 
 
 def test_alpha729_module_parses() -> None:
