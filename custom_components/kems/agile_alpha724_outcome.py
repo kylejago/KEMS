@@ -23,12 +23,7 @@ from typing import Any
 
 from . import agile_alpha723_shadow as alpha723
 from . import agile_rolling_replan as rolling
-from .kems_core import (
-    ControlConfig,
-    ControlState,
-    SimulationConfig,
-    SimulationState,
-)
+from .kems_core import ControlConfig, ControlState, SimulationConfig, SimulationState
 
 
 def _number(value: Any) -> float | None:
@@ -53,9 +48,7 @@ def _routing_snapshot(simulation: SimulationState) -> dict[str, float | None]:
         "house_load_kw": None if house is None else round(max(house, 0.0), 3),
         "solar_power_kw": None if solar is None else round(max(solar, 0.0), 3),
         "solar_to_battery_kw": (
-            None
-            if solar_to_battery is None
-            else round(max(solar_to_battery, 0.0), 3)
+            None if solar_to_battery is None else round(max(solar_to_battery, 0.0), 3)
         ),
         "battery_to_home_kw": (
             None if battery_home is None else round(max(battery_home, 0.0), 3)
@@ -101,10 +94,7 @@ def build_agile_shadow_command_with_outcome_parity(
     candidate_discharge = max(float(candidate.desired_total_discharge_power_kw), 0.0)
 
     if base_ac is not None:
-        normalised_ac = max(
-            float(base_ac) - base_discharge + candidate_discharge,
-            0.0,
-        )
+        normalised_ac = max(float(base_ac) - base_discharge + candidate_discharge, 0.0)
         basis = "digital_twin_ac_output_substitute_candidate_discharge"
     else:
         solar = routing.get("solar_power_kw") or 0.0
@@ -183,9 +173,7 @@ def _record_agile_decision_with_outcome(self, result: dict[str, Any], now) -> No
     tracking = result.get("tracking") or {}
     latest["tracking_score_percent"] = tracking.get("tracking_score_percent")
     latest["outcome_parity_passed"] = bool(result.get("outcome_parity_passed"))
-    latest["outcome_routing_basis"] = (result.get("outcome_routing") or {}).get(
-        "basis"
-    )
+    latest["outcome_routing_basis"] = (result.get("outcome_routing") or {}).get("basis")
     self._dirty = True
 
 
@@ -252,17 +240,11 @@ def install_alpha724_outcome_parity_patch() -> None:
             if not records:
                 return original_headroom(self, config)
             current = records[-1]
-            house = max(
-                _number(getattr(current, "house_load_kw", None)) or 0.0,
-                0.0,
-            )
+            house = max(_number(getattr(current, "house_load_kw", None)) or 0.0, 0.0)
             simulator = getattr(self, "_simulation", None)
             if simulator is None or not hasattr(simulator, "_simulated_solar_power"):
                 return original_headroom(self, config)
-            solar = max(
-                float(simulator._simulated_solar_power(current, config)),
-                0.0,
-            )
+            solar = max(float(simulator._simulated_solar_power(current, config)), 0.0)
             headroom_kw = min(
                 max(house - solar, 0.0),
                 max(config.max_discharge_kw, 0.0),
