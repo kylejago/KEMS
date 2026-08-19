@@ -24,9 +24,9 @@ def test_alpha730_module_parses() -> None:
 def test_alpha730_installs_after_alpha729() -> None:
     loader = LOADER.read_text(encoding="utf-8")
     assert "install_alpha730_current_routing_patch" in loader
-    assert loader.rindex(
-        "install_alpha730_current_routing_patch()"
-    ) > loader.rindex("install_alpha729_live_routing_parity_patch()")
+    assert loader.rindex("install_alpha730_current_routing_patch()") > loader.rindex(
+        "install_alpha729_live_routing_parity_patch()"
+    )
 
 
 def test_alpha730_rebuilds_current_proposal_simulation_each_scan() -> None:
@@ -79,7 +79,9 @@ def test_alpha730_replaces_entire_current_routing_card() -> None:
     source = PATCH.read_text(encoding="utf-8")
     assert "| Flow | Current power |" in source
     assert "one current KEMS coordinator routing snapshot" in source
-    assert "**Current decision:** {{ state_attr(e, 'routing_action') or '—' }}" in source
+    assert (
+        "**Current decision:** {{ state_attr(e, 'routing_action') or '—' }}" in source
+    )
     assert "_patch_current_routing_card" in source
 
 
