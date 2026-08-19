@@ -1,0 +1,101 @@
+name: Publish KEMS release automatically
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: publish-kems-release
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out merged source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Resolve canonical KEMS version
+        id: version
+        shell: bash
+        run: |
+          VERSION="$(python - <<'PY'
+          import json
+          from pathlib import Path
+
+          manifest = json.loads(Path("custom_components/kems/manifest.json").read_text())
+          print(str(manifest["version"]).strip())
+          PY
+          )"
+          if [[ -z "$VERSION" || "$VERSION" == v* ]]; then
+            echo "KEMS releases require an exact version with no leading v: $VERSION" >&2
+            exit 1
+          fi
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]]; then
+            echo "Invalid KEMS release version: $VERSION" >&2
+            exit 1
+          fi
+          echo "value=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Create canonical release when missing
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.value }}
+        run: |
+          if gh release view "$VERSION" >/dev/null 2>&1; then
+            echo "Release $VERSION already exists; keeping its existing tag target."
+            exit 0
+          fi
+
+          PRERELEASE_ARGS=()
+          if [[ "$VERSION" == *-* ]]; then
+            PRERELEASE_ARGS+=(--prerelease)
+          fi
+
+          gh release create "$VERSION" \
+            --target "$GITHUB_SHA" \
+            --title "KEMS $VERSION" \
+            --generate-notes \
+            "${PRERELEASE_ARGS[@]}"
+
+      - name: Check out exact release tag
+        shell: bash
+        env:
+          VERSION: ${{ steps.version.outputs.value }}
+        run: |
+          git fetch --force origin "refs/tags/$VERSION:refs/tags/$VERSION"
+          git checkout --detach "$VERSION"
+
+      - name: Render exact coordinated bundle
+        shell: bash
+        env:
+          VERSION: ${{ steps.version.outputs.value }}
+        run: |
+          python scripts/render_update_bundle.py \
+            --release-version "$VERSION" \
+            --output kems-bundle.json
+          sha256sum kems-bundle.json > kems-bundle.json.sha256
+
+      - name: Attach verified bundle to canonical release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.value }}
+        run: |
+          gh release upload "$VERSION" \
+            kems-bundle.json \
+            kems-bundle.json.sha256 \
+            --clobber
