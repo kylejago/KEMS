@@ -1,20 +1,18 @@
-"""Release guards for KEMS 0.7.0-alpha7.21."""
+"""Regression guards for the panel4 release introduced in KEMS alpha7.21."""
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
 ROOT = Path(__file__).parents[1]
 KEMS = ROOT / "custom_components" / "kems"
 
 
-def test_alpha721_manifest_and_panel_versions_move_together() -> None:
-    manifest = json.loads((KEMS / "manifest.json").read_text(encoding="utf-8"))
+def test_panel4_packaged_and_health_versions_remain_aligned() -> None:
+    """Later KEMS alphas must keep the packaged panel and verifier in lockstep."""
     panel = (KEMS / "kems16x16.yaml").read_text(encoding="utf-8")
     health = (KEMS / "panel.py").read_text(encoding="utf-8")
 
-    assert manifest["version"] == "0.7.0-alpha7.21"
     assert 'panel_config_version: "0.7.0-alpha7-panel4"' in panel
     assert 'PANEL_CONFIG_VERSION = "0.7.0-alpha7-panel4"' in health
 
