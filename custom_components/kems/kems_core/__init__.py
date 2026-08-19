@@ -54,6 +54,7 @@ from .models import (
     WholeHomeSummary,
 )
 from .ohme import interpret_charger_status
+from .overnight_cheap_policy import install_overnight_only_cheap_policy
 from .periods import (
     PERIOD_DATA_COMPLETE_KEY,
     period_value_keys,
@@ -73,6 +74,10 @@ from .scenario_comparison import (
 from .simulation import SimulationEngine
 from .system_profile import FOXHOLE_PROPOSAL_PROFILE, ProposalSystemProfile, SolarArray
 from .whole_home import WholeHomeEngine
+
+# Alpha7.34: make the configured overnight window the sole cheap-period
+# authority for both newly collected and previously retained snapshots.
+install_overnight_only_cheap_policy()
 
 __all__ = [
     "should_accumulate_lifetime_value",
