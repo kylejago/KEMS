@@ -175,7 +175,9 @@ def evaluate_agile_nonzero_export_proof(
             reason = "A non-zero target is present, but the full price horizon is not complete"
         else:
             state = "WAITING — price-horizon export hold"
-            reason = "A non-zero target is present while the export hold is still active"
+            reason = (
+                "A non-zero target is present while the export hold is still active"
+            )
         result["nonzero_export_proof"] = {
             "state": state,
             "reason": reason,
@@ -199,7 +201,8 @@ def evaluate_agile_nonzero_export_proof(
 
     checks = {
         "nonzero_optimizer_export": optimizer_export > NONZERO_EXPORT_THRESHOLD_KW,
-        "export_target_matches_optimizer": abs(candidate_export - optimizer_export) <= 0.001,
+        "export_target_matches_optimizer": abs(candidate_export - optimizer_export)
+        <= 0.001,
         "command_parity": bool(result.get("parity_passed")),
         "complete_price_horizon": horizon_complete,
         "price_horizon_not_held": not horizon_held,
@@ -210,12 +213,15 @@ def evaluate_agile_nonzero_export_proof(
             and safety.get("passed_checks") == 13
             and safety.get("total_checks") == 13
         ),
-        "strict_outcome_parity": bool(within and all(bool(value) for value in within.values())),
+        "strict_outcome_parity": bool(
+            within and all(bool(value) for value in within.values())
+        ),
         "strict_tracking_100_percent": tracking.get("tracking_score_percent") == 100.0,
         "discharge_within_limit": candidate_total <= config.max_discharge_kw + 1e-9,
         "kh7_ac_within_limit": candidate_ac <= config.inverter_limit_kw + 1e-9,
         "minimum_soc_respected": bool(
-            target_soc is not None and target_soc + 1e-9 >= config.normal_reserve_percent
+            target_soc is not None
+            and target_soc + 1e-9 >= config.normal_reserve_percent
         ),
         "hardware_writes_blocked": bool(
             not result.get("safe_to_write_hardware")
@@ -262,7 +268,9 @@ def evaluate_agile_nonzero_export_proof(
     return result
 
 
-def _record_agile_decision_with_nonzero_proof(self, result: dict[str, Any], now) -> None:
+def _record_agile_decision_with_nonzero_proof(
+    self, result: dict[str, Any], now
+) -> None:
     """Persist compact Alpha7.25 proof evidence with the existing decisions."""
     alpha724._record_agile_decision_with_outcome(self, result, now)
     decisions = getattr(self, "_agile_decisions", None)
@@ -279,8 +287,8 @@ def _record_agile_decision_with_nonzero_proof(self, result: dict[str, Any], now)
     latest["strict_tracking_score_percent"] = strict_tracking.get(
         "tracking_score_percent"
     )
-    latest["replay_battery_export_kw"] = (
-        (strict_tracking.get("outcome") or {}).get("battery_export_kw")
+    latest["replay_battery_export_kw"] = (strict_tracking.get("outcome") or {}).get(
+        "battery_export_kw"
     )
     self._dirty = True
 
@@ -334,7 +342,10 @@ _ALPHA725_DASHBOARD_CARDS = r"""      - type: entities
 
 def install_alpha725_nonzero_export_proof_patch() -> None:
     """Install non-zero Agile export proof after Alpha7.24."""
-    if alpha723.evaluate_agile_shadow_command is not evaluate_agile_nonzero_export_proof:
+    if (
+        alpha723.evaluate_agile_shadow_command
+        is not evaluate_agile_nonzero_export_proof
+    ):
         alpha723.evaluate_agile_shadow_command = evaluate_agile_nonzero_export_proof
     if alpha723._record_agile_decision is not _record_agile_decision_with_nonzero_proof:
         alpha723._record_agile_decision = _record_agile_decision_with_nonzero_proof
