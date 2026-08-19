@@ -69,7 +69,6 @@ from .const import (
     CONF_HISTORY_DAYS,
     CONF_HOUSE_LOAD,
     CONF_INTELLIGENT_SLOT,
-    CONF_INTELLIGENT_SLOTS_ENABLED,
     CONF_INVERTER_LIMIT,
     CONF_ISLAND_RESERVE_PERCENT,
     CONF_MANUAL_DAY_RATE,
@@ -99,8 +98,8 @@ from .const import (
     CONF_STALE_DATA_SECONDS,
     CONF_SYSTEM_COMMISSIONED,
     CONF_SYSTEM_COST,
+    CONF_SYSTEM_TYPE,
     CONF_TARIFF_MODE,
-    CONF_VIRTUAL_SCENARIO,
     DEFAULT_OPTIONS,
     DOMAIN,
     ENTITY_MAPPING_KEYS,
@@ -111,6 +110,7 @@ from .entity_discovery import (
     async_discover_entities,
     async_validate_entity_mappings,
 )
+from .product_types import SYSTEM_TYPE_DEFINITIONS, SYSTEM_TYPES
 
 SENSOR_SELECTOR = EntitySelector(EntitySelectorConfig(domain="sensor"))
 BINARY_SENSOR_SELECTOR = EntitySelector(EntitySelectorConfig(domain="binary_sensor"))
@@ -176,6 +176,21 @@ TARIFF_MODE_SELECTOR = _select(
     ]
 )
 
+SYSTEM_TYPE_SELECTOR = _select(
+    [
+        (key, SYSTEM_TYPE_DEFINITIONS[key].label)
+        for key in SYSTEM_TYPES
+    ]
+)
+
+USER_MODE_SELECTOR = _select(
+    [
+        ("observe", "Live"),
+        ("simulate", "Simulate"),
+        ("control", "Control"),
+    ]
+)
+
 
 def _entity_schema(
     suggested: dict[str, Any],
@@ -213,7 +228,6 @@ MANUAL_TARIFF_FIELDS = {
     vol.Required(CONF_EXPORT_RATE): _number(0, 200, 0.01, "p/kWh"),
     vol.Required(CONF_MANUAL_OFFPEAK_START): TIME_SELECTOR,
     vol.Required(CONF_MANUAL_OFFPEAK_END): TIME_SELECTOR,
-    vol.Required(CONF_INTELLIGENT_SLOTS_ENABLED): BOOLEAN_SELECTOR,
 }
 TARIFF_SCHEMA = vol.Schema(
     {
@@ -298,27 +312,8 @@ MONITORING_SCHEMA = vol.Schema(
 
 CONTROL_SCHEMA = vol.Schema(
     {
-        vol.Required(CONF_OPERATING_MODE): _select(
-            [
-                ("observe", "Observe only"),
-                ("simulate", "Virtual system simulation"),
-                ("shadow", "Calculate real commands but send nothing"),
-                ("control", "Live control, blocked until commissioned"),
-            ]
-        ),
-        vol.Required(CONF_VIRTUAL_SCENARIO): _select(
-            [
-                ("normal", "Normal grid-connected day"),
-                ("sunny_high_solar", "Sunny high-solar test"),
-                ("cloudy_low_solar", "Cloudy low-solar test"),
-                ("high_house_load", "High whole-house load test"),
-                ("power_down_active", "Active Power Down test"),
-                ("grid_outage_daylight", "Whole-house outage in daylight"),
-                ("grid_outage_night", "Whole-house outage at night"),
-                ("grid_outage_high_load", "Whole-house EPS overload test"),
-                ("grid_flapping", "Grid restoration stability hold"),
-            ]
-        ),
+        vol.Required(CONF_SYSTEM_TYPE): SYSTEM_TYPE_SELECTOR,
+        vol.Required(CONF_OPERATING_MODE): USER_MODE_SELECTOR,
         vol.Required(CONF_CONTROL_ENABLED): BOOLEAN_SELECTOR,
         vol.Required(CONF_SYSTEM_COMMISSIONED): BOOLEAN_SELECTOR,
         vol.Required(CONF_EMERGENCY_STOP): BOOLEAN_SELECTOR,
@@ -590,18 +585,14 @@ class KEMSConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 class KEMSOptionsFlow(OptionsFlowWithReload):
     """Present KEMS settings as a friendly category menu."""
 
-    # Use explicit English fallback labels so the menu remains usable when
-    # Home Assistant or the browser still has an older custom-integration
-    # translation bundle cached. The same labels remain in translations/en.json
-    # for normal localisation support.
     MENU_OPTIONS = {
         "tariff": "Tariff and prices",
         "battery": "Battery, inverter and grid limits",
-        "solar": "Solar, export and Power Down",
+        "solar": "Solar and export",
         "forecast": "Forecast and reserve planning",
         "financial": "System cost and ROI",
         "monitoring": "Monitoring and history",
-        "control": "Control Lab and EPS safety",
+        "control": "KEMS type, mode and safety",
     }
 
     async def async_step_init(
@@ -619,6 +610,10 @@ class KEMSOptionsFlow(OptionsFlowWithReload):
         values = {**DEFAULT_OPTIONS, **dict(self.config_entry.options)}
         if not values.get(CONF_COMMISSIONING_DATE):
             values.pop(CONF_COMMISSIONING_DATE, None)
+        # Shadow remains an engineering mode but is intentionally not a user
+        # choice. Existing shadow installs show as Simulate in the normal UI.
+        if values.get(CONF_OPERATING_MODE) == "shadow":
+            values[CONF_OPERATING_MODE] = "simulate"
         return values
 
     def _save_options(self, user_input: dict[str, Any]):
@@ -630,6 +625,8 @@ class KEMSOptionsFlow(OptionsFlowWithReload):
         }
         if not options.get(CONF_COMMISSIONING_DATE):
             options.pop(CONF_COMMISSIONING_DATE, None)
+        if options.get(CONF_SYSTEM_TYPE) == "live_data":
+            options[CONF_OPERATING_MODE] = "observe"
         return self.async_create_entry(data=options)
 
     def _show_category(self, step_id: str, schema: vol.Schema):
@@ -688,7 +685,7 @@ class KEMSOptionsFlow(OptionsFlowWithReload):
         return self._show_category("monitoring", MONITORING_SCHEMA)
 
     async def async_step_control(self, user_input: dict[str, Any] | None = None):
-        """Configure Control Lab and EPS safeguards."""
+        """Configure the KEMS type, simple mode and safety safeguards."""
         if user_input is not None:
             return self._save_options(user_input)
         return self._show_category("control", CONTROL_SCHEMA)
