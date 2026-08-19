@@ -61,7 +61,11 @@ def _cheap_snapshot(self, state: dict[str, Any]) -> dict[str, Any] | None:
         return None
 
     current, config, simulation = routing._current_simulation(self, now)
-    if current is None or not isinstance(config, SimulationConfig) or simulation is None:
+    if (
+        current is None
+        or not isinstance(config, SimulationConfig)
+        or simulation is None
+    ):
         return None
 
     house = max(_number(simulation.current_simulated_house_load_kw) or 0.0, 0.0)
@@ -114,7 +118,9 @@ def _cheap_snapshot(self, state: dict[str, Any]) -> dict[str, Any] | None:
         "generated_at": now.isoformat(),
         "routing_basis": "current coordinator routing snapshot — overnight cheap handover",
         "routing_slot": slot.get("label") if isinstance(slot, dict) else None,
-        "routing_valid_from": slot.get("valid_from") if isinstance(slot, dict) else None,
+        "routing_valid_from": (
+            slot.get("valid_from") if isinstance(slot, dict) else None
+        ),
         "routing_valid_to": slot.get("valid_to") if isinstance(slot, dict) else None,
         "routing_action": _ACTION,
         "dispatch_mode": "cheap_charge",
