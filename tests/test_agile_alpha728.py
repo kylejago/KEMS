@@ -105,7 +105,10 @@ def test_alpha728_extends_nonzero_proof_without_weakening_strict_checks() -> Non
 def test_alpha728_proof_records_bounded_basis_without_faking_completeness() -> None:
     source = PATCH.read_text(encoding="utf-8")
     assert '"dispatch_basis": "bounded_partial_horizon"' in source
-    assert '"price_horizon_complete": result.get("price_horizon_complete") is True' in source
+    assert (
+        '"price_horizon_complete": result.get("price_horizon_complete") is True'
+        in source
+    )
     assert '"price_horizon_safe_for_dispatch": True' in source
     assert "PASS — non-zero Agile export proof" in source
     assert "CHECK — non-zero Agile export proof" in source
