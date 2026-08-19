@@ -104,4 +104,7 @@ def test_vendor_neutral_backend_contract_is_recorded_before_alpha_ess() -> None:
     assert "Alpha ESS" in source
     assert "ControlState" in source
     assert "vendor-neutral" in source
-    assert "Do not implement Alpha ESS writes before FoxESS live control is proven" in source
+    assert (
+        "Do not implement Alpha ESS writes before FoxESS live control is proven"
+        in source
+    )
