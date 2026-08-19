@@ -15,7 +15,7 @@
       "delivery": "kems_core"
     },
     "panel": {
-      "version": "0.7.0-alpha7-panel3",
+      "version": "0.7.0-alpha7-panel4",
       "required": false,
       "delivery": "kems_core"
     },
@@ -42,13 +42,14 @@
   },
   "maintenance": {
     "required": true,
-    "reason": "Activate KEMS __RELEASE_VERSION__ and its managed dashboard with Agile Smart Export",
+    "reason": "Activate KEMS __RELEASE_VERSION__, its managed dashboard and panel firmware",
     "expected_downtime_minutes": 5,
     "home_assistant_restart_required": true,
     "reboot_required": false,
     "affected_components": [
       "kems_core",
-      "dashboard"
+      "dashboard",
+      "panel"
     ]
   }
 }

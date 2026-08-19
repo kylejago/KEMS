@@ -4,7 +4,7 @@ substitutions:
   device_name: kems16x16
   friendly_name: "KEMS16x16"
   led_pin: GPIO21
-  panel_config_version: "0.7.0-alpha7-panel3"
+  panel_config_version: "0.7.0-alpha7-panel4"
   kems_status: sensor.kems_status
   live_battery_soc: sensor.kems_battery_state_of_charge
   live_battery_power: sensor.kems_battery_power
@@ -407,7 +407,7 @@ display:
           flow_vertical(8, 3, 9, 6, YELLOW, YELLOW, +1);
         }
         if (elapsed_ms >= 2100) {
-          rect(15, 7, 16, 10, GREEN);
+          rect(15, 7, 16, 11, GREEN);
           flow_horizontal(11, 8, 14, 9, GREEN, GREEN, -1);
         }
         if (elapsed_ms >= 2800) {
@@ -452,7 +452,7 @@ display:
         rect(7, 7, 10, 10, OK);
         rect(7, 1, 10, 2, OK);
         rect(1, 7, 2, 10, OK);
-        rect(15, 7, 16, 10, OK);
+        rect(15, 7, 16, 11, OK);
         rect(7, 15, 10, 16, OK);
       };
 
@@ -726,40 +726,32 @@ display:
         float soc = battery_soc;
         if (soc < 0.0f) soc = 0.0f;
         if (soc > 100.0f) soc = 100.0f;
-        if (soc < 10.0f) {
-          px(15, 10, pulse(RED));
-        } else if (soc < 20.0f) {
-          px(15, 10, ORANGE);
-          px(16, 10, pulse(GREEN));
-        } else if (soc < 30.0f) {
-          rect(15, 10, 16, 10, GREEN);
-          px(15, 9, pulse(GREEN));
-        } else if (soc < 40.0f) {
-          rect(15, 10, 16, 10, GREEN);
-          px(15, 9, GREEN);
-          px(16, 9, pulse(GREEN));
-        } else if (soc < 50.0f) {
-          rect(15, 9, 16, 10, GREEN);
-          px(15, 8, pulse(GREEN));
-        } else if (soc < 60.0f) {
-          rect(15, 9, 16, 10, GREEN);
-          px(15, 8, GREEN);
-          px(16, 8, pulse(GREEN));
-        } else if (soc < 70.0f) {
-          rect(15, 8, 16, 10, GREEN);
-          px(15, 7, pulse(GREEN));
-        } else if (soc < 80.0f) {
-          rect(15, 8, 16, 10, GREEN);
-          px(15, 7, GREEN);
-          px(16, 7, pulse(GREEN));
-        } else if (soc < 90.0f) {
-          rect(15, 7, 16, 8, GREEN);
-          rect(15, 9, 16, 10, pulse(GREEN));
-        } else if (soc < 100.0f) {
-          rect(15, 9, 16, 10, GREEN);
-          rect(15, 7, 16, 8, pulse(GREEN));
+
+        // Ten physical battery cells: 10% per cell, filled bottom-up.
+        // The battery now occupies columns 15-16 and rows 7-11.
+        const int battery_cols[10] = {15, 16, 15, 16, 15, 16, 15, 16, 15, 16};
+        const int battery_rows[10] = {11, 11, 10, 10, 9, 9, 8, 8, 7, 7};
+
+        if (soc >= 100.0f) {
+          for (int i = 0; i < 10; i++) {
+            px(battery_cols[i], battery_rows[i], GREEN);
+          }
+        } else if (soc < 10.0f) {
+          px(battery_cols[0], battery_rows[0], pulse(RED));
         } else {
-          rect(15, 7, 16, 10, pulse(GREEN));
+          const int full_cells = (int) floorf(soc / 10.0f);
+          for (int i = 0; i < full_cells; i++) {
+            const Color filled =
+              (soc < 20.0f && i == 0) ? ORANGE : GREEN;
+            px(battery_cols[i], battery_rows[i], filled);
+          }
+          if (full_cells < 10) {
+            px(
+              battery_cols[full_cells],
+              battery_rows[full_cells],
+              pulse(GREEN)
+            );
+          }
         }
       }
       if (battery_charging) {

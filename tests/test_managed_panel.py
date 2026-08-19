@@ -26,7 +26,7 @@ def test_managed_panel_keeps_known_working_hardware_and_alpha7_modes() -> None:
 def test_managed_panel_exposes_agile_smart_export_simulation() -> None:
     """The panel should render Agile through the same compact scenario protocol."""
     content = PACKAGED.read_text(encoding="utf-8")
-    assert 'panel_config_version: "0.7.0-alpha7-panel3"' in content
+    assert 'panel_config_version: "0.7.0-alpha7-panel4"' in content
     assert '- "Agile Smart Export"' in content
     assert 'display_mode == "Agile Smart Export"' in content
     assert "selected_scenario = 7;" in content
@@ -94,7 +94,7 @@ def test_managed_panel_has_startup_and_ota_completion_animation() -> None:
 def test_managed_panel_reports_firmware_for_ota_verification() -> None:
     """The ESP32 must report the exact managed config version after OTA."""
     content = PACKAGED.read_text(encoding="utf-8")
-    assert 'panel_config_version: "0.7.0-alpha7-panel3"' in content
+    assert 'panel_config_version: "0.7.0-alpha7-panel4"' in content
     assert 'name: "Panel Firmware Version"' in content
     assert "id: panel_firmware_version" in content
     assert 'return {"${panel_config_version}"};' in content
@@ -110,5 +110,5 @@ def test_managed_panel_ota_tracks_queue_and_reconnect_health() -> None:
     )
     assert 'last_ota_result="queued"' in sync
     assert "async_verify_panel_firmware" in sync
-    assert 'PANEL_CONFIG_VERSION = "0.7.0-alpha7-panel3"' in panel_health
+    assert 'PANEL_CONFIG_VERSION = "0.7.0-alpha7-panel4"' in panel_health
     assert 'status="Success"' in panel_health
