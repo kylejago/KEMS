@@ -68,7 +68,7 @@ def test_virtual_scenario_selector_is_advanced_and_disabled_by_default() -> None
 
 
 def test_legacy_intelligent_slot_option_is_not_a_default_user_capability() -> None:
-    """Stored compatibility data remains inert while the new product default is clear."""
+    """Stored compatibility data stays inert under the new product model."""
     source = CONST.read_text(encoding="utf-8")
     assert 'CONF_SYSTEM_TYPE = "system_type"' in source
     assert 'CONF_SYSTEM_TYPE: "full_kems_agile"' in source
