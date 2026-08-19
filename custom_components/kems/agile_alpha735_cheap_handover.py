@@ -80,10 +80,6 @@ def _cheap_snapshot(self, state: dict[str, Any]) -> dict[str, Any] | None:
         _number(simulation.current_simulated_battery_to_home_power_kw) or 0.0,
         0.0,
     )
-    battery_export = max(
-        _number(simulation.current_simulated_battery_export_power_kw) or 0.0,
-        0.0,
-    )
     total_ac = max(
         _number(simulation.current_simulated_total_kh7_output_kw) or 0.0,
         0.0,
@@ -136,9 +132,7 @@ def _cheap_snapshot(self, state: dict[str, Any]) -> dict[str, Any] | None:
         "battery_export_kw": 0.0,
         "total_discharge_kw": round(battery_home, 3),
         "normalised_kh7_ac_output_kw": round(total_ac, 3),
-        "simulated_soc_percent": _number(
-            simulation.current_simulated_battery_soc_percent
-        ),
+        "simulated_soc_percent": _number(simulation.simulated_battery_soc),
         "battery_candidate_basis": (
             "overnight cheap simulation; rolling export candidate suppressed"
         ),
