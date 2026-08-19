@@ -86,6 +86,7 @@ CONF_MANUAL_OFFPEAK_RATE = "manual_offpeak_rate_pence"
 CONF_MANUAL_STANDING_CHARGE = "manual_standing_charge_pence"
 CONF_MANUAL_OFFPEAK_START = "manual_offpeak_start"
 CONF_MANUAL_OFFPEAK_END = "manual_offpeak_end"
+# Legacy option retained for config-entry compatibility. Alpha7.34 ignores it.
 CONF_INTELLIGENT_SLOTS_ENABLED = "intelligent_slots_enabled"
 
 CONF_SCAN_INTERVAL = "scan_interval_seconds"
@@ -148,7 +149,7 @@ DEFAULT_OPTIONS = {
     CONF_MANUAL_STANDING_CHARGE: 53.70435,
     CONF_MANUAL_OFFPEAK_START: "23:30:00",
     CONF_MANUAL_OFFPEAK_END: "05:30:00",
-    CONF_INTELLIGENT_SLOTS_ENABLED: True,
+    CONF_INTELLIGENT_SLOTS_ENABLED: False,
     CONF_SCAN_INTERVAL: DEFAULT_SCAN_INTERVAL_SECONDS,
     CONF_HISTORY_DAYS: DEFAULT_HISTORY_DAYS,
     CONF_BATTERY_CAPACITY: 56.42,
