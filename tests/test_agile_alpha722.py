@@ -12,6 +12,7 @@ INTEGRATION = ROOT / "custom_components" / "kems"
 HORIZON = INTEGRATION / "agile_price_horizon.py"
 PATCH = INTEGRATION / "agile_alpha722_horizon.py"
 LOADER = INTEGRATION / "agile_smart_export_runtime.py"
+MANIFEST = INTEGRATION / "manifest.json"
 
 spec = importlib.util.spec_from_file_location("agile_price_horizon", HORIZON)
 assert spec is not None and spec.loader is not None
@@ -26,6 +27,11 @@ def _slot(start: datetime) -> dict[str, str]:
         "valid_from": start.astimezone(UTC).isoformat(),
         "valid_to": (start + timedelta(minutes=30)).astimezone(UTC).isoformat(),
     }
+
+
+def test_alpha722_manifest_is_exact() -> None:
+    """This release branch must advertise the alpha7.22 HACS version."""
+    assert '"version": "0.7.0-alpha7.22"' in MANIFEST.read_text(encoding="utf-8")
 
 
 def test_expected_price_slots_follow_uk_dst_days() -> None:
