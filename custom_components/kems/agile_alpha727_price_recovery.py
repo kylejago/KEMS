@@ -132,13 +132,9 @@ async def _request_window(
         evidence["error"] = str(err)
         return [], evidence
 
-    results = [
-        item for item in data.get("results", []) if isinstance(item, dict)
-    ]
+    results = [item for item in data.get("results", []) if isinstance(item, dict)]
     evidence["result_count"] = len(results)
-    evidence["returned_intervals"] = [
-        _result_interval(item) for item in results[:8]
-    ]
+    evidence["returned_intervals"] = [_result_interval(item) for item in results[:8]]
     return results, evidence
 
 
@@ -171,8 +167,7 @@ def _overall_outcome(
     if any(item.get("outcome") == "recovered_context" for item in attempts):
         return "partially_recovered"
     if all(
-        item.get("outcome")
-        in {"octopus_slot_not_published", "octopus_no_results"}
+        item.get("outcome") in {"octopus_slot_not_published", "octopus_no_results"}
         for item in attempts
     ):
         return "octopus_missing_price"
@@ -246,9 +241,9 @@ async def _fetch_rates_with_observable_recovery(
         start = _parse_utc(slot.get("valid_from"))
         end = _parse_utc(slot.get("valid_to"))
         attempt: dict[str, Any] = {
-            "label": str(item_label)
-            if (item_label := slot.get("label"))
-            else "unknown",
+            "label": (
+                str(item_label) if (item_label := slot.get("label")) else "unknown"
+            ),
             "timezone": slot.get("timezone"),
             "target_valid_from_utc": start.isoformat() if start else None,
             "target_valid_to_utc": end.isoformat() if end else None,
@@ -330,9 +325,7 @@ async def _fetch_rates_with_observable_recovery(
         local_day,
         agile.LONDON,
     )
-    unresolved_labels = [
-        str(item.get("label") or "unknown") for item in missing_after
-    ]
+    unresolved_labels = [str(item.get("label") or "unknown") for item in missing_after]
     recovered_labels = [
         str(item.get("label") or "unknown")
         for item in future_missing
