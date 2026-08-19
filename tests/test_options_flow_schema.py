@@ -50,7 +50,8 @@ def test_normal_control_page_exposes_four_types_and_three_simple_modes() -> None
     for token in (
         "CONF_SYSTEM_TYPE",
         "SYSTEM_TYPE_SELECTOR",
-        "Full KEMS Agile",
+        "SYSTEM_TYPE_DEFINITIONS",
+        "SYSTEM_TYPES",
         "CONF_OPERATING_MODE",
         '("observe", "Live")',
         '("simulate", "Simulate")',
