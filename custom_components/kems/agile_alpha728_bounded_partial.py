@@ -1,28 +1,25 @@
 """Alpha 7.28 bounded partial-horizon Agile dispatch.
 
-Alpha7.27 proved that an incomplete Agile price horizon can be caused by Octopus
+Alpha7.27 proved that an incomplete Agile horizon can be caused by Octopus
 successfully answering a request while omitting the target settlement period.
-Keeping every known-price battery export at zero in that case is safe but overly
-conservative.
+Alpha7.28 permits only the known-price part of Alpha7.26's reserved provisional
+plan to enter the shadow command chain in that narrowly verified case.
 
-Alpha7.28 permits the known-price part of the Alpha7.26 provisional plan to pass
-into the existing shadow command chain only when Alpha7.27 has positively
-classified the unresolved relevant prices as an upstream Octopus gap. The full
-maximum discharge capacity of those unresolved slots must remain reserved, the
-current slot must have a real price, and unresolved slots themselves are never
-assigned a price or an export command.
+Every relevant missing slot must be classified by Alpha7.27 as an upstream
+Octopus gap, the current slot must have a real price, and the full maximum
+discharge capacity of unresolved relevant slots must remain reserved. Retrieval
+failures, ambiguous evidence, unknown current prices, or insufficient reserve
+retain the original full horizon hold.
 
-Retrieval failures, ambiguous recovery evidence, insufficient reserve capacity,
-or an unknown current price retain the original full price-horizon hold. The
-existing 7 kW limits, 10% reserve, 13-point independent validator and strict
-0.01 kW candidate-applied replay remain authoritative. Real FoxESS hardware
-writes remain blocked.
+The existing house-first dispatch calculation, 7 kW limits, 10% reserve,
+13-point independent validator and strict 0.01 kW candidate-applied replay
+remain authoritative. Real FoxESS hardware writes remain blocked.
 """
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
 import math
+from datetime import UTC, datetime
 from typing import Any
 
 from . import agile_alpha717_dispatch as alpha717
@@ -78,9 +75,7 @@ def _recovery_evidence(self, horizon: dict[str, Any]) -> dict[str, Any]:
     diagnostics = getattr(self, "_kems_alpha727_price_fetch_diagnostics", None)
     diagnostics = diagnostics if isinstance(diagnostics, dict) else {}
     missing_labels = {
-        str(item)
-        for item in (horizon.get("missing_labels") or [])
-        if str(item).strip()
+        str(item) for item in (horizon.get("missing_labels") or []) if str(item).strip()
     }
     unresolved = {
         str(item)
@@ -88,9 +83,7 @@ def _recovery_evidence(self, horizon: dict[str, Any]) -> dict[str, Any]:
         if str(item).strip()
     }
     attempts = [
-        item
-        for item in diagnostics.get("attempts", [])
-        if isinstance(item, dict)
+        item for item in diagnostics.get("attempts", []) if isinstance(item, dict)
     ]
     relevant_attempts = {
         str(item.get("label")): str(item.get("outcome") or "")
@@ -172,8 +165,7 @@ def _reserve_evidence(
         0.0,
     )
     sufficient = bool(
-        required <= _EPSILON
-        or reserved + _RESERVE_TOLERANCE_KWH >= required
+        required <= _EPSILON or reserved + _RESERVE_TOLERANCE_KWH >= required
     )
     return {
         "required_kwh": round(required, 3),
@@ -187,7 +179,7 @@ def _current_price_evidence(
     state: dict[str, Any],
     now: datetime,
 ) -> dict[str, Any]:
-    """Return evidence that the active slot is a real known-price period."""
+    """Return evidence that the active slot has a real known Agile price."""
     slot = alpha717._current_slot(state, now)
     if not isinstance(slot, dict):
         return {
@@ -206,7 +198,7 @@ def _current_price_evidence(
 
 
 def _selected_by_start(plan: dict[str, Any]) -> dict[str, dict[str, Any]]:
-    """Return the Alpha7.26 reserved known-price allocation by slot start."""
+    """Return Alpha7.26's reserved known-price allocation by slot start."""
     return {
         str(item.get("valid_from") or ""): dict(item)
         for item in plan.get("provisional_selected_slots", [])
@@ -215,13 +207,13 @@ def _selected_by_start(plan: dict[str, Any]) -> dict[str, dict[str, Any]]:
     }
 
 
-def _annotate_known_slots(
+def _restore_known_allocations(
     state: dict[str, Any],
     selected: dict[str, dict[str, Any]],
     *,
     now: datetime,
 ) -> None:
-    """Restore only the reserved known-price allocation after Alpha7.22's hold."""
+    """Restore only reserved known-price allocations after Alpha7.22's hold."""
     now_utc = now.astimezone(UTC)
     for slot in state.get("today_slots", []):
         if not isinstance(slot, dict):
@@ -230,36 +222,29 @@ def _annotate_known_slots(
         end = _parse_utc(slot.get("valid_to"))
         if start is None or end is None or end <= now_utc:
             continue
+        selected_slot = selected.get(str(slot.get("valid_from") or "")) or {}
         planned = max(
-            _number((selected.get(str(slot.get("valid_from") or "")) or {}).get(
-                "planned_battery_export_kwh"
-            ))
-            or 0.0,
+            _number(selected_slot.get("planned_battery_export_kwh")) or 0.0,
             0.0,
         )
         slot["rolling_planned_battery_export_kwh"] = round(planned, 3)
         if planned > _EPSILON:
-            slot["rolling_action"] = (
-                "known-price export eligible — bounded partial horizon"
-            )
-            if not (start <= now_utc < end):
-                slot["actions"] = [
-                    "known-price export eligible — bounded partial horizon"
-                ]
+            action = "known-price export eligible — bounded partial horizon"
         else:
-            slot["rolling_action"] = "hold — bounded partial horizon replan"
-            if not (start <= now_utc < end):
-                slot["actions"] = ["hold — bounded partial horizon replan"]
+            action = "hold — bounded partial horizon replan"
+        slot["rolling_action"] = action
+        if not (start <= now_utc < end):
+            slot["actions"] = [action]
 
 
-def _rebuild_selected_slots(
+def _executable_selected_slots(
     plan: dict[str, Any],
     state: dict[str, Any],
     *,
     now: datetime,
     export_target_kw: float,
 ) -> list[dict[str, Any]]:
-    """Return the executable known-price allocation with current load applied."""
+    """Apply current house-load headroom to the known-price allocation."""
     selected = [
         dict(item)
         for item in plan.get("provisional_selected_slots", [])
@@ -277,9 +262,8 @@ def _rebuild_selected_slots(
         if str(item.get("valid_from") or "") == current_start:
             item["planned_battery_export_kwh"] = current_energy
             item["bounded_current_load_adjusted"] = True
-        if (_number(item.get("planned_battery_export_kwh")) or 0.0) <= _EPSILON:
-            continue
-        rebuilt.append(item)
+        if (_number(item.get("planned_battery_export_kwh")) or 0.0) > _EPSILON:
+            rebuilt.append(item)
     rebuilt.sort(key=lambda item: str(item.get("valid_from") or ""))
     return rebuilt
 
@@ -306,7 +290,7 @@ def _apply_bounded_partial_dispatch(
     config: SimulationConfig,
     tariff: TariffSettings,
 ) -> None:
-    """Replace a verified upstream-gap full hold with bounded known-slot dispatch."""
+    """Replace only a verified upstream-gap full hold with bounded dispatch."""
     horizon = state.get("planning_horizon")
     horizon = horizon if isinstance(horizon, dict) else {}
     was_held = bool(plan.get("price_horizon_battery_export_held"))
@@ -359,7 +343,7 @@ def _apply_bounded_partial_dispatch(
         return
 
     selected_map = _selected_by_start(plan)
-    _annotate_known_slots(state, selected_map, now=now)
+    _restore_known_allocations(state, selected_map, now=now)
     targets = alpha717._dispatch_targets(
         self,
         state,
@@ -374,7 +358,7 @@ def _apply_bounded_partial_dispatch(
         0.0,
     )
     house_target = max(_number(targets.get("house_battery_kw")) or 0.0, 0.0)
-    selected = _rebuild_selected_slots(
+    selected = _executable_selected_slots(
         plan,
         state,
         now=now,
@@ -449,10 +433,7 @@ def _apply_bounded_partial_dispatch(
     if isinstance(current_slot, dict):
         remaining_hours = alpha717._remaining_current_slot_hours(state, now)
         current_slot["rolling_target_battery_export_kw"] = round(export_target, 3)
-        current_slot["rolling_target_total_discharge_kw"] = round(
-            discharge_target,
-            3,
-        )
+        current_slot["rolling_target_total_discharge_kw"] = round(discharge_target, 3)
         current_slot["rolling_planned_battery_export_kwh"] = round(
             export_target * remaining_hours,
             3,
@@ -469,7 +450,7 @@ def _rolling_plan_with_alpha728(
     config: SimulationConfig,
     tariff: TariffSettings,
 ) -> dict[str, Any]:
-    """Apply bounded partial-horizon permission after Alpha7.26/7.27 evidence."""
+    """Apply bounded permission after Alpha7.26/7.27 have produced evidence."""
     plan = alpha728_original_rolling_plan(
         self,
         state,
@@ -582,9 +563,7 @@ def _evaluate_with_bounded_nonzero_proof(
         "strict_tracking_100_percent": (
             tracking.get("tracking_score_percent") == 100.0
         ),
-        "discharge_within_limit": (
-            candidate_total <= config.max_discharge_kw + 1e-9
-        ),
+        "discharge_within_limit": (candidate_total <= config.max_discharge_kw + 1e-9),
         "kh7_ac_within_limit": candidate_ac <= config.inverter_limit_kw + 1e-9,
         "minimum_soc_respected": bool(
             target_soc is not None
@@ -639,7 +618,7 @@ def _evaluate_with_bounded_nonzero_proof(
 
 
 def _publish_with_alpha728(self, state: dict[str, Any]) -> None:
-    """Publish bounded-partial permission without exposing a hardware write path."""
+    """Publish bounded permission without exposing a hardware write path."""
     alpha728_original_publish(self, state)
     plan = state.get("rolling_export_plan")
     plan = plan if isinstance(plan, dict) else {}
@@ -679,9 +658,7 @@ def _publish_with_alpha728(self, state: dict[str, Any]) -> None:
         "unknown_capacity_reserved_kwh": plan.get(
             "bounded_unknown_capacity_reserved_kwh"
         ),
-        "unknown_capacity_sufficient": plan.get(
-            "bounded_unknown_capacity_sufficient"
-        ),
+        "unknown_capacity_sufficient": plan.get("bounded_unknown_capacity_sufficient"),
         "unknown_slot_dispatch_blocked": True,
         "price_fetch_status": state.get("price_fetch_status"),
         "hardware_writes": "blocked",
