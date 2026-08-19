@@ -1,4 +1,4 @@
-"""Final KEMS master-dashboard consolidation for the production-style UI."""
+"""KEMS Alpha7.35 product-type dashboard consolidation."""
 
 # ruff: noqa: E501
 
@@ -43,187 +43,385 @@ EXPECTED_SOURCE_TITLES = {
 }
 
 _HOME_PREFIX = """      - type: markdown
-        title: Operating context
+        title: Simple KEMS setup
         content: |
-          {% if is_state('binary_sensor.kems_system_installed', 'on') %}
-          **Dashboard context:** **{{ states('sensor.kems_operating_mode') | upper }}**  
-          {% else %}
-          **Dashboard context:** **SIMULATION / PRE-INSTALL**  
-          {% endif %}
-          **KEMS status:** {{ states('sensor.kems_status') }}  
-          **Commissioning:** {{ states('sensor.kems_commissioning_readiness') }}  
-          **Real control permitted:** {{ states('binary_sensor.kems_control_commands_permitted') }}  
-          **Current advice:** {{ states('sensor.kems_advice') }}
+          # ⚡ KEMS
+          KEMS now has four clear system types. Pick the capability you want, then choose **Live**, **Simulate** or **Control** where that type supports it.
 
-          The same production dashboard is used before and after installation. Simulation values remain active until the physical solar, battery and inverter are commissioned; live hardware values then take over progressively.
+          **System type:** {{ states('select.kems_system_type') }}  
+          **Mode:** {{ states('select.kems_operating_mode') }}  
+          **Status:** {{ states('sensor.kems_status') }}  
+          **Advice:** {{ states('sensor.kems_advice') }}  
+          **Commissioning:** {{ states('sensor.kems_commissioning_readiness') }}
+      - type: grid
+        columns: 2
+        square: false
+        cards:
+          - type: entities
+            title: Choose how KEMS works
+            entities:
+              - entity: select.kems_system_type
+                name: KEMS type
+              - entity: select.kems_operating_mode
+                name: Mode
+          - type: markdown
+            title: Four simple types
+            content: |
+              **Live Data** — actual property data only.  
+              **Battery & Solar** — tariff-aware battery/solar optimisation.  
+              **Full KEMS** — forecasts + smart import tariffs.  
+              **Full KEMS Agile** — Full KEMS + dynamic smart export.
 """
 
 _LIVE_PREFIX = """      - type: markdown
-        title: Live control tracking — prepared for commissioning
         content: |
-          {% set commissioned = is_state('binary_sensor.kems_battery_data_available', 'on') %}
-          **Hardware state:** **{{ 'LIVE DATA AVAILABLE' if commissioned else 'NOT COMMISSIONED — SIMULATION ONLY' }}**  
-          **Operating mode:** {{ states('sensor.kems_operating_mode') }}  
-          **Control commands permitted:** {{ states('binary_sensor.kems_control_commands_permitted') }}
-
-          | Control signal | Actual hardware | KEMS target |
-          |---|---:|---:|
-          | Battery power | {{ states('sensor.kems_battery_power') if commissioned else '—' }} kW | {{ states('sensor.kems_desired_total_battery_discharge_power') }} kW discharge |
-          | Battery export | — until commissioned | {{ states('sensor.kems_desired_battery_export_power') }} kW |
-          | Battery charge | — until commissioned | {{ states('sensor.kems_desired_battery_charge_power') }} kW |
-          | Minimum SOC | {{ states('sensor.kems_battery_state_of_charge') if commissioned else '—' }}% actual SOC | {{ states('sensor.kems_desired_minimum_soc') }}% minimum |
-
-          Once FoxESS direction verification passes, KEMS can normalise the hardware flows and this section can show **Actual → Target → Difference** directly without guessing battery sign conventions before commissioning.
+          # Live Data
+          This page is deliberately **actual data only**. Nothing here is a simulated flow.
+      - type: grid
+        columns: 2
+        square: false
+        cards:
+          - type: entities
+            title: Live power now
+            show_header_toggle: false
+            entities:
+              - entity: sensor.kems_house_load
+                name: House load
+              - entity: sensor.kems_solar_power
+                name: Solar
+              - entity: sensor.kems_grid_import
+                name: Grid import
+              - entity: sensor.kems_grid_export
+                name: Grid export
+              - entity: sensor.kems_battery_state_of_charge
+                name: Battery SOC
+              - entity: sensor.kems_battery_power
+                name: Battery power
+          - type: entities
+            title: Live cost & energy today
+            show_header_toggle: false
+            entities:
+              - entity: sensor.kems_current_import_rate
+                name: Import rate now
+              - entity: sensor.kems_observed_grid_import_today
+                name: Grid import
+              - entity: sensor.kems_observed_grid_export_today
+                name: Grid export
+              - entity: sensor.kems_observed_export_income_today
+                name: Export income
+              - entity: sensor.kems_observed_cost_today
+                name: Electricity cost
+              - entity: sensor.kems_whole_home_energy_today
+                name: Whole-home energy
 """
 
-_PLAN_PREFIX = """      - type: markdown
-        title: KEMS plan — one forward view
+_BATTERY_SOLAR_PREFIX = """      - type: markdown
         content: |
-          This page combines the forecast, Full KEMS Forecast strategy and digital-twin simulation into one operating plan. It is the place to answer **what KEMS expects to happen, what it intends to do, and why**.
+          # Battery & Solar
+          A simple battery/solar system using the configured import and export tariffs. **Live** is the property; **Simulated** is the same demand replayed through the Battery & Solar strategy.
+      - type: grid
+        columns: 2
+        square: false
+        cards:
+          - type: markdown
+            title: LIVE — now & today
+            content: |
+              | Metric | Live |
+              |---|---:|
+              | House load | {{ states('sensor.kems_house_load') }} kW |
+              | Solar | {{ states('sensor.kems_solar_power') }} kW |
+              | Grid import | {{ states('sensor.kems_grid_import') }} kW |
+              | Grid export | {{ states('sensor.kems_grid_export') }} kW |
+              | Battery SOC | {{ states('sensor.kems_battery_state_of_charge') }}% |
+              | Battery power | {{ states('sensor.kems_battery_power') }} kW |
+              | Grid import today | {{ states('sensor.kems_observed_grid_import_today') }} kWh |
+              | Grid export today | {{ states('sensor.kems_observed_grid_export_today') }} kWh |
+              | Export income today | {{ states('sensor.kems_observed_export_income_today') }} |
+              | Cost today | {{ states('sensor.kems_observed_cost_today') }} p |
+          - type: markdown
+            title: SIMULATED — Battery & Solar
+            content: |
+              {% set e = 'sensor.kems_compare_solar_and_battery_cost_today' %}
+              | Metric | Simulated |
+              |---|---:|
+              | House load | {{ state_attr(e, 'current_house_load_kw') or 0 }} kW |
+              | Solar | {{ state_attr(e, 'current_solar_power_kw') or 0 }} kW |
+              | Grid import | {{ state_attr(e, 'current_grid_import_kw') or 0 }} kW |
+              | Grid export | {{ state_attr(e, 'current_grid_export_kw') or 0 }} kW |
+              | Battery → home | {{ state_attr(e, 'current_battery_to_home_kw') or 0 }} kW |
+              | Battery → export | {{ state_attr(e, 'current_battery_export_kw') or 0 }} kW |
+              | Battery SOC | {{ state_attr(e, 'current_battery_soc_percent') if state_attr(e, 'current_battery_soc_percent') is not none else '—' }}% |
+              | Grid import today | {{ state_attr(e, 'grid_import_kwh') or 0 }} kWh |
+              | Grid export today | {{ state_attr(e, 'grid_export_kwh') or 0 }} kWh |
+              | Export income today | {{ state_attr(e, 'export_income_pence') or 0 }} p |
+              | Cost today | {{ states(e) }} p |
+      - type: entities
+        title: Tariff used by Battery & Solar
+        show_header_toggle: false
+        entities:
+          - sensor.kems_current_import_rate
+          - sensor.kems_current_export_rate
+          - binary_sensor.kems_cheap_period_confirmed
+          - sensor.kems_export_tariff_status
+"""
+
+_FULL_KEMS_PREFIX = """      - type: markdown
+        content: |
+          # Full KEMS
+          Full forecast-aware optimisation with smart **import** tariffs, EV awareness, reserve planning and grid-service logic. The same property is shown Live and Simulated side by side.
+      - type: grid
+        columns: 2
+        square: false
+        cards:
+          - type: markdown
+            title: LIVE — property
+            content: |
+              | Metric | Live |
+              |---|---:|
+              | House load | {{ states('sensor.kems_house_load') }} kW |
+              | Solar | {{ states('sensor.kems_solar_power') }} kW |
+              | Grid import | {{ states('sensor.kems_grid_import') }} kW |
+              | Grid export | {{ states('sensor.kems_grid_export') }} kW |
+              | Battery SOC | {{ states('sensor.kems_battery_state_of_charge') }}% |
+              | Battery power | {{ states('sensor.kems_battery_power') }} kW |
+              | Import rate | {{ states('sensor.kems_current_import_rate') }} p/kWh |
+              | Cheap period | {{ states('binary_sensor.kems_cheap_period_confirmed') }} |
+              | Grid import today | {{ states('sensor.kems_observed_grid_import_today') }} kWh |
+              | Grid export today | {{ states('sensor.kems_observed_grid_export_today') }} kWh |
+              | Cost today | {{ states('sensor.kems_observed_cost_today') }} p |
+          - type: markdown
+            title: SIMULATED — Full KEMS
+            content: |
+              {% set e = 'sensor.kems_compare_full_kems_forecast_cost_today' %}
+              | Metric | Simulated |
+              |---|---:|
+              | House load | {{ state_attr(e, 'current_house_load_kw') or 0 }} kW |
+              | Solar | {{ state_attr(e, 'current_solar_power_kw') or 0 }} kW |
+              | Grid import | {{ state_attr(e, 'current_grid_import_kw') or 0 }} kW |
+              | Grid export | {{ state_attr(e, 'current_grid_export_kw') or 0 }} kW |
+              | Grid → battery | {{ state_attr(e, 'current_grid_to_battery_kw') or 0 }} kW |
+              | Battery → home | {{ state_attr(e, 'current_battery_to_home_kw') or 0 }} kW |
+              | Battery → export | {{ state_attr(e, 'current_battery_export_kw') or 0 }} kW |
+              | Battery SOC | {{ state_attr(e, 'current_battery_soc_percent') if state_attr(e, 'current_battery_soc_percent') is not none else '—' }}% |
+              | Grid import today | {{ state_attr(e, 'grid_import_kwh') or 0 }} kWh |
+              | Grid export today | {{ state_attr(e, 'grid_export_kwh') or 0 }} kWh |
+              | Export income today | {{ state_attr(e, 'export_income_pence') or 0 }} p |
+              | Cost today | {{ states(e) }} p |
+      - type: grid
+        columns: 2
+        square: false
+        cards:
+          - type: entities
+            title: Smart import & EV
+            entities:
+              - sensor.kems_current_import_rate
+              - sensor.kems_next_import_rate
+              - binary_sensor.kems_cheap_period_confirmed
+              - sensor.kems_ev_status
+              - sensor.kems_ev_charging_power
+          - type: entities
+            title: Forecast protection
+            entities:
+              - sensor.kems_full_kems_forecast_status
+              - sensor.kems_forecast_solar_tomorrow
+              - sensor.kems_forecast_house_demand_tomorrow
+              - sensor.kems_forecast_required_morning_soc
 """
 
 _AGILE_PREFIX = """      - type: markdown
-        title: Agile Smart Export workspace
         content: |
-          Live Agile dispatch, rolling export allocation, half-hour price planning and assumptions are consolidated here. The strategy remains **simulation-only** until real-control commissioning explicitly permits hardware writes.
+          # Full KEMS Agile
+          Everything in Full KEMS, plus dynamic **smart export**. KEMS can hold or export battery energy according to Agile prices while still protecting the overnight deadline, reserve and shared inverter limit.
+      - type: grid
+        columns: 2
+        square: false
+        cards:
+          - type: markdown
+            title: LIVE — property
+            content: |
+              | Metric | Live |
+              |---|---:|
+              | House load | {{ states('sensor.kems_house_load') }} kW |
+              | Solar | {{ states('sensor.kems_solar_power') }} kW |
+              | Grid import | {{ states('sensor.kems_grid_import') }} kW |
+              | Grid export | {{ states('sensor.kems_grid_export') }} kW |
+              | Battery SOC | {{ states('sensor.kems_battery_state_of_charge') }}% |
+              | Battery power | {{ states('sensor.kems_battery_power') }} kW |
+              | Import rate | {{ states('sensor.kems_current_import_rate') }} p/kWh |
+              | Agile export rate | {{ states('sensor.kems_agile_export_rate_now') }} p/kWh |
+              | Cheap period | {{ states('binary_sensor.kems_cheap_period_confirmed') }} |
+              | Cost today | {{ states('sensor.kems_observed_cost_today') }} p |
+          - type: markdown
+            title: SIMULATED — Full KEMS Agile
+            content: |
+              {% set e = 'sensor.kems_agile_live_scenario' %}
+              {% set periods = state_attr('sensor.kems_agile_smart_export_plan', 'periods') or {} %}
+              {% set today = periods.get('today', {}) %}
+              {% set a = today.get('agile_smart_export', {}) %}
+              | Metric | Simulated |
+              |---|---:|
+              | House load | {{ state_attr(e, 'current_house_load_kw') or 0 }} kW |
+              | Solar | {{ state_attr(e, 'current_solar_power_kw') or 0 }} kW |
+              | Grid import | {{ state_attr(e, 'current_grid_import_kw') or 0 }} kW |
+              | Grid export | {{ state_attr(e, 'current_grid_export_kw') or 0 }} kW |
+              | Grid → battery | {{ state_attr(e, 'current_grid_to_battery_kw') or 0 }} kW |
+              | Battery → home | {{ state_attr(e, 'current_battery_to_home_kw') or 0 }} kW |
+              | Battery → export | {{ state_attr(e, 'current_battery_export_kw') or 0 }} kW |
+              | Battery SOC | {{ state_attr(e, 'simulated_soc_percent') if state_attr(e, 'simulated_soc_percent') is not none else '—' }}% |
+              | Grid import today | {{ a.get('grid_import_kwh', 0) }} kWh |
+              | Grid export today | {{ a.get('grid_export_kwh', 0) }} kWh |
+              | Export income today | {{ a.get('export_income_pence', 0) }} p |
+              | Economic cost today | {{ a.get('economic_net_cost_pence', 0) }} p |
+      - type: grid
+        columns: 2
+        square: false
+        cards:
+          - type: entities
+            title: Smart tariffs now
+            entities:
+              - sensor.kems_current_import_rate
+              - binary_sensor.kems_cheap_period_confirmed
+              - sensor.kems_agile_export_rate_now
+              - sensor.kems_agile_price_data_quality
+          - type: entities
+            title: Agile decision
+            entities:
+              - sensor.kems_agile_smart_export_status
+              - sensor.kems_agile_smart_export_plan
+              - sensor.kems_agile_rolling_next_export_slot
+              - sensor.kems_agile_rolling_capacity_margin
 """
 
 _COMPARE_PREFIX = """      - type: markdown
-        title: Compare & optimise
         content: |
-          Compare the available system strategies and tariff choices in one place. Incomplete fixed windows should be treated as **collecting evidence**, not as authoritative long-term winners.
+          # Compare every KEMS type
+          The same household demand is presented in one table so you can compare **Live Data**, **Battery & Solar**, **Full KEMS** and **Full KEMS Agile** without switching pages.
+      - type: markdown
+        title: Right now — all power flows
+        content: |
+          {% set b = 'sensor.kems_compare_solar_and_battery_cost_today' %}
+          {% set f = 'sensor.kems_compare_full_kems_forecast_cost_today' %}
+          {% set a = 'sensor.kems_agile_live_scenario' %}
+          | Metric | Live Data | Battery & Solar | Full KEMS | Full KEMS Agile |
+          |---|---:|---:|---:|---:|
+          | House load kW | {{ states('sensor.kems_house_load') }} | {{ state_attr(b, 'current_house_load_kw') or 0 }} | {{ state_attr(f, 'current_house_load_kw') or 0 }} | {{ state_attr(a, 'current_house_load_kw') or 0 }} |
+          | Solar kW | {{ states('sensor.kems_solar_power') }} | {{ state_attr(b, 'current_solar_power_kw') or 0 }} | {{ state_attr(f, 'current_solar_power_kw') or 0 }} | {{ state_attr(a, 'current_solar_power_kw') or 0 }} |
+          | Grid import kW | {{ states('sensor.kems_grid_import') }} | {{ state_attr(b, 'current_grid_import_kw') or 0 }} | {{ state_attr(f, 'current_grid_import_kw') or 0 }} | {{ state_attr(a, 'current_grid_import_kw') or 0 }} |
+          | Grid export kW | {{ states('sensor.kems_grid_export') }} | {{ state_attr(b, 'current_grid_export_kw') or 0 }} | {{ state_attr(f, 'current_grid_export_kw') or 0 }} | {{ state_attr(a, 'current_grid_export_kw') or 0 }} |
+          | Solar → home kW | — | {{ state_attr(b, 'current_solar_to_home_kw') or 0 }} | {{ state_attr(f, 'current_solar_to_home_kw') or 0 }} | {{ state_attr(a, 'current_solar_to_home_kw') or 0 }} |
+          | Solar → battery kW | — | {{ state_attr(b, 'current_solar_to_battery_kw') or 0 }} | {{ state_attr(f, 'current_solar_to_battery_kw') or 0 }} | {{ state_attr(a, 'current_solar_to_battery_kw') or 0 }} |
+          | Solar export kW | {{ states('sensor.kems_grid_export') }} | {{ state_attr(b, 'current_solar_export_kw') or 0 }} | {{ state_attr(f, 'current_solar_export_kw') or 0 }} | {{ state_attr(a, 'current_solar_export_kw') or 0 }} |
+          | Grid → battery kW | — | {{ state_attr(b, 'current_grid_to_battery_kw') or 0 }} | {{ state_attr(f, 'current_grid_to_battery_kw') or 0 }} | {{ state_attr(a, 'current_grid_to_battery_kw') or 0 }} |
+          | Battery → home kW | — | {{ state_attr(b, 'current_battery_to_home_kw') or 0 }} | {{ state_attr(f, 'current_battery_to_home_kw') or 0 }} | {{ state_attr(a, 'current_battery_to_home_kw') or 0 }} |
+          | Battery → export kW | — | {{ state_attr(b, 'current_battery_export_kw') or 0 }} | {{ state_attr(f, 'current_battery_export_kw') or 0 }} | {{ state_attr(a, 'current_battery_export_kw') or 0 }} |
+          | Battery SOC % | {{ states('sensor.kems_battery_state_of_charge') }} | {{ state_attr(b, 'current_battery_soc_percent') if state_attr(b, 'current_battery_soc_percent') is not none else '—' }} | {{ state_attr(f, 'current_battery_soc_percent') if state_attr(f, 'current_battery_soc_percent') is not none else '—' }} | {{ state_attr(a, 'simulated_soc_percent') if state_attr(a, 'simulated_soc_percent') is not none else '—' }} |
+      - type: markdown
+        title: Today — cost, energy & savings
+        content: |
+          {% set b = 'sensor.kems_compare_solar_and_battery_cost_today' %}
+          {% set f = 'sensor.kems_compare_full_kems_forecast_cost_today' %}
+          {% set periods = state_attr('sensor.kems_agile_smart_export_plan', 'periods') or {} %}
+          {% set a = (periods.get('today', {}) or {}).get('agile_smart_export', {}) %}
+          | Metric | Live Data | Battery & Solar | Full KEMS | Full KEMS Agile |
+          |---|---:|---:|---:|---:|
+          | Total / economic cost p | {{ states('sensor.kems_observed_cost_today') }} | {{ states(b) }} | {{ states(f) }} | {{ a.get('economic_net_cost_pence', '—') }} |
+          | Import cost p | — | {{ state_attr(b, 'import_cost_pence') or 0 }} | {{ state_attr(f, 'import_cost_pence') or 0 }} | {{ a.get('import_cost_pence', 0) }} |
+          | Export income p | {{ states('sensor.kems_observed_export_income_today') }} | {{ state_attr(b, 'export_income_pence') or 0 }} | {{ state_attr(f, 'export_income_pence') or 0 }} | {{ a.get('export_income_pence', 0) }} |
+          | Grid import kWh | {{ states('sensor.kems_observed_grid_import_today') }} | {{ state_attr(b, 'grid_import_kwh') or 0 }} | {{ state_attr(f, 'grid_import_kwh') or 0 }} | {{ a.get('grid_import_kwh', 0) }} |
+          | Grid export kWh | {{ states('sensor.kems_observed_grid_export_today') }} | {{ state_attr(b, 'grid_export_kwh') or 0 }} | {{ state_attr(f, 'grid_export_kwh') or 0 }} | {{ a.get('grid_export_kwh', 0) }} |
+          | Solar generation kWh | — | {{ state_attr(b, 'solar_generation_kwh') or 0 }} | {{ state_attr(f, 'solar_generation_kwh') or 0 }} | — |
+          | Solar → home kWh | — | {{ state_attr(b, 'solar_to_home_kwh') or 0 }} | {{ state_attr(f, 'solar_to_home_kwh') or 0 }} | {{ a.get('solar_to_home_kwh', 0) }} |
+          | Solar → battery kWh | — | {{ state_attr(b, 'solar_to_battery_kwh') or 0 }} | {{ state_attr(f, 'solar_to_battery_kwh') or 0 }} | {{ a.get('solar_to_battery_kwh', 0) }} |
+          | Solar export kWh | — | {{ state_attr(b, 'solar_export_kwh') or 0 }} | {{ state_attr(f, 'solar_export_kwh') or 0 }} | {{ a.get('solar_export_kwh', 0) }} |
+          | Battery charge kWh | — | {{ state_attr(b, 'battery_charge_kwh') or 0 }} | {{ state_attr(f, 'battery_charge_kwh') or 0 }} | — |
+          | Battery → home kWh | — | {{ state_attr(b, 'battery_to_home_kwh') or 0 }} | {{ state_attr(f, 'battery_to_home_kwh') or 0 }} | {{ a.get('battery_to_home_kwh', 0) }} |
+          | Battery export kWh | — | {{ state_attr(b, 'battery_export_kwh') or 0 }} | {{ state_attr(f, 'battery_export_kwh') or 0 }} | {{ a.get('battery_export_kwh', 0) }} |
+          | Ending SOC % | {{ states('sensor.kems_battery_state_of_charge') }} | {{ state_attr(b, 'ending_soc_percent') if state_attr(b, 'ending_soc_percent') is not none else '—' }} | {{ state_attr(f, 'ending_soc_percent') if state_attr(f, 'ending_soc_percent') is not none else '—' }} | {{ a.get('ending_soc_percent', '—') }} |
+          | Saving vs no system p | — | {{ state_attr(b, 'saving_vs_no_system_pence') or 0 }} | {{ state_attr(f, 'saving_vs_no_system_pence') or 0 }} | — |
+          | Agile weighted export p/kWh | — | — | — | {{ a.get('weighted_achieved_export_rate_pence', '—') }} |
+      - type: history-graph
+        title: Cost comparison — 24 hours
+        hours_to_show: 24
+        entities:
+          - entity: sensor.kems_observed_cost_today
+            name: Live Data
+          - entity: sensor.kems_compare_solar_and_battery_cost_today
+            name: Battery & Solar
+          - entity: sensor.kems_compare_full_kems_forecast_cost_today
+            name: Full KEMS
+          - entity: sensor.kems_agile_smart_export_cost_today
+            name: Full KEMS Agile
 """
 
 _HISTORY_PREFIX = """      - type: markdown
         title: History & finance
         content: |
-          Energy, Agile replay history, costs, export income, ROI, payback and gas history are grouped here so long-term performance can be judged from one page.
+          Historical energy, costs, export income, ROI, Agile evidence and gas are kept together here. Long-term Agile conclusions remain labelled incomplete until their required evidence window is complete.
 """
 
-_BATTERY_PREFIX = """      - type: markdown
-        title: Battery & solar plant
+_ADVANCED_PREFIX = """      - type: markdown
         content: |
-          Before installation this page describes the proposed/digital-twin system. After commissioning it becomes the physical plant page for solar, inverter and battery performance, limits and health.
-"""
+          # Advanced / Test Lab
+          Normal users do not need these controls. They remain available for commissioning, EPS validation and deterministic virtual stress tests.
 
-_EV_PREFIX = """      - type: markdown
-        title: EV, tariff & grid-services
-        content: |
-          Intelligent/cheap slots, EV charging and Power Down participation are grouped because they all affect when KEMS should import, charge, reserve or export energy.
-"""
-
-_EPS_CARDS = """      - type: markdown
-        content: |
-          # Backup / EPS
-          This page is prepared for the physical EPS installation. Until the hardware is commissioned, unavailable live readings are expected.
-
-          **Grid available:** {{ states('binary_sensor.kems_grid_available_for_control') }}  
-          **Island mode:** {{ states('binary_sensor.kems_whole_house_island_mode') }}  
-          **Estimated outage runtime:** {{ states('sensor.kems_estimated_outage_runtime') }}  
-          **Commissioning readiness:** {{ states('sensor.kems_commissioning_readiness') }}
-      - type: grid
-        columns: 2
-        square: false
-        cards:
-          - type: tile
-            entity: binary_sensor.kems_grid_available_for_control
-            name: Grid available
-          - type: tile
-            entity: binary_sensor.kems_whole_house_island_mode
-            name: Island mode
-          - type: tile
-            entity: sensor.kems_whole_house_eps_load
-            name: EPS load
-          - type: tile
-            entity: sensor.kems_estimated_outage_runtime
-            name: Estimated runtime
+          **Engineering progression:** Observe → Simulate → Shadow → Control.  
+          The normal user-facing selector intentionally exposes only **Live / Simulate / Control**; Shadow remains an internal commissioning stage.
       - type: entities
-        title: EPS loading and headroom
+        title: Advanced test lab
         show_header_toggle: false
         entities:
-          - sensor.kems_eps_headroom
-          - sensor.kems_eps_utilisation
-          - sensor.kems_eps_load_status
-          - binary_sensor.kems_eps_load_warning
-          - binary_sensor.kems_eps_load_critical
-          - sensor.kems_kh7_output_headroom
-          - sensor.kems_eps_output_limit
-      - type: markdown
-        title: If the grid failed now
-        content: |
-          {% set live = is_state('binary_sensor.kems_battery_data_available', 'on') %}
-          **SOC source:** {{ 'Live hardware' if live else 'Simulation' }}  
-          **Battery SOC:** {{ states('sensor.kems_battery_state_of_charge') if live else states('sensor.kems_simulated_battery_state_of_charge') }}%  
-          **Whole-home EPS demand:** {{ states('sensor.kems_whole_house_eps_load') }}  
-          **Estimated runtime:** {{ states('sensor.kems_estimated_outage_runtime') }}  
-          **EPS warning:** {{ states('binary_sensor.kems_eps_load_warning') }}  
-          **EPS critical:** {{ states('binary_sensor.kems_eps_load_critical') }}
-
-          The live version of this page will become the outage dashboard when the EPS and FoxESS hardware are commissioned.
-"""
-
-_CONTROL_PREFIX = """      - type: markdown
-        title: Control progression
-        content: |
-          **Operating mode:** {{ states('sensor.kems_operating_mode') }}  
-          **Commissioning:** {{ states('sensor.kems_commissioning_readiness') }}  
-          **Control preflight:** {{ states('sensor.kems_control_preflight') }}  
-          **Real backend:** {{ states('binary_sensor.kems_real_control_backend_available') }}  
-          **Commands permitted:** {{ states('binary_sensor.kems_control_commands_permitted') }}
-
-          Progression remains **Simulation → Shadow → Live**. Real writes must stay blocked until commissioning, source freshness, direction verification and safety checks all pass.
-      - type: entities
-        title: Control lab
-        entities:
-          - select.kems_operating_mode
-          - select.kems_virtual_scenario
+          - entity: select.kems_virtual_scenario
+            name: Virtual stress scenario
           - switch.kems_emergency_stop
           - switch.kems_master_control_enable
       - type: grid
         columns: 2
         square: false
         cards:
-          - type: tile
-            entity: binary_sensor.kems_control_plan_safe
-          - type: tile
-            entity: binary_sensor.kems_control_data_fresh
-          - type: tile
-            entity: binary_sensor.kems_real_control_backend_available
-          - type: tile
-            entity: binary_sensor.kems_control_commands_permitted
-      - type: entities
-        title: KEMS target / desired plan
-        show_header_toggle: false
-        entities:
-          - sensor.kems_control_operating_reason
-          - sensor.kems_desired_inverter_work_mode
-          - sensor.kems_desired_battery_charge_power
-          - sensor.kems_desired_battery_to_home_power
-          - sensor.kems_desired_battery_export_power
-          - sensor.kems_desired_total_battery_discharge_power
-          - sensor.kems_desired_minimum_soc
-          - sensor.kems_control_next_action
+          - type: entities
+            title: Safety gates
+            entities:
+              - binary_sensor.kems_control_plan_safe
+              - binary_sensor.kems_control_data_fresh
+              - binary_sensor.kems_real_control_backend_available
+              - binary_sensor.kems_control_commands_permitted
+          - type: entities
+            title: Desired control plan
+            entities:
+              - sensor.kems_control_operating_reason
+              - sensor.kems_desired_inverter_work_mode
+              - sensor.kems_desired_battery_charge_power
+              - sensor.kems_desired_battery_to_home_power
+              - sensor.kems_desired_battery_export_power
+              - sensor.kems_desired_minimum_soc
 """
 
 _SYSTEM_PREFIX = """      - type: markdown
-        title: System, learning & diagnostics
+        title: System & diagnostics
         content: |
-          KEMS learning/forecast health, coordinated updates and deep diagnostics live here rather than occupying separate day-to-day navigation tabs.
+          Updates, learning health and deep entity diagnostics live here rather than taking space in the normal energy-management workflow.
 """
 
 FINAL_VIEW_SPECS = (
     ViewSpec("Home", "home", "mdi:home-lightning-bolt", ("Overview",), _HOME_PREFIX),
-    ViewSpec("Live", "live", "mdi:flash", ("Live Energy",), _LIVE_PREFIX),
+    ViewSpec("Live Data", "live-data", "mdi:flash", ("Live Energy",), _LIVE_PREFIX),
     ViewSpec(
-        "Plan",
-        "plan",
-        "mdi:chart-timeline-variant-shimmer",
-        ("Forecast", "Full KEMS Forecast", "Simulation"),
-        _PLAN_PREFIX,
+        "Battery & Solar",
+        "battery-solar",
+        "mdi:solar-power",
+        ("Battery & Solar", "Simulation"),
+        _BATTERY_SOLAR_PREFIX,
     ),
     ViewSpec(
-        "Agile",
-        "agile",
+        "Full KEMS",
+        "full-kems",
+        "mdi:home-lightning-bolt-outline",
+        ("Forecast", "Full KEMS Forecast", "Tariff & EV", "Power Down"),
+        _FULL_KEMS_PREFIX,
+    ),
+    ViewSpec(
+        "Full KEMS Agile",
+        "full-kems-agile",
         "mdi:transmission-tower-export",
         ("Agile Smart Export", "Agile Price Plan", "Agile Assumptions"),
         _AGILE_PREFIX,
@@ -232,7 +430,7 @@ FINAL_VIEW_SPECS = (
         "Compare",
         "compare",
         "mdi:compare-horizontal",
-        ("Forecast vs Agile", "Compare"),
+        ("Compare", "Forecast vs Agile"),
         _COMPARE_PREFIX,
     ),
     ViewSpec(
@@ -243,26 +441,11 @@ FINAL_VIEW_SPECS = (
         _HISTORY_PREFIX,
     ),
     ViewSpec(
-        "Battery / Solar",
-        "battery-solar",
-        "mdi:solar-power",
-        ("Battery & Solar",),
-        _BATTERY_PREFIX,
-    ),
-    ViewSpec(
-        "EV / Tariff",
-        "ev-tariff",
-        "mdi:ev-station",
-        ("Tariff & EV", "Power Down"),
-        _EV_PREFIX,
-    ),
-    ViewSpec("EPS", "eps", "mdi:shield-home", (), _EPS_CARDS),
-    ViewSpec(
-        "Control",
-        "control",
-        "mdi:tune-variant",
-        ("Commissioning",),
-        _CONTROL_PREFIX,
+        "Advanced / Test Lab",
+        "advanced",
+        "mdi:test-tube",
+        ("Commissioning", "Control & EPS"),
+        _ADVANCED_PREFIX,
     ),
     ViewSpec(
         "System",
@@ -319,7 +502,7 @@ def _render_view(spec: ViewSpec, source_views: dict[str, str]) -> str:
 
 
 def consolidate_dashboard(content: str) -> str:
-    """Reduce the assembled KEMS dashboard to the production eleven-page layout."""
+    """Render the simplified nine-page KEMS product dashboard."""
     source_views = _split_views(content)
     missing = sorted(EXPECTED_SOURCE_TITLES - set(source_views))
     if missing:
@@ -335,7 +518,7 @@ def consolidate_dashboard(content: str) -> str:
 
 
 def install_dashboard_consolidation() -> None:
-    """Install the final dashboard consolidation after all feature view patches."""
+    """Install final dashboard consolidation after all feature view patches."""
     from . import dashboard as dashboard_module
 
     original = dashboard_module._combined_master_dashboard_bytes
