@@ -16,7 +16,7 @@ Alpha7.24 keeps the Alpha7.23 safety chain intact and makes two targeted correct
 
 ### 1. Proposal/live solar-aware house headroom
 
-The rolling Agile planner now calculates current house battery headroom from the same `SimulationEngine._simulated_solar_power` path used by the Agile replay.
+The rolling Agile planner now calculates current house battery headroom from the same `SimulationEngine._simulated_solar_power` path used by the Agile replay, keeping proposal/live solar routing consistent through pre-install shadow and commissioned operation.
 
 That function already chooses live FoxESS PV when it exists and otherwise falls back to the configured proposal-solar model. Pre-install shadow therefore sees the same solar context as the Agile replay, while a commissioned installation naturally uses live PV.
 
