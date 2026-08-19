@@ -86,7 +86,7 @@ CONF_MANUAL_OFFPEAK_RATE = "manual_offpeak_rate_pence"
 CONF_MANUAL_STANDING_CHARGE = "manual_standing_charge_pence"
 CONF_MANUAL_OFFPEAK_START = "manual_offpeak_start"
 CONF_MANUAL_OFFPEAK_END = "manual_offpeak_end"
-# Legacy option retained for config-entry compatibility. Alpha7.34 ignores it.
+# Legacy option retained for config-entry compatibility. Alpha7.34+ ignores it.
 CONF_INTELLIGENT_SLOTS_ENABLED = "intelligent_slots_enabled"
 
 CONF_SCAN_INTERVAL = "scan_interval_seconds"
@@ -122,6 +122,7 @@ CONF_BATTERY_DEGRADATION = "battery_degradation_percent"
 CONF_DISCOUNT_RATE = "discount_rate_percent"
 CONF_ROI_FORECAST_YEARS = "roi_forecast_years"
 
+CONF_SYSTEM_TYPE = "system_type"
 CONF_OPERATING_MODE = "operating_mode"
 CONF_VIRTUAL_SCENARIO = "virtual_scenario"
 CONF_CONTROL_ENABLED = "control_enabled"
@@ -181,6 +182,7 @@ DEFAULT_OPTIONS = {
     CONF_BATTERY_DEGRADATION: 2.0,
     CONF_DISCOUNT_RATE: 6.75,
     CONF_ROI_FORECAST_YEARS: 20,
+    CONF_SYSTEM_TYPE: "full_kems_agile",
     CONF_OPERATING_MODE: "simulate",
     CONF_VIRTUAL_SCENARIO: "normal",
     CONF_CONTROL_ENABLED: False,
