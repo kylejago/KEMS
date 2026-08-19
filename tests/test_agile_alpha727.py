@@ -111,4 +111,4 @@ def test_alpha727_documentation_exists() -> None:
     assert "Octopus" in source
     assert "retrieval error" in source
     assert "never invents" in source
-    assert "real FoxESS hardware writes remain blocked" in source
+    assert "Real FoxESS hardware writes remain blocked" in source
