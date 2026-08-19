@@ -331,7 +331,9 @@ def _snapshot_with_solar_aware_routing(
 
     snapshot.update(
         {
-            "routing_basis": "current coordinator routing snapshot — solar-aware Feed-in First",
+            "routing_basis": (
+                "current coordinator routing snapshot — solar-aware Feed-in First"
+            ),
             "solar_to_battery_kw": 0.0,
             "solar_to_home_kw": round(solar_to_home, 3),
             "solar_export_kw": round(solar_export, 3),
@@ -344,7 +346,8 @@ def _snapshot_with_solar_aware_routing(
                 3,
             ),
             "solar_routing_basis": (
-                "Feed-in First: solar to AC first; battery uses remaining inverter headroom"
+                "Feed-in First: solar to AC first; battery uses remaining "
+                "inverter headroom"
             ),
             "solar_aware_discharge_routing": True,
         }
