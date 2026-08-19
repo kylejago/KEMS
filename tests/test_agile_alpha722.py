@@ -102,7 +102,9 @@ def test_missing_2300_price_blocks_remaining_export_horizon() -> None:
     assert result["missing_slots"][0]["label"] == "23:00"
 
 
-def test_alpha722_patch_holds_price_optimised_export_but_keeps_deadline_override() -> None:
+def test_alpha722_patch_holds_price_optimised_export_but_keeps_deadline_override() -> (
+    None
+):
     """Unknown future prices block price chasing, not deadline safety."""
     source = PATCH.read_text(encoding="utf-8")
     assert '"price_horizon_hold"' in source
