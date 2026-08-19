@@ -141,7 +141,9 @@ def install_alpha729_live_routing_parity_patch() -> None:
         global alpha729_original_publish
         alpha729_original_publish = publish
         _publish_with_live_house_parity._kems_alpha729_live_routing = True
-        runtime.EfficientAgileSmartExportManager._publish = _publish_with_live_house_parity
+        runtime.EfficientAgileSmartExportManager._publish = (
+            _publish_with_live_house_parity
+        )
 
     original_dashboard = dashboard_module._combined_master_dashboard_bytes
     if getattr(original_dashboard, "_kems_alpha729_live_routing", False):
