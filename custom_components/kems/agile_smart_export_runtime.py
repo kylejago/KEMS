@@ -25,6 +25,7 @@ from .agile_alpha719_validation import install_alpha719_validation_patch  # noqa
 from .agile_alpha720_dashboard import install_alpha720_dashboard_patch  # noqa: E402
 from .agile_alpha720_preinstall import install_alpha720_preinstall_patch  # noqa: E402
 from .agile_alpha722_horizon import install_alpha722_price_horizon_patch  # noqa: E402
+from .agile_alpha723_shadow import install_alpha723_shadow_patch  # noqa: E402
 from .agile_dashboard_yaml_guard import install_dashboard_yaml_guard  # noqa: E402
 from .agile_rolling_replan import install_rolling_replan_patch  # noqa: E402
 from .agile_smart_export_live import install_live_scenario_patch  # noqa: E402
@@ -45,6 +46,7 @@ install_alpha719_dashboard_patch()
 install_alpha720_preinstall_patch()
 install_alpha720_dashboard_patch()
 install_alpha722_price_horizon_patch()
+install_alpha723_shadow_patch()
 
 EfficientAgileSmartExportManager = _base.EfficientAgileSmartExportManager
 
