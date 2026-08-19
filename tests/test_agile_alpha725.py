@@ -24,9 +24,9 @@ def test_alpha725_module_parses() -> None:
 def test_alpha725_installs_after_alpha724() -> None:
     loader = LOADER.read_text(encoding="utf-8")
     assert "install_alpha725_nonzero_export_proof_patch" in loader
-    assert loader.rindex("install_alpha725_nonzero_export_proof_patch()") > loader.rindex(
-        "install_alpha724_outcome_parity_patch()"
-    )
+    assert loader.rindex(
+        "install_alpha725_nonzero_export_proof_patch()"
+    ) > loader.rindex("install_alpha724_outcome_parity_patch()")
 
 
 def test_alpha725_requires_genuine_nonzero_target_and_complete_horizon() -> None:
@@ -34,7 +34,9 @@ def test_alpha725_requires_genuine_nonzero_target_and_complete_horizon() -> None
     assert "NONZERO_EXPORT_THRESHOLD_KW = 0.01" in source
     assert 'result.get("price_horizon_complete") is True' in source
     assert 'result.get("battery_export_held")' in source
-    assert "qualified = bool(nonzero and horizon_complete and not horizon_held)" in source
+    assert (
+        "qualified = bool(nonzero and horizon_complete and not horizon_held)" in source
+    )
     assert "WAITING — non-zero Agile export target" in source
     assert "WAITING — complete Agile price horizon" in source
 
@@ -45,7 +47,10 @@ def test_alpha725_uses_candidate_applied_digital_twin_replay() -> None:
     assert 'routing.get("total_kh7_ac_output_kw")' in source
     assert 'routing.get("base_digital_twin_discharge_kw")' in source
     assert "routed_solar_ac = max(base_ac - base_discharge, 0.0)" in source
-    assert "available_discharge = min(config.max_discharge_kw, inverter_headroom)" in source
+    assert (
+        "available_discharge = min(config.max_discharge_kw, inverter_headroom)"
+        in source
+    )
     assert "replay_export = min(" in source
     assert "config.export_limit_kw" in source
 
