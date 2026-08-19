@@ -48,7 +48,10 @@ def test_panel5_routes_battery_export_visually_through_house_bus() -> None:
     assert "battery_discharging ||\n        export_from_battery;" in content
     assert "const bool source_battery_active = battery_to_bus_active;" in content
     assert "else if (battery_to_bus_active)" in content
-    assert "battery_discharging =\n          battery_home_power > POWER_DEADBAND_KW;" in content
+    assert (
+        "battery_discharging =\n          battery_home_power > POWER_DEADBAND_KW;"
+        in content
+    )
 
 
 def test_kems_startup_refreshes_only_an_existing_panel_config() -> None:
