@@ -8,6 +8,8 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
+from kems_core import Snapshot
+
 ROOT = Path(__file__).parents[1]
 KEMS = ROOT / "custom_components" / "kems"
 PATCH = KEMS / "agile_alpha734_deadline_guard.py"
@@ -95,6 +97,23 @@ def test_extra_intelligent_slots_are_not_control_authoritative() -> None:
     assert "next_offpeak_start=manual_next_start" in source
     assert "offpeak_end=manual_end" in source
     assert "live_off_peak if" not in source
+
+
+def test_retained_intelligent_slot_snapshot_cannot_become_cheap() -> None:
+    """Old Intelligent/EV observations must also be inert during replay."""
+    old_extra_slot = Snapshot(
+        off_peak=False,
+        intelligent_slot=True,
+        ev_charging=True,
+    )
+    overnight = Snapshot(
+        off_peak=True,
+        intelligent_slot=False,
+        ev_charging=False,
+    )
+
+    assert old_extra_slot.cheap_period_confirmed is False
+    assert overnight.cheap_period_confirmed is True
 
 
 def test_vendor_neutral_backend_contract_is_recorded_before_alpha_ess() -> None:
