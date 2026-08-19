@@ -7,6 +7,8 @@ and retains compact decision evidence. It never calls a Home Assistant service
 and never exposes a real FoxESS backend.
 """
 
+# ruff: noqa: E501
+
 from __future__ import annotations
 
 from dataclasses import replace
