@@ -42,14 +42,13 @@
   },
   "maintenance": {
     "required": true,
-    "reason": "Activate KEMS __RELEASE_VERSION__ and automatically install the managed Panel5 display update",
+    "reason": "Activate KEMS __RELEASE_VERSION__: Agile latest-safe-start protection and overnight-only cheap control",
     "expected_downtime_minutes": 5,
     "home_assistant_restart_required": true,
     "reboot_required": false,
     "affected_components": [
       "kems_core",
-      "dashboard",
-      "panel"
+      "dashboard"
     ]
   }
 }
