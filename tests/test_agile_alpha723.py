@@ -9,11 +9,12 @@ ROOT = Path(__file__).parents[1]
 KEMS = ROOT / "custom_components" / "kems"
 PATCH = KEMS / "agile_alpha723_shadow.py"
 LOADER = KEMS / "agile_smart_export_runtime.py"
-MANIFEST = KEMS / "manifest.json"
 
 
-def test_alpha723_manifest_is_exact() -> None:
-    assert '"version": "0.7.0-alpha7.23"' in MANIFEST.read_text(encoding="utf-8")
+def test_alpha723_shadow_patch_remains_installed() -> None:
+    loader = LOADER.read_text(encoding="utf-8")
+    assert "install_alpha723_shadow_patch" in loader
+    assert "install_alpha723_shadow_patch()" in loader
 
 
 def test_alpha723_shadow_module_parses() -> None:
