@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ast
+import json
 from pathlib import Path
 
 ROOT = Path(__file__).parents[1]
@@ -13,8 +14,11 @@ MANIFEST = KEMS / "manifest.json"
 DOC = ROOT / "docs" / "agile-solar-aware-inverter-headroom.md"
 
 
-def test_alpha731_manifest_is_exact() -> None:
-    assert '"version": "0.7.0-alpha7.31"' in MANIFEST.read_text(encoding="utf-8")
+def test_alpha731_baseline_is_retained_in_later_alpha7_releases() -> None:
+    manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
+    version = str(manifest["version"])
+    assert version.startswith("0.7.0-alpha7.")
+    assert int(version.rsplit(".", 1)[1]) >= 31
 
 
 def test_alpha731_module_parses() -> None:

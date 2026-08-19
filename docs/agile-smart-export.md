@@ -1,112 +1,76 @@
-# Agile Smart Export
+# Agile Smart Export — current Alpha7 behaviour
 
-Agile Smart Export is a read-only KEMS simulation that compares the existing **Full KEMS Forecast** strategy with an export-price-aware strategy using the real Octopus Agile Outgoing half-hour prices for electricity region **L**.
+Agile Smart Export is KEMS' export-price-aware strategy for Octopus Agile Outgoing. It compares and plans against real Region L half-hour prices while retaining the same house-demand, battery-reserve, solar and inverter constraints used by the wider KEMS digital twin.
 
-It does not alter KEMS control commissioning and does not create a FoxESS write path.
+Real FoxESS writes remain blocked during the Alpha7 shadow phase.
 
-## Price source
+## Price collection
 
-KEMS uses the public Octopus Energy API. It discovers the current active Agile Outgoing export product instead of permanently hard-coding a product version, then follows the Region L tariff's `standard_unit_rates` link.
+KEMS discovers the active Agile Outgoing product and Region L tariff through the public Octopus API rather than hard-coding one product code. Rates retain their real `valid_from`/`valid_to` timestamps and the horizon logic is UK/DST aware.
 
-For each half-hour slot KEMS retains:
+When a relevant future period is absent, KEMS retries the exact target period and records recovery evidence. It never invents a neighbour price.
 
-- Octopus product code
-- Octopus tariff code
-- electricity region (`L`)
-- VAT-inclusive p/kWh rate
-- `valid_from`
-- `valid_to`
+## Known prices and incomplete horizons
 
-Rates are requested with explicit UTC time bounds and retained with their source timestamps. This also allows KEMS to report 46, 48, or 50 expected half-hour slots on UK daylight-saving transition days rather than assuming every local day contains exactly 48 slots.
+A missing future price no longer automatically erases the economic plan.
 
-The price collector refreshes at most once every 15 minutes, persists successfully fetched rates, and keeps the last successful data if Octopus is temporarily unreachable.
+KEMS first keeps the known-price allocation visible and reserves the full maximum discharge capacity of unresolved relevant periods. Bounded partial-horizon dispatch is permitted only when all of the following are true:
 
-## Simulation boundary
+- the broad price fetch succeeded;
+- every relevant missing slot is positively classified as an upstream Octopus omission/no-result rather than a retrieval failure;
+- the current settlement period has a real price;
+- enough battery/inverter capacity is reserved for every unknown relevant period;
+- no unknown-price period receives an export command.
 
-Agile Smart Export starts from the same KEMS observations and physical configuration as Full KEMS Forecast. It respects:
+Any retrieval ambiguity, current-price uncertainty or insufficient reserve restores the full horizon hold.
 
-- battery capacity and reserve SOC
-- maximum charge and discharge power
-- charge and discharge efficiency
-- inverter AC limit
-- export limit
-- configured site-import limit
-- observed or proposal solar generation
-- observed/learned house demand
-- forecast minimum pre-cheap reserve protection
-- forecast overnight charge target
-- normal Intelligent off-peak import timing and rates
+## Dispatch priorities
 
-The initial battery-wear allowance is **2p per discharged kWh**. It is included in the economic comparison for both strategies so Agile does not appear to win simply by cycling the battery harder. Raw energy-only cost is retained separately.
+Outside cheap import periods:
 
-## Dispatch logic
+1. solar serves the house first;
+2. battery can serve remaining house demand above the protected reserve;
+3. deliberate battery export uses the highest-value eligible Agile periods;
+4. unknown future prices reserve opportunity capacity rather than receiving a guessed value.
 
-Outside a confirmed cheap period, Agile Smart Export uses solar for the house first and then uses the battery for remaining house demand when energy is available above the protected reserve. This prevents KEMS from deliberately creating avoidable day-rate import purely so the same battery energy can be sold later.
+The current live house-demand basis is the same KEMS live house-load source used by the Live dashboard. The digital-twin slot-average demand is retained separately for replay/parity evidence.
 
-Surplus solar is stored when either reserve protection needs it or the best later Agile export opportunity, after charge/discharge losses and the battery-wear allowance, is worth more than exporting that solar immediately. Otherwise the solar is exported at the current Agile rate.
+## Solar-aware inverter headroom
 
-Exportable battery energy is reserved for the highest-value remaining Agile slots before the next normal cheap period. KEMS calculates how many half-hour slots would be required to export the remaining energy within the configured battery and inverter power limits and only deliberately exports when the current rate is inside that high-value set.
+The inverter constraint is applied to total AC output, not battery power in isolation.
 
-If an Agile export slot is negative, KEMS does not deliberately export into it where storage or curtailment is physically available.
+KEMS calculates current routed solar AC first, then gives the battery only the remaining configured inverter headroom. A deliberate export candidate therefore satisfies:
 
-During a confirmed cheap period the house can be supplied by the grid and the battery is charged toward the KEMS forecast overnight target, still respecting charge power and site-import limits. Positive-value solar can continue to export.
+`solar AC + battery AC <= configured inverter limit`
 
-## Fixed 12p benchmark
+For the current proposal the configured KH7 limit is 7 kW. The command must not be pre-clipped into a safety pass; independent validation remains authoritative.
 
-The fixed-export benchmark is **12p/kWh**. Agile Smart Export records both the real Agile export income and what the **same Agile dispatch** would have earned at 12p/kWh.
+## Shadow command and non-zero proof
 
-This deliberately answers a different question from the Full KEMS Forecast comparison:
+The optimiser's exact candidate is translated into the inverter-shaped shadow command. Deliberate export requires Feed-in First and grid export enabled; non-export operation remains Self Use.
 
-- **Full KEMS Forecast vs Agile Smart Export** answers which complete dispatch strategy was better after import cost, export income and battery wear.
-- **Agile tariff vs fixed 12p on the same dispatch** isolates the value of the export tariff itself without changing when or how much energy was exported.
+The independent safety layer checks 13 command invariants including charge/discharge exclusivity, configured charge/discharge/export/inverter limits, minimum SOC and the hardware-write lock.
 
-KEMS publishes both values for today, tomorrow, yesterday, 7 days, 30 days, 365 days and all tracked time.
+A genuine non-zero export proof then applies that exact safe candidate to a one-step digital-twin routing replay. It requires:
 
-## Today, tomorrow, and history
+- optimiser battery export above 0.01 kW;
+- command/optimiser parity;
+- qualified price horizon (complete or the verified bounded-partial path);
+- Feed-in First and export permission;
+- 13/13 independent safety;
+- strict target/outcome parity within 0.01 kW;
+- 100% strict tracking;
+- configured discharge/inverter/SOC limits respected;
+- hardware writes still blocked.
 
-KEMS calculates:
+Alpha7.31 produced genuine repeated non-zero proof passes and is the behavioural baseline for the Alpha7.32 platform cleanup.
 
-- Today
-- Tomorrow forecast
-- Yesterday
-- Last 7 days
-- Last 30 days
-- Last 365 days
-- All tracked time
+## Web and panel
 
-Completed days are persisted so the all-time comparison grows independently of the rolling observation-history window.
+The managed Home Assistant dashboard contains the detailed Agile workspace. KEMS Web Alpha7 adds a read-only Agile page showing the current rate, dispatch mode, live house demand, digital-twin routing, price-horizon qualification, selected export slots, shadow safety and non-zero proof.
 
-The 365-day result is **coverage-gated**. KEMS publishes the exact number of valid replay days as `x/365`, the earliest and latest settled replay dates, and a `twelve_month_ready` flag. It does not invent missing historical house-load, solar, tariff or strategy observations. The 365-day winner is therefore labelled as collecting data until all 365 daily replays are valid.
+Panel4 already includes an Agile Smart Export display mode and therefore does not require a firmware change for Alpha7.32.
 
-This distinction matters on an installation that has not yet accumulated a full year of KEMS observations: the shorter and all-time comparisons remain useful, but KEMS will not present a partial sample as an authoritative 12-month result.
+## Safety boundary
 
-Tomorrow uses the KEMS learned hourly house-demand profile and KEMS solar forecast. Because extra Intelligent charging slots are only known when Octopus/Ohme actually schedule them, tomorrow's projection uses the configured normal Intelligent off-peak window rather than inventing future bonus slots.
-
-## Price-data quality
-
-The comparison exposes separate counts and completeness for today and tomorrow. Tomorrow is reported as awaiting publication before the Octopus publication window, in the publication window while rates are arriving, or incomplete if the expected slots are still missing afterwards.
-
-Agile Smart Export will not report the live strategy as ready unless today's price coverage is complete and the underlying simulation has sufficient observation coverage.
-
-## Dashboard
-
-Agile Smart Export is built directly into the automatically managed **KEMS Master Dashboard**. KEMS packages the specialist comparison views with the integration and appends them to `/config/kems_master_dashboard.yaml` every time the managed dashboard is refreshed.
-
-No second Lovelace/YAML dashboard registration is required.
-
-The master gains four Agile comparison tabs:
-
-- **Forecast vs Agile** — current Region L Agile rate, data quality, current Smart Export action, Full KEMS Forecast vs Agile Smart Export cost/income/routing, today's strategy winner, and the fixed-12p same-dispatch tariff benchmark.
-- **Agile Price Plan** — today and tomorrow half-hour prices, planned actions, grid export, battery export and ending SOC.
-- **Agile History** — historical replay coverage, 7-day, 30-day, 365-day and all-time strategy results plus Agile-vs-fixed-12p tariff value.
-- **Agile Assumptions** — the fixed 12p benchmark, 365-day coverage rule, battery-wear allowance, physical constraints and read-only safety boundary.
-
-The standalone repository file `dashboards/kems_agile_smart_export_builtin.yaml` remains available as a specialist/reference dashboard for anyone who deliberately wants a separate comparison dashboard, but KEMS does not create or register a second managed dashboard file in Home Assistant.
-
-See `dashboards/README.md` for the one-time KEMS Master Dashboard registration.
-
-## Diagnostics and safety
-
-The KEMS diagnostics payload contains an `agile_smart_export` section with product/tariff discovery, current rate, data quality, period results, historical coverage, price-slot plans, update timestamps, and the last collection error if any.
-
-The simulation is explicitly labelled `simulation_only`. It never calls the KEMS control backend, does not bypass commissioning, and cannot issue charge/discharge/export commands to FoxESS hardware.
+Agile Smart Export remains a shadow/digital-twin capability until physical FoxESS commissioning verifies the real mappings, sign conventions, site limits and backend. The public `kems.uk` website has no property control path.
