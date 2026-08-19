@@ -9,12 +9,13 @@ ROOT = Path(__file__).parents[1]
 KEMS = ROOT / "custom_components" / "kems"
 PATCH = KEMS / "agile_alpha724_outcome.py"
 LOADER = KEMS / "agile_smart_export_runtime.py"
-MANIFEST = KEMS / "manifest.json"
 DOC = ROOT / "docs" / "agile-shadow-outcome-parity.md"
 
 
-def test_alpha724_manifest_is_exact() -> None:
-    assert '"version": "0.7.0-alpha7.24"' in MANIFEST.read_text(encoding="utf-8")
+def test_alpha724_patch_remains_installed() -> None:
+    loader = LOADER.read_text(encoding="utf-8")
+    assert "install_alpha724_outcome_parity_patch" in loader
+    assert "install_alpha724_outcome_parity_patch()" in loader
 
 
 def test_alpha724_module_parses() -> None:
