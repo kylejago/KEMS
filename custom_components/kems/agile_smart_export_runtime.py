@@ -30,6 +30,9 @@ from .agile_alpha724_outcome import install_alpha724_outcome_parity_patch  # noq
 from .agile_alpha725_nonzero import (  # noqa: E402
     install_alpha725_nonzero_export_proof_patch,
 )
+from .agile_alpha726_provisional import (  # noqa: E402
+    install_alpha726_provisional_planning_patch,
+)
 from .agile_dashboard_yaml_guard import install_dashboard_yaml_guard  # noqa: E402
 from .agile_rolling_replan import install_rolling_replan_patch  # noqa: E402
 from .agile_smart_export_live import install_live_scenario_patch  # noqa: E402
@@ -53,6 +56,7 @@ install_alpha722_price_horizon_patch()
 install_alpha723_shadow_patch()
 install_alpha724_outcome_parity_patch()
 install_alpha725_nonzero_export_proof_patch()
+install_alpha726_provisional_planning_patch()
 
 EfficientAgileSmartExportManager = _base.EfficientAgileSmartExportManager
 
