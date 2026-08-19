@@ -32,8 +32,13 @@ def test_alpha731_installs_after_alpha730() -> None:
 def test_alpha731_patches_shared_dispatch_target_before_shadow() -> None:
     source = PATCH.read_text(encoding="utf-8")
     assert "dispatch = alpha717._dispatch_targets" in source
-    assert "alpha717._dispatch_targets = _dispatch_targets_with_solar_headroom" in source
-    assert "inverter_headroom = max(config.inverter_limit_kw - routed_solar_ac, 0.0)" in source
+    assert (
+        "alpha717._dispatch_targets = _dispatch_targets_with_solar_headroom" in source
+    )
+    assert (
+        "inverter_headroom = max(config.inverter_limit_kw - routed_solar_ac, 0.0)"
+        in source
+    )
     assert "battery_headroom = min(" in source
     assert '"battery_export_target_kw": round(permitted_export, 3)' in source
     assert '"battery_discharge_target_kw": round(permitted_total, 3)' in source
@@ -51,10 +56,16 @@ def test_alpha731_routes_solar_to_ac_first_while_discharging() -> None:
 def test_alpha731_shadow_and_replay_use_same_solar_ac_headroom() -> None:
     source = PATCH.read_text(encoding="utf-8")
     assert "build_shadow = alpha723.build_agile_shadow_command" in source
-    assert "alpha723.build_agile_shadow_command = _build_shadow_with_solar_aware_ac" in source
+    assert (
+        "alpha723.build_agile_shadow_command = _build_shadow_with_solar_aware_ac"
+        in source
+    )
     assert "replay_base_ac = routed_solar_ac + base_discharge" in source
     assert "candidate_ac = routed_solar_ac + candidate_discharge" in source
-    assert '"basis": "solar_aware_feed_in_first_ac_substitute_candidate_discharge"' in source
+    assert (
+        '"basis": "solar_aware_feed_in_first_ac_substitute_candidate_discharge"'
+        in source
+    )
     assert '"total_kh7_ac_output_kw": round(replay_base_ac, 3)' in source
 
 
