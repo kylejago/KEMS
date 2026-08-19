@@ -69,7 +69,9 @@ def test_consolidated_dashboard_has_nine_simple_navigation_pages() -> None:
     assert len(parsed["views"]) == 9
 
 
-def test_every_legacy_source_view_is_preserved_under_a_product_or_advanced_page() -> None:
+def test_every_legacy_source_view_is_preserved_under_a_product_or_advanced_page() -> (
+    None
+):
     """Simplification must reorganise rich data rather than delete it."""
     module = _load_module()
     source_views = module._split_views(_assembled_source())
