@@ -124,9 +124,10 @@ def _patch_agile_dashboard(content: str) -> str:
         "          **Routing slot:** {{ state_attr(e, 'routing_slot') or '—' }}"
     )
     note = (
-        "\n\n          **House-demand basis:** `sensor.kems_house_load` — the same live "
-        "measurement shown on the Live tab. The digital-twin elapsed-slot "
-        "average is retained separately for simulation evidence."
+        "\n\n          **House-demand basis:** "
+        "`sensor.kems_house_load` — the same live measurement shown on the "
+        "Live tab. The digital-twin elapsed-slot average is retained separately "
+        "for simulation evidence."
     )
     if "**House-demand basis:**" not in block and note_anchor in block:
         block = block.replace(note_anchor, note_anchor + note, 1)
