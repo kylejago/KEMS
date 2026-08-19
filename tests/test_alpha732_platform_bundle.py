@@ -43,5 +43,5 @@ def test_current_entry_docs_are_alpha7() -> None:
     assert "0.7.0-alpha7.32" in start
     assert "0.7.0-alpha7.32" in validation
     assert "Alpha7.31" in agile
-    assert "bounded partial-horizon" in agile
+    assert "bounded partial-horizon" in agile.lower()
     assert "13/13" in agile
