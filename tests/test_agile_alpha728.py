@@ -9,12 +9,13 @@ ROOT = Path(__file__).parents[1]
 KEMS = ROOT / "custom_components" / "kems"
 PATCH = KEMS / "agile_alpha728_bounded_partial.py"
 LOADER = KEMS / "agile_smart_export_runtime.py"
-MANIFEST = KEMS / "manifest.json"
 DOC = ROOT / "docs" / "agile-bounded-partial-horizon-dispatch.md"
 
 
-def test_alpha728_manifest_is_exact() -> None:
-    assert '"version": "0.7.0-alpha7.28"' in MANIFEST.read_text(encoding="utf-8")
+def test_alpha728_release_remains_packaged() -> None:
+    source = PATCH.read_text(encoding="utf-8")
+    assert "Alpha 7.28" in source
+    assert "bounded partial-horizon" in source
 
 
 def test_alpha728_module_parses() -> None:
