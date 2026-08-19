@@ -81,9 +81,7 @@ def build_agile_shadow_command(
     export = max(export, 0.0)
     house = max(house if house is not None else discharge - export, 0.0)
     target_soc = _number(plan.get("target_soc_percent"))
-    target_soc = (
-        config.normal_reserve_percent if target_soc is None else target_soc
-    )
+    target_soc = config.normal_reserve_percent if target_soc is None else target_soc
     solar = max(
         _number(getattr(simulation, "current_simulated_solar_power_kw", None)) or 0.0,
         0.0,
@@ -410,7 +408,9 @@ def install_alpha723_shadow_patch() -> None:
                 return
             await self._store.async_save(
                 {
-                    "settled_half_hours": self._settled[-shadow_module.MAX_SETTLED_SLOTS :],
+                    "settled_half_hours": self._settled[
+                        -shadow_module.MAX_SETTLED_SLOTS :
+                    ],
                     "decisions": self._decisions[-shadow_module.MAX_DECISIONS :],
                     "agile_decisions": list(getattr(self, "_agile_decisions", []))[
                         -MAX_AGILE_DECISIONS:
