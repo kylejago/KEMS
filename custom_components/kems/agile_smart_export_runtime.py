@@ -27,9 +27,9 @@ from .agile_alpha720_preinstall import install_alpha720_preinstall_patch  # noqa
 from .agile_alpha722_horizon import install_alpha722_price_horizon_patch  # noqa: E402
 from .agile_alpha723_shadow import install_alpha723_shadow_patch  # noqa: E402
 from .agile_alpha724_outcome import install_alpha724_outcome_parity_patch  # noqa: E402
-from .agile_alpha725_nonzero import (
+from .agile_alpha725_nonzero import (  # noqa: E402
     install_alpha725_nonzero_export_proof_patch,
-)  # noqa: E402
+)
 from .agile_dashboard_yaml_guard import install_dashboard_yaml_guard  # noqa: E402
 from .agile_rolling_replan import install_rolling_replan_patch  # noqa: E402
 from .agile_smart_export_live import install_live_scenario_patch  # noqa: E402
