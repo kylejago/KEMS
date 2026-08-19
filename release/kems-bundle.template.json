@@ -15,7 +15,7 @@
       "delivery": "kems_core"
     },
     "panel": {
-      "version": "0.7.0-alpha7-panel4",
+      "version": "0.7.0-alpha7-panel5",
       "required": false,
       "delivery": "kems_core"
     },
@@ -37,20 +37,19 @@
     "public_web": {
       "version": "0.7.0-alpha7-web.13",
       "required": false,
-      "delivery": "ionos-deploy-now"
+      "delivery": "ionos-sftp"
     }
   },
   "maintenance": {
     "required": true,
-    "reason": "Activate KEMS __RELEASE_VERSION__ and its coordinated property Web/Pi components",
+    "reason": "Activate KEMS __RELEASE_VERSION__ and automatically install the managed Panel5 display update",
     "expected_downtime_minutes": 5,
     "home_assistant_restart_required": true,
     "reboot_required": false,
     "affected_components": [
       "kems_core",
       "dashboard",
-      "property_web",
-      "pi_agent"
+      "panel"
     ]
   }
 }

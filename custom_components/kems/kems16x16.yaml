@@ -4,7 +4,7 @@ substitutions:
   device_name: kems16x16
   friendly_name: "KEMS16x16"
   led_pin: GPIO21
-  panel_config_version: "0.7.0-alpha7-panel4"
+  panel_config_version: "0.7.0-alpha7-panel5"
   kems_status: sensor.kems_status
   live_battery_soc: sensor.kems_battery_state_of_charge
   live_battery_power: sensor.kems_battery_power
@@ -676,9 +676,12 @@ display:
         solar_to_home_active ||
         battery_charge_from_solar ||
         export_from_solar;
+      const bool battery_to_bus_active =
+        battery_discharging ||
+        export_from_battery;
       const bool source_grid_active = grid_importing;
       const bool source_solar_active = solar_bus_active;
-      const bool source_battery_active = battery_discharging;
+      const bool source_battery_active = battery_to_bus_active;
       const bool ev_from_grid =
         ev_charging && source_grid_active;
       const bool ev_from_solar =
@@ -764,7 +767,7 @@ display:
         } else {
           flow_horizontal(11, 8, 14, 9, WHITE, WHITE, +1);
         }
-      } else if (battery_discharging) {
+      } else if (battery_to_bus_active) {
         flow_horizontal(11, 8, 14, 9, GREEN, GREEN, -1);
       }
       if (ev_charging) {

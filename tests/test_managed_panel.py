@@ -26,7 +26,7 @@ def test_managed_panel_keeps_known_working_hardware_and_alpha7_modes() -> None:
 def test_managed_panel_exposes_agile_smart_export_simulation() -> None:
     """The panel should render Agile through the same compact scenario protocol."""
     content = PACKAGED.read_text(encoding="utf-8")
-    assert 'panel_config_version: "0.7.0-alpha7-panel4"' in content
+    assert 'panel_config_version: "0.7.0-alpha7-panel5"' in content
     assert '- "Agile Smart Export"' in content
     assert 'display_mode == "Agile Smart Export"' in content
     assert "selected_scenario = 7;" in content
@@ -37,6 +37,21 @@ def test_managed_panel_exposes_agile_smart_export_simulation() -> None:
     assert "float scenario_cost[8]" in content
     assert "flow_state = &id(ha_agile_flow).state;" in content
     assert '"SE=%f,GB=%f,BH=%f,BE=%f,SOC=%f"' in content
+
+
+def test_panel5_routes_battery_export_visually_through_house_bus() -> None:
+    """Battery export must light the battery-to-hub connector without falsifying BH."""
+    content = PACKAGED.read_text(encoding="utf-8")
+    assert "battery_home_power > POWER_DEADBAND_KW" in content
+    assert "battery_export_power > POWER_DEADBAND_KW" in content
+    assert "const bool battery_to_bus_active =" in content
+    assert "battery_discharging ||\n        export_from_battery;" in content
+    assert "const bool source_battery_active = battery_to_bus_active;" in content
+    assert "else if (battery_to_bus_active)" in content
+    assert (
+        "battery_discharging =\n          battery_home_power > POWER_DEADBAND_KW;"
+        in content
+    )
 
 
 def test_kems_startup_refreshes_only_an_existing_panel_config() -> None:
@@ -94,7 +109,7 @@ def test_managed_panel_has_startup_and_ota_completion_animation() -> None:
 def test_managed_panel_reports_firmware_for_ota_verification() -> None:
     """The ESP32 must report the exact managed config version after OTA."""
     content = PACKAGED.read_text(encoding="utf-8")
-    assert 'panel_config_version: "0.7.0-alpha7-panel4"' in content
+    assert 'panel_config_version: "0.7.0-alpha7-panel5"' in content
     assert 'name: "Panel Firmware Version"' in content
     assert "id: panel_firmware_version" in content
     assert 'return {"${panel_config_version}"};' in content
@@ -110,5 +125,5 @@ def test_managed_panel_ota_tracks_queue_and_reconnect_health() -> None:
     )
     assert 'last_ota_result="queued"' in sync
     assert "async_verify_panel_firmware" in sync
-    assert 'PANEL_CONFIG_VERSION = "0.7.0-alpha7-panel4"' in panel_health
+    assert 'PANEL_CONFIG_VERSION = "0.7.0-alpha7-panel5"' in panel_health
     assert 'status="Success"' in panel_health

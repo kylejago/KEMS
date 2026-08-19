@@ -1,20 +1,28 @@
-"""Regression guards for the panel4 release introduced in KEMS alpha7.21."""
+"""Regression guards for the managed-panel release introduced in KEMS alpha7.21."""
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 ROOT = Path(__file__).parents[1]
 KEMS = ROOT / "custom_components" / "kems"
 
 
-def test_panel4_packaged_and_health_versions_remain_aligned() -> None:
+def test_managed_panel_packaged_and_health_versions_remain_aligned() -> None:
     """Later KEMS alphas must keep the packaged panel and verifier in lockstep."""
     panel = (KEMS / "kems16x16.yaml").read_text(encoding="utf-8")
     health = (KEMS / "panel.py").read_text(encoding="utf-8")
 
-    assert 'panel_config_version: "0.7.0-alpha7-panel4"' in panel
-    assert 'PANEL_CONFIG_VERSION = "0.7.0-alpha7-panel4"' in health
+    panel_match = re.search(r'panel_config_version: "([^"]+)"', panel)
+    health_match = re.search(r'PANEL_CONFIG_VERSION = "([^"]+)"', health)
+    assert panel_match is not None
+    assert health_match is not None
+    panel_version = panel_match.group(1)
+    health_version = health_match.group(1)
+    assert panel_version == health_version
+    assert panel_version.startswith("0.7.0-alpha7-panel")
+    assert int(panel_version.rsplit("panel", 1)[1]) >= 4
 
 
 def test_alpha721_panel_uses_a_true_ten_cell_battery_meter() -> None:
