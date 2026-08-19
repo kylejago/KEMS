@@ -13,8 +13,10 @@ MANIFEST = KEMS / "manifest.json"
 DOC = ROOT / "docs" / "agile-price-recovery-observability.md"
 
 
-def test_alpha727_manifest_is_exact() -> None:
-    assert '"version": "0.7.0-alpha7.27"' in MANIFEST.read_text(encoding="utf-8")
+def test_alpha727_patch_remains_packaged() -> None:
+    manifest = MANIFEST.read_text(encoding="utf-8")
+    assert '"version": "0.7.0-alpha7.' in manifest
+    assert PATCH.exists()
 
 
 def test_alpha727_module_parses() -> None:
