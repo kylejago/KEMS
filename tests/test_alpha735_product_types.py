@@ -61,9 +61,9 @@ def test_user_modes_hide_shadow_but_keep_internal_mapping() -> None:
 def test_virtual_scenario_selector_is_advanced_and_disabled_by_default() -> None:
     """Engineering scenarios must remain available without cluttering normal UX."""
     source = SELECT.read_text(encoding="utf-8")
-    assert 'KEMSVirtualScenarioSelect' in source
-    assert 'EntityCategory.DIAGNOSTIC' in source
-    assert '_attr_entity_registry_enabled_default = False' in source
+    assert "KEMSVirtualScenarioSelect" in source
+    assert "EntityCategory.DIAGNOSTIC" in source
+    assert "_attr_entity_registry_enabled_default = False" in source
     assert '_attr_name = "Advanced test scenario"' in source
 
 
@@ -72,7 +72,7 @@ def test_legacy_intelligent_slot_option_is_not_a_default_user_capability() -> No
     source = CONST.read_text(encoding="utf-8")
     assert 'CONF_SYSTEM_TYPE = "system_type"' in source
     assert 'CONF_SYSTEM_TYPE: "full_kems_agile"' in source
-    assert 'CONF_INTELLIGENT_SLOTS_ENABLED: False' in source
+    assert "CONF_INTELLIGENT_SLOTS_ENABLED: False" in source
 
 
 def test_2330_handover_uses_the_same_configured_overnight_window() -> None:
@@ -87,10 +87,10 @@ def test_alpha735_handover_is_reporting_only_and_blocks_display_export() -> None
     """The fix must not change hardware or the proven Agile optimiser."""
     source = PATCH.read_text(encoding="utf-8")
     ast.parse(source)
-    assert 'battery_export = 0.0' in source
+    assert "battery_export = 0.0" in source
     assert '"dispatch_mode": "cheap_charge"' in source
     assert '"cheap overnight import / charge"' in source
-    assert 'rolling export candidate suppressed' in source
+    assert "rolling export candidate suppressed" in source
     assert '"hardware_writes": "blocked"' in source
     assert "safe_to_write_hardware = True" not in source
     assert ".services.async_call(" not in source
