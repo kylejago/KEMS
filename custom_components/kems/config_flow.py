@@ -177,10 +177,7 @@ TARIFF_MODE_SELECTOR = _select(
 )
 
 SYSTEM_TYPE_SELECTOR = _select(
-    [
-        (key, SYSTEM_TYPE_DEFINITIONS[key].label)
-        for key in SYSTEM_TYPES
-    ]
+    [(key, SYSTEM_TYPE_DEFINITIONS[key].label) for key in SYSTEM_TYPES]
 )
 
 USER_MODE_SELECTOR = _select(
