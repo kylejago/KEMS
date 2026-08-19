@@ -42,7 +42,7 @@
   },
   "maintenance": {
     "required": true,
-    "reason": "Activate the KEMS Alpha7.32 platform cleanup bundle across Home Assistant and the KEMS property appliance",
+    "reason": "Activate KEMS __RELEASE_VERSION__ and its coordinated property Web/Pi components",
     "expected_downtime_minutes": 5,
     "home_assistant_restart_required": true,
     "reboot_required": false,
