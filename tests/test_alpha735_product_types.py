@@ -3,22 +3,12 @@
 from __future__ import annotations
 
 import ast
+import importlib.util
 import json
+import sys
 from datetime import datetime, time
 from pathlib import Path
 from zoneinfo import ZoneInfo
-
-from custom_components.kems.product_types import (
-    SYSTEM_TYPE_BATTERY_SOLAR,
-    SYSTEM_TYPE_FULL_KEMS,
-    SYSTEM_TYPE_FULL_KEMS_AGILE,
-    SYSTEM_TYPE_LIVE_DATA,
-    SYSTEM_TYPES,
-    effective_operating_mode,
-    internal_mode_from_user,
-    user_mode_from_internal,
-)
-from custom_components.kems.tariff import manual_schedule
 
 ROOT = Path(__file__).parents[1]
 KEMS = ROOT / "custom_components" / "kems"
@@ -27,7 +17,34 @@ PATCH = KEMS / "agile_alpha735_cheap_handover.py"
 RUNTIME = KEMS / "agile_smart_export_runtime.py"
 SELECT = KEMS / "select.py"
 CONST = KEMS / "const.py"
+PRODUCT_TYPES = KEMS / "product_types.py"
+TARIFF = KEMS / "tariff.py"
 LONDON = ZoneInfo("Europe/London")
+
+
+def _load_pure_module(name: str, path: Path):
+    """Load one pure helper without importing the Home Assistant package."""
+    spec = importlib.util.spec_from_file_location(name, path)
+    assert spec is not None
+    assert spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+product_types = _load_pure_module("kems_alpha735_product_types_test", PRODUCT_TYPES)
+tariff = _load_pure_module("kems_alpha735_tariff_test", TARIFF)
+
+SYSTEM_TYPE_BATTERY_SOLAR = product_types.SYSTEM_TYPE_BATTERY_SOLAR
+SYSTEM_TYPE_FULL_KEMS = product_types.SYSTEM_TYPE_FULL_KEMS
+SYSTEM_TYPE_FULL_KEMS_AGILE = product_types.SYSTEM_TYPE_FULL_KEMS_AGILE
+SYSTEM_TYPE_LIVE_DATA = product_types.SYSTEM_TYPE_LIVE_DATA
+SYSTEM_TYPES = product_types.SYSTEM_TYPES
+effective_operating_mode = product_types.effective_operating_mode
+internal_mode_from_user = product_types.internal_mode_from_user
+user_mode_from_internal = product_types.user_mode_from_internal
+manual_schedule = tariff.manual_schedule
 
 
 def test_four_user_facing_product_types_are_stable() -> None:
