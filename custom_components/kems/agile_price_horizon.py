@@ -109,9 +109,7 @@ def remaining_price_horizon(
         day += timedelta(days=1)
 
     missing = [
-        item
-        for item in expected
-        if _parse_timestamp(item["valid_from"]) not in known
+        item for item in expected if _parse_timestamp(item["valid_from"]) not in known
     ]
     current_known = any(
         (start := _parse_timestamp(item.get("valid_from"))) is not None
