@@ -21,9 +21,11 @@ LONDON = ZoneInfo("Europe/London")
 
 
 def test_alpha734_release_identity() -> None:
-    """The deadline guard must ship as its own automatic-update release."""
+    """The deadline guard must remain installed in Alpha7.34 and later."""
     manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
-    assert manifest["version"] == "0.7.0-alpha7.34"
+    version = manifest["version"]
+    assert version.startswith("0.7.0-alpha7.")
+    assert int(version.rsplit(".", 1)[1]) >= 34
 
 
 def test_alpha734_patch_parses_and_installs_after_alpha731() -> None:
