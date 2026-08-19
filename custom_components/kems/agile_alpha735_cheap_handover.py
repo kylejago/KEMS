@@ -92,10 +92,6 @@ def _cheap_snapshot(self, state: dict[str, Any]) -> dict[str, Any] | None:
     if total_site_import is not None:
         grid_import = max(total_site_import, 0.0)
 
-    # The cheap-window simulation is authoritative for current routing. The
-    # normal engine already blocks deliberate battery export here; clamp the
-    # display as a second reporting guard so a previous rolling candidate can
-    # never leak across the boundary.
     battery_export = 0.0
     grid_to_battery = max(battery_charge - solar_to_battery, 0.0)
     solar_export = max(grid_export - battery_export, 0.0)
@@ -116,7 +112,7 @@ def _cheap_snapshot(self, state: dict[str, Any]) -> dict[str, Any] | None:
         "available": True,
         "version": "0.7.0-alpha7.35",
         "generated_at": now.isoformat(),
-        "routing_basis": "current coordinator routing snapshot — overnight cheap handover",
+        "routing_basis": "current routing snapshot — overnight cheap handover",
         "routing_slot": slot.get("label") if isinstance(slot, dict) else None,
         "routing_valid_from": (
             slot.get("valid_from") if isinstance(slot, dict) else None
@@ -167,7 +163,7 @@ def _publish_with_cheap_handover(self, state: dict[str, Any]) -> None:
     if snapshot is None:
         return
 
-    now = getattr(self, "_rolling_now")
+    now = self._rolling_now
     _mark_current_slot_cheap(state, now)
     state["current_routing_snapshot"] = snapshot
     state["current_action"] = _ACTION
