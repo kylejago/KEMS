@@ -19,7 +19,9 @@ def test_alpha732_manifest_and_bundle_contract() -> None:
 
 
 def test_alpha732_is_behaviour_freeze_not_another_agile_patch() -> None:
-    runtime = (ROOT / "custom_components/kems/agile_smart_export_runtime.py").read_text()
+    runtime = (
+        ROOT / "custom_components/kems/agile_smart_export_runtime.py"
+    ).read_text()
     assert "install_alpha731_solar_headroom_patch()" in runtime
     assert "alpha732" not in runtime.lower()
 
