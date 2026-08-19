@@ -1,45 +1,43 @@
-# Start here — KEMS 0.7.0-alpha6 scenario comparison
+# Start here — KEMS Alpha7 platform
 
-Alpha6 builds on the proven alpha5 no-export/live-readiness behaviour and adds a parallel **What would today have looked like?** replay engine. The active KEMS strategy is not changed by comparison replay.
+KEMS is currently in the **Observe → Learn → Advise → Simulate → Shadow → Control** development sequence.
 
-## Development branch
+The Alpha7.32 release train is a platform-cleanup and cross-component alignment release. Its behavioural baseline is the proven Alpha7.31 Agile Smart Export shadow implementation.
 
-```text
-release/0.7.0-alpha6-scenario-comparison
-```
+## Current coordinated versions
 
-Create the branch from the latest `develop`, apply the alpha6 overlay/patch, then run:
+- KEMS / Home Assistant integration: `0.7.0-alpha7.32`
+- Managed Home Assistant dashboard: `0.7.0-alpha7.32`
+- Managed ESPHome panel: `0.7.0-alpha7-panel4`
+- KEMS property Web / Pi agent: `0.7.0-alpha7-web.13`
+- Public `kems.uk` source: `0.7.0-alpha7-web.13` via IONOS
+
+## Safety boundary
+
+Alpha7.32 does **not** enable real FoxESS writes. Alpha7.31's proven Agile dispatch, inverter-headroom calculation, 10% reserve protection, 13-point independent command validator and strict candidate-applied replay remain the reference behaviour.
+
+Physical control remains blocked until commissioned FoxESS mappings, battery/grid direction, site limits and the real backend pass commissioning.
+
+## Development checks
+
+Run the repository checks before merge/release:
 
 ```powershell
 .\.venv\Scripts\Activate.ps1
-python -m pip install -r requirements-dev.txt
-python -m black .
+python -m black --check --diff .
 python -m ruff check .
 python -m pytest
-python -m pre_commit run --all-files
+python -m compileall -q custom_components tests
 ```
 
-The supplied build passes **136 pytest tests** before local Black/Ruff execution.
+GitHub Actions additionally validates the packaged managed dashboard, hassfest and HACS metadata.
 
-## New comparison scenarios
+## Key documentation
 
-KEMS now replays the same retained demand and tariff observations through:
+- `README.md` — current KEMS overview
+- `docs/agile-smart-export.md` — canonical Agile Smart Export behaviour
+- `docs/platform-release-alpha732.md` — this coordinated platform release
+- `docs/commissioning-checklist.md` — physical-system commissioning gates
+- `docs/control-boundary.md` — real-control safety boundary
 
-1. No system — grid supplies the whole home.
-2. Solar only — solar self-consumption plus paid surplus export, no battery.
-3. Solar + battery — conventional tariff-unaware self-use, no grid charging.
-4. KEMS no-export — solar-aware cheap charging and self-use with deliberate export disabled.
-5. Full KEMS smart control — paid export, cheap charging, home reserve, paced battery export and Power Down optimisation.
-
-Today, Yesterday, 7-day and 30-day summaries are exposed. The Today payload also includes a replay timeline for cumulative-cost graphs. Daily standing charge is included in scenario total cost; it cancels out when comparing savings.
-
-## Dashboards
-
-- `dashboards/kems_compare_builtin.yaml` — standard Home Assistant cards only.
-- `dashboards/kems_compare_advanced.yaml` — full replay graphs using ApexCharts plus Mushroom summary cards.
-
-The advanced dashboard needs **ApexCharts Card** and **Mushroom** from HACS.
-
-## Safety
-
-Alpha6 remains simulation/shadow only. Real FoxESS writes are still hard-blocked until the commissioned backend is mapped and verified.
+Historical one-release Agile proof documents remain under `docs/` as validation history; this file and `docs/agile-smart-export.md` are the current entry points.

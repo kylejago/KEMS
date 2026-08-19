@@ -1,14 +1,40 @@
-# KEMS 0.7.0-alpha6 validation report
+# KEMS Alpha7.32 validation report
 
-Build: `0.7.0-alpha6`
-Branch: `release/0.7.0-alpha6-scenario-comparison`
+Build: `0.7.0-alpha7.32`
 
-## Automated checks
+## Behavioural baseline
 
-- Pytest: **136 passed** in the isolated build environment.
-- Dashboard YAML: validated by the KEMS dashboard regression suite.
-- Python parsing/import regression tests: passed.
-- HACS package-layout regression tests: passed.
-- Scenario comparison regression tests cover all five scenarios, cost reconciliation, replay timeline generation and historical rollups.
+Alpha7.32 is intentionally a platform-contract/cleanup release. The economic and dispatch baseline remains Alpha7.31.
 
-Black, Ruff and pre-commit are not installed in the isolated artifact environment, so run the repository's normal local pre-commit suite before merge. The added Python source is kept within the configured 88-character line length.
+Fresh Alpha7.31 runtime evidence before this cleanup showed:
+
+- genuine non-zero Agile battery export selected by the optimiser;
+- Feed-in First command shape for deliberate export;
+- 13/13 independent shadow-command safety;
+- 100% strict candidate-applied digital-twin tracking at 0.01 kW tolerance;
+- combined solar + battery KH7 AC output held to the 7 kW configured limit;
+- minimum 10% SOC protection retained;
+- real hardware writes blocked.
+
+## Alpha7.32 validation scope
+
+The release must prove:
+
+- manifest and coordinated bundle versions agree;
+- property Web and Pi agent both target `0.7.0-alpha7-web.13`;
+- the public website target is the same Web release but remains externally delivered by IONOS;
+- Panel4 remains the expected firmware because no display behaviour changed;
+- stale Alpha6 root build instructions and the obsolete checksum manifest are removed;
+- Alpha7.31 remains the last installed Agile runtime patch, confirming this cleanup release does not silently alter optimiser/dispatch behaviour.
+
+## Required automated checks
+
+- packaged dashboard current
+- Black
+- Ruff
+- Pytest
+- Python compile
+- hassfest
+- HACS
+
+Real FoxESS writes remain blocked.
