@@ -24,9 +24,9 @@ def test_alpha727_module_parses() -> None:
 def test_alpha727_installs_after_alpha726() -> None:
     loader = LOADER.read_text(encoding="utf-8")
     assert "install_alpha727_price_recovery_patch" in loader
-    assert loader.rindex(
-        "install_alpha727_price_recovery_patch()"
-    ) > loader.rindex("install_alpha726_provisional_planning_patch()")
+    assert loader.rindex("install_alpha727_price_recovery_patch()") > loader.rindex(
+        "install_alpha726_provisional_planning_patch()"
+    )
 
 
 def test_alpha727_bypasses_double_alpha726_retry() -> None:
@@ -82,7 +82,9 @@ def test_alpha727_distinguishes_upstream_gap_from_retrieval_failure() -> None:
     assert '"retrieval_error"' in source
     assert '"primary_fetch_error"' in source
     assert "KEMS could not complete one or more recovery requests" in source
-    assert "Octopus responded successfully but did not publish the target slot" in source
+    assert (
+        "Octopus responded successfully but did not publish the target slot" in source
+    )
 
 
 def test_alpha727_retains_alpha726_diagnostic_compatibility() -> None:
