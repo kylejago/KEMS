@@ -33,7 +33,7 @@ The Full KEMS Agile dashboard exposes:
 - **Weekend Happy Hour start** — date and time of the booked slot;
 - **Weekend Happy Hour duration** — one or two booked hours.
 
-The manual event stays dormant until **Weekend Happy Hour planning** is enabled, so entering a date/time alone cannot alter the Agile plan.
+The manual event stays dormant until **Weekend Happy Hour planning** is enabled, so entering a date/time alone cannot alter the Agile plan. These controls provide planner input only; they do not expose a hardware-write path.
 
 The planner consumes an event with `source: manual`. A future Octopus/Home Assistant provider can supply the same event shape and replace manual entry without redesigning the optimisation policy.
 
