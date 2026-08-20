@@ -113,8 +113,8 @@ def test_alpha735_handover_is_reporting_only_and_blocks_display_export() -> None
     assert ".services.async_call(" not in source
 
 
-def test_alpha735_installs_after_alpha734_without_another_optimizer_patch() -> None:
-    """Alpha7.31/34 policy stays intact; Alpha7.35 is the final display wrapper."""
+def test_alpha735_installs_after_alpha734_and_before_later_reporting_patches() -> None:
+    """Alpha7.35 remains after the deadline guard without changing optimiser policy."""
     runtime = RUNTIME.read_text(encoding="utf-8")
     assert runtime.rindex("install_alpha735_cheap_handover_patch()") > runtime.rindex(
         "install_alpha734_deadline_guard_patch()"
@@ -122,7 +122,9 @@ def test_alpha735_installs_after_alpha734_without_another_optimizer_patch() -> N
     assert "alpha735_optimizer" not in runtime
 
 
-def test_alpha735_release_identity() -> None:
-    """The simplified dashboard ships through the coordinated updater."""
+def test_alpha735_release_identity_is_preserved_by_later_alpha7_builds() -> None:
+    """Later Alpha7 builds must remain on the same compatible release train."""
     manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
-    assert manifest["version"] == "0.7.0-alpha7.35"
+    version = str(manifest["version"])
+    assert version.startswith("0.7.0-alpha7.")
+    assert int(version.rsplit(".", 1)[1]) >= 35
