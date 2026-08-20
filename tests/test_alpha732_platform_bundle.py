@@ -12,9 +12,13 @@ def test_alpha732_platform_contract_is_retained_in_later_alpha7_releases() -> No
     version = str(manifest["version"])
     assert version.startswith("0.7.0-alpha7.")
     assert int(version.rsplit(".", 1)[1]) >= 32
-    assert template["components"]["property_web"]["version"] == "0.7.0-alpha7-web.14"
-    assert template["components"]["pi_agent"]["version"] == "0.7.0-alpha7-web.14"
-    assert template["components"]["public_web"]["version"] == "0.7.0-alpha7-web.14"
+
+    property_web = str(template["components"]["property_web"]["version"])
+    pi_agent = str(template["components"]["pi_agent"]["version"])
+    public_web = str(template["components"]["public_web"]["version"])
+    assert property_web == pi_agent == public_web
+    assert property_web.startswith("0.7.0-alpha7-web.")
+    assert int(property_web.rsplit(".", 1)[1]) >= 14
     assert template["components"]["public_web"]["required"] is False
     assert template["components"]["panel"]["version"] == "0.7.0-alpha7-panel7"
 
