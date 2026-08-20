@@ -21,7 +21,6 @@ def test_alpha738_coordinates_web18_and_approved_brand() -> None:
     approved = ROOT / "docs/assets/kems_full_brand_concept.png"
     assert approved.stat().st_size == 2_156_120
     assert (
-        "67ad8c3ee349a35de23f5a9040ce27c18b5cf347454f777cf1f55a6f905eb01f"
-        in branding
+        "67ad8c3ee349a35de23f5a9040ce27c18b5cf347454f777cf1f55a6f905eb01f" in branding
     )
     assert "not an approved master" in branding
