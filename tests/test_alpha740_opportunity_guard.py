@@ -1,6 +1,50 @@
+import ast
+import math
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
+from typing import Any
 
-from custom_components.kems.agile_alpha740_opportunity_guard import _economic_guard
+ROOT = Path(__file__).resolve().parents[1]
+MODULE = ROOT / "custom_components" / "kems" / "agile_alpha740_opportunity_guard.py"
+
+
+def _load_economic_guard():
+    """Load the pure planning helpers without importing Home Assistant."""
+    tree = ast.parse(MODULE.read_text(encoding="utf-8"))
+    function_names = {
+        "_number",
+        "_dt",
+        "_current_slot",
+        "_remaining_hours",
+        "_economic_guard",
+    }
+    constant_names = {
+        "_EPSILON",
+        "PRICE_ADVANTAGE_PENCE",
+        "UNCERTAINTY_MARGIN_FRACTION",
+    }
+    body: list[ast.stmt] = []
+    for node in tree.body:
+        if isinstance(node, ast.Assign) and any(
+            isinstance(target, ast.Name) and target.id in constant_names
+            for target in node.targets
+        ):
+            body.append(node)
+        elif isinstance(node, ast.FunctionDef) and node.name in function_names:
+            body.append(node)
+
+    isolated = ast.Module(body=body, type_ignores=[])
+    namespace = {
+        "Any": Any,
+        "UTC": UTC,
+        "datetime": datetime,
+        "math": math,
+    }
+    exec(
+        compile(ast.fix_missing_locations(isolated), str(MODULE), "exec"),
+        namespace,
+    )
+    return namespace["_economic_guard"]
 
 
 def _slot(start: datetime, rate: float) -> dict:
@@ -12,6 +56,7 @@ def _slot(start: datetime, rate: float) -> dict:
 
 
 def test_current_better_slot_gets_proactive_export_floor() -> None:
+    economic_guard = _load_economic_guard()
     now = datetime(2026, 8, 20, 14, 10, tzinfo=UTC)
     current = _slot(now.replace(minute=0), 12.27)
     future_a = _slot(now.replace(minute=30), 11.95)
@@ -22,7 +67,7 @@ def test_current_better_slot_gets_proactive_export_floor() -> None:
         "planned_battery_export_kwh": 4.0,
     }
 
-    guard = _economic_guard(state, plan, now=now, effective_kw=7.0)
+    guard = economic_guard(state, plan, now=now, effective_kw=7.0)
 
     assert guard["active"] is True
     assert guard["current_rate_pence"] == 12.27
@@ -31,6 +76,7 @@ def test_current_better_slot_gets_proactive_export_floor() -> None:
 
 
 def test_worse_current_slot_does_not_preempt_better_future_slots() -> None:
+    economic_guard = _load_economic_guard()
     now = datetime(2026, 8, 20, 14, 10, tzinfo=UTC)
     current = _slot(now.replace(minute=0), 8.0)
     future_a = _slot(now.replace(minute=30), 12.0)
@@ -41,7 +87,7 @@ def test_worse_current_slot_does_not_preempt_better_future_slots() -> None:
         "planned_battery_export_kwh": 2.0,
     }
 
-    guard = _economic_guard(state, plan, now=now, effective_kw=7.0)
+    guard = economic_guard(state, plan, now=now, effective_kw=7.0)
 
     assert guard["active"] is False
     assert guard["minimum_current_export_kwh"] == 0
