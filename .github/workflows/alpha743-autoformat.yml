@@ -1,0 +1,32 @@
+name: Alpha7.43 temporary autoformat
+
+on:
+  push:
+    branches:
+      - feature/alpha743-power-down-happy-hour
+    paths:
+      - ".github/workflows/alpha743-autoformat.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/alpha743-power-down-happy-hour
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: python -m pip install black==26.5.1
+      - name: Format Alpha7.43 files and remove temporary workflow
+        run: |
+          python -m black custom_components/kems/agile_alpha743_event_priority.py tests/test_alpha743_event_priority.py
+          git rm .github/workflows/alpha743-autoformat.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- custom_components/kems/agile_alpha743_event_priority.py tests/test_alpha743_event_priority.py
+          git commit -m "Format Alpha7.43 Python changes"
+          git push origin HEAD:feature/alpha743-power-down-happy-hour
