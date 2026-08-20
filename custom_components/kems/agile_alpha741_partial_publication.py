@@ -69,9 +69,7 @@ def _publication_recovery_evidence(
     diagnostics = getattr(self, "_kems_alpha727_price_fetch_diagnostics", None)
     diagnostics = diagnostics if isinstance(diagnostics, dict) else {}
     missing_labels = {
-        str(item)
-        for item in (horizon.get("missing_labels") or [])
-        if str(item).strip()
+        str(item) for item in (horizon.get("missing_labels") or []) if str(item).strip()
     }
     primary_missing = {
         str(item)
