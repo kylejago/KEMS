@@ -15,17 +15,17 @@
       "delivery": "kems_core"
     },
     "panel": {
-      "version": "0.7.0-alpha7-panel6",
+      "version": "0.7.0-alpha7-panel7",
       "required": false,
       "delivery": "kems_core"
     },
     "property_web": {
-      "version": "0.7.0-alpha7-web.13",
+      "version": "0.7.0-alpha7-web.14",
       "required": true,
       "delivery": "kems_pi"
     },
     "pi_agent": {
-      "version": "0.7.0-alpha7-web.13",
+      "version": "0.7.0-alpha7-web.14",
       "required": true,
       "delivery": "kems_pi"
     },
@@ -35,21 +35,23 @@
       "delivery": "kems_pi"
     },
     "public_web": {
-      "version": "0.7.0-alpha7-web.13",
+      "version": "0.7.0-alpha7-web.14",
       "required": false,
       "delivery": "ionos-sftp"
     }
   },
   "maintenance": {
     "required": true,
-    "reason": "Activate KEMS __RELEASE_VERSION__: Panel6 simplified modes, Agile panel-flow parity, complete comparison reporting and Cost & ROI dashboard",
+    "reason": "Activate KEMS __RELEASE_VERSION__: Panel7 migration repair, canonical branding and Web.14 four-product parity",
     "expected_downtime_minutes": 5,
     "home_assistant_restart_required": true,
     "reboot_required": false,
     "affected_components": [
       "kems_core",
       "dashboard",
-      "panel"
+      "panel",
+      "property_web",
+      "pi_agent"
     ]
   }
 }

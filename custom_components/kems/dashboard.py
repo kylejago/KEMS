@@ -31,6 +31,13 @@ PACKAGED_AGILE_DASHBOARD_PATH = Path(__file__).with_name(
 MANAGED_PANEL_FILENAME = "kems16x16.yaml"
 MANAGED_PANEL_HEADER = b"# KEMS-MANAGED-ESPHOME-PANEL"
 PACKAGED_PANEL_PATH = Path(__file__).with_name(MANAGED_PANEL_FILENAME)
+LEGACY_PANEL_MARKERS = (
+    b"name: kems16x16",
+    b'name: "Panel Firmware Version"',
+    b"id: panel_firmware_version",
+)
+PANEL6_VERSION_LINE = b'panel_config_version: "0.7.0-alpha7-panel6"'
+PANEL7_VERSION_LINE = b'panel_config_version: "0.7.0-alpha7-panel7"'
 
 SUPERVISOR_BASE_URL = "http://supervisor"
 ESPHOME_ADDON_SLUGS = (
@@ -82,22 +89,37 @@ def _combined_master_dashboard_bytes() -> bytes:
     return f"{master}\n\n{agile_views}".encode()
 
 
+def _managed_panel_bytes() -> bytes:
+    """Return the Panel7 payload while preserving the proven Panel6 source layout."""
+    source = PACKAGED_PANEL_PATH.read_bytes()
+    if PANEL7_VERSION_LINE in source:
+        return source
+    if PANEL6_VERSION_LINE not in source:
+        raise ValueError("Packaged KEMS panel has an unexpected config version")
+    return source.replace(PANEL6_VERSION_LINE, PANEL7_VERSION_LINE, 1)
+
+
 def _panel_is_kems_managed(target: Path) -> bool:
-    """Return whether the existing panel has already adopted KEMS management."""
+    """Return whether the existing panel is safe for KEMS managed migration."""
     if not target.exists():
         return False
     try:
-        return target.read_bytes().startswith(MANAGED_PANEL_HEADER)
+        content = target.read_bytes()
     except OSError:
         return False
+    if content.startswith(MANAGED_PANEL_HEADER):
+        return True
+    # Panel4/5-era installs can pre-date the management header. Treat only an
+    # unmistakable KEMS16x16 firmware file as managed so those users do not need
+    # a second manual flash merely to enter the Panel7 OTA path.
+    return all(marker in content for marker in LEGACY_PANEL_MARKERS)
 
 
-def _sync_existing_panel_file(source: Path, target: Path) -> bool:
+def _sync_existing_panel_file(source_bytes: bytes, target: Path) -> bool:
     """Refresh an opted-in KEMS panel config without creating one for everyone."""
     if not target.exists():
         return False
 
-    source_bytes = source.read_bytes()
     if target.read_bytes() == source_bytes:
         return False
 
@@ -308,12 +330,13 @@ async def async_sync_managed_dashboard(hass: HomeAssistant) -> bool:
         panel_target,
     )
     try:
+        panel_bytes = await hass.async_add_executor_job(_managed_panel_bytes)
         panel_changed = await hass.async_add_executor_job(
             _sync_existing_panel_file,
-            PACKAGED_PANEL_PATH,
+            panel_bytes,
             panel_target,
         )
-    except OSError:
+    except (OSError, ValueError):
         LOGGER.exception(
             "Unable to update managed KEMS 16x16 panel at %s", panel_target
         )
