@@ -11,6 +11,10 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import CONF_OPERATING_MODE, CONF_SYSTEM_TYPE, CONF_VIRTUAL_SCENARIO
 from .entity import KEMSEntity
+from .happy_hour import (
+    CONF_HAPPY_HOUR_DURATION_HOURS,
+    happy_hour_duration_hours,
+)
 from .kems_core import VIRTUAL_SCENARIOS
 from .product_types import (
     SYSTEM_TYPE_DEFINITIONS,
@@ -34,6 +38,7 @@ async def async_setup_entry(
     entities = [
         KEMSSystemTypeSelect(coordinator),
         KEMSOperatingModeSelect(coordinator),
+        KEMSWeekendHappyHourDurationSelect(coordinator),
         KEMSVirtualScenarioSelect(coordinator),
     ]
     entities.extend(build_update_select_entities(hass, coordinator, entry))
@@ -109,6 +114,36 @@ class KEMSOperatingModeSelect(KEMSEntity, SelectEntity):
             self.coordinator.entry,
             CONF_OPERATING_MODE,
             internal_mode_from_user(option),
+        )
+
+
+class KEMSWeekendHappyHourDurationSelect(KEMSEntity, SelectEntity):
+    """Choose whether one or two booked Weekend Happy Hours are consecutive."""
+
+    _attr_name = "Weekend Happy Hour duration"
+    _attr_icon = "mdi:timer-plus-outline"
+    _attr_options = ["1 hour", "2 hours"]
+
+    def __init__(self, coordinator) -> None:
+        """Initialise the Happy Hour duration selector."""
+        super().__init__(coordinator, "weekend_happy_hour_duration")
+
+    @property
+    def current_option(self) -> str:
+        """Return the currently booked duration."""
+        duration = happy_hour_duration_hours(self.coordinator.entry.options)
+        return f"{duration} hour" if duration == 1 else f"{duration} hours"
+
+    async def async_select_option(self, option: str) -> None:
+        """Persist one or two booked hours and reload the planner."""
+        if option not in self._attr_options:
+            raise HomeAssistantError(f"Unsupported Happy Hour duration: {option}")
+        duration = 2 if option.startswith("2") else 1
+        await async_set_runtime_option(
+            self.hass,
+            self.coordinator.entry,
+            CONF_HAPPY_HOUR_DURATION_HOURS,
+            duration,
         )
 
 
