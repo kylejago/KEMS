@@ -25,12 +25,12 @@ def _load_economic_guard():
     }
     body: list[ast.stmt] = []
     for node in tree.body:
-        if isinstance(node, ast.Assign) and any(
+        constant = isinstance(node, ast.Assign) and any(
             isinstance(target, ast.Name) and target.id in constant_names
             for target in node.targets
-        ):
-            body.append(node)
-        elif isinstance(node, ast.FunctionDef) and node.name in function_names:
+        )
+        helper = isinstance(node, ast.FunctionDef) and node.name in function_names
+        if constant or helper:
             body.append(node)
 
     isolated = ast.Module(body=body, type_ignores=[])
