@@ -15,7 +15,7 @@
       "delivery": "kems_core"
     },
     "panel": {
-      "version": "0.7.0-alpha7-panel5",
+      "version": "0.7.0-alpha7-panel6",
       "required": false,
       "delivery": "kems_core"
     },
@@ -42,13 +42,14 @@
   },
   "maintenance": {
     "required": true,
-    "reason": "Activate KEMS __RELEASE_VERSION__: simplified product types, live-vs-simulated dashboards and Agile overnight handover parity",
+    "reason": "Activate KEMS __RELEASE_VERSION__: Panel6 simplified modes, Agile panel-flow parity, complete comparison reporting and Cost & ROI dashboard",
     "expected_downtime_minutes": 5,
     "home_assistant_restart_required": true,
     "reboot_required": false,
     "affected_components": [
       "kems_core",
-      "dashboard"
+      "dashboard",
+      "panel"
     ]
   }
 }

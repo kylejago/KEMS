@@ -1,15 +1,16 @@
-"""Release regression coverage for Alpha7.33 / managed Panel5."""
+"""Release regression coverage for Alpha7.33 / managed Panel5 and later."""
 
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 KEMS = ROOT / "custom_components" / "kems"
 
 
-def test_alpha733_versions_and_bundle_are_aligned() -> None:
+def test_alpha733_versions_and_bundle_remain_panel5_or_later_aligned() -> None:
     manifest = json.loads((KEMS / "manifest.json").read_text(encoding="utf-8"))
     bundle = json.loads(
         (ROOT / "release" / "kems-bundle.template.json").read_text(encoding="utf-8")
@@ -20,11 +21,17 @@ def test_alpha733_versions_and_bundle_are_aligned() -> None:
     version = str(manifest["version"])
     assert version.startswith("0.7.0-alpha7.")
     assert int(version.rsplit(".", 1)[1]) >= 33
-    assert bundle["components"]["panel"]["version"] == "0.7.0-alpha7-panel5"
+
+    bundle_version = str(bundle["components"]["panel"]["version"])
+    panel_match = re.search(r'PANEL_CONFIG_VERSION = "([^"]+)"', panel)
+    yaml_match = re.search(r'panel_config_version: "([^"]+)"', yaml)
+    assert panel_match is not None
+    assert yaml_match is not None
+    assert bundle_version == panel_match.group(1) == yaml_match.group(1)
+    assert bundle_version.startswith("0.7.0-alpha7-panel")
+    assert int(bundle_version.rsplit("panel", 1)[1]) >= 5
     assert bundle["components"]["panel"]["delivery"] == "kems_core"
     assert bundle["components"]["panel"]["required"] is False
-    assert 'PANEL_CONFIG_VERSION = "0.7.0-alpha7-panel5"' in panel
-    assert 'panel_config_version: "0.7.0-alpha7-panel5"' in yaml
 
 
 def test_alpha733_preserves_alpha731_as_agile_runtime_baseline() -> None:

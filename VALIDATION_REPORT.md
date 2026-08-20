@@ -1,38 +1,44 @@
-# KEMS Alpha7.33 validation report
+# KEMS Alpha7.36 validation report
 
-Build: `0.7.0-alpha7.33`
+Build: `0.7.0-alpha7.36`
 
 ## Behavioural baseline
 
-Alpha7.33 is intentionally a managed-panel/display release. The economic and dispatch baseline remains Alpha7.31.
+Alpha7.36 is a reporting, dashboard and managed-panel release. The proven economic/dispatch stack remains Alpha7.31 plus Alpha7.34 latest-safe-start protection and Alpha7.35 overnight reporting handover.
 
-Fresh Alpha7.31 runtime evidence before this release showed:
+The release must not change:
 
-- genuine non-zero Agile battery export selected by the optimiser;
-- Feed-in First command shape for deliberate export;
-- 13/13 independent shadow-command safety;
-- 100% strict candidate-applied digital-twin tracking at 0.01 kW tolerance;
-- combined solar + battery KH7 AC output held to the 7 kW configured limit;
-- minimum 10% SOC protection retained;
-- real hardware writes blocked.
+- the 7 kW shared inverter ceiling;
+- the 10% minimum SOC reserve;
+- the 13-point independent shadow-command safety validator;
+- strict candidate-applied replay/tracking;
+- the configured overnight schedule as the only cheap-control authority;
+- the real-hardware write block before commissioning.
 
-## Alpha7.33 validation scope
+## Alpha7.36 validation scope
 
 The release must prove:
 
-- manifest and coordinated bundle versions agree;
-- property Web and Pi agent remain on `0.7.0-alpha7-web.13` without an unnecessary Web reinstall;
-- the public website remains externally delivered by IONOS SFTP;
-- Panel5 is the expected managed firmware and is delivered by KEMS core;
-- battery export activates the battery-to-house/AC-bus connector even when `battery_to_home` is zero;
-- `battery_to_home` remains a truthful separate flow rather than being overwritten for display purposes;
-- the established KEMS-managed ESPHome automatic compile, OTA and reconnect verification path remains intact;
-- Alpha7.31 remains the last installed Agile runtime patch, confirming Alpha7.33 does not alter optimiser/dispatch behaviour.
+- manifest and coordinated bundle versions agree on `0.7.0-alpha7.36`;
+- Panel6 is the expected managed firmware and is delivered by KEMS core;
+- Panel6 exposes only Live Data, Battery & Solar, Full KEMS and Full KEMS Agile;
+- Full KEMS Agile panel flow is generated from the final coherent `current_routing_snapshot`, including grid import/export, battery-to-home, battery export and simulated SOC;
+- the legacy Panel5 compact Agile flow entity is also republished from that final snapshot during migration;
+- the established managed ESPHome automatic compile, OTA and reconnect-verification path remains intact;
+- the Compare page uses native observed import cost instead of a literal dash;
+- Full KEMS Agile SOC falls back to the current-routing snapshot and no longer renders blank;
+- genuinely uncommissioned live solar/battery/export values are labelled as awaiting hardware data rather than shown as broken calculations;
+- Winner by period compares the three user-facing simulated products on the common `import cost - export income` basis for today, yesterday, seven days and 30 days;
+- rolling 365-day and all-tracked Agile evidence compare Full KEMS with Full KEMS Agile without inventing unavailable Battery & Solar history;
+- the Cost & ROI page separates actual measured costs from simulated costs and exposes predicted ROI plus the existing actual savings/ROI/payback ledger for post-commissioning use;
+- property Web and Pi agent remain on `0.7.0-alpha7-web.13` and public Web remains IONOS SFTP delivered.
 
 ## Required automated checks
 
-- packaged dashboard current
-- managed Panel5 regression coverage
+- packaged managed-dashboard current
+- Alpha7.36 dashboard composition regression
+- Panel6 simplified-mode and routing-parity regression
+- coordinated bundle regression
 - Black
 - Ruff
 - Pytest
@@ -40,4 +46,4 @@ The release must prove:
 - hassfest
 - HACS
 
-Real FoxESS writes remain blocked.
+Real FoxESS writes remain blocked until commissioning passes.
