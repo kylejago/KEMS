@@ -82,12 +82,17 @@ def test_power_down_is_absolute_priority_over_agile_price() -> None:
     assert "_apply_power_down_to_plan" in source
 
 
-def test_happy_hour_uses_best_known_pre_event_slots_and_reoptimises_afterwards() -> None:
+def test_happy_hour_uses_best_known_pre_event_slots_and_reoptimises_afterwards() -> (
+    None
+):
     source = EVENTS.read_text(encoding="utf-8")
 
     assert "_candidate_prep_slots" in source
     assert '"happy_hour_headroom_preparation": True' in source
-    assert '"unknown_price_policy": "never guess a pre/post Happy Hour Agile price"' in source
+    assert (
+        '"unknown_price_policy": "never guess a pre/post Happy Hour Agile price"'
+        in source
+    )
     assert "best_known_post_happy_hour_export_slot" in source
     assert "happy_hour_adjusted_soc_percent" in source
     assert '"mode": "happy_hour_charge"' in source

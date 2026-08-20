@@ -81,7 +81,9 @@ def _dt(value: Any) -> datetime | None:
     if value is None:
         return None
     try:
-        parsed = value if isinstance(value, datetime) else datetime.fromisoformat(str(value))
+        parsed = (
+            value if isinstance(value, datetime) else datetime.fromisoformat(str(value))
+        )
     except (TypeError, ValueError):
         return None
     if parsed.tzinfo is None:
@@ -196,7 +198,9 @@ def _power_down_context(
         "available": True,
         "joined": True,
         "active": active,
-        "status": "Active — absolute priority" if active else "Reserved — absolute priority",
+        "status": (
+            "Active — absolute priority" if active else "Reserved — absolute priority"
+        ),
         "start": start.isoformat(),
         "end": end.isoformat(),
         "duration_hours": round(duration, 3),
@@ -344,7 +348,10 @@ def _trim_selected_for_power_down(
         item["power_down_priority_limited"] = kept + _EPSILON < energy
         output.append(item)
         remaining -= kept
-    output.sort(key=lambda value: _dt(value.get("valid_from")) or datetime.max.replace(tzinfo=UTC))
+    output.sort(
+        key=lambda value: _dt(value.get("valid_from"))
+        or datetime.max.replace(tzinfo=UTC)
+    )
     return output
 
 
@@ -485,7 +492,10 @@ def _candidate_prep_slots(
             {
                 "valid_from": start.isoformat(),
                 "valid_to": end.isoformat(),
-                "label": str(slot.get("label") or start.astimezone(agile.LONDON).strftime("%H:%M")),
+                "label": str(
+                    slot.get("label")
+                    or start.astimezone(agile.LONDON).strftime("%H:%M")
+                ),
                 "rate_pence": round(rate, 5),
                 "capacity_kwh": max(slot_kw * hours, 0.0),
             }
@@ -510,7 +520,10 @@ def _candidate_prep_slots(
             }
         )
         remaining -= allocation
-    selected.sort(key=lambda value: _dt(value.get("valid_from")) or datetime.max.replace(tzinfo=UTC))
+    selected.sort(
+        key=lambda value: _dt(value.get("valid_from"))
+        or datetime.max.replace(tzinfo=UTC)
+    )
     return selected, round(max(remaining, 0.0), 3)
 
 
@@ -542,7 +555,9 @@ def _best_post_happy_hour_slot(
     rate, start, slot = max(candidates, key=lambda value: value[0])
     return {
         "valid_from": start.isoformat(),
-        "label": str(slot.get("label") or start.astimezone(agile.LONDON).strftime("%H:%M")),
+        "label": str(
+            slot.get("label") or start.astimezone(agile.LONDON).strftime("%H:%M")
+        ),
         "rate_pence": round(rate, 5),
     }
 
@@ -806,7 +821,9 @@ def _apply_happy_hour_to_plan(
                 "dispatch_action": "Weekend Happy Hour — maximum safe free-grid charge",
                 "selected_slots": [],
                 "planned_battery_export_kwh": 0.0,
-                "next_export_slot": context.get("best_known_post_happy_hour_export_slot"),
+                "next_export_slot": context.get(
+                    "best_known_post_happy_hour_export_slot"
+                ),
                 "current_battery_export_target_kw": 0.0,
                 "current_battery_discharge_target_kw": 0.0,
                 "current_battery_charge_target_kw": context.get("charge_target_kw"),
@@ -854,7 +871,9 @@ def _apply_happy_hour_to_plan(
     return plan
 
 
-def _active_happy_hour_routing(self, context: dict[str, Any], config: SimulationConfig) -> dict[str, float]:
+def _active_happy_hour_routing(
+    self, context: dict[str, Any], config: SimulationConfig
+) -> dict[str, float]:
     """Return simple current routing for the focused graph during free charging."""
     house = _recent_house_load_kw(self)
     solar = _current_solar_kw(self, config)
@@ -1146,7 +1165,9 @@ def install_alpha743_event_priority_patch() -> None:
 
             original_publish(self, state)
 
-            rolling_state = self._hass.states.get("sensor.kems_agile_rolling_export_plan")
+            rolling_state = self._hass.states.get(
+                "sensor.kems_agile_rolling_export_plan"
+            )
             rolling_attrs = (
                 dict(rolling_state.attributes) if rolling_state is not None else {}
             )
