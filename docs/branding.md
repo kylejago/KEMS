@@ -1,35 +1,38 @@
 # KEMS branding
 
-KEMS has one canonical brand family across Home Assistant, the property Pi, `kems.uk`, GitHub, the companion app, installers and future hardware backends.
+KEMS has one canonical brand family across Home Assistant, the property Pi, `kems.uk`, GitHub, companion applications, installers and future hardware backends.
 
-## Canonical master — approved artwork
+## Canonical master — exact supplied SVG
 
-`docs/assets/kems_full_brand_concept.png` is the **source of truth** for the KEMS visual identity. It is the exact approved artwork: blue house/roof, yellow sun, blue solar panel, green battery/energy arrow and plug, the blue-to-green **KEMS** wordmark, and the **Kyle Energy Management System** subtitle.
+`docs/assets/kems-logo-master.svg` is the **single source of truth** for the KEMS visual identity.
 
-The file is 2,156,120 bytes and its SHA-256 is:
+The canonical file is the exact SVG supplied and approved for KEMS. It must be copied or mechanically rasterised; it must not be redrawn, reinterpreted or replaced with an older KEMS concept.
 
-`67ad8c3ee349a35de23f5a9040ce27c18b5cf347454f777cf1f55a6f905eb01f`
+- Size: **877 bytes**
+- SHA-256: `ef53e22bdff4e4ebd81007c3a6d5f28da0384f547e9036a7be7e3bf2d420b464`
 
-`docs/assets/kems-logo-master.svg` is retained only as a historical/redrawn approximation. It is **not** an approved master and must not be used on user-facing surfaces.
-
-Any website/header/icon variant must be a crop, scale, mask or other mechanical derivative of the approved PNG. Do not redraw the house, solar, battery, plug, wordmark or subtitle.
+`docs/assets/kems_full_brand_concept.png` is retained only as historical/presentation artwork. It is **not** the canonical logo and must not replace the SVG on user-facing surfaces.
 
 ## Product variants
 
-- `custom_components/kems/brand/icon.png` — compact Home Assistant/HACS icon where a square asset is required.
-- `custom_components/kems/brand/logo.png` — compact Home Assistant logo where the full approved artwork is not practical.
-- The 16×16 panel uses a deliberately simplified pixel treatment because the physical resolution cannot reproduce the approved artwork.
+- `custom_components/kems/brand/icon.png` — 256×256 mechanical rasterisation of the canonical SVG for Home Assistant/HACS square artwork.
+- `custom_components/kems/brand/logo.png` — 512×512 mechanical rasterisation of the canonical SVG where Home Assistant requires raster artwork.
+- The 16×16 physical panel may use a resolution-specific pixel treatment because it cannot reproduce the SVG faithfully.
 
-Compact variants are resolution-specific derivatives, not alternate logos.
+The raster files are derivatives, not alternate logos.
 
 ## Web and Pi distribution
 
-From KEMS Web.18 onward, KEMS Web obtains the approved PNG directly from this repository, verifies the SHA-256 above, and distributes that exact file with both the property appliance and public `kems.uk` build.
+From KEMS Web.19 onward, `KEMS-Web/brand/kems-logo.svg` and the user-facing `public` / `public-site` SVG assets are byte-for-byte copies of this canonical master.
 
-The Web `brand-lockup.svg` and `logo.svg` files are crop wrappers only: they display regions of the approved PNG and contain no redrawn KEMS artwork. This keeps the exact approved image authoritative while still supporting wide header and compact icon slots.
+The same exact SVG is used on the property dashboard, Remote Access, setup/loading surfaces, `kems.uk`, the delayed demo, property sign-in and Pi first boot. Web.19 also advances the PWA cache so older branding is not pinned after upgrade.
 
-The same approved source is used by property headers, loading states, Remote Access setup, `kems.uk`, demo/login/privacy/404 pages and setup/install experiences.
+## Public demo and property login
 
-## Home Assistant and hardware
+Web.19 adds a deliberately sanitised public demo feed delayed by at least seven days. It exposes aggregate evidence only and does not expose Home Assistant credentials, entity IDs, device identifiers, live control or Pi-management APIs.
 
-Branding changes do not alter KEMS optimisation, tariffs, safety interlocks, panel control or FoxESS write protection. Real FoxESS writes remain governed by the existing commissioning and safety gates.
+Property sign-in is handled by Cloudflare Access/App Launcher rather than a KEMS password database. Property tunnels continue to expose the read-only KEMS Web origin only; local Pi-management and Home Assistant control boundaries remain private.
+
+## Home Assistant and hardware safety
+
+Branding, demo and login changes do not alter KEMS optimisation, tariffs, Panel7 behaviour, safety interlocks or FoxESS control gates. Real FoxESS writes remain governed by the existing commissioning and safety protections.
