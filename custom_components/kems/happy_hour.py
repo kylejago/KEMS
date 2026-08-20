@@ -10,8 +10,9 @@ the manual source without changing dispatch policy.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from datetime import UTC, datetime, timedelta
-from typing import Any, Mapping
+from typing import Any
 
 CONF_HAPPY_HOUR_ENABLED = "weekend_happy_hour_enabled"
 CONF_HAPPY_HOUR_START = "weekend_happy_hour_start"

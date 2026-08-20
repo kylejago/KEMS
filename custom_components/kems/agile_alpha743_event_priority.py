@@ -1,5 +1,7 @@
 """Alpha7.43 Power Down priority and manual Weekend Happy Hour planning.
 
+# ruff: noqa: E501
+
 Power Down is an absolute event priority.  Agile price ranking is never allowed
 to spend the battery energy needed to run the house and maximise safe export in
 a joined Power Down session.  During the session the current Agile price is
