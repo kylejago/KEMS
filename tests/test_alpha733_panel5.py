@@ -30,7 +30,10 @@ def test_alpha733_versions_and_bundle_remain_panel5_or_later_aligned() -> None:
     assert yaml_match is not None
     assert bundle_version == panel_match.group(1) == "0.7.0-alpha7-panel7"
     assert yaml_match.group(1) == "0.7.0-alpha7-panel6"
-    assert 'PANEL7_VERSION_LINE = b\'panel_config_version: "0.7.0-alpha7-panel7"\'' in dashboard
+    assert (
+        'PANEL7_VERSION_LINE = b\'panel_config_version: "0.7.0-alpha7-panel7"\''
+        in dashboard
+    )
     assert "source.replace(PANEL6_VERSION_LINE, PANEL7_VERSION_LINE, 1)" in dashboard
     assert bundle_version.startswith("0.7.0-alpha7-panel")
     assert int(bundle_version.rsplit("panel", 1)[1]) >= 5
