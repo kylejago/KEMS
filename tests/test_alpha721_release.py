@@ -35,10 +35,11 @@ def test_alpha721_panel_uses_a_true_ten_cell_battery_meter() -> None:
     assert "rect(15, 7, 16, 8, pulse(GREEN));" not in panel
 
 
-def test_alpha721_preserves_agile_panel_scenario() -> None:
+def test_alpha721_preserves_agile_panel_capability() -> None:
+    """Later panel UX may rename Agile, but the Agile routing capability remains."""
     panel = (KEMS / "kems16x16.yaml").read_text(encoding="utf-8")
 
-    assert '- "Agile Smart Export"' in panel
+    assert '- "Full KEMS Agile"' in panel
     assert "sensor.kems_agile_smart_export_cost_today" in panel
-    assert "sensor.kems_agile_smart_export_flow_now" in panel
+    assert "sensor.kems_panel_full_kems_agile_flow_now" in panel
     assert "sensor.kems_compare_solar_and_battery_flow_now" in panel
