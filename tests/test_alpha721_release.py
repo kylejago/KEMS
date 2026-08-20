@@ -24,11 +24,11 @@ def test_managed_panel_packaged_source_promotes_to_current_health_version() -> N
     assert source_version == "0.7.0-alpha7-panel6"
     assert health_version == "0.7.0-alpha7-panel7"
     assert (
-        'PANEL6_VERSION_LINE = b\'panel_config_version: "0.7.0-alpha7-panel6"\''
+        "PANEL6_VERSION_LINE = b'panel_config_version: \"0.7.0-alpha7-panel6\"'"
         in dashboard
     )
     assert (
-        'PANEL7_VERSION_LINE = b\'panel_config_version: "0.7.0-alpha7-panel7"\''
+        "PANEL7_VERSION_LINE = b'panel_config_version: \"0.7.0-alpha7-panel7\"'"
         in dashboard
     )
     assert "source.replace(PANEL6_VERSION_LINE, PANEL7_VERSION_LINE, 1)" in dashboard
@@ -41,10 +41,7 @@ def test_alpha721_panel_uses_a_true_ten_cell_battery_meter() -> None:
 
     assert "Ten physical battery cells: 10% per cell" in panel
     assert "const int battery_cols[10]" in panel
-    assert (
-        "const int battery_rows[10] = {11, 11, 10, 10, 9, 9, 8, 8, 7, 7};"
-        in panel
-    )
+    assert "const int battery_rows[10] = {11, 11, 10, 10, 9, 9, 8, 8, 7, 7};" in panel
     assert "const int full_cells = (int) floorf(soc / 10.0f);" in panel
     assert "rect(15, 7, 16, 8, pulse(GREEN));" not in panel
 
