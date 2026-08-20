@@ -42,7 +42,7 @@
   },
   "maintenance": {
     "required": true,
-    "reason": "Activate KEMS __RELEASE_VERSION__: Full KEMS Agile primary optimiser/dashboard, expanded strategy comparison and Web.20 parity",
+    "reason": "Activate KEMS __RELEASE_VERSION__: progressive Agile partial-publication planning with bounded unknown-slot reserve",
     "expected_downtime_minutes": 5,
     "home_assistant_restart_required": true,
     "reboot_required": false,
