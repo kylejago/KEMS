@@ -1,0 +1,5 @@
+KEMS Alpha7.39 canonical brand hashes
+
+master SVG  ef53e22bdff4e4ebd81007c3a6d5f28da0384f547e9036a7be7e3bf2d420b464  docs/assets/kems-logo-master.svg
+HA icon PNG f3c68f1a2e73c190b9415bf6abe0a3c590a38b298321af668a5ec3325c7bae90  custom_components/kems/brand/icon.png
+HA logo PNG 08e45c44b1f509f49256a8378d0680196f89d77b8d19ce74467a00a62ce01d77  custom_components/kems/brand/logo.png
