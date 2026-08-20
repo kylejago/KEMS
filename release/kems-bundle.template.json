@@ -20,12 +20,12 @@
       "delivery": "kems_core"
     },
     "property_web": {
-      "version": "0.7.0-alpha7-web.19",
+      "version": "0.7.0-alpha7-web.20",
       "required": true,
       "delivery": "kems_pi"
     },
     "pi_agent": {
-      "version": "0.7.0-alpha7-web.19",
+      "version": "0.7.0-alpha7-web.20",
       "required": true,
       "delivery": "kems_pi"
     },
@@ -35,14 +35,14 @@
       "delivery": "kems_pi"
     },
     "public_web": {
-      "version": "0.7.0-alpha7-web.19",
+      "version": "0.7.0-alpha7-web.20",
       "required": false,
       "delivery": "ionos-sftp"
     }
   },
   "maintenance": {
     "required": true,
-    "reason": "Activate KEMS __RELEASE_VERSION__: Panel7 retained, exact supplied SVG branding and Web.19 delayed-demo/login coordination",
+    "reason": "Activate KEMS __RELEASE_VERSION__: Full KEMS Agile primary optimiser/dashboard, expanded strategy comparison and Web.20 parity",
     "expected_downtime_minutes": 5,
     "home_assistant_restart_required": true,
     "reboot_required": false,

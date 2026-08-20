@@ -55,12 +55,18 @@ from .agile_alpha735_cheap_handover import (  # noqa: E402
     install_alpha735_cheap_handover_patch,
 )
 from .agile_alpha736_panel_flow import install_alpha736_panel_flow_patch  # noqa: E402
+from .agile_alpha740_opportunity_guard import (  # noqa: E402
+    install_alpha740_opportunity_guard_patch,
+)
 from .agile_dashboard_yaml_guard import install_dashboard_yaml_guard  # noqa: E402
 from .agile_rolling_replan import install_rolling_replan_patch  # noqa: E402
 from .agile_smart_export_live import install_live_scenario_patch  # noqa: E402
 from .agile_smart_export_runtime_base import *  # noqa: E402,F403
 from .dashboard_alpha736_finance import (  # noqa: E402
     install_alpha736_finance_dashboard_patch,
+)
+from .dashboard_alpha740_agile_primary import (  # noqa: E402
+    install_alpha740_agile_primary_dashboard_patch,
 )
 from .dashboard_consolidation import install_dashboard_consolidation  # noqa: E402
 
@@ -91,6 +97,8 @@ install_alpha734_deadline_guard_patch()
 install_alpha735_cheap_handover_patch()
 install_alpha736_panel_flow_patch()
 install_alpha736_finance_dashboard_patch()
+install_alpha740_opportunity_guard_patch()
+install_alpha740_agile_primary_dashboard_patch()
 
 EfficientAgileSmartExportManager = _base.EfficientAgileSmartExportManager
 
