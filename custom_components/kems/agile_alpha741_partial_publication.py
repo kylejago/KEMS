@@ -28,7 +28,7 @@ and the hard FoxESS write block remain unchanged.
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from . import agile_alpha728_bounded_partial as alpha728
@@ -37,7 +37,6 @@ from . import agile_smart_export_runtime_base as runtime
 from .agile_price_horizon import missing_slots_for_day
 
 _TOMORROW_SENSOR = "sensor.kems_agile_tomorrow_publication_plan"
-_EPSILON = 1e-6
 
 
 def _parse_utc(value: Any) -> datetime | None:
@@ -154,7 +153,7 @@ def _progressive_tomorrow_state(self, state: dict[str, Any]) -> dict[str, Any]:
         }
 
     local_now = generated.astimezone(agile.LONDON)
-    tomorrow = local_now.date() + agile.timedelta(days=1)
+    tomorrow = local_now.date() + timedelta(days=1)
     slots = state.get("tomorrow_slots")
     slots = slots if isinstance(slots, list) else []
     missing = missing_slots_for_day(slots, tomorrow, agile.LONDON)
