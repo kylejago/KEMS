@@ -41,9 +41,7 @@ _AGILE_VIEW_START = (
     "    icon: mdi:transmission-tower-export\n"
 )
 _COMPARE_VIEW_START = (
-    "  - title: Compare\n"
-    "    path: compare\n"
-    "    icon: mdi:compare-horizontal\n"
+    "  - title: Compare\n" "    path: compare\n" "    icon: mdi:compare-horizontal\n"
 )
 
 _REPLACEMENTS = {
@@ -152,7 +150,9 @@ def install_alpha742_live_graph_telemetry_patch() -> None:
     if not getattr(publish, "_kems_alpha742_live_graph", False):
         alpha742_live_original_publish = publish
         _publish_with_alpha742_live_graph._kems_alpha742_live_graph = True
-        runtime.EfficientAgileSmartExportManager._publish = _publish_with_alpha742_live_graph
+        runtime.EfficientAgileSmartExportManager._publish = (
+            _publish_with_alpha742_live_graph
+        )
 
     shutdown = runtime.EfficientAgileSmartExportManager.async_shutdown
     if not getattr(shutdown, "_kems_alpha742_live_graph", False):
