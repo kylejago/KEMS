@@ -15,8 +15,8 @@ The canonical file is the exact SVG supplied and approved for KEMS. It must be c
 
 ## Product variants
 
-- `custom_components/kems/brand/icon.png` — 256×256 mechanical rasterisation of the canonical SVG for Home Assistant/HACS square artwork.
-- `custom_components/kems/brand/logo.png` — 512×512 mechanical rasterisation of the canonical SVG where Home Assistant requires raster artwork.
+- `custom_components/kems/brand/icon.png` — 256×256 optimised mechanical rasterisation of the canonical SVG for Home Assistant/HACS square artwork.
+- `custom_components/kems/brand/logo.png` — 256×256 optimised mechanical rasterisation of the same canonical SVG for Home Assistant raster artwork.
 - The 16×16 physical panel may use a resolution-specific pixel treatment because it cannot reproduce the SVG faithfully.
 
 The raster files are derivatives, not alternate logos.
