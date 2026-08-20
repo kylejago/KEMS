@@ -88,7 +88,7 @@ def test_alpha736_reporting_patches_install_after_alpha735() -> None:
     assert runtime.rindex("install_alpha736_panel_flow_patch()") > runtime.rindex(
         "install_alpha735_cheap_handover_patch()"
     )
-    assert runtime.rindex("install_alpha736_finance_dashboard_patch()") > runtime.rindex(
-        "install_alpha736_panel_flow_patch()"
-    )
+    assert runtime.rindex(
+        "install_alpha736_finance_dashboard_patch()"
+    ) > runtime.rindex("install_alpha736_panel_flow_patch()")
     assert "alpha736_optimizer" not in runtime

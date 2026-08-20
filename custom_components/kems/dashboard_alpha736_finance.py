@@ -4,7 +4,6 @@
 
 from __future__ import annotations
 
-
 _WINNER_CARD = r"""      - type: markdown
         title: Winner by period — user-facing KEMS products
         content: |
@@ -201,9 +200,13 @@ def improve_alpha736_dashboard(content: str) -> str:
     new_soc = "| Battery SOC % | {{ states('sensor.kems_battery_state_of_charge') if states('sensor.kems_battery_state_of_charge') not in ['unknown', 'unavailable'] else 'Awaiting battery data' }} | {{ state_attr(b, 'current_battery_soc_percent') if state_attr(b, 'current_battery_soc_percent') is not none else '—' }} | {{ state_attr(f, 'current_battery_soc_percent') if state_attr(f, 'current_battery_soc_percent') is not none else '—' }} | {{ state_attr(a, 'simulated_soc_percent') if state_attr(a, 'simulated_soc_percent') is not none else (state_attr(a, 'current_routing_snapshot') or {}).get('simulated_soc_percent', '—') }} |"
     content = content.replace(old_soc, new_soc, 1)
 
-    graph_marker = "      - type: history-graph\n        title: Cost comparison — 24 hours\n"
+    graph_marker = (
+        "      - type: history-graph\n        title: Cost comparison — 24 hours\n"
+    )
     if graph_marker not in content:
-        raise ValueError("Alpha7.36 could not find the Compare cost graph insertion point")
+        raise ValueError(
+            "Alpha7.36 could not find the Compare cost graph insertion point"
+        )
     content = content.replace(graph_marker, _WINNER_CARD + graph_marker, 1)
 
     history_marker = "  - title: History\n"

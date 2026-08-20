@@ -91,9 +91,7 @@ def _publish_with_panel_flow(self, state: dict[str, Any]) -> None:
     live_state = self._hass.states.get(_LIVE_SENSOR)
     if live_state is not None:
         live_attributes = dict(live_state.attributes)
-        live_attributes["simulated_soc_percent"] = snapshot.get(
-            "simulated_soc_percent"
-        )
+        live_attributes["simulated_soc_percent"] = snapshot.get("simulated_soc_percent")
         live_attributes["panel_flow_state"] = flow
         live_attributes["panel_flow_source"] = _PANEL_FLOW_SENSOR
         self._set(_LIVE_SENSOR, live_state.state, live_attributes)

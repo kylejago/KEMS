@@ -39,9 +39,7 @@ def test_panel6_uses_current_agile_routing_snapshot_feed() -> None:
     assert 'panel_config_version: "0.7.0-alpha7-panel6"' in content
     assert 'display_mode == "Full KEMS Agile"' in content
     assert "selected_scenario = 7;" in content
-    assert (
-        "scenario_agile_flow: sensor.kems_panel_full_kems_agile_flow_now" in content
-    )
+    assert "scenario_agile_flow: sensor.kems_panel_full_kems_agile_flow_now" in content
     assert "id: ha_agile_flow" in content
     assert "flow_state = &id(ha_agile_flow).state;" in content
     assert '"SE=%f,GB=%f,BH=%f,BE=%f,SOC=%f"' in content
