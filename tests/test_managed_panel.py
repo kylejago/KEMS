@@ -43,8 +43,7 @@ def test_panel7_uses_current_agile_routing_snapshot_feed() -> None:
         encoding="utf-8"
     )
     assert (
-        'PANEL7_VERSION_LINE = b\'panel_config_version: "0.7.0-alpha7-panel7"\''
-        in sync
+        "PANEL7_VERSION_LINE = b'panel_config_version: \"0.7.0-alpha7-panel7\"'" in sync
     )
     assert "source.replace(PANEL6_VERSION_LINE, PANEL7_VERSION_LINE, 1)" in sync
     assert 'display_mode == "Full KEMS Agile"' in content
@@ -105,7 +104,7 @@ def test_legacy_kems_panel_is_migrated_without_another_manual_flash() -> None:
     )
     assert "LEGACY_PANEL_MARKERS" in sync
     assert 'b"name: kems16x16"' in sync
-    assert 'b\'name: "Panel Firmware Version"\'' in sync
+    assert "b'name: \"Panel Firmware Version\"'" in sync
     assert 'b"id: panel_firmware_version"' in sync
     assert "return all(marker in content for marker in LEGACY_PANEL_MARKERS)" in sync
 
