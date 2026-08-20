@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-_FORECAST_EVIDENCE = """        title: Forecast evidence
+_FORECAST_EVIDENCE = """            title: Forecast evidence
             show_header_toggle: false
             entities:
               - sensor.kems_forecast_solar_tomorrow
 """
 
-_FORECAST_EVIDENCE_ALPHA741 = """        title: Forecast evidence
+_FORECAST_EVIDENCE_ALPHA741 = """            title: Forecast evidence
             show_header_toggle: false
             entities:
               - sensor.kems_agile_tomorrow_publication_plan
