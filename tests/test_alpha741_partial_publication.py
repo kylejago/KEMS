@@ -75,7 +75,7 @@ def test_alpha741_publishes_progressive_tomorrow_state() -> None:
 def test_alpha741_dashboard_adds_publication_sensor() -> None:
     improve = runpy.run_path(str(DASHBOARD))["improve_alpha741_dashboard"]
     source = (
-        "        title: Forecast evidence\n"
+        "            title: Forecast evidence\n"
         "            show_header_toggle: false\n"
         "            entities:\n"
         "              - sensor.kems_forecast_solar_tomorrow\n"
