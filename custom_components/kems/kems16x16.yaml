@@ -4,7 +4,7 @@ substitutions:
   device_name: kems16x16
   friendly_name: "KEMS16x16"
   led_pin: GPIO21
-  panel_config_version: "0.7.0-alpha7-panel5"
+  panel_config_version: "0.7.0-alpha7-panel6"
   kems_status: sensor.kems_status
   live_battery_soc: sensor.kems_battery_state_of_charge
   live_battery_power: sensor.kems_battery_power
@@ -30,7 +30,7 @@ substitutions:
   scenario_full_kems_flow: sensor.kems_compare_full_kems_flow_now
   scenario_full_kems_forecast_flow: sensor.kems_compare_full_kems_forecast_flow_now
   scenario_full_island_flow: sensor.kems_compare_full_island_flow_now
-  scenario_agile_flow: sensor.kems_agile_smart_export_flow_now
+  scenario_agile_flow: sensor.kems_panel_full_kems_agile_flow_now
 esphome:
   name: ${device_name}
   friendly_name: ${friendly_name}
@@ -80,17 +80,12 @@ select:
     icon: mdi:monitor-dashboard
     optimistic: true
     restore_value: true
-    initial_option: "Live (actual current KEMS control)"
+    initial_option: "Live Data"
     options:
-      - "Live (actual current KEMS control)"
-      - "No system"
-      - "Solar only"
-      - "Solar + battery"
-      - "KEMS no-export"
+      - "Live Data"
+      - "Battery & Solar"
       - "Full KEMS"
-      - "Full KEMS Forecast"
-      - "Agile Smart Export"
-      - "Full Island Mode"
+      - "Full KEMS Agile"
 text_sensor:
   - platform: template
     id: panel_firmware_version
@@ -495,32 +490,19 @@ display:
 
       std::string display_mode =
         id(panel_display_mode).current_option().c_str();
-      const bool live_mode =
-        display_mode == "Live (actual current KEMS control)";
+      const bool live_mode = display_mode == "Live Data";
       int selected_scenario = -1;
-      if (display_mode == "No system") {
-        selected_scenario = 0;
-      } else if (display_mode == "Solar only") {
-        selected_scenario = 1;
-      } else if (display_mode == "Solar + battery") {
+      if (display_mode == "Battery & Solar") {
         selected_scenario = 2;
-      } else if (display_mode == "KEMS no-export") {
-        selected_scenario = 3;
       } else if (display_mode == "Full KEMS") {
-        selected_scenario = 4;
-      } else if (display_mode == "Full KEMS Forecast") {
         selected_scenario = 5;
-      } else if (display_mode == "Full Island Mode") {
-        selected_scenario = 6;
-      } else if (display_mode == "Agile Smart Export") {
+      } else if (display_mode == "Full KEMS Agile") {
         selected_scenario = 7;
       }
       const bool ev_connected = id(ha_ev_connected).state;
       const bool ev_charging = id(ha_ev_charging).state;
       const bool grid_available = id(ha_grid_available).state;
-      const bool island_display = selected_scenario == 6;
-      const bool grid_available_for_display =
-        island_display ? false : grid_available;
+      const bool grid_available_for_display = grid_available;
       float battery_soc = NAN;
       float battery_power = NAN;
       float cost_today = NAN;
