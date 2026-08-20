@@ -55,8 +55,14 @@ def test_alpha741_accepts_only_clean_publication_pending_gaps() -> None:
 
 def test_alpha741_never_guesses_missing_prices_and_keeps_reserve() -> None:
     source = PATCH.read_text(encoding="utf-8")
-    assert '"unknown_price_policy": "reserve full slot capacity; never guess price"' in source
-    assert '"current_slot_policy": "no deliberate export without a real current price"' in source
+    assert (
+        '"unknown_price_policy": "reserve full slot capacity; never guess price"'
+        in source
+    )
+    assert (
+        '"current_slot_policy": "no deliberate export without a real current price"'
+        in source
+    )
     assert '"unknown_slot_capacity_reserved_kwh"' in source
     assert "missing_slots_for_day" in source
     assert "rebuild automatically as new Octopus prices arrive" in source
@@ -65,7 +71,9 @@ def test_alpha741_never_guesses_missing_prices_and_keeps_reserve() -> None:
 def test_alpha741_publishes_progressive_tomorrow_state() -> None:
     source = PATCH.read_text(encoding="utf-8")
     assert "sensor.kems_agile_tomorrow_publication_plan" in source
-    assert 'status = f"Provisional — using {known}/{expected} published prices"' in source
+    assert (
+        'status = f"Provisional — using {known}/{expected} published prices"' in source
+    )
     assert 'status = f"Complete — {known}/{expected} prices"' in source
     assert 'mode = "progressive_known_prices"' in source
     assert 'quality["tomorrow_status"] = str(progressive.get("status"))' in source
