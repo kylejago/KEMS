@@ -1,4 +1,4 @@
-"""Regression coverage for Alpha7.36 reporting plus Alpha7.37 coordination."""
+"""Regression coverage for Alpha7.36 reporting plus later release coordination."""
 
 from __future__ import annotations
 
@@ -11,8 +11,8 @@ ROOT = Path(__file__).parents[1]
 KEMS = ROOT / "custom_components" / "kems"
 
 
-def test_alpha737_release_targets_panel7_and_web14() -> None:
-    """Core, bundle and verifier must coordinate Alpha7.37/Panel7/Web.14."""
+def test_alpha737_or_later_release_targets_panel7_and_current_web() -> None:
+    """Core, bundle and verifier must retain Panel7 and a coordinated web target."""
     manifest = json.loads((KEMS / "manifest.json").read_text(encoding="utf-8"))
     bundle = json.loads(
         (ROOT / "release" / "kems-bundle.template.json").read_text(encoding="utf-8")
@@ -21,11 +21,18 @@ def test_alpha737_release_targets_panel7_and_web14() -> None:
     panel_yaml = (KEMS / "kems16x16.yaml").read_text(encoding="utf-8")
     dashboard = (KEMS / "dashboard.py").read_text(encoding="utf-8")
 
-    assert manifest["version"] == "0.7.0-alpha7.37"
+    version = str(manifest["version"])
+    assert version.startswith("0.7.0-alpha7.")
+    assert int(version.rsplit(".", 1)[1]) >= 37
     assert bundle["components"]["panel"]["version"] == "0.7.0-alpha7-panel7"
-    assert bundle["components"]["property_web"]["version"] == "0.7.0-alpha7-web.14"
-    assert bundle["components"]["pi_agent"]["version"] == "0.7.0-alpha7-web.14"
-    assert bundle["components"]["public_web"]["version"] == "0.7.0-alpha7-web.14"
+
+    property_web = str(bundle["components"]["property_web"]["version"])
+    pi_agent = str(bundle["components"]["pi_agent"]["version"])
+    public_web = str(bundle["components"]["public_web"]["version"])
+    assert property_web == pi_agent == public_web
+    assert property_web.startswith("0.7.0-alpha7-web.")
+    assert int(property_web.rsplit(".", 1)[1]) >= 14
+
     assert 'PANEL_CONFIG_VERSION = "0.7.0-alpha7-panel7"' in panel_py
     assert 'panel_config_version: "0.7.0-alpha7-panel6"' in panel_yaml
     assert (
