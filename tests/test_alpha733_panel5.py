@@ -61,5 +61,7 @@ def test_alpha733_public_web_delivery_matches_live_ionos_route() -> None:
         (ROOT / "release" / "kems-bundle.template.json").read_text(encoding="utf-8")
     )
     public_web = bundle["components"]["public_web"]
-    assert public_web["version"] == "0.7.0-alpha7-web.14"
+    version = str(public_web["version"])
+    assert version.startswith("0.7.0-alpha7-web.")
+    assert int(version.rsplit(".", 1)[1]) >= 14
     assert public_web["delivery"] == "ionos-sftp"

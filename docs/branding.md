@@ -2,34 +2,34 @@
 
 KEMS has one canonical brand family across Home Assistant, the property Pi, `kems.uk`, GitHub, the companion app, installers and future hardware backends.
 
-## Canonical master
+## Canonical master — approved artwork
 
-- `docs/assets/kems-logo-master.svg` — source-of-truth full KEMS logo. It combines the home, solar, battery, managed energy-flow and EV-charging concepts with the KEMS wordmark and **Kyle Energy Management System** subtitle.
-- `docs/assets/kems_full_brand_concept.png` — presentation/background treatment of the same energy-system concept.
+`docs/assets/kems_full_brand_concept.png` is the **source of truth** for the KEMS visual identity. It is the exact approved artwork: blue house/roof, yellow sun, blue solar panel, green battery/energy arrow and plug, the blue-to-green **KEMS** wordmark, and the **Kyle Energy Management System** subtitle.
 
-The master lockup is the default visible brand for website headers, public pages, documentation covers, installer/setup surfaces and other locations with enough horizontal space. Do not replace it with an unrelated monogram, lightning-bolt mark or a different KEMS wordmark.
+The file is 2,156,120 bytes and its SHA-256 is:
+
+`67ad8c3ee349a35de23f5a9040ce27c18b5cf347454f777cf1f55a6f905eb01f`
+
+`docs/assets/kems-logo-master.svg` is retained only as a historical/redrawn approximation. It is **not** an approved master and must not be used on user-facing surfaces.
+
+Any website/header/icon variant must be a crop, scale, mask or other mechanical derivative of the approved PNG. Do not redraw the house, solar, battery, plug, wordmark or subtitle.
 
 ## Product variants
 
-- `custom_components/kems/brand/icon.png` — compact square integration icon for Home Assistant, HACS, favicons and similarly constrained square surfaces.
-- `custom_components/kems/brand/logo.png` — compact horizontal wordmark for small Home Assistant surfaces where the full master is not practical.
-- The 16×16 panel uses a deliberately simplified pixel treatment rather than attempting to reproduce the full master artwork.
+- `custom_components/kems/brand/icon.png` — compact Home Assistant/HACS icon where a square asset is required.
+- `custom_components/kems/brand/logo.png` — compact Home Assistant logo where the full approved artwork is not practical.
+- The 16×16 panel uses a deliberately simplified pixel treatment because the physical resolution cannot reproduce the approved artwork.
 
-Compact variants are derivatives of the same brand, not alternate logos. They should preserve the blue/cyan/green energy palette, yellow solar cue and the home/energy-system identity wherever the available resolution permits.
+Compact variants are resolution-specific derivatives, not alternate logos.
 
 ## Web and Pi distribution
 
-KEMS Web.16 mirrors the canonical master into both of its presentation roots:
+From KEMS Web.18 onward, KEMS Web obtains the approved PNG directly from this repository, verifies the SHA-256 above, and distributes that exact file with both the property appliance and public `kems.uk` build.
 
-- `KEMS-Web/public/brand-lockup.svg` — local property/Pi dashboard, Remote Access setup and installable web app.
-- `KEMS-Web/public-site/brand-lockup.svg` — public `kems.uk`, delayed demo, property-access entry point and privacy pages.
+The Web `brand-lockup.svg` and `logo.svg` files are crop wrappers only: they display regions of the approved PNG and contain no redrawn KEMS artwork. This keeps the exact approved image authoritative while still supporting wide header and compact icon slots.
 
-The property and public Web copies must remain visually identical to the canonical master. The compact square Web `logo.svg` remains only for favicons, PWA/loading states and other square icon slots.
-
-The Raspberry Pi first-boot status page also renders the canonical energy-system lockup so the appliance never falls back to a separate temporary brand during setup.
+The same approved source is used by property headers, loading states, Remote Access setup, `kems.uk`, demo/login/privacy/404 pages and setup/install experiences.
 
 ## Home Assistant and hardware
 
-Home Assistant/HACS continues to use the compact canonical `brand/icon.png` and `brand/logo.png` assets because those surfaces impose small/square artwork constraints. No optimizer, tariff, safety or hardware-control behavior depends on branding.
-
-The ESP32 16×16 panel may use a simplified pixel KEMS identity, but it must be treated as a resolution-specific derivative of this master rather than a new brand family.
+Branding changes do not alter KEMS optimisation, tariffs, safety interlocks, panel control or FoxESS write protection. Real FoxESS writes remain governed by the existing commissioning and safety gates.
