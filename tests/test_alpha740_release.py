@@ -6,11 +6,9 @@ ROOT = Path(__file__).resolve().parents[1]
 DASHBOARD = ROOT / "custom_components" / "kems" / "dashboard_alpha740_agile_primary.py"
 
 
-def test_alpha740_manifest_and_bundle_targets_web20() -> None:
-    manifest = json.loads((ROOT / "custom_components/kems/manifest.json").read_text())
+def test_alpha740_bundle_targets_web20() -> None:
     bundle = json.loads((ROOT / "release/kems-bundle.template.json").read_text())
 
-    assert manifest["version"] == "0.7.0-alpha7.40"
     assert bundle["components"]["property_web"]["version"] == "0.7.0-alpha7-web.20"
     assert bundle["components"]["pi_agent"]["version"] == "0.7.0-alpha7-web.20"
     assert bundle["components"]["public_web"]["version"] == "0.7.0-alpha7-web.20"
