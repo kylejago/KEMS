@@ -1,4 +1,4 @@
-"""Regression tests for the production-style KEMS dashboard consolidation."""
+"""Regression tests for the simplified Alpha7.35 KEMS dashboard."""
 
 from __future__ import annotations
 
@@ -16,15 +16,13 @@ RUNTIME = ROOT / "custom_components" / "kems" / "agile_smart_export_runtime.py"
 
 EXPECTED_PATHS = [
     "home",
-    "live",
-    "plan",
-    "agile",
+    "live-data",
+    "battery-solar",
+    "full-kems",
+    "full-kems-agile",
     "compare",
     "history",
-    "battery-solar",
-    "ev-tariff",
-    "eps",
-    "control",
+    "advanced",
     "system",
 ]
 
@@ -61,18 +59,20 @@ def _assembled_source() -> str:
     return f"{master}\n\n{agile_views}\n\n{live_view}\n"
 
 
-def test_consolidated_dashboard_has_exactly_eleven_navigation_pages() -> None:
-    """The managed UI should expose only the agreed production navigation."""
+def test_consolidated_dashboard_has_nine_simple_navigation_pages() -> None:
+    """The managed UI should expose only the agreed product navigation."""
     module = _load_module()
     rendered = module.consolidate_dashboard(_assembled_source())
     parsed = yaml.safe_load(rendered)
     assert parsed["title"] == "KEMS Master Dashboard"
     assert [view["path"] for view in parsed["views"]] == EXPECTED_PATHS
-    assert len(parsed["views"]) == 11
+    assert len(parsed["views"]) == 9
 
 
-def test_every_legacy_source_view_is_preserved_or_intentionally_replaced() -> None:
-    """Consolidation must not silently lose one of the existing feature tabs."""
+def test_every_legacy_source_view_is_preserved_under_a_product_or_advanced_page() -> (
+    None
+):
+    """Simplification must reorganise rich data rather than delete it."""
     module = _load_module()
     source_views = module._split_views(_assembled_source())
     assert set(source_views) == module.EXPECTED_SOURCE_TITLES
@@ -80,51 +80,68 @@ def test_every_legacy_source_view_is_preserved_or_intentionally_replaced() -> No
     merged_sources = {
         title for spec in module.FINAL_VIEW_SPECS for title in spec.sources
     }
-    assert module.EXPECTED_SOURCE_TITLES - merged_sources == {"Control & EPS"}
+    assert merged_sources == module.EXPECTED_SOURCE_TITLES
 
 
-def test_consolidated_dashboard_keeps_live_preparation_and_eps_pages() -> None:
-    """The new navigation should prepare the same UI for future live hardware."""
-    module = _load_module()
-    parsed = yaml.safe_load(module.consolidate_dashboard(_assembled_source()))
-    rendered = str(parsed)
-    assert "SIMULATION / PRE-INSTALL" in rendered
-    assert "Actual hardware" in rendered
-    assert "KEMS target" in rendered
-    assert "Simulation → Shadow → Live" in rendered
-    assert "If the grid failed now" in rendered
-    assert "sensor.kems_estimated_outage_runtime" in rendered
-    assert "sensor.kems_desired_battery_export_power" in rendered
-
-
-def test_related_pages_are_merged_without_old_navigation_paths() -> None:
-    """Forecast, Agile, history and system detail should be grouped as intended."""
+def test_user_product_pages_have_live_vs_simulated_side_by_side() -> None:
+    """Every optimising product should put live and simulated data together."""
     module = _load_module()
     parsed = yaml.safe_load(module.consolidate_dashboard(_assembled_source()))
     views = {view["path"]: str(view) for view in parsed["views"]}
 
-    assert "Full KEMS Forecast" in views["plan"]
-    assert "Simulation" in views["plan"]
-    assert "Agile Price Plan" in views["agile"]
-    assert "Agile Assumptions" in views["agile"]
-    assert "Forecast vs Agile" in views["compare"]
-    assert "Agile History" in views["history"]
-    assert "Gas" in views["history"]
-    assert "Power Down" in views["ev-tariff"]
-    assert "Updates" in views["system"]
-    assert "All Entities" in views["system"]
+    assert "actual data only" in views["live-data"]
+    for path in ("battery-solar", "full-kems", "full-kems-agile"):
+        assert "LIVE —" in views[path]
+        assert "SIMULATED —" in views[path]
+
+    assert "sensor.kems_compare_solar_and_battery_cost_today" in views["battery-solar"]
+    assert "sensor.kems_compare_full_kems_forecast_cost_today" in views["full-kems"]
+    assert "sensor.kems_agile_live_scenario" in views["full-kems-agile"]
 
 
-def test_consolidation_is_installed_after_all_agile_dashboard_patches() -> None:
-    """The final writer must consolidate only after feature views are complete."""
+def test_comparison_page_contains_all_four_types_and_common_metrics() -> None:
+    """One page must make the four product outcomes directly comparable."""
+    module = _load_module()
+    parsed = yaml.safe_load(module.consolidate_dashboard(_assembled_source()))
+    views = {view["path"]: str(view) for view in parsed["views"]}
+    compare = views["compare"]
+
+    for label in ("Live Data", "Battery & Solar", "Full KEMS", "Full KEMS Agile"):
+        assert label in compare
+    for metric in (
+        "House load kW",
+        "Grid import kW",
+        "Grid export kW",
+        "Battery → home kW",
+        "Battery → export kW",
+        "Total / economic cost p",
+        "Grid import kWh",
+        "Grid export kWh",
+        "Ending SOC %",
+    ):
+        assert metric in compare
+    assert "Cost comparison — 24 hours" in compare
+
+
+def test_engineering_scenarios_are_moved_to_advanced_lab() -> None:
+    """Virtual stress scenarios remain available without cluttering normal UX."""
+    module = _load_module()
+    parsed = yaml.safe_load(module.consolidate_dashboard(_assembled_source()))
+    views = {view["path"]: str(view) for view in parsed["views"]}
+    assert "select.kems_virtual_scenario" in views["advanced"]
+    assert "Observe → Simulate → Shadow → Control" in views["advanced"]
+    assert "select.kems_virtual_scenario" not in views["home"]
+
+
+def test_consolidation_is_installed_before_runtime_routing_patches() -> None:
+    """Dashboard assembly remains complete before late reporting wrappers install."""
     runtime = RUNTIME.read_text(encoding="utf-8")
     assert "install_live_scenario_patch()\ninstall_dashboard_yaml_guard()" in runtime
-    assert (
-        "install_alpha717_dashboard_patch()\ninstall_alpha719_validation_patch()"
-        in runtime
-    )
     assert (
         "install_alpha719_validation_patch()\n"
         "install_dashboard_consolidation()\n"
         "install_alpha719_dashboard_patch()"
     ) in runtime
+    assert runtime.rindex("install_alpha735_cheap_handover_patch()") > runtime.rindex(
+        "install_alpha734_deadline_guard_patch()"
+    )

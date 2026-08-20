@@ -61,11 +61,13 @@ from .const import (
     CONF_STALE_DATA_SECONDS,
     CONF_SYSTEM_COMMISSIONED,
     CONF_SYSTEM_COST,
+    CONF_SYSTEM_TYPE,
     CONF_TARIFF_MODE,
     CONF_VIRTUAL_SCENARIO,
     DEFAULT_OPTIONS,
 )
 from .kems_core import ControlConfig, ForecastConfig, ROIConfig, SimulationConfig
+from .product_types import effective_operating_mode, normalise_system_type
 from .tariff import TariffSettings, parse_time
 
 
@@ -76,6 +78,7 @@ class KEMSSettings:
     scan_interval_seconds: int
     history_days: int
     gas_kwh_per_m3: float
+    system_type: str
     tariff: TariffSettings
     simulation: SimulationConfig
     forecast: ForecastConfig
@@ -87,10 +90,12 @@ class KEMSSettings:
         """Build settings using defaults for omitted options."""
         values = {**DEFAULT_OPTIONS, **dict(options)}
         commissioning_date = _parse_date(values.get(CONF_COMMISSIONING_DATE))
+        system_type = normalise_system_type(values.get(CONF_SYSTEM_TYPE))
         return cls(
             scan_interval_seconds=max(int(values[CONF_SCAN_INTERVAL]), 30),
             history_days=max(int(values[CONF_HISTORY_DAYS]), 1),
             gas_kwh_per_m3=max(float(values[CONF_GAS_KWH_PER_M3]), 0.1),
+            system_type=system_type,
             tariff=TariffSettings(
                 mode=(
                     "manual"
@@ -205,7 +210,10 @@ class KEMSSettings:
                 forecast_years=max(int(values[CONF_ROI_FORECAST_YEARS]), 1),
             ),
             control=ControlConfig(
-                operating_mode=str(values[CONF_OPERATING_MODE]),
+                operating_mode=effective_operating_mode(
+                    system_type,
+                    values[CONF_OPERATING_MODE],
+                ),
                 virtual_scenario=str(values[CONF_VIRTUAL_SCENARIO]),
                 control_enabled=bool(values[CONF_CONTROL_ENABLED]),
                 commissioned=bool(values[CONF_SYSTEM_COMMISSIONED]),
