@@ -30,9 +30,18 @@ def test_alpha739_coordinates_web19_and_exact_svg_brand() -> None:
     icon = ROOT / "custom_components/kems/brand/icon.png"
     logo = ROOT / "custom_components/kems/brand/logo.png"
     assert master.stat().st_size == 877
-    assert _sha256(master) == "ef53e22bdff4e4ebd81007c3a6d5f28da0384f547e9036a7be7e3bf2d420b464"
-    assert _sha256(icon) == "fe743d5275610376e49a28fed0e1d5c4d536c6809c9c2f5f4ffb87842408b059"
-    assert _sha256(logo) == "b5283d7901b9e277f6854bc9a4b11ca209f93547533682f94d96d54a496d3198"
+    assert (
+        _sha256(master)
+        == "ef53e22bdff4e4ebd81007c3a6d5f28da0384f547e9036a7be7e3bf2d420b464"
+    )
+    assert (
+        _sha256(icon)
+        == "fe743d5275610376e49a28fed0e1d5c4d536c6809c9c2f5f4ffb87842408b059"
+    )
+    assert (
+        _sha256(logo)
+        == "b5283d7901b9e277f6854bc9a4b11ca209f93547533682f94d96d54a496d3198"
+    )
 
     assert "exact supplied SVG" in branding
     assert "kems_full_brand_concept.png" in branding
