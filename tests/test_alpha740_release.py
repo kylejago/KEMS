@@ -5,7 +5,6 @@ from custom_components.kems.dashboard_alpha740_agile_primary import (
     improve_alpha740_dashboard,
 )
 
-
 ROOT = Path(__file__).resolve().parents[1]
 
 
