@@ -1,11 +1,9 @@
 import json
+import runpy
 from pathlib import Path
 
-from custom_components.kems.dashboard_alpha740_agile_primary import (
-    improve_alpha740_dashboard,
-)
-
 ROOT = Path(__file__).resolve().parents[1]
+DASHBOARD = ROOT / "custom_components" / "kems" / "dashboard_alpha740_agile_primary.py"
 
 
 def test_alpha740_manifest_and_bundle_targets_web20() -> None:
@@ -20,6 +18,9 @@ def test_alpha740_manifest_and_bundle_targets_web20() -> None:
 
 
 def test_alpha740_dashboard_inserts_agile_and_compare_command_cards() -> None:
+    improve_alpha740_dashboard = runpy.run_path(str(DASHBOARD))[
+        "improve_alpha740_dashboard"
+    ]
     source = (
         "title: KEMS Master Dashboard\n\nviews:\n"
         "  - title: Full KEMS Agile\n"
