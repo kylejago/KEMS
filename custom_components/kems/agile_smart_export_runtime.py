@@ -65,6 +65,9 @@ from .agile_smart_export_runtime_base import *  # noqa: E402,F403
 from .dashboard_alpha736_finance import (  # noqa: E402
     install_alpha736_finance_dashboard_patch,
 )
+from .dashboard_alpha740_agile_primary import (  # noqa: E402
+    install_alpha740_agile_primary_dashboard_patch,
+)
 from .dashboard_consolidation import install_dashboard_consolidation  # noqa: E402
 
 install_rolling_replan_patch()
@@ -95,6 +98,7 @@ install_alpha735_cheap_handover_patch()
 install_alpha736_panel_flow_patch()
 install_alpha736_finance_dashboard_patch()
 install_alpha740_opportunity_guard_patch()
+install_alpha740_agile_primary_dashboard_patch()
 
 EfficientAgileSmartExportManager = _base.EfficientAgileSmartExportManager
 
