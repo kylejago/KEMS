@@ -84,3 +84,5 @@ A Power Down can never be displaced by an Agile price or by Happy Hour preparati
 ## Safety boundary
 
 Alpha7.43 remains simulation/shadow functionality. It adds no direct inverter service call and no FoxESS backend write path. **Real FoxESS hardware writes remain blocked** until the separate commissioning and control boundary is explicitly completed.
+
+Scheme assumptions in this release were checked against Octopus Weekend Happy Hour information and terms current on 20 August 2026; a future automatic Octopus source can replace the manual event input without changing this priority contract.
