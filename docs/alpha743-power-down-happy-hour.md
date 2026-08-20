@@ -33,6 +33,8 @@ The Full KEMS Agile dashboard exposes:
 - **Weekend Happy Hour start** — date and time of the booked slot;
 - **Weekend Happy Hour duration** — one or two booked hours.
 
+The manual event stays dormant until **Weekend Happy Hour planning** is enabled, so entering a date/time alone cannot alter the Agile plan.
+
 The planner consumes an event with `source: manual`. A future Octopus/Home Assistant provider can supply the same event shape and replace manual entry without redesigning the optimisation policy.
 
 For the current Octopus scheme KEMS models the published fair-use limit as **16 kWh per selected one-hour Weekend Happy Hour reward**. When two booked one-hour rewards are selected consecutively, planning therefore exposes two reward caps across the two-hour event.
