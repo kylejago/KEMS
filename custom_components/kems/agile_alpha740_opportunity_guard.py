@@ -158,7 +158,8 @@ def _economic_guard(
     return {
         "active": proactive > _EPSILON,
         "reason": (
-            "current higher-value slot protects economic outcome before latest-safe cliff"
+            "current higher-value slot protects economic outcome "
+            "before latest-safe cliff"
             if proactive > _EPSILON
             else "future capacity and prices do not justify early export"
         ),
@@ -244,8 +245,9 @@ def install_alpha740_opportunity_guard_patch() -> None:
                         3,
                     ),
                     "action": (
-                        "proactive Agile export — use the stronger current price before "
-                        "forecast/headroom uncertainty can force energy into a cheaper slot"
+                        "proactive Agile export — use the stronger current "
+                        "price before forecast/headroom uncertainty can force "
+                        "energy into a cheaper slot"
                     ),
                 }
             )
