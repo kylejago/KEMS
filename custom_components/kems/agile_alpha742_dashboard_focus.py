@@ -50,9 +50,7 @@ _AGILE_VIEW_START = (
     "    icon: mdi:transmission-tower-export\n"
 )
 _COMPARE_VIEW_START = (
-    "  - title: Compare\n"
-    "    path: compare\n"
-    "    icon: mdi:compare-horizontal\n"
+    "  - title: Compare\n" "    path: compare\n" "    icon: mdi:compare-horizontal\n"
 )
 
 _AGILE_FOCUSED_VIEW = r"""  - title: Full KEMS Agile
