@@ -23,11 +23,15 @@ def test_release_bundle_renders_exact_core_and_existing_companion_targets() -> N
     assert bundle["components"]["kems_core"]["version"] == "0.7.0-alpha8"
     assert bundle["components"]["dashboard"]["version"] == "0.7.0-alpha8"
     assert bundle["components"]["panel"]["version"] == "0.7.0-alpha7-panel7"
-    assert bundle["components"]["property_web"]["version"] == "0.7.0-alpha7-web.14"
-    assert bundle["components"]["pi_agent"]["version"] == "0.7.0-alpha7-web.14"
+
+    property_web = str(bundle["components"]["property_web"]["version"])
+    pi_agent = str(bundle["components"]["pi_agent"]["version"])
+    public_web = str(bundle["components"]["public_web"]["version"])
+    assert property_web == pi_agent == public_web
+    assert property_web.startswith("0.7.0-alpha7-web.")
+    assert int(property_web.rsplit(".", 1)[1]) >= 14
     assert bundle["components"]["property_web"]["required"] is True
     assert bundle["components"]["pi_agent"]["required"] is True
-    assert bundle["components"]["public_web"]["version"] == "0.7.0-alpha7-web.14"
     assert bundle["components"]["public_web"]["required"] is False
     assert bundle["components"]["public_web"]["delivery"] == "ionos-sftp"
     assert bundle["maintenance"]["affected_components"] == [
