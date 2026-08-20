@@ -75,18 +75,30 @@ def _economic_guard(
     """Return proactive current-slot export evidence and minimum energy."""
     current = _current_slot(state, now)
     if current is None or effective_kw <= _EPSILON:
-        return {"active": False, "reason": "no current Agile slot", "minimum_current_export_kwh": 0.0}
+        return {
+            "active": False,
+            "reason": "no current Agile slot",
+            "minimum_current_export_kwh": 0.0,
+        }
 
     current_rate = _number(current.get("rate_pence")) or 0.0
     remaining_hours = _remaining_hours(current, now)
     current_capacity = max(effective_kw * remaining_hours, 0.0)
     if current_capacity <= _EPSILON or current_rate <= 0:
-        return {"active": False, "reason": "current slot has no useful export capacity", "minimum_current_export_kwh": 0.0}
+        return {
+            "active": False,
+            "reason": "current slot has no useful export capacity",
+            "minimum_current_export_kwh": 0.0,
+        }
 
     exportable = max(_number(plan.get("exportable_battery_energy_kwh")) or 0.0, 0.0)
     planned = max(_number(plan.get("planned_battery_export_kwh")) or 0.0, 0.0)
     if exportable <= _EPSILON or planned <= _EPSILON:
-        return {"active": False, "reason": "no exportable battery energy", "minimum_current_export_kwh": 0.0}
+        return {
+            "active": False,
+            "reason": "no exportable battery energy",
+            "minimum_current_export_kwh": 0.0,
+        }
 
     future: list[tuple[float, float]] = []
     now_utc = now.astimezone(UTC)
@@ -105,7 +117,11 @@ def _economic_guard(
             future.append((rate, effective_kw * hours))
 
     if not future:
-        return {"active": False, "reason": "no positive future export slots", "minimum_current_export_kwh": 0.0}
+        return {
+            "active": False,
+            "reason": "no positive future export slots",
+            "minimum_current_export_kwh": 0.0,
+        }
 
     future.sort(key=lambda item: item[0], reverse=True)
     remaining_need = min(planned, exportable)
@@ -185,7 +201,9 @@ def install_alpha740_opportunity_guard_patch() -> None:
             if mode in {"maximum_discharge", "target_reached"}:
                 return targets
 
-            effective_kw = max(_number(targets.get("effective_discharge_kw")) or 0.0, 0.0)
+            effective_kw = max(
+                _number(targets.get("effective_discharge_kw")) or 0.0, 0.0
+            )
             guard = _economic_guard(state, plan, now=now, effective_kw=effective_kw)
             targets["economic_opportunity_guard"] = guard
             if not guard.get("active"):
@@ -193,10 +211,14 @@ def install_alpha740_opportunity_guard_patch() -> None:
 
             current = _current_slot(state, now)
             hours = _remaining_hours(current, now) if current is not None else 0.0
-            minimum_kwh = max(_number(guard.get("minimum_current_export_kwh")) or 0.0, 0.0)
+            minimum_kwh = max(
+                _number(guard.get("minimum_current_export_kwh")) or 0.0, 0.0
+            )
             minimum_kw = minimum_kwh / hours if hours > _EPSILON else 0.0
             house_kw = max(_number(targets.get("house_battery_kw")) or 0.0, 0.0)
-            existing_export = max(_number(targets.get("battery_export_target_kw")) or 0.0, 0.0)
+            existing_export = max(
+                _number(targets.get("battery_export_target_kw")) or 0.0, 0.0
+            )
             export_kw = min(
                 max(existing_export, minimum_kw),
                 max(config.export_limit_kw, 0.0),
@@ -207,11 +229,18 @@ def install_alpha740_opportunity_guard_patch() -> None:
             export_kw = max(total_kw - house_kw, 0.0)
             targets.update(
                 {
-                    "mode": "economic_preemptive_export" if mode == "price_optimised" else mode,
+                    "mode": (
+                        "economic_preemptive_export"
+                        if mode == "price_optimised"
+                        else mode
+                    ),
                     "battery_export_target_kw": round(export_kw, 3),
                     "battery_discharge_target_kw": round(total_kw, 3),
                     "planned_price_export_kw": round(
-                        max(_number(targets.get("planned_price_export_kw")) or 0.0, export_kw),
+                        max(
+                            _number(targets.get("planned_price_export_kw")) or 0.0,
+                            export_kw,
+                        ),
                         3,
                     ),
                     "action": (
@@ -244,8 +273,12 @@ def install_alpha740_opportunity_guard_patch() -> None:
             guard = _economic_guard(state, plan, now=now, effective_kw=effective_kw)
             plan["economic_opportunity_guard"] = guard
             plan["economic_guard_active"] = bool(guard.get("active"))
-            plan["economic_guard_price_advantage_pence"] = guard.get("price_advantage_pence")
-            plan["economic_guard_minimum_current_export_kwh"] = guard.get("minimum_current_export_kwh")
+            plan["economic_guard_price_advantage_pence"] = guard.get(
+                "price_advantage_pence"
+            )
+            plan["economic_guard_minimum_current_export_kwh"] = guard.get(
+                "minimum_current_export_kwh"
+            )
             return plan
 
         rolling_plan_with_alpha740._kems_alpha740_opportunity_guard = True
