@@ -42,7 +42,7 @@
   },
   "maintenance": {
     "required": true,
-    "reason": "Activate KEMS __RELEASE_VERSION__: progressive Agile partial-publication planning with bounded unknown-slot reserve",
+    "reason": "Activate KEMS __RELEASE_VERSION__: focused Full KEMS Agile live-vs-simulation dashboard and recorder-friendly graph telemetry",
     "expected_downtime_minutes": 5,
     "home_assistant_restart_required": true,
     "reboot_required": false,

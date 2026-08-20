@@ -18,6 +18,8 @@ select = ["E", "F", "I", "UP", "B", "SIM"]
 [tool.ruff.lint.per-file-ignores]
 "custom_components/kems/agile_alpha726_provisional.py" = ["E501"]
 "custom_components/kems/dashboard_alpha740_agile_primary.py" = ["E501"]
+"custom_components/kems/agile_alpha742_dashboard_focus.py" = ["E501"]
+"custom_components/kems/agile_alpha742_live_graph_telemetry.py" = ["E501"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
