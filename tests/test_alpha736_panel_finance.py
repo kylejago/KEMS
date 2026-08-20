@@ -23,15 +23,13 @@ def test_alpha737_release_targets_panel7_and_web14() -> None:
 
     assert manifest["version"] == "0.7.0-alpha7.37"
     assert bundle["components"]["panel"]["version"] == "0.7.0-alpha7-panel7"
-    assert (
-        bundle["components"]["property_web"]["version"] == "0.7.0-alpha7-web.14"
-    )
+    assert bundle["components"]["property_web"]["version"] == "0.7.0-alpha7-web.14"
     assert bundle["components"]["pi_agent"]["version"] == "0.7.0-alpha7-web.14"
     assert bundle["components"]["public_web"]["version"] == "0.7.0-alpha7-web.14"
     assert 'PANEL_CONFIG_VERSION = "0.7.0-alpha7-panel7"' in panel_py
     assert 'panel_config_version: "0.7.0-alpha7-panel6"' in panel_yaml
     assert (
-        'PANEL7_VERSION_LINE = b\'panel_config_version: "0.7.0-alpha7-panel7"\''
+        "PANEL7_VERSION_LINE = b'panel_config_version: \"0.7.0-alpha7-panel7\"'"
         in dashboard
     )
     assert bundle["maintenance"]["affected_components"] == [
