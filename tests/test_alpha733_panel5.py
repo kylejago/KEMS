@@ -17,6 +17,7 @@ def test_alpha733_versions_and_bundle_remain_panel5_or_later_aligned() -> None:
     )
     panel = (KEMS / "panel.py").read_text(encoding="utf-8")
     yaml = (KEMS / "kems16x16.yaml").read_text(encoding="utf-8")
+    dashboard = (KEMS / "dashboard.py").read_text(encoding="utf-8")
 
     version = str(manifest["version"])
     assert version.startswith("0.7.0-alpha7.")
@@ -27,7 +28,10 @@ def test_alpha733_versions_and_bundle_remain_panel5_or_later_aligned() -> None:
     yaml_match = re.search(r'panel_config_version: "([^"]+)"', yaml)
     assert panel_match is not None
     assert yaml_match is not None
-    assert bundle_version == panel_match.group(1) == yaml_match.group(1)
+    assert bundle_version == panel_match.group(1) == "0.7.0-alpha7-panel7"
+    assert yaml_match.group(1) == "0.7.0-alpha7-panel6"
+    assert 'PANEL7_VERSION_LINE = b\'panel_config_version: "0.7.0-alpha7-panel7"\'' in dashboard
+    assert "source.replace(PANEL6_VERSION_LINE, PANEL7_VERSION_LINE, 1)" in dashboard
     assert bundle_version.startswith("0.7.0-alpha7-panel")
     assert int(bundle_version.rsplit("panel", 1)[1]) >= 5
     assert bundle["components"]["panel"]["delivery"] == "kems_core"
@@ -54,5 +58,5 @@ def test_alpha733_public_web_delivery_matches_live_ionos_route() -> None:
         (ROOT / "release" / "kems-bundle.template.json").read_text(encoding="utf-8")
     )
     public_web = bundle["components"]["public_web"]
-    assert public_web["version"] == "0.7.0-alpha7-web.13"
+    assert public_web["version"] == "0.7.0-alpha7-web.14"
     assert public_web["delivery"] == "ionos-sftp"
