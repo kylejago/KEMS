@@ -1,4 +1,4 @@
-"""Regression coverage for Alpha7.36 Panel6 and comparison finance parity."""
+"""Regression coverage for Alpha7.36 reporting plus Alpha7.37 coordination."""
 
 from __future__ import annotations
 
@@ -11,23 +11,30 @@ ROOT = Path(__file__).parents[1]
 KEMS = ROOT / "custom_components" / "kems"
 
 
-def test_alpha736_release_and_panel6_versions_are_aligned() -> None:
-    """Core, bundle, verifier and ESPHome source must target Alpha7.36/Panel6."""
+def test_alpha737_release_targets_panel7_and_web14() -> None:
+    """Core, bundle and verifier must coordinate Alpha7.37/Panel7/Web.14."""
     manifest = json.loads((KEMS / "manifest.json").read_text(encoding="utf-8"))
     bundle = json.loads(
         (ROOT / "release" / "kems-bundle.template.json").read_text(encoding="utf-8")
     )
     panel_py = (KEMS / "panel.py").read_text(encoding="utf-8")
     panel_yaml = (KEMS / "kems16x16.yaml").read_text(encoding="utf-8")
+    dashboard = (KEMS / "dashboard.py").read_text(encoding="utf-8")
 
-    assert manifest["version"] == "0.7.0-alpha7.36"
-    assert bundle["components"]["panel"]["version"] == "0.7.0-alpha7-panel6"
-    assert 'PANEL_CONFIG_VERSION = "0.7.0-alpha7-panel6"' in panel_py
+    assert manifest["version"] == "0.7.0-alpha7.37"
+    assert bundle["components"]["panel"]["version"] == "0.7.0-alpha7-panel7"
+    assert bundle["components"]["property_web"]["version"] == "0.7.0-alpha7-web.14"
+    assert bundle["components"]["pi_agent"]["version"] == "0.7.0-alpha7-web.14"
+    assert bundle["components"]["public_web"]["version"] == "0.7.0-alpha7-web.14"
+    assert 'PANEL_CONFIG_VERSION = "0.7.0-alpha7-panel7"' in panel_py
     assert 'panel_config_version: "0.7.0-alpha7-panel6"' in panel_yaml
+    assert 'PANEL7_VERSION_LINE = b\'panel_config_version: "0.7.0-alpha7-panel7"\'' in dashboard
     assert bundle["maintenance"]["affected_components"] == [
         "kems_core",
         "dashboard",
         "panel",
+        "property_web",
+        "pi_agent",
     ]
 
 
@@ -45,7 +52,7 @@ def test_alpha736_panel_flow_comes_from_final_current_routing_snapshot() -> None
 
 
 def test_alpha736_panel_selector_matches_four_user_product_types() -> None:
-    """Panel6 must no longer expose the old strategy/scenario clutter."""
+    """The retained Panel6 renderer exposes only the four user product types."""
     source = (KEMS / "kems16x16.yaml").read_text(encoding="utf-8")
     options = re.search(r"    options:\n(?P<body>(?:      - .*\n)+)", source)
     assert options is not None
@@ -83,7 +90,7 @@ def test_alpha736_dashboard_repairs_missing_compare_values_and_adds_finance() ->
 
 
 def test_alpha736_reporting_patches_install_after_alpha735() -> None:
-    """The new reporting layers must not disturb the proven dispatch ordering."""
+    """The reporting layers must not disturb the proven dispatch ordering."""
     runtime = (KEMS / "agile_smart_export_runtime.py").read_text(encoding="utf-8")
     assert runtime.rindex("install_alpha736_panel_flow_patch()") > runtime.rindex(
         "install_alpha735_cheap_handover_patch()"
