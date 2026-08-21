@@ -21,6 +21,7 @@ install_reporting_patch()
 install_deadline_patch()
 install_enhanced_backfill()
 install_alpha715_backfill_patch()
+from . import agile_smart_export_runtime_base
 install_rolling_replan_patch()
 install_live_scenario_patch()
 install_dashboard_yaml_guard()
