@@ -34,14 +34,15 @@ def test_alpha746_module_parses_and_installs_after_alpha745() -> None:
     )
 
 
-def test_alpha746_uses_known_prices_without_unknown_capacity_reservation() -> None:
+def test_alpha746_keeps_full_known_price_plan_and_reserves_zero() -> None:
     source = PATCH.read_text(encoding="utf-8")
 
-    assert '"provisional_reserved_unknown_capacity_kwh"] = 0.0' in source
+    assert "def _no_reserve_unknown_capacity(" in source
+    assert "return [dict(item) for item in selected if isinstance(item, dict)], 0.0" in source
+    assert "alpha726._reserve_unknown_capacity = _no_reserve_unknown_capacity" in source
+    assert '"provisional_reserved_unknown_capacity_kwh": 0.0' in source
     assert '"bounded_unknown_capacity_reserved_kwh": 0.0' in source
     assert '"unknown_price_reservation_policy": "none"' in source
-    assert "selected_full = _known_price_plan(" in source
-    assert 'sorted(candidates, key=lambda value: value["rate"], reverse=True)' in source
     assert "replan_when_price_publishes" in source
 
 
@@ -50,8 +51,9 @@ def test_alpha746_only_relaxes_clean_publication_gaps() -> None:
 
     assert 'recovery.get("publication_pending")' in source
     assert 'recovery.get("verified")' in source
-    assert "alpha746_original_apply(" in source
+    assert 'horizon.get("current_slot_known")' in source
     assert 'current_price.get("known")' in source
+    assert "alpha746_original_apply(" in source
 
 
 def test_alpha746_dashboard_explains_no_reserve_and_reranking() -> None:
