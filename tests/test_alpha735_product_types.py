@@ -122,9 +122,8 @@ def test_alpha735_installs_after_alpha734_and_before_later_reporting_patches() -
     assert "alpha735_optimizer" not in runtime
 
 
-def test_alpha735_release_identity_is_preserved_by_later_alpha7_builds() -> None:
-    """Later Alpha7 builds must remain on the same compatible release train."""
+def test_alpha735_release_identity_is_preserved_in_alpha8() -> None:
+    """Alpha8 keeps the Alpha7.35 product/handover contract as parity baseline."""
     manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
-    version = str(manifest["version"])
-    assert version.startswith("0.7.0-alpha7.")
-    assert int(version.rsplit(".", 1)[1]) >= 35
+    assert manifest["version"] == "0.8.0-alpha8.0"
+    assert PATCH.exists()
