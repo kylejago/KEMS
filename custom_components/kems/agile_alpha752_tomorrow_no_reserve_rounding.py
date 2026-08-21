@@ -67,9 +67,9 @@ def _clean_tomorrow_publication_gap(
         item for item in diagnostics.get("attempts", []) if isinstance(item, dict)
     ]
     relevant = [item for item in attempts if str(item.get("label")) in missing]
-    if any(str(item.get("outcome") or "") == "retrieval_error" for item in relevant):
-        return False
-    return True
+    return not any(
+        str(item.get("outcome") or "") == "retrieval_error" for item in relevant
+    )
 
 
 def _progressive_tomorrow_state_alpha752(
