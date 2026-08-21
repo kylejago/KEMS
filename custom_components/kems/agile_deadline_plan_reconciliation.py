@@ -477,12 +477,10 @@ def install_deadline_plan_coverage() -> None:
 def install_maximum_discharge_plan_reconcile() -> None:
     """Install maximum-discharge plan reconciliation after publication reporting."""
     dispatch = alpha717._dispatch_targets
-    if getattr(dispatch, "_kems_maximum_discharge_plan_reconcile", False):
+    if getattr(dispatch, "_kems_max_discharge_plan_reconcile", False):
         return
 
     global _original_maximum_discharge_dispatch
     _original_maximum_discharge_dispatch = dispatch
-    _dispatch_with_maximum_discharge_reconcile._kems_maximum_discharge_plan_reconcile = (
-        True
-    )
+    _dispatch_with_maximum_discharge_reconcile._kems_max_discharge_plan_reconcile = True
     alpha717._dispatch_targets = _dispatch_with_maximum_discharge_reconcile
