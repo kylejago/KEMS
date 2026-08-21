@@ -1,0 +1,59 @@
+"""Regression coverage for Alpha7.47 no-reserve plan promotion."""
+
+from __future__ import annotations
+
+import ast
+import json
+from pathlib import Path
+
+ROOT = Path(__file__).parents[1]
+KEMS = ROOT / "custom_components" / "kems"
+PATCH = KEMS / "agile_alpha746_no_unknown_reserve.py"
+DOC = ROOT / "docs" / "alpha747-agile-no-reserve-promotion.md"
+
+
+def test_alpha747_release_version_keeps_web20_and_panel7() -> None:
+    manifest = json.loads((KEMS / "manifest.json").read_text())
+    bundle = json.loads((ROOT / "release/kems-bundle.template.json").read_text())
+
+    assert manifest["version"] == "0.7.0-alpha7.47"
+    assert bundle["components"]["property_web"]["version"] == "0.7.0-alpha7-web.20"
+    assert bundle["components"]["pi_agent"]["version"] == "0.7.0-alpha7-web.20"
+    assert bundle["components"]["public_web"]["version"] == "0.7.0-alpha7-web.20"
+    assert bundle["components"]["panel"]["version"] == "0.7.0-alpha7-panel7"
+
+
+def test_alpha747_patch_parses() -> None:
+    ast.parse(PATCH.read_text(encoding="utf-8"))
+
+
+def test_alpha747_uses_verified_octopus_gap_not_missing_publication_pending_key() -> None:
+    source = PATCH.read_text(encoding="utf-8")
+
+    assert 'recovery.get("verified")' in source
+    assert 'recovery.get("recovery_outcome") == "octopus_missing_price"' in source
+    assert 'recovery.get("publication_pending")' not in source
+    assert 'horizon.get("current_slot_known")' in source
+    assert 'current_price.get("known")' in source
+
+
+def test_alpha747_promotes_known_price_plan_and_resets_unknown_reserve_to_zero() -> None:
+    source = PATCH.read_text(encoding="utf-8")
+
+    assert 'plan["provisional_reserved_unknown_capacity_kwh"] = required' in source
+    assert '"provisional_reserved_unknown_capacity_kwh": 0.0' in source
+    assert '"publication_gap_no_reserve_active": True' in source
+    assert '"dispatch_mode": "progressive_known_prices_no_reserve"' in source
+    assert '"unknown_price_reservation_policy": "none"' in source
+    assert '"replan_when_price_publishes": True' in source
+
+
+def test_alpha747_preserves_conservative_fallback_and_hardware_block() -> None:
+    source = PATCH.read_text(encoding="utf-8")
+    docs = DOC.read_text(encoding="utf-8")
+
+    assert "alpha746_original_apply(" in source
+    assert ".services.async_call(" not in source
+    assert "providers.foxess" not in source
+    assert "retrieval failures remain conservative" in docs.lower()
+    assert "real FoxESS hardware writes remain blocked" in docs
