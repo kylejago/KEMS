@@ -57,7 +57,9 @@ def _effective_no_reserve(attrs: dict[str, Any]) -> bool:
         0.0,
     )
     bounded_active = bool(attrs.get("bounded_partial_horizon_dispatch_active"))
-    return _clean_publication_gap(attrs) and not bounded_active and provisional <= _EPSILON
+    return (
+        _clean_publication_gap(attrs) and not bounded_active and provisional <= _EPSILON
+    )
 
 
 def _plan_summary_alpha750(self) -> dict[str, Any]:
