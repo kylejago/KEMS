@@ -103,12 +103,29 @@ def test_alpha8_compatibility_registry_is_complete_and_resolvable() -> None:
         assert installer_name in functions, f"{module_name} is missing {installer_name}"
 
 
+def test_full_battery_routing_retires_alpha748_from_execution() -> None:
+    specs = _compat_specs()
+    no_unknown = (
+        "agile_alpha746_no_unknown_reserve",
+        "install_alpha746_no_unknown_reserve_patch",
+    )
+    full_battery = ("agile_full_battery_routing", "install_full_battery_routing")
+    deadline_coverage = (
+        "agile_deadline_plan_reconciliation",
+        "install_deadline_plan_coverage",
+    )
+
+    assert specs.index(full_battery) > specs.index(no_unknown)
+    assert specs.index(full_battery) < specs.index(deadline_coverage)
+
+    retired = "agile_alpha748_full_battery_solar"
+    assert not any(module_name == retired for module_name, _ in specs)
+    assert (KEMS / f"{retired}.py").is_file()
+
+
 def test_deadline_reconciliation_retires_alpha749_and_alpha751_from_execution() -> None:
     specs = _compat_specs()
-    alpha748 = (
-        "agile_alpha748_full_battery_solar",
-        "install_alpha748_full_battery_solar_patch",
-    )
+    full_battery = ("agile_full_battery_routing", "install_full_battery_routing")
     deadline_coverage = (
         "agile_deadline_plan_reconciliation",
         "install_deadline_plan_coverage",
@@ -123,7 +140,7 @@ def test_deadline_reconciliation_retires_alpha749_and_alpha751_from_execution() 
         "install_tomorrow_publication_reporting",
     )
 
-    assert specs.index(deadline_coverage) > specs.index(alpha748)
+    assert specs.index(deadline_coverage) > specs.index(full_battery)
     assert specs.index(deadline_coverage) < specs.index(no_reserve)
     assert specs.index(maximum_discharge) > specs.index(no_reserve)
     assert specs.index(maximum_discharge) < specs.index(tomorrow)
@@ -162,6 +179,17 @@ def test_publication_reporting_retires_alpha750_and_alpha752_from_execution() ->
     }
     assert not any(module_name in retired for module_name, _ in specs)
     assert all((KEMS / f"{module_name}.py").is_file() for module_name in retired)
+
+
+def test_canonical_full_battery_routing_cannot_enable_hardware_writes() -> None:
+    source = (KEMS / "agile_full_battery_routing.py").read_text(encoding="utf-8")
+    assert "_dispatch_targets" not in source
+    assert "_rolling_plan" not in source
+    assert ".services.async_call(" not in source
+    assert "providers.foxess" not in source
+    assert "safe_to_write_hardware = True" not in source
+    assert "commands_permitted = True" not in source
+    assert '"hardware_writes": "blocked"' in source
 
 
 def test_canonical_deadline_reconciliation_cannot_enable_hardware_writes() -> None:
