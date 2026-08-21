@@ -1,0 +1,91 @@
+"""Frozen Alpha7 Agile compatibility chain for the Alpha8 consolidation baseline.
+
+Alpha8.0 deliberately preserves Alpha7.52 behaviour while moving the historical
+runtime monkey-patch sequence behind one compatibility boundary. New Alpha8
+behaviour must be implemented in canonical modules rather than by adding another
+version-named patch module.
+"""
+
+from __future__ import annotations
+
+from importlib import import_module
+from types import ModuleType
+from typing import Final
+
+PatchSpec = tuple[str, str]
+
+# These patches historically had to be installed before runtime_base was imported.
+PRE_BASE_PATCHES: Final[tuple[PatchSpec, ...]] = (
+    ("agile_smart_export_reporting", "install_reporting_patch"),
+    ("agile_deadline_dispatch", "install_deadline_patch"),
+    ("agile_history_backfill_v2", "install_enhanced_backfill"),
+    ("agile_alpha715_backfill", "install_alpha715_backfill_patch"),
+)
+
+# Preserve the exact Alpha7.52 installation order. This registry is intentionally
+# boring: it is a parity fixture, not the place for future feature development.
+POST_BASE_PATCHES: Final[tuple[PatchSpec, ...]] = (
+    ("agile_rolling_replan", "install_rolling_replan_patch"),
+    ("agile_smart_export_live", "install_live_scenario_patch"),
+    ("agile_dashboard_yaml_guard", "install_dashboard_yaml_guard"),
+    ("agile_alpha717_dispatch", "install_alpha717_dispatch_patch"),
+    ("agile_alpha714_dashboard", "install_alpha714_dashboard_patch"),
+    ("agile_alpha715_dashboard", "install_alpha715_dashboard_patch"),
+    ("agile_alpha716_dashboard", "install_alpha716_dashboard_patch"),
+    ("agile_alpha717_dashboard", "install_alpha717_dashboard_patch"),
+    ("agile_alpha719_validation", "install_alpha719_validation_patch"),
+    ("dashboard_consolidation", "install_dashboard_consolidation"),
+    ("agile_alpha719_dashboard", "install_alpha719_dashboard_patch"),
+    ("agile_alpha720_preinstall", "install_alpha720_preinstall_patch"),
+    ("agile_alpha720_dashboard", "install_alpha720_dashboard_patch"),
+    ("agile_alpha722_horizon", "install_alpha722_price_horizon_patch"),
+    ("agile_alpha723_shadow", "install_alpha723_shadow_patch"),
+    ("agile_alpha724_outcome", "install_alpha724_outcome_parity_patch"),
+    ("agile_alpha725_nonzero", "install_alpha725_nonzero_export_proof_patch"),
+    ("agile_alpha726_provisional", "install_alpha726_provisional_planning_patch"),
+    ("agile_alpha727_price_recovery", "install_alpha727_price_recovery_patch"),
+    ("agile_alpha728_bounded_partial", "install_alpha728_bounded_partial_horizon_patch"),
+    ("agile_alpha729_live_routing", "install_alpha729_live_routing_parity_patch"),
+    ("agile_alpha730_current_routing", "install_alpha730_current_routing_patch"),
+    ("agile_alpha731_solar_headroom", "install_alpha731_solar_headroom_patch"),
+    ("agile_alpha734_deadline_guard", "install_alpha734_deadline_guard_patch"),
+    ("agile_alpha735_cheap_handover", "install_alpha735_cheap_handover_patch"),
+    ("agile_alpha736_panel_flow", "install_alpha736_panel_flow_patch"),
+    ("dashboard_alpha736_finance", "install_alpha736_finance_dashboard_patch"),
+    ("agile_alpha740_opportunity_guard", "install_alpha740_opportunity_guard_patch"),
+    ("dashboard_alpha740_agile_primary", "install_alpha740_agile_primary_dashboard_patch"),
+    ("agile_alpha741_partial_publication", "install_alpha741_partial_publication_patch"),
+    ("dashboard_alpha741_partial_publication", "install_alpha741_partial_publication_dashboard_patch"),
+    ("agile_alpha742_dashboard_focus", "install_alpha742_dashboard_focus_patch"),
+    ("agile_alpha742_live_graph_telemetry", "install_alpha742_live_graph_telemetry_patch"),
+    ("agile_alpha743_event_priority", "install_alpha743_event_priority_patch"),
+    ("agile_alpha744_dashboard_parity", "install_alpha744_dashboard_parity_patch"),
+    ("agile_alpha745_plan_clarity", "install_alpha745_plan_clarity_patch"),
+    ("agile_alpha746_no_unknown_reserve", "install_alpha746_no_unknown_reserve_patch"),
+    ("agile_alpha748_full_battery_solar", "install_alpha748_full_battery_solar_patch"),
+    ("agile_alpha749_deadline_plan_coverage", "install_alpha749_deadline_plan_coverage_patch"),
+    ("agile_alpha750_no_reserve_reporting", "install_alpha750_no_reserve_reporting_patch"),
+    ("agile_alpha751_maximum_discharge_plan_reconcile", "install_alpha751_maximum_discharge_plan_reconcile_patch"),
+    ("agile_alpha752_tomorrow_no_reserve_rounding", "install_alpha752_tomorrow_no_reserve_rounding_patch"),
+)
+
+
+def _install(spec: PatchSpec) -> None:
+    """Import and install one frozen compatibility patch."""
+    module_name, installer_name = spec
+    module = import_module(f".{module_name}", __package__)
+    installer = getattr(module, installer_name)
+    installer()
+
+
+def install_alpha7_compatibility() -> ModuleType:
+    """Install the exact Alpha7.52 runtime chain and return runtime_base."""
+    for spec in PRE_BASE_PATCHES:
+        _install(spec)
+
+    base = import_module(".agile_smart_export_runtime_base", __package__)
+
+    for spec in POST_BASE_PATCHES:
+        _install(spec)
+
+    return base
