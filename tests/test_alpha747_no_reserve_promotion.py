@@ -16,7 +16,9 @@ def test_alpha747_release_version_keeps_web20_and_panel7() -> None:
     manifest = json.loads((KEMS / "manifest.json").read_text())
     bundle = json.loads((ROOT / "release/kems-bundle.template.json").read_text())
 
-    assert manifest["version"] == "0.7.0-alpha7.47"
+    version = str(manifest["version"])
+    assert version.startswith("0.7.0-alpha7.")
+    assert int(version.rsplit(".", 1)[-1]) >= 47
     assert bundle["components"]["property_web"]["version"] == "0.7.0-alpha7-web.20"
     assert bundle["components"]["pi_agent"]["version"] == "0.7.0-alpha7-web.20"
     assert bundle["components"]["public_web"]["version"] == "0.7.0-alpha7-web.20"
@@ -27,7 +29,9 @@ def test_alpha747_patch_parses() -> None:
     ast.parse(PATCH.read_text(encoding="utf-8"))
 
 
-def test_alpha747_uses_verified_octopus_gap_not_missing_publication_pending_key() -> None:
+def test_alpha747_uses_verified_octopus_gap_not_missing_publication_pending_key() -> (
+    None
+):
     source = PATCH.read_text(encoding="utf-8")
 
     assert 'recovery.get("verified")' in source
@@ -37,7 +41,9 @@ def test_alpha747_uses_verified_octopus_gap_not_missing_publication_pending_key(
     assert 'current_price.get("known")' in source
 
 
-def test_alpha747_promotes_known_price_plan_and_resets_unknown_reserve_to_zero() -> None:
+def test_alpha747_promotes_known_price_plan_and_resets_unknown_reserve_to_zero() -> (
+    None
+):
     source = PATCH.read_text(encoding="utf-8")
 
     assert 'plan["provisional_reserved_unknown_capacity_kwh"] = required' in source
@@ -56,4 +62,4 @@ def test_alpha747_preserves_conservative_fallback_and_hardware_block() -> None:
     assert ".services.async_call(" not in source
     assert "providers.foxess" not in source
     assert "retrieval failures remain conservative" in docs.lower()
-    assert "real FoxESS hardware writes remain blocked" in docs
+    assert "Real FoxESS hardware writes remain blocked" in docs

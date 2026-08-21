@@ -17,7 +17,9 @@ def test_alpha746_release_version_keeps_web20_and_panel7() -> None:
     manifest = json.loads((KEMS / "manifest.json").read_text())
     bundle = json.loads((ROOT / "release/kems-bundle.template.json").read_text())
 
-    assert manifest["version"] == "0.7.0-alpha7.46"
+    version = str(manifest["version"])
+    assert version.startswith("0.7.0-alpha7.")
+    assert int(version.rsplit(".", 1)[-1]) >= 46
     assert bundle["components"]["property_web"]["version"] == "0.7.0-alpha7-web.20"
     assert bundle["components"]["pi_agent"]["version"] == "0.7.0-alpha7-web.20"
     assert bundle["components"]["public_web"]["version"] == "0.7.0-alpha7-web.20"
@@ -52,8 +54,9 @@ def test_alpha746_keeps_full_known_price_plan_and_reserves_zero() -> None:
 def test_alpha746_only_relaxes_clean_publication_gaps() -> None:
     source = PATCH.read_text(encoding="utf-8")
 
-    assert 'recovery.get("publication_pending")' in source
+    assert 'recovery.get("publication_pending")' not in source
     assert 'recovery.get("verified")' in source
+    assert 'recovery.get("recovery_outcome") == "octopus_missing_price"' in source
     assert 'horizon.get("current_slot_known")' in source
     assert 'current_price.get("known")' in source
     assert "alpha746_original_apply(" in source
