@@ -1,36 +1,25 @@
 """Alpha7.46 no-reserve planning for clean Agile publication gaps.
 
-When Octopus has successfully published most of the current local-day Agile
-prices but one or more future settlement periods are still unpublished, KEMS
-must not hold battery energy back merely in case those unknown prices prove
-better later.
+For a clean Octopus publication gap KEMS now allocates the full currently
+exportable battery energy across prices that are already published. It does not
+hold discretionary battery energy back for an unknown future price. When that
+price arrives the normal rolling optimiser runs again and may replace lower
+value future allocations with the newly published slot.
 
-For a clean publication gap Alpha7.46 therefore plans the full currently
-exportable battery energy across the best *known* prices before the next cheap
-period. The unknown slot keeps no discretionary battery reservation. As soon as
-Octopus publishes that price the normal rolling planner runs again and may move
-energy from lower-value future slots into the newly published slot.
-
-Retrieval failures remain conservative, the active settlement period still
-requires a real price before deliberate export, Alpha7.34/7.40 deadline and
-opportunity guards remain intact, Power Down and Happy Hour retain priority,
-and real FoxESS writes remain blocked.
+Retrieval failures remain conservative, the current settlement period still
+requires a real price before deliberate export, all existing reserve/deadline
+guards remain active, Power Down and Happy Hour retain priority, and real
+FoxESS writes remain blocked.
 """
 
 from __future__ import annotations
 
 import math
-from datetime import UTC, datetime
 from typing import Any
 
-from . import agile_alpha717_dispatch as alpha717
-from . import agile_alpha725_nonzero as alpha725
+from . import agile_alpha726_provisional as alpha726
 from . import agile_alpha728_bounded_partial as alpha728
 from . import agile_alpha745_plan_clarity as alpha745
-from . import agile_rolling_replan as rolling
-from . import agile_smart_export as agile
-from .kems_core import SimulationConfig
-from .tariff import TariffSettings
 
 _EPSILON = 1e-6
 
@@ -84,116 +73,13 @@ def _number(value: Any) -> float | None:
     return number if math.isfinite(number) else None
 
 
-def _dt(value: Any) -> datetime | None:
-    if value in (None, ""):
-        return None
-    try:
-        parsed = (
-            value
-            if isinstance(value, datetime)
-            else datetime.fromisoformat(str(value).replace("Z", "+00:00"))
-        )
-    except (TypeError, ValueError):
-        return None
-    if parsed.tzinfo is None:
-        parsed = parsed.replace(tzinfo=UTC)
-    return parsed.astimezone(UTC)
-
-
-def _known_price_plan(
-    self,
-    state: dict[str, Any],
-    plan: dict[str, Any],
-    *,
-    now: datetime,
-    config: SimulationConfig,
-    tariff: TariffSettings,
-) -> list[dict[str, Any]]:
-    """Allocate all exportable energy across only the currently known prices."""
-    now_utc = now.astimezone(UTC)
-    deadline = agile._next_cheap(now, tariff).astimezone(UTC)
-    effective_kw = max(_number(plan.get("effective_discharge_kw")) or 0.0, 0.0)
-    exportable = max(
-        _number(plan.get("exportable_battery_energy_kwh")) or 0.0,
-        0.0,
-    )
-    current_house_kw = rolling._current_house_headroom_kw(self, config)
-
-    candidates: list[dict[str, Any]] = []
-    for slot in state.get("today_slots", []):
-        if not isinstance(slot, dict):
-            continue
-        start = _dt(slot.get("valid_from"))
-        end = _dt(slot.get("valid_to"))
-        rate = _number(slot.get("rate_pence"))
-        if start is None or end is None or rate is None:
-            continue
-        overlap_start = max(start, now_utc)
-        overlap_end = min(end, deadline)
-        if overlap_end <= overlap_start:
-            continue
-        is_current = start <= now_utc < end
-        available_kw = effective_kw
-        if is_current:
-            available_kw = max(available_kw - current_house_kw, 0.0)
-        hours = (overlap_end - overlap_start).total_seconds() / 3600.0
-        candidates.append(
-            {
-                "slot": slot,
-                "start": start,
-                "rate": rate,
-                "capacity_kwh": max(available_kw * hours, 0.0),
-                "is_current": is_current,
-                "allocation_kwh": 0.0,
-            }
-        )
-
-    total_capacity = sum(item["capacity_kwh"] for item in candidates)
-    desired = min(exportable, total_capacity)
-    current = next((item for item in candidates if item["is_current"]), None)
-    current_capacity = current["capacity_kwh"] if current is not None else 0.0
-    safety_headroom = min(
-        effective_kw * rolling.SAFETY_HEADROOM_MINUTES / 60.0,
-        total_capacity,
-    )
-    required_now = max(
-        desired + safety_headroom - max(total_capacity - current_capacity, 0.0),
-        0.0,
-    )
-    if current is not None and desired > _EPSILON:
-        current["allocation_kwh"] = min(required_now, current_capacity, desired)
-
-    remaining = max(
-        desired - sum(item["allocation_kwh"] for item in candidates),
-        0.0,
-    )
-    for item in sorted(candidates, key=lambda value: value["rate"], reverse=True):
-        if remaining <= _EPSILON:
-            break
-        spare = max(item["capacity_kwh"] - item["allocation_kwh"], 0.0)
-        allocated = min(remaining, spare)
-        item["allocation_kwh"] += allocated
-        remaining -= allocated
-
-    selected: list[dict[str, Any]] = []
-    for item in sorted(candidates, key=lambda value: value["start"]):
-        allocation = round(float(item["allocation_kwh"]), 3)
-        if allocation <= _EPSILON:
-            continue
-        slot = item["slot"]
-        selected.append(
-            {
-                "valid_from": slot.get("valid_from"),
-                "label": slot.get("label"),
-                "rate_pence": round(float(item["rate"]), 5),
-                "planned_battery_export_kwh": allocation,
-                "deadline_forced": bool(
-                    item["is_current"] and required_now > _EPSILON
-                ),
-                "publication_gap_no_reserve": True,
-            }
-        )
-    return selected
+def _no_reserve_unknown_capacity(
+    selected: list[dict[str, Any]],
+    reserve_kwh: float,
+) -> tuple[list[dict[str, Any]], float]:
+    """Keep the full known-price allocation and reserve nothing for unknowns."""
+    del reserve_kwh
+    return [dict(item) for item in selected if isinstance(item, dict)], 0.0
 
 
 def _apply_no_reserve_publication_dispatch(
@@ -201,39 +87,22 @@ def _apply_no_reserve_publication_dispatch(
     state: dict[str, Any],
     plan: dict[str, Any],
     *,
-    now: datetime,
-    config: SimulationConfig,
-    tariff: TariffSettings,
+    now,
+    config,
+    tariff,
 ) -> None:
-    """Use all known-price capacity for clean publication gaps only."""
+    """Relax only a verified clean publication gap, never a retrieval failure."""
     horizon = state.get("planning_horizon")
     horizon = horizon if isinstance(horizon, dict) else {}
     recovery = alpha728._recovery_evidence(self, horizon)
-    publication_pending = bool(
-        recovery.get("verified") and recovery.get("publication_pending")
-    )
-    if not publication_pending:
-        alpha746_original_apply(
-            self,
-            state,
-            plan,
-            now=now,
-            config=config,
-            tariff=tariff,
-        )
-        return
-
-    was_held = bool(plan.get("price_horizon_battery_export_held"))
-    provisional_active = bool(plan.get("provisional_plan_active"))
-    current_known = bool(horizon.get("current_slot_known"))
     current_price = alpha728._current_price_evidence(state, now)
-    eligible = bool(
-        was_held
-        and provisional_active
-        and current_known
+    clean_publication_gap = bool(
+        recovery.get("verified")
+        and recovery.get("publication_pending")
+        and horizon.get("current_slot_known")
         and current_price.get("known")
     )
-    if not eligible:
+    if not clean_publication_gap:
         alpha746_original_apply(
             self,
             state,
@@ -244,26 +113,15 @@ def _apply_no_reserve_publication_dispatch(
         )
         return
 
-    selected_full = _known_price_plan(
-        self,
-        state,
-        plan,
-        now=now,
-        config=config,
-        tariff=tariff,
-    )
-    plan["provisional_selected_slots"] = selected_full
-    plan["provisional_planned_battery_export_kwh"] = round(
-        sum(float(item["planned_battery_export_kwh"]) for item in selected_full),
-        3,
-    )
-    plan["provisional_reserved_unknown_capacity_kwh"] = 0.0
-    selected_map = {
-        str(item.get("valid_from") or ""): dict(item) for item in selected_full
-    }
-    alpha728._restore_known_allocations(state, selected_map, now=now)
+    reserve = alpha728._reserve_evidence(plan, horizon, now=now)
+    required = max(_number(reserve.get("required_kwh")) or 0.0, 0.0)
 
-    targets = alpha717._dispatch_targets(
+    # Alpha7.28's executable safety gate requires the reserve amount to match the
+    # unresolved capacity. Supply that value only while its existing validation
+    # and dispatch path runs. The selected rows themselves are the untrimmed
+    # known-price plan because Alpha7.46 replaced Alpha7.26's trimming helper.
+    plan["provisional_reserved_unknown_capacity_kwh"] = required
+    alpha746_original_apply(
         self,
         state,
         plan,
@@ -271,83 +129,48 @@ def _apply_no_reserve_publication_dispatch(
         config=config,
         tariff=tariff,
     )
-    export_target = max(
-        _number(targets.get("battery_export_target_kw")) or 0.0,
-        0.0,
-    )
-    discharge_target = max(
-        _number(targets.get("battery_discharge_target_kw")) or 0.0,
-        0.0,
-    )
-    house_target = max(_number(targets.get("house_battery_kw")) or 0.0, 0.0)
-    selected = alpha728._executable_selected_slots(
-        plan,
-        state,
-        now=now,
-        export_target_kw=export_target,
-    )
-    planned = round(
-        sum(
-            max(_number(item.get("planned_battery_export_kwh")) or 0.0, 0.0)
-            for item in selected
-        ),
-        3,
-    )
+
+    if not plan.get("bounded_partial_horizon_dispatch_active"):
+        plan["provisional_reserved_unknown_capacity_kwh"] = 0.0
+        return
+
+    planned = max(_number(plan.get("planned_battery_export_kwh")) or 0.0, 0.0)
     exportable = max(
         _number(plan.get("exportable_battery_energy_kwh")) or 0.0,
         0.0,
     )
-
-    if export_target > alpha725.NONZERO_EXPORT_THRESHOLD_KW:
-        action = "progressive known-price export — unpublished slots not reserved"
-    else:
-        action = "progressive known-price hold — current known slot not selected"
+    export_now = max(
+        _number(plan.get("current_battery_export_target_kw")) or 0.0,
+        0.0,
+    )
+    action = (
+        "progressive known-price export — unpublished slots not reserved"
+        if export_now > _EPSILON
+        else "progressive known-price hold — current known slot not selected"
+    )
 
     plan.update(
         {
-            "bounded_partial_horizon_eligible": True,
-            "bounded_partial_horizon_reason": (
-                "clean Octopus publication gap; optimise all exportable energy "
-                "across published prices and re-rank when new prices arrive"
-            ),
-            "bounded_upstream_gap_verified": True,
-            "bounded_recovery_evidence": recovery,
-            "bounded_current_price_known": True,
-            "bounded_current_price": current_price,
+            "provisional_reserved_unknown_capacity_kwh": 0.0,
             "bounded_unknown_capacity_required_kwh": 0.0,
             "bounded_unknown_capacity_reserved_kwh": 0.0,
             "bounded_unknown_capacity_sufficient": True,
-            "bounded_unknown_slot_dispatch_blocked": True,
-            "bounded_partial_horizon_dispatch_active": True,
             "publication_gap_no_reserve_active": True,
             "unknown_price_reservation_policy": "none",
+            "replan_when_price_publishes": True,
             "economic_plan_status": "progressive_known_prices_no_reserve",
-            "dispatch_blocked_for_price_horizon": False,
-            "dispatch_permitted_battery_export_kw": round(export_target, 3),
             "dispatch_mode": "progressive_known_prices_no_reserve",
-            "bounded_underlying_dispatch_mode": targets.get("mode"),
             "dispatch_action": action,
-            "current_house_battery_kw": round(house_target, 3),
-            "current_battery_discharge_target_kw": round(discharge_target, 3),
-            "current_battery_export_target_kw": round(export_target, 3),
-            "planned_battery_export_kwh": planned,
-            "selected_slots": selected,
-            "next_export_slot": alpha728._next_selected_slot(selected, now),
-            "unallocated_exportable_kwh": round(max(exportable - planned, 0.0), 3),
-            "price_horizon_battery_export_held": False,
             "price_horizon_status": "progressive_known_prices_no_reserve",
+            "unallocated_exportable_kwh": round(max(exportable - planned, 0.0), 3),
         }
     )
     horizon.update(
         {
-            "battery_export_held": False,
             "status": "progressive_known_prices_no_reserve",
-            "bounded_partial_dispatch": True,
-            "upstream_gap_verified": True,
             "unknown_capacity_required_kwh": 0.0,
             "unknown_capacity_reserved_kwh": 0.0,
             "unknown_capacity_sufficient": True,
-            "unknown_slot_dispatch_blocked": True,
             "unknown_price_reservation_policy": "none",
             "replan_when_price_publishes": True,
         }
@@ -355,18 +178,8 @@ def _apply_no_reserve_publication_dispatch(
     state["planning_horizon"] = horizon
     state["current_action"] = action
 
-    current_slot = alpha717._current_slot(state, now)
+    current_slot = alpha728.alpha717._current_slot(state, now)
     if isinstance(current_slot, dict):
-        remaining_hours = alpha717._remaining_current_slot_hours(state, now)
-        current_slot["rolling_target_battery_export_kw"] = round(export_target, 3)
-        current_slot["rolling_target_total_discharge_kw"] = round(
-            discharge_target,
-            3,
-        )
-        current_slot["rolling_planned_battery_export_kwh"] = round(
-            export_target * remaining_hours,
-            3,
-        )
         current_slot["rolling_action"] = action
         current_slot["dispatch_action"] = action
 
@@ -387,11 +200,7 @@ def _plan_summary_no_reserve(self) -> dict[str, Any]:
         0.0,
     )
     unaccounted = max(exportable - planned, 0.0)
-    coverage = (
-        100.0
-        if exportable <= 0.01
-        else min(planned / exportable * 100.0, 100.0)
-    )
+    coverage = 100.0 if exportable <= 0.01 else min(planned / exportable * 100.0, 100.0)
     result.update(
         {
             "unknown_price_capacity_reserved_kwh": 0.0,
@@ -416,14 +225,19 @@ def _plan_summary_no_reserve(self) -> dict[str, Any]:
 
 
 def _annotate_unknown_rows_no_reserve(self, plan: dict[str, Any]) -> None:
+    rolling_state = self._hass.states.get("sensor.kems_agile_rolling_export_plan")
+    rolling_attrs = dict(rolling_state.attributes) if rolling_state is not None else {}
+    if not rolling_attrs.get("publication_gap_no_reserve_active"):
+        alpha746_original_annotate(self, plan)
+        return
+
     slot_state = self._hass.states.get("sensor.kems_agile_slot_decisions_today")
     if slot_state is None:
         return
     attrs = dict(slot_state.attributes)
     slots = [dict(item) for item in attrs.get("slots", []) if isinstance(item, dict)]
     for row in slots:
-        decision = str(row.get("decision") or "")
-        if decision.startswith("Waiting for Octopus price"):
+        if str(row.get("decision") or "").startswith("Waiting for Octopus price"):
             row["reserved_unknown_slot_capacity_kwh"] = 0.0
             row["currently_needed_from_this_unknown_capacity_kwh"] = 0.0
             row["decision"] = (
@@ -439,20 +253,24 @@ def _annotate_unknown_rows_no_reserve(self, plan: dict[str, Any]) -> None:
 def _improve_dashboard_no_reserve(content: str) -> str:
     content = content.replace(_OLD_RESERVE_TEXT, _NEW_RESERVE_TEXT, 1)
     content = content.replace(_OLD_PROJECTED_ROW, _NEW_PROJECTED_ROW, 1)
-    content = content.replace(_OLD_MISSING_NOTE, _NEW_MISSING_NOTE, 1)
-    return content
+    return content.replace(_OLD_MISSING_NOTE, _NEW_MISSING_NOTE, 1)
 
 
 def install_alpha746_no_unknown_reserve_patch() -> None:
     """Install no-reserve progressive publication planning."""
+    global alpha746_original_annotate
     global alpha746_original_apply
     global alpha746_original_plan_summary
+
+    alpha726._reserve_unknown_capacity = _no_reserve_unknown_capacity
 
     apply = alpha728._apply_bounded_partial_dispatch
     if not getattr(apply, "_kems_alpha746_no_unknown_reserve", False):
         alpha746_original_apply = apply
         _apply_no_reserve_publication_dispatch._kems_alpha746_no_unknown_reserve = True
-        alpha728._apply_bounded_partial_dispatch = _apply_no_reserve_publication_dispatch
+        alpha728._apply_bounded_partial_dispatch = (
+            _apply_no_reserve_publication_dispatch
+        )
 
     plan_summary = alpha745._plan_summary
     if not getattr(plan_summary, "_kems_alpha746_no_unknown_reserve", False):
@@ -460,7 +278,11 @@ def install_alpha746_no_unknown_reserve_patch() -> None:
         _plan_summary_no_reserve._kems_alpha746_no_unknown_reserve = True
         alpha745._plan_summary = _plan_summary_no_reserve
 
-    alpha745._annotate_unknown_slot_rows = _annotate_unknown_rows_no_reserve
+    annotate = alpha745._annotate_unknown_slot_rows
+    if not getattr(annotate, "_kems_alpha746_no_unknown_reserve", False):
+        alpha746_original_annotate = annotate
+        _annotate_unknown_rows_no_reserve._kems_alpha746_no_unknown_reserve = True
+        alpha745._annotate_unknown_slot_rows = _annotate_unknown_rows_no_reserve
 
     from . import dashboard as dashboard_module
 
