@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import ast
 import json
-import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -53,12 +52,33 @@ def test_alpha8_release_family_is_coordinated() -> None:
     assert 'panel_config_version: "0.8.0-alpha8-panel.0"' in panel_yaml
 
 
-def test_runtime_entrypoint_has_one_alpha7_compatibility_boundary() -> None:
-    runtime = (KEMS / "agile_smart_export_runtime.py").read_text(encoding="utf-8")
-    assert "install_alpha7_compatibility" in runtime
-    assert "agile_alpha7_compat" in runtime
-    assert not re.search(r"from \.agile_alpha7\d+", runtime)
-    assert not re.search(r"install_alpha7\d+", runtime)
+def test_runtime_entrypoint_has_one_executable_alpha7_compatibility_boundary() -> None:
+    runtime_path = KEMS / "agile_smart_export_runtime.py"
+    source = runtime_path.read_text(encoding="utf-8")
+    tree = ast.parse(source, filename=str(runtime_path))
+
+    compat_imports = [
+        node
+        for node in tree.body
+        if isinstance(node, ast.ImportFrom) and node.module == "agile_alpha7_compat"
+    ]
+    assert len(compat_imports) == 1
+    assert [alias.name for alias in compat_imports[0].names] == [
+        "install_alpha7_compatibility"
+    ]
+
+    executable_calls = [
+        node.func.id
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+    ]
+    assert executable_calls.count("install_alpha7_compatibility") == 1
+    assert not any(
+        name.startswith("install_alpha7") and name != "install_alpha7_compatibility"
+        for name in executable_calls
+    )
+
+    assert "ALPHA7_COMPATIBILITY_ORDER" in source
 
 
 def test_frozen_alpha7_compatibility_registry_is_complete_and_resolvable() -> None:
