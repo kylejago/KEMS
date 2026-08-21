@@ -15,17 +15,15 @@ LOADER = KEMS / "agile_smart_export_runtime.py"
 DOC = ROOT / "docs" / "alpha741-progressive-agile-publication.md"
 
 
-def test_alpha741_or_later_keeps_web20_and_panel7() -> None:
+def test_alpha741_contract_is_coordinated_in_alpha8() -> None:
     manifest = json.loads((KEMS / "manifest.json").read_text())
     bundle = json.loads((ROOT / "release/kems-bundle.template.json").read_text())
 
-    version = str(manifest["version"])
-    assert version.startswith("0.7.0-alpha7.")
-    assert int(version.rsplit(".", 1)[1]) >= 41
-    assert bundle["components"]["property_web"]["version"] == "0.7.0-alpha7-web.20"
-    assert bundle["components"]["pi_agent"]["version"] == "0.7.0-alpha7-web.20"
-    assert bundle["components"]["public_web"]["version"] == "0.7.0-alpha7-web.20"
-    assert bundle["components"]["panel"]["version"] == "0.7.0-alpha7-panel7"
+    assert manifest["version"] == "0.8.0-alpha8.0"
+    assert bundle["components"]["property_web"]["version"] == "0.8.0-alpha8-web.0"
+    assert bundle["components"]["pi_agent"]["version"] == "0.8.0-alpha8-web.0"
+    assert bundle["components"]["public_web"]["version"] == "0.8.0-alpha8-web.0"
+    assert bundle["components"]["panel"]["version"] == "0.8.0-alpha8-panel.0"
 
 
 def test_alpha741_modules_parse() -> None:
