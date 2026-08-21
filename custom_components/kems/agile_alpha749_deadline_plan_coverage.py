@@ -75,7 +75,7 @@ def _future_price_plan_coverage(
             "reason": "no valid future selected slot/deadline pair",
         }
 
-    if next_start <= now_utc + alpha717.timedelta(seconds=1):
+    if next_start <= now_utc:
         return {
             "available": True,
             "safe_to_wait": False,
@@ -144,11 +144,11 @@ def _rebalance_deadline_forced_current_slot(
         0.0,
     )
     selected_source = plan.get("selected_slots")
-    selected = [
-        dict(item)
-        for item in selected_source
-        if isinstance(item, dict)
-    ] if isinstance(selected_source, list) else []
+    selected = (
+        [dict(item) for item in selected_source if isinstance(item, dict)]
+        if isinstance(selected_source, list)
+        else []
+    )
 
     current_row = next(
         (
@@ -158,10 +158,11 @@ def _rebalance_deadline_forced_current_slot(
         ),
         None,
     )
-    existing_current = max(
-        _number(current_row.get("planned_battery_export_kwh")) or 0.0,
-        0.0,
-    ) if current_row is not None else 0.0
+    existing_current = (
+        max(_number(current_row.get("planned_battery_export_kwh")) or 0.0, 0.0)
+        if current_row is not None
+        else 0.0
+    )
     desired_current = min(
         max(export_target_kw, 0.0) * remaining_hours,
         exportable,
