@@ -62,4 +62,4 @@ def test_alpha747_preserves_conservative_fallback_and_hardware_block() -> None:
     assert ".services.async_call(" not in source
     assert "providers.foxess" not in source
     assert "retrieval failures remain conservative" in docs.lower()
-    assert "real FoxESS hardware writes remain blocked" in docs
+    assert "Real FoxESS hardware writes remain blocked" in docs
