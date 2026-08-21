@@ -9,8 +9,8 @@ ROOT = Path(__file__).parents[1]
 KEMS = ROOT / "custom_components" / "kems"
 
 
-def test_managed_panel_packaged_source_promotes_to_current_health_version() -> None:
-    """Later KEMS alphas must generate the verifier's exact managed panel target."""
+def test_managed_panel_packaged_source_matches_current_health_version() -> None:
+    """Alpha8 ships the exact managed-panel target without runtime rewriting."""
     panel = (KEMS / "kems16x16.yaml").read_text(encoding="utf-8")
     health = (KEMS / "panel.py").read_text(encoding="utf-8")
     dashboard = (KEMS / "dashboard.py").read_text(encoding="utf-8")
@@ -21,19 +21,11 @@ def test_managed_panel_packaged_source_promotes_to_current_health_version() -> N
     assert health_match is not None
     source_version = panel_match.group(1)
     health_version = health_match.group(1)
-    assert source_version == "0.7.0-alpha7-panel6"
-    assert health_version == "0.7.0-alpha7-panel7"
-    assert (
-        "PANEL6_VERSION_LINE = b'panel_config_version: \"0.7.0-alpha7-panel6\"'"
-        in dashboard
-    )
-    assert (
-        "PANEL7_VERSION_LINE = b'panel_config_version: \"0.7.0-alpha7-panel7\"'"
-        in dashboard
-    )
-    assert "source.replace(PANEL6_VERSION_LINE, PANEL7_VERSION_LINE, 1)" in dashboard
-    assert health_version.startswith("0.7.0-alpha7-panel")
-    assert int(health_version.rsplit("panel", 1)[1]) >= 4
+    assert source_version == "0.8.0-alpha8-panel.0"
+    assert health_version == source_version
+    assert "PANEL6_VERSION_LINE" not in dashboard
+    assert "PANEL7_VERSION_LINE" not in dashboard
+    assert "return PACKAGED_PANEL_PATH.read_bytes()" in dashboard
 
 
 def test_alpha721_panel_uses_a_true_ten_cell_battery_meter() -> None:
