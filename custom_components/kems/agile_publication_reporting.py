@@ -250,7 +250,9 @@ def install_tomorrow_publication_reporting() -> None:
     progressive = alpha741._progressive_tomorrow_state
     if not getattr(progressive, "_kems_tomorrow_no_reserve_reporting", False):
         _original_progressive_tomorrow_state = progressive
-        _progressive_tomorrow_state_no_reserve._kems_tomorrow_no_reserve_reporting = True
+        _progressive_tomorrow_state_no_reserve._kems_tomorrow_no_reserve_reporting = (
+            True
+        )
         alpha741._progressive_tomorrow_state = _progressive_tomorrow_state_no_reserve
 
     plan_summary = alpha745._plan_summary
