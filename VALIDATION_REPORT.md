@@ -1,49 +1,80 @@
-# KEMS Alpha7.36 validation report
+# KEMS Alpha8.0 validation report
 
-Build: `0.7.0-alpha7.36`
+Build: `0.8.0-alpha8.0`
+
+Coordinated companions:
+
+- KEMS Web / Pi / public: `0.8.0-alpha8-web.0`
+- Managed ESPHome panel: `0.8.0-alpha8-panel.0`
 
 ## Behavioural baseline
 
-Alpha7.36 is a reporting, dashboard and managed-panel release. The proven economic/dispatch stack remains Alpha7.31 plus Alpha7.34 latest-safe-start protection and Alpha7.35 overnight reporting handover.
+Alpha8.0 is a consolidation and parity release. The accepted behavioural baseline is KEMS `0.7.0-alpha7.52`; the accepted mobile/PWA baseline is KEMS Web `0.7.0-alpha7-web.33`.
 
 The release must not change:
 
-- the 7 kW shared inverter ceiling;
-- the 10% minimum SOC reserve;
-- the 13-point independent shadow-command safety validator;
+- the established Agile optimiser outcomes covered by the Alpha7.52 regression suite;
+- the shared inverter/export/discharge limits;
+- the minimum SOC reserve policy;
+- the independent 13-point shadow-command safety validator;
 - strict candidate-applied replay/tracking;
-- the configured overnight schedule as the only cheap-control authority;
-- the real-hardware write block before commissioning.
+- conservative handling of genuine rate-retrieval failures;
+- Power Down / Happy Hour priority ordering;
+- the real-hardware write block before commissioning;
+- the read-only property Web and Cloudflare Access security boundary.
 
-## Alpha7.36 validation scope
+## Alpha8.0 consolidation scope
 
 The release must prove:
 
-- manifest and coordinated bundle versions agree on `0.7.0-alpha7.36`;
-- Panel6 is the expected managed firmware and is delivered by KEMS core;
-- Panel6 exposes only Live Data, Battery & Solar, Full KEMS and Full KEMS Agile;
-- Full KEMS Agile panel flow is generated from the final coherent `current_routing_snapshot`, including grid import/export, battery-to-home, battery export and simulated SOC;
-- the legacy Panel5 compact Agile flow entity is also republished from that final snapshot during migration;
-- the established managed ESPHome automatic compile, OTA and reconnect-verification path remains intact;
-- the Compare page uses native observed import cost instead of a literal dash;
-- Full KEMS Agile SOC falls back to the current-routing snapshot and no longer renders blank;
-- genuinely uncommissioned live solar/battery/export values are labelled as awaiting hardware data rather than shown as broken calculations;
-- Winner by period compares the three user-facing simulated products on the common `import cost - export income` basis for today, yesterday, seven days and 30 days;
-- rolling 365-day and all-tracked Agile evidence compare Full KEMS with Full KEMS Agile without inventing unavailable Battery & Solar history;
-- the Cost & ROI page separates actual measured costs from simulated costs and exposes predicted ROI plus the existing actual savings/ROI/payback ledger for post-commissioning use;
-- property Web and Pi agent remain on `0.7.0-alpha7-web.13` and public Web remains IONOS SFTP delivered.
+- Home Assistant publishes `0.8.0-alpha8.0`;
+- property Web, Pi agent and public Web all target `0.8.0-alpha8-web.0`;
+- the managed panel YAML, panel verifier and release bundle all target `0.8.0-alpha8-panel.0`;
+- the Agile runtime enters the frozen Alpha7.52 compatibility stack through one boundary rather than importing every historical patch directly;
+- the compatibility registry preserves the proven installer order and every referenced installer remains packaged and parseable;
+- Alpha8 does not start a new version-named Agile patch chain;
+- the packaged panel is copied unchanged instead of being version-rewritten at runtime;
+- existing managed-panel OTA and reconnect verification remain intact;
+- the managed ESPHome YAML validates and compiles in CI;
+- Web retains the Web.33 authenticated manifest/PWA install contract through Cloudflare Access;
+- the service worker continues to avoid caching live API telemetry or Access login redirects as KEMS assets;
+- Live Data and the web panel consume one shared physical panel-state model;
+- only the shared PWA bootstrap registers the service worker;
+- Compare, Agile, Cost & ROI, Settings, public demo, fixture and Pi-deployment contracts remain intact;
+- no Home Assistant service/control write path is added to KEMS Web.
 
 ## Required automated checks
 
+### Home Assistant / panel
+
 - packaged managed-dashboard current
-- Alpha7.36 dashboard composition regression
-- Panel6 simplified-mode and routing-parity regression
-- coordinated bundle regression
 - Black
 - Ruff
-- Pytest
+- complete Pytest suite
 - Python compile
-- hassfest
-- HACS
+- HACS validation
+- hassfest validation
+- ESPHome configuration validation
+- ESPHome firmware compile
 
-Real FoxESS writes remain blocked until commissioning passes.
+### Web / Pi / PWA
+
+- JavaScript syntax checks
+- unconfigured smoke test and runtime manifest check
+- Alpha5 fixture regression
+- Alpha6 scenario regression
+- connected live fixture regression
+- Agile read-only/entity/safety contract
+- Compare contract
+- historical Web capability regressions
+- Web.31 mobile/PWA contract
+- Web.32 install-state diagnostics contract
+- Web.33 Cloudflare-authenticated manifest contract
+- Alpha8 consolidation contract
+- Pi deployment checks
+
+## Release decision
+
+Alpha8.0 may be merged and published only when the exact final heads of both coordinated pull requests are green. Web should be published first so `0.8.0-alpha8-web.0` exists before the Home Assistant coordinated bundle is released.
+
+Real FoxESS hardware writes remain blocked until commissioning passes. Alpha8.0 does not relax that boundary.
