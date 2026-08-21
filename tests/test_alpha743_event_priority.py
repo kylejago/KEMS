@@ -20,17 +20,15 @@ DATETIME = KEMS / "datetime.py"
 DOC = ROOT / "docs" / "alpha743-power-down-happy-hour.md"
 
 
-def test_alpha743_release_version_keeps_web20_and_panel7() -> None:
+def test_alpha743_contract_is_coordinated_in_alpha8() -> None:
     manifest = json.loads((KEMS / "manifest.json").read_text())
     bundle = json.loads((ROOT / "release/kems-bundle.template.json").read_text())
 
-    version = str(manifest["version"])
-    assert version.startswith("0.7.0-alpha7.")
-    assert int(version.rsplit(".", 1)[-1]) >= 43
-    assert bundle["components"]["property_web"]["version"] == "0.7.0-alpha7-web.20"
-    assert bundle["components"]["pi_agent"]["version"] == "0.7.0-alpha7-web.20"
-    assert bundle["components"]["public_web"]["version"] == "0.7.0-alpha7-web.20"
-    assert bundle["components"]["panel"]["version"] == "0.7.0-alpha7-panel7"
+    assert manifest["version"] == "0.8.0-alpha8.0"
+    assert bundle["components"]["property_web"]["version"] == "0.8.0-alpha8-web.0"
+    assert bundle["components"]["pi_agent"]["version"] == "0.8.0-alpha8-web.0"
+    assert bundle["components"]["public_web"]["version"] == "0.8.0-alpha8-web.0"
+    assert bundle["components"]["panel"]["version"] == "0.8.0-alpha8-panel.0"
 
 
 def test_alpha743_modules_parse_and_install_last() -> None:
