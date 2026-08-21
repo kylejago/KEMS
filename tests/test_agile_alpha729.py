@@ -13,11 +13,10 @@ MANIFEST = KEMS / "manifest.json"
 DOC = ROOT / "docs" / "agile-live-routing-parity.md"
 
 
-def test_alpha729_manifest_is_alpha729_or_newer() -> None:
+def test_alpha729_contract_is_retained_in_alpha8() -> None:
     manifest = MANIFEST.read_text(encoding="utf-8")
-    assert '"version": "0.7.0-alpha7.' in manifest
-    version = manifest.split('"version": "0.7.0-alpha7.', 1)[1].split('"', 1)[0]
-    assert int(version) >= 29
+    assert '"version": "0.8.0-alpha8.0"' in manifest
+    assert PATCH.exists()
 
 
 def test_alpha729_module_parses() -> None:
