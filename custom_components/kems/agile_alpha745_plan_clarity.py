@@ -15,6 +15,8 @@ when available and makes missing physical battery data explicit.
 Real FoxESS hardware writes remain blocked.
 """
 
+# ruff: noqa: E501
+
 from __future__ import annotations
 
 import math
