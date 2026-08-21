@@ -119,38 +119,77 @@ def find_panel_firmware_state(hass: HomeAssistant) -> State | None:
 
 async def async_refresh_reported_panel_version(hass: HomeAssistant) -> dict[str, Any]:
     """Refresh the retained firmware version from Home Assistant state."""
-    state = find_panel_firmware_state(hass)
-    if state is None:
-        return await async_update_panel_health(
-            hass,
-            reported_version=None,
-            reported_entity_id=None,
-        )
+    panel_state = find_panel_firmware_state(hass)
+    if panel_state is None or panel_state.state in {"unknown", "unavailable"}:
+        return await async_load_panel_health(hass)
+
+    current = panel_health_snapshot(hass)
+    status = current["status"]
+    if panel_state.state == PANEL_CONFIG_VERSION and status not in {
+        "Updating",
+        "Success",
+    }:
+        status = "Ready"
+    elif panel_state.state != PANEL_CONFIG_VERSION and status not in {
+        "Updating",
+        "Manual install required",
+    }:
+        status = "Version mismatch"
+
     return await async_update_panel_health(
         hass,
-        reported_version=state.state,
-        reported_entity_id=state.entity_id,
+        status=status,
+        reported_version=panel_state.state,
+        reported_entity_id=panel_state.entity_id,
     )
 
 
-async def async_wait_for_panel_version(
+async def async_verify_panel_firmware(
     hass: HomeAssistant,
-    expected_version: str = PANEL_CONFIG_VERSION,
     *,
-    timeout_seconds: float = PANEL_VERIFY_TIMEOUT_SECONDS,
-    interval_seconds: float = PANEL_VERIFY_INTERVAL_SECONDS,
+    timeout_seconds: int = PANEL_VERIFY_TIMEOUT_SECONDS,
 ) -> bool:
-    """Wait until the panel reports the expected managed configuration version."""
-    started = monotonic()
-    while monotonic() - started < timeout_seconds:
-        state = find_panel_firmware_state(hass)
-        if state is not None:
-            await async_update_panel_health(
-                hass,
-                reported_version=state.state,
-                reported_entity_id=state.entity_id,
-            )
-            if state.state == expected_version:
+    """Confirm that the expected firmware reconnects after an automatic OTA."""
+    deadline = monotonic() + max(int(timeout_seconds), PANEL_VERIFY_INTERVAL_SECONDS)
+    last_reported: str | None = None
+    last_entity_id: str | None = None
+
+    while monotonic() < deadline:
+        panel_state = find_panel_firmware_state(hass)
+        if panel_state is not None and panel_state.state not in {
+            "unknown",
+            "unavailable",
+        }:
+            last_reported = panel_state.state
+            last_entity_id = panel_state.entity_id
+            if panel_state.state == PANEL_CONFIG_VERSION:
+                now = dt_util.now().isoformat()
+                await async_update_panel_health(
+                    hass,
+                    status="Success",
+                    reported_version=panel_state.state,
+                    reported_entity_id=panel_state.entity_id,
+                    last_ota_success=now,
+                    last_ota_result="success",
+                    last_error=None,
+                )
                 return True
-        await asyncio.sleep(interval_seconds)
+        await asyncio.sleep(PANEL_VERIFY_INTERVAL_SECONDS)
+
+    detail = (
+        f"Panel reported {last_reported!r} instead of {PANEL_CONFIG_VERSION!r}"
+        if last_reported is not None
+        else (
+            f"Panel did not report {PANEL_CONFIG_VERSION!r} within "
+            f"{timeout_seconds} seconds"
+        )
+    )
+    await async_update_panel_health(
+        hass,
+        status="Failed",
+        reported_version=last_reported,
+        reported_entity_id=last_entity_id,
+        last_ota_result="failed",
+        last_error=detail,
+    )
     return False
