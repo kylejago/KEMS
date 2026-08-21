@@ -38,7 +38,10 @@ def test_alpha746_keeps_full_known_price_plan_and_reserves_zero() -> None:
     source = PATCH.read_text(encoding="utf-8")
 
     assert "def _no_reserve_unknown_capacity(" in source
-    assert "return [dict(item) for item in selected if isinstance(item, dict)], 0.0" in source
+    assert (
+        "return [dict(item) for item in selected if isinstance(item, dict)], 0.0"
+        in source
+    )
     assert "alpha726._reserve_unknown_capacity = _no_reserve_unknown_capacity" in source
     assert '"provisional_reserved_unknown_capacity_kwh": 0.0' in source
     assert '"bounded_unknown_capacity_reserved_kwh": 0.0' in source
