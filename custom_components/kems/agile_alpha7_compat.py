@@ -78,7 +78,7 @@ POST_BASE_PATCHES: Final[tuple[PatchSpec, ...]] = (
     ("agile_alpha744_dashboard_parity", "install_alpha744_dashboard_parity_patch"),
     ("agile_alpha745_plan_clarity", "install_alpha745_plan_clarity_patch"),
     ("agile_alpha746_no_unknown_reserve", "install_alpha746_no_unknown_reserve_patch"),
-    ("agile_alpha748_full_battery_solar", "install_alpha748_full_battery_solar_patch"),
+    ("agile_full_battery_routing", "install_full_battery_routing"),
     (
         "agile_deadline_plan_reconciliation",
         "install_deadline_plan_coverage",
