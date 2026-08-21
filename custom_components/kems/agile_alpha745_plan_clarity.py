@@ -55,13 +55,19 @@ _BATTERY_PLAN_CARD = r"""      - type: markdown
 
 _SIM_SOC_ROW_MARKER = """              | Battery net | {{ states('sensor.kems_agile_simulated_battery_net_power') }} kW |
 """
-_SIM_SOC_ROW = _SIM_SOC_ROW_MARKER + """              | Battery SOC | **{{ states('sensor.kems_agile_simulated_battery_soc_now') }}%** |
+_SIM_SOC_ROW = (
+    _SIM_SOC_ROW_MARKER
+    + """              | Battery SOC | **{{ states('sensor.kems_agile_simulated_battery_soc_now') }}%** |
 """
+)
 
 _LIVE_SOC_ROW_MARKER = """              | Battery power | {{ states('sensor.kems_battery_power') if states('sensor.kems_battery_power') not in ['unknown','unavailable'] else '—' }}{% if states('sensor.kems_battery_power') not in ['unknown','unavailable'] %} kW{% endif %} |
 """
-_LIVE_SOC_ROW = _LIVE_SOC_ROW_MARKER + """              | Battery SOC | {{ states('sensor.kems_battery_state_of_charge') if states('sensor.kems_battery_state_of_charge') not in ['unknown','unavailable'] else '—' }}{% if states('sensor.kems_battery_state_of_charge') not in ['unknown','unavailable'] %}%{% endif %} |
+_LIVE_SOC_ROW = (
+    _LIVE_SOC_ROW_MARKER
+    + """              | Battery SOC | {{ states('sensor.kems_battery_state_of_charge') if states('sensor.kems_battery_state_of_charge') not in ['unknown','unavailable'] else '—' }}{% if states('sensor.kems_battery_state_of_charge') not in ['unknown','unavailable'] %}%{% endif %} |
 """
+)
 
 
 def _number(value: Any) -> float | None:
@@ -110,15 +116,17 @@ def _plan_summary(self) -> dict[str, Any]:
 
     tolerance = 0.01
     if exportable <= tolerance:
-        target_status = "No discretionary export required — house and reserve are protected"
+        target_status = (
+            "No discretionary export required — house and reserve are protected"
+        )
     elif gap_after_known <= tolerance:
         target_status = "Covered by published-price export plan"
     elif reserved + tolerance >= gap_after_known:
-        target_status = (
-            "Covered — published exports plus reserved unpublished-slot capacity can reach target"
-        )
+        target_status = "Covered — published exports plus reserved unpublished-slot capacity can reach target"
     else:
-        target_status = f"Shortfall {unaccounted:.3f} kWh — more export capacity is required"
+        target_status = (
+            f"Shortfall {unaccounted:.3f} kWh — more export capacity is required"
+        )
 
     unresolved = attrs.get("provisional_unresolved_price_slots")
     unresolved = [str(item) for item in unresolved or [] if str(item).strip()]
@@ -139,7 +147,9 @@ def _plan_summary(self) -> dict[str, Any]:
         "target_status": target_status,
         "target_covered": unaccounted <= tolerance,
         "unresolved_price_slots": unresolved,
-        "bounded_partial_horizon": bool(attrs.get("bounded_partial_horizon_dispatch_active")),
+        "bounded_partial_horizon": bool(
+            attrs.get("bounded_partial_horizon_dispatch_active")
+        ),
         "unknown_prices_are_never_guessed": True,
         "reporting_only": True,
         "hardware_writes": "blocked",
@@ -158,7 +168,9 @@ def _annotate_unknown_slot_rows(self, plan: dict[str, Any]) -> None:
     rolling = self._hass.states.get("sensor.kems_agile_rolling_export_plan")
     rolling_attrs = dict(rolling.attributes) if rolling is not None else {}
     effective_kw = max(_number(rolling_attrs.get("effective_discharge_kw")) or 0.0, 0.0)
-    remaining_need = max(_number(plan.get("required_from_unknown_slots_kwh")) or 0.0, 0.0)
+    remaining_need = max(
+        _number(plan.get("required_from_unknown_slots_kwh")) or 0.0, 0.0
+    )
 
     for row in slots:
         decision = str(row.get("decision") or "")
@@ -170,11 +182,7 @@ def _annotate_unknown_slot_rows(self, plan: dict[str, Any]) -> None:
         row["currently_needed_from_this_unknown_capacity_kwh"] = round(needed_here, 3)
         row["decision"] = (
             f"Waiting for Octopus price — {slot_capacity:.3f} kWh capacity reserved"
-            + (
-                f"; {needed_here:.3f} kWh currently needed"
-                if needed_here > 0.0
-                else ""
-            )
+            + (f"; {needed_here:.3f} kWh currently needed" if needed_here > 0.0 else "")
         )
         remaining_need = max(remaining_need - needed_here, 0.0)
 
@@ -192,9 +200,16 @@ def improve_alpha745_dashboard(content: str) -> str:
             _BATTERY_PLAN_CARD + _SLOT_CARD_MARKER,
             1,
         )
-    if _SIM_SOC_ROW_MARKER in content and "| Battery SOC | **{{ states('sensor.kems_agile_simulated_battery_soc_now') }}%** |" not in content:
+    if (
+        _SIM_SOC_ROW_MARKER in content
+        and "| Battery SOC | **{{ states('sensor.kems_agile_simulated_battery_soc_now') }}%** |"
+        not in content
+    ):
         content = content.replace(_SIM_SOC_ROW_MARKER, _SIM_SOC_ROW, 1)
-    if _LIVE_SOC_ROW_MARKER in content and "sensor.kems_battery_state_of_charge" not in content:
+    if (
+        _LIVE_SOC_ROW_MARKER in content
+        and "sensor.kems_battery_state_of_charge" not in content
+    ):
         content = content.replace(_LIVE_SOC_ROW_MARKER, _LIVE_SOC_ROW, 1)
     return content
 
