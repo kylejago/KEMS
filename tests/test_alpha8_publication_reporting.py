@@ -53,7 +53,9 @@ def test_sub_tolerance_reporting_residual_still_normalises_to_full_coverage() ->
     assert "(required_unknown or 0.0) > _EPSILON" in source
 
 
-def test_canonicalisation_leaves_dispatch_and_hardware_permissions_out_of_scope() -> None:
+def test_canonicalisation_leaves_dispatch_and_hardware_permissions_out_of_scope() -> (
+    None
+):
     source = CANONICAL.read_text(encoding="utf-8")
     assert "battery_export_target_kw" not in source
     assert ".services.async_call(" not in source
