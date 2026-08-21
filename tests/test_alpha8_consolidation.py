@@ -103,24 +103,56 @@ def test_alpha8_compatibility_registry_is_complete_and_resolvable() -> None:
         assert installer_name in functions, f"{module_name} is missing {installer_name}"
 
 
-def test_publication_reporting_retires_alpha750_and_alpha752_from_execution() -> None:
+def test_deadline_reconciliation_retires_alpha749_and_alpha751_from_execution() -> None:
     specs = _compat_specs()
+    alpha748 = (
+        "agile_alpha748_full_battery_solar",
+        "install_alpha748_full_battery_solar_patch",
+    )
+    deadline_coverage = (
+        "agile_deadline_plan_reconciliation",
+        "install_deadline_plan_coverage",
+    )
     no_reserve = ("agile_publication_reporting", "install_no_reserve_reporting")
     maximum_discharge = (
-        "agile_alpha751_maximum_discharge_plan_reconcile",
-        "install_alpha751_maximum_discharge_plan_reconcile_patch",
+        "agile_deadline_plan_reconciliation",
+        "install_maximum_discharge_plan_reconcile",
     )
     tomorrow = (
         "agile_publication_reporting",
         "install_tomorrow_publication_reporting",
     )
 
-    assert specs.index(no_reserve) > specs.index(
-        (
-            "agile_alpha749_deadline_plan_coverage",
-            "install_alpha749_deadline_plan_coverage_patch",
-        )
+    assert specs.index(deadline_coverage) > specs.index(alpha748)
+    assert specs.index(deadline_coverage) < specs.index(no_reserve)
+    assert specs.index(maximum_discharge) > specs.index(no_reserve)
+    assert specs.index(maximum_discharge) < specs.index(tomorrow)
+
+    retired = {
+        "agile_alpha749_deadline_plan_coverage",
+        "agile_alpha751_maximum_discharge_plan_reconcile",
+    }
+    assert not any(module_name in retired for module_name, _ in specs)
+    assert all((KEMS / f"{module_name}.py").is_file() for module_name in retired)
+
+
+def test_publication_reporting_retires_alpha750_and_alpha752_from_execution() -> None:
+    specs = _compat_specs()
+    deadline_coverage = (
+        "agile_deadline_plan_reconciliation",
+        "install_deadline_plan_coverage",
     )
+    no_reserve = ("agile_publication_reporting", "install_no_reserve_reporting")
+    maximum_discharge = (
+        "agile_deadline_plan_reconciliation",
+        "install_maximum_discharge_plan_reconcile",
+    )
+    tomorrow = (
+        "agile_publication_reporting",
+        "install_tomorrow_publication_reporting",
+    )
+
+    assert specs.index(no_reserve) > specs.index(deadline_coverage)
     assert specs.index(no_reserve) < specs.index(maximum_discharge)
     assert specs.index(tomorrow) > specs.index(maximum_discharge)
 
@@ -130,6 +162,17 @@ def test_publication_reporting_retires_alpha750_and_alpha752_from_execution() ->
     }
     assert not any(module_name in retired for module_name, _ in specs)
     assert all((KEMS / f"{module_name}.py").is_file() for module_name in retired)
+
+
+def test_canonical_deadline_reconciliation_cannot_enable_hardware_writes() -> None:
+    source = (KEMS / "agile_deadline_plan_reconciliation.py").read_text(
+        encoding="utf-8"
+    )
+    assert ".services.async_call(" not in source
+    assert "providers.foxess" not in source
+    assert "safe_to_write_hardware = True" not in source
+    assert "commands_permitted = True" not in source
+    assert "Real FoxESS hardware writes remain blocked" in source
 
 
 def test_canonical_publication_reporting_cannot_enable_hardware_writes() -> None:

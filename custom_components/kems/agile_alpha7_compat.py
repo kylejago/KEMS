@@ -80,13 +80,13 @@ POST_BASE_PATCHES: Final[tuple[PatchSpec, ...]] = (
     ("agile_alpha746_no_unknown_reserve", "install_alpha746_no_unknown_reserve_patch"),
     ("agile_alpha748_full_battery_solar", "install_alpha748_full_battery_solar_patch"),
     (
-        "agile_alpha749_deadline_plan_coverage",
-        "install_alpha749_deadline_plan_coverage_patch",
+        "agile_deadline_plan_reconciliation",
+        "install_deadline_plan_coverage",
     ),
     ("agile_publication_reporting", "install_no_reserve_reporting"),
     (
-        "agile_alpha751_maximum_discharge_plan_reconcile",
-        "install_alpha751_maximum_discharge_plan_reconcile_patch",
+        "agile_deadline_plan_reconciliation",
+        "install_maximum_discharge_plan_reconcile",
     ),
     ("agile_publication_reporting", "install_tomorrow_publication_reporting"),
 )
