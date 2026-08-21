@@ -31,8 +31,8 @@ current-day safety layers still decide what may actually run.
 
 ## Sub-rounding residuals
 
-The same acceptance diagnostics showed **35.109 kWh** exportable and **35.108
-kWh** planned, leaving a mathematical **0.001 kWh** residual. That is within the
+The same acceptance diagnostics showed **35.109 kWh** exportable and **35.108 kWh**
+planned, leaving a mathematical **0.001 kWh** residual. That is within the
 existing 0.01 kWh target-covered tolerance but was still displayed as a real
 unaccounted requirement and could leave the coverage field blank.
 
