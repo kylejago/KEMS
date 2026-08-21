@@ -65,10 +65,7 @@ def test_alpha748_regression_matches_reported_full_soc_case() -> None:
     solar_surplus_kw = max(solar_kw - solar_to_home_kw, 0.0)
     export_headroom_kw = max(export_limit_kw - battery_export_kw, 0.0)
     inverter_headroom_kw = max(
-        inverter_limit_kw
-        - solar_to_home_kw
-        - battery_to_home_kw
-        - battery_export_kw,
+        inverter_limit_kw - solar_to_home_kw - battery_to_home_kw - battery_export_kw,
         0.0,
     )
     solar_export_kw = min(
