@@ -44,7 +44,10 @@ POST_BASE_PATCHES: Final[tuple[PatchSpec, ...]] = (
     ("agile_alpha725_nonzero", "install_alpha725_nonzero_export_proof_patch"),
     ("agile_alpha726_provisional", "install_alpha726_provisional_planning_patch"),
     ("agile_alpha727_price_recovery", "install_alpha727_price_recovery_patch"),
-    ("agile_alpha728_bounded_partial", "install_alpha728_bounded_partial_horizon_patch"),
+    (
+        "agile_alpha728_bounded_partial",
+        "install_alpha728_bounded_partial_horizon_patch",
+    ),
     ("agile_alpha729_live_routing", "install_alpha729_live_routing_parity_patch"),
     ("agile_alpha730_current_routing", "install_alpha730_current_routing_patch"),
     ("agile_alpha731_solar_headroom", "install_alpha731_solar_headroom_patch"),
@@ -53,20 +56,44 @@ POST_BASE_PATCHES: Final[tuple[PatchSpec, ...]] = (
     ("agile_alpha736_panel_flow", "install_alpha736_panel_flow_patch"),
     ("dashboard_alpha736_finance", "install_alpha736_finance_dashboard_patch"),
     ("agile_alpha740_opportunity_guard", "install_alpha740_opportunity_guard_patch"),
-    ("dashboard_alpha740_agile_primary", "install_alpha740_agile_primary_dashboard_patch"),
-    ("agile_alpha741_partial_publication", "install_alpha741_partial_publication_patch"),
-    ("dashboard_alpha741_partial_publication", "install_alpha741_partial_publication_dashboard_patch"),
+    (
+        "dashboard_alpha740_agile_primary",
+        "install_alpha740_agile_primary_dashboard_patch",
+    ),
+    (
+        "agile_alpha741_partial_publication",
+        "install_alpha741_partial_publication_patch",
+    ),
+    (
+        "dashboard_alpha741_partial_publication",
+        "install_alpha741_partial_publication_dashboard_patch",
+    ),
     ("agile_alpha742_dashboard_focus", "install_alpha742_dashboard_focus_patch"),
-    ("agile_alpha742_live_graph_telemetry", "install_alpha742_live_graph_telemetry_patch"),
+    (
+        "agile_alpha742_live_graph_telemetry",
+        "install_alpha742_live_graph_telemetry_patch",
+    ),
     ("agile_alpha743_event_priority", "install_alpha743_event_priority_patch"),
     ("agile_alpha744_dashboard_parity", "install_alpha744_dashboard_parity_patch"),
     ("agile_alpha745_plan_clarity", "install_alpha745_plan_clarity_patch"),
     ("agile_alpha746_no_unknown_reserve", "install_alpha746_no_unknown_reserve_patch"),
     ("agile_alpha748_full_battery_solar", "install_alpha748_full_battery_solar_patch"),
-    ("agile_alpha749_deadline_plan_coverage", "install_alpha749_deadline_plan_coverage_patch"),
-    ("agile_alpha750_no_reserve_reporting", "install_alpha750_no_reserve_reporting_patch"),
-    ("agile_alpha751_maximum_discharge_plan_reconcile", "install_alpha751_maximum_discharge_plan_reconcile_patch"),
-    ("agile_alpha752_tomorrow_no_reserve_rounding", "install_alpha752_tomorrow_no_reserve_rounding_patch"),
+    (
+        "agile_alpha749_deadline_plan_coverage",
+        "install_alpha749_deadline_plan_coverage_patch",
+    ),
+    (
+        "agile_alpha750_no_reserve_reporting",
+        "install_alpha750_no_reserve_reporting_patch",
+    ),
+    (
+        "agile_alpha751_maximum_discharge_plan_reconcile",
+        "install_alpha751_maximum_discharge_plan_reconcile_patch",
+    ),
+    (
+        "agile_alpha752_tomorrow_no_reserve_rounding",
+        "install_alpha752_tomorrow_no_reserve_rounding_patch",
+    ),
 )
 
 
