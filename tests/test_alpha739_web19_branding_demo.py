@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import hashlib
 import json
-import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -12,21 +11,15 @@ def _sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def _suffix(version: str, marker: str) -> int:
-    match = re.search(rf"{re.escape(marker)}(\d+)$", version)
-    assert match is not None, version
-    return int(match.group(1))
-
-
-def test_alpha739_or_later_keeps_web19_plus_and_exact_svg_brand() -> None:
+def test_alpha8_keeps_web19_plus_branding_contract_and_exact_svg_brand() -> None:
     manifest = json.loads((ROOT / "custom_components/kems/manifest.json").read_text())
     bundle = json.loads((ROOT / "release/kems-bundle.template.json").read_text())
     branding = (ROOT / "docs/branding.md").read_text()
 
-    assert _suffix(manifest["version"], "alpha7.") >= 39
-    assert bundle["components"]["panel"]["version"] == "0.7.0-alpha7-panel7"
+    assert manifest["version"] == "0.8.0-alpha8.0"
+    assert bundle["components"]["panel"]["version"] == "0.8.0-alpha8-panel.0"
     for component in ("property_web", "pi_agent", "public_web"):
-        assert _suffix(bundle["components"][component]["version"], "-web.") >= 19
+        assert bundle["components"][component]["version"] == "0.8.0-alpha8-web.0"
 
     reason = bundle["maintenance"]["reason"]
     assert "Web.18" not in reason
