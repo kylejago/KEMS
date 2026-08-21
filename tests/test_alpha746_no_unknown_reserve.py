@@ -54,8 +54,9 @@ def test_alpha746_keeps_full_known_price_plan_and_reserves_zero() -> None:
 def test_alpha746_only_relaxes_clean_publication_gaps() -> None:
     source = PATCH.read_text(encoding="utf-8")
 
-    assert 'recovery.get("publication_pending")' in source
+    assert 'recovery.get("publication_pending")' not in source
     assert 'recovery.get("verified")' in source
+    assert 'recovery.get("recovery_outcome") == "octopus_missing_price"' in source
     assert 'horizon.get("current_slot_known")' in source
     assert 'current_price.get("known")' in source
     assert "alpha746_original_apply(" in source
