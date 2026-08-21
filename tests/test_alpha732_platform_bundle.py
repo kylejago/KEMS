@@ -37,12 +37,14 @@ def test_stale_root_build_artifacts_are_removed() -> None:
         assert not (ROOT / name).exists(), name
 
 
-def test_current_entry_docs_are_alpha7() -> None:
+def test_current_entry_docs_are_alpha8() -> None:
     start = (ROOT / "START_HERE.md").read_text()
     validation = (ROOT / "VALIDATION_REPORT.md").read_text()
     agile = (ROOT / "docs/agile-smart-export.md").read_text()
-    assert "0.7.0-alpha7" in start
-    assert "0.7.0-alpha7" in validation
-    assert "Alpha7.31" in agile
-    assert "bounded partial-horizon" in agile.lower()
+    assert "0.8.0-alpha8.0" in start
+    assert "0.8.0-alpha8-web.0" in start
+    assert "0.8.0-alpha8-panel.0" in start
+    assert "0.8.0-alpha8.0" in validation
+    assert "Alpha7.52" in agile
+    assert "verified publication gap" in agile.lower()
     assert "13/13" in agile
