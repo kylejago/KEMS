@@ -1,15 +1,20 @@
-"""Alpha7.46 no-reserve planning for clean Agile publication gaps.
+"""Alpha7.46/7.47 no-reserve planning for clean Agile publication gaps.
 
-For a clean Octopus publication gap KEMS now allocates the full currently
+For a verified clean Octopus publication gap KEMS allocates the full currently
 exportable battery energy across prices that are already published. It does not
 hold discretionary battery energy back for an unknown future price. When that
 price arrives the normal rolling optimiser runs again and may replace lower
 value future allocations with the newly published slot.
 
-Retrieval failures remain conservative, the current settlement period still
-requires a real price before deliberate export, all existing reserve/deadline
-guards remain active, Power Down and Happy Hour retain priority, and real
-FoxESS writes remain blocked.
+Alpha7.47 fixes the runtime promotion gate exposed by the 21 August acceptance
+test: Alpha7.28's recovery evidence does not expose ``publication_pending``.
+The clean-gap path therefore keys directly from its verified
+``octopus_missing_price`` recovery outcome, together with a known current slot
+and current price. Retrieval failures remain conservative.
+
+The current settlement period still requires a real price before deliberate
+export, all existing reserve/deadline guards remain active, Power Down and
+Happy Hour retain priority, and real FoxESS writes remain blocked.
 """
 
 from __future__ import annotations
@@ -98,7 +103,7 @@ def _apply_no_reserve_publication_dispatch(
     current_price = alpha728._current_price_evidence(state, now)
     clean_publication_gap = bool(
         recovery.get("verified")
-        and recovery.get("publication_pending")
+        and recovery.get("recovery_outcome") == "octopus_missing_price"
         and horizon.get("current_slot_known")
         and current_price.get("known")
     )
