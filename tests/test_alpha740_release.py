@@ -6,13 +6,13 @@ ROOT = Path(__file__).resolve().parents[1]
 DASHBOARD = ROOT / "custom_components" / "kems" / "dashboard_alpha740_agile_primary.py"
 
 
-def test_alpha740_bundle_targets_web20() -> None:
+def test_alpha740_bundle_capabilities_continue_in_alpha8() -> None:
     bundle = json.loads((ROOT / "release/kems-bundle.template.json").read_text())
 
-    assert bundle["components"]["property_web"]["version"] == "0.7.0-alpha7-web.20"
-    assert bundle["components"]["pi_agent"]["version"] == "0.7.0-alpha7-web.20"
-    assert bundle["components"]["public_web"]["version"] == "0.7.0-alpha7-web.20"
-    assert bundle["components"]["panel"]["version"] == "0.7.0-alpha7-panel7"
+    assert bundle["components"]["property_web"]["version"] == "0.8.0-alpha8-web.0"
+    assert bundle["components"]["pi_agent"]["version"] == "0.8.0-alpha8-web.0"
+    assert bundle["components"]["public_web"]["version"] == "0.8.0-alpha8-web.0"
+    assert bundle["components"]["panel"]["version"] == "0.8.0-alpha8-panel.0"
 
 
 def test_alpha740_dashboard_inserts_agile_and_compare_command_cards() -> None:
