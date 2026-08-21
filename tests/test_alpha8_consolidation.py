@@ -36,7 +36,9 @@ def _compat_specs() -> list[tuple[str, str]]:
 
 def test_alpha8_release_family_is_coordinated() -> None:
     manifest = json.loads((KEMS / "manifest.json").read_text(encoding="utf-8"))
-    bundle = json.loads((ROOT / "release/kems-bundle.template.json").read_text(encoding="utf-8"))
+    bundle = json.loads(
+        (ROOT / "release/kems-bundle.template.json").read_text(encoding="utf-8")
+    )
     panel_manager = (KEMS / "panel.py").read_text(encoding="utf-8")
     panel_yaml = (KEMS / "kems16x16.yaml").read_text(encoding="utf-8")
 
@@ -62,7 +64,9 @@ def test_runtime_entrypoint_has_one_alpha7_compatibility_boundary() -> None:
 def test_frozen_alpha7_compatibility_registry_is_complete_and_resolvable() -> None:
     specs = _compat_specs()
     assert specs
-    assert len(specs) == len(set(specs)), "Alpha7 compatibility installers must be unique"
+    assert len(specs) == len(
+        set(specs)
+    ), "Alpha7 compatibility installers must be unique"
     assert specs[0] == ("agile_smart_export_reporting", "install_reporting_patch")
     assert specs[-1] == (
         "agile_alpha752_tomorrow_no_reserve_rounding",
