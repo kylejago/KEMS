@@ -33,19 +33,16 @@ def test_managed_panel_keeps_known_working_hardware_and_simple_product_modes() -
         assert f'- "{obsolete}"' not in content
 
 
-def test_panel7_uses_current_agile_routing_snapshot_feed() -> None:
-    """Full KEMS Agile keeps the final coherent routing feed during Panel7 migration."""
+def test_alpha8_panel_uses_current_agile_routing_snapshot_feed() -> None:
+    """Full KEMS Agile keeps the final coherent routing feed in Alpha8."""
     content = PACKAGED.read_text(encoding="utf-8")
-    # The proven Panel6 source layout is promoted to Panel7 by dashboard.py so we
-    # do not churn the 16x16 rendering code merely for a firmware-version bump.
-    assert 'panel_config_version: "0.7.0-alpha7-panel6"' in content
+    assert 'panel_config_version: "0.8.0-alpha8-panel.0"' in content
     sync = (ROOT / "custom_components" / "kems" / "dashboard.py").read_text(
         encoding="utf-8"
     )
-    assert (
-        "PANEL7_VERSION_LINE = b'panel_config_version: \"0.7.0-alpha7-panel7\"'" in sync
-    )
-    assert "source.replace(PANEL6_VERSION_LINE, PANEL7_VERSION_LINE, 1)" in sync
+    assert "PANEL6_VERSION_LINE" not in sync
+    assert "PANEL7_VERSION_LINE" not in sync
+    assert "return PACKAGED_PANEL_PATH.read_bytes()" in sync
     assert 'display_mode == "Full KEMS Agile"' in content
     assert "selected_scenario = 7;" in content
     assert "scenario_agile_flow: sensor.kems_panel_full_kems_agile_flow_now" in content
@@ -54,7 +51,7 @@ def test_panel7_uses_current_agile_routing_snapshot_feed() -> None:
     assert '"SE=%f,GB=%f,BH=%f,BE=%f,SOC=%f"' in content
 
 
-def test_panel7_routes_battery_export_visually_through_house_bus() -> None:
+def test_panel_routes_battery_export_visually_through_house_bus() -> None:
     """Battery export must light the battery-to-hub connector without falsifying BH."""
     content = PACKAGED.read_text(encoding="utf-8")
     assert "battery_home_power > POWER_DEADBAND_KW" in content
@@ -133,8 +130,8 @@ def test_managed_panel_has_startup_and_ota_completion_animation() -> None:
     assert "ha_kems_status).has_state()" in content
 
 
-def test_managed_panel_reports_panel7_firmware_for_ota_verification() -> None:
-    """The generated ESP32 config must report the Panel7 target after OTA."""
+def test_managed_panel_reports_alpha8_firmware_for_ota_verification() -> None:
+    """The generated ESP32 config must report the Alpha8 target after OTA."""
     content = PACKAGED.read_text(encoding="utf-8")
     assert 'name: "Panel Firmware Version"' in content
     assert "id: panel_firmware_version" in content
@@ -142,7 +139,7 @@ def test_managed_panel_reports_panel7_firmware_for_ota_verification() -> None:
     panel_health = (ROOT / "custom_components" / "kems" / "panel.py").read_text(
         encoding="utf-8"
     )
-    assert 'PANEL_CONFIG_VERSION = "0.7.0-alpha7-panel7"' in panel_health
+    assert 'PANEL_CONFIG_VERSION = "0.8.0-alpha8-panel.0"' in panel_health
 
 
 def test_managed_panel_ota_tracks_queue_and_reconnect_health() -> None:
@@ -155,5 +152,5 @@ def test_managed_panel_ota_tracks_queue_and_reconnect_health() -> None:
     )
     assert 'last_ota_result="queued"' in sync
     assert "async_verify_panel_firmware" in sync
-    assert 'PANEL_CONFIG_VERSION = "0.7.0-alpha7-panel7"' in panel_health
+    assert 'PANEL_CONFIG_VERSION = "0.8.0-alpha8-panel.0"' in panel_health
     assert 'status="Success"' in panel_health

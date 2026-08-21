@@ -39,3 +39,33 @@ jobs:
 
       - name: Compile Python source
         run: python -m compileall -q custom_components tests
+
+  panel-compile:
+    name: ESPHome panel compile
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install ESPHome
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install esphome
+
+      - name: Provide CI-only Wi-Fi secrets
+        run: |
+          cat > custom_components/kems/secrets.yaml <<'EOF'
+          wifi_ssid: "KEMS-CI"
+          wifi_password: "kems-ci-placeholder"
+          EOF
+
+      - name: Validate managed panel configuration
+        run: esphome config custom_components/kems/kems16x16.yaml
+
+      - name: Compile managed panel firmware
+        run: esphome compile custom_components/kems/kems16x16.yaml

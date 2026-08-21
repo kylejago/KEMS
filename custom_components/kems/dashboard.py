@@ -36,8 +36,6 @@ LEGACY_PANEL_MARKERS = (
     b'name: "Panel Firmware Version"',
     b"id: panel_firmware_version",
 )
-PANEL6_VERSION_LINE = b'panel_config_version: "0.7.0-alpha7-panel6"'
-PANEL7_VERSION_LINE = b'panel_config_version: "0.7.0-alpha7-panel7"'
 
 SUPERVISOR_BASE_URL = "http://supervisor"
 ESPHOME_ADDON_SLUGS = (
@@ -90,13 +88,8 @@ def _combined_master_dashboard_bytes() -> bytes:
 
 
 def _managed_panel_bytes() -> bytes:
-    """Return the Panel7 payload while preserving the proven Panel6 source layout."""
-    source = PACKAGED_PANEL_PATH.read_bytes()
-    if PANEL7_VERSION_LINE in source:
-        return source
-    if PANEL6_VERSION_LINE not in source:
-        raise ValueError("Packaged KEMS panel has an unexpected config version")
-    return source.replace(PANEL6_VERSION_LINE, PANEL7_VERSION_LINE, 1)
+    """Return the packaged managed-panel payload unchanged."""
+    return PACKAGED_PANEL_PATH.read_bytes()
 
 
 def _panel_is_kems_managed(target: Path) -> bool:
@@ -109,9 +102,9 @@ def _panel_is_kems_managed(target: Path) -> bool:
         return False
     if content.startswith(MANAGED_PANEL_HEADER):
         return True
-    # Panel4/5-era installs can pre-date the management header. Treat only an
+    # Older installs can pre-date the management header. Treat only an
     # unmistakable KEMS16x16 firmware file as managed so those users do not need
-    # a second manual flash merely to enter the Panel7 OTA path.
+    # a second manual flash merely to enter the managed OTA path.
     return all(marker in content for marker in LEGACY_PANEL_MARKERS)
 
 

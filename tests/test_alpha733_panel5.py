@@ -10,7 +10,7 @@ ROOT = Path(__file__).resolve().parents[1]
 KEMS = ROOT / "custom_components" / "kems"
 
 
-def test_alpha733_versions_and_bundle_remain_panel5_or_later_aligned() -> None:
+def test_alpha733_versions_and_bundle_remain_aligned_in_alpha8() -> None:
     manifest = json.loads((KEMS / "manifest.json").read_text(encoding="utf-8"))
     bundle = json.loads(
         (ROOT / "release" / "kems-bundle.template.json").read_text(encoding="utf-8")
@@ -19,24 +19,18 @@ def test_alpha733_versions_and_bundle_remain_panel5_or_later_aligned() -> None:
     yaml = (KEMS / "kems16x16.yaml").read_text(encoding="utf-8")
     dashboard = (KEMS / "dashboard.py").read_text(encoding="utf-8")
 
-    version = str(manifest["version"])
-    assert version.startswith("0.7.0-alpha7.")
-    assert int(version.rsplit(".", 1)[1]) >= 33
+    assert manifest["version"] == "0.8.0-alpha8.0"
 
     bundle_version = str(bundle["components"]["panel"]["version"])
     panel_match = re.search(r'PANEL_CONFIG_VERSION = "([^"]+)"', panel)
     yaml_match = re.search(r'panel_config_version: "([^"]+)"', yaml)
     assert panel_match is not None
     assert yaml_match is not None
-    assert bundle_version == panel_match.group(1) == "0.7.0-alpha7-panel7"
-    assert yaml_match.group(1) == "0.7.0-alpha7-panel6"
-    assert (
-        "PANEL7_VERSION_LINE = b'panel_config_version: \"0.7.0-alpha7-panel7\"'"
-        in dashboard
-    )
-    assert "source.replace(PANEL6_VERSION_LINE, PANEL7_VERSION_LINE, 1)" in dashboard
-    assert bundle_version.startswith("0.7.0-alpha7-panel")
-    assert int(bundle_version.rsplit("panel", 1)[1]) >= 5
+    assert bundle_version == panel_match.group(1) == yaml_match.group(1)
+    assert bundle_version == "0.8.0-alpha8-panel.0"
+    assert "PANEL6_VERSION_LINE" not in dashboard
+    assert "PANEL7_VERSION_LINE" not in dashboard
+    assert "return PACKAGED_PANEL_PATH.read_bytes()" in dashboard
     assert bundle["components"]["panel"]["delivery"] == "kems_core"
     assert bundle["components"]["panel"]["required"] is False
 
@@ -56,12 +50,10 @@ def test_alpha733_automatic_panel_delivery_path_is_still_armed() -> None:
     assert "async_verify_panel_firmware" in dashboard
 
 
-def test_alpha733_public_web_delivery_matches_live_ionos_route() -> None:
+def test_alpha733_public_web_delivery_matches_alpha8_route() -> None:
     bundle = json.loads(
         (ROOT / "release" / "kems-bundle.template.json").read_text(encoding="utf-8")
     )
     public_web = bundle["components"]["public_web"]
-    version = str(public_web["version"])
-    assert version.startswith("0.7.0-alpha7-web.")
-    assert int(version.rsplit(".", 1)[1]) >= 14
+    assert public_web["version"] == "0.8.0-alpha8-web.0"
     assert public_web["delivery"] == "ionos-sftp"
