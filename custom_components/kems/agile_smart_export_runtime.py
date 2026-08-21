@@ -76,6 +76,9 @@ from .agile_alpha744_dashboard_parity import (  # noqa: E402
 from .agile_alpha745_plan_clarity import (  # noqa: E402
     install_alpha745_plan_clarity_patch,
 )
+from .agile_alpha746_no_unknown_reserve import (  # noqa: E402
+    install_alpha746_no_unknown_reserve_patch,
+)
 from .agile_dashboard_yaml_guard import install_dashboard_yaml_guard  # noqa: E402
 from .agile_rolling_replan import install_rolling_replan_patch  # noqa: E402
 from .agile_smart_export_live import install_live_scenario_patch  # noqa: E402
@@ -127,6 +130,7 @@ install_alpha742_live_graph_telemetry_patch()
 install_alpha743_event_priority_patch()
 install_alpha744_dashboard_parity_patch()
 install_alpha745_plan_clarity_patch()
+install_alpha746_no_unknown_reserve_patch()
 
 EfficientAgileSmartExportManager = _base.EfficientAgileSmartExportManager
 

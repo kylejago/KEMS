@@ -42,7 +42,7 @@
   },
   "maintenance": {
     "required": true,
-    "reason": "Activate KEMS __RELEASE_VERSION__: Agile battery-SOC visibility and published-vs-reserved export-plan clarity",
+    "reason": "Activate KEMS __RELEASE_VERSION__: Agile no-reserve planning across published prices with automatic re-ranking when late prices arrive",
     "expected_downtime_minutes": 5,
     "home_assistant_restart_required": true,
     "reboot_required": false,
