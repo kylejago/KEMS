@@ -41,7 +41,7 @@ def test_alpha746_uses_known_prices_without_unknown_capacity_reservation() -> No
     assert '"bounded_unknown_capacity_reserved_kwh": 0.0' in source
     assert '"unknown_price_reservation_policy": "none"' in source
     assert "selected_full = _known_price_plan(" in source
-    assert "sorted(candidates, key=lambda value: value[\"rate\"], reverse=True)" in source
+    assert 'sorted(candidates, key=lambda value: value["rate"], reverse=True)' in source
     assert "replan_when_price_publishes" in source
 
 
@@ -51,7 +51,7 @@ def test_alpha746_only_relaxes_clean_publication_gaps() -> None:
     assert 'recovery.get("publication_pending")' in source
     assert 'recovery.get("verified")' in source
     assert "alpha746_original_apply(" in source
-    assert "current_price.get(\"known\")" in source
+    assert 'current_price.get("known")' in source
 
 
 def test_alpha746_dashboard_explains_no_reserve_and_reranking() -> None:
