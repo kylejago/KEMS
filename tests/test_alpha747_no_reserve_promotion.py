@@ -29,7 +29,9 @@ def test_alpha747_patch_parses() -> None:
     ast.parse(PATCH.read_text(encoding="utf-8"))
 
 
-def test_alpha747_uses_verified_octopus_gap_not_missing_publication_pending_key() -> None:
+def test_alpha747_uses_verified_octopus_gap_not_missing_publication_pending_key() -> (
+    None
+):
     source = PATCH.read_text(encoding="utf-8")
 
     assert 'recovery.get("verified")' in source
@@ -39,7 +41,9 @@ def test_alpha747_uses_verified_octopus_gap_not_missing_publication_pending_key(
     assert 'current_price.get("known")' in source
 
 
-def test_alpha747_promotes_known_price_plan_and_resets_unknown_reserve_to_zero() -> None:
+def test_alpha747_promotes_known_price_plan_and_resets_unknown_reserve_to_zero() -> (
+    None
+):
     source = PATCH.read_text(encoding="utf-8")
 
     assert 'plan["provisional_reserved_unknown_capacity_kwh"] = required' in source
