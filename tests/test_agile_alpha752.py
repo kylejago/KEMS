@@ -81,9 +81,9 @@ def test_alpha752_publishes_100_percent_for_sub_tolerance_residual() -> None:
 
 def test_alpha752_does_not_hide_real_unknown_reserve() -> None:
     source = PATCH.read_text(encoding="utf-8")
-    assert '(reserve or 0.0) > _EPSILON' in source
-    assert '(required_unknown or 0.0) > _EPSILON' in source
-    assert 'residual > _REPORTING_TOLERANCE_KWH' in source
+    assert "(reserve or 0.0) > _EPSILON" in source
+    assert "(required_unknown or 0.0) > _EPSILON" in source
+    assert "residual > _REPORTING_TOLERANCE_KWH" in source
 
 
 def test_alpha752_keeps_hardware_writes_blocked() -> None:
