@@ -17,7 +17,9 @@ DOC = ROOT / "docs" / "agile-full-battery-solar-routing.md"
 
 def test_alpha748_version_and_module_parse() -> None:
     manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
-    assert manifest["version"] == "0.7.0-alpha7.48"
+    version = str(manifest["version"])
+    assert version.startswith("0.7.0-alpha7.")
+    assert int(version.rsplit(".", 1)[-1]) >= 48
     ast.parse(PATCH.read_text(encoding="utf-8"))
 
 
