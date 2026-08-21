@@ -64,7 +64,9 @@ def test_reported_full_soc_case_still_exports_2830_kw() -> None:
     assert round(grid_import_kw, 3) == 0.0
 
 
-def test_full_battery_routing_does_not_change_dispatch_or_hardware_permissions() -> None:
+def test_full_battery_routing_does_not_change_dispatch_or_hardware_permissions() -> (
+    None
+):
     source = CANONICAL.read_text(encoding="utf-8")
     assert "_dispatch_targets" not in source
     assert "_rolling_plan" not in source
