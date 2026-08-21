@@ -14,11 +14,10 @@ MANIFEST = KEMS / "manifest.json"
 DOC = ROOT / "docs" / "agile-solar-aware-inverter-headroom.md"
 
 
-def test_alpha731_baseline_is_retained_in_later_alpha7_releases() -> None:
+def test_alpha731_baseline_is_retained_in_alpha8() -> None:
     manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
-    version = str(manifest["version"])
-    assert version.startswith("0.7.0-alpha7.")
-    assert int(version.rsplit(".", 1)[1]) >= 31
+    assert manifest["version"] == "0.8.0-alpha8.0"
+    assert PATCH.exists()
 
 
 def test_alpha731_module_parses() -> None:
