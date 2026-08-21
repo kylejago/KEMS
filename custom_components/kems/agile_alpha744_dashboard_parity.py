@@ -21,6 +21,8 @@ Alpha7.44 keeps the existing optimiser untouched and fixes only reporting:
 Real FoxESS hardware writes remain blocked.
 """
 
+# ruff: noqa: E501
+
 from __future__ import annotations
 
 import math
@@ -198,7 +200,9 @@ def _friendly_actions(actions: Any) -> str:
         "store solar for higher Agile slot": "Store solar for later",
         "export battery at high Agile price": "Battery export",
     }
-    return " + ".join(labels.get(item, item.replace("_", " ").title()) for item in values)
+    return " + ".join(
+        labels.get(item, item.replace("_", " ").title()) for item in values
+    )
 
 
 def _slot_decisions(self, state: dict[str, Any]) -> list[dict[str, Any]]:
@@ -249,9 +253,7 @@ def _slot_decisions(self, state: dict[str, Any]) -> list[dict[str, Any]]:
         else:
             status = "future"
 
-        if power_down.get("available") and _event_overlap(
-            power_down, cursor, slot_end
-        ):
+        if power_down.get("available") and _event_overlap(power_down, cursor, slot_end):
             decision = "Power Down — house first + maximum safe export"
         elif happy.get("available") and _event_overlap(happy, cursor, slot_end):
             decision = "Happy Hour — maximum safe battery charge"
