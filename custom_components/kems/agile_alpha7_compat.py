@@ -1,9 +1,9 @@
-"""Frozen Alpha7 Agile compatibility chain for the Alpha8 consolidation baseline.
+"""Alpha7 Agile compatibility boundary for the Alpha8 consolidation baseline.
 
-Alpha8.0 deliberately preserves Alpha7.52 behaviour while moving the historical
-runtime monkey-patch sequence behind one compatibility boundary. New Alpha8
-behaviour must be implemented in canonical modules rather than by adding another
-version-named patch module.
+Alpha8 preserves proven Alpha7.52 behaviour while progressively moving historical
+runtime monkey patches into canonical modules. New Alpha8 behaviour must be
+implemented in canonical modules rather than by adding another version-named
+patch module.
 """
 
 from __future__ import annotations
@@ -22,8 +22,9 @@ PRE_BASE_PATCHES: Final[tuple[PatchSpec, ...]] = (
     ("agile_alpha715_backfill", "install_alpha715_backfill_patch"),
 )
 
-# Preserve the exact Alpha7.52 installation order. This registry is intentionally
-# boring: it is a parity fixture, not the place for future feature development.
+# Preserve Alpha7.52 behaviour and installation semantics while replacing proven
+# slices with canonical modules in small, parity-gated steps. Historical modules
+# remain in the tree as regression evidence even after leaving this live registry.
 POST_BASE_PATCHES: Final[tuple[PatchSpec, ...]] = (
     ("agile_rolling_replan", "install_rolling_replan_patch"),
     ("agile_smart_export_live", "install_live_scenario_patch"),
@@ -82,23 +83,17 @@ POST_BASE_PATCHES: Final[tuple[PatchSpec, ...]] = (
         "agile_alpha749_deadline_plan_coverage",
         "install_alpha749_deadline_plan_coverage_patch",
     ),
-    (
-        "agile_alpha750_no_reserve_reporting",
-        "install_alpha750_no_reserve_reporting_patch",
-    ),
+    ("agile_publication_reporting", "install_no_reserve_reporting"),
     (
         "agile_alpha751_maximum_discharge_plan_reconcile",
         "install_alpha751_maximum_discharge_plan_reconcile_patch",
     ),
-    (
-        "agile_alpha752_tomorrow_no_reserve_rounding",
-        "install_alpha752_tomorrow_no_reserve_rounding_patch",
-    ),
+    ("agile_publication_reporting", "install_tomorrow_publication_reporting"),
 )
 
 
 def _install(spec: PatchSpec) -> None:
-    """Import and install one frozen compatibility patch."""
+    """Import and install one compatibility or canonicalised behaviour slice."""
     module_name, installer_name = spec
     module = import_module(f".{module_name}", __package__)
     installer = getattr(module, installer_name)
@@ -106,7 +101,7 @@ def _install(spec: PatchSpec) -> None:
 
 
 def install_alpha7_compatibility() -> ModuleType:
-    """Install the exact Alpha7.52 runtime chain and return runtime_base."""
+    """Install the Alpha7.52-equivalent runtime chain and return runtime_base."""
     for spec in PRE_BASE_PATCHES:
         _install(spec)
 

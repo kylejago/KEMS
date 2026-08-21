@@ -1,8 +1,8 @@
 """Alpha8 coordinated consolidation contracts.
 
-These tests make Alpha8.0 a refactor/parity release: the proven Alpha7.52
-behaviour is kept behind one frozen boundary while new version-named runtime
-patches are prohibited.
+These tests keep Alpha8 on a staged refactor/parity path: proven Alpha7.52
+behaviour remains behind one compatibility boundary while version-named runtime
+patches are progressively retired into canonical modules.
 """
 
 from __future__ import annotations
@@ -81,21 +81,19 @@ def test_runtime_entrypoint_has_one_executable_alpha7_compatibility_boundary() -
     assert "ALPHA7_COMPATIBILITY_ORDER" in source
 
 
-def test_frozen_alpha7_compatibility_registry_is_complete_and_resolvable() -> None:
+def test_alpha8_compatibility_registry_is_complete_and_resolvable() -> None:
     specs = _compat_specs()
     assert specs
-    assert len(specs) == len(
-        set(specs)
-    ), "Alpha7 compatibility installers must be unique"
+    assert len(specs) == len(set(specs)), "Compatibility installers must be unique"
     assert specs[0] == ("agile_smart_export_reporting", "install_reporting_patch")
     assert specs[-1] == (
-        "agile_alpha752_tomorrow_no_reserve_rounding",
-        "install_alpha752_tomorrow_no_reserve_rounding_patch",
+        "agile_publication_reporting",
+        "install_tomorrow_publication_reporting",
     )
 
     for module_name, installer_name in specs:
         path = KEMS / f"{module_name}.py"
-        assert path.is_file(), f"Missing frozen compatibility module {module_name}"
+        assert path.is_file(), f"Missing compatibility module {module_name}"
         tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
         functions = {
             node.name
@@ -103,6 +101,44 @@ def test_frozen_alpha7_compatibility_registry_is_complete_and_resolvable() -> No
             if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
         }
         assert installer_name in functions, f"{module_name} is missing {installer_name}"
+
+
+def test_publication_reporting_retires_alpha750_and_alpha752_from_execution() -> None:
+    specs = _compat_specs()
+    no_reserve = ("agile_publication_reporting", "install_no_reserve_reporting")
+    maximum_discharge = (
+        "agile_alpha751_maximum_discharge_plan_reconcile",
+        "install_alpha751_maximum_discharge_plan_reconcile_patch",
+    )
+    tomorrow = (
+        "agile_publication_reporting",
+        "install_tomorrow_publication_reporting",
+    )
+
+    assert specs.index(no_reserve) > specs.index(
+        (
+            "agile_alpha749_deadline_plan_coverage",
+            "install_alpha749_deadline_plan_coverage_patch",
+        )
+    )
+    assert specs.index(no_reserve) < specs.index(maximum_discharge)
+    assert specs.index(tomorrow) > specs.index(maximum_discharge)
+
+    retired = {
+        "agile_alpha750_no_reserve_reporting",
+        "agile_alpha752_tomorrow_no_reserve_rounding",
+    }
+    assert not any(module_name in retired for module_name, _ in specs)
+    assert all((KEMS / f"{module_name}.py").is_file() for module_name in retired)
+
+
+def test_canonical_publication_reporting_cannot_enable_hardware_writes() -> None:
+    source = (KEMS / "agile_publication_reporting.py").read_text(encoding="utf-8")
+    assert ".services.async_call(" not in source
+    assert "providers.foxess" not in source
+    assert "safe_to_write_hardware = True" not in source
+    assert "commands_permitted = True" not in source
+    assert "hardware-write permissions remain untouched" in source
 
 
 def test_alpha8_does_not_restart_version_named_patch_debt() -> None:
