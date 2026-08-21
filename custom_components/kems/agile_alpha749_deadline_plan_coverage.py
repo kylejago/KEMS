@@ -170,7 +170,10 @@ def _rebalance_deadline_forced_current_slot(
     desired_current = max(desired_current, existing_current)
     extra = max(desired_current - existing_current, 0.0)
     if extra <= _EPSILON:
-        return {"applied": False, "reason": "economic plan already covers current export"}
+        return {
+            "applied": False,
+            "reason": "economic plan already covers current export",
+        }
 
     future_rows = [
         item
@@ -189,7 +192,10 @@ def _rebalance_deadline_forced_current_slot(
     )
     moved = min(extra, available_to_move)
     if moved <= _EPSILON:
-        return {"applied": False, "reason": "no later selected export can be rebalanced"}
+        return {
+            "applied": False,
+            "reason": "no later selected export can be rebalanced",
+        }
 
     remaining = moved
     reduced_labels: list[str] = []
@@ -226,8 +232,7 @@ def _rebalance_deadline_forced_current_slot(
     selected = [
         item
         for item in selected
-        if max(_number(item.get("planned_battery_export_kwh")) or 0.0, 0.0)
-        > _EPSILON
+        if max(_number(item.get("planned_battery_export_kwh")) or 0.0, 0.0) > _EPSILON
     ]
     selected.sort(key=_selected_slot_start)
 
@@ -248,7 +253,9 @@ def _rebalance_deadline_forced_current_slot(
         allocation = allocation_by_start.get(start, 0.0)
         slot["rolling_planned_battery_export_kwh"] = round(allocation, 3)
         if start == current_start and allocation > _EPSILON:
-            slot["rolling_action"] = "deadline-required export — economic plan rebalanced"
+            slot["rolling_action"] = (
+                "deadline-required export — economic plan rebalanced"
+            )
         elif allocation > _EPSILON:
             slot["rolling_action"] = "planned battery export — rolling replan"
             slot["battery_export_kwh"] = round(allocation, 3)
