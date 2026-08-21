@@ -85,7 +85,7 @@ def test_alpha748_regression_matches_reported_full_soc_case() -> None:
 
 
 def test_agile_partial_slot_charge_stops_exactly_at_capacity_then_exports() -> None:
-    """A 99% battery may fill only its real room; same-slot PV then remains exportable."""
+    """A 99% battery fills only its real room; same-slot PV remains exportable."""
     source = AGILE.read_text(encoding="utf-8")
     assert "and battery < capacity" in source
     assert "max(capacity - battery, 0)" in source
