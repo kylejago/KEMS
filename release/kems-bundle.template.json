@@ -15,17 +15,17 @@
       "delivery": "kems_core"
     },
     "panel": {
-      "version": "0.7.0-alpha7-panel7",
+      "version": "0.8.0-alpha8-panel.0",
       "required": false,
       "delivery": "kems_core"
     },
     "property_web": {
-      "version": "0.7.0-alpha7-web.20",
+      "version": "0.8.0-alpha8-web.0",
       "required": true,
       "delivery": "kems_pi"
     },
     "pi_agent": {
-      "version": "0.7.0-alpha7-web.20",
+      "version": "0.8.0-alpha8-web.0",
       "required": true,
       "delivery": "kems_pi"
     },
@@ -35,14 +35,14 @@
       "delivery": "kems_pi"
     },
     "public_web": {
-      "version": "0.7.0-alpha7-web.20",
+      "version": "0.8.0-alpha8-web.0",
       "required": false,
       "delivery": "ionos-sftp"
     }
   },
   "maintenance": {
     "required": true,
-    "reason": "Activate KEMS __RELEASE_VERSION__: promote verified no-reserve Agile publication-gap plans into the active shadow plan",
+    "reason": "Activate coordinated KEMS Alpha8.0 consolidation baseline after Alpha7.52/Web.33 parity validation",
     "expected_downtime_minutes": 5,
     "home_assistant_restart_required": true,
     "reboot_required": false,
