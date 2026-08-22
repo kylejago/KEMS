@@ -45,10 +45,7 @@ POST_BASE_PATCHES: Final[tuple[PatchSpec, ...]] = (
     ("agile_alpha725_nonzero", "install_alpha725_nonzero_export_proof_patch"),
     ("agile_alpha726_provisional", "install_alpha726_provisional_planning_patch"),
     ("agile_price_recovery", "install_price_recovery"),
-    (
-        "agile_alpha728_bounded_partial",
-        "install_alpha728_bounded_partial_horizon_patch",
-    ),
+    ("agile_bounded_partial", "install_bounded_partial_horizon"),
     ("agile_live_routing", "install_live_routing"),
     ("agile_routing", "install_current_routing"),
     ("agile_routing", "install_solar_headroom"),
