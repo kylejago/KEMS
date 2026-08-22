@@ -83,7 +83,10 @@ def _slot(start: datetime, rate: float) -> dict[str, object]:
 
 def test_economic_opportunity_retires_both_alpha740_modules_from_execution() -> None:
     specs = _compat_specs()
-    previous = ("dashboard_alpha736_finance", "install_alpha736_finance_dashboard_patch")
+    previous = (
+        "dashboard_alpha736_finance",
+        "install_alpha736_finance_dashboard_patch",
+    )
     canonical = ("agile_economic_opportunity", "install_economic_opportunity")
     following = ("agile_price_publication", "install_price_publication")
 
@@ -108,7 +111,9 @@ def test_economic_opportunity_facade_preserves_planning_then_dashboard_order() -
     ast.parse(source)
 
     planning_call = "opportunity_runtime.install_alpha740_opportunity_guard_patch()"
-    dashboard_call = "dashboard_runtime.install_alpha740_agile_primary_dashboard_patch()"
+    dashboard_call = (
+        "dashboard_runtime.install_alpha740_agile_primary_dashboard_patch()"
+    )
     assert planning_call in source
     assert dashboard_call in source
     assert source.index(planning_call) < source.index(dashboard_call)
