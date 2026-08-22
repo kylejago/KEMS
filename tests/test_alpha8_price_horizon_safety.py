@@ -69,7 +69,8 @@ def test_frozen_provisional_runtime_mutates_the_bridged_alpha722_object() -> Non
     assert "from . import agile_alpha722_horizon as alpha722" in provisional
     assert "current_hold = alpha722._hold_price_optimised_export" in provisional
     assert (
-        "alpha722._hold_price_optimised_export = _provisional_hold_price_optimised_export"
+        "alpha722._hold_price_optimised_export = "
+        "_provisional_hold_price_optimised_export"
         in provisional
     )
     assert "alpha722_original_hold(state, plan, horizon, now=now)" in provisional
@@ -82,7 +83,8 @@ def test_price_horizon_runtime_preserves_conservative_dispatch_contract() -> Non
     source = RUNTIME.read_text(encoding="utf-8")
 
     for token in (
-        '_DEADLINE_OVERRIDE_MODES = frozenset({"deadline_following", "maximum_discharge"})',
+        '_DEADLINE_OVERRIDE_MODES = frozenset({"deadline_following", '
+        '"maximum_discharge"})',
         "deadline_override = mode in _DEADLINE_OVERRIDE_MODES and current_known",
         'horizon["battery_export_held"] = True',
         'plan["dispatch_mode"] = "price_horizon_hold"',
