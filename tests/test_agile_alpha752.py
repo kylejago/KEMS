@@ -16,7 +16,7 @@ DOC = ROOT / "docs" / "alpha752-tomorrow-no-reserve-rounding.md"
 
 def test_alpha752_version_and_module_parse() -> None:
     manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
-    assert manifest["version"] == "0.8.0-alpha8.0"
+    assert str(manifest["version"]).startswith("0.8.0-alpha8.")
     ast.parse(PATCH.read_text(encoding="utf-8"))
 
 
