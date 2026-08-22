@@ -103,19 +103,36 @@ def test_alpha8_compatibility_registry_is_complete_and_resolvable() -> None:
         assert installer_name in functions, f"{module_name} is missing {installer_name}"
 
 
+def test_dashboard_parity_retires_alpha744_from_execution() -> None:
+    specs = _compat_specs()
+    event_priority = (
+        "agile_alpha743_event_priority",
+        "install_alpha743_event_priority_patch",
+    )
+    dashboard_parity = ("agile_dashboard_parity", "install_dashboard_parity")
+    progressive = (
+        "agile_progressive_publication",
+        "install_progressive_publication_planning",
+    )
+
+    assert specs.index(dashboard_parity) > specs.index(event_priority)
+    assert specs.index(dashboard_parity) < specs.index(progressive)
+
+    retired = "agile_alpha744_dashboard_parity"
+    assert not any(module_name == retired for module_name, _ in specs)
+    assert (KEMS / f"{retired}.py").is_file()
+
+
 def test_progressive_publication_retires_alpha745_and_alpha746_from_execution() -> None:
     specs = _compat_specs()
-    alpha744 = (
-        "agile_alpha744_dashboard_parity",
-        "install_alpha744_dashboard_parity_patch",
-    )
+    dashboard_parity = ("agile_dashboard_parity", "install_dashboard_parity")
     progressive = (
         "agile_progressive_publication",
         "install_progressive_publication_planning",
     )
     full_battery = ("agile_full_battery_routing", "install_full_battery_routing")
 
-    assert specs.index(progressive) > specs.index(alpha744)
+    assert specs.index(progressive) > specs.index(dashboard_parity)
     assert specs.index(progressive) < specs.index(full_battery)
 
     retired = {
@@ -207,6 +224,17 @@ def test_publication_reporting_retires_alpha750_and_alpha752_from_execution() ->
     }
     assert not any(module_name in retired for module_name, _ in specs)
     assert all((KEMS / f"{module_name}.py").is_file() for module_name in retired)
+
+
+def test_canonical_dashboard_parity_cannot_change_dispatch_or_hardware_writes() -> None:
+    source = (KEMS / "agile_dashboard_parity.py").read_text(encoding="utf-8")
+    assert "_dispatch_targets" not in source
+    assert "_rolling_plan" not in source
+    assert ".services.async_call(" not in source
+    assert "providers.foxess" not in source
+    assert "safe_to_write_hardware = True" not in source
+    assert "commands_permitted = True" not in source
+    assert "Real FoxESS hardware writes remain blocked" in source
 
 
 def test_canonical_progressive_publication_cannot_enable_hardware_writes() -> None:
