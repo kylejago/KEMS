@@ -26,13 +26,13 @@ PRE_BASE_PATCHES: Final[tuple[PatchSpec, ...]] = (
 # slices with canonical modules in small, parity-gated steps. Historical modules
 # remain in the tree as regression evidence even after leaving this live registry.
 POST_BASE_PATCHES: Final[tuple[PatchSpec, ...]] = (
-    ("agile_rolling_replan", "install_rolling_replan_patch"),
+    ("agile_rolling_planning", "install_rolling_replan"),
     ("agile_smart_export_live", "install_live_scenario_patch"),
     ("agile_dashboard_yaml_guard", "install_dashboard_yaml_guard"),
     ("agile_alpha717_dispatch", "install_alpha717_dispatch_patch"),
     ("agile_history_dashboard", "install_deadline_history_dashboard"),
     ("agile_history_dashboard", "install_history_diagnostics_dashboard"),
-    ("agile_alpha716_dashboard", "install_alpha716_dashboard_patch"),
+    ("agile_rolling_planning", "install_rolling_dashboard"),
     ("agile_alpha717_dashboard", "install_alpha717_dashboard_patch"),
     ("agile_validation_evidence", "install_validation_evidence"),
     ("dashboard_consolidation", "install_dashboard_consolidation"),
