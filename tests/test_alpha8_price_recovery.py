@@ -11,7 +11,8 @@ COMPAT = KEMS / "agile_alpha7_compat.py"
 FACADE = KEMS / "agile_price_recovery.py"
 RUNTIME = KEMS / "agile_price_recovery_runtime.py"
 HISTORICAL = KEMS / "agile_alpha727_price_recovery.py"
-BOUNDED = KEMS / "agile_alpha728_bounded_partial.py"
+BOUNDED = KEMS / "agile_bounded_partial_runtime.py"
+BOUNDED_HISTORICAL = KEMS / "agile_alpha728_bounded_partial.py"
 
 
 def _compat_specs() -> list[tuple[str, str]]:
@@ -38,10 +39,7 @@ def test_price_recovery_retires_alpha727_from_execution() -> None:
         "install_alpha726_provisional_planning_patch",
     )
     canonical = ("agile_price_recovery", "install_price_recovery")
-    following = (
-        "agile_alpha728_bounded_partial",
-        "install_alpha728_bounded_partial_horizon_patch",
-    )
+    following = ("agile_bounded_partial", "install_bounded_partial_horizon")
 
     assert specs.index(canonical) > specs.index(previous)
     assert specs.index(canonical) < specs.index(following)
@@ -50,6 +48,7 @@ def test_price_recovery_retires_alpha727_from_execution() -> None:
     )
     assert HISTORICAL.is_file()
     assert BOUNDED.is_file()
+    assert BOUNDED_HISTORICAL.is_file()
 
 
 def test_price_recovery_runtime_is_byte_identical_to_alpha727() -> None:
@@ -90,16 +89,14 @@ def test_price_recovery_preserves_proven_recovery_contract() -> None:
         assert token in source
 
 
-def test_price_recovery_leaves_alpha728_historical_consumer_untouched() -> None:
+def test_price_recovery_precedes_canonical_bounded_partial_consumer() -> None:
     specs = _compat_specs()
     canonical = ("agile_price_recovery", "install_price_recovery")
-    bounded = (
-        "agile_alpha728_bounded_partial",
-        "install_alpha728_bounded_partial_horizon_patch",
-    )
+    bounded = ("agile_bounded_partial", "install_bounded_partial_horizon")
     source = BOUNDED.read_text(encoding="utf-8")
 
     assert specs.index(canonical) < specs.index(bounded)
+    assert BOUNDED.read_bytes() == BOUNDED_HISTORICAL.read_bytes()
     assert 'getattr(self, "_kems_alpha727_price_fetch_diagnostics", None)' in source
     assert "from . import agile_alpha727_price_recovery" not in source
     assert "install_alpha728_bounded_partial_horizon_patch" in source
