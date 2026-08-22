@@ -44,7 +44,7 @@ POST_BASE_PATCHES: Final[tuple[PatchSpec, ...]] = (
     ("agile_alpha724_outcome", "install_alpha724_outcome_parity_patch"),
     ("agile_alpha725_nonzero", "install_alpha725_nonzero_export_proof_patch"),
     ("agile_alpha726_provisional", "install_alpha726_provisional_planning_patch"),
-    ("agile_alpha727_price_recovery", "install_alpha727_price_recovery_patch"),
+    ("agile_price_recovery", "install_price_recovery"),
     (
         "agile_alpha728_bounded_partial",
         "install_alpha728_bounded_partial_horizon_patch",
