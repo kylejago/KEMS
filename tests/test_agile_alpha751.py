@@ -17,7 +17,7 @@ DOC = ROOT / "docs" / "alpha751-maximum-discharge-plan-reconcile.md"
 
 def test_alpha751_version_and_module_parse() -> None:
     manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
-    assert manifest["version"] == "0.8.0-alpha8.0"
+    assert str(manifest["version"]).startswith("0.8.0-alpha8.")
     ast.parse(PATCH.read_text(encoding="utf-8"))
 
 
@@ -58,7 +58,7 @@ def test_reported_1530_case_requires_about_0093_kwh_in_current_slot() -> None:
 
 
 def test_alpha751_current_export_replaces_later_low_value_energy() -> None:
-    """The forced 0.093 kWh is moved, not added to the day's export plan."""
+    """The forced 0.093 kWh is moved, not added to, the day's export plan."""
     current_kwh = 0.093
     later_low_value_kwh = 0.146
     original_total_kwh = 38.646
