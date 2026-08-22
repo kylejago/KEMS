@@ -37,7 +37,7 @@ def _compat_specs() -> list[tuple[str, str]]:
 
 def test_price_horizon_safety_retires_alpha722_from_execution() -> None:
     specs = _compat_specs()
-    dashboard = ("agile_alpha720_dashboard", "install_alpha720_dashboard_patch")
+    dashboard = ("agile_preinstall_evidence", "install_preinstall_dashboard")
     horizon = ("agile_price_horizon_safety", "install_price_horizon_safety")
     shadow = ("agile_shadow_outcome", "install_shadow_command")
 
