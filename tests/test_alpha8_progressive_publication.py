@@ -61,7 +61,9 @@ def test_non_clean_or_unpromoted_path_stays_conservative() -> None:
     assert 'plan["provisional_reserved_unknown_capacity_kwh"] = required' in source
     assert 'if not plan.get("bounded_partial_horizon_dispatch_active")' in source
     assert 'plan["provisional_reserved_unknown_capacity_kwh"] = 0.0' in source
-    assert "Existing current-price, reserve, deadline, Power Down and Happy Hour" in source
+    assert (
+        "Existing current-price, reserve, deadline, Power Down and Happy Hour" in source
+    )
 
 
 def test_dashboard_keeps_plan_clarity_and_no_reserve_explanation() -> None:
