@@ -9,7 +9,7 @@ ROOT = Path(__file__).resolve().parents[1]
 def test_alpha732_platform_contract_is_retained_in_alpha8() -> None:
     manifest = json.loads((ROOT / "custom_components/kems/manifest.json").read_text())
     template = json.loads((ROOT / "release/kems-bundle.template.json").read_text())
-    assert manifest["version"] == "0.8.0-alpha8.0"
+    assert str(manifest["version"]).startswith("0.8.0-alpha8.")
 
     property_web = str(template["components"]["property_web"]["version"])
     pi_agent = str(template["components"]["pi_agent"]["version"])
