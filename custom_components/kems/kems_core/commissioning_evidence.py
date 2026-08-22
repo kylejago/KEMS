@@ -189,9 +189,7 @@ def assess_foxess_unit_contract(
     else:
         expected["battery_power_kw"] = {"w", "kw"}
 
-    observed = {
-        field: _normalised_unit(source_units.get(field)) for field in expected
-    }
+    observed = {field: _normalised_unit(source_units.get(field)) for field in expected}
     missing = tuple(sorted(field for field, unit in observed.items() if unit is None))
     mismatched = tuple(
         sorted(
