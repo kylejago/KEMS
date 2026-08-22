@@ -22,7 +22,7 @@ def test_coordinated_release_keeps_web_panel_and_brand_contract() -> None:
         str(bundle["components"]["pi_agent"]["version"]),
         str(bundle["components"]["public_web"]["version"]),
     }
-    assert web_versions == {"0.8.0-alpha8-web.0"}
+    assert web_versions == {"0.8.0-alpha8-web.1"}
     assert bundle["components"]["panel"]["version"] == "0.8.0-alpha8-panel.0"
 
     assert "docs/assets/kems-logo-master.svg" in branding

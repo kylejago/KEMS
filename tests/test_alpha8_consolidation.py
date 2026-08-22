@@ -47,7 +47,7 @@ def test_alpha8_release_family_is_coordinated() -> None:
         bundle["components"]["property_web"]["version"],
         bundle["components"]["pi_agent"]["version"],
         bundle["components"]["public_web"]["version"],
-    } == {"0.8.0-alpha8-web.0"}
+    } == {"0.8.0-alpha8-web.1"}
     assert 'PANEL_CONFIG_VERSION = "0.8.0-alpha8-panel.0"' in panel_manager
     assert 'panel_config_version: "0.8.0-alpha8-panel.0"' in panel_yaml
 

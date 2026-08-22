@@ -14,7 +14,7 @@ def test_alpha732_platform_contract_is_retained_in_alpha8() -> None:
     property_web = str(template["components"]["property_web"]["version"])
     pi_agent = str(template["components"]["pi_agent"]["version"])
     public_web = str(template["components"]["public_web"]["version"])
-    assert property_web == pi_agent == public_web == "0.8.0-alpha8-web.0"
+    assert property_web == pi_agent == public_web == "0.8.0-alpha8-web.1"
     assert template["components"]["public_web"]["required"] is False
     assert template["components"]["panel"]["version"] == "0.8.0-alpha8-panel.0"
 

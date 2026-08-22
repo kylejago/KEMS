@@ -1,4 +1,4 @@
-"""Release-scope guards for KEMS 0.8.0-alpha8.1."""
+"""Safety guards introduced with KEMS 0.8.0-alpha8.1 and retained thereafter."""
 
 from __future__ import annotations
 
@@ -9,14 +9,14 @@ ROOT = Path(__file__).parents[1]
 INTEGRATION = ROOT / "custom_components" / "kems"
 
 
-def test_alpha8_1_release_keeps_real_hardware_writes_blocked() -> None:
+def test_alpha8_1_safety_scope_remains_blocked_in_later_alpha8_releases() -> None:
     manifest = json.loads((INTEGRATION / "manifest.json").read_text(encoding="utf-8"))
     shadow = (INTEGRATION / "agile_shadow_command_runtime.py").read_text(
         encoding="utf-8"
     )
     commissioning = (INTEGRATION / "commissioning.py").read_text(encoding="utf-8")
 
-    assert manifest["version"] == "0.8.0-alpha8.1"
+    assert str(manifest["version"]).startswith("0.8.0-alpha8.")
     assert '"hardware_writes": "blocked"' in shadow
     assert '"real_backend_available": False' in shadow
     assert '"commands_permitted": False' in shadow

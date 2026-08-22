@@ -20,12 +20,12 @@
       "delivery": "kems_core"
     },
     "property_web": {
-      "version": "0.8.0-alpha8-web.0",
+      "version": "0.8.0-alpha8-web.1",
       "required": true,
       "delivery": "kems_pi"
     },
     "pi_agent": {
-      "version": "0.8.0-alpha8-web.0",
+      "version": "0.8.0-alpha8-web.1",
       "required": true,
       "delivery": "kems_pi"
     },
@@ -35,20 +35,22 @@
       "delivery": "kems_pi"
     },
     "public_web": {
-      "version": "0.8.0-alpha8-web.0",
+      "version": "0.8.0-alpha8-web.1",
       "required": false,
       "delivery": "ionos-sftp"
     }
   },
   "maintenance": {
     "required": true,
-    "reason": "Activate KEMS Alpha8.1 commissioning evidence, Full KEMS Agile forecast/headroom planning and presentation reconciliation",
+    "reason": "Coordinate KEMS Web / Pi / PWA 0.8.0-alpha8-web.1 with the canonical KEMS product identity",
     "expected_downtime_minutes": 5,
     "home_assistant_restart_required": true,
     "reboot_required": false,
     "affected_components": [
       "kems_core",
-      "dashboard"
+      "dashboard",
+      "property_web",
+      "pi_agent"
     ]
   }
 }
