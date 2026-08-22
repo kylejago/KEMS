@@ -68,9 +68,15 @@ def test_facade_binds_only_rolling_legacy_name() -> None:
 
 def test_frozen_consumers_keep_shared_rolling_object() -> None:
     consumers = {
-        "agile_alpha717_dispatch.py": "rolling._rolling_plan = rolling_plan_with_alpha717",
-        "agile_bounded_partial_runtime.py": "from . import agile_rolling_replan as rolling",
-        "agile_event_priority_runtime.py": "from . import agile_rolling_replan as rolling",
+        "agile_alpha717_dispatch.py": (
+            "rolling._rolling_plan = rolling_plan_with_alpha717"
+        ),
+        "agile_bounded_partial_runtime.py": (
+            "from . import agile_rolling_replan as rolling"
+        ),
+        "agile_event_priority_runtime.py": (
+            "from . import agile_rolling_replan as rolling"
+        ),
     }
 
     for filename, token in consumers.items():
