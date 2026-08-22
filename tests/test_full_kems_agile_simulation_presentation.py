@@ -2,17 +2,22 @@
 
 from __future__ import annotations
 
+import importlib.util
 from pathlib import Path
 from types import SimpleNamespace
 
-from custom_components.kems import agile_simulation_presentation as presentation
-from custom_components.kems.product_types import (
-    SYSTEM_TYPE_BATTERY_SOLAR,
-    SYSTEM_TYPE_FULL_KEMS_AGILE,
-)
+ROOT = Path(__file__).parents[1]
+MODULE = ROOT / "custom_components" / "kems" / "agile_simulation_presentation.py"
+SPEC = importlib.util.spec_from_file_location("kems_agile_simulation_presentation", MODULE)
+assert SPEC is not None and SPEC.loader is not None
+presentation = importlib.util.module_from_spec(SPEC)
+SPEC.loader.exec_module(presentation)
+
+FULL_KEMS_AGILE = "full_kems_agile"
+BATTERY_SOLAR = "battery_solar"
 
 
-def _coordinator(system_type: str = SYSTEM_TYPE_FULL_KEMS_AGILE):
+def _coordinator(system_type: str = FULL_KEMS_AGILE):
     state = {
         "current_rate_pence": 12.94,
         "rolling_export_plan": {
@@ -129,7 +134,7 @@ def test_agile_current_export_projects_to_generic_graph_contract() -> None:
 
 
 def test_other_product_types_keep_the_original_simulation_contract() -> None:
-    coordinator = _coordinator(SYSTEM_TYPE_BATTERY_SOLAR)
+    coordinator = _coordinator(BATTERY_SOLAR)
 
     assert (
         presentation._projected_value(coordinator, "simulated_grid_export_today")
