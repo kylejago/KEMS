@@ -61,8 +61,7 @@ def test_facade_bridges_v2_name_to_canonical_runtime() -> None:
     ast.parse(source)
 
     assert (
-        '_bind_legacy_name("agile_history_backfill_v2", enhancement_runtime)'
-        in source
+        '_bind_legacy_name("agile_history_backfill_v2", enhancement_runtime)' in source
     )
     assert "sys.modules[qualified] = module" in source
     assert "setattr(_PACKAGE, name, module)" in source
