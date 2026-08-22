@@ -306,7 +306,9 @@ def _improve_plan_clarity_dashboard(content: str) -> str:
     """Apply the proven plan/SOC dashboard additions."""
     if "title: Battery plan to next cheap period" not in content:
         if _SLOT_CARD_MARKER not in content:
-            raise ValueError("Agile plan-clarity slot decision dashboard marker missing")
+            raise ValueError(
+                "Agile plan-clarity slot decision dashboard marker missing"
+            )
         content = content.replace(
             _SLOT_CARD_MARKER,
             _BATTERY_PLAN_CARD + _SLOT_CARD_MARKER,
@@ -452,7 +454,9 @@ def install_progressive_publication_planning() -> None:
         global _original_bounded_partial_apply
         _original_bounded_partial_apply = apply
         _apply_no_reserve_publication_dispatch._kems_progressive_publication = True
-        alpha728._apply_bounded_partial_dispatch = _apply_no_reserve_publication_dispatch
+        alpha728._apply_bounded_partial_dispatch = (
+            _apply_no_reserve_publication_dispatch
+        )
 
     publish = runtime.EfficientAgileSmartExportManager._publish
     if not getattr(publish, "_kems_progressive_publication", False):
