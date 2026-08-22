@@ -56,11 +56,7 @@ POST_BASE_PATCHES: Final[tuple[PatchSpec, ...]] = (
     ("agile_alpha735_cheap_handover", "install_alpha735_cheap_handover_patch"),
     ("agile_alpha736_panel_flow", "install_alpha736_panel_flow_patch"),
     ("dashboard_alpha736_finance", "install_alpha736_finance_dashboard_patch"),
-    ("agile_alpha740_opportunity_guard", "install_alpha740_opportunity_guard_patch"),
-    (
-        "dashboard_alpha740_agile_primary",
-        "install_alpha740_agile_primary_dashboard_patch",
-    ),
+    ("agile_economic_opportunity", "install_economic_opportunity"),
     ("agile_price_publication", "install_price_publication"),
     ("agile_operator_telemetry", "install_operator_telemetry"),
     ("agile_event_priority", "install_event_priority"),
