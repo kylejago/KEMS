@@ -103,12 +103,39 @@ def test_alpha8_compatibility_registry_is_complete_and_resolvable() -> None:
         assert installer_name in functions, f"{module_name} is missing {installer_name}"
 
 
+def test_event_priority_retires_alpha743_from_execution() -> None:
+    specs = _compat_specs()
+    live_graph = (
+        "agile_alpha742_live_graph_telemetry",
+        "install_alpha742_live_graph_telemetry_patch",
+    )
+    event_priority = ("agile_event_priority", "install_event_priority")
+    dashboard_parity = ("agile_dashboard_parity", "install_dashboard_parity")
+
+    assert specs.index(event_priority) > specs.index(live_graph)
+    assert specs.index(event_priority) < specs.index(dashboard_parity)
+
+    retired = "agile_alpha743_event_priority"
+    assert not any(module_name == retired for module_name, _ in specs)
+
+    historical = KEMS / f"{retired}.py"
+    canonical_runtime = KEMS / "agile_event_priority_runtime.py"
+    canonical_facade = KEMS / "agile_event_priority.py"
+    assert historical.is_file()
+    assert canonical_runtime.is_file()
+    assert canonical_facade.is_file()
+    assert canonical_runtime.read_text(encoding="utf-8") == historical.read_text(
+        encoding="utf-8"
+    )
+
+    facade = canonical_facade.read_text(encoding="utf-8")
+    assert "agile_event_priority_runtime" in facade
+    assert "agile_alpha743_event_priority" not in facade
+
+
 def test_dashboard_parity_retires_alpha744_from_execution() -> None:
     specs = _compat_specs()
-    event_priority = (
-        "agile_alpha743_event_priority",
-        "install_alpha743_event_priority_patch",
-    )
+    event_priority = ("agile_event_priority", "install_event_priority")
     dashboard_parity = ("agile_dashboard_parity", "install_dashboard_parity")
     progressive = (
         "agile_progressive_publication",
@@ -224,6 +251,22 @@ def test_publication_reporting_retires_alpha750_and_alpha752_from_execution() ->
     }
     assert not any(module_name in retired for module_name, _ in specs)
     assert all((KEMS / f"{module_name}.py").is_file() for module_name in retired)
+
+
+def test_canonical_event_priority_preserves_dispatch_and_hardware_boundary() -> None:
+    facade = (KEMS / "agile_event_priority.py").read_text(encoding="utf-8")
+    runtime = (KEMS / "agile_event_priority_runtime.py").read_text(encoding="utf-8")
+
+    assert "install_event_priority" in facade
+    assert "agile_event_priority_runtime" in facade
+    assert "_dispatch_targets" in runtime
+    assert "_rolling_plan" in runtime
+    assert "safety > Power Down > Happy Hour > Agile price" in runtime
+    assert '"hardware_writes": "blocked"' in runtime
+    assert ".services.async_call(" not in facade + runtime
+    assert "providers.foxess" not in facade + runtime
+    assert "safe_to_write_hardware = True" not in facade + runtime
+    assert "commands_permitted = True" not in facade + runtime
 
 
 def test_canonical_dashboard_parity_cannot_change_dispatch_or_hardware_writes() -> None:
