@@ -54,12 +54,13 @@ def test_dashboard_runtimes_are_byte_identical() -> None:
     assert DIAGNOSTICS_RUNTIME.read_bytes() == HISTORICAL_715.read_bytes()
 
 
-def test_facade_binds_714_before_importing_frozen_715() -> None:
+def test_facade_binds_714_before_loading_frozen_715() -> None:
     source = FACADE.read_text(encoding="utf-8")
     bind = '_bind_legacy_name("agile_alpha714_dashboard", deadline_history_runtime)'
-    imported = "agile_history_diagnostics_dashboard_runtime as diagnostics_runtime"
+    loaded = "diagnostics_runtime = import_module("
 
-    assert source.index(bind) < source.index(imported)
+    assert source.index(bind) < source.index(loaded)
+    assert '".agile_history_diagnostics_dashboard_runtime"' in source
     assert '_bind_legacy_name("agile_alpha715_dashboard"' not in source
 
 
