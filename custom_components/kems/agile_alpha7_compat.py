@@ -61,14 +61,7 @@ POST_BASE_PATCHES: Final[tuple[PatchSpec, ...]] = (
         "dashboard_alpha740_agile_primary",
         "install_alpha740_agile_primary_dashboard_patch",
     ),
-    (
-        "agile_alpha741_partial_publication",
-        "install_alpha741_partial_publication_patch",
-    ),
-    (
-        "dashboard_alpha741_partial_publication",
-        "install_alpha741_partial_publication_dashboard_patch",
-    ),
+    ("agile_price_publication", "install_price_publication"),
     ("agile_operator_telemetry", "install_operator_telemetry"),
     ("agile_event_priority", "install_event_priority"),
     ("agile_dashboard_parity", "install_dashboard_parity"),
