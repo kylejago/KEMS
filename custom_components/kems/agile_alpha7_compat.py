@@ -52,7 +52,7 @@ POST_BASE_PATCHES: Final[tuple[PatchSpec, ...]] = (
     ("agile_alpha729_live_routing", "install_alpha729_live_routing_parity_patch"),
     ("agile_alpha730_current_routing", "install_alpha730_current_routing_patch"),
     ("agile_alpha731_solar_headroom", "install_alpha731_solar_headroom_patch"),
-    ("agile_alpha734_deadline_guard", "install_alpha734_deadline_guard_patch"),
+    ("agile_deadline_guard", "install_deadline_guard"),
     ("agile_cheap_window_handover", "install_cheap_window_handover"),
     ("agile_product_presentation", "install_product_presentation"),
     ("agile_economic_opportunity", "install_economic_opportunity"),
