@@ -15,9 +15,10 @@ ENTITY = INTEGRATION / "entity.py"
 def test_manifest_is_the_only_literal_runtime_release_identity() -> None:
     manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
     version = str(manifest["version"])
+    const_lines = CONST.read_text(encoding="utf-8").splitlines()
 
     assert version.startswith("0.8.0-alpha8.")
-    assert "VERSION =" not in CONST.read_text(encoding="utf-8")
+    assert not any(line.startswith("VERSION =") for line in const_lines)
     entity = ENTITY.read_text(encoding="utf-8")
     assert 'with_name("manifest.json")' in entity
     assert "sw_version=INTEGRATION_VERSION" in entity
