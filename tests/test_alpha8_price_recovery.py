@@ -34,10 +34,7 @@ def _compat_specs() -> list[tuple[str, str]]:
 
 def test_price_recovery_retires_alpha727_from_execution() -> None:
     specs = _compat_specs()
-    previous = (
-        "agile_alpha726_provisional",
-        "install_alpha726_provisional_planning_patch",
-    )
+    previous = ("agile_proof_planning", "install_provisional_planning")
     canonical = ("agile_price_recovery", "install_price_recovery")
     following = ("agile_bounded_partial", "install_bounded_partial_horizon")
 
