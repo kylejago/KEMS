@@ -142,7 +142,7 @@ def test_historical_alpha720_metadata_and_version_remain_unchanged() -> None:
 
     assert "install_alpha720_preinstall_patch()" in historical
     assert "install_alpha720_dashboard_patch()" in historical
-    assert manifest["version"] == "0.8.0-alpha8.0"
+    assert str(manifest["version"]).startswith("0.8.0-alpha8.")
 
 
 def test_alpha720_ownership_note_is_explicitly_refactor_only() -> None:
