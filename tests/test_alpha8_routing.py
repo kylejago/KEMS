@@ -69,9 +69,7 @@ def test_routing_facade_bridges_frozen_import_names_to_canonical_objects() -> No
         '_bind_legacy_name("agile_alpha730_current_routing", current_runtime)'
     )
     solar_import = "from . import agile_solar_headroom_runtime as solar_runtime"
-    solar_alias = (
-        '_bind_legacy_name("agile_alpha731_solar_headroom", solar_runtime)'
-    )
+    solar_alias = '_bind_legacy_name("agile_alpha731_solar_headroom", solar_runtime)'
 
     assert source.index(current_alias) < source.index(solar_import)
     assert source.index(solar_import) < source.index(solar_alias)
@@ -106,10 +104,7 @@ def test_deadline_guard_frozen_alpha731_import_resolves_through_bridge() -> None
 
     assert "from . import agile_alpha731_solar_headroom as alpha731" in deadline
     assert "alpha731._proposal_solar_evidence(self, config)" in deadline
-    assert (
-        '_bind_legacy_name("agile_alpha731_solar_headroom", solar_runtime)'
-        in facade
-    )
+    assert '_bind_legacy_name("agile_alpha731_solar_headroom", solar_runtime)' in facade
 
 
 def test_routing_preserves_reporting_dispatch_and_hardware_boundaries() -> None:
@@ -123,7 +118,10 @@ def test_routing_preserves_reporting_dispatch_and_hardware_boundaries() -> None:
     assert '"reporting_only": True' in current
     assert '"hardware_writes": "blocked"' in current
     assert "alpha717._dispatch_targets = _dispatch_targets_with_solar_headroom" in solar
-    assert "alpha723.build_agile_shadow_command = _build_shadow_with_solar_aware_ac" in solar
+    assert (
+        "alpha723.build_agile_shadow_command = _build_shadow_with_solar_aware_ac"
+        in solar
+    )
     assert ".services.async_call(" not in source
     assert "providers.foxess" not in source
     assert "safe_to_write_hardware = True" not in source
