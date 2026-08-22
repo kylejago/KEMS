@@ -7,8 +7,8 @@ progressive known-price no-reserve path only for a verified clean Octopus
 publication gap.
 
 Existing current-price, reserve, deadline, Power Down and Happy Hour safety
-behaviour remains owned by the earlier canonical/runtime layers. Real FoxESS
-hardware writes remain blocked.
+behaviour remains owned by the earlier canonical/runtime layers.
+Real FoxESS hardware writes remain blocked.
 """
 
 # ruff: noqa: E501
