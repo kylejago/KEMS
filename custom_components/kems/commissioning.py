@@ -21,6 +21,7 @@ from .const import (
     CONF_SOLAR_POWER,
 )
 from .entity import KEMSEntity
+from .kems_core.commissioning_evidence import assess_foxess_telemetry_stability
 from .panel import PANEL_CONFIG_VERSION, panel_health_snapshot
 
 PASS = "PASS"
@@ -282,7 +283,73 @@ def build_commissioning_snapshot(hass: HomeAssistant, coordinator) -> dict[str, 
     )
     checks.append(_source_check(hass, mappings, CONF_HOUSE_LOAD, "House load mapping"))
 
+    mapping_checks = {item["key"]: item for item in checks}
+    foxess_physical_mappings_ready = all(
+        mapping_checks[key]["status"] == PASS
+        for key in (
+            CONF_BATTERY_SOC,
+            "battery_power_mapping",
+            CONF_SOLAR_POWER,
+            CONF_GRID_IMPORT,
+            CONF_GRID_EXPORT,
+            CONF_HOUSE_LOAD,
+        )
+    )
     records = tuple(getattr(getattr(coordinator, "_history", None), "records", ()))
+    telemetry_evidence_payload: dict[str, Any] | None = None
+    if not foxess_physical_mappings_ready:
+        telemetry_check = _check(
+            "foxess_telemetry_stability",
+            "FoxESS telemetry stability",
+            WAIT,
+            "Waiting for all required live FoxESS physical telemetry mappings",
+        )
+    else:
+        telemetry_evidence = assess_foxess_telemetry_stability(
+            records,
+            expected_interval_seconds=coordinator.settings.scan_interval_seconds,
+        )
+        telemetry_evidence_payload = telemetry_evidence.to_dict()
+        if telemetry_evidence.ready:
+            telemetry_check = _check(
+                "foxess_telemetry_stability",
+                "FoxESS telemetry stability",
+                PASS,
+                (
+                    f"{telemetry_evidence.complete_samples}/"
+                    f"{telemetry_evidence.samples} complete; max gap="
+                    f"{telemetry_evidence.maximum_gap_seconds}s; allowed <= "
+                    f"{telemetry_evidence.allowed_gap_seconds}s"
+                ),
+            )
+        elif telemetry_evidence.state in {"collecting", "timestamp_incomplete"}:
+            telemetry_check = _check(
+                "foxess_telemetry_stability",
+                "FoxESS telemetry stability",
+                WAIT,
+                (
+                    f"{telemetry_evidence.state}: "
+                    f"{telemetry_evidence.complete_samples}/"
+                    f"{telemetry_evidence.samples} complete; "
+                    f"{telemetry_evidence.completeness_percent:.1f}%"
+                ),
+            )
+        else:
+            telemetry_check = _check(
+                "foxess_telemetry_stability",
+                "FoxESS telemetry stability",
+                FAIL,
+                (
+                    f"{telemetry_evidence.state}: "
+                    f"{telemetry_evidence.completeness_percent:.1f}% complete; "
+                    f"missing={list(telemetry_evidence.missing_fields)}; "
+                    f"stale={list(telemetry_evidence.stale_fields)}; max gap="
+                    f"{telemetry_evidence.maximum_gap_seconds}s; allowed <= "
+                    f"{telemetry_evidence.allowed_gap_seconds}s"
+                ),
+            )
+    checks.append(telemetry_check)
+
     detected_positive_is_discharge, direction_samples, direction_confidence = (
         _detect_battery_power_convention(records)
     )
@@ -544,6 +611,8 @@ def build_commissioning_snapshot(hass: HomeAssistant, coordinator) -> dict[str, 
         "foxess_registered_entity_count": len(foxess_registered),
         "foxess_registered_entities": foxess_registered,
         "foxess_mappings": foxess_mappings,
+        "foxess_telemetry_mapping_gate_passed": foxess_physical_mappings_ready,
+        "foxess_telemetry_stability": telemetry_evidence_payload,
         "configured_battery_power_positive_is_discharge": (
             configured_positive_is_discharge
         ),
