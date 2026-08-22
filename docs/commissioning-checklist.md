@@ -14,4 +14,4 @@
 - Restore grid and verify the stability hold before normal planning resumes.
 - Only then implement and enable the real FoxESS backend one command family at a time.
 
-`kems_core.commissioning_evidence.assess_foxess_telemetry_stability()` is the read-only evidence primitive for the sustained telemetry requirement above. It analyses retained observations only; it does not call Home Assistant services, implement a FoxESS write backend, or change the real-hardware write lock.
+`kems_core.commissioning_evidence.assess_foxess_telemetry_stability()` is the read-only evidence primitive for the sustained telemetry requirement above. `sensor.kems_commissioning_readiness` now consumes that evidence only after all required physical observations are mapped to live FoxESS Modbus entities, using the configured KEMS scan interval as the continuity baseline. Collecting evidence remains a commissioning wait; materially incomplete/stale telemetry or excessive update gaps fail closed and prevent `Ready for Shadow`. This gate does not call Home Assistant services, implement a FoxESS write backend, or change the real-hardware write lock.
