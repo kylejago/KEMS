@@ -1,18 +1,18 @@
 """Project Full KEMS Agile through the existing simulated KEMS sensor contract.
 
 The property web application intentionally consumes the stable
-``sensor.kems_simulated_*`` interface.  Full KEMS Agile has a separate,
+``sensor.kems_simulated_*`` interface. Full KEMS Agile has a separate,
 settlement-aware replay and current-routing ledger, so exposing the base proposal
 ``SimulationState`` through those same presentation sensors can make the web
 page disagree with the Agile panel and plan.
 
 This module fixes that boundary without replacing or mutating ``SimulationState``.
 Control, ROI, lifetime accounting, commissioning and shadow safety continue to
-use their existing objects.  Only the values returned by generic KEMS sensor
+use their existing objects. Only the values returned by generic KEMS sensor
 entities are projected from the Agile ledger while the selected system type is
 Full KEMS Agile.
 
-Release versions identify repository states, not implementation filenames.  This
+Release versions identify repository states, not implementation filenames. This
 module therefore has a functional canonical name and must not be copied into a
 version-named Alpha8 patch chain.
 """
@@ -22,8 +22,7 @@ from __future__ import annotations
 import math
 from typing import Any
 
-from .product_types import SYSTEM_TYPE_FULL_KEMS_AGILE
-
+_FULL_KEMS_AGILE = "full_kems_agile"
 _MISSING = object()
 _PRESENTATION_KEYS = frozenset(
     {
@@ -104,7 +103,7 @@ def _sum_available(*values: Any) -> float | None:
 def _projected_value(coordinator: Any, key: str) -> object:
     """Return one Agile presentation value or ``_MISSING`` for base behaviour."""
     settings = getattr(coordinator, "settings", None)
-    if getattr(settings, "system_type", None) != SYSTEM_TYPE_FULL_KEMS_AGILE:
+    if getattr(settings, "system_type", None) != _FULL_KEMS_AGILE:
         return _MISSING
     if key not in _PRESENTATION_KEYS:
         return _MISSING
@@ -250,14 +249,14 @@ def install_agile_simulation_presentation() -> None:
         if (
             self.entity_description.key not in _PRESENTATION_KEYS
             or getattr(self.coordinator.settings, "system_type", None)
-            != SYSTEM_TYPE_FULL_KEMS_AGILE
+            != _FULL_KEMS_AGILE
         ):
             return attributes
         result = dict(attributes or {})
         result.update(
             {
                 "presentation_source": "Full KEMS Agile settlement-aware replay",
-                "presentation_system_type": SYSTEM_TYPE_FULL_KEMS_AGILE,
+                "presentation_system_type": _FULL_KEMS_AGILE,
                 "base_simulation_state_preserved": True,
                 "reporting_only": True,
                 "hardware_writes": "blocked",
