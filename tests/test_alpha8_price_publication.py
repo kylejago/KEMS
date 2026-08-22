@@ -68,7 +68,11 @@ def test_price_publication_facade_preserves_runtime_then_dashboard_order() -> No
     assert runtime_call in source
     assert dashboard_call in source
     assert source.index(runtime_call) < source.index(dashboard_call)
-    assert "agile_alpha741_partial_publication" not in source
+    assert (
+        '_bind_legacy_name("agile_alpha741_partial_publication", price_runtime)'
+        in source
+    )
+    assert "from . import agile_alpha741_partial_publication" not in source
     assert "dashboard_alpha741_partial_publication" not in source
 
 
