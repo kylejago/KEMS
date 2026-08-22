@@ -69,7 +69,10 @@ def test_cheap_handover_preserves_manual_schedule_and_publish_order() -> None:
     assert source.index("alpha735_original_publish(self, state)") < source.index(
         "snapshot = _cheap_snapshot(self, state)"
     )
-    assert '"routing_basis": "current routing snapshot — overnight cheap handover"' in source
+    assert (
+        '"routing_basis": "current routing snapshot — overnight cheap handover"'
+        in source
+    )
     assert '"reporting_only": True' in source
     assert '"hardware_writes": "blocked"' in source
 
@@ -92,8 +95,8 @@ def test_cheap_handover_blocks_display_export_without_replanning() -> None:
 
 
 def test_cheap_handover_cannot_enable_real_hardware_writes() -> None:
-    source = FACADE.read_text(encoding="utf-8") + "\n" + RUNTIME.read_text(
-        encoding="utf-8"
+    source = (
+        FACADE.read_text(encoding="utf-8") + "\n" + RUNTIME.read_text(encoding="utf-8")
     )
 
     assert ".services.async_call(" not in source
