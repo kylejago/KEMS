@@ -429,7 +429,9 @@ def install_dashboard_parity() -> None:
             )
 
         publish_with_dashboard_parity._kems_dashboard_parity = True
-        runtime.EfficientAgileSmartExportManager._publish = publish_with_dashboard_parity
+        runtime.EfficientAgileSmartExportManager._publish = (
+            publish_with_dashboard_parity
+        )
 
     shutdown = runtime.EfficientAgileSmartExportManager.async_shutdown
     if not getattr(shutdown, "_kems_dashboard_parity", False):
