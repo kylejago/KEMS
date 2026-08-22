@@ -32,10 +32,7 @@ def _compat_specs() -> list[tuple[str, str]]:
 
 def test_live_routing_retires_alpha729_from_execution() -> None:
     specs = _compat_specs()
-    previous = (
-        "agile_alpha728_bounded_partial",
-        "install_alpha728_bounded_partial_horizon_patch",
-    )
+    previous = ("agile_bounded_partial", "install_bounded_partial_horizon")
     canonical = ("agile_live_routing", "install_live_routing")
     following = ("agile_routing", "install_current_routing")
 
