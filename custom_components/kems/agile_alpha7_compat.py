@@ -56,6 +56,7 @@ POST_BASE_PATCHES: Final[tuple[PatchSpec, ...]] = (
     ("agile_cheap_window_handover", "install_cheap_window_handover"),
     ("agile_product_presentation", "install_product_presentation"),
     ("agile_economic_opportunity", "install_economic_opportunity"),
+    ("agile_forecast_arbitrage", "install_forecast_arbitrage"),
     ("agile_price_publication", "install_price_publication"),
     ("agile_operator_telemetry", "install_operator_telemetry"),
     ("agile_event_priority", "install_event_priority"),
