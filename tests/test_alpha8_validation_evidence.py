@@ -77,19 +77,24 @@ def test_frozen_provisional_runtime_mutates_bridged_alpha719_objects() -> None:
     provisional = PROVISIONAL_RUNTIME.read_text(encoding="utf-8")
 
     assert "from . import agile_alpha719_dashboard as alpha719_dashboard" in provisional
-    assert "from . import agile_alpha719_validation as alpha719_validation" in provisional
+    assert (
+        "from . import agile_alpha719_validation as alpha719_validation" in provisional
+    )
     assert "current_audit = alpha719_validation._decision_audit" in provisional
-    assert "alpha719_validation._decision_audit = _decision_audit_with_provisional" in provisional
+    assert (
+        "alpha719_validation._decision_audit = _decision_audit_with_provisional"
+        in provisional
+    )
     assert "current_trajectory = alpha719_validation._soc_trajectory" in provisional
-    assert "alpha719_validation._soc_trajectory = _soc_trajectory_with_provisional" in provisional
+    assert (
+        "alpha719_validation._soc_trajectory = _soc_trajectory_with_provisional"
+        in provisional
+    )
     assert "alpha719_dashboard._AGILE_CARDS = _ALPHA726_AGILE_CARDS" in provisional
     assert (
-        '_bind_legacy_name("agile_alpha719_validation", validation_runtime)'
-        in facade
+        '_bind_legacy_name("agile_alpha719_validation", validation_runtime)' in facade
     )
-    assert (
-        '_bind_legacy_name("agile_alpha719_dashboard", dashboard_runtime)' in facade
-    )
+    assert '_bind_legacy_name("agile_alpha719_dashboard", dashboard_runtime)' in facade
 
 
 def test_validation_runtime_preserves_evidence_and_soc_contract() -> None:
