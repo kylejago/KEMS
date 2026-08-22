@@ -102,16 +102,16 @@ def test_live_routing_leaves_alpha730_alpha731_coupled_pair_untouched() -> None:
     assert specs.index(current) < specs.index(solar)
     assert specs.index(solar) < specs.index(deadline)
 
-    source = FACADE.read_text(encoding="utf-8") + "\n" + RUNTIME.read_text(
-        encoding="utf-8"
+    source = (
+        FACADE.read_text(encoding="utf-8") + "\n" + RUNTIME.read_text(encoding="utf-8")
     )
     assert "agile_alpha730_current_routing" not in source
     assert "agile_alpha731_solar_headroom" not in source
 
 
 def test_live_routing_cannot_change_dispatch_or_enable_hardware_writes() -> None:
-    source = FACADE.read_text(encoding="utf-8") + "\n" + RUNTIME.read_text(
-        encoding="utf-8"
+    source = (
+        FACADE.read_text(encoding="utf-8") + "\n" + RUNTIME.read_text(encoding="utf-8")
     )
 
     assert "_dispatch_targets(" not in source
