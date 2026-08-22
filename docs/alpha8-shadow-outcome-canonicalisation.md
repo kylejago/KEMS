@@ -41,7 +41,7 @@ Historical compatibility-order metadata remains untouched.
 
 This remains simulation/shadow only. No Home Assistant hardware service call is
 added and no FoxESS provider write path is added. `commands_permitted` remains
-false and `safe_to_write_hardware` remains false. Real hardware writes remain blocked.
+false and `safe_to_write_hardware` remains false; real hardware writes remain blocked.
 Commissioning is not bypassed.
 
 There is no release, tag or manifest-version change in this cleanup slice.
