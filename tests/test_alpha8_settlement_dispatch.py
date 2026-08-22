@@ -37,7 +37,7 @@ def _post_specs() -> list[tuple[str, str]]:
 
 def test_settlement_dispatch_retires_alpha717_live_entries() -> None:
     specs = _post_specs()
-    yaml_guard = ("agile_dashboard_yaml_guard", "install_dashboard_yaml_guard")
+    yaml_guard = ("agile_live_scenario", "install_live_scenario_yaml_guard")
     dispatch = ("agile_settlement_dispatch", "install_settlement_dispatch")
     history = ("agile_history_dashboard", "install_deadline_history_dashboard")
     rolling_dashboard = ("agile_rolling_planning", "install_rolling_dashboard")

@@ -38,7 +38,7 @@ def _post_specs() -> list[tuple[str, str]]:
 def test_rolling_ownership_retires_alpha716_live_entries() -> None:
     specs = _post_specs()
     rolling = ("agile_rolling_planning", "install_rolling_replan")
-    live = ("agile_smart_export_live", "install_live_scenario_patch")
+    live = ("agile_live_scenario", "install_live_scenario")
     history = ("agile_history_dashboard", "install_history_diagnostics_dashboard")
     dashboard = ("agile_rolling_planning", "install_rolling_dashboard")
     alpha717 = (
