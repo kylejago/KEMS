@@ -34,10 +34,7 @@ def _compat_specs() -> list[tuple[str, str]]:
 
 def test_operator_telemetry_retires_both_alpha742_modules_from_execution() -> None:
     specs = _compat_specs()
-    previous = (
-        "dashboard_alpha741_partial_publication",
-        "install_alpha741_partial_publication_dashboard_patch",
-    )
+    previous = ("agile_price_publication", "install_price_publication")
     canonical = ("agile_operator_telemetry", "install_operator_telemetry")
     following = ("agile_event_priority", "install_event_priority")
 
