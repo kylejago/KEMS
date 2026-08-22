@@ -40,7 +40,10 @@ def _compat_specs() -> list[tuple[str, str]]:
 
 def test_validation_evidence_retires_alpha719_from_execution() -> None:
     specs = _compat_specs()
-    alpha717 = ("agile_alpha717_dashboard", "install_alpha717_dashboard_patch")
+    alpha717 = (
+        "agile_settlement_dispatch",
+        "install_settlement_dispatch_dashboard",
+    )
     validation = ("agile_validation_evidence", "install_validation_evidence")
     consolidation = ("dashboard_consolidation", "install_dashboard_consolidation")
     dashboard = ("agile_validation_evidence", "install_validation_dashboard")
