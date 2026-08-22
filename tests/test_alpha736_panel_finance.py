@@ -27,7 +27,7 @@ def test_alpha8_release_targets_coordinated_panel_and_web() -> None:
     property_web = str(bundle["components"]["property_web"]["version"])
     pi_agent = str(bundle["components"]["pi_agent"]["version"])
     public_web = str(bundle["components"]["public_web"]["version"])
-    assert property_web == pi_agent == public_web == "0.8.0-alpha8-web.0"
+    assert property_web == pi_agent == public_web == "0.8.0-alpha8-web.1"
 
     assert 'PANEL_CONFIG_VERSION = "0.8.0-alpha8-panel.0"' in panel_py
     assert 'panel_config_version: "0.8.0-alpha8-panel.0"' in panel_yaml
@@ -37,6 +37,8 @@ def test_alpha8_release_targets_coordinated_panel_and_web() -> None:
     assert bundle["maintenance"]["affected_components"] == [
         "kems_core",
         "dashboard",
+        "property_web",
+        "pi_agent",
     ]
 
 
