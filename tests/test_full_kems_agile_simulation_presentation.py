@@ -89,8 +89,7 @@ def test_overnight_grid_charge_is_visible_as_negative_battery_power() -> None:
     coordinator = _coordinator()
 
     assert (
-        presentation._projected_value(coordinator, "simulated_grid_import_power")
-        == 7.8
+        presentation._projected_value(coordinator, "simulated_grid_import_power") == 7.8
     )
     assert (
         presentation._projected_value(coordinator, "simulated_battery_charging_power")
@@ -117,10 +116,11 @@ def test_agile_current_export_projects_to_generic_graph_contract() -> None:
     )
 
     assert (
-        presentation._projected_value(coordinator, "simulated_grid_export_power")
-        == 3.4
+        presentation._projected_value(coordinator, "simulated_grid_export_power") == 3.4
     )
-    assert presentation._projected_value(coordinator, "simulated_grid_net_power") == -3.4
+    assert (
+        presentation._projected_value(coordinator, "simulated_grid_net_power") == -3.4
+    )
     assert presentation._projected_value(coordinator, "simulated_battery_power") == 4.0
     assert (
         presentation._projected_value(coordinator, "simulated_battery_export_power")
