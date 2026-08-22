@@ -32,11 +32,11 @@ def test_event_priority_facade_is_canonical_and_does_not_import_historical_modul
 def test_event_priority_registry_preserves_exact_installation_position() -> None:
     source = COMPAT.read_text(encoding="utf-8")
 
-    live_graph = '"agile_alpha742_live_graph_telemetry"'
+    operator_telemetry = '("agile_operator_telemetry", "install_operator_telemetry")'
     event_priority = '("agile_event_priority", "install_event_priority")'
     dashboard_parity = '("agile_dashboard_parity", "install_dashboard_parity")'
 
-    assert source.index(event_priority) > source.index(live_graph)
+    assert source.index(event_priority) > source.index(operator_telemetry)
     assert source.index(event_priority) < source.index(dashboard_parity)
     assert '"agile_alpha743_event_priority"' not in source
 
