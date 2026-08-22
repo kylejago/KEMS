@@ -8,7 +8,9 @@ from types import SimpleNamespace
 
 ROOT = Path(__file__).parents[1]
 MODULE = ROOT / "custom_components" / "kems" / "agile_simulation_presentation.py"
-SPEC = importlib.util.spec_from_file_location("kems_agile_simulation_presentation", MODULE)
+SPEC = importlib.util.spec_from_file_location(
+    "kems_agile_simulation_presentation", MODULE
+)
 assert SPEC is not None and SPEC.loader is not None
 presentation = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(presentation)
