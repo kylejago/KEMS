@@ -32,10 +32,7 @@ def _compat_specs() -> list[tuple[str, str]]:
 
 def test_deadline_guard_retires_alpha734_from_execution() -> None:
     specs = _compat_specs()
-    previous = (
-        "agile_alpha731_solar_headroom",
-        "install_alpha731_solar_headroom_patch",
-    )
+    previous = ("agile_routing", "install_solar_headroom")
     canonical = ("agile_deadline_guard", "install_deadline_guard")
     following = ("agile_cheap_window_handover", "install_cheap_window_handover")
 
