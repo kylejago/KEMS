@@ -9,9 +9,9 @@ DASHBOARD = ROOT / "custom_components" / "kems" / "dashboard_alpha740_agile_prim
 def test_alpha740_bundle_capabilities_continue_in_alpha8() -> None:
     bundle = json.loads((ROOT / "release/kems-bundle.template.json").read_text())
 
-    assert bundle["components"]["property_web"]["version"] == "0.8.0-alpha8-web.0"
-    assert bundle["components"]["pi_agent"]["version"] == "0.8.0-alpha8-web.0"
-    assert bundle["components"]["public_web"]["version"] == "0.8.0-alpha8-web.0"
+    assert bundle["components"]["property_web"]["version"] == "0.8.0-alpha8-web.1"
+    assert bundle["components"]["pi_agent"]["version"] == "0.8.0-alpha8-web.1"
+    assert bundle["components"]["public_web"]["version"] == "0.8.0-alpha8-web.1"
     assert bundle["components"]["panel"]["version"] == "0.8.0-alpha8-panel.0"
 
 
