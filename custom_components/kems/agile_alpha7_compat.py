@@ -74,7 +74,7 @@ POST_BASE_PATCHES: Final[tuple[PatchSpec, ...]] = (
         "agile_alpha742_live_graph_telemetry",
         "install_alpha742_live_graph_telemetry_patch",
     ),
-    ("agile_alpha743_event_priority", "install_alpha743_event_priority_patch"),
+    ("agile_event_priority", "install_event_priority"),
     ("agile_dashboard_parity", "install_dashboard_parity"),
     (
         "agile_progressive_publication",
