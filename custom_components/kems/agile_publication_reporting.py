@@ -12,7 +12,7 @@ import math
 from typing import Any
 
 from . import agile_alpha741_partial_publication as alpha741
-from . import agile_alpha745_plan_clarity as alpha745
+from . import agile_progressive_publication as progressive_publication
 
 _EPSILON = 1e-6
 _REPORTING_TOLERANCE_KWH = 0.01
@@ -228,18 +228,20 @@ def install_no_reserve_reporting() -> None:
     global _original_no_reserve_annotate
     global _original_no_reserve_plan_summary
 
-    plan_summary = alpha745._plan_summary
+    plan_summary = progressive_publication._plan_summary
     if not getattr(plan_summary, "_kems_no_reserve_reporting", False):
         _original_no_reserve_plan_summary = plan_summary
         _plan_summary_no_reserve._kems_no_reserve_reporting = True
-        alpha745._plan_summary = _plan_summary_no_reserve
+        progressive_publication._plan_summary = _plan_summary_no_reserve
 
-    annotate = alpha745._annotate_unknown_slot_rows
+    annotate = progressive_publication._annotate_unknown_slot_rows
     if getattr(annotate, "_kems_no_reserve_reporting", False):
         return
     _original_no_reserve_annotate = annotate
     _annotate_unknown_rows_no_reserve._kems_no_reserve_reporting = True
-    alpha745._annotate_unknown_slot_rows = _annotate_unknown_rows_no_reserve
+    progressive_publication._annotate_unknown_slot_rows = (
+        _annotate_unknown_rows_no_reserve
+    )
 
 
 def install_tomorrow_publication_reporting() -> None:
@@ -255,9 +257,9 @@ def install_tomorrow_publication_reporting() -> None:
         )
         alpha741._progressive_tomorrow_state = _progressive_tomorrow_state_no_reserve
 
-    plan_summary = alpha745._plan_summary
+    plan_summary = progressive_publication._plan_summary
     if getattr(plan_summary, "_kems_publication_rounding", False):
         return
     _original_rounding_plan_summary = plan_summary
     _plan_summary_rounding._kems_publication_rounding = True
-    alpha745._plan_summary = _plan_summary_rounding
+    progressive_publication._plan_summary = _plan_summary_rounding

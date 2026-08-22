@@ -103,11 +103,39 @@ def test_alpha8_compatibility_registry_is_complete_and_resolvable() -> None:
         assert installer_name in functions, f"{module_name} is missing {installer_name}"
 
 
+def test_progressive_publication_retires_alpha745_and_alpha746_from_execution() -> None:
+    specs = _compat_specs()
+    alpha744 = (
+        "agile_alpha744_dashboard_parity",
+        "install_alpha744_dashboard_parity_patch",
+    )
+    progressive = (
+        "agile_progressive_publication",
+        "install_progressive_publication_planning",
+    )
+    full_battery = ("agile_full_battery_routing", "install_full_battery_routing")
+
+    assert specs.index(progressive) > specs.index(alpha744)
+    assert specs.index(progressive) < specs.index(full_battery)
+
+    retired = {
+        "agile_alpha745_plan_clarity",
+        "agile_alpha746_no_unknown_reserve",
+    }
+    assert not any(module_name in retired for module_name, _ in specs)
+    assert all((KEMS / f"{module_name}.py").is_file() for module_name in retired)
+
+    reporting = (KEMS / "agile_publication_reporting.py").read_text(encoding="utf-8")
+    assert "agile_progressive_publication" in reporting
+    assert "agile_alpha745_plan_clarity" not in reporting
+    assert "agile_alpha746_no_unknown_reserve" not in reporting
+
+
 def test_full_battery_routing_retires_alpha748_from_execution() -> None:
     specs = _compat_specs()
-    no_unknown = (
-        "agile_alpha746_no_unknown_reserve",
-        "install_alpha746_no_unknown_reserve_patch",
+    progressive = (
+        "agile_progressive_publication",
+        "install_progressive_publication_planning",
     )
     full_battery = ("agile_full_battery_routing", "install_full_battery_routing")
     deadline_coverage = (
@@ -115,7 +143,7 @@ def test_full_battery_routing_retires_alpha748_from_execution() -> None:
         "install_deadline_plan_coverage",
     )
 
-    assert specs.index(full_battery) > specs.index(no_unknown)
+    assert specs.index(full_battery) > specs.index(progressive)
     assert specs.index(full_battery) < specs.index(deadline_coverage)
 
     retired = "agile_alpha748_full_battery_solar"
@@ -179,6 +207,15 @@ def test_publication_reporting_retires_alpha750_and_alpha752_from_execution() ->
     }
     assert not any(module_name in retired for module_name, _ in specs)
     assert all((KEMS / f"{module_name}.py").is_file() for module_name in retired)
+
+
+def test_canonical_progressive_publication_cannot_enable_hardware_writes() -> None:
+    source = (KEMS / "agile_progressive_publication.py").read_text(encoding="utf-8")
+    assert ".services.async_call(" not in source
+    assert "providers.foxess" not in source
+    assert "safe_to_write_hardware = True" not in source
+    assert "commands_permitted = True" not in source
+    assert "Real FoxESS hardware writes remain blocked" in source
 
 
 def test_canonical_full_battery_routing_cannot_enable_hardware_writes() -> None:
