@@ -11,6 +11,7 @@ that runtime is imported. Real hardware writes remain blocked.
 from __future__ import annotations
 
 import sys
+from importlib import import_module
 from types import ModuleType
 
 from . import agile_deadline_history_dashboard_runtime as deadline_history_runtime
@@ -29,9 +30,10 @@ def _bind_legacy_name(name: str, module: ModuleType) -> None:
 # reads _BACKFILL_DIAGNOSTICS_CARD from that module object.
 _bind_legacy_name("agile_alpha714_dashboard", deadline_history_runtime)
 
-from . import (
-    agile_history_diagnostics_dashboard_runtime as diagnostics_runtime,
-)  # noqa: E402
+diagnostics_runtime = import_module(
+    ".agile_history_diagnostics_dashboard_runtime",
+    __package__,
+)
 
 
 def install_deadline_history_dashboard() -> None:
