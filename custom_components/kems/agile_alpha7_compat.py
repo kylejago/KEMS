@@ -39,7 +39,7 @@ POST_BASE_PATCHES: Final[tuple[PatchSpec, ...]] = (
     ("agile_alpha719_dashboard", "install_alpha719_dashboard_patch"),
     ("agile_alpha720_preinstall", "install_alpha720_preinstall_patch"),
     ("agile_alpha720_dashboard", "install_alpha720_dashboard_patch"),
-    ("agile_alpha722_horizon", "install_alpha722_price_horizon_patch"),
+    ("agile_price_horizon_safety", "install_price_horizon_safety"),
     ("agile_shadow_outcome", "install_shadow_command"),
     ("agile_shadow_outcome", "install_outcome_parity"),
     ("agile_proof_planning", "install_nonzero_export_proof"),
