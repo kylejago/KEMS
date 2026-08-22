@@ -42,7 +42,7 @@ def _compat_specs() -> list[tuple[str, str]]:
 
 def test_shadow_outcome_retires_alpha723_alpha724_from_execution() -> None:
     specs = _compat_specs()
-    horizon = ("agile_alpha722_horizon", "install_alpha722_price_horizon_patch")
+    horizon = ("agile_price_horizon_safety", "install_price_horizon_safety")
     shadow = ("agile_shadow_outcome", "install_shadow_command")
     outcome = ("agile_shadow_outcome", "install_outcome_parity")
     proof = ("agile_proof_planning", "install_nonzero_export_proof")
