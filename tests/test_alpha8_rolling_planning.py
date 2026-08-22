@@ -60,8 +60,8 @@ def test_facade_binds_only_rolling_legacy_name() -> None:
     source = FACADE.read_text(encoding="utf-8")
 
     assert '_bind_legacy_name("agile_rolling_replan", rolling_runtime)' in source
-    assert 'sys.modules[qualified] = module' in source
-    assert 'setattr(_PACKAGE, name, module)' in source
+    assert "sys.modules[qualified] = module" in source
+    assert "setattr(_PACKAGE, name, module)" in source
     assert '".agile_rolling_dashboard_runtime"' in source
     assert '_bind_legacy_name("agile_alpha716_dashboard"' not in source
 
