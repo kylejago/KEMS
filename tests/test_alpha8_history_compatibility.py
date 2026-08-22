@@ -37,7 +37,10 @@ def _pre_base_specs() -> list[tuple[str, str]]:
 
 def test_history_compatibility_retires_alpha715_from_live_pre_base_execution() -> None:
     specs = _pre_base_specs()
-    enhanced = ("agile_history_backfill_v2", "install_enhanced_backfill")
+    enhanced = (
+        "agile_history_backfill_enhancement",
+        "install_history_backfill_enhancement",
+    )
     canonical = ("agile_history_compatibility", "install_history_compatibility")
 
     assert specs.index(canonical) == specs.index(enhanced) + 1

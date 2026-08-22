@@ -18,7 +18,10 @@ PatchSpec = tuple[str, str]
 PRE_BASE_PATCHES: Final[tuple[PatchSpec, ...]] = (
     ("agile_smart_export_reporting", "install_reporting_patch"),
     ("agile_deadline_dispatch", "install_deadline_patch"),
-    ("agile_history_backfill_v2", "install_enhanced_backfill"),
+    (
+        "agile_history_backfill_enhancement",
+        "install_history_backfill_enhancement",
+    ),
     ("agile_history_compatibility", "install_history_compatibility"),
 )
 
