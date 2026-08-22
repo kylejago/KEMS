@@ -92,9 +92,7 @@ def test_history_runtime_preserves_diagnostics_and_shutdown_cleanup() -> None:
         assert token in source
 
 
-def test_preinstall_evidence_consumes_shared_backfill_not_alpha715_module_identity() -> (
-    None
-):
+def test_preinstall_evidence_uses_shared_backfill_without_alpha715_identity() -> None:
     source = PREINSTALL_RUNTIME.read_text(encoding="utf-8")
 
     assert "from . import agile_history_backfill as backfill" in source
