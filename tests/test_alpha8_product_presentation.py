@@ -34,10 +34,7 @@ def _compat_specs() -> list[tuple[str, str]]:
 
 def test_product_presentation_retires_both_alpha736_modules_from_execution() -> None:
     specs = _compat_specs()
-    previous = (
-        "agile_alpha735_cheap_handover",
-        "install_alpha735_cheap_handover_patch",
-    )
+    previous = ("agile_cheap_window_handover", "install_cheap_window_handover")
     canonical = ("agile_product_presentation", "install_product_presentation")
     following = ("agile_economic_opportunity", "install_economic_opportunity")
 
