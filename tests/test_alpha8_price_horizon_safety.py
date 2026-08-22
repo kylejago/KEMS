@@ -70,8 +70,7 @@ def test_frozen_provisional_runtime_mutates_the_bridged_alpha722_object() -> Non
     assert "current_hold = alpha722._hold_price_optimised_export" in provisional
     assert (
         "alpha722._hold_price_optimised_export = "
-        "_provisional_hold_price_optimised_export"
-        in provisional
+        "_provisional_hold_price_optimised_export" in provisional
     )
     assert "alpha722_original_hold(state, plan, horizon, now=now)" in provisional
     assert (
