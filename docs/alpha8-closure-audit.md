@@ -66,11 +66,9 @@ duplicate module.
 
 ## Closure decision
 
-Once the full exact-head validation suite passes, Alpha8 can claim **zero
-accidental residual historical dependencies** in the live Agile chain. Remaining
-`agile_alpha7xx` source references are then either packaged regression evidence
-or explicitly bridged compatibility references whose runtime identity is
-canonical and byte-identical.
+Once the full exact-head validation suite passes, the live Agile chain has zero accidental residual historical dependencies. Remaining `agile_alpha7xx` source
+references are then either packaged regression evidence or explicitly bridged
+compatibility references whose runtime identity is canonical and byte-identical.
 
 No tariff, dispatch, reserve, SOC, deadline, export, dashboard, commissioning or
 hardware-control policy is changed by this audit. No Home Assistant hardware
