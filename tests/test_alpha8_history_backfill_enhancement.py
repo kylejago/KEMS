@@ -146,4 +146,4 @@ def test_enhanced_backfill_docs_record_ownership_only() -> None:
     assert "ownership migration only" in source
     assert "58a4f238f499faa916e91c39760f71839a066c7f" in source
     assert "agile_history_backfill_v2" in source
-    assert "real hardware writes remain blocked" in source
+    assert "Real hardware writes remain blocked" in source
