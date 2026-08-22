@@ -111,7 +111,10 @@ def test_later_frozen_layers_keep_patching_the_same_shadow_object() -> None:
     assert "alpha723.evaluate_agile_shadow_command = " in bounded
     assert "from . import agile_alpha723_shadow as alpha723" in solar
     assert "build_shadow = alpha723.build_agile_shadow_command" in solar
-    assert "alpha723.build_agile_shadow_command = _build_shadow_with_solar_aware_ac" in solar
+    assert (
+        "alpha723.build_agile_shadow_command = _build_shadow_with_solar_aware_ac"
+        in solar
+    )
 
 
 def test_shadow_runtime_preserves_optimizer_safety_and_hardware_contract() -> None:
