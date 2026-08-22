@@ -44,7 +44,7 @@ def test_validation_evidence_retires_alpha719_from_execution() -> None:
     validation = ("agile_validation_evidence", "install_validation_evidence")
     consolidation = ("dashboard_consolidation", "install_dashboard_consolidation")
     dashboard = ("agile_validation_evidence", "install_validation_dashboard")
-    alpha720 = ("agile_alpha720_preinstall", "install_alpha720_preinstall_patch")
+    alpha720 = ("agile_preinstall_evidence", "install_preinstall_evidence")
 
     assert specs.index(alpha717) < specs.index(validation)
     assert specs.index(validation) < specs.index(consolidation)
@@ -145,11 +145,17 @@ def test_validation_evidence_keeps_hardware_control_blocked() -> None:
     assert "zero inverter writes" in dashboard
 
 
-def test_alpha720_ownership_is_explicitly_unchanged() -> None:
+def test_alpha720_canonicalisation_remains_downstream_of_validation() -> None:
     specs = _compat_specs()
+    validation_dashboard = (
+        "agile_validation_evidence",
+        "install_validation_dashboard",
+    )
+    preinstall = ("agile_preinstall_evidence", "install_preinstall_evidence")
+    dashboard = ("agile_preinstall_evidence", "install_preinstall_dashboard")
 
-    assert ("agile_alpha720_preinstall", "install_alpha720_preinstall_patch") in specs
-    assert ("agile_alpha720_dashboard", "install_alpha720_dashboard_patch") in specs
+    assert specs.index(validation_dashboard) < specs.index(preinstall)
+    assert specs.index(dashboard) == specs.index(preinstall) + 1
 
 
 def test_historical_metadata_and_alpha8_version_remain_unchanged() -> None:
