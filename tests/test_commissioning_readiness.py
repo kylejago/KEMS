@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -70,7 +70,7 @@ def test_commissioning_checks_foxess_sources_directions_and_limits() -> None:
 
 def test_foxess_telemetry_stability_requires_sustained_complete_samples() -> None:
     """Commissioning evidence must prove continuity rather than one live reading."""
-    start = datetime(2026, 8, 22, 12, 0, tzinfo=timezone.utc)
+    start = datetime(2026, 8, 22, 12, 0, tzinfo=UTC)
     records = [_record(start + timedelta(seconds=30 * index)) for index in range(12)]
 
     evidence = assess_foxess_telemetry_stability(
@@ -88,7 +88,7 @@ def test_foxess_telemetry_stability_requires_sustained_complete_samples() -> Non
 
 def test_foxess_telemetry_stability_fails_closed_on_missing_or_stale_data() -> None:
     """Missing/stale physical signals must prevent commissioning evidence passing."""
-    start = datetime(2026, 8, 22, 12, 0, tzinfo=timezone.utc)
+    start = datetime(2026, 8, 22, 12, 0, tzinfo=UTC)
     records = [_record(start + timedelta(seconds=30 * index)) for index in range(12)]
     records[-1] = _record(
         records[-1].timestamp,
@@ -110,7 +110,7 @@ def test_foxess_telemetry_stability_fails_closed_on_missing_or_stale_data() -> N
 
 def test_foxess_telemetry_stability_rejects_large_update_gaps() -> None:
     """A stalled Modbus feed must remain commissioning evidence, not control proof."""
-    start = datetime(2026, 8, 22, 12, 0, tzinfo=timezone.utc)
+    start = datetime(2026, 8, 22, 12, 0, tzinfo=UTC)
     records = [_record(start + timedelta(seconds=30 * index)) for index in range(12)]
     records[-1] = _record(records[-2].timestamp + timedelta(seconds=120))
 
