@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from types import SimpleNamespace
 
 from custom_components.kems import agile_simulation_presentation as presentation
@@ -61,19 +62,40 @@ def _coordinator(system_type: str = SYSTEM_TYPE_FULL_KEMS_AGILE):
 def test_agile_totals_drive_existing_simulated_contract() -> None:
     coordinator = _coordinator()
 
-    assert presentation._projected_value(coordinator, "simulated_grid_import_today") == 38.1
-    assert presentation._projected_value(coordinator, "simulated_grid_export_today") == 4.14
-    assert presentation._projected_value(coordinator, "simulated_export_income_today") == 43.69
+    assert (
+        presentation._projected_value(coordinator, "simulated_grid_import_today")
+        == 38.1
+    )
+    assert (
+        presentation._projected_value(coordinator, "simulated_grid_export_today")
+        == 4.14
+    )
+    assert (
+        presentation._projected_value(coordinator, "simulated_export_income_today")
+        == 43.69
+    )
     assert presentation._projected_value(coordinator, "simulated_cost_today") == 87.31
-    assert presentation._projected_value(coordinator, "simulated_battery_export_today") == 0.39
-    assert presentation._projected_value(coordinator, "simulated_battery_charge_today") == 46.934
+    assert (
+        presentation._projected_value(coordinator, "simulated_battery_export_today")
+        == 0.39
+    )
+    assert (
+        presentation._projected_value(coordinator, "simulated_battery_charge_today")
+        == 46.934
+    )
 
 
 def test_overnight_grid_charge_is_visible_as_negative_battery_power() -> None:
     coordinator = _coordinator()
 
-    assert presentation._projected_value(coordinator, "simulated_grid_import_power") == 7.8
-    assert presentation._projected_value(coordinator, "simulated_battery_charging_power") == 7.0
+    assert (
+        presentation._projected_value(coordinator, "simulated_grid_import_power")
+        == 7.8
+    )
+    assert (
+        presentation._projected_value(coordinator, "simulated_battery_charging_power")
+        == 7.0
+    )
     assert presentation._projected_value(coordinator, "simulated_battery_power") == -7.0
     assert presentation._projected_value(coordinator, "simulated_grid_net_power") == 7.8
     assert presentation._projected_value(coordinator, "simulated_battery_soc") == 80.0
@@ -94,10 +116,16 @@ def test_agile_current_export_projects_to_generic_graph_contract() -> None:
         }
     )
 
-    assert presentation._projected_value(coordinator, "simulated_grid_export_power") == 3.4
+    assert (
+        presentation._projected_value(coordinator, "simulated_grid_export_power")
+        == 3.4
+    )
     assert presentation._projected_value(coordinator, "simulated_grid_net_power") == -3.4
     assert presentation._projected_value(coordinator, "simulated_battery_power") == 4.0
-    assert presentation._projected_value(coordinator, "simulated_battery_export_power") == 3.4
+    assert (
+        presentation._projected_value(coordinator, "simulated_battery_export_power")
+        == 3.4
+    )
 
 
 def test_other_product_types_keep_the_original_simulation_contract() -> None:
@@ -116,9 +144,9 @@ def test_other_product_types_keep_the_original_simulation_contract() -> None:
 def test_presentation_projection_is_reporting_only_and_canonically_named() -> None:
     source = presentation.__file__
     assert source is not None
-    text = open(source, encoding="utf-8").read()
+    text = Path(source).read_text(encoding="utf-8")
 
-    assert "hardware_writes\": \"blocked" in text
+    assert 'hardware_writes": "blocked' in text
     assert "base_simulation_state_preserved" in text
     assert "commands_permitted = True" not in text
     assert "safe_to_write_hardware = True" not in text
