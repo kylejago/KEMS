@@ -53,7 +53,7 @@ POST_BASE_PATCHES: Final[tuple[PatchSpec, ...]] = (
     ("agile_alpha730_current_routing", "install_alpha730_current_routing_patch"),
     ("agile_alpha731_solar_headroom", "install_alpha731_solar_headroom_patch"),
     ("agile_alpha734_deadline_guard", "install_alpha734_deadline_guard_patch"),
-    ("agile_alpha735_cheap_handover", "install_alpha735_cheap_handover_patch"),
+    ("agile_cheap_window_handover", "install_cheap_window_handover"),
     ("agile_product_presentation", "install_product_presentation"),
     ("agile_economic_opportunity", "install_economic_opportunity"),
     ("agile_price_publication", "install_price_publication"),
