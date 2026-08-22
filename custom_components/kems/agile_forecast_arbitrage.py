@@ -29,7 +29,12 @@ from . import agile_settlement_dispatch
 from . import agile_smart_export as agile
 from . import agile_smart_export_runtime_base as runtime
 from .agile_deadline_dispatch import _effective_deadline_kw, _target_percent
-from .kems_core import ForecastPlanState, LearnedState, SimulationConfig, SolarForecastState
+from .kems_core import (
+    ForecastPlanState,
+    LearnedState,
+    SimulationConfig,
+    SolarForecastState,
+)
 from .tariff import TariffSettings
 
 rolling = agile_rolling_planning.rolling_runtime
@@ -139,7 +144,9 @@ def _forecast_spill_projection(
     the past. The result is used only to re-time existing export.
     """
     confidence = _forecast_confidence(forecast, forecast_plan)
-    hourly = tuple(getattr(forecast, "hourly", ()) or ()) if forecast is not None else ()
+    hourly = (
+        tuple(getattr(forecast, "hourly", ()) or ()) if forecast is not None else ()
+    )
     if (
         soc_percent is None
         or forecast is None
@@ -568,9 +575,9 @@ def _write_allocations(
             {
                 "valid_from": key,
                 "label": slot.get("label") or prior.get("label"),
-                "rate_pence": _number(slot.get("rate_pence"))
-                if slot
-                else prior.get("rate_pence"),
+                "rate_pence": (
+                    _number(slot.get("rate_pence")) if slot else prior.get("rate_pence")
+                ),
                 "planned_battery_export_kwh": round(allocation, 3),
                 "deadline_forced": bool(prior.get("deadline_forced")),
                 "solar_headroom_retimed": additions.get(key, 0.0) > _EPSILON,
@@ -621,7 +628,9 @@ def _forecast_deadline_context(
         deadline=deadline,
         config=config,
     )
-    remaining_capacity = sum(float(item.get("capacity_kwh") or 0.0) for item in segments)
+    remaining_capacity = sum(
+        float(item.get("capacity_kwh") or 0.0) for item in segments
+    )
     latest_safe = deadline_runtime._latest_safe_start(segments, required_ac)
     guard_minutes = int(deadline_runtime.DEADLINE_GUARD_MINUTES)
     guarded_start = (
@@ -662,7 +671,9 @@ def _planned_current_export_kw(
 ) -> float:
     slot = dispatch._current_slot(state, now)
     hours = dispatch._remaining_current_slot_hours(state, now)
-    allocation = _number(slot.get("rolling_planned_battery_export_kwh")) if slot else None
+    allocation = (
+        _number(slot.get("rolling_planned_battery_export_kwh")) if slot else None
+    )
     return (
         min(max((allocation or 0.0) / hours, 0.0), effective_kw)
         if hours > _EPSILON
@@ -827,7 +838,9 @@ def install_forecast_arbitrage() -> None:
                 return targets
 
             mode = str(guard.get("mode") or "price_optimised")
-            effective_kw = max(_number(targets.get("effective_discharge_kw")) or 0.0, 0.0)
+            effective_kw = max(
+                _number(targets.get("effective_discharge_kw")) or 0.0, 0.0
+            )
             if mode == "target_reached":
                 targets.update(
                     {
@@ -864,7 +877,9 @@ def install_forecast_arbitrage() -> None:
                             "house first"
                         ),
                         "planned_price_export_kw": round(export_kw, 3),
-                        "battery_export_target_kw": round(max(total_kw - house_kw, 0.0), 3),
+                        "battery_export_target_kw": round(
+                            max(total_kw - house_kw, 0.0), 3
+                        ),
                         "battery_discharge_target_kw": round(total_kw, 3),
                         "deadline_margin_kwh": guard.get("deadline_margin_kwh"),
                     }
@@ -955,7 +970,9 @@ def install_forecast_arbitrage() -> None:
             )
             plan["forecast_solar_headroom"] = headroom
             plan["solar_headroom_active"] = bool(headroom.get("active"))
-            plan["solar_headroom_retimed_kwh"] = headroom.get("re_timed_export_kwh", 0.0)
+            plan["solar_headroom_retimed_kwh"] = headroom.get(
+                "re_timed_export_kwh", 0.0
+            )
             _write_allocations(
                 state,
                 plan,
