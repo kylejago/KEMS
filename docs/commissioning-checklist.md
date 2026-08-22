@@ -4,7 +4,9 @@
 - Confirm direct Modbus connection and stable update interval.
 - Before treating telemetry as commissioning evidence, retain at least 12 recent KEMS observations with at least 95% complete physical telemetry and no observation gap greater than three configured scan intervals. The required physical fields are battery SOC, battery power, solar power, house load, grid import, and grid export.
 - Record battery SOC, battery charge/discharge, solar, load, grid import/export, grid availability, and EPS entities.
-- Verify every unit and sign convention before any write is enabled.
+- Verify every raw source unit and sign convention before any write is enabled. Direct power sources must be W or kW; battery SOC must be percent; voltage/current battery-power derivation must use V and A.
+- Verify repeated whole-site power balance: solar + grid import + battery discharge must reconcile with house load + grid export + battery charge across recent observations, within the defined asynchronous-register tolerance.
+- Compare KEMS shadow battery intent with the observed FoxESS battery direction and magnitude as commissioning evidence only. Until a real backend exists, physical tracking is informational and must never be interpreted as permission to write hardware.
 - Confirm DNO export limit and KH7 continuous/short-duration EPS limits.
 - Confirm whole-house EPS changeover and that Home Assistant/network/Modbus remain powered.
 - Run shadow mode through cheap charge, self-use, paced export, and low-power export tests.
@@ -15,3 +17,5 @@
 - Only then implement and enable the real FoxESS backend one command family at a time.
 
 `kems_core.commissioning_evidence.assess_foxess_telemetry_stability()` is the read-only evidence primitive for the sustained telemetry requirement above. `sensor.kems_commissioning_readiness` now consumes that evidence only after all required physical observations are mapped to live FoxESS Modbus entities, using the configured KEMS scan interval as the continuity baseline. Collecting evidence remains a commissioning wait; materially incomplete/stale telemetry or excessive update gaps fail closed and prevent `Ready for Shadow`. This gate does not call Home Assistant services, implement a FoxESS write backend, or change the real-hardware write lock.
+
+The physical telemetry contract is implemented by `assess_foxess_unit_contract()`, `assess_foxess_power_balance()`, and `compare_shadow_battery_target()`. These helpers are Home Assistant-independent and read-only. This slice proves their behaviour before a separate wiring change feeds live FoxESS entity metadata and commissioning state into them.
