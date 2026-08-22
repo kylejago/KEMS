@@ -7,9 +7,10 @@ writes.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from math import isfinite
-from typing import Any, Mapping
+from typing import Any
 
 FOXESS_REQUIRED_TELEMETRY_FIELDS: tuple[str, ...] = (
     "battery_soc",
