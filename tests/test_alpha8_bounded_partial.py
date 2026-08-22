@@ -46,8 +46,8 @@ def test_alpha8_bounded_partial_preserves_dispatch_and_proof_contract() -> None:
         "alpha726._future_missing_capacity_kwh",
         "alpha717._dispatch_targets(",
         "alpha725._candidate_applied_replay(result, config)",
-        "safety.get(\"passed_checks\") == 13",
-        "tracking.get(\"tracking_score_percent\") == 100.0",
+        'safety.get("passed_checks") == 13',
+        'tracking.get("tracking_score_percent") == 100.0',
         '"bounded_unknown_slot_dispatch_blocked": True',
         '"dispatch_basis": "bounded_partial_horizon"',
     ):
