@@ -121,4 +121,4 @@ def test_price_publication_cannot_change_dispatch_or_enable_hardware_writes() ->
     assert "commands_permitted = True" not in source
     assert '"hardware_writes": "blocked"' in source
     assert '"real_backend_available": False' in source
-    assert "real FoxESS hardware writes remain blocked" in source
+    assert "real FoxESS hardware writes remain blocked" in source.replace("\n", " ")
