@@ -41,7 +41,10 @@ def test_rolling_ownership_retires_alpha716_live_entries() -> None:
     live = ("agile_smart_export_live", "install_live_scenario_patch")
     history = ("agile_history_dashboard", "install_history_diagnostics_dashboard")
     dashboard = ("agile_rolling_planning", "install_rolling_dashboard")
-    alpha717 = ("agile_alpha717_dashboard", "install_alpha717_dashboard_patch")
+    alpha717 = (
+        "agile_settlement_dispatch",
+        "install_settlement_dispatch_dashboard",
+    )
 
     assert specs[0] == rolling
     assert specs.index(live) == specs.index(rolling) + 1

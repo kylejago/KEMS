@@ -37,7 +37,7 @@ def _post_specs() -> list[tuple[str, str]]:
 
 def test_history_dashboard_retires_714_and_715_from_live_registry() -> None:
     specs = _post_specs()
-    dispatch = ("agile_alpha717_dispatch", "install_alpha717_dispatch_patch")
+    dispatch = ("agile_settlement_dispatch", "install_settlement_dispatch")
     first = ("agile_history_dashboard", "install_deadline_history_dashboard")
     second = ("agile_history_dashboard", "install_history_diagnostics_dashboard")
     alpha716 = ("agile_rolling_planning", "install_rolling_dashboard")
