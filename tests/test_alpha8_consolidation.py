@@ -105,14 +105,11 @@ def test_alpha8_compatibility_registry_is_complete_and_resolvable() -> None:
 
 def test_event_priority_retires_alpha743_from_execution() -> None:
     specs = _compat_specs()
-    live_graph = (
-        "agile_alpha742_live_graph_telemetry",
-        "install_alpha742_live_graph_telemetry_patch",
-    )
+    operator_telemetry = ("agile_operator_telemetry", "install_operator_telemetry")
     event_priority = ("agile_event_priority", "install_event_priority")
     dashboard_parity = ("agile_dashboard_parity", "install_dashboard_parity")
 
-    assert specs.index(event_priority) > specs.index(live_graph)
+    assert specs.index(event_priority) > specs.index(operator_telemetry)
     assert specs.index(event_priority) < specs.index(dashboard_parity)
 
     retired = "agile_alpha743_event_priority"
