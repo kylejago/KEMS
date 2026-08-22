@@ -76,8 +76,12 @@ def test_price_recovery_frozen_alpha726_dependency_resolves_through_bridge() -> 
     recovery = PRICE_RECOVERY_RUNTIME.read_text(encoding="utf-8")
 
     assert "from . import agile_alpha726_provisional as alpha726" in recovery
-    assert "await alpha726.alpha726_original_fetch_rates(self, records, now)" in recovery
-    assert '_bind_legacy_name("agile_alpha726_provisional", provisional_runtime)' in facade
+    assert (
+        "await alpha726.alpha726_original_fetch_rates(self, records, now)" in recovery
+    )
+    assert (
+        '_bind_legacy_name("agile_alpha726_provisional", provisional_runtime)' in facade
+    )
 
 
 def test_bounded_partial_frozen_helpers_resolve_through_bridge() -> None:
@@ -89,7 +93,9 @@ def test_bounded_partial_frozen_helpers_resolve_through_bridge() -> None:
     assert "alpha725._candidate_applied_replay(result, config)" in bounded
     assert "alpha726._future_missing_capacity_kwh" in bounded
     assert '_bind_legacy_name("agile_alpha725_nonzero", nonzero_runtime)' in facade
-    assert '_bind_legacy_name("agile_alpha726_provisional", provisional_runtime)' in facade
+    assert (
+        '_bind_legacy_name("agile_alpha726_provisional", provisional_runtime)' in facade
+    )
 
 
 def test_nonzero_runtime_preserves_proven_proof_contract() -> None:
