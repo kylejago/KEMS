@@ -37,10 +37,7 @@ def test_live_routing_retires_alpha729_from_execution() -> None:
         "install_alpha728_bounded_partial_horizon_patch",
     )
     canonical = ("agile_live_routing", "install_live_routing")
-    following = (
-        "agile_alpha730_current_routing",
-        "install_alpha730_current_routing_patch",
-    )
+    following = ("agile_routing", "install_current_routing")
 
     assert specs.index(canonical) > specs.index(previous)
     assert specs.index(canonical) < specs.index(following)
@@ -85,17 +82,11 @@ def test_live_routing_preserves_proven_reporting_contract() -> None:
         assert token in source
 
 
-def test_live_routing_leaves_alpha730_alpha731_coupled_pair_untouched() -> None:
+def test_live_routing_precedes_canonical_current_solar_pair() -> None:
     specs = _compat_specs()
     canonical = ("agile_live_routing", "install_live_routing")
-    current = (
-        "agile_alpha730_current_routing",
-        "install_alpha730_current_routing_patch",
-    )
-    solar = (
-        "agile_alpha731_solar_headroom",
-        "install_alpha731_solar_headroom_patch",
-    )
+    current = ("agile_routing", "install_current_routing")
+    solar = ("agile_routing", "install_solar_headroom")
     deadline = ("agile_deadline_guard", "install_deadline_guard")
 
     assert specs.index(canonical) < specs.index(current)
