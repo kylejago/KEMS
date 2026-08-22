@@ -19,7 +19,7 @@ PRE_BASE_PATCHES: Final[tuple[PatchSpec, ...]] = (
     ("agile_smart_export_reporting", "install_reporting_patch"),
     ("agile_deadline_dispatch", "install_deadline_patch"),
     ("agile_history_backfill_v2", "install_enhanced_backfill"),
-    ("agile_alpha715_backfill", "install_alpha715_backfill_patch"),
+    ("agile_history_compatibility", "install_history_compatibility"),
 )
 
 # Preserve Alpha7.52 behaviour and installation semantics while replacing proven
