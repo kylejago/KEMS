@@ -12,7 +12,7 @@ import math
 from typing import Any
 
 from . import agile_alpha741_partial_publication as alpha741
-from . import agile_progressive_publication as progressive
+from . import agile_progressive_publication as progressive_publication
 
 _EPSILON = 1e-6
 _REPORTING_TOLERANCE_KWH = 0.01
@@ -134,21 +134,21 @@ def _annotate_unknown_rows_no_reserve(self, plan: dict[str, Any]) -> None:
 def _clean_tomorrow_publication_gap(
     self,
     state: dict[str, Any],
-    progressive_state: dict[str, Any],
+    progressive: dict[str, Any],
 ) -> bool:
     """Prove missing tomorrow prices are publication-pending, not fetch errors."""
-    if not progressive_state.get("provisional"):
+    if not progressive.get("provisional"):
         return False
-    if int(progressive_state.get("known_price_count") or 0) <= 0:
+    if int(progressive.get("known_price_count") or 0) <= 0:
         return False
-    if int(progressive_state.get("missing_price_count") or 0) <= 0:
+    if int(progressive.get("missing_price_count") or 0) <= 0:
         return False
     if state.get("last_error") not in (None, ""):
         return False
 
     missing = {
         str(item)
-        for item in (progressive_state.get("missing_price_labels") or [])
+        for item in (progressive.get("missing_price_labels") or [])
         if str(item).strip()
     }
     diagnostics = getattr(self, "_kems_alpha727_price_fetch_diagnostics", None)
@@ -228,18 +228,20 @@ def install_no_reserve_reporting() -> None:
     global _original_no_reserve_annotate
     global _original_no_reserve_plan_summary
 
-    plan_summary = progressive._plan_summary
+    plan_summary = progressive_publication._plan_summary
     if not getattr(plan_summary, "_kems_no_reserve_reporting", False):
         _original_no_reserve_plan_summary = plan_summary
         _plan_summary_no_reserve._kems_no_reserve_reporting = True
-        progressive._plan_summary = _plan_summary_no_reserve
+        progressive_publication._plan_summary = _plan_summary_no_reserve
 
-    annotate = progressive._annotate_unknown_slot_rows
+    annotate = progressive_publication._annotate_unknown_slot_rows
     if getattr(annotate, "_kems_no_reserve_reporting", False):
         return
     _original_no_reserve_annotate = annotate
     _annotate_unknown_rows_no_reserve._kems_no_reserve_reporting = True
-    progressive._annotate_unknown_slot_rows = _annotate_unknown_rows_no_reserve
+    progressive_publication._annotate_unknown_slot_rows = (
+        _annotate_unknown_rows_no_reserve
+    )
 
 
 def install_tomorrow_publication_reporting() -> None:
@@ -247,17 +249,17 @@ def install_tomorrow_publication_reporting() -> None:
     global _original_progressive_tomorrow_state
     global _original_rounding_plan_summary
 
-    progressive_tomorrow = alpha741._progressive_tomorrow_state
-    if not getattr(progressive_tomorrow, "_kems_tomorrow_no_reserve_reporting", False):
-        _original_progressive_tomorrow_state = progressive_tomorrow
+    progressive = alpha741._progressive_tomorrow_state
+    if not getattr(progressive, "_kems_tomorrow_no_reserve_reporting", False):
+        _original_progressive_tomorrow_state = progressive
         _progressive_tomorrow_state_no_reserve._kems_tomorrow_no_reserve_reporting = (
             True
         )
         alpha741._progressive_tomorrow_state = _progressive_tomorrow_state_no_reserve
 
-    plan_summary = progressive._plan_summary
+    plan_summary = progressive_publication._plan_summary
     if getattr(plan_summary, "_kems_publication_rounding", False):
         return
     _original_rounding_plan_summary = plan_summary
     _plan_summary_rounding._kems_publication_rounding = True
-    progressive._plan_summary = _plan_summary_rounding
+    progressive_publication._plan_summary = _plan_summary_rounding
