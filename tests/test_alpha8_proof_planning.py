@@ -39,7 +39,7 @@ def _compat_specs() -> list[tuple[str, str]]:
 
 def test_proof_planning_retires_alpha725_alpha726_from_execution() -> None:
     specs = _compat_specs()
-    outcome = ("agile_alpha724_outcome", "install_alpha724_outcome_parity_patch")
+    outcome = ("agile_shadow_outcome", "install_outcome_parity")
     nonzero = ("agile_proof_planning", "install_nonzero_export_proof")
     provisional = ("agile_proof_planning", "install_provisional_planning")
     recovery = ("agile_price_recovery", "install_price_recovery")
