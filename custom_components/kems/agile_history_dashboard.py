@@ -29,7 +29,9 @@ def _bind_legacy_name(name: str, module: ModuleType) -> None:
 # reads _BACKFILL_DIAGNOSTICS_CARD from that module object.
 _bind_legacy_name("agile_alpha714_dashboard", deadline_history_runtime)
 
-from . import agile_history_diagnostics_dashboard_runtime as diagnostics_runtime  # noqa: E402
+from . import (
+    agile_history_diagnostics_dashboard_runtime as diagnostics_runtime,
+)  # noqa: E402
 
 
 def install_deadline_history_dashboard() -> None:
