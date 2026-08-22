@@ -101,7 +101,10 @@ def test_preinstall_evidence_remains_hypothetical_and_transparent() -> None:
 def test_preinstall_evidence_preserves_priority_cache_and_fail_safe() -> None:
     source = EVIDENCE_RUNTIME.read_text(encoding="utf-8")
     assert "baseline = await original_records(" in source
-    assert "backfill._merge_native_and_backfill(baseline, list(evidence_records))" in source
+    assert (
+        "backfill._merge_native_and_backfill(baseline, list(evidence_records))"
+        in source
+    )
     assert '_kems_alpha720_evidence_day", None) != local_day' in source
     assert "network evidence must never break KEMS" in source
     assert "historical irradiance fetch failed" in source
