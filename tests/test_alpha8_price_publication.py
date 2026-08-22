@@ -100,7 +100,9 @@ def test_price_publication_keeps_sensor_and_dashboard_contract() -> None:
 
     assert "sensor.kems_agile_tomorrow_publication_plan" in runtime
     assert "sensor.kems_agile_tomorrow_publication_plan" in dashboard
-    assert 'status = f"Provisional — using {known}/{expected} published prices"' in runtime
+    assert (
+        'status = f"Provisional — using {known}/{expected} published prices"' in runtime
+    )
     assert 'status = f"Complete — {known}/{expected} prices"' in runtime
     assert "Forecast evidence" in dashboard
 
