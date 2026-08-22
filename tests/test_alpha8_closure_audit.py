@@ -91,13 +91,13 @@ def _versioned_bridges() -> dict[str, tuple[Path, str]]:
             legacy = legacy_arg.value
             if _VERSIONED.fullmatch(legacy) is None:
                 continue
-            assert isinstance(runtime_arg, ast.Name), (
-                f"{path.name}: versioned bridge target must be an imported module name"
-            )
+            assert isinstance(
+                runtime_arg, ast.Name
+            ), f"{path.name}: versioned bridge target must be an imported module name"
             runtime_module = aliases.get(runtime_arg.id)
-            assert runtime_module is not None, (
-                f"{path.name}: cannot resolve bridge target {runtime_arg.id}"
-            )
+            assert (
+                runtime_module is not None
+            ), f"{path.name}: cannot resolve bridge target {runtime_arg.id}"
             assert legacy not in bridges, f"Duplicate versioned bridge for {legacy}"
             bridges[legacy] = (path, runtime_module)
     return bridges
@@ -114,7 +114,9 @@ def _compat_specs() -> list[tuple[str, str]]:
         assert isinstance(node.value, ast.Tuple)
         for item in node.value.elts:
             assert isinstance(item, ast.Tuple) and len(item.elts) == 2
-            specs.append((ast.literal_eval(item.elts[0]), ast.literal_eval(item.elts[1])))
+            specs.append(
+                (ast.literal_eval(item.elts[0]), ast.literal_eval(item.elts[1]))
+            )
     return specs
 
 
@@ -146,7 +148,9 @@ def test_every_versioned_bridge_points_to_byte_identical_historical_runtime() ->
         historical = KEMS / f"{legacy}.py"
         runtime = KEMS / f"{runtime_module}.py"
         assert historical.is_file(), f"Missing historical evidence for {legacy}"
-        assert runtime.is_file(), f"{owner.name} bridge target is missing: {runtime_module}"
+        assert (
+            runtime.is_file()
+        ), f"{owner.name} bridge target is missing: {runtime_module}"
         assert runtime.read_bytes() == historical.read_bytes(), (
             f"{owner.name}: {legacy} must resolve to an exact historical runtime copy, "
             f"not a behavioural rewrite ({runtime_module})"
@@ -155,7 +159,9 @@ def test_every_versioned_bridge_points_to_byte_identical_historical_runtime() ->
 
 def test_frozen_runtimes_with_versioned_imports_remain_historical_blobs() -> None:
     historical_blobs = {
-        path.read_bytes() for path in KEMS.glob("agile_alpha7*.py") if _is_historical(path)
+        path.read_bytes()
+        for path in KEMS.glob("agile_alpha7*.py")
+        if _is_historical(path)
     }
     audited = []
     for path in _canonical_python_files():
