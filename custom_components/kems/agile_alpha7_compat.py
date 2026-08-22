@@ -1,9 +1,10 @@
-"""Alpha7 Agile compatibility boundary for the Alpha8 consolidation baseline.
+"""Alpha7 behaviour compatibility boundary for the Alpha8 consolidation baseline.
 
-Alpha8 preserves proven Alpha7.52 behaviour while progressively moving historical
-runtime monkey patches into canonical modules. New Alpha8 behaviour must be
-implemented in canonical modules rather than by adding another version-named
-patch module.
+Alpha8 preserves proven Alpha7.52 behaviour through functional canonical owners.
+Historical version-named modules remain packaged regression evidence, while the
+live PRE_BASE_PATCHES and POST_BASE_PATCHES registries contain no version-named
+Alpha7 runtime modules. New Alpha8 behaviour must be implemented in canonical
+modules rather than by adding another version-named patch module.
 """
 
 from __future__ import annotations
@@ -25,9 +26,8 @@ PRE_BASE_PATCHES: Final[tuple[PatchSpec, ...]] = (
     ("agile_history_compatibility", "install_history_compatibility"),
 )
 
-# Preserve Alpha7.52 behaviour and installation semantics while replacing proven
-# slices with canonical modules in small, parity-gated steps. Historical modules
-# remain in the tree as regression evidence even after leaving this live registry.
+# Preserve Alpha7.52 behaviour and installation semantics through functional
+# canonical owners. Historical modules remain in the tree as regression evidence.
 POST_BASE_PATCHES: Final[tuple[PatchSpec, ...]] = (
     ("agile_rolling_planning", "install_rolling_replan"),
     ("agile_live_scenario", "install_live_scenario"),
