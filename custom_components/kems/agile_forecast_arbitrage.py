@@ -23,9 +23,7 @@ import math
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from . import agile_deadline_guard
-from . import agile_rolling_planning
-from . import agile_settlement_dispatch
+from . import agile_deadline_guard, agile_rolling_planning, agile_settlement_dispatch
 from . import agile_smart_export as agile
 from . import agile_smart_export_runtime_base as runtime
 from .agile_deadline_dispatch import _effective_deadline_kw, _target_percent
@@ -463,7 +461,10 @@ def _retime_for_solar_headroom(
         evidence.update(
             {
                 "state": "waiting_for_retimable_export",
-                "reason": "no later planned export can be moved into a better pre-spill slot",
+                "reason": (
+                    "no later planned export can be moved into a better "
+                    "pre-spill slot"
+                ),
                 "spill_reference_rate_pence": round(spill_rate, 5),
                 "existing_pre_spill_export_kwh": round(existing_early, 3),
             }
@@ -505,7 +506,9 @@ def _retime_for_solar_headroom(
         {
             "active": True,
             "state": "headroom_retimed",
-            "reason": "earlier Agile export is worth more than forecast forced solar spill",
+            "reason": (
+                "earlier Agile export is worth more than forecast forced solar spill"
+            ),
             "spill_reference_rate_pence": round(spill_rate, 5),
             "economic_export_floor_pence": round(floor_pence, 5),
             "existing_pre_spill_export_kwh": round(existing_early, 3),
@@ -873,8 +876,8 @@ def install_forecast_arbitrage() -> None:
                     {
                         "mode": "forecast_protected_price_optimised",
                         "action": (
-                            "price-optimised export above forecast pre-cheap SOC floor; "
-                            "house first"
+                            "price-optimised export above forecast pre-cheap SOC "
+                            "floor; house first"
                         ),
                         "planned_price_export_kw": round(export_kw, 3),
                         "battery_export_target_kw": round(
