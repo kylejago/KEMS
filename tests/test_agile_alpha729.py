@@ -15,7 +15,7 @@ DOC = ROOT / "docs" / "agile-live-routing-parity.md"
 
 def test_alpha729_contract_is_retained_in_alpha8() -> None:
     manifest = MANIFEST.read_text(encoding="utf-8")
-    assert '"version": "0.8.0-alpha8.0"' in manifest
+    assert '"version": "0.8.0-alpha8.' in manifest
     assert PATCH.exists()
 
 

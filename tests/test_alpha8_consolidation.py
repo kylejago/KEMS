@@ -41,7 +41,7 @@ def test_alpha8_release_family_is_coordinated() -> None:
     panel_manager = (KEMS / "panel.py").read_text(encoding="utf-8")
     panel_yaml = (KEMS / "kems16x16.yaml").read_text(encoding="utf-8")
 
-    assert manifest["version"] == "0.8.0-alpha8.0"
+    assert str(manifest["version"]).startswith("0.8.0-alpha8.")
     assert bundle["components"]["panel"]["version"] == "0.8.0-alpha8-panel.0"
     assert {
         bundle["components"]["property_web"]["version"],

@@ -21,7 +21,7 @@ def test_alpha8_release_targets_coordinated_panel_and_web() -> None:
     panel_yaml = (KEMS / "kems16x16.yaml").read_text(encoding="utf-8")
     dashboard = (KEMS / "dashboard.py").read_text(encoding="utf-8")
 
-    assert manifest["version"] == "0.8.0-alpha8.0"
+    assert str(manifest["version"]).startswith("0.8.0-alpha8.")
     assert bundle["components"]["panel"]["version"] == "0.8.0-alpha8-panel.0"
 
     property_web = str(bundle["components"]["property_web"]["version"])
@@ -37,9 +37,6 @@ def test_alpha8_release_targets_coordinated_panel_and_web() -> None:
     assert bundle["maintenance"]["affected_components"] == [
         "kems_core",
         "dashboard",
-        "panel",
-        "property_web",
-        "pi_agent",
     ]
 
 

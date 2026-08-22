@@ -12,7 +12,7 @@ def test_coordinated_release_keeps_web_panel_and_brand_contract() -> None:
     branding = (ROOT / "docs/branding.md").read_text()
 
     version = str(manifest["version"])
-    assert version == "0.8.0-alpha8.0"
+    assert version.startswith("0.8.0-alpha8.")
     assert bundle["bundle"] == "__RELEASE_VERSION__"
     assert bundle["components"]["kems_core"]["version"] == "__RELEASE_VERSION__"
     assert bundle["components"]["dashboard"]["version"] == "__RELEASE_VERSION__"

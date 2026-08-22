@@ -18,10 +18,10 @@ spec.loader.exec_module(module)
 
 def test_release_bundle_renders_exact_coordinated_alpha8_targets() -> None:
     """A release should carry exact Alpha8 targets for every participating component."""
-    bundle = module.render_bundle(TEMPLATE, "v0.8.0-alpha8.0")
-    assert bundle["bundle"] == "0.8.0-alpha8.0"
-    assert bundle["components"]["kems_core"]["version"] == "0.8.0-alpha8.0"
-    assert bundle["components"]["dashboard"]["version"] == "0.8.0-alpha8.0"
+    bundle = module.render_bundle(TEMPLATE, "v0.8.0-alpha8.1")
+    assert bundle["bundle"] == "0.8.0-alpha8.1"
+    assert bundle["components"]["kems_core"]["version"] == "0.8.0-alpha8.1"
+    assert bundle["components"]["dashboard"]["version"] == "0.8.0-alpha8.1"
     assert bundle["components"]["panel"]["version"] == "0.8.0-alpha8-panel.0"
 
     property_web = str(bundle["components"]["property_web"]["version"])
@@ -35,19 +35,16 @@ def test_release_bundle_renders_exact_coordinated_alpha8_targets() -> None:
     assert bundle["maintenance"]["affected_components"] == [
         "kems_core",
         "dashboard",
-        "panel",
-        "property_web",
-        "pi_agent",
     ]
     assert bundle["maintenance"]["reboot_required"] is False
-    assert "Alpha8.0" in bundle["maintenance"]["reason"]
+    assert "Alpha8.1" in bundle["maintenance"]["reason"]
 
 
 def test_bundle_contract_rejects_mismatched_appliance_versions() -> None:
     """Property web and its Pi agent must be published as one appliance release."""
     raw = json.loads(
         TEMPLATE.read_text(encoding="utf-8").replace(
-            "__RELEASE_VERSION__", "0.8.0-alpha8.0"
+            "__RELEASE_VERSION__", "0.8.0-alpha8.1"
         )
     )
     raw["components"]["pi_agent"]["version"] = "different"
@@ -63,7 +60,7 @@ def test_bundle_maintenance_only_names_known_components() -> None:
     """A typo in a maintenance scope must fail release validation."""
     raw = json.loads(
         TEMPLATE.read_text(encoding="utf-8").replace(
-            "__RELEASE_VERSION__", "0.8.0-alpha8.0"
+            "__RELEASE_VERSION__", "0.8.0-alpha8.1"
         )
     )
     raw["maintenance"]["affected_components"].append("not_a_component")

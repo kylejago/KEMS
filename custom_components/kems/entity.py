@@ -2,11 +2,28 @@
 
 from __future__ import annotations
 
+import json
+from pathlib import Path
+
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import DOMAIN, NAME, VERSION
+from .const import DOMAIN, NAME
 from .coordinator import KEMSCoordinator
+
+
+def _integration_version() -> str:
+    """Read the single authoritative integration release identity."""
+    try:
+        manifest = json.loads(
+            Path(__file__).with_name("manifest.json").read_text(encoding="utf-8")
+        )
+    except (OSError, TypeError, ValueError):
+        return "unknown"
+    return str(manifest.get("version") or "unknown")
+
+
+INTEGRATION_VERSION = _integration_version()
 
 
 class KEMSEntity(CoordinatorEntity[KEMSCoordinator]):
@@ -23,5 +40,5 @@ class KEMSEntity(CoordinatorEntity[KEMSCoordinator]):
             name=NAME,
             manufacturer="KEMS",
             model="Whole-home proposal simulation",
-            sw_version=VERSION,
+            sw_version=INTEGRATION_VERSION,
         )

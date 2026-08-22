@@ -15,7 +15,7 @@ DOC = ROOT / "docs" / "agile-provisional-planning-bst-horizon.md"
 
 def test_alpha726_patch_remains_packaged() -> None:
     manifest = MANIFEST.read_text(encoding="utf-8")
-    assert '"version": "0.8.0-alpha8.0"' in manifest
+    assert '"version": "0.8.0-alpha8.' in manifest
     assert PATCH.exists()
 
 

@@ -125,5 +125,5 @@ def test_alpha735_installs_after_alpha734_and_before_later_reporting_patches() -
 def test_alpha735_release_identity_is_preserved_in_alpha8() -> None:
     """Alpha8 keeps the Alpha7.35 product/handover contract as parity baseline."""
     manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
-    assert manifest["version"] == "0.8.0-alpha8.0"
+    assert str(manifest["version"]).startswith("0.8.0-alpha8.")
     assert PATCH.exists()

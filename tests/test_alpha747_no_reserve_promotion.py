@@ -16,7 +16,7 @@ def test_alpha747_contract_is_coordinated_in_alpha8() -> None:
     manifest = json.loads((KEMS / "manifest.json").read_text())
     bundle = json.loads((ROOT / "release/kems-bundle.template.json").read_text())
 
-    assert manifest["version"] == "0.8.0-alpha8.0"
+    assert str(manifest["version"]).startswith("0.8.0-alpha8.")
     assert bundle["components"]["property_web"]["version"] == "0.8.0-alpha8-web.0"
     assert bundle["components"]["pi_agent"]["version"] == "0.8.0-alpha8-web.0"
     assert bundle["components"]["public_web"]["version"] == "0.8.0-alpha8-web.0"

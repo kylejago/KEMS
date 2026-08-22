@@ -23,7 +23,7 @@ LONDON = ZoneInfo("Europe/London")
 def test_alpha734_release_identity_is_retained_in_alpha8() -> None:
     """The deadline guard remains part of the Alpha8 parity baseline."""
     manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
-    assert manifest["version"] == "0.8.0-alpha8.0"
+    assert str(manifest["version"]).startswith("0.8.0-alpha8.")
     assert PATCH.exists()
 
 

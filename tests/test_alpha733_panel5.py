@@ -19,7 +19,7 @@ def test_alpha733_versions_and_bundle_remain_aligned_in_alpha8() -> None:
     yaml = (KEMS / "kems16x16.yaml").read_text(encoding="utf-8")
     dashboard = (KEMS / "dashboard.py").read_text(encoding="utf-8")
 
-    assert manifest["version"] == "0.8.0-alpha8.0"
+    assert str(manifest["version"]).startswith("0.8.0-alpha8.")
 
     bundle_version = str(bundle["components"]["panel"]["version"])
     panel_match = re.search(r'PANEL_CONFIG_VERSION = "([^"]+)"', panel)

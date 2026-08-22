@@ -42,16 +42,13 @@
   },
   "maintenance": {
     "required": true,
-    "reason": "Activate coordinated KEMS Alpha8.0 consolidation baseline after Alpha7.52/Web.33 parity validation",
+    "reason": "Activate KEMS Alpha8.1 commissioning evidence, Full KEMS Agile forecast/headroom planning and presentation reconciliation",
     "expected_downtime_minutes": 5,
     "home_assistant_restart_required": true,
     "reboot_required": false,
     "affected_components": [
       "kems_core",
-      "dashboard",
-      "panel",
-      "property_web",
-      "pi_agent"
+      "dashboard"
     ]
   }
 }

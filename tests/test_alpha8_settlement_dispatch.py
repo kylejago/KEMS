@@ -157,7 +157,7 @@ def test_version_and_historical_alpha717_sources_remain_unchanged() -> None:
 
     assert HISTORICAL_DISPATCH.is_file()
     assert HISTORICAL_DASHBOARD.is_file()
-    assert '"version": "0.8.0-alpha8.0"' in manifest
+    assert '"version": "0.8.0-alpha8.' in manifest
 
 
 def test_settlement_dispatch_docs_record_ownership_only() -> None:

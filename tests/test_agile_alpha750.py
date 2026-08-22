@@ -16,7 +16,7 @@ DOC = ROOT / "docs" / "alpha750-no-reserve-row-reporting.md"
 
 def test_alpha750_version_and_module_parse() -> None:
     manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
-    assert manifest["version"] == "0.8.0-alpha8.0"
+    assert str(manifest["version"]).startswith("0.8.0-alpha8.")
     ast.parse(PATCH.read_text(encoding="utf-8"))
 
 

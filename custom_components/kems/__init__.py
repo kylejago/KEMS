@@ -8,6 +8,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 
+from .agile_simulation_presentation import install_agile_simulation_presentation
 from .collector import Collector
 from .const import (
     CONF_EV_POWER,
@@ -121,6 +122,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             "but automatic maintenance restart disabled"
         )
         await update_orchestrator.async_set_policy(automatic_restart=True)
+    install_agile_simulation_presentation()
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     LOGGER.info(
         "KEMS initialised with read-only control lab; real hardware writes are blocked"
