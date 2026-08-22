@@ -83,10 +83,7 @@ def _slot(start: datetime, rate: float) -> dict[str, object]:
 
 def test_economic_opportunity_retires_both_alpha740_modules_from_execution() -> None:
     specs = _compat_specs()
-    previous = (
-        "dashboard_alpha736_finance",
-        "install_alpha736_finance_dashboard_patch",
-    )
+    previous = ("agile_product_presentation", "install_product_presentation")
     canonical = ("agile_economic_opportunity", "install_economic_opportunity")
     following = ("agile_price_publication", "install_price_publication")
 
