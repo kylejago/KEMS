@@ -1,4 +1,4 @@
-"""Ensure release literals identify releases rather than runtime implementation files."""
+"""Keep release literals out of runtime implementation filenames."""
 
 from __future__ import annotations
 
