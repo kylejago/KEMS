@@ -72,6 +72,5 @@ compatibility references whose runtime identity is canonical and byte-identical.
 
 No tariff, dispatch, reserve, SOC, deadline, export, dashboard, commissioning or
 hardware-control policy is changed by this audit. No Home Assistant hardware
-service call or FoxESS provider write is added, and real hardware writes remain
-blocked. The integration remains `0.8.0-alpha8.0`; there is no release, tag or
-version bump in this closure slice.
+service call or FoxESS provider write is added. The safety result is explicit: real hardware writes remain blocked. The integration remains
+`0.8.0-alpha8.0`; there is no release, tag or version bump in this closure slice.
