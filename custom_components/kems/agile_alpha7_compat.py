@@ -76,8 +76,10 @@ POST_BASE_PATCHES: Final[tuple[PatchSpec, ...]] = (
     ),
     ("agile_alpha743_event_priority", "install_alpha743_event_priority_patch"),
     ("agile_alpha744_dashboard_parity", "install_alpha744_dashboard_parity_patch"),
-    ("agile_alpha745_plan_clarity", "install_alpha745_plan_clarity_patch"),
-    ("agile_alpha746_no_unknown_reserve", "install_alpha746_no_unknown_reserve_patch"),
+    (
+        "agile_progressive_publication",
+        "install_progressive_publication_planning",
+    ),
     ("agile_full_battery_routing", "install_full_battery_routing"),
     (
         "agile_deadline_plan_reconciliation",
