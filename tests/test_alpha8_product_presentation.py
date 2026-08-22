@@ -100,7 +100,9 @@ def test_product_finance_dashboard_keeps_comparison_and_roi_contract() -> None:
     assert "sensor.kems_lifetime_simulated_system_value" in source
 
 
-def test_product_presentation_cannot_change_planning_or_enable_hardware_writes() -> None:
+def test_product_presentation_cannot_change_planning_or_enable_hardware_writes() -> (
+    None
+):
     source = "\n".join(
         path.read_text(encoding="utf-8")
         for path in (FACADE, PANEL_RUNTIME, DASHBOARD_RUNTIME)
