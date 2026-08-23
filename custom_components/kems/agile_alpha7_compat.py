@@ -56,6 +56,7 @@ POST_BASE_PATCHES: Final[tuple[PatchSpec, ...]] = (
     ("agile_operator_telemetry", "install_operator_telemetry"),
     ("agile_event_priority", "install_event_priority"),
     ("happy_hour_auto", "install_automatic_happy_hour"),
+    ("happy_hour_retention", "install_happy_hour_retention"),
     ("agile_dashboard_parity", "install_dashboard_parity"),
     ("ev_policy_dashboard", "install_ev_policy_dashboard"),
     ("panel_ev_policy", "install_panel_ev_policy"),
