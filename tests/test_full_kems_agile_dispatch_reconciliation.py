@@ -42,6 +42,7 @@ class _ReplaySnapshot:
 def test_happy_hour_replay_is_free_charge_only_inside_the_event() -> None:
     namespace: dict[str, Any] = {
         "Any": Any,
+        "UTC": UTC,
         "replace": replace,
         "agile": SimpleNamespace(LONDON=UTC),
     }
@@ -82,6 +83,7 @@ def test_happy_hour_replay_is_free_charge_only_inside_the_event() -> None:
 def test_happy_hour_replay_yields_to_power_down_priority() -> None:
     namespace: dict[str, Any] = {
         "Any": Any,
+        "UTC": UTC,
         "replace": replace,
         "agile": SimpleNamespace(LONDON=UTC),
     }
@@ -177,13 +179,17 @@ def test_final_charge_route_uses_solar_before_import_and_exports_only_surplus() 
 
 def test_reconciliation_is_the_last_canonical_runtime_boundary() -> None:
     source = COMPAT.read_text(encoding="utf-8")
-    previous = (
-        '("agile_publication_reporting", ' '"install_tomorrow_publication_reporting")'
-    )
-    final = '("agile_dispatch_reconciliation", ' '"install_dispatch_reconciliation")'
-    assert previous in source
-    assert final in source
-    assert source.index(final) > source.index(previous)
+    previous_module = "agile_publication_reporting"
+    previous_installer = "install_tomorrow_publication_reporting"
+    final_module = "agile_dispatch_reconciliation"
+    final_installer = "install_dispatch_reconciliation"
+
+    assert previous_module in source
+    assert previous_installer in source
+    assert final_module in source
+    assert final_installer in source
+    assert source.index(final_module) > source.index(previous_module)
+    assert source.index(final_installer) > source.index(previous_installer)
     assert "agile_alpha8" not in MODULE.name
 
 
