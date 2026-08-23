@@ -573,10 +573,9 @@ def _install_publish_reconciliation() -> None:
                 tariff=tariff,
                 power_down=power_down,
             )
-            charging = (
-                str(happy.get("mode") or "") == "charging"
-                and not power_down.get("active")
-            )
+            charging = str(
+                happy.get("mode") or ""
+            ) == "charging" and not power_down.get("active")
         self._kems_suppress_event_graph_overlay = charging
         try:
             original_publish(self, state)
