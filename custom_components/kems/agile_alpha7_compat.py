@@ -57,6 +57,7 @@ POST_BASE_PATCHES: Final[tuple[PatchSpec, ...]] = (
     ("agile_product_presentation", "install_product_presentation"),
     ("agile_economic_opportunity", "install_economic_opportunity"),
     ("agile_forecast_arbitrage", "install_forecast_arbitrage"),
+    ("agile_profit_first_headroom", "install_profit_first_headroom"),
     ("agile_price_publication", "install_price_publication"),
     ("agile_operator_telemetry", "install_operator_telemetry"),
     ("agile_event_priority", "install_event_priority"),
@@ -76,6 +77,15 @@ POST_BASE_PATCHES: Final[tuple[PatchSpec, ...]] = (
         "install_maximum_discharge_plan_reconcile",
     ),
     ("agile_publication_reporting", "install_tomorrow_publication_reporting"),
+    ("agile_charge_recovery", "install_charge_recovery_policy"),
+    (
+        "agile_event_settlement_reconciliation",
+        "install_event_settlement_reconciliation",
+    ),
+    (
+        "agile_dispatch_reconciliation",
+        "install_dispatch_reconciliation",
+    ),
 )
 
 

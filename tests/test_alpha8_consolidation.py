@@ -87,8 +87,8 @@ def test_alpha8_compatibility_registry_is_complete_and_resolvable() -> None:
     assert len(specs) == len(set(specs)), "Compatibility installers must be unique"
     assert specs[0] == ("agile_smart_export_reporting", "install_reporting_patch")
     assert specs[-1] == (
-        "agile_publication_reporting",
-        "install_tomorrow_publication_reporting",
+        "agile_dispatch_reconciliation",
+        "install_dispatch_reconciliation",
     )
 
     for module_name, installer_name in specs:
@@ -237,10 +237,15 @@ def test_publication_reporting_retires_alpha750_and_alpha752_from_execution() ->
         "agile_publication_reporting",
         "install_tomorrow_publication_reporting",
     )
+    reconciliation = (
+        "agile_dispatch_reconciliation",
+        "install_dispatch_reconciliation",
+    )
 
     assert specs.index(no_reserve) > specs.index(deadline_coverage)
     assert specs.index(no_reserve) < specs.index(maximum_discharge)
     assert specs.index(tomorrow) > specs.index(maximum_discharge)
+    assert specs.index(reconciliation) > specs.index(tomorrow)
 
     retired = {
         "agile_alpha750_no_reserve_reporting",
@@ -315,6 +320,15 @@ def test_canonical_publication_reporting_cannot_enable_hardware_writes() -> None
     assert "safe_to_write_hardware = True" not in source
     assert "commands_permitted = True" not in source
     assert "hardware-write permissions remain untouched" in source
+
+
+def test_final_dispatch_reconciliation_cannot_enable_hardware_writes() -> None:
+    source = (KEMS / "agile_dispatch_reconciliation.py").read_text(encoding="utf-8")
+    assert ".services.async_call(" not in source
+    assert "providers.foxess" not in source
+    assert "safe_to_write_hardware = True" not in source
+    assert "commands_permitted = True" not in source
+    assert '"hardware_writes": "blocked"' in source
 
 
 def test_alpha8_does_not_restart_version_named_patch_debt() -> None:
