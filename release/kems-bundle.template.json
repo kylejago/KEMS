@@ -42,7 +42,7 @@
   },
   "maintenance": {
     "required": true,
-    "reason": "Repair managed Full KEMS Agile dashboard insertion for selectable shadow EV charging policy",
+    "reason": "Add automatic Octopus Weekend Happy Hour discovery and managed dashboard source telemetry while preserving the selectable shadow EV charging policy",
     "expected_downtime_minutes": 5,
     "home_assistant_restart_required": true,
     "reboot_required": false,

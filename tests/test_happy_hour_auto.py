@@ -32,7 +32,8 @@ def _load_auto_module():
     return sys.modules[f"{package_name}.happy_hour_auto"]
 
 
-automatic_happy_hour_event = _load_auto_module().automatic_happy_hour_event
+AUTO_MODULE = _load_auto_module()
+automatic_happy_hour_event = AUTO_MODULE.automatic_happy_hour_event
 
 NOW = datetime(2026, 8, 23, 8, 30, tzinfo=UTC)  # Sunday 09:30 BST
 
@@ -196,3 +197,24 @@ def test_weekday_code_less_power_up_is_not_auto_classified() -> None:
     )
     assert result["source"] == "manual"
     assert result["automatic_status"] == "no_confident_weekend_happy_hour"
+
+
+def test_dashboard_copy_exposes_automatic_source_and_manual_fallback() -> None:
+    content = AUTO_MODULE._AUTO_DASHBOARD_INSERT
+    assert "Weekend Happy Hour" in content
+    assert "Octopus Energy — automatic" in content
+    assert "Happy Hour fallback controls" in content
+    assert "automatic_status" in content
+    assert "datetime.kems_weekend_happy_hour_start" in content
+
+
+def test_automatic_patch_runs_after_event_priority_installer() -> None:
+    compat = (INTEGRATION / "agile_alpha7_compat.py").read_text(encoding="utf-8")
+    event_priority = '("agile_event_priority", "install_event_priority")'
+    automatic = '("happy_hour_auto", "install_automatic_happy_hour")'
+    assert event_priority in compat
+    assert automatic in compat
+    assert compat.index(event_priority) < compat.index(automatic)
+
+    runtime = (INTEGRATION / "agile_event_priority_runtime.py").read_text(encoding="utf-8")
+    assert "return improve_alpha743_dashboard(content).encode(\"utf-8\")" in runtime

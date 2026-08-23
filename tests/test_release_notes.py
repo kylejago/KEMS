@@ -11,6 +11,7 @@ ALPHA8_3_NOTES = ROOT / "docs" / "alpha8.3-release-notes.md"
 ALPHA8_4_NOTES = ROOT / "docs" / "alpha8.4-release-notes.md"
 ALPHA8_5_NOTES = ROOT / "docs" / "alpha8.5-release-notes.md"
 ALPHA8_6_NOTES = ROOT / "docs" / "alpha8.6-release-notes.md"
+ALPHA8_7_NOTES = ROOT / "docs" / "alpha8.7-release-notes.md"
 
 
 def test_alpha8_1_notes_remain_historical_release_evidence() -> None:
@@ -85,5 +86,21 @@ def test_alpha8_6_notes_document_dashboard_setup_hotfix() -> None:
     assert "presentation transform cannot stop" in text
     assert "0.8.0-alpha8-web.2` (unchanged)" in text
     assert "0.8.0-alpha8-panel.1` (unchanged)" in text
+    assert "no Home Assistant service call to Ohme" in text
+    assert "no FoxESS hardware write" in text
+
+
+def test_alpha8_7_notes_document_automatic_octopus_happy_hour() -> None:
+    text = ALPHA8_7_NOTES.read_text(encoding="utf-8")
+
+    assert "0.8.0-alpha8.7" in text
+    assert "19.0.1+" in text
+    assert "POWER_UP_DOWN_COORDINATOR" in text
+    assert "Octopus Energy — automatic" in text
+    assert "Manual fallback" in text
+    assert "code-less weekend" in text
+    assert "0.8.0-alpha8-web.2` (unchanged)" in text
+    assert "0.8.0-alpha8-panel.1` (unchanged)" in text
+    assert "no Home Assistant service call to Octopus" in text
     assert "no Home Assistant service call to Ohme" in text
     assert "no FoxESS hardware write" in text
