@@ -58,7 +58,9 @@ def _retained(start: datetime, end: datetime) -> dict:
         "automatic_source_supported": True,
         "source_kind": "octopus_coordinator",
         "source_account": "A-60624FB8",
-        "classification_basis": "code-less weekend Power Up, 1/2-hour conservative match",
+        "classification_basis": (
+            "code-less weekend Power Up, 1/2-hour conservative match"
+        ),
         "confidence": "conservative",
         "event_ids": ["hh-1"],
         "start": start.isoformat(),
