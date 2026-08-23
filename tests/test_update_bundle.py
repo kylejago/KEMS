@@ -41,7 +41,10 @@ def test_release_bundle_renders_exact_coordinated_alpha8_targets() -> None:
         "public_web",
     ]
     assert bundle["maintenance"]["reboot_required"] is False
-    assert "automatic Octopus Weekend Happy Hour discovery" in bundle["maintenance"]["reason"]
+    assert (
+        "automatic Octopus Weekend Happy Hour discovery"
+        in bundle["maintenance"]["reason"]
+    )
     assert "selectable shadow EV charging policy" in bundle["maintenance"]["reason"]
 
 
