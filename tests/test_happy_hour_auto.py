@@ -43,11 +43,7 @@ def _event(start: datetime, end: datetime, *, event_id="hh-1", code=None):
 def test_public_power_up_event_is_used_automatically() -> None:
     state = FakeState(
         "event.octopus_energy_a_60624fb8_octoplus_power_up_events",
-        {
-            "events": [
-                _event(NOW - timedelta(minutes=30), NOW + timedelta(minutes=30))
-            ]
-        },
+        {"events": [_event(NOW - timedelta(minutes=30), NOW + timedelta(minutes=30))]},
     )
     result = automatic_happy_hour_event(
         FakeHass(states=[state]),

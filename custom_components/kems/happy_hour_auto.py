@@ -227,9 +227,7 @@ def _merge_consecutive(events: list[dict[str, Any]]) -> list[dict[str, Any]]:
                 "end": last["end"],
                 "duration_minutes": (last["end"] - first["start"]).total_seconds()
                 / 60.0,
-                "event_ids": [
-                    item.get("id") for item in group if item.get("id")
-                ],
+                "event_ids": [item.get("id") for item in group if item.get("id")],
             }
         )
     return merged
@@ -308,9 +306,7 @@ def automatic_happy_hour_event(
             "start": candidate["start"],
             "end": candidate["end"],
             "duration_hours": duration_hours,
-            "fair_use_cap_kwh": (
-                HAPPY_HOUR_FAIR_USE_KWH_PER_REWARD * duration_hours
-            ),
+            "fair_use_cap_kwh": (HAPPY_HOUR_FAIR_USE_KWH_PER_REWARD * duration_hours),
         }
 
     manual = dict(manual_happy_hour_event(manual_options))
