@@ -42,7 +42,7 @@
   },
   "maintenance": {
     "required": true,
-    "reason": "Reconcile Full KEMS Agile charge routing, Happy Hour accounting and shadow-command parity",
+    "reason": "Recover proven completed Happy Hour evidence across Alpha8 upgrade",
     "expected_downtime_minutes": 5,
     "home_assistant_restart_required": true,
     "reboot_required": false,
