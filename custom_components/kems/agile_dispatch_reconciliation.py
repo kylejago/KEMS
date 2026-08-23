@@ -29,7 +29,6 @@ from . import agile_shadow_command_runtime as shadow
 from . import agile_smart_export as agile
 from . import agile_smart_export_runtime_base as runtime
 from .happy_hour import (
-    CONF_HAPPY_HOUR_DURATION_HOURS,
     CONF_HAPPY_HOUR_ENABLED,
     CONF_HAPPY_HOUR_START,
     HAPPY_HOUR_FAIR_USE_KWH_PER_REWARD,
