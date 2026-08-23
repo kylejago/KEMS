@@ -28,9 +28,11 @@ _FULL_SOC_PERCENT = 100.0
 def _force_full_charge_target(records: list[Any]) -> list[Any]:
     """Keep 100% as the requested target in every authoritative cheap slot."""
     return [
-        replace(item, forecast_maximum_overnight_soc_percent=_FULL_SOC_PERCENT)
-        if bool(getattr(item, "cheap_period_confirmed", False))
-        else item
+        (
+            replace(item, forecast_maximum_overnight_soc_percent=_FULL_SOC_PERCENT)
+            if bool(getattr(item, "cheap_period_confirmed", False))
+            else item
+        )
         for item in records
     ]
 
