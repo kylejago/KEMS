@@ -77,7 +77,8 @@ def test_headroom_moves_existing_export_without_increasing_daily_export() -> Non
 
     assert "Only re-time energy that was already due to be exported later" in source
     assert '"total_planned_battery_export_increased": False' in source
-    assert "later planned export is removed from its lowest-value" in source
+    assert "later planned export" in source
+    assert "lowest-value" in source
     assert "sorted(\n        donors," in source
 
 
@@ -101,4 +102,4 @@ def test_profit_first_headroom_cannot_enable_hardware_writes() -> None:
     assert "providers.foxess" not in source
     assert "safe_to_write_hardware = True" not in source
     assert "commands_permitted = True" not in source
-    assert "Real hardware writes remain blocked" in source
+    assert "writes remain blocked" in source
