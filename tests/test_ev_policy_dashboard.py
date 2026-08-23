@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib.util
+import sys
 from pathlib import Path
 
 ROOT = Path(__file__).parents[1]
@@ -13,6 +14,7 @@ CONSOLIDATION = KEMS / "dashboard_consolidation.py"
 SPEC = importlib.util.spec_from_file_location("kems_ev_policy_dashboard", MODULE)
 assert SPEC is not None and SPEC.loader is not None
 dashboard = importlib.util.module_from_spec(SPEC)
+sys.modules[SPEC.name] = dashboard
 SPEC.loader.exec_module(dashboard)
 
 CONSOLIDATION_SPEC = importlib.util.spec_from_file_location(
@@ -20,6 +22,7 @@ CONSOLIDATION_SPEC = importlib.util.spec_from_file_location(
 )
 assert CONSOLIDATION_SPEC is not None and CONSOLIDATION_SPEC.loader is not None
 consolidation = importlib.util.module_from_spec(CONSOLIDATION_SPEC)
+sys.modules[CONSOLIDATION_SPEC.name] = consolidation
 CONSOLIDATION_SPEC.loader.exec_module(consolidation)
 
 
