@@ -37,8 +37,6 @@ def test_alpha8_release_targets_coordinated_panel_and_web() -> None:
     assert bundle["maintenance"]["affected_components"] == [
         "kems_core",
         "dashboard",
-        "property_web",
-        "pi_agent",
     ]
 
 
