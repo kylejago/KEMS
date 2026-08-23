@@ -1,5 +1,7 @@
 """Regression coverage for the managed EV policy dashboard cards."""
 
+# ruff: noqa: E501
+
 from __future__ import annotations
 
 import importlib.util

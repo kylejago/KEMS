@@ -1,5 +1,7 @@
 """Expose the selectable EV shadow policy on the managed KEMS dashboard."""
 
+# ruff: noqa: E501
+
 from __future__ import annotations
 
 _MARKER = """      - type: markdown

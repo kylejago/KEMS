@@ -109,7 +109,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         and not update_orchestrator.policy.automatic_restart
     ):
         LOGGER.warning(
-            "KEMS repaired a legacy update policy with automatic updates enabled but automatic maintenance restart disabled"
+            "KEMS repaired a legacy update policy with automatic updates enabled "
+            "but automatic maintenance restart disabled"
         )
         await update_orchestrator.async_set_policy(automatic_restart=True)
     install_agile_simulation_presentation()

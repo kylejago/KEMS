@@ -11,8 +11,9 @@ services or a charger/inverter hardware backend.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import replace
-from typing import Any, Mapping
+from typing import Any
 
 from .control import ControlEngine
 

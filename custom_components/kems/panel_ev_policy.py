@@ -1,5 +1,7 @@
 """Project KEMS EV shadow policy onto the managed ESPHome panel payload."""
 
+# ruff: noqa: E501
+
 from __future__ import annotations
 
 PANEL_EV_POLICY_VERSION = "0.8.0-alpha8-panel.1"
