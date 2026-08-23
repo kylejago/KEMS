@@ -7,13 +7,17 @@ It keeps the established Full KEMS Agile economic policy:
 - the battery still targets **100%** when charging, even when the overnight window cannot physically reach it;
 - the normal pre-cheap/export reserve remains **10%**;
 - the configured **23:30–05:30** cheap period remains the authoritative house/battery charging window;
-- after that window, if the battery is still below 100%, available solar normally recovers the remaining headroom before ordinary deliberate battery export resumes;
-- **100% is a charge/recovery aim, not a hard gate that blocks economically useful forecast headroom export**: when high-confidence solar is expected to fill the battery later and force lower-value solar spill/export, KEMS may move already-planned battery export into an earlier, better-priced Agile slot to create that headroom;
+- after that window, available solar normally recovers remaining battery headroom, but **100% is a charge/recovery aim, not a hard gate** that blocks a better export opportunity;
+- the configured overnight replacement price is the ordinary battery-export economic floor;
+- normal battery export is allocated toward the **highest-value feasible Agile slots** while retaining house/reserve, inverter, export-limit and deadline constraints;
+- a high-confidence solar forecast acts as a **timing/headroom constraint**: if headroom must exist before incoming solar would otherwise spill, KEMS moves only already-planned battery export into the highest eligible pre-headroom Agile slots above the overnight replacement-cost floor;
+- forecast headroom no longer requires the earlier slot to beat the expected spill-period price by an extra fixed margin; the spill-period rate remains useful evidence, not a second export floor;
+- when export must be moved earlier for forecast headroom, the lowest-value later planned allocations are reduced first so stronger later prices are preserved wherever physically possible;
 - forecast solar-headroom re-timing must never increase the day's planned battery export, weaken protected house energy, or lower the 10% reserve;
-- the later deadline plan must remain able to discharge sufficiently toward the 10% pre-cheap target even if solar never physically reaches 100%;
-- the battery may still support the home during solar recovery;
+- the later deadline plan remains able to discharge sufficiently toward the 10% pre-cheap target even if solar never physically reaches 100%;
+- the battery may still support the home while solar is recovering battery SOC;
 - extra Intelligent daytime slots remain non-authoritative for KEMS battery control;
-- normal Agile price ranking, forecast protection, solar-headroom optimisation, deadline reconciliation and Power Down priority remain in place.
+- normal Agile price ranking, forecast protection, deadline reconciliation and Power Down priority remain in place.
 
 The release reconciles the post-plan views of Full KEMS Agile so they describe the same charge decision:
 
