@@ -42,7 +42,7 @@
   },
   "maintenance": {
     "required": true,
-    "reason": "Add selectable shadow EV charging policy and coordinated presentation parity",
+    "reason": "Repair managed Full KEMS Agile dashboard insertion for selectable shadow EV charging policy",
     "expected_downtime_minutes": 5,
     "home_assistant_restart_required": true,
     "reboot_required": false,
