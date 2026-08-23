@@ -11,6 +11,7 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[1]
 KEMS = ROOT / "custom_components" / "kems"
 MODULE = KEMS / "agile_charge_recovery.py"
+FORECAST = KEMS / "agile_forecast_arbitrage.py"
 COMPAT = KEMS / "agile_alpha7_compat.py"
 
 
@@ -77,6 +78,26 @@ def test_morning_recovery_window_uses_configured_overnight_schedule_only() -> No
     )[1].split("def _event_slot_starts", 1)[0]
 
 
+def test_forecast_arbitrage_preserves_valuable_early_headroom_export() -> None:
+    source = FORECAST.read_text(encoding="utf-8")
+
+    assert "when high-confidence solar is likely to overflow a full battery" in source
+    assert "required_early_export_kwh" in source
+    assert "HEADROOM_MIN_PRICE_ADVANTAGE_PENCE" in source
+    assert "earlier Agile export is worth more than forecast forced solar spill" in source
+    assert '"solar_headroom_retimed"' in source
+    assert 'plan["solar_headroom_active"]' in source
+
+
+def test_recovery_contract_makes_100_percent_an_aim_not_a_hard_gate() -> None:
+    notes = (ROOT / "docs" / "alpha8.3-release-notes.md").read_text(encoding="utf-8")
+
+    assert "100% is a charge/recovery aim, not a hard gate" in notes
+    assert "earlier, better-priced Agile slot" in notes
+    assert "must never increase the day's planned battery export" in notes
+    assert "10% pre-cheap target" in notes
+
+
 def test_recovery_masks_only_deliberate_battery_export_decisions() -> None:
     source = MODULE.read_text(encoding="utf-8")
 
@@ -125,7 +146,6 @@ def test_policy_explicitly_keeps_100_charge_and_10_reserve() -> None:
 
     assert "_FULL_SOC_PERCENT = 100.0" in source
     assert '"battery_reserve_target_soc_percent": 10.0' in source
-    assert "hold deliberate battery export until solar recovers 100% SOC" in source
 
 
 def test_charge_recovery_cannot_enable_hardware_writes() -> None:
