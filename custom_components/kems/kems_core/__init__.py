@@ -7,6 +7,7 @@ from .control import (
     ControlEngine,
     run_preflight_suite,
 )
+from .ev_charge_policy import install_ev_charge_policy
 from .forecast import ForecastPlanningEngine, fuse_solar_forecasts
 from .forecast_validation import (
     ForecastObservation,
@@ -78,6 +79,11 @@ from .whole_home import WholeHomeEngine
 # Alpha7.34: make the configured overnight window the sole cheap-period
 # authority for both newly collected and previously retained snapshots.
 install_overnight_only_cheap_policy()
+
+# EV control remains shadow-only, but its desired command is deliberately
+# narrower than tariff observation: only the authoritative overnight window may
+# permit charging, and battery discharge/export is held at zero while permitted.
+install_ev_charge_policy()
 
 __all__ = [
     "should_accumulate_lifetime_value",
