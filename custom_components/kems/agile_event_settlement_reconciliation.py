@@ -1,10 +1,10 @@
 """Net-site settlement reconciliation for Full KEMS Agile free-charge events.
 
 Weekend Happy Hour is represented to the core replay as a temporary free charge
-window so battery energy carries naturally into later Agile decisions.  The
+window so battery energy carries naturally into later Agile decisions. The
 legacy cheap-window replay records gross grid import and gross solar export as
 separate flows, which is useful internally but is not a valid single site-meter
-settlement state.  This layer converts only manually projected daytime cheap
+settlement state. This layer converts only manually projected daytime cheap
 slots to one net import-or-export route while preserving the same house energy
 and battery charge.
 
@@ -28,6 +28,7 @@ _EVENT_MARKER = "_kems_happy_hour_net_route"
 
 
 def _number(value: Any) -> float | None:
+    """Return a finite float when possible."""
     if value is None:
         return None
     try:
@@ -38,6 +39,7 @@ def _number(value: Any) -> float | None:
 
 
 def _dt(value: Any) -> datetime | None:
+    """Parse one timestamp and normalise it to UTC."""
     try:
         parsed = datetime.fromisoformat(str(value))
     except (TypeError, ValueError):
@@ -120,6 +122,7 @@ def _net_event_slot(
     efficiency = max(config.charge_efficiency, 0.01)
     old_solar_charge_input = old_solar_stored / efficiency
     old_grid_charge_input = max(old_import - house, 0.0)
+    old_grid_stored = old_grid_charge_input * efficiency
     total_charge_input = old_solar_charge_input + old_grid_charge_input
 
     inverter_energy = max(config.inverter_limit_kw, 0.0) * hours
@@ -142,15 +145,20 @@ def _net_event_slot(
         inverter_energy - solar_to_home - total_charge_input - battery_export,
         0.0,
     )
-    solar_export = min(remaining_solar, export_energy, inverter_headroom)
+    rate_pence = _number(item.get("rate_pence")) or 0.0
+    solar_export = (
+        min(remaining_solar, export_energy, inverter_headroom)
+        if rate_pence > 0.0
+        else 0.0
+    )
     gross_import = grid_to_home + grid_to_battery_input
     gross_export = solar_export + battery_export
     net = gross_import - gross_export
     grid_import = max(net, 0.0)
     grid_export = max(-net, 0.0)
 
-    # Event policy never deliberately discharges the battery.  Keep this guard
-    # explicit so a future upstream regression cannot hide behind netting.
+    # Happy Hour must never deliberately discharge the battery. Keep the guard
+    # explicit so an upstream regression cannot hide behind net settlement.
     if battery_export > _EPSILON:
         grid_export = max(grid_export - battery_export, 0.0)
         battery_export = 0.0
@@ -185,6 +193,7 @@ def _net_event_slot(
         "solar_to_home": solar_to_home,
         "old_solar_stored": old_solar_stored,
         "new_solar_stored": solar_to_battery_stored,
+        "old_grid_stored": old_grid_stored,
         "new_grid_stored": grid_to_battery_stored,
     }
 
@@ -220,20 +229,9 @@ def _recalculate_event_summary(
     solar_stored_delta = sum(
         item["new_solar_stored"] - item["old_solar_stored"] for item in deltas
     )
-    grid_stored = sum(item["new_grid_stored"] for item in deltas)
-    old_grid_stored = max(
-        _number(result.get("grid_to_battery_kwh")) or 0.0,
-        0.0,
+    grid_stored_delta = sum(
+        item["new_grid_stored"] - item["old_grid_stored"] for item in deltas
     )
-    event_old_grid_stored = sum(
-        max(
-            (item["old_import"] - item["solar_to_home"])
-            * 0.0,
-            0.0,
-        )
-        for item in deltas
-    )
-    del event_old_grid_stored
 
     old_income = _number(result.get("export_income_pence")) or 0.0
     import_cost = _number(result.get("import_cost_pence")) or 0.0
@@ -269,7 +267,11 @@ def _recalculate_event_summary(
                 3,
             ),
             "grid_to_battery_kwh": round(
-                max(old_grid_stored + grid_stored, 0.0),
+                max(
+                    (_number(result.get("grid_to_battery_kwh")) or 0.0)
+                    + grid_stored_delta,
+                    0.0,
+                ),
                 3,
             ),
             "export_income_pence": round(income, 2),
@@ -362,7 +364,8 @@ def install_event_settlement_reconciliation() -> None:
                 tariff,
                 initial_soc,
             )
-            event_starts = _manual_event_slot_starts(list(records), rates, tariff)
+            replay_records = list(records)
+            event_starts = _manual_event_slot_starts(replay_records, rates, tariff)
             if not event_starts:
                 return summary, plan
             deltas = []
@@ -370,7 +373,7 @@ def install_event_settlement_reconciliation() -> None:
                 start = _dt(item.get("valid_from"))
                 if start is None or start not in event_starts:
                     continue
-                delta = _net_event_slot(self, item, list(records), config)
+                delta = _net_event_slot(self, item, replay_records, config)
                 if delta is not None:
                     deltas.append(delta)
             if not deltas:
