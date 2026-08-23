@@ -86,7 +86,7 @@ def test_power_down_beats_overlapping_overnight_window() -> None:
         ControlConfig(),
     )
     assert state.desired_ev_charging_allowed is False
-    assert state.operating_reason == "Power Down session active"
+    assert state.operating_reason == "power_down_session"
 
 
 def test_surplus_mode_requires_real_connection_and_surplus_pv() -> None:
