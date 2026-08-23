@@ -112,7 +112,6 @@ def retained_happy_hour_result(
         result["retained_automatic_event_stale"] = True
         return result
 
-    # Never hide a different manual fallback that is currently active or future.
     manual_start = _dt(result.get("start"))
     manual_end = _dt(result.get("end"))
     manual_current_or_future = bool(
@@ -157,7 +156,6 @@ class HappyHourEvidenceRecorder:
     """Persist the last confidently detected automatic Happy Hour."""
 
     def __init__(self, hass: Any, storage_key: str) -> None:
-        # Lazy import keeps source-neutral unit tests independent of Home Assistant.
         from homeassistant.helpers.storage import Store
 
         self._hass = hass
@@ -176,8 +174,6 @@ class HappyHourEvidenceRecorder:
         try:
             data = await self._store.async_load()
             last_event = data.get("last_event") if isinstance(data, Mapping) else None
-            # A live event may have been captured while storage was loading. Never
-            # let older disk evidence overwrite that newer live observation.
             if isinstance(last_event, Mapping) and self._retained is None:
                 self._retained = dict(last_event)
                 self._last_signature = self._signature(self._retained)
@@ -186,7 +182,7 @@ class HappyHourEvidenceRecorder:
             self._loading = False
 
     def ensure_loaded(self) -> None:
-        """Start one non-blocking storage restore before normal planning continues."""
+        """Start one non-blocking storage restore before planning continues."""
         if self._loaded or self._loading:
             return
         self._loading = True
@@ -276,12 +272,12 @@ def install_happy_hour_retention() -> None:
     automatic_with_retention._kems_happy_hour_retention = True
     happy_hour_auto.automatic_happy_hour_event = automatic_with_retention
 
-    # Alpha8.7's dashboard insert is read at render time, so the retained evidence
-    # line can be added without replacing or duplicating the proven card layout.
     old_line = "**Automatic source:** {{ auto or 'waiting for Octopus Power Up data' }}"
     new_lines = """**Automatic source:** {{ auto or 'waiting for Octopus Power Up data' }}  
           **Evidence:** {{ state_attr('sensor.kems_agile_happy_hour_plan', 'automatic_evidence') or 'live/manual fallback' }}"""
-    happy_hour_auto._AUTO_DASHBOARD_INSERT = happy_hour_auto._AUTO_DASHBOARD_INSERT.replace(
-        old_line,
-        new_lines,
+    happy_hour_auto._AUTO_DASHBOARD_INSERT = (
+        happy_hour_auto._AUTO_DASHBOARD_INSERT.replace(
+            old_line,
+            new_lines,
+        )
     )
