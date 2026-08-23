@@ -3,9 +3,36 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
-from types import SimpleNamespace
+import importlib.util
+from pathlib import Path
+import sys
+from types import ModuleType, SimpleNamespace
 
-from custom_components.kems.happy_hour_auto import automatic_happy_hour_event
+ROOT = Path(__file__).parents[1]
+INTEGRATION = ROOT / "custom_components" / "kems"
+
+
+def _load_auto_module():
+    """Load the source-neutral Happy Hour modules without Home Assistant."""
+    package_name = "kems_happy_hour_auto_test"
+    package = ModuleType(package_name)
+    package.__path__ = [str(INTEGRATION)]
+    sys.modules[package_name] = package
+
+    for module_name in ("happy_hour", "happy_hour_auto"):
+        qualified = f"{package_name}.{module_name}"
+        spec = importlib.util.spec_from_file_location(
+            qualified,
+            INTEGRATION / f"{module_name}.py",
+        )
+        assert spec is not None and spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[qualified] = module
+        spec.loader.exec_module(module)
+    return sys.modules[f"{package_name}.happy_hour_auto"]
+
+
+automatic_happy_hour_event = _load_auto_module().automatic_happy_hour_event
 
 NOW = datetime(2026, 8, 23, 8, 30, tzinfo=UTC)  # Sunday 09:30 BST
 
