@@ -43,12 +43,18 @@ def _event(start: datetime, end: datetime, *, event_id="hh-1", code=None):
 def test_public_power_up_event_is_used_automatically() -> None:
     state = FakeState(
         "event.octopus_energy_a_60624fb8_octoplus_power_up_events",
-        {"events": [_event(NOW - timedelta(minutes=30), NOW + timedelta(minutes=30))]},
+        {
+            "events": [
+                _event(NOW - timedelta(minutes=30), NOW + timedelta(minutes=30))
+            ]
+        },
     )
     result = automatic_happy_hour_event(
         FakeHass(states=[state]),
         manual_options={},
-        saving_session_entity="event.octopus_energy_a_60624fb8_octoplus_power_down_events",
+        saving_session_entity=(
+            "event.octopus_energy_a_60624fb8_octoplus_power_down_events"
+        ),
         now=NOW,
     )
     assert result["source"] == "octopus_energy"
@@ -64,11 +70,17 @@ def test_two_consecutive_one_hour_rewards_are_merged() -> None:
         {
             "events": [
                 _event(start, start + timedelta(hours=1), event_id="one"),
-                _event(start + timedelta(hours=1), start + timedelta(hours=2), event_id="two"),
+                _event(
+                    start + timedelta(hours=1),
+                    start + timedelta(hours=2),
+                    event_id="two",
+                ),
             ]
         },
     )
-    result = automatic_happy_hour_event(FakeHass(states=[state]), manual_options={}, now=NOW)
+    result = automatic_happy_hour_event(
+        FakeHass(states=[state]), manual_options={}, now=NOW
+    )
     assert result["source"] == "octopus_energy"
     assert result["duration_hours"] == 2
     assert result["fair_use_cap_kwh"] == 32.0
@@ -79,9 +91,15 @@ def test_coded_free_electricity_event_is_never_happy_hour() -> None:
     start = datetime(2026, 8, 23, 9, 0, tzinfo=UTC)
     state = FakeState(
         "event.octopus_energy_a_60624fb8_octoplus_power_up_events",
-        {"events": [_event(start, start + timedelta(hours=1), code="FREE-ELECTRICITY")]},
+        {
+            "events": [
+                _event(start, start + timedelta(hours=1), code="FREE-ELECTRICITY")
+            ]
+        },
     )
-    result = automatic_happy_hour_event(FakeHass(states=[state]), manual_options={}, now=NOW)
+    result = automatic_happy_hour_event(
+        FakeHass(states=[state]), manual_options={}, now=NOW
+    )
     assert result["source"] == "manual"
     assert result["automatic_source_supported"] is True
     assert result["automatic_status"] == "no_confident_weekend_happy_hour"
@@ -121,7 +139,9 @@ def test_disabled_public_entity_uses_read_only_octopus_coordinator() -> None:
         end=start + timedelta(hours=1),
         duration_in_minutes=60,
     )
-    coordinator = SimpleNamespace(data=SimpleNamespace(joined_power_up_events=[coordinator_event]))
+    coordinator = SimpleNamespace(
+        data=SimpleNamespace(joined_power_up_events=[coordinator_event])
+    )
     hass = FakeHass(
         data={
             "octopus_energy": {
@@ -132,7 +152,9 @@ def test_disabled_public_entity_uses_read_only_octopus_coordinator() -> None:
     result = automatic_happy_hour_event(
         hass,
         manual_options={},
-        saving_session_entity="event.octopus_energy_a_60624fb8_octoplus_power_down_events",
+        saving_session_entity=(
+            "event.octopus_energy_a_60624fb8_octoplus_power_down_events"
+        ),
         now=NOW,
     )
     assert result["source"] == "octopus_energy"
@@ -146,6 +168,8 @@ def test_weekday_code_less_power_up_is_not_auto_classified() -> None:
         "event.octopus_energy_a_60624fb8_octoplus_power_up_events",
         {"events": [_event(monday, monday + timedelta(hours=1))]},
     )
-    result = automatic_happy_hour_event(FakeHass(states=[state]), manual_options={}, now=NOW)
+    result = automatic_happy_hour_event(
+        FakeHass(states=[state]), manual_options={}, now=NOW
+    )
     assert result["source"] == "manual"
     assert result["automatic_status"] == "no_confident_weekend_happy_hour"
