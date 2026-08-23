@@ -140,7 +140,9 @@ def test_interrupted_event_is_not_recovered_as_full_free_hour() -> None:
     assert recovered is None
 
 
-def test_charge_without_post_event_transition_is_not_enough_to_claim_completion() -> None:
+def test_charge_without_post_event_transition_is_not_enough_to_claim_completion() -> (
+    None
+):
     recovered = _recover(
         {
             CONF_HAPPY_HOUR_ENABLED: False,
