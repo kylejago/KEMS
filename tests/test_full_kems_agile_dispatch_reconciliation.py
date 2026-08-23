@@ -51,7 +51,10 @@ def test_happy_hour_replay_is_free_charge_only_inside_the_event() -> None:
     }
     namespace["_event_for_replay_day"] = lambda self, day: event
     namespace["_power_down_active"] = lambda snapshot, moment: False
-    exec(compile(_function_nodes("_happy_hour_replay_records"), str(MODULE), "exec"), namespace)
+    exec(
+        compile(_function_nodes("_happy_hour_replay_records"), str(MODULE), "exec"),
+        namespace,
+    )
 
     records = [
         _ReplaySnapshot(datetime(2026, 8, 23, 8, 30, tzinfo=UTC)),
@@ -88,7 +91,10 @@ def test_happy_hour_replay_yields_to_power_down_priority() -> None:
     }
     namespace["_event_for_replay_day"] = lambda self, day: event
     namespace["_power_down_active"] = lambda snapshot, moment: True
-    exec(compile(_function_nodes("_happy_hour_replay_records"), str(MODULE), "exec"), namespace)
+    exec(
+        compile(_function_nodes("_happy_hour_replay_records"), str(MODULE), "exec"),
+        namespace,
+    )
 
     record = _ReplaySnapshot(datetime(2026, 8, 23, 9, 30, tzinfo=UTC))
     projected = namespace["_happy_hour_replay_records"](object(), [record])
@@ -172,13 +178,9 @@ def test_final_charge_route_uses_solar_before_import_and_exports_only_surplus() 
 def test_reconciliation_is_the_last_canonical_runtime_boundary() -> None:
     source = COMPAT.read_text(encoding="utf-8")
     previous = (
-        '("agile_publication_reporting", '
-        '"install_tomorrow_publication_reporting")'
+        '("agile_publication_reporting", ' '"install_tomorrow_publication_reporting")'
     )
-    final = (
-        '("agile_dispatch_reconciliation", '
-        '"install_dispatch_reconciliation")'
-    )
+    final = '("agile_dispatch_reconciliation", ' '"install_dispatch_reconciliation")'
     assert previous in source
     assert final in source
     assert source.index(final) > source.index(previous)
