@@ -7,6 +7,8 @@ feed becomes empty. Ambiguous live Power Up data always wins fail-safe and a
 newer manual fallback is never hidden by older retained evidence.
 """
 
+# ruff: noqa: E501  # Embedded Lovelace/Jinja lines are intentionally verbatim.
+
 from __future__ import annotations
 
 from collections.abc import Mapping
@@ -22,7 +24,7 @@ _NO_EVENT_STATUSES = {
     "no_confident_weekend_happy_hour",
     "power_up_source_unavailable",
 }
-_RECORDERS: dict[tuple[int, str], "HappyHourEvidenceRecorder"] = {}
+_RECORDERS: dict[tuple[int, str], HappyHourEvidenceRecorder] = {}
 
 
 def _dt(value: Any) -> datetime | None:
