@@ -30,7 +30,10 @@ def _load_force_target():
             for target in node.targets
         ):
             body.append(node)
-        if isinstance(node, ast.FunctionDef) and node.name == "_force_full_charge_target":
+        if (
+            isinstance(node, ast.FunctionDef)
+            and node.name == "_force_full_charge_target"
+        ):
             body.append(node)
     namespace: dict[str, Any] = {"Any": Any, "replace": replace}
     exec(
