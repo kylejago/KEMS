@@ -17,7 +17,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Any
 
-from . import agile_forecast_arbitrage as forecast
+from . import agile_forecast_arbitrage as forecast_runtime
 from . import agile_rolling_planning
 from .kems_core import (
     ForecastPlanState,
@@ -33,7 +33,7 @@ _EPSILON = 1e-6
 
 def _number(value: Any) -> float | None:
     """Use the canonical finite-number parser."""
-    return forecast._number(value)
+    return forecast_runtime._number(value)
 
 
 def _candidate_is_economic(rate_pence: float, floor_pence: float) -> bool:
@@ -70,9 +70,9 @@ def _retime_for_profit_first_solar_headroom(
     replacement price as the economic floor. The spill-period export price is
     retained as evidence but is not an additional candidate threshold.
     """
-    deadline = forecast.agile._next_cheap(now, tariff).astimezone(UTC)
+    deadline = forecast_runtime.agile._next_cheap(now, tariff).astimezone(UTC)
     soc = rolling._current_agile_soc(state)
-    projection = forecast._forecast_spill_projection(
+    projection = forecast_runtime._forecast_spill_projection(
         now=now,
         deadline=deadline,
         soc_percent=soc,
@@ -97,14 +97,14 @@ def _retime_for_profit_first_solar_headroom(
     if not projection.get("available") or projection.get("state") != "spill_expected":
         return allocations, {}, evidence
 
-    first_spill = forecast._dt(projection.get("first_spill_at"))
+    first_spill = forecast_runtime._dt(projection.get("first_spill_at"))
     if first_spill is None or first_spill <= now.astimezone(UTC):
         evidence["reason"] = "forecast spill is already active or has passed"
         return allocations, {}, evidence
 
-    slots = forecast._slot_map(state)
-    spill_rate = forecast._spill_reference_rate(state, projection)
-    floor_pence = forecast._economic_export_floor_pence(tariff)
+    slots = forecast_runtime._slot_map(state)
+    spill_rate = forecast_runtime._spill_reference_rate(state, projection)
+    floor_pence = forecast_runtime._economic_export_floor_pence(tariff)
     evidence["spill_reference_rate_pence"] = (
         round(spill_rate, 5) if spill_rate is not None else None
     )
@@ -114,7 +114,7 @@ def _retime_for_profit_first_solar_headroom(
     existing_early = 0.0
     for key, allocation in allocations.items():
         slot = slots.get(key) or {}
-        end = forecast._dt(slot.get("valid_to"))
+        end = forecast_runtime._dt(slot.get("valid_to"))
         if end is not None and end <= first_spill:
             existing_early += allocation
 
@@ -137,8 +137,8 @@ def _retime_for_profit_first_solar_headroom(
     candidates: list[tuple[float, datetime, str, float]] = []
     now_utc = now.astimezone(UTC)
     for key, slot in slots.items():
-        start = forecast._dt(slot.get("valid_from"))
-        end = forecast._dt(slot.get("valid_to"))
+        start = forecast_runtime._dt(slot.get("valid_from"))
+        end = forecast_runtime._dt(slot.get("valid_to"))
         rate = _number(slot.get("rate_pence"))
         if start is None or end is None or rate is None:
             continue
@@ -164,7 +164,7 @@ def _retime_for_profit_first_solar_headroom(
         key
         for key, allocation in allocations.items()
         if allocation > _EPSILON
-        and (forecast._dt((slots.get(key) or {}).get("valid_from")) or now_utc)
+        and (forecast_runtime._dt((slots.get(key) or {}).get("valid_from")) or now_utc)
         >= first_spill
     ]
     donor_available = sum(allocations[key] for key in donors)
@@ -251,8 +251,8 @@ def _retime_for_profit_first_solar_headroom(
 
 def install_profit_first_headroom() -> None:
     """Install profit-first solar-headroom allocation exactly once."""
-    current = forecast._retime_for_solar_headroom
+    current = forecast_runtime._retime_for_solar_headroom
     if getattr(current, "_kems_profit_first_headroom", False):
         return
     _retime_for_profit_first_solar_headroom._kems_profit_first_headroom = True
-    forecast._retime_for_solar_headroom = _retime_for_profit_first_solar_headroom
+    forecast_runtime._retime_for_solar_headroom = _retime_for_profit_first_solar_headroom
