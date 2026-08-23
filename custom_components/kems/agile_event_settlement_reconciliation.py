@@ -254,8 +254,7 @@ def _recalculate_event_summary(
             "solar_export_kwh": round(solar_export, 3),
             "battery_export_kwh": round(battery_export, 3),
             "solar_to_home_kwh": round(
-                (_number(result.get("solar_to_home_kwh")) or 0.0)
-                + solar_home_delta,
+                (_number(result.get("solar_to_home_kwh")) or 0.0) + solar_home_delta,
                 3,
             ),
             "solar_to_battery_kwh": round(
@@ -310,9 +309,7 @@ def _install_slot_presentation_parity() -> None:
                 if source is None:
                     continue
                 item[_EVENT_MARKER] = True
-                item["event_solar_to_home_kwh"] = source.get(
-                    "event_solar_to_home_kwh"
-                )
+                item["event_solar_to_home_kwh"] = source.get("event_solar_to_home_kwh")
                 item["event_grid_to_battery_kwh"] = source.get(
                     "event_grid_to_battery_kwh"
                 )
