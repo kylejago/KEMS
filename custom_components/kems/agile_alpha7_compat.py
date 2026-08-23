@@ -83,6 +83,10 @@ POST_BASE_PATCHES: Final[tuple[PatchSpec, ...]] = (
         "install_event_settlement_reconciliation",
     ),
     (
+        "agile_event_completion_migration",
+        "install_event_completion_migration",
+    ),
+    (
         "agile_dispatch_reconciliation",
         "install_dispatch_reconciliation",
     ),
