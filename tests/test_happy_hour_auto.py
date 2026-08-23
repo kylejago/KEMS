@@ -216,5 +216,7 @@ def test_automatic_patch_runs_after_event_priority_installer() -> None:
     assert automatic in compat
     assert compat.index(event_priority) < compat.index(automatic)
 
-    runtime = (INTEGRATION / "agile_event_priority_runtime.py").read_text(encoding="utf-8")
-    assert "return improve_alpha743_dashboard(content).encode(\"utf-8\")" in runtime
+    runtime = (INTEGRATION / "agile_event_priority_runtime.py").read_text(
+        encoding="utf-8"
+    )
+    assert 'return improve_alpha743_dashboard(content).encode("utf-8")' in runtime
