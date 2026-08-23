@@ -232,7 +232,9 @@ def _retime_for_profit_first_solar_headroom(
             "existing_pre_spill_export_kwh": round(existing_early, 3),
             "re_timed_export_kwh": round(shifted, 3),
             "expected_value_gain_pence": round(profit_above_floor, 2),
-            "expected_value_gain_basis": "export value above overnight replacement cost",
+            "expected_value_gain_basis": (
+                "export value above overnight replacement cost"
+            ),
             "expected_profit_above_replacement_pence": round(profit_above_floor, 2),
             "candidate_slots": [
                 {
