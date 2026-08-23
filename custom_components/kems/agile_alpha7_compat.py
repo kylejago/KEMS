@@ -78,6 +78,10 @@ POST_BASE_PATCHES: Final[tuple[PatchSpec, ...]] = (
     ("agile_publication_reporting", "install_tomorrow_publication_reporting"),
     ("agile_charge_recovery", "install_charge_recovery_policy"),
     (
+        "agile_event_settlement_reconciliation",
+        "install_event_settlement_reconciliation",
+    ),
+    (
         "agile_dispatch_reconciliation",
         "install_dispatch_reconciliation",
     ),
