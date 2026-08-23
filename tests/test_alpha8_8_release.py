@@ -1,4 +1,4 @@
-"""Release contract for the Alpha8.8 retained Happy Hour evidence release."""
+"""Alpha8.8 retained Happy Hour evidence contracts kept thereafter."""
 
 from __future__ import annotations
 
@@ -11,11 +11,11 @@ BUNDLE = ROOT / "release" / "kems-bundle.template.json"
 NOTES = ROOT / "docs" / "alpha8.8-release-notes.md"
 
 
-def test_alpha8_8_release_identity_and_coordinated_versions() -> None:
+def test_alpha8_8_retention_contract_survives_later_alpha8_releases() -> None:
     manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
     bundle = json.loads(BUNDLE.read_text(encoding="utf-8"))
 
-    assert manifest["version"] == "0.8.0-alpha8.8"
+    assert str(manifest["version"]).startswith("0.8.0-alpha8.")
     assert bundle["components"]["panel"]["version"] == "0.8.0-alpha8-panel.1"
     assert bundle["components"]["property_web"]["version"] == "0.8.0-alpha8-web.2"
     assert bundle["components"]["pi_agent"]["version"] == "0.8.0-alpha8-web.2"

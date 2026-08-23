@@ -42,7 +42,7 @@
   },
   "maintenance": {
     "required": true,
-    "reason": "Retain automatic Octopus Weekend Happy Hour discovery evidence after upstream Power Up removal and expose managed dashboard evidence telemetry while preserving the selectable shadow EV charging policy",
+    "reason": "Correct Full KEMS Agile decision evidence after runtime gaps while retaining automatic Octopus Weekend Happy Hour discovery and the selectable shadow EV charging policy",
     "expected_downtime_minutes": 5,
     "home_assistant_restart_required": true,
     "reboot_required": false,
