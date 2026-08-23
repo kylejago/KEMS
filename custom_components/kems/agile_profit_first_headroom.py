@@ -255,4 +255,6 @@ def install_profit_first_headroom() -> None:
     if getattr(current, "_kems_profit_first_headroom", False):
         return
     _retime_for_profit_first_solar_headroom._kems_profit_first_headroom = True
-    forecast_runtime._retime_for_solar_headroom = _retime_for_profit_first_solar_headroom
+    forecast_runtime._retime_for_solar_headroom = (
+        _retime_for_profit_first_solar_headroom
+    )
