@@ -24,6 +24,7 @@ select = ["E", "F", "I", "UP", "B", "SIM"]
 "custom_components/kems/agile_alpha742_live_graph_telemetry.py" = ["E501"]
 "custom_components/kems/agile_operator_dashboard_runtime.py" = ["E501"]
 "custom_components/kems/agile_live_graph_runtime.py" = ["E501"]
+"custom_components/kems/happy_hour_auto.py" = ["E501", "I001"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
