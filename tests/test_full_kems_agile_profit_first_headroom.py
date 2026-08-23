@@ -72,7 +72,9 @@ def test_solar_forecast_is_timing_constraint_not_spill_price_threshold() -> None
     assert "_candidate_is_economic(rate, floor_pence)" in source
 
 
-def test_forecast_runtime_module_cannot_be_shadowed_by_solar_forecast_argument() -> None:
+def test_forecast_runtime_module_cannot_be_shadowed_by_solar_forecast_argument() -> (
+    None
+):
     source = MODULE.read_text(encoding="utf-8")
 
     assert "agile_forecast_arbitrage as forecast_runtime" in source
