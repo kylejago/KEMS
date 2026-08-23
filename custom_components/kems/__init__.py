@@ -35,6 +35,7 @@ from .entity_discovery import (
     async_discover_entities,
     async_validate_entity_mappings,
 )
+from .kems_core import configure_ev_charge_policy
 from .providers.entity_map import KEMSEntities
 from .providers.foxess import FoxESSProvider
 from .providers.gas import GasProvider
@@ -66,37 +67,26 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     validation = await async_validate_entity_mappings(hass, dict(entry.data))
     discovery = await async_discover_entities(hass)
-    enriched = {
-        **validation.accepted,
-        **discovery.mappings,
-    }
+    enriched = {**validation.accepted, **discovery.mappings}
 
     if enriched != dict(entry.data):
         hass.config_entries.async_update_entry(entry, data=enriched)
     if validation.rejected:
-        LOGGER.warning(
-            "KEMS rejected unsafe source mappings: %s",
-            validation.summary(),
-        )
+        LOGGER.warning("KEMS rejected unsafe source mappings: %s", validation.summary())
 
     source_validation = SourceValidationResult(
-        accepted=enriched,
-        rejected=validation.rejected,
+        accepted=enriched, rejected=validation.rejected
     )
     entities = KEMSEntities.from_entry_data(enriched)
     settings = KEMSSettings.from_options(entry.options)
     collector = Collector(
         octopus=OctopusProvider(
-            hass,
-            entities,
-            stale_data_seconds=settings.control.stale_data_seconds,
+            hass, entities, stale_data_seconds=settings.control.stale_data_seconds
         ),
         gas=GasProvider(hass, entities, settings.gas_kwh_per_m3),
         ohme=OhmeProvider(hass, entities),
         foxess=FoxESSProvider(
-            hass,
-            entities,
-            stale_data_seconds=settings.control.stale_data_seconds,
+            hass, entities, stale_data_seconds=settings.control.stale_data_seconds
         ),
         octoplus=OctoplusProvider(hass, entities),
         settings=settings,
@@ -109,6 +99,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         settings,
         source_validation=source_validation,
     )
+    configure_ev_charge_policy(coordinator._control, entry.options)
 
     await coordinator.async_config_entry_first_refresh()
     entry.runtime_data = coordinator
@@ -131,7 +122,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    """Unload a KEMS config entry."""
+    """Unload KEMS config entry."""
     coordinator: KEMSCoordinator = entry.runtime_data
     await async_unload_update_orchestrator(hass, entry)
     await coordinator.async_shutdown()
@@ -145,14 +136,11 @@ async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     data = dict(entry.data)
     options = dict(entry.options)
-
     old_ev_power = data.pop("ev_power", None)
     if old_ev_power and not data.get(CONF_EV_POWER):
         data[CONF_EV_POWER] = old_ev_power
 
     if entry.version < 8:
-        # The accepted proposal changed from a KH10 to a KH7. Migrate the
-        # simulation automatically while preserving all observed history.
         options[CONF_INVERTER_LIMIT] = 7.0
         options[CONF_MAX_CHARGE] = 7.0
         options[CONF_MAX_DISCHARGE] = 7.0
@@ -165,13 +153,9 @@ async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         options[CONF_SIMULATION_STRATEGY] = "paced_export"
 
     if entry.version < 11:
-        # Site import is a separate installation constraint. Zero means the
-        # installer-confirmed limit has not yet been configured.
         options.setdefault(CONF_SITE_IMPORT_LIMIT, 0.0)
 
     if entry.version < 12:
-        # Alpha4 adds a user-editable tariff profile. Automatic mode preserves
-        # existing live Octopus behaviour and uses these values only as fallback.
         options.setdefault(CONF_TARIFF_MODE, "automatic")
         options.setdefault(CONF_MANUAL_DAY_RATE, 28.3036)
         options.setdefault(CONF_MANUAL_OFFPEAK_RATE, 3.4933)
@@ -181,8 +165,6 @@ async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         options.setdefault(CONF_INTELLIGENT_SLOTS_ENABLED, True)
 
     if entry.version < 13:
-        # Alpha5 separates export-tariff availability from the configured
-        # future export rate. Existing installations retain alpha4 behaviour.
         options.setdefault(CONF_EXPORT_TARIFF_STATUS, "active")
 
     hass.config_entries.async_update_entry(

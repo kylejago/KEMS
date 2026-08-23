@@ -17,10 +17,10 @@ def test_alpha747_contract_is_coordinated_in_alpha8() -> None:
     bundle = json.loads((ROOT / "release/kems-bundle.template.json").read_text())
 
     assert str(manifest["version"]).startswith("0.8.0-alpha8.")
-    assert bundle["components"]["property_web"]["version"] == "0.8.0-alpha8-web.1"
-    assert bundle["components"]["pi_agent"]["version"] == "0.8.0-alpha8-web.1"
-    assert bundle["components"]["public_web"]["version"] == "0.8.0-alpha8-web.1"
-    assert bundle["components"]["panel"]["version"] == "0.8.0-alpha8-panel.0"
+    assert bundle["components"]["property_web"]["version"] == "0.8.0-alpha8-web.2"
+    assert bundle["components"]["pi_agent"]["version"] == "0.8.0-alpha8-web.2"
+    assert bundle["components"]["public_web"]["version"] == "0.8.0-alpha8-web.2"
+    assert bundle["components"]["panel"]["version"] == "0.8.0-alpha8-panel.1"
 
 
 def test_alpha747_patch_parses() -> None:

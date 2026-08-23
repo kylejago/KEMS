@@ -64,8 +64,11 @@ jobs:
           wifi_password: "kems-ci-placeholder"
           EOF
 
+      - name: Render runtime managed panel
+        run: python scripts/render_managed_panel.py
+
       - name: Validate managed panel configuration
-        run: esphome config custom_components/kems/kems16x16.yaml
+        run: esphome config custom_components/kems/kems16x16-ci.yaml
 
       - name: Compile managed panel firmware
-        run: esphome compile custom_components/kems/kems16x16.yaml
+        run: esphome compile custom_components/kems/kems16x16-ci.yaml

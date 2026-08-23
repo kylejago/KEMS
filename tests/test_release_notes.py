@@ -9,6 +9,7 @@ ALPHA8_1_NOTES = ROOT / "docs" / "alpha8.1-release-notes.md"
 ALPHA8_2_NOTES = ROOT / "docs" / "alpha8.2-release-notes.md"
 ALPHA8_3_NOTES = ROOT / "docs" / "alpha8.3-release-notes.md"
 ALPHA8_4_NOTES = ROOT / "docs" / "alpha8.4-release-notes.md"
+ALPHA8_5_NOTES = ROOT / "docs" / "alpha8.5-release-notes.md"
 
 
 def test_alpha8_1_notes_remain_historical_release_evidence() -> None:
@@ -56,3 +57,18 @@ def test_alpha8_4_notes_describe_conservative_completion_recovery() -> None:
     assert "0.8.0-alpha8-web.1` (unchanged)" in text
     assert "0.8.0-alpha8-panel.0` (unchanged)" in text
     assert "Real FoxESS hardware writes remain blocked" in text
+
+
+def test_alpha8_5_notes_lock_ev_policy_and_shadow_only_scope() -> None:
+    text = ALPHA8_5_NOTES.read_text(encoding="utf-8")
+
+    assert "0.8.0-alpha8.5" in text
+    assert "EV cheap-window mode" in text
+    assert "EV surplus mode" in text
+    assert "EV disabled" in text
+    assert "23:30–05:30" in text
+    assert "0.8.0-alpha8-web.2" in text
+    assert "0.8.0-alpha8-panel.1" in text
+    assert "does not fabricate an overnight shifted-energy replay" in text
+    assert "no Home Assistant service call to Ohme" in text
+    assert "no FoxESS hardware write" in text

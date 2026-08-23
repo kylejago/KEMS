@@ -15,19 +15,13 @@ from typing import Final
 
 PatchSpec = tuple[str, str]
 
-# These patches historically had to be installed before runtime_base was imported.
 PRE_BASE_PATCHES: Final[tuple[PatchSpec, ...]] = (
     ("agile_smart_export_reporting", "install_reporting_patch"),
     ("agile_deadline_dispatch", "install_deadline_patch"),
-    (
-        "agile_history_backfill_enhancement",
-        "install_history_backfill_enhancement",
-    ),
+    ("agile_history_backfill_enhancement", "install_history_backfill_enhancement"),
     ("agile_history_compatibility", "install_history_compatibility"),
 )
 
-# Preserve Alpha7.52 behaviour and installation semantics through functional
-# canonical owners. Historical modules remain in the tree as regression evidence.
 POST_BASE_PATCHES: Final[tuple[PatchSpec, ...]] = (
     ("agile_rolling_planning", "install_rolling_replan"),
     ("agile_live_scenario", "install_live_scenario"),
@@ -62,34 +56,21 @@ POST_BASE_PATCHES: Final[tuple[PatchSpec, ...]] = (
     ("agile_operator_telemetry", "install_operator_telemetry"),
     ("agile_event_priority", "install_event_priority"),
     ("agile_dashboard_parity", "install_dashboard_parity"),
-    (
-        "agile_progressive_publication",
-        "install_progressive_publication_planning",
-    ),
+    ("ev_policy_dashboard", "install_ev_policy_dashboard"),
+    ("panel_ev_policy", "install_panel_ev_policy"),
+    ("agile_progressive_publication", "install_progressive_publication_planning"),
     ("agile_full_battery_routing", "install_full_battery_routing"),
-    (
-        "agile_deadline_plan_reconciliation",
-        "install_deadline_plan_coverage",
-    ),
+    ("agile_deadline_plan_reconciliation", "install_deadline_plan_coverage"),
     ("agile_publication_reporting", "install_no_reserve_reporting"),
-    (
-        "agile_deadline_plan_reconciliation",
-        "install_maximum_discharge_plan_reconcile",
-    ),
+    ("agile_deadline_plan_reconciliation", "install_maximum_discharge_plan_reconcile"),
     ("agile_publication_reporting", "install_tomorrow_publication_reporting"),
     ("agile_charge_recovery", "install_charge_recovery_policy"),
     (
         "agile_event_settlement_reconciliation",
         "install_event_settlement_reconciliation",
     ),
-    (
-        "agile_event_completion_migration",
-        "install_event_completion_migration",
-    ),
-    (
-        "agile_dispatch_reconciliation",
-        "install_dispatch_reconciliation",
-    ),
+    ("agile_event_completion_migration", "install_event_completion_migration"),
+    ("agile_dispatch_reconciliation", "install_dispatch_reconciliation"),
 )
 
 

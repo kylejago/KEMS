@@ -7,6 +7,18 @@ from .control import (
     ControlEngine,
     run_preflight_suite,
 )
+from .ev_charge_policy import (
+    CONF_EV_CHARGING_POLICY,
+    DEFAULT_EV_POLICY,
+    EV_POLICY_CHEAP_WINDOW,
+    EV_POLICY_DISABLED,
+    EV_POLICY_KEYS,
+    EV_POLICY_LABELS,
+    EV_POLICY_SURPLUS,
+    configure_ev_charge_policy,
+    ev_policy_from_options,
+    install_ev_charge_policy,
+)
 from .forecast import ForecastPlanningEngine, fuse_solar_forecasts
 from .forecast_validation import (
     ForecastObservation,
@@ -67,10 +79,7 @@ from .power_down_audit import (
 )
 from .quality import assess_quality
 from .roi import ROIEngine
-from .scenario_comparison import (
-    SCENARIO_KEYS,
-    ScenarioComparisonEngine,
-)
+from .scenario_comparison import SCENARIO_KEYS, ScenarioComparisonEngine
 from .simulation import SimulationEngine
 from .system_profile import FOXHOLE_PROPOSAL_PROFILE, ProposalSystemProfile, SolarArray
 from .whole_home import WholeHomeEngine
@@ -78,6 +87,10 @@ from .whole_home import WholeHomeEngine
 # Alpha7.34: make the configured overnight window the sole cheap-period
 # authority for both newly collected and previously retained snapshots.
 install_overnight_only_cheap_policy()
+
+# EV policy remains a shadow-only desired-command gate. Each coordinator sets
+# its own persisted policy on its ControlEngine instance during setup.
+install_ev_charge_policy()
 
 __all__ = [
     "should_accumulate_lifetime_value",
@@ -90,10 +103,17 @@ __all__ = [
     "AdviceEngine",
     "AdviceItem",
     "AdviceState",
+    "CONF_EV_CHARGING_POLICY",
     "ControlConfig",
     "ControlEngine",
     "ControlState",
+    "DEFAULT_EV_POLICY",
     "DataQuality",
+    "EV_POLICY_CHEAP_WINDOW",
+    "EV_POLICY_DISABLED",
+    "EV_POLICY_KEYS",
+    "EV_POLICY_LABELS",
+    "EV_POLICY_SURPLUS",
     "ForecastConfig",
     "ForecastHour",
     "ForecastObservation",
@@ -136,6 +156,8 @@ __all__ = [
     "WholeHomeSummary",
     "assess_quality",
     "calculate_battery_power_kw",
+    "configure_ev_charge_policy",
+    "ev_policy_from_options",
     "normalise_grid_power",
     "run_preflight_suite",
     "period_value_keys",

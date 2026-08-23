@@ -15,17 +15,17 @@
       "delivery": "kems_core"
     },
     "panel": {
-      "version": "0.8.0-alpha8-panel.0",
+      "version": "0.8.0-alpha8-panel.1",
       "required": false,
       "delivery": "kems_core"
     },
     "property_web": {
-      "version": "0.8.0-alpha8-web.1",
+      "version": "0.8.0-alpha8-web.2",
       "required": true,
       "delivery": "kems_pi"
     },
     "pi_agent": {
-      "version": "0.8.0-alpha8-web.1",
+      "version": "0.8.0-alpha8-web.2",
       "required": true,
       "delivery": "kems_pi"
     },
@@ -35,20 +35,24 @@
       "delivery": "kems_pi"
     },
     "public_web": {
-      "version": "0.8.0-alpha8-web.1",
+      "version": "0.8.0-alpha8-web.2",
       "required": false,
       "delivery": "ionos-sftp"
     }
   },
   "maintenance": {
     "required": true,
-    "reason": "Recover proven completed Happy Hour evidence across Alpha8 upgrade",
+    "reason": "Add selectable shadow EV charging policy and coordinated presentation parity",
     "expected_downtime_minutes": 5,
     "home_assistant_restart_required": true,
     "reboot_required": false,
     "affected_components": [
       "kems_core",
-      "dashboard"
+      "dashboard",
+      "panel",
+      "property_web",
+      "pi_agent",
+      "public_web"
     ]
   }
 }
