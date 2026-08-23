@@ -42,7 +42,7 @@
   },
   "maintenance": {
     "required": true,
-    "reason": "Repair managed Full KEMS Agile EV dashboard insertion without changing EV policy",
+    "reason": "Repair managed Full KEMS Agile dashboard insertion for selectable shadow EV charging policy",
     "expected_downtime_minutes": 5,
     "home_assistant_restart_required": true,
     "reboot_required": false,
