@@ -42,15 +42,13 @@
   },
   "maintenance": {
     "required": true,
-    "reason": "Coordinate KEMS Web / Pi / PWA 0.8.0-alpha8-web.1 with the canonical KEMS product identity",
+    "reason": "Reconcile Full KEMS Agile charge routing, Happy Hour accounting and shadow-command parity",
     "expected_downtime_minutes": 5,
     "home_assistant_restart_required": true,
     "reboot_required": false,
     "affected_components": [
       "kems_core",
-      "dashboard",
-      "property_web",
-      "pi_agent"
+      "dashboard"
     ]
   }
 }
