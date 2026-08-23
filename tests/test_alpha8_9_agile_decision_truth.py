@@ -41,7 +41,14 @@ def _load_functions(path: Path, names: set[str], constants: set[str] | None = No
         "timedelta": timedelta,
         "math": math,
     }
-    exec(compile(ast.fix_missing_locations(ast.Module(body=body, type_ignores=[])), str(path), "exec"), namespace)
+    exec(
+        compile(
+            ast.fix_missing_locations(ast.Module(body=body, type_ignores=[])),
+            str(path),
+            "exec",
+        ),
+        namespace,
+    )
     return namespace
 
 
@@ -141,7 +148,9 @@ def _slot(start: datetime, label: str, rate: float) -> dict[str, Any]:
     }
 
 
-def test_23_august_price_shape_uses_highest_feasible_slots_before_lower_late_slots() -> None:
+def test_23_august_price_shape_uses_highest_feasible_slots_before_lower_late_slots() -> (
+    None
+):
     """Regression for the table that exposed the misleading 23 August presentation."""
     now = datetime(2026, 8, 23, 14, 30, tzinfo=UTC)
     deadline = datetime(2026, 8, 23, 22, 30, tzinfo=UTC)
@@ -202,17 +211,21 @@ def test_23_august_price_shape_uses_highest_feasible_slots_before_lower_late_slo
     assert "23:00" not in selected
 
 
-def test_decision_evidence_is_reporting_only_and_keeps_proven_rolling_runtime_frozen() -> None:
+def test_decision_evidence_is_reporting_only_and_keeps_proven_rolling_runtime_frozen() -> (
+    None
+):
     evidence = EVIDENCE.read_text(encoding="utf-8")
     compat = COMPAT.read_text(encoding="utf-8")
 
     assert ROLLING.read_bytes() == HISTORICAL_ROLLING.read_bytes()
-    assert 'key=lambda value: value["rate"], reverse=True' in ROLLING.read_text(encoding="utf-8")
+    assert 'key=lambda value: value["rate"], reverse=True' in ROLLING.read_text(
+        encoding="utf-8"
+    )
     assert '("agile_dashboard_parity", "install_dashboard_parity")' in compat
     assert '("agile_decision_evidence", "install_decision_evidence")' in compat
-    assert compat.index('("agile_dashboard_parity", "install_dashboard_parity")') < compat.index(
-        '("agile_decision_evidence", "install_decision_evidence")'
-    )
+    assert compat.index(
+        '("agile_dashboard_parity", "install_dashboard_parity")'
+    ) < compat.index('("agile_decision_evidence", "install_decision_evidence")')
     assert "| Evidence |" in evidence
     assert ".services.async_call(" not in evidence
     assert "providers.foxess" not in evidence
