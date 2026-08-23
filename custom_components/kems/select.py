@@ -63,10 +63,21 @@ class KEMSSystemTypeSelect(KEMSEntity, SelectEntity):
     @property
     def current_option(self) -> str:
         definition = SYSTEM_TYPE_DEFINITIONS.get(self.coordinator.settings.system_type)
-        return definition.label if definition else SYSTEM_TYPE_DEFINITIONS[SYSTEM_TYPES[-1]].label
+        return (
+            definition.label
+            if definition
+            else SYSTEM_TYPE_DEFINITIONS[SYSTEM_TYPES[-1]].label
+        )
 
     async def async_select_option(self, option: str) -> None:
-        selected = next((key for key, definition in SYSTEM_TYPE_DEFINITIONS.items() if definition.label == option), None)
+        selected = next(
+            (
+                key
+                for key, definition in SYSTEM_TYPE_DEFINITIONS.items()
+                if definition.label == option
+            ),
+            None,
+        )
         if selected is None:
             raise HomeAssistantError(f"Unsupported KEMS system type: {option}")
         changes = {CONF_SYSTEM_TYPE: selected}
@@ -92,7 +103,10 @@ class KEMSOperatingModeSelect(KEMSEntity, SelectEntity):
     async def async_select_option(self, option: str) -> None:
         if option not in USER_MODES:
             raise HomeAssistantError(f"Unsupported KEMS mode: {option}")
-        if self.coordinator.settings.system_type == SYSTEM_TYPE_LIVE_DATA and option != "Live":
+        if (
+            self.coordinator.settings.system_type == SYSTEM_TYPE_LIVE_DATA
+            and option != "Live"
+        ):
             raise HomeAssistantError("Live Data supports Live mode only")
         await async_set_runtime_option(
             self.hass,
@@ -118,7 +132,9 @@ class KEMSEVChargingPolicySelect(KEMSEntity, SelectEntity):
         return EV_POLICY_LABELS.get(policy, EV_POLICY_LABELS[DEFAULT_EV_POLICY])
 
     async def async_select_option(self, option: str) -> None:
-        selected = next((key for key, label in EV_POLICY_LABELS.items() if label == option), None)
+        selected = next(
+            (key for key, label in EV_POLICY_LABELS.items() if label == option), None
+        )
         if selected is None:
             raise HomeAssistantError(f"Unsupported EV charging policy: {option}")
         await async_set_runtime_option(

@@ -20,11 +20,15 @@ def test_ev_policy_cards_are_added_before_current_routing() -> None:
     assert "select.kems_ev_charging_policy" in result
     assert "binary_sensor.kems_ev_charging_allowed_by_control" in result
     assert "PLUGGED IN — BLOCKED BY KEMS" in result
-    assert result.index("EV charging policy — shadow") < result.index("Current routing and today totals")
+    assert result.index("EV charging policy — shadow") < result.index(
+        "Current routing and today totals"
+    )
 
 
 def test_ev_policy_dashboard_is_idempotent_and_reporting_only() -> None:
-    source = """      - type: markdown\n        title: Current routing and today totals\n"""
+    source = (
+        """      - type: markdown\n        title: Current routing and today totals\n"""
+    )
     first = dashboard.add_ev_policy_dashboard(source)
     assert dashboard.add_ev_policy_dashboard(first) == first
     text = MODULE.read_text(encoding="utf-8")

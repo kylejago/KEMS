@@ -64,7 +64,10 @@ def test_default_negative_daytime_price_does_not_authorise_ev() -> None:
 def test_default_overnight_allows_ev_and_isolates_battery() -> None:
     state = ControlEngine().plan(
         _snapshot(off_peak=True, ev_charging=True),
-        _simulation(current_simulated_battery_to_home_power_kw=2.0, target_battery_export_power_kw=4.0),
+        _simulation(
+            current_simulated_battery_to_home_power_kw=2.0,
+            target_battery_export_power_kw=4.0,
+        ),
         NOW,
         ControlConfig(),
     )
@@ -116,7 +119,10 @@ def test_disabled_mode_always_blocks_ev() -> None:
 def test_blocked_real_ev_load_is_not_fed_from_battery_outside_power_down() -> None:
     state = ControlEngine().plan(
         _snapshot(ev_charging=True, ev_power_kw=7.0, house_load_kw=8.0),
-        _simulation(current_simulated_battery_to_home_power_kw=4.0, target_battery_export_power_kw=2.0),
+        _simulation(
+            current_simulated_battery_to_home_power_kw=4.0,
+            target_battery_export_power_kw=2.0,
+        ),
         NOW,
         ControlConfig(),
     )
@@ -135,7 +141,10 @@ def test_emergency_stop_can_never_be_reopened_by_ev_policy() -> None:
 
 
 def test_ev_policy_is_shadow_only_and_contains_no_hardware_calls() -> None:
-    source = Path(__file__).parents[1] / "custom_components/kems/kems_core/ev_charge_policy.py"
+    source = (
+        Path(__file__).parents[1]
+        / "custom_components/kems/kems_core/ev_charge_policy.py"
+    )
     text = source.read_text(encoding="utf-8")
     assert ".services.async_call(" not in text
     assert "providers.ohme" not in text

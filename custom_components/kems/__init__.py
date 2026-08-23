@@ -30,7 +30,11 @@ from .const import (
 )
 from .coordinator import KEMSCoordinator
 from .dashboard import async_sync_managed_dashboard
-from .entity_discovery import SourceValidationResult, async_discover_entities, async_validate_entity_mappings
+from .entity_discovery import (
+    SourceValidationResult,
+    async_discover_entities,
+    async_validate_entity_mappings,
+)
 from .kems_core import configure_ev_charge_policy
 from .providers.entity_map import KEMSEntities
 from .providers.foxess import FoxESSProvider
@@ -70,14 +74,20 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     if validation.rejected:
         LOGGER.warning("KEMS rejected unsafe source mappings: %s", validation.summary())
 
-    source_validation = SourceValidationResult(accepted=enriched, rejected=validation.rejected)
+    source_validation = SourceValidationResult(
+        accepted=enriched, rejected=validation.rejected
+    )
     entities = KEMSEntities.from_entry_data(enriched)
     settings = KEMSSettings.from_options(entry.options)
     collector = Collector(
-        octopus=OctopusProvider(hass, entities, stale_data_seconds=settings.control.stale_data_seconds),
+        octopus=OctopusProvider(
+            hass, entities, stale_data_seconds=settings.control.stale_data_seconds
+        ),
         gas=GasProvider(hass, entities, settings.gas_kwh_per_m3),
         ohme=OhmeProvider(hass, entities),
-        foxess=FoxESSProvider(hass, entities, stale_data_seconds=settings.control.stale_data_seconds),
+        foxess=FoxESSProvider(
+            hass, entities, stale_data_seconds=settings.control.stale_data_seconds
+        ),
         octoplus=OctoplusProvider(hass, entities),
         settings=settings,
     )
@@ -94,14 +104,19 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     await coordinator.async_config_entry_first_refresh()
     entry.runtime_data = coordinator
     update_orchestrator = await async_setup_update_orchestrator(hass, entry)
-    if update_orchestrator.policy.automatic_updates and not update_orchestrator.policy.automatic_restart:
+    if (
+        update_orchestrator.policy.automatic_updates
+        and not update_orchestrator.policy.automatic_restart
+    ):
         LOGGER.warning(
             "KEMS repaired a legacy update policy with automatic updates enabled but automatic maintenance restart disabled"
         )
         await update_orchestrator.async_set_policy(automatic_restart=True)
     install_agile_simulation_presentation()
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
-    LOGGER.info("KEMS initialised with read-only control lab; real hardware writes are blocked")
+    LOGGER.info(
+        "KEMS initialised with read-only control lab; real hardware writes are blocked"
+    )
     return True
 
 

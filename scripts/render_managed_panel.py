@@ -16,5 +16,7 @@ assert spec is not None and spec.loader is not None
 policy = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(policy)
 
-OUTPUT.write_text(policy.apply_ev_policy_panel(SOURCE.read_text(encoding="utf-8")), encoding="utf-8")
+OUTPUT.write_text(
+    policy.apply_ev_policy_panel(SOURCE.read_text(encoding="utf-8")), encoding="utf-8"
+)
 print(OUTPUT)

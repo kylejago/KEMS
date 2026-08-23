@@ -36,7 +36,9 @@ def ev_policy_from_options(options: Mapping[str, Any]) -> str:
     return value if value in EV_POLICY_KEYS else DEFAULT_EV_POLICY
 
 
-def configure_ev_charge_policy(engine: ControlEngine, options: Mapping[str, Any]) -> None:
+def configure_ev_charge_policy(
+    engine: ControlEngine, options: Mapping[str, Any]
+) -> None:
     """Attach one config-entry-specific EV policy to a control engine."""
     engine._kems_ev_charging_policy = ev_policy_from_options(options)
 
