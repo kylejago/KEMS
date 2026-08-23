@@ -1,4 +1,4 @@
-"""Contracts introduced with Alpha8.8 retained Happy Hour evidence and kept thereafter."""
+"""Alpha8.8 retained Happy Hour evidence contracts kept thereafter."""
 
 from __future__ import annotations
 

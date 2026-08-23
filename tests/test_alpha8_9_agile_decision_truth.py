@@ -148,9 +148,7 @@ def _slot(start: datetime, label: str, rate: float) -> dict[str, Any]:
     }
 
 
-def test_23_august_price_shape_uses_highest_feasible_slots_before_lower_late_slots() -> (
-    None
-):
+def test_23_august_prices_prefer_high_feasible_slots() -> None:
     """Regression for the table that exposed the misleading 23 August presentation."""
     now = datetime(2026, 8, 23, 14, 30, tzinfo=UTC)
     deadline = datetime(2026, 8, 23, 22, 30, tzinfo=UTC)
@@ -211,9 +209,7 @@ def test_23_august_price_shape_uses_highest_feasible_slots_before_lower_late_slo
     assert "23:00" not in selected
 
 
-def test_decision_evidence_is_reporting_only_and_keeps_proven_rolling_runtime_frozen() -> (
-    None
-):
+def test_decision_evidence_reporting_only_and_rolling_runtime_frozen() -> None:
     evidence = EVIDENCE.read_text(encoding="utf-8")
     compat = COMPAT.read_text(encoding="utf-8")
 

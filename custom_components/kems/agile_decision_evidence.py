@@ -9,6 +9,8 @@ has no retained decision evidence.  A historical replay placeholder such as
 Real hardware writes remain blocked.
 """
 
+# ruff: noqa: E501
+
 from __future__ import annotations
 
 from typing import Any
@@ -64,12 +66,10 @@ def _classify_slot(
         source = "event_priority"
         label = "Event priority"
         available = True
-    elif decision.startswith("Happy Hour prep —"):
-        source = "rolling_plan"
-        label = "Live rolling plan"
-        available = True
-    elif decision.startswith("Deadline guard —") or decision.startswith(
-        "Planned battery export"
+    elif (
+        decision.startswith("Happy Hour prep —")
+        or decision.startswith("Deadline guard —")
+        or decision.startswith("Planned battery export")
     ):
         source = "rolling_plan"
         label = "Live rolling plan"
