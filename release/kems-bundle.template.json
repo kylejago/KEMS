@@ -48,7 +48,11 @@
     "reboot_required": false,
     "affected_components": [
       "kems_core",
-      "dashboard"
+      "dashboard",
+      "panel",
+      "property_web",
+      "pi_agent",
+      "public_web"
     ]
   }
 }
