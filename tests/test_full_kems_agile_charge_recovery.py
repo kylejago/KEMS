@@ -4,9 +4,8 @@ from __future__ import annotations
 
 import ast
 from dataclasses import dataclass, replace
-from datetime import UTC, datetime, time
+from datetime import UTC, datetime
 from pathlib import Path
-from types import SimpleNamespace
 from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
