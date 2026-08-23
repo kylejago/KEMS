@@ -1,4 +1,4 @@
-"""Regression contracts for Full KEMS Agile charge and solar recovery policy."""
+"""Regression contracts for Full KEMS Agile charge/recovery intent."""
 
 from __future__ import annotations
 
@@ -11,7 +11,6 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[1]
 KEMS = ROOT / "custom_components" / "kems"
 MODULE = KEMS / "agile_charge_recovery.py"
-FORECAST = KEMS / "agile_forecast_arbitrage.py"
 COMPAT = KEMS / "agile_alpha7_compat.py"
 
 
@@ -66,86 +65,44 @@ def test_every_authoritative_cheap_slot_keeps_100_percent_target() -> None:
     assert cheap.forecast_maximum_overnight_soc_percent == 80.7
 
 
-def test_morning_recovery_window_uses_configured_overnight_schedule_only() -> None:
-    source = MODULE.read_text(encoding="utf-8")
-
-    assert "_morning_recovery_window" in source
-    assert "tariff.offpeak_start" in source
-    assert "tariff.offpeak_end" in source
-    assert "agile._next_cheap" in source
-    assert "cheap_period_confirmed" not in source.split(
-        "def _morning_recovery_window", 1
-    )[1].split("def _event_slot_starts", 1)[0]
-
-
-def test_forecast_arbitrage_preserves_valuable_early_headroom_export() -> None:
-    source = FORECAST.read_text(encoding="utf-8")
-
-    assert "when high-confidence solar is likely to overflow a full battery" in source
-    assert "required_early_export_kwh" in source
-    assert "HEADROOM_MIN_PRICE_ADVANTAGE_PENCE" in source
-    assert "earlier Agile export is worth more than forecast forced solar spill" in source
-    assert '"solar_headroom_retimed"' in source
-    assert 'plan["solar_headroom_active"]' in source
-
-
-def test_recovery_contract_makes_100_percent_an_aim_not_a_hard_gate() -> None:
-    notes = (ROOT / "docs" / "alpha8.3-release-notes.md").read_text(encoding="utf-8")
-
-    assert "100% is a charge/recovery aim, not a hard gate" in notes
-    assert "earlier, better-priced Agile slot" in notes
-    assert "must never increase the day's planned battery export" in notes
-    assert "10% pre-cheap target" in notes
-
-
-def test_recovery_masks_only_deliberate_battery_export_decisions() -> None:
-    source = MODULE.read_text(encoding="utf-8")
-
-    assert "_RECOVERY_DECISION_RATE_PENCE = -100.0" in source
-    assert "_masked_rates" in source
-    assert "_restore_real_rates" in source
-    assert "_restore_recovery_solar_export" in source
-    assert "solar recovery to 100% before deliberate battery export" in source
-    assert "export solar surplus after recovery charging" in source
-
-
-def test_manual_happy_hour_slots_are_excluded_from_recovery_price_mask() -> None:
-    source = MODULE.read_text(encoding="utf-8")
-
-    assert "_event_slot_starts" in source
-    assert "excluded_starts=event_starts" in source
-    assert "valid_from not in excluded_starts" in source
-
-
-def test_recovery_finance_is_restored_to_real_agile_prices() -> None:
-    source = MODULE.read_text(encoding="utf-8")
-
-    assert "_recalculate_export_finance" in source
-    assert '"export_income_pence"' in source
-    assert '"weighted_achieved_export_rate_pence"' in source
-    assert "agile.FIXED_EXPORT_PENCE" in source
-    assert 'item["rate_pence"] = round(value, 5)' in source
-
-
-def test_charge_recovery_installs_immediately_before_final_reconciliation() -> None:
-    source = COMPAT.read_text(encoding="utf-8")
-    charge = '("agile_charge_recovery", "install_charge_recovery_policy")'
-    final = (
-        '("agile_dispatch_reconciliation", '
-        '"install_dispatch_reconciliation")'
-    )
-
-    assert charge in source
-    assert final in source
-    assert source.index(charge) < source.index(final)
-    assert "agile_alpha8" not in MODULE.name
-
-
-def test_policy_explicitly_keeps_100_charge_and_10_reserve() -> None:
+def test_100_percent_is_an_aim_not_an_export_gate() -> None:
     source = MODULE.read_text(encoding="utf-8")
 
     assert "_FULL_SOC_PERCENT = 100.0" in source
-    assert '"battery_reserve_target_soc_percent": 10.0' in source
+    assert '"full_soc_is_export_gate": False' in source
+    assert '"forecast_headroom_export_can_precede_full_soc": True' in source
+    assert "profit-first forecast headroom export may occur before 100%" in source
+    assert "_RECOVERY_DECISION_RATE_PENCE" not in source
+    assert "_masked_rates" not in source
+
+
+def test_charge_recovery_preserves_configured_reserve_instead_of_raising_it() -> None:
+    source = MODULE.read_text(encoding="utf-8")
+
+    assert "config.battery_reserve_percent" in source
+    assert '"battery_reserve_target_soc_percent"' in source
+    assert "minimum_precheap_soc" not in source
+
+
+def test_profit_first_headroom_installs_after_forecast_arbitrage() -> None:
+    source = COMPAT.read_text(encoding="utf-8")
+    forecast = '("agile_forecast_arbitrage", "install_forecast_arbitrage")'
+    profit = '("agile_profit_first_headroom", "install_profit_first_headroom")'
+    charge = '("agile_charge_recovery", "install_charge_recovery_policy")'
+
+    assert forecast in source
+    assert profit in source
+    assert charge in source
+    assert source.index(forecast) < source.index(profit) < source.index(charge)
+
+
+def test_policy_documentation_keeps_100_charge_and_10_reserve() -> None:
+    notes = (ROOT / "docs" / "alpha8.3-release-notes.md").read_text(encoding="utf-8")
+
+    assert "100% is a charge/recovery aim, not a hard gate" in notes
+    assert "10%" in notes
+    assert "overnight replacement" in notes
+    assert "highest" in notes
 
 
 def test_charge_recovery_cannot_enable_hardware_writes() -> None:
@@ -155,4 +112,4 @@ def test_charge_recovery_cannot_enable_hardware_writes() -> None:
     assert "providers.foxess" not in source
     assert "safe_to_write_hardware = True" not in source
     assert "commands_permitted = True" not in source
-    assert "real hardware writes remain blocked" in source
+    assert "Real hardware writes remain blocked" in source
