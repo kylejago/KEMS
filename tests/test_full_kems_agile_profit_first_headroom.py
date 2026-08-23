@@ -66,10 +66,10 @@ def test_solar_forecast_is_timing_constraint_not_spill_price_threshold() -> None
     source = MODULE.read_text(encoding="utf-8")
 
     assert "Solar forecast is a timing constraint" in source
-    assert "spill-period export price is retained as evidence" in source
     assert '"spill_price_is_candidate_threshold"] = False' in source
     assert "HEADROOM_MIN_PRICE_ADVANTAGE_PENCE" not in source
     assert "_candidate_is_economic(rate, floor_pence)" in source
+    assert "_economic_export_floor_pence(tariff)" in source
 
 
 def test_forecast_runtime_module_cannot_be_shadowed_by_solar_forecast_argument() -> (
