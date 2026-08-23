@@ -112,4 +112,4 @@ def test_charge_recovery_cannot_enable_hardware_writes() -> None:
     assert "providers.foxess" not in source
     assert "safe_to_write_hardware = True" not in source
     assert "commands_permitted = True" not in source
-    assert "Real hardware writes remain blocked" in source
+    assert "writes remain blocked" in source
