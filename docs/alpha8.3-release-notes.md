@@ -2,11 +2,13 @@
 
 KEMS `0.8.0-alpha8.3` is a Full KEMS Agile dispatch-reconciliation maintenance release.
 
-It keeps the established Full KEMS Agile economic policy unchanged:
+It keeps the established Full KEMS Agile economic policy:
 
-- the battery still targets **100%** when charging;
+- the battery still targets **100%** when charging, even when the overnight window cannot physically reach it;
 - the normal pre-cheap/export reserve remains **10%**;
 - the configured **23:30–05:30** cheap period remains the authoritative house/battery charging window;
+- after that window, if the battery is still below 100%, morning solar recovers the remaining headroom before deliberate battery export resumes;
+- the battery may still support the home during that solar-recovery period;
 - extra Intelligent daytime slots remain non-authoritative for KEMS battery control;
 - normal Agile price ranking, forecast protection, solar-headroom optimisation, deadline reconciliation and Power Down priority remain in place.
 
