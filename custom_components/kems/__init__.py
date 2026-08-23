@@ -62,8 +62,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up KEMS from a config entry."""
     try:
         await async_sync_managed_dashboard(hass)
-    except OSError:
-        LOGGER.exception("Unable to update the managed KEMS dashboard")
+    except (OSError, ValueError):
+        LOGGER.exception(
+            "Unable to update the managed KEMS dashboard; continuing KEMS setup"
+        )
 
     validation = await async_validate_entity_mappings(hass, dict(entry.data))
     discovery = await async_discover_entities(hass)

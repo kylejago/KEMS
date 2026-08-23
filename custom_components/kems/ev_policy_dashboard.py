@@ -4,8 +4,14 @@
 
 from __future__ import annotations
 
-_MARKER = """      - type: markdown
-        title: Current routing and today totals
+import logging
+
+LOGGER = logging.getLogger(__name__)
+
+_AGILE_VIEW_MARKER = """  - title: Full KEMS Agile
+    path: full-kems-agile
+    icon: mdi:transmission-tower-export
+    cards:
 """
 
 _EV_CARDS = r"""      - type: grid
@@ -41,17 +47,25 @@ _EV_CARDS = r"""      - type: grid
 
               **Default EV cheap-window mode** permits charging only in the configured **23:30–05:30** overnight window. Daytime Intelligent slots and Agile prices do not widen it. Power Down remains higher priority.
 
-              *Alpha8.5 is shadow policy only: KEMS reports what the charger should do but does not issue an Ohme control write.*
+              *EV policy is shadow-only: KEMS reports what the charger should do but does not issue an Ohme control write.*
 """
 
 
 def add_ev_policy_dashboard(content: str) -> str:
-    """Insert EV policy cards once into the Full KEMS Agile command view."""
+    """Insert EV policy cards once into the consolidated Full KEMS Agile view."""
     if "EV charging policy — shadow" in content:
         return content
-    if _MARKER not in content:
-        raise ValueError("Full KEMS Agile routing card marker missing")
-    return content.replace(_MARKER, _EV_CARDS + _MARKER, 1)
+    if _AGILE_VIEW_MARKER not in content:
+        LOGGER.warning(
+            "KEMS managed dashboard has no consolidated Full KEMS Agile view; "
+            "skipping EV policy cards without blocking integration setup"
+        )
+        return content
+    return content.replace(
+        _AGILE_VIEW_MARKER,
+        _AGILE_VIEW_MARKER + _EV_CARDS,
+        1,
+    )
 
 
 def install_ev_policy_dashboard() -> None:
