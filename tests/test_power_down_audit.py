@@ -1,7 +1,6 @@
 """Regression tests for Power Down active-session safety and accounting."""
 
 import pytest
-
 from kems_core import (
     PowerDownAccountingState,
     PowerDownAuditState,
