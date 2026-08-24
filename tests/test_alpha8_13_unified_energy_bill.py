@@ -27,10 +27,22 @@ def test_user_facing_products_are_live_data_and_kems_only() -> None:
 
 
 def test_legacy_product_choice_preserves_export_tariff_intent() -> None:
-    assert export_tariff_type_from_options({"system_type": "battery_solar"}) == EXPORT_TARIFF_TYPE_NONE
-    assert export_tariff_type_from_options({"system_type": "full_kems"}) == EXPORT_TARIFF_TYPE_FIXED
-    assert export_tariff_type_from_options({"system_type": "full_kems_agile"}) == EXPORT_TARIFF_TYPE_AGILE
-    assert export_tariff_type_from_options({"export_tariff_type": "agile"}) == EXPORT_TARIFF_TYPE_AGILE
+    assert (
+        export_tariff_type_from_options({"system_type": "battery_solar"})
+        == EXPORT_TARIFF_TYPE_NONE
+    )
+    assert (
+        export_tariff_type_from_options({"system_type": "full_kems"})
+        == EXPORT_TARIFF_TYPE_FIXED
+    )
+    assert (
+        export_tariff_type_from_options({"system_type": "full_kems_agile"})
+        == EXPORT_TARIFF_TYPE_AGILE
+    )
+    assert (
+        export_tariff_type_from_options({"export_tariff_type": "agile"})
+        == EXPORT_TARIFF_TYPE_AGILE
+    )
 
 
 def test_bill_equivalent_scenario_includes_standing_gas_and_supplier_credit() -> None:
@@ -110,7 +122,9 @@ def test_alpha8_13_release_identity_and_coordinated_web4() -> None:
 
 
 def test_dashboard_and_web_contract_use_one_canonical_bill_state() -> None:
-    presentation = (ROOT / "custom_components/kems/energy_bill_presentation.py").read_text()
+    presentation = (
+        ROOT / "custom_components/kems/energy_bill_presentation.py"
+    ).read_text()
     init_source = (ROOT / "custom_components/kems/__init__.py").read_text()
     assert "sensor.kems_energy_cost_comparison" in presentation
     assert "Total energy cost by period — Live Data vs KEMS" in presentation
