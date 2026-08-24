@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from datetime import date
 from pathlib import Path
 
 from custom_components.kems.energy_bill import _scenario, _strategy
@@ -66,6 +67,7 @@ def test_bill_equivalent_scenario_includes_standing_gas_and_supplier_credit() ->
 
 
 def test_agile_bill_reconciliation_uses_producer_bill_not_battery_wear() -> None:
+    day = date(2026, 8, 24)
     rows = [
         {
             "import_cost_pence": 144.39,
@@ -85,15 +87,14 @@ def test_agile_bill_reconciliation_uses_producer_bill_not_battery_wear() -> None
     }
     result = _strategy(
         rows,
-        set(),
+        {day},
         gas,
-        {},
+        {day: 53.70},
         53.70,
         "Agile export optimisation",
     )
-    # With no selected dates this helper has no standing day to add, so the
-    # retained producer's -616p result reconciles to a supplier credit. The key
-    # regression is that economic_net_cost_pence/battery wear is never consumed.
+    assert result["electricity_standing_charge_pence"] == 53.70
+    assert result["supplier_energy_credit_pence"] == 0.0
     assert result["electricity_total_cost_pence"] == -616.0
     assert result["total_energy_cost_pence"] == -506.0
     assert result["battery_wear_included"] is False
