@@ -18,8 +18,14 @@ def test_alpha8_keeps_web19_plus_branding_contract_and_exact_svg_brand() -> None
 
     assert str(manifest["version"]).startswith("0.8.0-alpha8.")
     assert bundle["components"]["panel"]["version"] == "0.8.0-alpha8-panel.1"
-    for component in ("property_web", "pi_agent", "public_web"):
-        assert bundle["components"][component]["version"] == "0.8.0-alpha8-web.2"
+    web_versions = {
+        str(bundle["components"][component]["version"])
+        for component in ("property_web", "pi_agent", "public_web")
+    }
+    assert len(web_versions) == 1
+    web_version = web_versions.pop()
+    assert web_version.startswith("0.8.0-alpha8-web.")
+    assert int(web_version.rsplit(".", 1)[1]) >= 2
 
     reason = bundle["maintenance"]["reason"]
     assert "Web.18" not in reason

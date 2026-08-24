@@ -1,4 +1,4 @@
-"""Home Assistant-independent Power Down session audit helpers."""
+"""Home Assistant-independent Power Down session audit and accounting helpers."""
 
 from __future__ import annotations
 
@@ -35,6 +35,72 @@ class PowerDownAuditState:
             island_override_observed=(
                 self.island_override_observed or island_mode_active
             ),
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class PowerDownAccountingState:
+    """Integrated planned site flow from the final Full KEMS Agile event route."""
+
+    planned_battery_to_home_kwh: float = 0.0
+    planned_export_kwh: float = 0.0
+    maximum_inverter_output_kw: float = 0.0
+    rewardable_reduction_kwh: float = 0.0
+    bonus_pence: float = 0.0
+    fixed_export_income_pence: float = 0.0
+    route_samples_observed: int = 0
+    reward_samples_observed: int = 0
+
+    def observe(
+        self,
+        *,
+        hours: float,
+        battery_to_home_kw: float,
+        grid_import_kw: float,
+        grid_export_kw: float,
+        inverter_output_kw: float,
+        baseline_net_kw: float | None,
+        bonus_rate_pence: float | None,
+        export_rate_pence: float,
+    ) -> PowerDownAccountingState:
+        """Integrate one final shadow-route interval on a net site-meter basis."""
+        hours = max(float(hours), 0.0)
+        if hours <= 0.0:
+            return self
+
+        battery_home = max(float(battery_to_home_kw), 0.0)
+        grid_import = max(float(grid_import_kw), 0.0)
+        grid_export = max(float(grid_export_kw), 0.0)
+        inverter_output = max(float(inverter_output_kw), 0.0)
+        export_rate = max(float(export_rate_pence), 0.0)
+
+        rewardable = 0.0
+        bonus = 0.0
+        reward_samples = self.reward_samples_observed
+        if baseline_net_kw is not None and bonus_rate_pence is not None:
+            baseline_energy = float(baseline_net_kw) * hours
+            planned_net_energy = (grid_import - grid_export) * hours
+            rewardable = max(baseline_energy - planned_net_energy, 0.0)
+            bonus = rewardable * max(float(bonus_rate_pence), 0.0)
+            reward_samples += 1
+
+        return replace(
+            self,
+            planned_battery_to_home_kwh=(
+                self.planned_battery_to_home_kwh + battery_home * hours
+            ),
+            planned_export_kwh=self.planned_export_kwh + grid_export * hours,
+            maximum_inverter_output_kw=max(
+                self.maximum_inverter_output_kw,
+                inverter_output,
+            ),
+            rewardable_reduction_kwh=(self.rewardable_reduction_kwh + rewardable),
+            bonus_pence=self.bonus_pence + bonus,
+            fixed_export_income_pence=(
+                self.fixed_export_income_pence + grid_export * hours * export_rate
+            ),
+            route_samples_observed=self.route_samples_observed + 1,
+            reward_samples_observed=reward_samples,
         )
 
 
