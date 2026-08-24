@@ -68,9 +68,13 @@ def _sync_dashboard_file(source: Path, target: Path) -> bool:
 
 
 def _dashboard_readability_pass(content: str) -> str:
-    """Keep managed dashboard summary cards readable on normal displays."""
-    return content.replace("        columns: 4\n", "        columns: 2\n").replace(
+    """Keep managed dashboard cards readable and optional templates defensive."""
+    content = content.replace("        columns: 4\n", "        columns: 2\n").replace(
         "        columns: 5\n", "        columns: 3\n"
+    )
+    return content.replace(
+        "{% set failure = update.attributes.last_error or maintenance.attributes.error %}",
+        "{% set failure = update.attributes.get('last_error') or maintenance.attributes.get('error') %}",
     )
 
 
