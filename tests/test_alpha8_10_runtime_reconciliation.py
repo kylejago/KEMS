@@ -19,14 +19,17 @@ def _load_functions(names: set[str], constants: set[str] | None = None):
     tree = ast.parse(RECONCILIATION.read_text(encoding="utf-8"))
     body: list[ast.stmt] = []
     for node in tree.body:
-        if isinstance(node, ast.ImportFrom) and node.module == "__future__":
-            body.append(node)
-        elif isinstance(node, ast.Assign) and any(
-            isinstance(target, ast.Name) and target.id in constants
-            for target in node.targets
+        if (
+            (isinstance(node, ast.ImportFrom) and node.module == "__future__")
+            or (
+                isinstance(node, ast.Assign)
+                and any(
+                    isinstance(target, ast.Name) and target.id in constants
+                    for target in node.targets
+                )
+            )
+            or (isinstance(node, ast.FunctionDef) and node.name in names)
         ):
-            body.append(node)
-        elif isinstance(node, ast.FunctionDef) and node.name in names:
             body.append(node)
     namespace = {
         "Any": Any,
