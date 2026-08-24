@@ -1,23 +1,55 @@
 from __future__ import annotations
 
+import importlib.util
 import json
+import sys
 from datetime import date
 from pathlib import Path
-
-from custom_components.kems.energy_bill import _scenario, _strategy
-from custom_components.kems.kems_core.models import ScenarioSummary
-from custom_components.kems.product_types import (
-    EXPORT_TARIFF_TYPE_AGILE,
-    EXPORT_TARIFF_TYPE_FIXED,
-    EXPORT_TARIFF_TYPE_NONE,
-    SYSTEM_TYPE_KEMS,
-    SYSTEM_TYPE_LIVE_DATA,
-    SYSTEM_TYPES,
-    export_tariff_type_from_options,
-    normalise_system_type,
-)
+from types import ModuleType
 
 ROOT = Path(__file__).resolve().parents[1]
+KEMS_ROOT = ROOT / "custom_components" / "kems"
+PACKAGE = "kems_alpha813_test"
+
+
+def _load(name: str, path: Path):
+    spec = importlib.util.spec_from_file_location(name, path)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+# Load the HA-independent modules under a synthetic package so their relative
+# imports work without importing custom_components.kems.__init__ (and therefore
+# without requiring the full Home Assistant runtime in repository CI).
+package = ModuleType(PACKAGE)
+package.__path__ = [str(KEMS_ROOT)]
+sys.modules[PACKAGE] = package
+
+product_types = _load(f"{PACKAGE}.product_types", KEMS_ROOT / "product_types.py")
+models = _load(f"{PACKAGE}.kems_core.models", KEMS_ROOT / "kems_core" / "models.py")
+kems_core = ModuleType(f"{PACKAGE}.kems_core")
+kems_core.__path__ = [str(KEMS_ROOT / "kems_core")]
+kems_core.KEMSData = models.KEMSData
+kems_core.ScenarioSummary = models.ScenarioSummary
+kems_core.Snapshot = models.Snapshot
+sys.modules[f"{PACKAGE}.kems_core"] = kems_core
+energy_bill = _load(f"{PACKAGE}.energy_bill", KEMS_ROOT / "energy_bill.py")
+
+_scenario = energy_bill._scenario
+_strategy = energy_bill._strategy
+ScenarioSummary = models.ScenarioSummary
+
+EXPORT_TARIFF_TYPE_AGILE = product_types.EXPORT_TARIFF_TYPE_AGILE
+EXPORT_TARIFF_TYPE_FIXED = product_types.EXPORT_TARIFF_TYPE_FIXED
+EXPORT_TARIFF_TYPE_NONE = product_types.EXPORT_TARIFF_TYPE_NONE
+SYSTEM_TYPE_KEMS = product_types.SYSTEM_TYPE_KEMS
+SYSTEM_TYPE_LIVE_DATA = product_types.SYSTEM_TYPE_LIVE_DATA
+SYSTEM_TYPES = product_types.SYSTEM_TYPES
+export_tariff_type_from_options = product_types.export_tariff_type_from_options
+normalise_system_type = product_types.normalise_system_type
 
 
 def test_user_facing_products_are_live_data_and_kems_only() -> None:
