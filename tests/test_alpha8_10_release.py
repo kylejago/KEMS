@@ -13,11 +13,14 @@ RECONCILIATION = ROOT / "custom_components" / "kems" / "agile_runtime_reconcilia
 POWER_DOWN = ROOT / "custom_components" / "kems" / "power_down.py"
 
 
-def test_alpha8_10_release_identity_and_coordinated_versions() -> None:
+def test_alpha8_10_release_identity_and_coordinated_versions_survive_later_alpha8() -> (
+    None
+):
     manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
     bundle = json.loads(BUNDLE.read_text(encoding="utf-8"))
 
-    assert manifest["version"] == "0.8.0-alpha8.10"
+    assert str(manifest["version"]).startswith("0.8.0-alpha8.")
+    assert int(str(manifest["version"]).rsplit(".", 1)[1]) >= 10
     assert bundle["components"]["panel"]["version"] == "0.8.0-alpha8-panel.1"
     assert bundle["components"]["property_web"]["version"] == "0.8.0-alpha8-web.3"
     assert bundle["components"]["pi_agent"]["version"] == "0.8.0-alpha8-web.3"

@@ -4,12 +4,15 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN, NAME
-from .coordinator import KEMSCoordinator
+
+if TYPE_CHECKING:
+    from .coordinator import KEMSCoordinator
 
 
 def _integration_version() -> str:
@@ -26,7 +29,7 @@ def _integration_version() -> str:
 INTEGRATION_VERSION = _integration_version()
 
 
-class KEMSEntity(CoordinatorEntity[KEMSCoordinator]):
+class KEMSEntity(CoordinatorEntity):
     """Base class for coordinator-backed KEMS entities."""
 
     _attr_has_entity_name = True
