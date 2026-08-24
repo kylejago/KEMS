@@ -55,7 +55,9 @@ def _baseline_net_power_kw(snapshot: Snapshot) -> float | None:
     return (float(imported) - float(exported or 0.0)) / hours if hours > 0.0 else None
 
 
-def _agile_power_down_route(agile_state: dict[str, Any] | None) -> dict[str, float] | None:
+def _agile_power_down_route(
+    agile_state: dict[str, Any] | None,
+) -> dict[str, float] | None:
     """Return the final Full KEMS Agile site route only while Power Down is active."""
     if not isinstance(agile_state, dict):
         return None
@@ -120,7 +122,9 @@ def _update_reconciled_accounting(
 
     last_at_value = pending.get("_agile_accounting_last_at")
     last_at = (
-        datetime.fromisoformat(str(last_at_value)) if last_at_value is not None else None
+        datetime.fromisoformat(str(last_at_value))
+        if last_at_value is not None
+        else None
     )
 
     # On the first active sample, use that final route back to the exact event
@@ -161,9 +165,7 @@ def _update_reconciled_accounting(
                 grid_export_kw=grid_export or 0.0,
                 inverter_output_kw=inverter_output or 0.0,
                 baseline_net_kw=_number(pending.get("_agile_last_baseline_net_kw")),
-                bonus_rate_pence=_number(
-                    pending.get("_agile_last_bonus_rate_pence")
-                ),
+                bonus_rate_pence=_number(pending.get("_agile_last_bonus_rate_pence")),
                 export_rate_pence=(
                     _number(pending.get("_agile_last_export_rate_pence")) or 0.0
                 ),
@@ -175,9 +177,7 @@ def _update_reconciled_accounting(
                     "_agile_maximum_inverter_output_kw": (
                         state.maximum_inverter_output_kw
                     ),
-                    "_agile_rewardable_reduction_kwh": (
-                        state.rewardable_reduction_kwh
-                    ),
+                    "_agile_rewardable_reduction_kwh": (state.rewardable_reduction_kwh),
                     "_agile_bonus_pence": state.bonus_pence,
                     "_agile_fixed_export_income_pence": (
                         state.fixed_export_income_pence
