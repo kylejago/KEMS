@@ -19,7 +19,7 @@ issues Home Assistant, Ohme or FoxESS hardware writes.
 
 from __future__ import annotations
 
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
 from typing import Any
 
 from . import agile_event_priority_runtime as events
