@@ -1,0 +1,42 @@
+"""Regression contracts for the Alpha8.11 Home Assistant startup hotfix."""
+
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+ROOT = Path(__file__).parents[1]
+ENTITY = ROOT / "custom_components" / "kems" / "entity.py"
+MANIFEST = ROOT / "custom_components" / "kems" / "manifest.json"
+BUNDLE = ROOT / "release" / "kems-bundle.template.json"
+RECONCILIATION = ROOT / "custom_components" / "kems" / "agile_runtime_reconciliation.py"
+POWER_DOWN = ROOT / "custom_components" / "kems" / "power_down.py"
+
+
+def test_alpha8_11_breaks_entity_coordinator_runtime_import_cycle() -> None:
+    source = ENTITY.read_text(encoding="utf-8")
+
+    assert "from typing import TYPE_CHECKING" in source
+    assert "if TYPE_CHECKING:\n    from .coordinator import KEMSCoordinator" in source
+    assert "class KEMSEntity(CoordinatorEntity):" in source
+
+
+def test_alpha8_11_release_identity_keeps_web_and_panel_coordinated() -> None:
+    manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
+    bundle = json.loads(BUNDLE.read_text(encoding="utf-8"))
+
+    assert manifest["version"] == "0.8.0-alpha8.11"
+    assert bundle["components"]["panel"]["version"] == "0.8.0-alpha8-panel.1"
+    assert bundle["components"]["property_web"]["version"] == "0.8.0-alpha8-web.3"
+    assert bundle["components"]["pi_agent"]["version"] == "0.8.0-alpha8-web.3"
+    assert bundle["components"]["public_web"]["version"] == "0.8.0-alpha8-web.3"
+
+
+def test_alpha8_11_preserves_shadow_only_safety_boundary() -> None:
+    runtime = RECONCILIATION.read_text(encoding="utf-8")
+    power_down = POWER_DOWN.read_text(encoding="utf-8")
+    combined = runtime + power_down
+
+    assert ".services.async_call(" not in combined
+    assert "providers.foxess" not in combined
+    assert "commands_permitted = True" not in combined
