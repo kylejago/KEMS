@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import ast
 import json
+from collections.abc import Callable
 from pathlib import Path
 
 ROOT = Path(__file__).parents[1]
@@ -20,7 +21,7 @@ SAFE_FAILURE_TEMPLATE = (
 )
 
 
-def _load_readability_pass():
+def _load_readability_pass() -> Callable[[str], str]:
     source = DASHBOARD_RUNTIME.read_text(encoding="utf-8")
     tree = ast.parse(source)
     function = next(
@@ -31,13 +32,19 @@ def _load_readability_pass():
     )
     namespace: dict[str, object] = {}
     exec(
-        compile(ast.Module(body=[function], type_ignores=[]), str(DASHBOARD_RUNTIME), "exec"),
+        compile(
+            ast.Module(body=[function], type_ignores=[]),
+            str(DASHBOARD_RUNTIME),
+            "exec",
+        ),
         namespace,
     )
-    return namespace["_dashboard_readability_pass"]
+    return namespace["_dashboard_readability_pass"]  # type: ignore[return-value]
 
 
-def test_alpha8_12_managed_dashboard_hardens_missing_optional_error_attributes() -> None:
+def test_alpha8_12_managed_dashboard_hardens_missing_optional_error_attributes() -> (
+    None
+):
     readability_pass = _load_readability_pass()
     rendered = readability_pass(UNSAFE_FAILURE_TEMPLATE)
 
