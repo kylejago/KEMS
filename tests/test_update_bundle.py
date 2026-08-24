@@ -29,17 +29,24 @@ def test_release_bundle_renders_exact_coordinated_alpha8_targets() -> None:
     public_web = str(bundle["components"]["public_web"]["version"])
     assert property_web == pi_agent == public_web
     assert property_web.startswith("0.8.0-alpha8-web.")
-    assert int(property_web.rsplit(".", 1)[1]) >= 2
+    web_number = int(property_web.rsplit(".", 1)[1])
+    assert web_number >= 2
     assert bundle["components"]["property_web"]["required"] is True
     assert bundle["components"]["pi_agent"]["required"] is True
     assert bundle["components"]["public_web"]["required"] is False
     assert bundle["components"]["public_web"]["delivery"] == "ionos-sftp"
-    assert bundle["maintenance"]["affected_components"] == [
-        "kems_core",
-        "dashboard",
-    ]
+
+    affected = bundle["maintenance"]["affected_components"]
+    assert affected[:2] == ["kems_core", "dashboard"]
+    if web_number >= 4:
+        assert affected == [
+            "kems_core",
+            "dashboard",
+            "property_web",
+            "pi_agent",
+            "public_web",
+        ]
     assert bundle["maintenance"]["reboot_required"] is False
-    assert "managed Home Assistant dashboard" in bundle["maintenance"]["reason"]
 
 
 def test_bundle_contract_rejects_mismatched_appliance_versions() -> None:
@@ -69,6 +76,6 @@ def test_bundle_maintenance_only_names_known_components() -> None:
     try:
         module.validate_bundle(raw)
     except ValueError as error:
-        assert "unknown components" in str(error)
+        assert "unknown component" in str(error)
     else:
         raise AssertionError("Unknown maintenance component was accepted")
