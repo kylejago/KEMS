@@ -54,16 +54,23 @@ _TODAY_CARD = r"""      - type: markdown
           **KEMS strategy:** {{ kems.get('strategy_label', '—') }}. Battery wear is deliberately excluded from every total above.
 """
 
-_ENERGY_VIEW = r"""
+_ENERGY_VIEW = (
+    r"""
 
   - title: Energy Cost
     path: energy-cost
     icon: mdi:home-currency-gbp
     cards:
-""" + _PERIOD_CARD.replace("      - type:", "      - type:", 1) + "\n" + _TODAY_CARD.replace("      - type:", "      - type:", 1)
+"""
+    + _PERIOD_CARD.replace("      - type:", "      - type:", 1)
+    + "\n"
+    + _TODAY_CARD.replace("      - type:", "      - type:", 1)
+)
 
 
-def _replace_markdown_card(content: str, title: str, replacement: str) -> tuple[str, bool]:
+def _replace_markdown_card(
+    content: str, title: str, replacement: str
+) -> tuple[str, bool]:
     marker = f"      - type: markdown\n        title: {title}\n"
     start = content.find(marker)
     if start < 0:
