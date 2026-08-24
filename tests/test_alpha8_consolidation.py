@@ -28,7 +28,7 @@ def _compat_specs() -> list[tuple[str, str]]:
         for item in node.value.elts:
             assert isinstance(item, ast.Tuple) and len(item.elts) == 2
             module = ast.literal_eval(item.elts[0])
-            installer = ast.literal_eval(item.elelts[1])
+            installer = ast.literal_eval(item.elts[1])
             specs.append((module, installer))
     return specs
 
