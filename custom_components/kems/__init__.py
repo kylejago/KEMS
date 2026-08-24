@@ -30,6 +30,10 @@ from .const import (
 )
 from .coordinator import KEMSCoordinator
 from .dashboard import async_sync_managed_dashboard
+from .energy_bill_presentation import (
+    async_setup_energy_bill_state,
+    install_energy_bill_dashboard_patch,
+)
 from .entity_discovery import (
     SourceValidationResult,
     async_discover_entities,
@@ -60,6 +64,9 @@ PLATFORMS: list[Platform] = [
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up KEMS from a config entry."""
+    # Install the reporting-only Alpha8.13 bill presentation before the managed
+    # dashboard is rendered. It does not alter planning or hardware permissions.
+    install_energy_bill_dashboard_patch()
     try:
         await async_sync_managed_dashboard(hass)
     except (OSError, ValueError):
@@ -105,6 +112,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     await coordinator.async_config_entry_first_refresh()
     entry.runtime_data = coordinator
+    async_setup_energy_bill_state(hass, entry, coordinator)
     update_orchestrator = await async_setup_update_orchestrator(hass, entry)
     if (
         update_orchestrator.policy.automatic_updates

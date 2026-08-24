@@ -1,19 +1,34 @@
-"""Regression coverage for the canonical Full KEMS Agile sensor projection."""
+"""Regression coverage for the canonical adaptive-KEMS Agile sensor projection."""
 
 from __future__ import annotations
 
 import importlib.util
+import sys
 from pathlib import Path
-from types import SimpleNamespace
+from types import ModuleType, SimpleNamespace
 
 ROOT = Path(__file__).parents[1]
-MODULE = ROOT / "custom_components" / "kems" / "agile_simulation_presentation.py"
-SPEC = importlib.util.spec_from_file_location(
-    "kems_agile_simulation_presentation", MODULE
+KEMS_ROOT = ROOT / "custom_components" / "kems"
+PACKAGE = "kems_agile_presentation_test"
+
+
+def _load(name: str, path: Path):
+    spec = importlib.util.spec_from_file_location(name, path)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+package = ModuleType(PACKAGE)
+package.__path__ = [str(KEMS_ROOT)]
+sys.modules[PACKAGE] = package
+product_types = _load(f"{PACKAGE}.product_types", KEMS_ROOT / "product_types.py")
+presentation = _load(
+    f"{PACKAGE}.agile_simulation_presentation",
+    KEMS_ROOT / "agile_simulation_presentation.py",
 )
-assert SPEC is not None and SPEC.loader is not None
-presentation = importlib.util.module_from_spec(SPEC)
-SPEC.loader.exec_module(presentation)
 
 FULL_KEMS_AGILE = "full_kems_agile"
 BATTERY_SOLAR = "battery_solar"
@@ -60,7 +75,9 @@ def _coordinator(system_type: str = FULL_KEMS_AGILE):
             }
         },
     }
+    options = {"system_type": system_type}
     return SimpleNamespace(
+        entry=SimpleNamespace(options=options),
         settings=SimpleNamespace(system_type=system_type),
         agile_smart_export_state=state,
     )
@@ -135,7 +152,7 @@ def test_agile_current_export_projects_to_generic_graph_contract() -> None:
     )
 
 
-def test_other_product_types_keep_the_original_simulation_contract() -> None:
+def test_non_agile_tariff_keeps_original_simulation_contract() -> None:
     coordinator = _coordinator(BATTERY_SOLAR)
 
     assert (
@@ -145,6 +162,18 @@ def test_other_product_types_keep_the_original_simulation_contract() -> None:
     assert (
         presentation._projected_value(coordinator, "simulated_battery_power")
         is presentation._MISSING
+    )
+
+
+def test_explicit_agile_tariff_drives_projection_for_unified_kems_product() -> None:
+    coordinator = _coordinator("kems")
+    coordinator.entry.options = {
+        "system_type": "kems",
+        "export_tariff_type": product_types.EXPORT_TARIFF_TYPE_AGILE,
+    }
+    assert (
+        presentation._projected_value(coordinator, "simulated_grid_export_today")
+        == 4.14
     )
 
 

@@ -39,22 +39,25 @@ tariff = _load_pure_module("kems_alpha735_tariff_test", TARIFF)
 SYSTEM_TYPE_BATTERY_SOLAR = product_types.SYSTEM_TYPE_BATTERY_SOLAR
 SYSTEM_TYPE_FULL_KEMS = product_types.SYSTEM_TYPE_FULL_KEMS
 SYSTEM_TYPE_FULL_KEMS_AGILE = product_types.SYSTEM_TYPE_FULL_KEMS_AGILE
+SYSTEM_TYPE_KEMS = product_types.SYSTEM_TYPE_KEMS
 SYSTEM_TYPE_LIVE_DATA = product_types.SYSTEM_TYPE_LIVE_DATA
 SYSTEM_TYPES = product_types.SYSTEM_TYPES
 effective_operating_mode = product_types.effective_operating_mode
 internal_mode_from_user = product_types.internal_mode_from_user
+normalise_system_type = product_types.normalise_system_type
 user_mode_from_internal = product_types.user_mode_from_internal
 manual_schedule = tariff.manual_schedule
 
 
-def test_four_user_facing_product_types_are_stable() -> None:
-    """KEMS should expose four capability levels rather than strategy clutter."""
-    assert SYSTEM_TYPES == (
-        SYSTEM_TYPE_LIVE_DATA,
+def test_alpha735_capability_levels_survive_unified_kems_product() -> None:
+    """Retired Alpha7 product keys remain compatible behind Live Data / KEMS."""
+    assert SYSTEM_TYPES == (SYSTEM_TYPE_LIVE_DATA, SYSTEM_TYPE_KEMS)
+    for legacy in (
         SYSTEM_TYPE_BATTERY_SOLAR,
         SYSTEM_TYPE_FULL_KEMS,
         SYSTEM_TYPE_FULL_KEMS_AGILE,
-    )
+    ):
+        assert normalise_system_type(legacy) == SYSTEM_TYPE_KEMS
 
 
 def test_live_data_can_never_escalate_to_simulation_or_control() -> None:

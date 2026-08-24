@@ -44,11 +44,14 @@ def test_alpha8_release_family_is_coordinated() -> None:
 
     assert str(manifest["version"]).startswith("0.8.0-alpha8.")
     assert bundle["components"]["panel"]["version"] == "0.8.0-alpha8-panel.1"
-    assert {
-        bundle["components"]["property_web"]["version"],
-        bundle["components"]["pi_agent"]["version"],
-        bundle["components"]["public_web"]["version"],
-    } == {"0.8.0-alpha8-web.3"}
+    web_versions = {
+        str(bundle["components"][key]["version"])
+        for key in ("property_web", "pi_agent", "public_web")
+    }
+    assert len(web_versions) == 1
+    web_version = web_versions.pop()
+    assert web_version.startswith("0.8.0-alpha8-web.")
+    assert int(web_version.rsplit(".", 1)[1]) >= 3
     assert 'PANEL_CONFIG_VERSION = "0.8.0-alpha8-panel.0"' in panel_manager
     assert 'panel_config_version: "0.8.0-alpha8-panel.0"' in panel_yaml
     assert 'PANEL_EV_POLICY_VERSION = "0.8.0-alpha8-panel.1"' in panel_transform

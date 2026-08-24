@@ -1,20 +1,15 @@
-"""Project Full KEMS Agile through the existing simulated KEMS sensor contract.
+"""Project the adaptive Agile strategy through the simulated KEMS sensor contract.
 
 The property web application intentionally consumes the stable
-``sensor.kems_simulated_*`` interface. Full KEMS Agile has a separate,
+``sensor.kems_simulated_*`` interface. Agile Outgoing has a separate,
 settlement-aware replay and current-routing ledger, so exposing the base proposal
 ``SimulationState`` through those same presentation sensors can make the web
 page disagree with the Agile panel and plan.
 
-This module fixes that boundary without replacing or mutating ``SimulationState``.
-Control, ROI, lifetime accounting, commissioning and shadow safety continue to
-use their existing objects. Only the values returned by generic KEMS sensor
-entities are projected from the Agile ledger while the selected system type is
-Full KEMS Agile.
-
-Release versions identify repository states, not implementation filenames. This
-module therefore has a functional canonical name and must not be copied into a
-version-named Alpha8 patch chain.
+Alpha8.13 keeps one user-facing KEMS product. This adapter projects Agile values
+whenever the configured export tariff is Agile Outgoing. Other tariff strategies
+continue to use the existing base simulation. Control, ROI, lifetime accounting,
+commissioning and shadow safety remain unchanged.
 """
 
 from __future__ import annotations
@@ -22,7 +17,8 @@ from __future__ import annotations
 import math
 from typing import Any
 
-_FULL_KEMS_AGILE = "full_kems_agile"
+from .product_types import EXPORT_TARIFF_TYPE_AGILE, export_tariff_type_from_options
+
 _MISSING = object()
 _PRESENTATION_KEYS = frozenset(
     {
@@ -72,6 +68,15 @@ def _dict(value: Any) -> dict[str, Any]:
     return value if isinstance(value, dict) else {}
 
 
+def _uses_agile(coordinator: Any) -> bool:
+    """Return whether the adaptive KEMS product is using Agile Outgoing."""
+    entry = getattr(coordinator, "entry", None)
+    return (
+        export_tariff_type_from_options(getattr(entry, "options", {}))
+        == EXPORT_TARIFF_TYPE_AGILE
+    )
+
+
 def _agile_state(coordinator: Any) -> dict[str, Any]:
     """Return the retained Agile state without reaching into HA state storage."""
     state = getattr(coordinator, "agile_smart_export_state", None)
@@ -102,8 +107,7 @@ def _sum_available(*values: Any) -> float | None:
 
 def _projected_value(coordinator: Any, key: str) -> object:
     """Return one Agile presentation value or ``_MISSING`` for base behaviour."""
-    settings = getattr(coordinator, "settings", None)
-    if getattr(settings, "system_type", None) != _FULL_KEMS_AGILE:
+    if not _uses_agile(coordinator):
         return _MISSING
     if key not in _PRESENTATION_KEYS:
         return _MISSING
@@ -246,17 +250,16 @@ def install_agile_simulation_presentation() -> None:
 
     def projected_attributes(self):
         attributes = original_attributes(self)
-        if (
-            self.entity_description.key not in _PRESENTATION_KEYS
-            or getattr(self.coordinator.settings, "system_type", None)
-            != _FULL_KEMS_AGILE
+        if self.entity_description.key not in _PRESENTATION_KEYS or not _uses_agile(
+            self.coordinator
         ):
             return attributes
         result = dict(attributes or {})
         result.update(
             {
-                "presentation_source": "Full KEMS Agile settlement-aware replay",
-                "presentation_system_type": _FULL_KEMS_AGILE,
+                "presentation_source": "KEMS Agile settlement-aware replay",
+                "presentation_system_type": "kems",
+                "presentation_strategy": "agile_outgoing",
                 "base_simulation_state_preserved": True,
                 "reporting_only": True,
                 "hardware_writes": "blocked",

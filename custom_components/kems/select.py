@@ -9,7 +9,12 @@ from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import CONF_OPERATING_MODE, CONF_SYSTEM_TYPE, CONF_VIRTUAL_SCENARIO
+from .const import (
+    CONF_EXPORT_TARIFF_STATUS,
+    CONF_OPERATING_MODE,
+    CONF_SYSTEM_TYPE,
+    CONF_VIRTUAL_SCENARIO,
+)
 from .entity import KEMSEntity
 from .happy_hour import CONF_HAPPY_HOUR_DURATION_HOURS, happy_hour_duration_hours
 from .kems_core import (
@@ -21,10 +26,15 @@ from .kems_core import (
     ev_policy_from_options,
 )
 from .product_types import (
+    EXPORT_TARIFF_TYPE_LABELS,
+    EXPORT_TARIFF_TYPE_NONE,
+    EXPORT_TARIFF_TYPES,
     SYSTEM_TYPE_DEFINITIONS,
+    SYSTEM_TYPE_KEMS,
     SYSTEM_TYPE_LIVE_DATA,
     SYSTEM_TYPES,
     USER_MODES,
+    export_tariff_type_from_options,
     internal_mode_from_user,
     user_mode_from_internal,
 )
@@ -41,6 +51,7 @@ async def async_setup_entry(
     coordinator = entry.runtime_data
     entities = [
         KEMSSystemTypeSelect(coordinator),
+        KEMSExportTariffSelect(coordinator),
         KEMSOperatingModeSelect(coordinator),
         KEMSEVChargingPolicySelect(coordinator),
         KEMSWeekendHappyHourDurationSelect(coordinator),
@@ -51,7 +62,7 @@ async def async_setup_entry(
 
 
 class KEMSSystemTypeSelect(KEMSEntity, SelectEntity):
-    """Choose the user-facing KEMS capability level."""
+    """Choose between measured Live Data and the adaptive KEMS product."""
 
     _attr_name = "System type"
     _attr_icon = "mdi:home-cog-outline"
@@ -66,24 +77,72 @@ class KEMSSystemTypeSelect(KEMSEntity, SelectEntity):
         return (
             definition.label
             if definition
-            else SYSTEM_TYPE_DEFINITIONS[SYSTEM_TYPES[-1]].label
+            else SYSTEM_TYPE_DEFINITIONS[SYSTEM_TYPE_KEMS].label
         )
 
     async def async_select_option(self, option: str) -> None:
         selected = next(
             (
                 key
-                for key, definition in SYSTEM_TYPE_DEFINITIONS.items()
-                if definition.label == option
+                for key in SYSTEM_TYPES
+                if SYSTEM_TYPE_DEFINITIONS[key].label == option
             ),
             None,
         )
         if selected is None:
             raise HomeAssistantError(f"Unsupported KEMS system type: {option}")
-        changes = {CONF_SYSTEM_TYPE: selected}
+
+        # Resolve the legacy product's tariff intent before replacing the old
+        # system_type option. This means Full KEMS Agile -> KEMS cannot silently
+        # fall back to fixed export during the migration.
+        tariff_type = export_tariff_type_from_options(self.coordinator.entry.options)
+        changes = {
+            CONF_SYSTEM_TYPE: selected,
+            "export_tariff_type": tariff_type,
+        }
         if selected == SYSTEM_TYPE_LIVE_DATA:
             changes[CONF_OPERATING_MODE] = "observe"
         await async_set_runtime_options(self.hass, self.coordinator.entry, changes)
+
+
+class KEMSExportTariffSelect(KEMSEntity, SelectEntity):
+    """Select the export tariff that chooses KEMS's internal optimisation path."""
+
+    _attr_name = "Export tariff"
+    _attr_icon = "mdi:cash-sync"
+    _attr_options = [EXPORT_TARIFF_TYPE_LABELS[key] for key in EXPORT_TARIFF_TYPES]
+
+    def __init__(self, coordinator) -> None:
+        super().__init__(coordinator, "export_tariff_type")
+
+    @property
+    def current_option(self) -> str:
+        selected = export_tariff_type_from_options(self.coordinator.entry.options)
+        return EXPORT_TARIFF_TYPE_LABELS[selected]
+
+    async def async_select_option(self, option: str) -> None:
+        selected = next(
+            (
+                key
+                for key, label in EXPORT_TARIFF_TYPE_LABELS.items()
+                if label == option
+            ),
+            None,
+        )
+        if selected is None:
+            raise HomeAssistantError(f"Unsupported KEMS export tariff: {option}")
+        await async_set_runtime_options(
+            self.hass,
+            self.coordinator.entry,
+            {
+                "export_tariff_type": selected,
+                # The existing simulation engine already has the correct
+                # no-export safety path behind this established option.
+                CONF_EXPORT_TARIFF_STATUS: (
+                    "awaiting" if selected == EXPORT_TARIFF_TYPE_NONE else "active"
+                ),
+            },
+        )
 
 
 class KEMSOperatingModeSelect(KEMSEntity, SelectEntity):

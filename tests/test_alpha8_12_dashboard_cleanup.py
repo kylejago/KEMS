@@ -52,17 +52,30 @@ def test_alpha8_12_managed_dashboard_hardens_missing_optional_error_attributes()
     assert UNSAFE_FAILURE_TEMPLATE not in rendered
 
 
-def test_alpha8_12_release_scope_is_ha_and_dashboard_only() -> None:
+def test_alpha8_12_release_contract_survives_later_coordinated_alpha8() -> None:
     manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
     bundle = json.loads(BUNDLE.read_text(encoding="utf-8"))
 
-    assert manifest["version"] == "0.8.0-alpha8.12"
+    version = str(manifest["version"])
+    assert version.startswith("0.8.0-alpha8.")
+    assert int(version.rsplit(".", 1)[1]) >= 12
     assert bundle["components"]["panel"]["version"] == "0.8.0-alpha8-panel.1"
-    assert bundle["components"]["property_web"]["version"] == "0.8.0-alpha8-web.3"
-    assert bundle["components"]["pi_agent"]["version"] == "0.8.0-alpha8-web.3"
-    assert bundle["components"]["public_web"]["version"] == "0.8.0-alpha8-web.3"
-    assert bundle["maintenance"]["affected_components"] == [
-        "kems_core",
-        "dashboard",
-    ]
-    assert "managed Home Assistant dashboard" in bundle["maintenance"]["reason"]
+
+    web_versions = {
+        str(bundle["components"][key]["version"])
+        for key in ("property_web", "pi_agent", "public_web")
+    }
+    assert len(web_versions) == 1
+    web_version = web_versions.pop()
+    assert web_version.startswith("0.8.0-alpha8-web.")
+    assert int(web_version.rsplit(".", 1)[1]) >= 3
+
+    # Alpha8.12 itself was HA/dashboard-only. Later coordinated releases may
+    # legitimately widen the current maintenance scope without rewriting that
+    # historical release contract.
+    if version == "0.8.0-alpha8.12":
+        assert bundle["maintenance"]["affected_components"] == [
+            "kems_core",
+            "dashboard",
+        ]
+        assert "managed Home Assistant dashboard" in bundle["maintenance"]["reason"]
