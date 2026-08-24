@@ -74,7 +74,11 @@ class KEMSSystemTypeSelect(KEMSEntity, SelectEntity):
     @property
     def current_option(self) -> str:
         definition = SYSTEM_TYPE_DEFINITIONS.get(self.coordinator.settings.system_type)
-        return definition.label if definition else SYSTEM_TYPE_DEFINITIONS[SYSTEM_TYPE_KEMS].label
+        return (
+            definition.label
+            if definition
+            else SYSTEM_TYPE_DEFINITIONS[SYSTEM_TYPE_KEMS].label
+        )
 
     async def async_select_option(self, option: str) -> None:
         selected = next(
@@ -87,7 +91,15 @@ class KEMSSystemTypeSelect(KEMSEntity, SelectEntity):
         )
         if selected is None:
             raise HomeAssistantError(f"Unsupported KEMS system type: {option}")
-        changes = {CONF_SYSTEM_TYPE: selected}
+
+        # Resolve the legacy product's tariff intent before replacing the old
+        # system_type option. This means Full KEMS Agile -> KEMS cannot silently
+        # fall back to fixed export during the migration.
+        tariff_type = export_tariff_type_from_options(self.coordinator.entry.options)
+        changes = {
+            CONF_SYSTEM_TYPE: selected,
+            "export_tariff_type": tariff_type,
+        }
         if selected == SYSTEM_TYPE_LIVE_DATA:
             changes[CONF_OPERATING_MODE] = "observe"
         await async_set_runtime_options(self.hass, self.coordinator.entry, changes)
@@ -110,7 +122,11 @@ class KEMSExportTariffSelect(KEMSEntity, SelectEntity):
 
     async def async_select_option(self, option: str) -> None:
         selected = next(
-            (key for key, label in EXPORT_TARIFF_TYPE_LABELS.items() if label == option),
+            (
+                key
+                for key, label in EXPORT_TARIFF_TYPE_LABELS.items()
+                if label == option
+            ),
             None,
         )
         if selected is None:
