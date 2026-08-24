@@ -123,9 +123,7 @@ def _active_power_down_targets(
     reserve = max(config.battery_reserve_percent, 0.0)
     battery_allowed = soc is None or soc > reserve + 0.05
 
-    battery_to_home = (
-        min(remaining_house, battery_headroom) if battery_allowed else 0.0
-    )
+    battery_to_home = min(remaining_house, battery_headroom) if battery_allowed else 0.0
     remaining_battery_headroom = max(battery_headroom - battery_to_home, 0.0)
     battery_export = (
         min(max(config.export_limit_kw, 0.0), remaining_battery_headroom)
@@ -184,7 +182,9 @@ def _nonblocking_price_horizon(
     """Treat unknown future prices as zero-reserved capacity, not a global hold."""
     mode = str(plan.get("dispatch_mode") or "price_optimised")
     current_known = bool(horizon.get("current_slot_known"))
-    deadline_override = mode in horizon_runtime._DEADLINE_OVERRIDE_MODES and current_known
+    deadline_override = (
+        mode in horizon_runtime._DEADLINE_OVERRIDE_MODES and current_known
+    )
     horizon["deadline_override"] = deadline_override
 
     if horizon.get("complete"):
@@ -209,7 +209,9 @@ def _restore_required_current_export(
     """Prevent a final maximum-discharge plan from silently zeroing its current slot."""
     if str(plan.get("dispatch_mode") or "") != "maximum_discharge":
         return
-    current = max(events._number(plan.get("current_battery_export_target_kw")) or 0.0, 0.0)
+    current = max(
+        events._number(plan.get("current_battery_export_target_kw")) or 0.0, 0.0
+    )
     if current > _EPSILON:
         return
     selected_kw = max(events._selected_current_export_kw(selected, now), 0.0)
@@ -277,12 +279,8 @@ def _repair_commissioning_tariff_check(payload: dict[str, Any], coordinator) -> 
     payload["pass_count"] = sum(
         item.get("status") == commissioning.PASS for item in checks
     )
-    required_fail = any(
-        item.get("status") == commissioning.FAIL for item in required
-    )
-    required_wait = any(
-        item.get("status") == commissioning.WAIT for item in required
-    )
+    required_fail = any(item.get("status") == commissioning.FAIL for item in required)
+    required_wait = any(item.get("status") == commissioning.WAIT for item in required)
     foxess_count = int(payload.get("foxess_registered_entity_count") or 0)
     if required_fail:
         state = "Blocked"
