@@ -250,9 +250,8 @@ def install_agile_simulation_presentation() -> None:
 
     def projected_attributes(self):
         attributes = original_attributes(self)
-        if (
-            self.entity_description.key not in _PRESENTATION_KEYS
-            or not _uses_agile(self.coordinator)
+        if self.entity_description.key not in _PRESENTATION_KEYS or not _uses_agile(
+            self.coordinator
         ):
             return attributes
         result = dict(attributes or {})
