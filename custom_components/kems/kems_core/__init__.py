@@ -74,6 +74,7 @@ from .periods import (
     summarise_period_records,
 )
 from .power_down_audit import (
+    PowerDownAccountingState,
     PowerDownAuditState,
     finalise_power_down_audit,
 )
@@ -133,6 +134,7 @@ __all__ = [
     "LifetimeLedger",
     "PeriodTotals",
     "PERIOD_DATA_COMPLETE_KEY",
+    "PowerDownAccountingState",
     "PowerDownAuditState",
     "PowerDownResult",
     "ProposalSystemProfile",
