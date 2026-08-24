@@ -37,7 +37,11 @@ def _load_functions(names: set[str], constants: set[str] | None = None):
         "_SETTLEMENT_PERIOD": timedelta(minutes=30),
     }
     exec(
-        compile(ast.fix_missing_locations(ast.Module(body=body, type_ignores=[])), "reconciliation", "exec"),
+        compile(
+            ast.fix_missing_locations(ast.Module(body=body, type_ignores=[])),
+            "reconciliation",
+            "exec",
+        ),
         namespace,
     )
     return namespace
@@ -46,7 +50,9 @@ def _load_functions(names: set[str], constants: set[str] | None = None):
 def _dt(value):
     if value is None:
         return None
-    parsed = value if isinstance(value, datetime) else datetime.fromisoformat(str(value))
+    parsed = (
+        value if isinstance(value, datetime) else datetime.fromisoformat(str(value))
+    )
     return parsed.astimezone(UTC)
 
 
@@ -67,9 +73,7 @@ def test_selected_slots_gain_explicit_half_hour_bounds() -> None:
         "next_export_slot": {"valid_from": start.isoformat(), "label": "16:30"},
     }
     state = {
-        "today_slots": [
-            {"valid_from": start.isoformat(), "valid_to": end.isoformat()}
-        ]
+        "today_slots": [{"valid_from": start.isoformat(), "valid_to": end.isoformat()}]
     }
 
     selected = ns["_normalise_selected_slots"](plan, state)
@@ -104,8 +108,7 @@ def test_active_power_down_uses_live_house_load_and_one_grid_direction() -> None
     assert result["projected_grid_import_kw"] == 0.0
     assert result["grid_export_target_kw"] == 1.387
     assert not (
-        result["projected_grid_import_kw"] > 0
-        and result["grid_export_target_kw"] > 0
+        result["projected_grid_import_kw"] > 0 and result["grid_export_target_kw"] > 0
     )
     assert result["active_house_load_basis"] == "current_snapshot"
 
@@ -230,4 +233,4 @@ def test_reconciliation_is_final_canonical_shadow_only_boundary() -> None:
     assert "agile_alpha810" not in compat
     assert ".services.async_call(" not in source
     assert "providers.foxess" not in source
-    assert "hardware_writes\": \"blocked" in source
+    assert 'hardware_writes": "blocked' in source
