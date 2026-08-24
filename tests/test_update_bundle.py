@@ -37,17 +37,9 @@ def test_release_bundle_renders_exact_coordinated_alpha8_targets() -> None:
     assert bundle["maintenance"]["affected_components"] == [
         "kems_core",
         "dashboard",
-        "panel",
-        "property_web",
-        "pi_agent",
-        "public_web",
     ]
     assert bundle["maintenance"]["reboot_required"] is False
-    assert (
-        "automatic Octopus Weekend Happy Hour discovery"
-        in bundle["maintenance"]["reason"]
-    )
-    assert "selectable shadow EV charging policy" in bundle["maintenance"]["reason"]
+    assert "managed Home Assistant dashboard" in bundle["maintenance"]["reason"]
 
 
 def test_bundle_contract_rejects_mismatched_appliance_versions() -> None:
