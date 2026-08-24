@@ -94,9 +94,7 @@ class PowerDownAccountingState:
                 self.maximum_inverter_output_kw,
                 inverter_output,
             ),
-            rewardable_reduction_kwh=(
-                self.rewardable_reduction_kwh + rewardable
-            ),
+            rewardable_reduction_kwh=(self.rewardable_reduction_kwh + rewardable),
             bonus_pence=self.bonus_pence + bonus,
             fixed_export_income_pence=(
                 self.fixed_export_income_pence + grid_export * hours * export_rate
