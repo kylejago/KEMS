@@ -13,7 +13,9 @@ RECONCILIATION = ROOT / "custom_components" / "kems" / "agile_runtime_reconcilia
 POWER_DOWN = ROOT / "custom_components" / "kems" / "power_down.py"
 
 
-def test_alpha8_10_release_identity_and_coordinated_versions_survive_later_alpha8() -> None:
+def test_alpha8_10_release_identity_and_coordinated_versions_survive_later_alpha8() -> (
+    None
+):
     manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
     bundle = json.loads(BUNDLE.read_text(encoding="utf-8"))
 
