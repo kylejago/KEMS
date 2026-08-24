@@ -28,7 +28,7 @@ def _compat_specs() -> list[tuple[str, str]]:
         for item in node.value.elts:
             assert isinstance(item, ast.Tuple) and len(item.elts) == 2
             module = ast.literal_eval(item.elts[0])
-            installer = ast.literal_eval(item.elts[1])
+            installer = ast.literal_eval(item.elelts[1])
             specs.append((module, installer))
     return specs
 
@@ -89,8 +89,8 @@ def test_alpha8_compatibility_registry_is_complete_and_resolvable() -> None:
     assert len(specs) == len(set(specs)), "Compatibility installers must be unique"
     assert specs[0] == ("agile_smart_export_reporting", "install_reporting_patch")
     assert specs[-1] == (
-        "agile_dispatch_reconciliation",
-        "install_dispatch_reconciliation",
+        "agile_runtime_reconciliation",
+        "install_runtime_reconciliation",
     )
 
     for module_name, installer_name in specs:
