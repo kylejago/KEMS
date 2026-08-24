@@ -26,9 +26,9 @@ from .kems_core import (
     ev_policy_from_options,
 )
 from .product_types import (
-    EXPORT_TARIFF_TYPES,
     EXPORT_TARIFF_TYPE_LABELS,
     EXPORT_TARIFF_TYPE_NONE,
+    EXPORT_TARIFF_TYPES,
     SYSTEM_TYPE_DEFINITIONS,
     SYSTEM_TYPE_KEMS,
     SYSTEM_TYPE_LIVE_DATA,
