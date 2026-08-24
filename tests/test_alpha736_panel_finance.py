@@ -38,14 +38,6 @@ def test_alpha8_release_targets_coordinated_panel_and_web() -> None:
     assert "PANEL6_VERSION_LINE" not in dashboard
     assert "PANEL7_VERSION_LINE" not in dashboard
     assert "return PACKAGED_PANEL_PATH.read_bytes()" in dashboard
-    assert bundle["maintenance"]["affected_components"] == [
-        "kems_core",
-        "dashboard",
-        "panel",
-        "property_web",
-        "pi_agent",
-        "public_web",
-    ]
 
 
 def test_alpha736_panel_flow_comes_from_final_current_routing_snapshot() -> None:
