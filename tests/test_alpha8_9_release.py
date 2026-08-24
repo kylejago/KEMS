@@ -1,4 +1,4 @@
-"""Release contract for the Alpha8.9 Agile decision-evidence correction."""
+"""Alpha8.9 decision-evidence contracts retained by later Alpha8 releases."""
 
 from __future__ import annotations
 
@@ -12,16 +12,20 @@ NOTES = ROOT / "docs" / "alpha8.9-release-notes.md"
 EVIDENCE = ROOT / "custom_components" / "kems" / "agile_decision_evidence.py"
 
 
-def test_alpha8_9_release_identity_and_coordinated_versions() -> None:
+def test_alpha8_9_truth_contract_survives_later_alpha8_releases() -> None:
     manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
     bundle = json.loads(BUNDLE.read_text(encoding="utf-8"))
 
-    assert manifest["version"] == "0.8.0-alpha8.9"
+    assert str(manifest["version"]).startswith("0.8.0-alpha8.")
+    assert int(str(manifest["version"]).rsplit(".", 1)[1]) >= 9
     assert bundle["components"]["panel"]["version"] == "0.8.0-alpha8-panel.1"
-    assert bundle["components"]["property_web"]["version"] == "0.8.0-alpha8-web.2"
-    assert bundle["components"]["pi_agent"]["version"] == "0.8.0-alpha8-web.2"
-    assert bundle["components"]["public_web"]["version"] == "0.8.0-alpha8-web.2"
-    assert "decision evidence after runtime gaps" in bundle["maintenance"]["reason"]
+    web_versions = {
+        bundle["components"]["property_web"]["version"],
+        bundle["components"]["pi_agent"]["version"],
+        bundle["components"]["public_web"]["version"],
+    }
+    assert len(web_versions) == 1
+    assert next(iter(web_versions)).startswith("0.8.0-alpha8-web.")
 
 
 def test_alpha8_9_notes_lock_truth_and_shadow_scope() -> None:
