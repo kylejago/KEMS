@@ -1,5 +1,7 @@
 """Home Assistant publication and dashboard presentation for Alpha8.13 bills."""
 
+# ruff: noqa: E501
+
 from __future__ import annotations
 
 from typing import Any
