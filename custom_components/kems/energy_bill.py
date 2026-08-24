@@ -366,7 +366,10 @@ def build_energy_cost_comparison(
         "contract_version": 1,
         "headline": "Total energy cost",
         "basis": "bill_equivalent",
-        "formula": "electricity import + electricity standing charge - electricity export income - supplier/account energy credits + gas usage + gas standing charge",
+        "formula": (
+            "electricity import + electricity standing charge - electricity export "
+            "income - supplier/account energy credits + gas usage + gas standing charge"
+        ),
         "battery_wear_included": False,
         "gas_included": True,
         "standing_charges_included": True,
