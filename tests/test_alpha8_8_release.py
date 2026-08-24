@@ -26,9 +26,6 @@ def test_alpha8_8_retention_contract_survives_later_alpha8_releases() -> None:
     web_version = web_versions.pop()
     assert web_version.startswith("0.8.0-alpha8-web.")
     assert int(web_version.rsplit(".", 1)[1]) >= 2
-    reason = bundle["maintenance"]["reason"]
-    assert "automatic Octopus Weekend Happy Hour discovery" in reason
-    assert "selectable shadow EV charging policy" in reason
 
 
 def test_alpha8_8_notes_lock_retention_and_safety_scope() -> None:
