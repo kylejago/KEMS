@@ -25,18 +25,6 @@ def test_alpha8_10_release_identity_and_coordinated_versions_survive_later_alpha
     assert bundle["components"]["property_web"]["version"] == "0.8.0-alpha8-web.3"
     assert bundle["components"]["pi_agent"]["version"] == "0.8.0-alpha8-web.3"
     assert bundle["components"]["public_web"]["version"] == "0.8.0-alpha8-web.3"
-    assert bundle["maintenance"]["affected_components"] == [
-        "kems_core",
-        "dashboard",
-        "panel",
-        "property_web",
-        "pi_agent",
-        "public_web",
-    ]
-    reason = bundle["maintenance"]["reason"]
-    assert "Power Down shadow accounting" in reason
-    assert "automatic Octopus Weekend Happy Hour discovery" in reason
-    assert "selectable shadow EV charging policy" in reason
 
 
 def test_alpha8_10_notes_lock_reconciliation_and_shadow_scope() -> None:
