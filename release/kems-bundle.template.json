@@ -42,17 +42,13 @@
   },
   "maintenance": {
     "required": true,
-    "reason": "Reconcile Full KEMS Agile runtime, Power Down shadow accounting and cross-surface comparison parity while retaining automatic Octopus Weekend Happy Hour discovery and the selectable shadow EV charging policy",
+    "reason": "Harden the managed Home Assistant dashboard against missing optional update-status attributes and align release metadata with the HA/dashboard-only maintenance scope",
     "expected_downtime_minutes": 5,
     "home_assistant_restart_required": true,
     "reboot_required": false,
     "affected_components": [
       "kems_core",
-      "dashboard",
-      "panel",
-      "property_web",
-      "pi_agent",
-      "public_web"
+      "dashboard"
     ]
   }
 }
