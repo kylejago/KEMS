@@ -72,10 +72,15 @@ def _dashboard_readability_pass(content: str) -> str:
     content = content.replace("        columns: 4\n", "        columns: 2\n").replace(
         "        columns: 5\n", "        columns: 3\n"
     )
-    return content.replace(
-        "{% set failure = update.attributes.last_error or maintenance.attributes.error %}",
-        "{% set failure = update.attributes.get('last_error') or maintenance.attributes.get('error') %}",
+    unsafe_failure_template = (
+        "{% set failure = update.attributes.last_error or "
+        "maintenance.attributes.error %}"
     )
+    safe_failure_template = (
+        "{% set failure = update.attributes.get('last_error') or "
+        "maintenance.attributes.get('error') %}"
+    )
+    return content.replace(unsafe_failure_template, safe_failure_template)
 
 
 def _combined_master_dashboard_bytes() -> bytes:
