@@ -73,7 +73,9 @@ def _bounds(key: str, today: date, days: set[date]) -> tuple[date, date]:
     return (min(days), today) if days else (today, today)
 
 
-def _standing_maps(records: list[Snapshot]) -> tuple[dict[date, float], dict[date, float]]:
+def _standing_maps(
+    records: list[Snapshot],
+) -> tuple[dict[date, float], dict[date, float]]:
     electricity: dict[date, float] = {}
     gas: dict[date, float] = {}
     for item in sorted(records, key=lambda row: row.timestamp):
@@ -85,7 +87,9 @@ def _standing_maps(records: list[Snapshot]) -> tuple[dict[date, float], dict[dat
     return electricity, gas
 
 
-def _standing(days: set[date], known: Mapping[date, float], fallback: float | None) -> tuple[float, int]:
+def _standing(
+    days: set[date], known: Mapping[date, float], fallback: float | None
+) -> tuple[float, int]:
     default = max(_f(fallback), 0.0)
     total = 0.0
     estimated = 0
@@ -168,7 +172,9 @@ def _live(
     }
 
 
-def _scenario(scenario: ScenarioSummary | None, gas: Mapping[str, Any]) -> dict[str, Any]:
+def _scenario(
+    scenario: ScenarioSummary | None, gas: Mapping[str, Any]
+) -> dict[str, Any]:
     if scenario is None or not scenario.ready:
         return {"ready": False, "total_energy_cost_pence": None}
     electric = round(scenario.total_cost_pence, 2)
@@ -181,7 +187,9 @@ def _scenario(scenario: ScenarioSummary | None, gas: Mapping[str, Any]) -> dict[
         "supplier_energy_credit_pence": round(scenario.power_down_income_pence, 2),
         "electricity_total_cost_pence": electric,
         **gas,
-        "total_energy_cost_pence": round(electric + gas_total, 2) if gas_total is not None else None,
+        "total_energy_cost_pence": (
+            round(electric + gas_total, 2) if gas_total is not None else None
+        ),
         "home_energy_kwh": round(scenario.house_consumption_kwh, 3),
         "grid_import_kwh": round(scenario.grid_import_kwh, 3),
         "grid_export_kwh": round(scenario.grid_export_kwh, 3),
@@ -205,7 +213,7 @@ def _strategy_days(
         row = value.get(strategy) if isinstance(value, Mapping) else None
         if isinstance(row, Mapping) and row.get("ready") is not False:
             output[day] = row
-    current = (((state.get("periods") or {}).get("today") or {}).get(strategy))
+    current = ((state.get("periods") or {}).get("today") or {}).get(strategy)
     if isinstance(current, Mapping) and current.get("ready") is not False:
         output[today] = current
     return output
@@ -238,7 +246,9 @@ def _strategy(
         "supplier_energy_credit_pence": credit,
         "electricity_total_cost_pence": electric,
         **gas,
-        "total_energy_cost_pence": round(electric + gas_total, 2) if gas_total is not None else None,
+        "total_energy_cost_pence": (
+            round(electric + gas_total, 2) if gas_total is not None else None
+        ),
         "home_energy_kwh": round(_sum(rows, "house_load_kwh"), 3),
         "grid_import_kwh": round(_sum(rows, "grid_import_kwh"), 3),
         "grid_export_kwh": round(_sum(rows, "grid_export_kwh"), 3),
@@ -264,9 +274,16 @@ def build_energy_cost_comparison(
     actual = _daily(daily_records, tracking_date, tracking_values)
     actual_days = set(actual)
     elec_standing, gas_standing = _standing_maps(history_records)
-    gas_available = bool(data.gas.available or any(_f(row.get("gas_cost_pence")) for row in actual.values()))
+    gas_available = bool(
+        data.gas.available
+        or any(_f(row.get("gas_cost_pence")) for row in actual.values())
+    )
     strategy_label = kems_strategy_label(export_tariff_type)
-    retained_key = "agile_smart_export" if export_tariff_type == EXPORT_TARIFF_TYPE_AGILE else "full_kems_forecast"
+    retained_key = (
+        "agile_smart_export"
+        if export_tariff_type == EXPORT_TARIFF_TYPE_AGILE
+        else "full_kems_forecast"
+    )
     retained = _strategy_days(agile_daily, agile_state, retained_key, now.date())
 
     periods: dict[str, Any] = {}
@@ -277,25 +294,62 @@ def build_energy_cost_comparison(
         live = _live(rows, dates, elec_standing, gas_standing, data, gas_available)
         gas = {name: value for name, value in live.items() if name.startswith("gas_")}
 
-        if export_tariff_type == EXPORT_TARIFF_TYPE_NONE and key in {"today", "yesterday", "7_days", "30_days"}:
+        if export_tariff_type == EXPORT_TARIFF_TYPE_NONE and key in {
+            "today",
+            "yesterday",
+            "7_days",
+            "30_days",
+        }:
             period = data.scenarios.period(key)
-            kems = _scenario(period.scenario("kems_no_export") if period else None, gas)
-        elif export_tariff_type in {EXPORT_TARIFF_TYPE_FIXED, EXPORT_TARIFF_TYPE_AGILE}:
-            strategy_dates = {day for day in retained if start <= day <= end and (not dates or day in dates)}
+            kems = _scenario(
+                period.scenario("kems_no_export") if period else None,
+                gas,
+            )
+        elif export_tariff_type in {
+            EXPORT_TARIFF_TYPE_FIXED,
+            EXPORT_TARIFF_TYPE_AGILE,
+        }:
+            strategy_dates = {
+                day
+                for day in retained
+                if start <= day <= end and (not dates or day in dates)
+            }
             strategy_rows = [retained[day] for day in sorted(strategy_dates)]
-            if not strategy_rows and export_tariff_type == EXPORT_TARIFF_TYPE_FIXED and key in {"today", "yesterday", "7_days", "30_days"}:
+            if (
+                not strategy_rows
+                and export_tariff_type == EXPORT_TARIFF_TYPE_FIXED
+                and key in {"today", "yesterday", "7_days", "30_days"}
+            ):
                 period = data.scenarios.period(key)
-                kems = _scenario(period.scenario("kems_forecast") if period else None, gas)
+                kems = _scenario(
+                    period.scenario("kems_forecast") if period else None,
+                    gas,
+                )
             else:
-                kems = _strategy(strategy_rows, strategy_dates, gas, elec_standing, data.snapshot.electricity_standing_charge, strategy_label)
+                kems = _strategy(
+                    strategy_rows,
+                    strategy_dates,
+                    gas,
+                    elec_standing,
+                    data.snapshot.electricity_standing_charge,
+                    strategy_label,
+                )
         else:
-            kems = {"ready": False, "total_energy_cost_pence": None, "evidence": "Matching long-range no-export replay is still building"}
+            kems = {
+                "ready": False,
+                "total_energy_cost_pence": None,
+                "evidence": "Matching long-range no-export replay is still building",
+            }
 
         kems["strategy"] = export_tariff_type
         kems["strategy_label"] = strategy_label
         live_total = live.get("total_energy_cost_pence")
         kems_total = kems.get("total_energy_cost_pence")
-        saving = round(float(live_total) - float(kems_total), 2) if live_total is not None and kems_total is not None else None
+        saving = (
+            round(float(live_total) - float(kems_total), 2)
+            if live_total is not None and kems_total is not None
+            else None
+        )
         periods[key] = {
             "label": label,
             "start_date": start.isoformat(),
@@ -320,8 +374,12 @@ def build_energy_cost_comparison(
         "selected_kems_strategy_label": strategy_label,
         "products": ["live_data", "kems"],
         "periods": periods,
-        "today_live_total_energy_cost_pence": today["live_data"].get("total_energy_cost_pence"),
-        "today_kems_total_energy_cost_pence": today["kems"].get("total_energy_cost_pence"),
+        "today_live_total_energy_cost_pence": today["live_data"].get(
+            "total_energy_cost_pence"
+        ),
+        "today_kems_total_energy_cost_pence": today["kems"].get(
+            "total_energy_cost_pence"
+        ),
         "today_saving_pence": today.get("saving_pence"),
         "generated_at": now.isoformat(),
         "reporting_only": True,
