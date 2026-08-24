@@ -20,12 +20,12 @@
       "delivery": "kems_core"
     },
     "property_web": {
-      "version": "0.8.0-alpha8-web.2",
+      "version": "0.8.0-alpha8-web.3",
       "required": true,
       "delivery": "kems_pi"
     },
     "pi_agent": {
-      "version": "0.8.0-alpha8-web.2",
+      "version": "0.8.0-alpha8-web.3",
       "required": true,
       "delivery": "kems_pi"
     },
@@ -35,14 +35,14 @@
       "delivery": "kems_pi"
     },
     "public_web": {
-      "version": "0.8.0-alpha8-web.2",
+      "version": "0.8.0-alpha8-web.3",
       "required": false,
       "delivery": "ionos-sftp"
     }
   },
   "maintenance": {
     "required": true,
-    "reason": "Correct Full KEMS Agile decision evidence after runtime gaps while retaining automatic Octopus Weekend Happy Hour discovery and the selectable shadow EV charging policy",
+    "reason": "Reconcile Full KEMS Agile runtime, Power Down shadow accounting and cross-surface comparison parity while retaining automatic Octopus Weekend Happy Hour discovery and the selectable shadow EV charging policy",
     "expected_downtime_minutes": 5,
     "home_assistant_restart_required": true,
     "reboot_required": false,
