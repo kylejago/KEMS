@@ -253,6 +253,7 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                 simulation,
                 control,
                 now,
+                agile_state=self._agile_smart_export.state,
             )
             phase = self._phase(
                 learned.ready,
