@@ -73,14 +73,15 @@ def _canonical_home_copy(content: str) -> str:
     )
     old_types = (
         "              **Live Data** — actual property data only.  \n"
-        "              **Battery & Solar** — tariff-aware battery/solar optimisation.  \n"
+        "              **Battery & Solar** — tariff-aware battery/solar "
+        "optimisation.  \n"
         "              **Full KEMS** — forecasts + smart import tariffs.  \n"
         "              **Full KEMS Agile** — Full KEMS + dynamic smart export.\n"
     )
     new_types = (
         "              **Live Data** — what the property actually did.  \n"
-        "              **KEMS** — what KEMS would have done using the strategy selected "
-        "for the configured tariff and system.  \n"
+        "              **KEMS** — what KEMS would have done using the strategy "
+        "selected for the configured tariff and system.  \n"
         "              Legacy strategy engines remain internal evidence rather than "
         "separate products.\n"
     )
