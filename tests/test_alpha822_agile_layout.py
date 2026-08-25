@@ -42,9 +42,7 @@ def test_today_and_tomorrow_are_single_readable_chronological_lists() -> None:
     parsed = _final_dashboard()
 
     today = _card(_view(parsed, "kems"), "Today's KEMS plan — 00:00 to 23:30")
-    tomorrow = _card(
-        _view(parsed, "tomorrow"), "Tomorrow's KEMS plan — 00:00 to 23:30"
-    )
+    tomorrow = _card(_view(parsed, "tomorrow"), "Tomorrow's KEMS plan — 00:00 to 23:30")
 
     for card in (today, tomorrow):
         assert card["type"] == "markdown"
