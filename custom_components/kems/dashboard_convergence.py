@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import hashlib
 import os
+from contextlib import suppress
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -96,10 +97,8 @@ def sync_and_verify_managed_dashboard(
             temporary.write_bytes(expected)
             os.replace(temporary, target)
     except OSError as error:
-        try:
+        with suppress(OSError):
             temporary.unlink(missing_ok=True)
-        except OSError:
-            pass
         raise DashboardConvergenceError(
             f"Managed dashboard repair failed at {target}: {error}"
         ) from error
