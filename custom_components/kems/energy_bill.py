@@ -17,9 +17,13 @@ from .product_types import (
 PERIODS = {
     "today": (0, "Today"),
     "yesterday": (1, "Yesterday"),
+    "this_week": (0, "This Week"),
+    "last_week": (0, "Last Week"),
     "7_days": (7, "Last 7 days"),
+    "this_month": (0, "This Month"),
+    "last_month": (0, "Last Month"),
     "30_days": (30, "Last 30 days"),
-    "year": (-1, "Year"),
+    "year": (-1, "This Year"),
     "365_days": (365, "Rolling 365 evidence"),
     "all_time": (0, "All tracked evidence"),
 }
@@ -62,8 +66,19 @@ def _bounds(key: str, today: date, days: set[date]) -> tuple[date, date]:
         return today, today
     if key == "yesterday":
         return today - timedelta(days=1), today - timedelta(days=1)
+    week_start = today - timedelta(days=today.weekday())
+    if key == "this_week":
+        return week_start, today
+    if key == "last_week":
+        end = week_start - timedelta(days=1)
+        return end - timedelta(days=6), end
     if key == "7_days":
         return today - timedelta(days=6), today
+    if key == "this_month":
+        return today.replace(day=1), today
+    if key == "last_month":
+        end = today.replace(day=1) - timedelta(days=1)
+        return end.replace(day=1), end
     if key == "30_days":
         return today - timedelta(days=29), today
     if key == "year":
