@@ -10,9 +10,7 @@ from types import ModuleType
 
 ROOT = Path(__file__).parents[1]
 PIPELINE_PATH = ROOT / "custom_components" / "kems" / "dashboard_pipeline.py"
-CONSOLIDATION_PATH = (
-    ROOT / "custom_components" / "kems" / "dashboard_consolidation.py"
-)
+CONSOLIDATION_PATH = ROOT / "custom_components" / "kems" / "dashboard_consolidation.py"
 INIT_PATH = ROOT / "custom_components" / "kems" / "__init__.py"
 MANIFEST_PATH = ROOT / "custom_components" / "kems" / "manifest.json"
 BUNDLE_PATH = ROOT / "release" / "kems-bundle.template.json"
@@ -104,17 +102,23 @@ def test_pipeline_restores_readability_then_finalizes_the_complete_builder() -> 
     content = PIPELINE_PATH.read_text(encoding="utf-8")
     init = INIT_PATH.read_text(encoding="utf-8")
 
-    assert "dashboard._dashboard_readability_pass = baseline_readability_pass" in content
-    assert "content = original_builder().decode(\"utf-8\")" in content
+    assert (
+        "dashboard._dashboard_readability_pass = baseline_readability_pass" in content
+    )
+    assert 'content = original_builder().decode("utf-8")' in content
     assert "content = improve_energy_bill_dashboard(content)" in content
     assert "content = canonicalize_final_dashboard(content)" in content
     assert "convergent._managed_dashboard_bytes = managed_dashboard_bytes" in content
-    assert init.index("install_energy_bill_dashboard_patch()") < init.index(
-        "install_dashboard_pipeline()"
-    ) < init.index("await async_sync_managed_dashboard(hass)")
+    assert (
+        init.index("install_energy_bill_dashboard_patch()")
+        < init.index("install_dashboard_pipeline()")
+        < init.index("await async_sync_managed_dashboard(hass)")
+    )
 
 
-def test_alpha816_release_scope_keeps_web_panel_and_hardware_boundary_unchanged() -> None:
+def test_alpha816_release_scope_keeps_web_panel_and_hardware_boundary_unchanged() -> (
+    None
+):
     manifest = json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
     bundle = json.loads(BUNDLE_PATH.read_text(encoding="utf-8"))
     content = PIPELINE_PATH.read_text(encoding="utf-8")
