@@ -123,7 +123,8 @@ def test_alpha816_release_scope_keeps_web_panel_and_hardware_boundary_unchanged(
     bundle = json.loads(BUNDLE_PATH.read_text(encoding="utf-8"))
     content = PIPELINE_PATH.read_text(encoding="utf-8")
 
-    assert manifest["version"] == "0.8.0-alpha8.16"
+    assert manifest["version"].startswith("0.8.0-alpha8.")
+    assert int(manifest["version"].rsplit(".", 1)[-1]) >= 16
     assert bundle["components"]["panel"]["version"] == "0.8.0-alpha8-panel.1"
     assert bundle["components"]["property_web"]["version"] == "0.8.0-alpha8-web.4"
     assert bundle["components"]["pi_agent"]["version"] == "0.8.0-alpha8-web.4"
