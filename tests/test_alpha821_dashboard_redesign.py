@@ -101,12 +101,13 @@ def test_today_slots_live_on_kems_and_tomorrow_slots_live_on_tomorrow() -> None:
 def test_compare_is_three_column_no_system_live_kems_view() -> None:
     compare = _view("Compare")
     content = yaml.safe_dump(compare, sort_keys=False)
+    literal = str(compare)
     assert "columns: 3" in content
     for title in ("Without KEMS", "Live", "KEMS"):
         assert f"title: {title}" in content
     assert "sensor.kems_compare_no_system_cost_today" in content
-    assert "Live system value vs no system" in content
-    assert "KEMS potential value vs no system" in content
+    assert "Live system value vs no system" in literal
+    assert "KEMS potential value vs no system" in literal
 
 
 def test_history_has_requested_calendar_periods() -> None:
@@ -141,6 +142,7 @@ def test_history_has_requested_calendar_periods() -> None:
 def test_system_page_is_compact_and_update_history_is_bounded() -> None:
     system_view = _view("System")
     system = yaml.safe_dump(system_view, sort_keys=False)
+    literal = str(system_view)
     assert "title: Health" in system
     assert "title: Control safety" in system
     assert "title: Update" in system
@@ -149,5 +151,5 @@ def test_system_page_is_compact_and_update_history_is_bounded() -> None:
         for card in system_view["cards"]
     )
     assert "[0:5]" in system
-    assert "Real inverter writes remain blocked" not in system
-    assert "Physical control remains locked" in system
+    assert "Real inverter writes remain blocked" not in literal
+    assert "Physical control remains locked" in literal
