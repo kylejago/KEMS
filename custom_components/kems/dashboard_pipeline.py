@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-
 _PLAN_VALUE_EXPRESSIONS = {
     "{{ '%.2f' | format(p.get('grid_import_kwh', 0) | float) }}": (
         "{{ ('%.2f' | format(p.get('grid_import_kwh') | float(0))) if "
