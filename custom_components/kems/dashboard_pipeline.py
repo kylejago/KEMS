@@ -5,27 +5,46 @@ from __future__ import annotations
 
 def _plan_table_card(*, title: str, attribute: str, empty_message: str) -> str:
     """Return one readable full-card-width chronological KEMS plan table."""
-    return f"""      - type: markdown
-        title: {title}
-        content: |
-          {{% set slots = state_attr('sensor.kems_agile_slots', '{attribute}') or [] %}}
-          {{% if slots %}}
-          | Time | Rate | KEMS plan and energy |
-          |---|---:|---|
-          {{% for p in slots %}}
-          {{% set raw = (p.get('actions') or ['—']) | join(', ') %}}
-          {{% set a = raw | lower %}}
-          {{% set plan = 'Cheap charge' if 'cheap charge' in a else 'Max discharge' if 'maximum discharge' in a else 'Deadline export' if 'deadline' in a else 'Battery export' if 'export battery' in a else 'Store solar' if 'store solar' in a else 'Battery → home' if 'battery to home' in a else raw[:36] %}}
-          {{% set gi = p.get('grid_import_kwh') %}}
-          {{% set ge = p.get('grid_export_kwh') %}}
-          {{% set bo = p.get('battery_export_kwh') %}}
-          {{% set soc = p.get('ending_soc_percent') %}}
-          | {{{{ p.get('label', '—') }}}} | {{{{ ('%.2f' | format(p.get('rate_pence') | float(0))) ~ 'p' if p.get('rate_pence') is not none else '—' }}}} | **{{{{ plan }}}}** · Grid in/out {{{{ ('%.2f' | format(gi | float(0))) if gi is not none else '—' }}}}/{{{{ ('%.2f' | format(ge | float(0))) if ge is not none else '—' }}}} · Batt out {{{{ ('%.2f' | format(bo | float(0))) if bo is not none else '—' }}}} · SOC {{{{ ('%.1f%%' | format(soc | float(0))) if soc is not none else '—' }}}} |
-          {{% endfor %}}
-          {{% else %}}
-          {empty_message}
-          {{% endif %}}
-"""
+    plan_line = (
+        "          {% set plan = 'Cheap charge' if 'cheap charge' in a else "
+        "'Max discharge' if 'maximum discharge' in a else 'Deadline export' "
+        "if 'deadline' in a else 'Battery export' if 'export battery' in a "
+        "else 'Store solar' if 'store solar' in a else 'Battery → home' if "
+        "'battery to home' in a else raw[:36] %}\n"
+    )
+    row_line = (
+        "          | {{ p.get('label', '—') }} | {{ ('%.2f' | "
+        "format(p.get('rate_pence') | float(0))) ~ 'p' if "
+        "p.get('rate_pence') is not none else '—' }} | **{{ plan }}** · "
+        "Grid in/out {{ ('%.2f' | format(gi | float(0))) if gi is not none "
+        "else '—' }}/{{ ('%.2f' | format(ge | float(0))) if ge is not none "
+        "else '—' }} · Batt out {{ ('%.2f' | format(bo | float(0))) if bo "
+        "is not none else '—' }} · SOC {{ ('%.1f%%' | format(soc | "
+        "float(0))) if soc is not none else '—' }} |\n"
+    )
+    return (
+        "      - type: markdown\n"
+        f"        title: {title}\n"
+        "        content: |\n"
+        f"          {{% set slots = state_attr('sensor.kems_agile_slots', "
+        f"'{attribute}') or [] %}}\n"
+        "          {% if slots %}\n"
+        "          | Time | Rate | KEMS plan and energy |\n"
+        "          |---|---:|---|\n"
+        "          {% for p in slots %}\n"
+        "          {% set raw = (p.get('actions') or ['—']) | join(', ') %}\n"
+        "          {% set a = raw | lower %}\n"
+        f"{plan_line}"
+        "          {% set gi = p.get('grid_import_kwh') %}\n"
+        "          {% set ge = p.get('grid_export_kwh') %}\n"
+        "          {% set bo = p.get('battery_export_kwh') %}\n"
+        "          {% set soc = p.get('ending_soc_percent') %}\n"
+        f"{row_line}"
+        "          {% endfor %}\n"
+        "          {% else %}\n"
+        f"          {empty_message}\n"
+        "          {% endif %}\n"
+    )
 
 
 def _replace_split_plan_cards(
