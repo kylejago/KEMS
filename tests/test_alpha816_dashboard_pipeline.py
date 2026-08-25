@@ -18,7 +18,9 @@ def test_successor_pipeline_keeps_one_authoritative_dashboard_payload() -> None:
     init = INIT_PATH.read_text(encoding="utf-8")
 
     assert "PACKAGED_DASHBOARD_PATH.read_bytes()" in content
-    assert "dashboard._combined_master_dashboard_bytes = _fresh_dashboard_bytes" in content
+    assert (
+        "dashboard._combined_master_dashboard_bytes = _fresh_dashboard_bytes" in content
+    )
     assert "convergent._managed_dashboard_bytes = _fresh_dashboard_bytes" in content
     assert "dashboard_consolidation" not in content
     assert "improve_energy_bill_dashboard" not in content
