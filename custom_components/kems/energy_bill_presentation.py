@@ -56,8 +56,7 @@ _TODAY_CARD = r"""      - type: markdown
           **KEMS strategy:** {{ kems.get('strategy_label', '—') }}. Battery wear is deliberately excluded from every total above.
 """
 
-_PRODUCT_VIEWS = r"""
-  - title: Live Data vs KEMS
+_PRODUCT_VIEWS = r"""  - title: Live Data vs KEMS
     path: overview
     icon: mdi:home-lightning-bolt
     cards:
@@ -87,12 +86,6 @@ _PRODUCT_VIEWS = r"""
           - type: tile
             entity: sensor.kems_data_quality
             name: Data quality
-          - type: tile
-            entity: sensor.kems_house_load
-            name: Home power
-          - type: tile
-            entity: sensor.kems_current_import_rate
-            name: Import rate
 
   - title: Live Data
     path: live-data
@@ -101,7 +94,11 @@ _PRODUCT_VIEWS = r"""
       - type: markdown
         content: |
           # Live Data
-          What actually happened in your home and on your supplier account. These figures use the same bill basis as KEMS: import + standing charges − export income − supplier credits + gas.
+          What actually happened in your home and on your supplier account. The headline is the canonical bill-equivalent total, not an engineering cost model.
+
+          {% set p = ((state_attr('sensor.kems_energy_cost_comparison', 'periods') or {}).get('today', {}) or {}) %}
+          {% set live = p.get('live_data', {}) or {} %}
+          **Today's total energy cost:** {{ ('£%.2f' | format((live.get('total_energy_cost_pence') | float) / 100)) if live.get('total_energy_cost_pence') is not none else '—' }}
       - type: grid
         columns: 2
         square: false
@@ -126,19 +123,6 @@ _PRODUCT_VIEWS = r"""
           - sensor.kems_grid_import
           - sensor.kems_grid_net_power
           - sensor.kems_ev_charging_power
-      - type: markdown
-        title: Today — Live Data bill
-        content: |
-          {% set p = ((state_attr('sensor.kems_energy_cost_comparison', 'periods') or {}).get('today', {}) or {}) %}
-          {% set live = p.get('live_data', {}) or {} %}
-          | Bill component | Live Data |
-          |---|---:|
-          | Electricity import | {{ ('£%.2f' | format((live.get('electricity_import_cost_pence') | float) / 100)) if live.get('electricity_import_cost_pence') is not none else '—' }} |
-          | Electricity standing charge | {{ ('£%.2f' | format((live.get('electricity_standing_charge_pence') | float) / 100)) if live.get('electricity_standing_charge_pence') is not none else '—' }} |
-          | Electricity export income | {{ ('-£%.2f' | format((live.get('electricity_export_income_pence') | float) / 100)) if live.get('electricity_export_income_pence') is not none else '—' }} |
-          | Supplier/account credits | {{ ('-£%.2f' | format((live.get('supplier_energy_credit_pence') | float) / 100)) if live.get('supplier_energy_credit_pence') is not none else '—' }} |
-          | Gas | {{ ('£%.2f' | format((live.get('gas_total_cost_pence') | float) / 100)) if live.get('gas_total_cost_pence') is not none else '—' }} |
-          | **TOTAL ENERGY COST** | **{{ ('£%.2f' | format((live.get('total_energy_cost_pence') | float) / 100)) if live.get('total_energy_cost_pence') is not none else '—' }}** |
 
   - title: KEMS
     path: kems
@@ -149,7 +133,11 @@ _PRODUCT_VIEWS = r"""
           # KEMS
           KEMS automatically uses the correct internal strategy for the configured tariff and system. The old Battery & Solar / Full KEMS / Full KEMS Agile names are retained only as internal evidence engines.
 
-          **Selected strategy:** {{ state_attr('sensor.kems_energy_cost_comparison', 'selected_kems_strategy_label') or '—' }}
+          {% set p = ((state_attr('sensor.kems_energy_cost_comparison', 'periods') or {}).get('today', {}) or {}) %}
+          {% set kems = p.get('kems', {}) or {} %}
+          **Selected strategy:** {{ state_attr('sensor.kems_energy_cost_comparison', 'selected_kems_strategy_label') or '—' }}  
+          **Today's total energy cost:** {{ ('£%.2f' | format((kems.get('total_energy_cost_pence') | float) / 100)) if kems.get('total_energy_cost_pence') is not none else '—' }}  
+          **Saving vs Live Data:** {{ ('£%.2f' | format((p.get('saving_pence') | float) / 100)) if p.get('saving_pence') is not none else '—' }}
       - type: grid
         columns: 2
         square: false
@@ -166,33 +154,66 @@ _PRODUCT_VIEWS = r"""
           - type: tile
             entity: sensor.kems_full_kems_forecast_status
             name: KEMS plan
-      - type: markdown
-        title: Today — KEMS bill
-        content: |
-          {% set p = ((state_attr('sensor.kems_energy_cost_comparison', 'periods') or {}).get('today', {}) or {}) %}
-          {% set kems = p.get('kems', {}) or {} %}
-          | Bill component | KEMS |
-          |---|---:|
-          | Electricity import | {{ ('£%.2f' | format((kems.get('electricity_import_cost_pence') | float) / 100)) if kems.get('electricity_import_cost_pence') is not none else '—' }} |
-          | Electricity standing charge | {{ ('£%.2f' | format((kems.get('electricity_standing_charge_pence') | float) / 100)) if kems.get('electricity_standing_charge_pence') is not none else '—' }} |
-          | Electricity export income | {{ ('-£%.2f' | format((kems.get('electricity_export_income_pence') | float) / 100)) if kems.get('electricity_export_income_pence') is not none else '—' }} |
-          | Supplier/account credits | {{ ('-£%.2f' | format((kems.get('supplier_energy_credit_pence') | float) / 100)) if kems.get('supplier_energy_credit_pence') is not none else '—' }} |
-          | Gas | {{ ('£%.2f' | format((kems.get('gas_total_cost_pence') | float) / 100)) if kems.get('gas_total_cost_pence') is not none else '—' }} |
-          | **TOTAL ENERGY COST** | **{{ ('£%.2f' | format((kems.get('total_energy_cost_pence') | float) / 100)) if kems.get('total_energy_cost_pence') is not none else '—' }}** |
-          | **Saving vs Live Data** | **{{ ('£%.2f' | format((p.get('saving_pence') | float) / 100)) if p.get('saving_pence') is not none else '—' }}** |
+
 """
 
-_COMPARE_VIEW = (
-    r"""
+_COMPARE_VIEW_HEADER = r"""
 
   - title: Compare
     path: compare
     icon: mdi:compare-horizontal
     cards:
 """
-    + _PERIOD_CARD
-    + "\n"
-    + _TODAY_CARD
+
+_VIEW_RENAMES = (
+    (
+        "  - title: Overview\n    path: overview\n",
+        "  - title: System Overview\n    path: system-overview\n",
+    ),
+    (
+        "  - title: Live Energy\n    path: live-energy\n",
+        "  - title: Live System\n    path: live-system\n",
+    ),
+    (
+        "  - title: Simulation\n    path: simulation\n",
+        "  - title: Engineering Simulation\n    path: engineering-simulation\n",
+    ),
+    (
+        "  - title: Forecast\n    path: forecast\n",
+        "  - title: KEMS Planning\n    path: kems-planning\n",
+    ),
+    (
+        "  - title: Full KEMS Forecast\n    path: full-kems-forecast\n",
+        "  - title: Advanced KEMS Strategy\n    path: advanced-kems-strategy\n",
+    ),
+    (
+        "  - title: Compare\n    path: compare\n    icon: mdi:compare-horizontal\n",
+        "  - title: Scenario Evidence\n    path: scenario-evidence\n    icon: mdi:flask-outline\n",
+    ),
+    (
+        "  - title: Battery & Solar\n    path: battery-solar\n",
+        "  - title: System Detail\n    path: system-detail\n",
+    ),
+    (
+        "  - title: Forecast vs Agile\n",
+        "  - title: Advanced Strategy Validation\n",
+    ),
+    (
+        "  - title: Agile Price Plan\n",
+        "  - title: Advanced Price Plan\n",
+    ),
+    (
+        "  - title: Agile History\n",
+        "  - title: Advanced Strategy History\n",
+    ),
+    (
+        "  - title: Agile Assumptions\n",
+        "  - title: Advanced Assumptions\n",
+    ),
+    (
+        "# Full KEMS Forecast vs Agile Smart Export",
+        "# Advanced KEMS strategy validation",
+    ),
 )
 
 
@@ -222,32 +243,20 @@ def improve_energy_bill_dashboard(content: str) -> str:
         _TODAY_CARD,
     )
 
-    # Preserve the old engines as engineering evidence without presenting them
-    # as products. The first three injected views are the normal user journey.
-    replacements = {
-        "  - title: Overview\n    path: overview\n": "  - title: System Overview\n    path: system-overview\n",
-        "  - title: Live Energy\n    path: live-energy\n": "  - title: Live System\n    path: live-system\n",
-        "  - title: Simulation\n    path: simulation\n": "  - title: Engineering Simulation\n    path: engineering-simulation\n",
-        "  - title: Forecast\n    path: forecast\n": "  - title: KEMS Planning\n    path: kems-planning\n",
-        "  - title: Full KEMS Forecast\n    path: full-kems-forecast\n": "  - title: Advanced KEMS Strategy\n    path: advanced-kems-strategy\n",
-        "  - title: Compare\n    path: compare\n    icon: mdi:compare-horizontal\n": "  - title: Scenario Evidence\n    path: scenario-evidence\n    icon: mdi:flask-outline\n",
-        "  - title: Battery & Solar\n    path: battery-solar\n": "  - title: System Detail\n    path: system-detail\n",
-        "  - title: Forecast vs Agile\n": "  - title: Advanced Strategy Validation\n",
-        "  - title: Agile Price Plan\n": "  - title: Advanced Price Plan\n",
-        "  - title: Agile History\n": "  - title: Advanced Strategy History\n",
-        "  - title: Agile Assumptions\n": "  - title: Advanced Assumptions\n",
-        "# Full KEMS Forecast vs Agile Smart Export": "# Advanced KEMS strategy validation",
-    }
-    for old, new in replacements.items():
+    for old, new in _VIEW_RENAMES:
         content = content.replace(old, new, 1)
 
     if "\n  - title: Live Data vs KEMS\n" not in content:
         marker = "views:\n"
         if marker not in content:
             raise ValueError("Managed KEMS dashboard has no views section")
-        content = content.replace(marker, marker + _PRODUCT_VIEWS.lstrip("\n"), 1)
+        content = content.replace(marker, marker + _PRODUCT_VIEWS, 1)
+
     if "\n  - title: Compare\n    path: compare\n" not in content:
-        content = content.rstrip() + _COMPARE_VIEW + "\n"
+        compare_view = "".join(
+            (_COMPARE_VIEW_HEADER, _PERIOD_CARD, "\n", _TODAY_CARD)
+        )
+        content = content.rstrip() + compare_view + "\n"
     return content
 
 
