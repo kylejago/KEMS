@@ -144,10 +144,10 @@ def test_agile_bill_reconciliation_uses_producer_bill_not_battery_wear() -> None
     assert result["battery_wear_included"] is False
 
 
-def test_alpha8_13_release_identity_and_coordinated_web4() -> None:
+def test_unified_bill_contract_is_preserved_in_alpha8_14_and_coordinated_web4() -> None:
     manifest = json.loads((ROOT / "custom_components/kems/manifest.json").read_text())
     bundle = json.loads((ROOT / "release/kems-bundle.template.json").read_text())
-    assert manifest["version"] == "0.8.0-alpha8.13"
+    assert manifest["version"] == "0.8.0-alpha8.14"
     assert bundle["components"]["panel"]["version"] == "0.8.0-alpha8-panel.1"
     for key in ("property_web", "pi_agent", "public_web"):
         assert bundle["components"][key]["version"] == "0.8.0-alpha8-web.4"
