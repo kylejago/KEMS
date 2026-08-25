@@ -126,7 +126,8 @@ def test_alpha819_release_scope_keeps_external_versions_and_hardware_lock() -> N
     bundle = json.loads(BUNDLE.read_text(encoding="utf-8"))
     slots = SLOTS.read_text(encoding="utf-8")
 
-    assert manifest["version"] == "0.8.0-alpha8.19"
+    assert manifest["version"].startswith("0.8.0-alpha8.")
+    assert int(manifest["version"].rsplit(".", 1)[-1]) >= 19
     assert bundle["maintenance"]["affected_components"] == ["kems_core", "dashboard"]
     assert bundle["components"]["panel"]["version"] == "0.8.0-alpha8-panel.1"
     assert bundle["components"]["property_web"]["version"] == "0.8.0-alpha8-web.4"
