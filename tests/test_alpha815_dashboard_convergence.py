@@ -5,7 +5,6 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-
 from dashboard_convergence import (
     DashboardConvergenceError,
     sync_and_verify_managed_dashboard,
