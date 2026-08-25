@@ -399,6 +399,16 @@ views:
             name: Export tariff
           - entity: select.kems_update_mode
             name: Update mode
+          - entity: switch.kems_automatic_updates
+            name: Automatic updates
+          - entity: switch.kems_automatic_maintenance_restart
+            name: Automatic maintenance restart
+          - entity: switch.kems_backup_before_update
+            name: Backup before update
+          - entity: time.kems_maintenance_window_start
+            name: Maintenance window start
+          - entity: time.kems_maintenance_window_end
+            name: Maintenance window end
 
       - type: markdown
         title: Health & safety
@@ -415,6 +425,7 @@ views:
           | Commands permitted | **{{ states('binary_sensor.kems_control_commands_permitted') }}** |
           | Commissioning | {{ states('sensor.kems_commissioning_readiness') }} |
           | Panel | {{ states('sensor.kems_panel_management_status') }} |
+          | Panel firmware | {{ states('sensor.kems_panel_firmware_version') }} |
 
       - type: grid
         columns: 2
@@ -435,9 +446,43 @@ views:
       - type: markdown
         title: Update state
         content: |
+          {% set u = states.sensor.kems_update_status %}
           **Status:** {{ states('sensor.kems_update_status') }}  
-          **Installed:** {{ state_attr('sensor.kems_update_status', 'installed_version') or '—' }}  
-          **Latest:** {{ state_attr('sensor.kems_update_status', 'latest_version') or '—' }}  
-          **Last result:** {{ state_attr('sensor.kems_update_status', 'last_result') or '—' }}
+          **Running KEMS:** {{ u.attributes.running_kems_version if u else '—' }}  
+          **Target bundle:** {{ u.attributes.bundle if u and u.attributes.bundle else '—' }}  
+          **Maintenance:** {{ states('sensor.kems_maintenance_status') }}  
+          **Last result:** {{ u.attributes.last_result if u and u.attributes.last_result else '—' }}
+
+          {% if u and u.attributes.last_error %}
+          **Failure:** {{ u.attributes.last_error }}
+          {% else %}
+          **Failure:** —
+          {% endif %}
+
+      - type: markdown
+        title: Component verification
+        content: |
+          {% set components = state_attr('sensor.kems_update_status', 'components') or [] %}
+          | Component | Installed | Target | Status |
+          |---|---|---|---|
+          {% for c in components %}
+          | {{ c.get('key', '—') }} | {{ c.get('installed') or '—' }} | {{ c.get('target') or '—' }} | {{ c.get('status') or '—' }} |
+          {% endfor %}
+          {% if not components %}
+          | — | — | — | Waiting for update check |
+          {% endif %}
+
+      - type: markdown
+        title: Recent update history
+        content: |
+          {% set history = state_attr('sensor.kems_update_status', 'history') or [] %}
+          | Completed | Bundle | Result | Error |
+          |---|---|---|---|
+          {% for h in history | reverse %}
+          | {{ h.get('completed_at') or h.get('updated_at') or '—' }} | {{ h.get('bundle') or h.get('target') or '—' }} | {{ h.get('result') or h.get('status') or '—' }} | {{ h.get('error') or '—' }} |
+          {% endfor %}
+          {% if not history %}
+          | — | — | No completed updates recorded | — |
+          {% endif %}
 
           If an optional physical sensor is not commissioned, the dashboard shows `—` instead of treating that as a dashboard failure.
