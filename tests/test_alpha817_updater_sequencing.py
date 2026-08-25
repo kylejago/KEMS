@@ -55,7 +55,7 @@ def test_stale_older_pending_target_still_uses_proven_base_cleanup() -> None:
 
 
 def test_exact_target_still_requires_strict_dashboard_convergence() -> None:
-    """Once the target core is active, exact dashboard verification remains a hard gate."""
+    """An active target core must still require exact dashboard convergence."""
     body = _verify_pending_body()
 
     assert (
