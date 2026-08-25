@@ -90,7 +90,7 @@ class ConvergentKEMSUpdateOrchestrator(reliable.ReliableKEMSUpdateOrchestrator):
         self._dashboard_installed_sha256 = verification.installed_sha256
 
     async def async_verify_pending(self, *, save: bool = True) -> None:
-        """Converge the dashboard first, then run the proven exact component check."""
+        """Converge the dashboard only after the pending target core is active."""
         if self.pending and self.latest_bundle is None:
             if save:
                 await self._async_save()
@@ -98,6 +98,26 @@ class ConvergentKEMSUpdateOrchestrator(reliable.ReliableKEMSUpdateOrchestrator):
             return
 
         if self.pending:
+            target = str(self.pending.get("target") or "").strip()
+            running = base._installed_integration_version()
+            if target and not base._version_matches(running, target):
+                relation = base.version_relation(target, running)
+                if relation is not None and relation < 0:
+                    await base.KEMSUpdateOrchestrator.async_verify_pending(
+                        self, save=save
+                    )
+                    return
+                self._dashboard_verification_detail = (
+                    f"Waiting for KEMS core {target}; running {running}. "
+                    "Dashboard convergence starts only after the target core is active."
+                )
+                self._dashboard_expected_sha256 = None
+                self._dashboard_installed_sha256 = None
+                if save:
+                    await self._async_save()
+                self._write_legacy_states()
+                return
+
             try:
                 verification = await _async_converge_dashboard(self.hass, strict=True)
             except HomeAssistantError as error:
@@ -112,7 +132,7 @@ class ConvergentKEMSUpdateOrchestrator(reliable.ReliableKEMSUpdateOrchestrator):
             self._remember_dashboard_verification(verification)
 
         # Deliberately bypass the Alpha8.14 presentation-layer compatibility wrapper.
-        # The active updater owns convergence in Alpha8.15 and the base verifier owns
+        # The active updater owns convergence in Alpha8.15+ and the base verifier owns
         # transaction completion once every required local component is exact.
         await base.KEMSUpdateOrchestrator.async_verify_pending(self, save=save)
 

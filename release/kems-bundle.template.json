@@ -42,7 +42,7 @@
   },
   "maintenance": {
     "required": true,
-    "reason": "Repair managed-dashboard pipeline ordering so consolidation runs before Live Data/KEMS presentation and exact convergence uses the final rendered payload",
+    "reason": "Defer managed-dashboard convergence until the target KEMS core is active, then retain exact post-restart dashboard verification",
     "expected_downtime_minutes": 5,
     "home_assistant_restart_required": true,
     "reboot_required": false,
