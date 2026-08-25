@@ -6,16 +6,20 @@ from pathlib import Path
 
 ROOT = Path(__file__).parents[1]
 RELIABLE = ROOT / "custom_components" / "kems" / "update_orchestrator_reliable.py"
+CONVERGENT = ROOT / "custom_components" / "kems" / "update_orchestrator_convergent.py"
 INIT = ROOT / "custom_components" / "kems" / "__init__.py"
 
 
-def test_kems_uses_reliable_orchestrator_setup() -> None:
-    """Integration startup must instantiate the reliability-hardened orchestrator."""
+def test_kems_uses_convergent_orchestrator_setup() -> None:
+    """Integration startup must instantiate the strict Alpha8.15 orchestrator."""
     content = INIT.read_text(encoding="utf-8")
     assert (
-        "from .update_orchestrator_reliable import async_setup_update_orchestrator"
+        "from .update_orchestrator_convergent import async_setup_update_orchestrator"
         in content
     )
+    convergent = CONVERGENT.read_text(encoding="utf-8")
+    assert "class ConvergentKEMSUpdateOrchestrator" in convergent
+    assert "reliable.ReliableKEMSUpdateOrchestrator" in convergent
 
 
 def test_reliable_orchestrator_waits_for_post_restart_bundle_before_success() -> None:
