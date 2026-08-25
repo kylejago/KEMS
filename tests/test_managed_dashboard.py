@@ -13,79 +13,62 @@ AGILE_SOURCE = ROOT / "dashboards" / "kems_agile_smart_export_builtin.yaml"
 AGILE_PACKAGED = (
     ROOT / "custom_components" / "kems" / "kems_agile_smart_export_dashboard.yaml"
 )
+PIPELINE = ROOT / "custom_components" / "kems" / "dashboard_pipeline.py"
 
-
-def _merged_master_content() -> dict:
-    """Mirror the runtime merge of Agile comparison views into the master."""
-    master = PACKAGED.read_text(encoding="utf-8").rstrip()
-    agile = AGILE_PACKAGED.read_text(encoding="utf-8")
-    marker = "\nviews:\n"
-    assert marker in agile
-    agile_views = agile.split(marker, 1)[1].lstrip("\n")
-    merged = f"{master}\n\n{agile_views}"
-    return yaml.safe_load(merged)
+EXPECTED_CUSTOMER_PATHS = [
+    "home",
+    "live-data",
+    "kems",
+    "compare",
+    "agile-slots",
+    "history",
+    "system",
+]
 
 
 def test_packaged_master_dashboard_matches_repository_source() -> None:
-    """HACS must receive the same master dashboard base that the repo documents."""
+    """HACS must receive the exact dashboard source documented by the repo."""
     assert PACKAGED.exists()
     assert PACKAGED.read_bytes() == SOURCE.read_bytes()
 
 
-def test_managed_master_dashboard_is_valid_builtin_yaml() -> None:
-    """The runtime master should parse and include normal plus Agile views."""
-    content = _merged_master_content()
-    assert content["title"] == "KEMS Master Dashboard"
-    paths = {view["path"] for view in content["views"]}
-    assert {
-        "overview",
-        "live-energy",
-        "simulation",
-        "forecast",
-        "full-kems-forecast",
-        "forecast-vs-agile",
-        "agile-price-plan",
-        "agile-history",
-        "agile-assumptions",
-        "commissioning",
-        "compare",
-        "battery-solar",
-        "tariff-ev",
-        "power-down",
-        "control-eps",
-        "finance-history",
-        "learning-health",
-        "gas",
-        "all-entities",
-    } <= paths
-
-
-def test_full_kems_forecast_view_exposes_operating_detail() -> None:
-    """The dedicated forecast strategy view should expose plan, flow and audit data."""
+def test_managed_master_dashboard_is_fresh_builtin_yaml() -> None:
+    """The customer dashboard should parse with the seven clean Alpha8.19 views."""
     content = yaml.safe_load(PACKAGED.read_text(encoding="utf-8"))
-    view = next(
-        item for item in content["views"] if item["path"] == "full-kems-forecast"
-    )
-    rendered = str(view)
-    assert "sensor.kems_full_kems_forecast_status" in rendered
-    assert "sensor.kems_compare_full_kems_forecast_cost_today" in rendered
-    assert "Current Full KEMS Forecast power routing" in rendered
-    assert "Recharge & reserve decision" in rendered
-    assert "Hourly fused solar / weather outlook" in rendered
-    assert "Forecast protection audit inside the scenario" in rendered
-    assert "Complete Full KEMS Forecast scenario attributes" in rendered
+    assert content["title"] == "KEMS"
+    assert [view["path"] for view in content["views"]] == EXPECTED_CUSTOMER_PATHS
+
+
+def test_managed_dashboard_has_only_live_data_and_kems_products() -> None:
+    """Retired strategy engines must not return as customer product views."""
+    content = PACKAGED.read_text(encoding="utf-8")
+    assert "# Live Data" in content
+    assert "# KEMS" in content
+    assert "# Live Data vs KEMS" in content
+    assert "Battery & Solar" not in content
+    assert "Full KEMS Agile" not in content
+    assert "Compare every KEMS type" not in content
+
+
+def test_managed_dashboard_keeps_agile_slots_as_tariff_information() -> None:
+    """Half-hour Agile data should remain visible without becoming a product."""
+    content = PACKAGED.read_text(encoding="utf-8")
+    assert "path: agile-slots" in content
+    assert "sensor.kems_agile_slots" in content
+    assert "today_slots" in content
+    assert "tomorrow_slots" in content
+    assert "not another KEMS product" in content
 
 
 def test_packaged_agile_dashboard_matches_repository_source() -> None:
-    """HACS must receive the Agile view source used by the managed master."""
+    """The historical Agile evidence dashboard remains available standalone."""
     assert AGILE_PACKAGED.exists()
     assert AGILE_PACKAGED.read_bytes() == AGILE_SOURCE.read_bytes()
 
 
-def test_agile_dashboard_is_builtin_and_has_required_views() -> None:
-    """The Agile comparison source must parse with all requested sections."""
+def test_standalone_agile_evidence_dashboard_retains_engineering_views() -> None:
+    """Internal Agile evidence is retained even though it is not customer navigation."""
     content = yaml.safe_load(AGILE_PACKAGED.read_text(encoding="utf-8"))
-    assert content["title"] == "Full KEMS Forecast vs Agile Smart Export"
     paths = {view["path"] for view in content["views"]}
     assert {
         "forecast-vs-agile",
@@ -93,51 +76,16 @@ def test_agile_dashboard_is_builtin_and_has_required_views() -> None:
         "agile-history",
         "agile-assumptions",
     } <= paths
-    rendered = str(content)
-    assert "sensor.kems_agile_export_rate_now" in rendered
-    assert "sensor.kems_agile_price_data_quality" in rendered
-    assert "sensor.kems_agile_smart_export_plan" in rendered
-    assert "sensor.kems_agile_advantage_today" in rendered
-    assert "sensor.kems_full_kems_forecast_vs_agile_winner_all_time" in rendered
 
 
-def test_agile_headline_layout_is_readable() -> None:
-    """Agile summary cards should not return to the cramped three-column layout."""
-    content = yaml.safe_load(AGILE_PACKAGED.read_text(encoding="utf-8"))
-    forecast = next(
-        item for item in content["views"] if item["path"] == "forecast-vs-agile"
-    )
-    history = next(item for item in content["views"] if item["path"] == "agile-history")
-    forecast_grids = [card for card in forecast["cards"] if card.get("type") == "grid"]
-    history_grids = [card for card in history["cards"] if card.get("type") == "grid"]
-    assert forecast_grids
-    assert history_grids
-    assert all(card.get("columns") == 2 for card in forecast_grids)
-    assert all(card.get("columns") == 2 for card in history_grids)
-
-
-def test_managed_dashboard_readability_pass_widens_summary_cards() -> None:
-    """Managed four/five-column summary grids should render with more width."""
-    sync = (ROOT / "custom_components" / "kems" / "dashboard.py").read_text(
-        encoding="utf-8"
-    )
-    assert "def _dashboard_readability_pass" in sync
-    assert 'columns: 4\\n", "        columns: 2\\n' in sync
-    assert 'columns: 5\\n", "        columns: 3\\n' in sync
-    assert "master = _dashboard_readability_pass(master)" in sync
-    assert "agile_views = _dashboard_readability_pass(agile_views)" in sync
-
-
-def test_agile_dashboard_is_embedded_into_master_config() -> None:
-    """Startup should merge Agile views into the one managed master dashboard."""
-    sync = (ROOT / "custom_components" / "kems" / "dashboard.py").read_text(
-        encoding="utf-8"
-    )
-    assert "_combined_master_dashboard_bytes" in sync
-    assert "PACKAGED_AGILE_DASHBOARD_PATH" in sync
-    assert "hass.config.path(MANAGED_DASHBOARD_FILENAME)" in sync
-    assert "hass.config.path(AGILE_DASHBOARD_FILENAME)" not in sync
-    assert "Updated managed KEMS master dashboard with Agile Smart Export views" in sync
+def test_runtime_pipeline_bypasses_historical_master_agile_composition() -> None:
+    """The managed customer YAML must be shipped directly without old view appends."""
+    pipeline = PIPELINE.read_text(encoding="utf-8")
+    assert "PACKAGED_DASHBOARD_PATH.read_bytes()" in pipeline
+    assert "dashboard._combined_master_dashboard_bytes = _fresh_dashboard_bytes" in pipeline
+    assert "convergent._managed_dashboard_bytes = _fresh_dashboard_bytes" in pipeline
+    assert "PACKAGED_AGILE_DASHBOARD_PATH" not in pipeline
+    assert "dashboard_consolidation" not in pipeline
 
 
 def test_kems_setup_syncs_managed_dashboard() -> None:
