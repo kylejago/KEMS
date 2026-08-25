@@ -13,7 +13,9 @@ PIPELINE = ROOT / "custom_components" / "kems" / "dashboard_pipeline.py"
 
 
 def _pipeline_module():
-    spec = importlib.util.spec_from_file_location("kems_dashboard_pipeline_test", PIPELINE)
+    spec = importlib.util.spec_from_file_location(
+        "kems_dashboard_pipeline_test", PIPELINE
+    )
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
