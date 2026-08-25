@@ -20,18 +20,25 @@ def test_all_dashboard_yaml_is_valid() -> None:
         assert content.get("views")
 
 
-def test_master_dashboard_uses_current_alpha7_entities() -> None:
-    """The master view should use validated Alpha 7 IDs and learning sensors."""
+def test_master_dashboard_uses_verified_fresh_customer_entities() -> None:
+    """The managed master should use the stable entities proven in live diagnostics."""
     text = (DASHBOARDS / "kems_master_dashboard.yaml").read_text(encoding="utf-8")
-    assert "sensor.kems_forecast_minimum_pre_cheap_soc" in text
-    assert "sensor.kems_forecast_minimum_precheap_soc" not in text
-    assert "sensor.kems_forecast_validation_status" in text
-    assert "sensor.kems_forecast_validation_fused_solar_mae" in text
-    assert "sensor.kems_forecast_validation_house_mae" in text
-    assert "states.sensor" in text
-    assert "states.binary_sensor" in text
-    assert "states.select" in text
-    assert "states.switch" in text
+    for entity_id in (
+        "sensor.kems_status",
+        "sensor.kems_house_load",
+        "sensor.kems_current_import_rate",
+        "sensor.kems_observed_cost_today",
+        "sensor.kems_simulated_kems_cost_today",
+        "sensor.kems_simulated_house_load_power",
+        "sensor.kems_simulated_battery_state_of_charge",
+        "sensor.kems_forecast_solar_tomorrow",
+        "sensor.kems_agile_slots",
+        "sensor.kems_update_status",
+    ):
+        assert entity_id in text
+    assert "sensor.kems_energy_cost_comparison" not in text
+    assert "sensor.kems_agile_smart_export_plan" not in text
+    assert "Full KEMS Agile" not in text
 
 
 def test_comparison_dashboards_include_live_and_simulated_flows() -> None:
