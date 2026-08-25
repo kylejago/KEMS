@@ -1,4 +1,4 @@
-"""Alpha8.22 regressions for the managed Today/Tomorrow plan layout."""
+"""Regressions for the managed Today/Tomorrow plan presentation."""
 
 from __future__ import annotations
 
@@ -34,54 +34,53 @@ def _view(parsed: dict, path: str) -> dict:
     return next(view for view in parsed["views"] if view["path"] == path)
 
 
-def _plan_titles(prefix: str) -> list[str]:
-    return [
-        f"{prefix} — 00:00 to 07:30",
-        f"{prefix} — 08:00 to 15:30",
-        f"{prefix} — 16:00 to 23:30",
-    ]
+def _card(view: dict, title: str) -> dict:
+    return next(card for card in view["cards"] if card.get("title") == title)
 
 
-def _plan_grid(view: dict, prefix: str) -> dict:
-    expected = _plan_titles(prefix)
-    for card in view["cards"]:
-        if not isinstance(card, dict) or card.get("type") != "grid":
-            continue
-        titles = [item.get("title") for item in card.get("cards", [])]
-        if titles == expected:
-            return card
-    raise AssertionError(f"No ordered {prefix} plan grid found")
-
-
-def test_today_and_tomorrow_plans_are_fixed_chronological_grids() -> None:
+def test_today_and_tomorrow_are_single_readable_chronological_lists() -> None:
     parsed = _final_dashboard()
 
-    today = _plan_grid(_view(parsed, "kems"), "Today")
-    tomorrow = _plan_grid(_view(parsed, "tomorrow"), "Tomorrow")
+    today = _card(_view(parsed, "kems"), "Today's KEMS plan — 00:00 to 23:30")
+    tomorrow = _card(
+        _view(parsed, "tomorrow"), "Tomorrow's KEMS plan — 00:00 to 23:30"
+    )
 
-    assert today["columns"] == 3
-    assert today["square"] is False
-    assert tomorrow["columns"] == 3
-    assert tomorrow["square"] is False
+    for card in (today, tomorrow):
+        assert card["type"] == "markdown"
+        content = card["content"]
+        assert "| Time | Rate | KEMS plan and energy |" in content
+        assert "{% for p in slots %}" in content
+        assert "Grid in/out" in content
+        assert "Batt out" in content
+        assert "SOC" in content
 
-    for path, prefix in (("kems", "Today"), ("tomorrow", "Tomorrow")):
-        top_level_titles = {
-            card.get("title")
-            for card in _view(parsed, path)["cards"]
-            if isinstance(card, dict)
-        }
-        assert not set(_plan_titles(prefix)) & top_level_titles
+    final_text = yaml.safe_dump(parsed, sort_keys=False)
+    for old_title in (
+        "Today — 00:00 to 07:30",
+        "Today — 08:00 to 15:30",
+        "Today — 16:00 to 23:30",
+        "Tomorrow — 00:00 to 07:30",
+        "Tomorrow — 08:00 to 15:30",
+        "Tomorrow — 16:00 to 23:30",
+    ):
+        assert old_title not in final_text
 
 
 def test_nullable_slot_values_render_as_dash_instead_of_breaking_card() -> None:
     module = _pipeline_module()
     content = module._finalise_dashboard_bytes(SOURCE.read_bytes()).decode("utf-8")
 
-    for field in ("grid_import_kwh", "grid_export_kwh", "battery_export_kwh"):
-        assert f"p.get('{field}', 0) | float" not in content
-        assert f"p.get('{field}') is not none else '—'" in content
+    for alias, field in (
+        ("gi", "grid_import_kwh"),
+        ("ge", "grid_export_kwh"),
+        ("bo", "battery_export_kwh"),
+        ("soc", "ending_soc_percent"),
+    ):
+        assert f"set {alias} = p.get('{field}')" in content
+        assert f"if {alias} is not none else '—'" in content
 
-    assert "p.get('ending_soc_percent') is not none else '—'" in content
+    assert "p.get('rate_pence') is not none else '—'" in content
 
 
 def test_tomorrow_partial_publication_is_visible_and_aggregation_is_safe() -> None:
