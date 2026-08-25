@@ -37,7 +37,7 @@ def test_dashboard_verifier_uses_the_exact_rendered_managed_payload() -> None:
 
 
 def test_normal_dashboard_journey_is_live_data_then_kems_then_compare() -> None:
-    """The managed UI must expose the unified product model ahead of engineering views."""
+    """The managed UI must put Live Data and KEMS ahead of engineering views."""
     content = PRESENTATION.read_text(encoding="utf-8")
     live_vs = content.index("  - title: Live Data vs KEMS")
     live = content.index("  - title: Live Data\n", live_vs)
