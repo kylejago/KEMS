@@ -1,4 +1,4 @@
-"""Home Assistant publication and dashboard presentation for Alpha8.13 bills."""
+"""Home Assistant publication and dashboard presentation for Alpha8.14 bills."""
 
 # ruff: noqa: E501
 
@@ -56,6 +56,25 @@ _TODAY_CARD = r"""      - type: markdown
           **KEMS strategy:** {{ kems.get('strategy_label', '—') }}. Battery wear is deliberately excluded from every total above.
 """
 
+_OVERVIEW_CARD = r"""      - type: markdown
+        title: Live Data vs KEMS
+        content: |
+          {% set p = ((state_attr('sensor.kems_energy_cost_comparison', 'periods') or {}).get('today', {}) or {}) %}
+          {% set live = p.get('live_data', {}) or {} %}
+          {% set kems = p.get('kems', {}) or {} %}
+          # ⚡ KEMS
+          KEMS has two user-facing views: **Live Data** shows what the property actually did; **KEMS** shows what KEMS would have done using the strategy selected for the configured tariff and system.
+
+          | Today | Live Data | KEMS |
+          |---|---:|---:|
+          | Total energy cost | **{{ ('£%.2f' | format((live.get('total_energy_cost_pence') | float) / 100)) if live.get('total_energy_cost_pence') is not none else '—' }}** | **{{ ('£%.2f' | format((kems.get('total_energy_cost_pence') | float) / 100)) if kems.get('total_energy_cost_pence') is not none else '—' }}** |
+          | Electricity | {{ ('£%.2f' | format((live.get('electricity_total_cost_pence') | float) / 100)) if live.get('electricity_total_cost_pence') is not none else '—' }} | {{ ('£%.2f' | format((kems.get('electricity_total_cost_pence') | float) / 100)) if kems.get('electricity_total_cost_pence') is not none else '—' }} |
+          | Gas | {{ ('£%.2f' | format((live.get('gas_total_cost_pence') | float) / 100)) if live.get('gas_total_cost_pence') is not none else '—' }} | {{ ('£%.2f' | format((kems.get('gas_total_cost_pence') | float) / 100)) if kems.get('gas_total_cost_pence') is not none else '—' }} |
+
+          **Saving today:** {{ ('£%.2f' | format((p.get('saving_pence') | float) / 100)) if p.get('saving_pence') is not none else '—' }}  
+          **KEMS strategy:** {{ state_attr('sensor.kems_energy_cost_comparison', 'selected_kems_strategy_label') or '—' }}
+"""
+
 _ENERGY_VIEW = (
     r"""
 
@@ -83,8 +102,76 @@ def _replace_markdown_card(
     return content[:start] + replacement.rstrip() + content[end:], True
 
 
+def _remove_view(content: str, title: str) -> str:
+    """Remove one legacy engineering view from the managed user dashboard."""
+    marker = f"\n  - title: {title}\n"
+    start = content.find(marker)
+    if start < 0 and content.startswith(f"  - title: {title}\n"):
+        start = 0
+    if start < 0:
+        return content
+    search_from = start + len(marker)
+    end = content.find("\n  - title:", search_from)
+    if end < 0:
+        end = len(content)
+    return content[:start] + content[end:]
+
+
+def _align_live_kems_navigation(content: str) -> str:
+    """Make Live Data and KEMS the only product choices in the managed dashboard."""
+    content = (
+        content.replace(
+            "  - title: Live Energy\n    path: live-energy\n",
+            "  - title: Live Data\n    path: live-data\n",
+        )
+        .replace(
+            "          # Live / observed home\n",
+            "          # Live Data\n",
+        )
+        .replace(
+            "  - title: Simulation\n    path: simulation\n",
+            "  - title: KEMS\n    path: kems\n",
+        )
+        .replace(
+            "        title: Simulated power — 24 hours\n",
+            "        title: KEMS power — 24 hours\n",
+        )
+        .replace(
+            "            name: Sim battery SOC\n",
+            "            name: KEMS battery SOC\n",
+        )
+        .replace(
+            "            name: Observed electricity\n",
+            "            name: Live Data electricity\n",
+        )
+        .replace(
+            "            name: Simulated KEMS\n",
+            "            name: KEMS electricity\n",
+        )
+        .replace(
+            "            name: Simulated saving\n",
+            "            name: KEMS saving\n",
+        )
+    )
+
+    # These engines remain in code and standalone evidence dashboards, but are no
+    # longer customer-facing product tabs in the managed master dashboard.
+    for legacy_title in (
+        "Full KEMS Forecast",
+        "Forecast vs Agile",
+        "Advanced strategy validation",
+        "Agile Price Plan",
+        "Agile History",
+        "Agile Assumptions",
+        "Battery & Solar",
+    ):
+        content = _remove_view(content, legacy_title)
+    return content
+
+
 def improve_energy_bill_dashboard(content: str) -> str:
-    """Replace legacy multi-product finance cards with Live Data vs KEMS."""
+    """Present one canonical Live Data vs KEMS product model in Home Assistant."""
+    content = _align_live_kems_navigation(content)
     content, _ = _replace_markdown_card(
         content,
         "Winner by period — user-facing KEMS products",
@@ -95,33 +182,56 @@ def improve_energy_bill_dashboard(content: str) -> str:
         "Today — cost, energy & savings",
         _TODAY_CARD,
     )
-    # Retain fixed-vs-Agile engineering evidence, but make it explicit that it
-    # is validation of KEMS internals rather than a list of separate products.
-    content = content.replace(
-        "  - title: Forecast vs Agile\n",
-        "  - title: Advanced strategy validation\n",
-    ).replace(
-        "# Full KEMS Forecast vs Agile Smart Export",
-        "# Advanced KEMS strategy validation",
-    )
-    if "\n  - title: Energy Cost\n" not in content:
+
+    # Put the canonical bill-equivalent comparison at the top of Overview without
+    # removing operational status/advice cards that remain useful underneath it.
+    overview_cards = "  - title: Overview\n    path: overview\n    icon: mdi:home-lightning-bolt\n    cards:\n"
+    if (
+        overview_cards in content
+        and "        title: Live Data vs KEMS\n" not in content
+    ):
+        content = content.replace(
+            overview_cards,
+            overview_cards + _OVERVIEW_CARD,
+            1,
+        )
+
+    if "\n  - title: Energy Cost\n" not in content and "\nviews:\n" in content:
         content = content.rstrip() + _ENERGY_VIEW + "\n"
     return content
 
 
 def install_energy_bill_dashboard_patch() -> None:
-    """Apply the Alpha8.13 presentation pass before the managed dashboard sync."""
+    """Apply Alpha8.14 dashboard presentation and post-restart verification repair."""
     from . import dashboard
+    from . import update_orchestrator_reliable as reliable
 
     original = dashboard._dashboard_readability_pass
-    if getattr(original, "_kems_alpha813_energy_bill", False):
-        return
+    if not getattr(original, "_kems_alpha814_energy_bill", False):
 
-    def readability_with_energy_bill(content: str) -> str:
-        return improve_energy_bill_dashboard(original(content))
+        def readability_with_energy_bill(content: str) -> str:
+            return improve_energy_bill_dashboard(original(content))
 
-    readability_with_energy_bill._kems_alpha813_energy_bill = True
-    dashboard._dashboard_readability_pass = readability_with_energy_bill
+        readability_with_energy_bill._kems_alpha814_energy_bill = True
+        dashboard._dashboard_readability_pass = readability_with_energy_bill
+
+    original_verify = reliable.ReliableKEMSUpdateOrchestrator.async_verify_pending
+    if not getattr(original_verify, "_kems_alpha814_dashboard_resync", False):
+
+        async def verify_with_dashboard_resync(self: Any, *, save: bool = True) -> None:
+            # A HACS update can restart into the new core while /config still holds
+            # an absent or stale managed dashboard. Once the verified release bundle
+            # is back, repair the dashboard first, then run the existing exact-byte
+            # component verification. This makes the transaction converge instead
+            # of remaining indefinitely at dashboard=waiting / stage=verifying.
+            if self.pending and self.latest_bundle is not None:
+                await reliable._async_sync_update_dashboard(self.hass)
+            await original_verify(self, save=save)
+
+        verify_with_dashboard_resync._kems_alpha814_dashboard_resync = True
+        reliable.ReliableKEMSUpdateOrchestrator.async_verify_pending = (
+            verify_with_dashboard_resync
+        )
 
 
 def _payload(coordinator: Any) -> dict[str, Any] | None:
