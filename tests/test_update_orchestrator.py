@@ -91,7 +91,7 @@ def test_managed_dashboard_has_update_and_maintenance_view() -> None:
     """Users need one visible place to confirm that every component is current."""
     assert DASHBOARD.read_bytes() == PACKAGED_DASHBOARD.read_bytes()
     content = DASHBOARD.read_text(encoding="utf-8")
-    assert "path: updates" in content
+    assert "path: system" in content
     assert "sensor.kems_update_status" in content
     assert "sensor.kems_maintenance_status" in content
     assert "switch.kems_automatic_updates" in content
