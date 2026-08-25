@@ -144,7 +144,9 @@ def test_agile_bill_reconciliation_uses_producer_bill_not_battery_wear() -> None
     assert result["battery_wear_included"] is False
 
 
-def test_unified_bill_contract_is_preserved_in_alpha8_14_and_coordinated_web4() -> None:
+def test_unified_bill_contract_is_preserved_in_alpha8_14_and_coordinated_web4() -> (
+    None
+):
     manifest = json.loads((ROOT / "custom_components/kems/manifest.json").read_text())
     bundle = json.loads((ROOT / "release/kems-bundle.template.json").read_text())
     assert manifest["version"] == "0.8.0-alpha8.14"
