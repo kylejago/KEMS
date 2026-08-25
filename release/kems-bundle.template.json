@@ -42,16 +42,13 @@
   },
   "maintenance": {
     "required": true,
-    "reason": "Unify all user-facing KEMS financial reporting on a bill-equivalent Live Data vs KEMS total-energy-cost contract, including electricity and gas standing charges while excluding battery wear",
+    "reason": "Repair post-restart managed-dashboard verification and align the Home Assistant dashboard around the unified Live Data vs KEMS product model",
     "expected_downtime_minutes": 5,
     "home_assistant_restart_required": true,
     "reboot_required": false,
     "affected_components": [
       "kems_core",
-      "dashboard",
-      "property_web",
-      "pi_agent",
-      "public_web"
+      "dashboard"
     ]
   }
 }
