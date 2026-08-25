@@ -29,7 +29,7 @@ def test_successor_dashboard_keeps_live_data_and_kems_as_only_products() -> None
         "live-data",
         "kems",
         "compare",
-        "agile-slots",
+        "tomorrow",
         "history",
         "system",
     ]
@@ -38,26 +38,29 @@ def test_successor_dashboard_keeps_live_data_and_kems_as_only_products() -> None
     assert "Compare every KEMS type" not in content
 
 
-def test_compare_page_is_live_data_vs_kems_only() -> None:
+def test_compare_page_preserves_two_products_and_adds_no_system_counterfactual() -> None:
     parsed, _ = _dashboard()
     views = {view["path"]: str(view) for view in parsed["views"]}
     compare = views["compare"]
 
-    assert "Live Data" in compare
+    assert "Without KEMS" in compare
+    assert "Live" in compare
     assert "KEMS" in compare
+    assert "counterfactual" in compare.lower()
     assert "Battery & Solar" not in compare
     assert "Full KEMS Agile" not in compare
 
 
-def test_agile_slots_is_tariff_information_not_a_product() -> None:
+def test_tariff_slots_are_planning_information_not_another_product() -> None:
     parsed, content = _dashboard()
     views = {view["path"]: str(view) for view in parsed["views"]}
-    slots = views["agile-slots"]
+    kems = views["kems"]
+    tomorrow = views["tomorrow"]
 
-    assert "not another KEMS product" in slots
     assert "sensor.kems_agile_slots" in content
-    assert "today_slots" in slots
-    assert "tomorrow_slots" in slots
+    assert "today_slots" in kems
+    assert "tomorrow_slots" in tomorrow
+    assert "simulated planning" in tomorrow.lower()
 
 
 def test_alpha818_release_boundary_survives_successors() -> None:
