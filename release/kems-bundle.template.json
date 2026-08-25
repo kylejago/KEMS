@@ -42,7 +42,7 @@
   },
   "maintenance": {
     "required": true,
-    "reason": "Replace the historical managed-dashboard compositor with a clean dashboard built directly from verified KEMS entities, retaining only Live Data and KEMS plus a stable Agile half-hour slot view",
+    "reason": "Hard-latch the 10% pre-cheap battery deadline once the guarded latest-safe-start is reached so rolling Agile price replans cannot postpone discharge until the target becomes unreachable",
     "expected_downtime_minutes": 5,
     "home_assistant_restart_required": true,
     "reboot_required": false,
