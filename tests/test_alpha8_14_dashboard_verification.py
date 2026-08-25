@@ -9,9 +9,7 @@ RELIABLE = ROOT / "custom_components" / "kems" / "update_orchestrator_reliable.p
 PRESENTATION = ROOT / "custom_components" / "kems" / "energy_bill_presentation.py"
 
 
-def test_post_restart_verification_repairs_managed_dashboard_before_completion() -> (
-    None
-):
+def test_post_restart_verification_repairs_managed_dashboard_before_completion() -> None:
     """A missing/stale managed dashboard must self-heal before base verification."""
     content = RELIABLE.read_text(encoding="utf-8")
     assert "async def _async_repair_dashboard_verification" in content
