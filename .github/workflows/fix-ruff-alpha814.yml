@@ -1,0 +1,38 @@
+name: Fix Alpha8.14 Ruff once
+
+on:
+  push:
+    branches:
+      - fix/alpha8.14-dashboard-verification-live-kems
+    paths:
+      - .github/workflows/fix-ruff-alpha814.yml
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    if: github.event.head_commit.message == 'Add temporary Alpha8.14 Ruff fixer'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/alpha8.14-dashboard-verification-live-kems
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - run: python -m pip install -r requirements-dev.txt
+      - name: Fix Ruff issues and reformat
+        run: |
+          python -m ruff check --fix custom_components/kems/energy_bill_presentation.py custom_components/kems/update_orchestrator_reliable.py tests/test_alpha8_13_unified_energy_bill.py tests/test_alpha8_14_dashboard_verification.py
+          python -m black custom_components/kems/energy_bill_presentation.py custom_components/kems/update_orchestrator_reliable.py tests/test_alpha8_13_unified_energy_bill.py tests/test_alpha8_14_dashboard_verification.py
+      - name: Commit fixer output
+        run: |
+          if git diff --quiet; then
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add custom_components/kems/energy_bill_presentation.py custom_components/kems/update_orchestrator_reliable.py tests/test_alpha8_13_unified_energy_bill.py tests/test_alpha8_14_dashboard_verification.py
+          git commit -m 'Apply Ruff fixes to Alpha8.14 changes'
+          git push origin HEAD:fix/alpha8.14-dashboard-verification-live-kems
