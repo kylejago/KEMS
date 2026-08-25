@@ -58,7 +58,9 @@ def test_dashboard_is_fresh_seven_view_customer_product() -> None:
     assert "Compare every KEMS type" not in content
 
 
-def test_dashboard_uses_verified_stable_entities_not_retired_presentation_states() -> None:
+def test_dashboard_uses_verified_stable_entities_not_retired_presentation_states() -> (
+    None
+):
     content = _content()
 
     for entity_id in STALE_PRESENTATION_ENTITIES:
@@ -83,8 +85,13 @@ def test_optional_uncommissioned_live_hardware_is_rendered_defensively() -> None
     content = _content()
 
     assert "['unknown', 'unavailable', 'none', '']" in content
-    assert "dashboard shows `—` instead of treating that as a dashboard failure" in content
-    assert "Live solar/battery values remain `—` until the physical system is commissioned" in content
+    assert (
+        "dashboard shows `—` instead of treating that as a dashboard failure" in content
+    )
+    assert (
+        "Live solar/battery values remain `—` until the physical system is commissioned"
+        in content
+    )
 
 
 def test_agile_slots_has_one_stable_state_backed_by_retained_runtime_data() -> None:
@@ -106,7 +113,10 @@ def test_sync_and_verification_use_exact_same_fresh_packaged_bytes() -> None:
 
     assert SOURCE.read_bytes() == PACKAGED.read_bytes()
     assert "PACKAGED_DASHBOARD_PATH.read_bytes()" in pipeline
-    assert "dashboard._combined_master_dashboard_bytes = _fresh_dashboard_bytes" in pipeline
+    assert (
+        "dashboard._combined_master_dashboard_bytes = _fresh_dashboard_bytes"
+        in pipeline
+    )
     assert "convergent._managed_dashboard_bytes = _fresh_dashboard_bytes" in pipeline
     assert "original_builder" not in pipeline
 
