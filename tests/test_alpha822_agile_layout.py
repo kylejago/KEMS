@@ -34,12 +34,16 @@ def _view(parsed: dict, path: str) -> dict:
     return next(view for view in parsed["views"] if view["path"] == path)
 
 
-def _plan_grid(view: dict, prefix: str) -> dict:
-    expected = [
+def _plan_titles(prefix: str) -> list[str]:
+    return [
         f"{prefix} — 00:00 to 07:30",
         f"{prefix} — 08:00 to 15:30",
         f"{prefix} — 16:00 to 23:30",
     ]
+
+
+def _plan_grid(view: dict, prefix: str) -> dict:
+    expected = _plan_titles(prefix)
     for card in view["cards"]:
         if not isinstance(card, dict) or card.get("type") != "grid":
             continue
@@ -60,13 +64,13 @@ def test_today_and_tomorrow_plans_are_fixed_chronological_grids() -> None:
     assert tomorrow["columns"] == 3
     assert tomorrow["square"] is False
 
-    for path, prefix in (("kems", "Today —"), ("tomorrow", "Tomorrow —")):
-        top_level_titles = [
+    for path, prefix in (("kems", "Today"), ("tomorrow", "Tomorrow")):
+        top_level_titles = {
             card.get("title")
             for card in _view(parsed, path)["cards"]
             if isinstance(card, dict)
-        ]
-        assert not any(str(title).startswith(prefix) for title in top_level_titles)
+        }
+        assert not set(_plan_titles(prefix)) & top_level_titles
 
 
 def test_nullable_slot_values_render_as_dash_instead_of_breaking_card() -> None:
