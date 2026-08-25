@@ -42,7 +42,7 @@
   },
   "maintenance": {
     "required": true,
-    "reason": "Keep today's and tomorrow's KEMS plan cards in chronological grids and render nullable or unpublished slot values safely",
+    "reason": "Replace the cramped three-column Today and Tomorrow plan grids with one readable full-card-width chronological list for each day",
     "expected_downtime_minutes": 5,
     "home_assistant_restart_required": true,
     "reboot_required": false,
