@@ -139,11 +139,15 @@ def test_history_has_requested_calendar_periods() -> None:
 
 
 def test_system_page_is_compact_and_update_history_is_bounded() -> None:
-    system = yaml.safe_dump(_view("System"), sort_keys=False)
+    system_view = _view("System")
+    system = yaml.safe_dump(system_view, sort_keys=False)
     assert "title: Health" in system
     assert "title: Control safety" in system
     assert "title: Update" in system
-    assert "Recent updates — latest 5" in system
+    assert any(
+        isinstance(card, dict) and card.get("title") == "Recent updates — latest 5"
+        for card in system_view["cards"]
+    )
     assert "[0:5]" in system
     assert "Real inverter writes remain blocked" not in system
     assert "Physical control remains locked" in system
