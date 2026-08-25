@@ -42,7 +42,7 @@
   },
   "maintenance": {
     "required": true,
-    "reason": "Defer managed-dashboard convergence until the target KEMS core is active, then retain exact post-restart dashboard verification",
+    "reason": "Finish the two-product Home Assistant dashboard by replacing legacy four-engine comparisons with Live Data vs KEMS and restoring the Agile half-hour slot list",
     "expected_downtime_minutes": 5,
     "home_assistant_restart_required": true,
     "reboot_required": false,
