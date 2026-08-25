@@ -66,13 +66,14 @@ def test_exact_target_still_requires_strict_dashboard_convergence() -> None:
     assert "base.KEMSUpdateOrchestrator.async_verify_pending(self, save=save)" in body
 
 
-def test_alpha817_release_is_ha_dashboard_only_and_preserves_external_pins() -> None:
-    """The sequencing hotfix must not redeploy Web, panel, or enable hardware writes."""
+def test_alpha817_contract_survives_coordinated_successor_releases() -> None:
+    """Successors must retain sequencing, scope, external pins, and safety."""
     manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
     bundle = json.loads(BUNDLE.read_text(encoding="utf-8"))
     content = CONVERGENT.read_text(encoding="utf-8")
 
-    assert manifest["version"] == "0.8.0-alpha8.17"
+    assert manifest["version"].startswith("0.8.0-alpha8.")
+    assert int(manifest["version"].rsplit(".", 1)[-1]) >= 17
     assert bundle["maintenance"]["affected_components"] == ["kems_core", "dashboard"]
     assert bundle["components"]["panel"]["version"] == "0.8.0-alpha8-panel.1"
     assert bundle["components"]["property_web"]["version"] == "0.8.0-alpha8-web.4"
