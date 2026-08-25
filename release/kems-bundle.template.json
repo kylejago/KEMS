@@ -42,7 +42,7 @@
   },
   "maintenance": {
     "required": true,
-    "reason": "Rebuild the managed Home Assistant dashboard around paired Live Data and KEMS graphs, a three-column no-system comparison, readable today and tomorrow plans, calendar history and a compact System view",
+    "reason": "Keep today's and tomorrow's KEMS plan cards in chronological grids and render nullable or unpublished slot values safely",
     "expected_downtime_minutes": 5,
     "home_assistant_restart_required": true,
     "reboot_required": false,
