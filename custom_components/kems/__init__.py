@@ -30,6 +30,7 @@ from .const import (
 )
 from .coordinator import KEMSCoordinator
 from .dashboard import async_sync_managed_dashboard
+from .dashboard_pipeline import install_dashboard_pipeline
 from .energy_bill_presentation import (
     async_setup_energy_bill_state,
     install_energy_bill_dashboard_patch,
@@ -64,9 +65,11 @@ PLATFORMS: list[Platform] = [
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up KEMS from a config entry."""
-    # Install the reporting-only Alpha8.13 bill presentation before the managed
-    # dashboard is rendered. It does not alter planning or hardware permissions.
+    # Preserve the Alpha8.13/8.14 bill presentation, then move its dashboard
+    # transformation to the final Alpha8.16 pipeline so consolidation still sees
+    # the complete legacy source-view contract before user-facing views are shaped.
     install_energy_bill_dashboard_patch()
+    install_dashboard_pipeline()
     try:
         await async_sync_managed_dashboard(hass)
     except (OSError, ValueError):
