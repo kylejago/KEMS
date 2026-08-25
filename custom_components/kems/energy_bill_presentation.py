@@ -253,9 +253,7 @@ def improve_energy_bill_dashboard(content: str) -> str:
         content = content.replace(marker, marker + _PRODUCT_VIEWS, 1)
 
     if "\n  - title: Compare\n    path: compare\n" not in content:
-        compare_view = "".join(
-            (_COMPARE_VIEW_HEADER, _PERIOD_CARD, "\n", _TODAY_CARD)
-        )
+        compare_view = "".join((_COMPARE_VIEW_HEADER, _PERIOD_CARD, "\n", _TODAY_CARD))
         content = content.rstrip() + compare_view + "\n"
     return content
 
