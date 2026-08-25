@@ -1,4 +1,4 @@
-"""Validate the fully assembled Alpha7.36 managed dashboard output."""
+"""Validate the retained internal Alpha7.36 dashboard-finance transformation."""
 
 from __future__ import annotations
 
@@ -10,8 +10,6 @@ import yaml
 
 ROOT = Path(__file__).parents[1]
 KEMS = ROOT / "custom_components" / "kems"
-MASTER = KEMS / "kems_master_dashboard.yaml"
-AGILE = KEMS / "kems_agile_smart_export_dashboard.yaml"
 
 
 def _load(name: str, path: Path):
@@ -25,23 +23,24 @@ def _load(name: str, path: Path):
 
 
 def _source_dashboard() -> str:
-    master = MASTER.read_text(encoding="utf-8").rstrip()
-    agile = AGILE.read_text(encoding="utf-8")
-    marker = "\nviews:\n"
-    assert marker in agile
-    agile_views = agile.split(marker, 1)[1].lstrip("\n").rstrip()
-    live_view = """
-  - title: Agile Smart Export
-    path: agile-smart-export
-    icon: mdi:transmission-tower-export
-    cards:
-      - type: markdown
-        content: Runtime Agile live scenario placeholder.
-""".rstrip()
-    return f"{master}\n\n{agile_views}\n\n{live_view}\n"
+    """Build legacy engineering source views independently of customer YAML."""
+    consolidation = _load(
+        "kems_alpha736_source_consolidation_test", KEMS / "dashboard_consolidation.py"
+    )
+    parts = ["title: KEMS legacy Alpha7.36 fixture\n\nviews:\n"]
+    for index, title in enumerate(sorted(consolidation.EXPECTED_SOURCE_TITLES)):
+        parts.append(
+            f"  - title: {title}\n"
+            f"    path: source-{index}\n"
+            "    cards:\n"
+            "      - type: markdown\n"
+            "        content: |\n"
+            f"          Internal evidence fixture for {title}.\n"
+        )
+    return "\n".join(part.rstrip() for part in parts).rstrip() + "\n"
 
 
-def test_alpha736_final_dashboard_has_ten_valid_views_and_finance_parity() -> None:
+def test_alpha736_internal_dashboard_finance_transform_remains_valid() -> None:
     consolidation = _load(
         "kems_alpha736_consolidation_test", KEMS / "dashboard_consolidation.py"
     )

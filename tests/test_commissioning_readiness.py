@@ -133,16 +133,17 @@ def test_foxess_telemetry_evidence_has_no_hardware_write_path() -> None:
     assert "safe_to_write_hardware = True" not in content
 
 
-def test_commissioning_entities_and_dashboard_are_registered() -> None:
-    """Home Assistant should expose one clear commissioning operating view."""
+def test_commissioning_entities_are_visible_in_fresh_system_dashboard() -> None:
+    """The clean dashboard must retain commissioning and safety visibility."""
     sensor = SENSOR.read_text(encoding="utf-8")
     dashboard = DASHBOARD.read_text(encoding="utf-8")
     assert "build_commissioning_entities" in sensor
+    assert "path: system" in dashboard
     assert "sensor.kems_commissioning_readiness" in dashboard
     assert "sensor.kems_panel_management_status" in dashboard
-    assert "sensor.kems_panel_firmware_version" in dashboard
-    assert "path: commissioning" in dashboard
-    assert "Shadow command" in dashboard
+    assert "sensor.kems_control_preflight" in dashboard
+    assert "binary_sensor.kems_real_control_backend_available" in dashboard
+    assert "binary_sensor.kems_control_commands_permitted" in dashboard
 
 
 def test_panel_health_is_persistent_and_diagnostic_visible() -> None:

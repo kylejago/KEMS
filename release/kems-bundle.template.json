@@ -42,7 +42,7 @@
   },
   "maintenance": {
     "required": true,
-    "reason": "Finish the two-product Home Assistant dashboard by replacing legacy four-engine comparisons with Live Data vs KEMS and restoring the Agile half-hour slot list",
+    "reason": "Replace the historical managed-dashboard compositor with a clean dashboard built directly from verified KEMS entities, retaining only Live Data and KEMS plus a stable Agile half-hour slot view",
     "expected_downtime_minutes": 5,
     "home_assistant_restart_required": true,
     "reboot_required": false,

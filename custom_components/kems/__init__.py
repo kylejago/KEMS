@@ -9,6 +9,7 @@ from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 
 from .agile_simulation_presentation import install_agile_simulation_presentation
+from .agile_slots_state import async_setup_agile_slots_state
 from .collector import Collector
 from .const import (
     CONF_EV_POWER,
@@ -65,9 +66,8 @@ PLATFORMS: list[Platform] = [
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up KEMS from a config entry."""
-    # Preserve the Alpha8.13/8.14 bill presentation, then move its dashboard
-    # transformation to the final Alpha8.16 pipeline so consolidation still sees
-    # the complete legacy source-view contract before user-facing views are shaped.
+    # Alpha8.19 keeps the existing billing state but replaces the historical
+    # dashboard compositor with one fresh packaged customer dashboard.
     install_energy_bill_dashboard_patch()
     install_dashboard_pipeline()
     try:
@@ -116,6 +116,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     await coordinator.async_config_entry_first_refresh()
     entry.runtime_data = coordinator
     async_setup_energy_bill_state(hass, entry, coordinator)
+    async_setup_agile_slots_state(hass, entry, coordinator)
     update_orchestrator = await async_setup_update_orchestrator(hass, entry)
     if (
         update_orchestrator.policy.automatic_updates
