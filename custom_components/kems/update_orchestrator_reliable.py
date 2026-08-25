@@ -268,13 +268,35 @@ class ReliableKEMSUpdateOrchestrator(base.KEMSUpdateOrchestrator):
             bundle = {**bundle, "release": release}
         await super()._consider_bundle(bundle)
 
+    async def _async_repair_dashboard_verification(self) -> None:
+        """Recreate a missing/stale managed dashboard before restart verification."""
+        if not self.pending or self.latest_bundle is None:
+            return
+        if str(self.pending.get("stage") or "") not in {
+            "restart_requested",
+            "verifying",
+        }:
+            return
+        if base._component_target(self.latest_bundle, "dashboard") is None:
+            return
+        current = await self.hass.async_add_executor_job(self._dashboard_current)
+        if current is True:
+            return
+        base.LOGGER.warning(
+            "KEMS managed dashboard was unavailable or stale during post-restart "
+            "verification; rebuilding it from the running release"
+        )
+        await _async_sync_update_dashboard(self.hass)
+
     async def async_verify_pending(self, *, save: bool = True) -> None:
-        """Do not claim success until the post-restart bundle is loaded again."""
+        """Verify only after bundle reload, repairing the managed dashboard first."""
         if self.pending and self.latest_bundle is None:
             if save:
                 await self._async_save()
             self._write_legacy_states()
             return
+        if self.pending:
+            await self._async_repair_dashboard_verification()
         await super().async_verify_pending(save=save)
 
     def _refresh_component_status(self) -> None:
