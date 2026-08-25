@@ -20,7 +20,7 @@ EXPECTED_CUSTOMER_PATHS = [
     "live-data",
     "kems",
     "compare",
-    "agile-slots",
+    "tomorrow",
     "history",
     "system",
 ]
@@ -33,7 +33,7 @@ def test_packaged_master_dashboard_matches_repository_source() -> None:
 
 
 def test_managed_master_dashboard_is_fresh_builtin_yaml() -> None:
-    """The customer dashboard should parse with the seven clean Alpha8.19 views."""
+    """The customer dashboard should parse with the seven current customer views."""
     content = yaml.safe_load(PACKAGED.read_text(encoding="utf-8"))
     assert content["title"] == "KEMS"
     assert [view["path"] for view in content["views"]] == EXPECTED_CUSTOMER_PATHS
@@ -44,20 +44,23 @@ def test_managed_dashboard_has_only_live_data_and_kems_products() -> None:
     content = PACKAGED.read_text(encoding="utf-8")
     assert "# Live Data" in content
     assert "# KEMS" in content
-    assert "# Live Data vs KEMS" in content
+    assert "Live Data vs KEMS" in content
+    assert "Without KEMS" in content
+    assert "counterfactual" in content.lower()
     assert "Battery & Solar" not in content
     assert "Full KEMS Agile" not in content
     assert "Compare every KEMS type" not in content
 
 
-def test_managed_dashboard_keeps_agile_slots_as_tariff_information() -> None:
-    """Half-hour Agile data should remain visible without becoming a product."""
+def test_managed_dashboard_keeps_agile_slots_as_planning_information() -> None:
+    """Half-hour Agile data stays visible inside KEMS/Tomorrow, not as a product tab."""
     content = PACKAGED.read_text(encoding="utf-8")
-    assert "path: agile-slots" in content
+    assert "path: agile-slots" not in content
+    assert "path: tomorrow" in content
     assert "sensor.kems_agile_slots" in content
     assert "today_slots" in content
     assert "tomorrow_slots" in content
-    assert "not another KEMS product" in content
+    assert "simulated planning" in content
 
 
 def test_packaged_agile_dashboard_matches_repository_source() -> None:

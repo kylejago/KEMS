@@ -42,7 +42,7 @@
   },
   "maintenance": {
     "required": true,
-    "reason": "Hard-latch the 10% pre-cheap battery deadline once the guarded latest-safe-start is reached so rolling Agile price replans cannot postpone discharge until the target becomes unreachable",
+    "reason": "Rebuild the managed Home Assistant dashboard around paired Live Data and KEMS graphs, a three-column no-system comparison, readable today and tomorrow plans, calendar history and a compact System view",
     "expected_downtime_minutes": 5,
     "home_assistant_restart_required": true,
     "reboot_required": false,

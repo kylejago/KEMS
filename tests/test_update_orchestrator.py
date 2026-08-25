@@ -97,7 +97,8 @@ def test_managed_dashboard_has_update_and_maintenance_view() -> None:
     assert "switch.kems_automatic_updates" in content
     assert "time.kems_maintenance_window_start" in content
     assert "Component verification" in content
-    assert "Recent update history" in content
+    assert "Recent updates — latest 5" in content
+    assert "[0:5]" in content
 
 
 def test_verified_bundle_installs_exact_release_tag_even_if_hacs_advertises_other() -> (
@@ -124,8 +125,9 @@ def test_failed_update_is_durable_visible_and_pauses_unattended_retries() -> Non
     assert "def _active_error" in content
     assert '"last_error": self._active_error()' in content
     assert '"error": pending.get("error")' in content
-    assert "**Failure:**" in dashboard
-    assert "| Completed | Bundle | Result | Error |" in dashboard
+    assert "**Last error:**" in dashboard
+    assert "u.attributes.last_error" in dashboard
+    assert "| Completed | Bundle | Result |" in dashboard
 
 
 def test_real_control_is_not_unlocked_by_update_orchestration() -> None:

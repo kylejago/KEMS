@@ -34,9 +34,9 @@ def test_master_dashboard_uses_verified_fresh_customer_entities() -> None:
         "sensor.kems_forecast_solar_tomorrow",
         "sensor.kems_agile_slots",
         "sensor.kems_update_status",
+        "sensor.kems_energy_cost_comparison",
     ):
         assert entity_id in text
-    assert "sensor.kems_energy_cost_comparison" not in text
     assert "sensor.kems_agile_smart_export_plan" not in text
     assert "Full KEMS Agile" not in text
 
