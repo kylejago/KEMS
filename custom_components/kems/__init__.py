@@ -48,7 +48,7 @@ from .providers.octopus import OctopusProvider
 from .providers.ohme import OhmeProvider
 from .settings import KEMSSettings
 from .update_orchestrator import async_unload_update_orchestrator
-from .update_orchestrator_reliable import async_setup_update_orchestrator
+from .update_orchestrator_convergent import async_setup_update_orchestrator
 
 LOGGER = logging.getLogger(__name__)
 
