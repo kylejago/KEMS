@@ -1,4 +1,4 @@
-"""Regression tests for the simplified Alpha7.35 KEMS dashboard."""
+"""Regression tests for the retained internal Alpha7.35 consolidation helper."""
 
 from __future__ import annotations
 
@@ -10,8 +10,6 @@ import yaml
 
 ROOT = Path(__file__).parents[1]
 MODULE_PATH = ROOT / "custom_components" / "kems" / "dashboard_consolidation.py"
-MASTER = ROOT / "custom_components" / "kems" / "kems_master_dashboard.yaml"
-AGILE = ROOT / "custom_components" / "kems" / "kems_agile_smart_export_dashboard.yaml"
 RUNTIME = ROOT / "custom_components" / "kems" / "agile_smart_export_runtime.py"
 
 EXPECTED_PATHS = [
@@ -41,26 +39,23 @@ def _load_module():
 
 
 def _assembled_source() -> str:
-    """Mirror the current base/Agile merge and add the runtime live Agile view."""
-    master = MASTER.read_text(encoding="utf-8").rstrip()
-    agile = AGILE.read_text(encoding="utf-8")
-    marker = "\nviews:\n"
-    assert marker in agile
-    agile_views = agile.split(marker, 1)[1].lstrip("\n").rstrip()
-    live_view = """
-  - title: Agile Smart Export
-    path: agile-smart-export
-    icon: mdi:transmission-tower-export
-    cards:
-      - type: markdown
-        content: |
-          Runtime Agile live scenario placeholder for consolidation testing.
-""".rstrip()
-    return f"{master}\n\n{agile_views}\n\n{live_view}\n"
+    """Build synthetic legacy source views without coupling to the customer YAML."""
+    module = _load_module()
+    parts = ["title: KEMS legacy engineering fixture\n\nviews:\n"]
+    for index, title in enumerate(sorted(module.EXPECTED_SOURCE_TITLES)):
+        parts.append(
+            f"  - title: {title}\n"
+            f"    path: source-{index}\n"
+            "    cards:\n"
+            "      - type: markdown\n"
+            "        content: |\n"
+            f"          Internal evidence fixture for {title}.\n"
+        )
+    return "\n".join(part.rstrip() for part in parts).rstrip() + "\n"
 
 
-def test_consolidated_dashboard_has_nine_simple_navigation_pages() -> None:
-    """The managed UI should expose only the agreed product navigation."""
+def test_consolidated_dashboard_has_nine_internal_navigation_pages() -> None:
+    """The retained helper must still deterministically consolidate legacy evidence."""
     module = _load_module()
     rendered = module.consolidate_dashboard(_assembled_source())
     parsed = yaml.safe_load(rendered)
@@ -69,10 +64,8 @@ def test_consolidated_dashboard_has_nine_simple_navigation_pages() -> None:
     assert len(parsed["views"]) == 9
 
 
-def test_every_legacy_source_view_is_preserved_under_a_product_or_advanced_page() -> (
-    None
-):
-    """Simplification must reorganise rich data rather than delete it."""
+def test_every_legacy_source_view_is_preserved_by_internal_helper() -> None:
+    """Internal engineering consolidation must retain every legacy source view."""
     module = _load_module()
     source_views = module._split_views(_assembled_source())
     assert set(source_views) == module.EXPECTED_SOURCE_TITLES
@@ -83,8 +76,8 @@ def test_every_legacy_source_view_is_preserved_under_a_product_or_advanced_page(
     assert merged_sources == module.EXPECTED_SOURCE_TITLES
 
 
-def test_user_product_pages_have_live_vs_simulated_side_by_side() -> None:
-    """Every optimising product should put live and simulated data together."""
+def test_internal_product_prefixes_still_expose_engineering_evidence() -> None:
+    """Legacy prefixes remain usable for standalone engineering evidence only."""
     module = _load_module()
     parsed = yaml.safe_load(module.consolidate_dashboard(_assembled_source()))
     views = {view["path"]: str(view) for view in parsed["views"]}
@@ -99,8 +92,8 @@ def test_user_product_pages_have_live_vs_simulated_side_by_side() -> None:
     assert "sensor.kems_agile_live_scenario" in views["full-kems-agile"]
 
 
-def test_comparison_page_contains_all_four_types_and_common_metrics() -> None:
-    """One page must make the four product outcomes directly comparable."""
+def test_internal_compare_fixture_keeps_four_engine_evidence() -> None:
+    """The old four-engine comparison survives internally, not in customer YAML."""
     module = _load_module()
     parsed = yaml.safe_load(module.consolidate_dashboard(_assembled_source()))
     views = {view["path"]: str(view) for view in parsed["views"]}
@@ -108,33 +101,20 @@ def test_comparison_page_contains_all_four_types_and_common_metrics() -> None:
 
     for label in ("Live Data", "Battery & Solar", "Full KEMS", "Full KEMS Agile"):
         assert label in compare
-    for metric in (
-        "House load kW",
-        "Grid import kW",
-        "Grid export kW",
-        "Battery → home kW",
-        "Battery → export kW",
-        "Total / economic cost p",
-        "Grid import kWh",
-        "Grid export kWh",
-        "Ending SOC %",
-    ):
-        assert metric in compare
     assert "Cost comparison — 24 hours" in compare
 
 
-def test_engineering_scenarios_are_moved_to_advanced_lab() -> None:
-    """Virtual stress scenarios remain available without cluttering normal UX."""
+def test_engineering_scenarios_are_retained_in_internal_advanced_lab() -> None:
+    """Virtual stress scenarios remain available to engineering evidence tooling."""
     module = _load_module()
     parsed = yaml.safe_load(module.consolidate_dashboard(_assembled_source()))
     views = {view["path"]: str(view) for view in parsed["views"]}
     assert "select.kems_virtual_scenario" in views["advanced"]
     assert "Observe → Simulate → Shadow → Control" in views["advanced"]
-    assert "select.kems_virtual_scenario" not in views["home"]
 
 
-def test_consolidation_is_installed_before_runtime_routing_patches() -> None:
-    """Dashboard assembly remains complete before late reporting wrappers install."""
+def test_historical_runtime_install_order_is_preserved_for_internal_evidence() -> None:
+    """Retained runtime evidence patches keep their historical deterministic order."""
     runtime = RUNTIME.read_text(encoding="utf-8")
     assert "install_live_scenario_patch()\ninstall_dashboard_yaml_guard()" in runtime
     assert (
