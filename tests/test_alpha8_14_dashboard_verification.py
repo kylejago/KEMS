@@ -9,7 +9,9 @@ RELIABLE = ROOT / "custom_components" / "kems" / "update_orchestrator_reliable.p
 PRESENTATION = ROOT / "custom_components" / "kems" / "energy_bill_presentation.py"
 
 
-def test_post_restart_verification_repairs_managed_dashboard_before_completion() -> None:
+def test_post_restart_verification_repairs_managed_dashboard_before_completion() -> (
+    None
+):
     """A missing/stale managed dashboard must self-heal before base verification."""
     content = RELIABLE.read_text(encoding="utf-8")
     assert "async def _async_repair_dashboard_verification" in content
@@ -28,7 +30,10 @@ def test_dashboard_verifier_uses_the_exact_rendered_managed_payload() -> None:
     content = RELIABLE.read_text(encoding="utf-8")
     assert "_combined_dashboard_with_update_button_bytes" in content
     assert 'self.hass.config.path("kems_master_dashboard.yaml")' in content
-    assert "installed.read_bytes() == _combined_dashboard_with_update_button_bytes()" in content
+    assert (
+        "installed.read_bytes() == _combined_dashboard_with_update_button_bytes()"
+        in content
+    )
 
 
 def test_normal_dashboard_journey_is_live_data_then_kems_then_compare() -> None:
