@@ -82,7 +82,10 @@ def test_runtime_pipeline_bypasses_historical_master_agile_composition() -> None
     """The managed customer YAML must be shipped directly without old view appends."""
     pipeline = PIPELINE.read_text(encoding="utf-8")
     assert "PACKAGED_DASHBOARD_PATH.read_bytes()" in pipeline
-    assert "dashboard._combined_master_dashboard_bytes = _fresh_dashboard_bytes" in pipeline
+    assert (
+        "dashboard._combined_master_dashboard_bytes = _fresh_dashboard_bytes"
+        in pipeline
+    )
     assert "convergent._managed_dashboard_bytes = _fresh_dashboard_bytes" in pipeline
     assert "PACKAGED_AGILE_DASHBOARD_PATH" not in pipeline
     assert "dashboard_consolidation" not in pipeline
