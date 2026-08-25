@@ -38,7 +38,9 @@ def test_successor_dashboard_keeps_live_data_and_kems_as_only_products() -> None
     assert "Compare every KEMS type" not in content
 
 
-def test_compare_page_preserves_two_products_and_adds_no_system_counterfactual() -> None:
+def test_compare_page_preserves_two_products_and_adds_no_system_counterfactual() -> (
+    None
+):
     parsed, _ = _dashboard()
     views = {view["path"]: str(view) for view in parsed["views"]}
     compare = views["compare"]
