@@ -42,7 +42,7 @@
   },
   "maintenance": {
     "required": true,
-    "reason": "Repair post-restart managed-dashboard verification and align the Home Assistant dashboard around the canonical Live Data vs KEMS product model",
+    "reason": "Converge the managed Home Assistant dashboard deterministically after restart and fail explicitly instead of remaining in verifying",
     "expected_downtime_minutes": 5,
     "home_assistant_restart_required": true,
     "reboot_required": false,
