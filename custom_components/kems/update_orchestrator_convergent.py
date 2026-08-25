@@ -55,7 +55,7 @@ async def _async_converge_dashboard(
     *,
     strict: bool,
 ) -> DashboardVerification | None:
-    """Repair and verify the managed dashboard, optionally making failure a hard gate."""
+    """Repair and verify the managed dashboard with optional strict failure."""
     target = Path(hass.config.path("kems_master_dashboard.yaml"))
     try:
         expected = await hass.async_add_executor_job(_managed_dashboard_bytes)
