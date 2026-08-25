@@ -61,9 +61,14 @@ def test_active_updater_owns_convergence_and_hard_fails_pending_error() -> None:
         "from .update_orchestrator_convergent import async_setup_update_orchestrator"
         in init
     )
-    assert "verification = await _async_converge_dashboard(self.hass, strict=True)" in content
+    assert (
+        "verification = await _async_converge_dashboard(self.hass, strict=True)"
+        in content
+    )
     assert "await self._fail_pending(str(error))" in content
-    assert "base.KEMSUpdateOrchestrator.async_verify_pending(self, save=save)" in content
+    assert (
+        "base.KEMSUpdateOrchestrator.async_verify_pending(self, save=save)" in content
+    )
     assert 'snapshot["dashboard_verification"]' in content
 
 
