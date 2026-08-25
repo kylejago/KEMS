@@ -23,8 +23,12 @@ def test_newer_pending_core_defers_dashboard_convergence() -> None:
     body = _verify_pending_body()
 
     running_at = body.index("running = base._installed_integration_version()")
-    target_gate_at = body.index("if target and not base._version_matches(running, target):")
-    defer_at = body.index("Dashboard convergence starts only after the target core is active.")
+    target_gate_at = body.index(
+        "if target and not base._version_matches(running, target):"
+    )
+    defer_at = body.index(
+        "Dashboard convergence starts only after the target core is active."
+    )
     converge_at = body.index(
         "verification = await _async_converge_dashboard(self.hass, strict=True)"
     )
@@ -46,8 +50,7 @@ def test_stale_older_pending_target_still_uses_proven_base_cleanup() -> None:
     assert (
         "await base.KEMSUpdateOrchestrator.async_verify_pending(\n"
         "                        self, save=save\n"
-        "                    )"
-        in body
+        "                    )" in body
     )
 
 
@@ -55,7 +58,9 @@ def test_exact_target_still_requires_strict_dashboard_convergence() -> None:
     """Once the target core is active, exact dashboard verification remains a hard gate."""
     body = _verify_pending_body()
 
-    assert "verification = await _async_converge_dashboard(self.hass, strict=True)" in body
+    assert (
+        "verification = await _async_converge_dashboard(self.hass, strict=True)" in body
+    )
     assert "await self._fail_pending(str(error))" in body
     assert "self._remember_dashboard_verification(verification)" in body
     assert "base.KEMSUpdateOrchestrator.async_verify_pending(self, save=save)" in body
