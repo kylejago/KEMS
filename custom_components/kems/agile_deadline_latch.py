@@ -71,7 +71,11 @@ def _release_reason(
 ) -> str | None:
     """Return why an active latch may be released, otherwise ``None``."""
     soc, target = _soc_and_target(guard)
-    if soc is not None and target is not None and soc <= target + _SOC_TOLERANCE_PERCENT:
+    if (
+        soc is not None
+        and target is not None
+        and soc <= target + _SOC_TOLERANCE_PERCENT
+    ):
         return "target_reached"
     deadline = _deadline_from(latch, guard)
     if deadline is not None and now.astimezone(UTC) >= deadline:
