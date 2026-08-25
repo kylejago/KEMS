@@ -21,13 +21,12 @@ EXPECTED_PATHS = [
     "live-data",
     "kems",
     "compare",
-    "agile-slots",
+    "tomorrow",
     "history",
     "system",
 ]
 
 STALE_PRESENTATION_ENTITIES = (
-    "sensor.kems_energy_cost_comparison",
     "sensor.kems_agile_smart_export_plan",
     "sensor.kems_agile_live_scenario",
     "sensor.kems_agile_export_rate_now",
@@ -77,6 +76,7 @@ def test_dashboard_uses_verified_stable_entities_not_retired_presentation_states
         "sensor.kems_forecast_solar_tomorrow",
         "sensor.kems_update_status",
         "sensor.kems_agile_slots",
+        "sensor.kems_energy_cost_comparison",
     ):
         assert entity_id in content
 
@@ -85,9 +85,7 @@ def test_optional_uncommissioned_live_hardware_is_rendered_defensively() -> None
     content = _content()
 
     assert "['unknown', 'unavailable', 'none', '']" in content
-    assert (
-        "dashboard shows `—` instead of treating that as a dashboard failure" in content
-    )
+    assert "Optional physical sensors remain `—` until commissioned" in content
     assert (
         "Live solar/battery values remain `—` until the physical system is commissioned"
         in content
