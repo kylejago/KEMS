@@ -135,7 +135,9 @@ def test_latch_does_not_release_merely_because_recalculated_slack_returns() -> N
     )
 
 
-def test_rolling_replan_cannot_switch_latched_deadline_back_to_price_optimised() -> None:
+def test_rolling_replan_cannot_switch_latched_deadline_back_to_price_optimised() -> (
+    None
+):
     ns = _load_latch_functions()
     manager = SimpleNamespace()
     plan: dict[str, Any] = {
@@ -210,22 +212,28 @@ def test_latch_releases_only_at_target_or_original_cheap_deadline() -> None:
         "simulated_soc_percent": 10.0,
         "deadline": "2026-08-25T22:30:00+00:00",
     }
-    assert ns["_release_reason"](
-        latch,
-        target_guard,
-        now=datetime(2026, 8, 25, 21, 0, tzinfo=UTC),
-    ) == "target_reached"
+    assert (
+        ns["_release_reason"](
+            latch,
+            target_guard,
+            now=datetime(2026, 8, 25, 21, 0, tzinfo=UTC),
+        )
+        == "target_reached"
+    )
 
     above_target = {
         "target_soc_percent": 10.0,
         "simulated_soc_percent": 13.4,
         "deadline": "2026-08-26T22:30:00+00:00",
     }
-    assert ns["_release_reason"](
-        latch,
-        above_target,
-        now=datetime(2026, 8, 25, 22, 30, tzinfo=UTC),
-    ) == "cheap_window_started"
+    assert (
+        ns["_release_reason"](
+            latch,
+            above_target,
+            now=datetime(2026, 8, 25, 22, 30, tzinfo=UTC),
+        )
+        == "cheap_window_started"
+    )
 
 
 def test_deadline_latch_remains_shadow_only() -> None:
