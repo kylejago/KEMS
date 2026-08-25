@@ -5,9 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 ROOT = Path(__file__).parents[1]
-PRESENTATION = (
-    ROOT / "custom_components" / "kems" / "energy_bill_presentation.py"
-)
+PRESENTATION = ROOT / "custom_components" / "kems" / "energy_bill_presentation.py"
 
 
 def test_managed_dashboard_uses_live_data_and_kems_as_product_views() -> None:
