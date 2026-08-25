@@ -24,7 +24,15 @@ def test_successor_dashboard_keeps_live_data_and_kems_as_only_products() -> None
     parsed, content = _dashboard()
     paths = [view["path"] for view in parsed["views"]]
 
-    assert paths == ["home", "live-data", "kems", "compare", "agile-slots", "history", "system"]
+    assert paths == [
+        "home",
+        "live-data",
+        "kems",
+        "compare",
+        "agile-slots",
+        "history",
+        "system",
+    ]
     assert "Battery & Solar" not in content
     assert "Full KEMS Agile" not in content
     assert "Compare every KEMS type" not in content
