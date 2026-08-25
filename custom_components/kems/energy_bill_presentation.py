@@ -119,30 +119,39 @@ def _remove_view(content: str, title: str) -> str:
 
 def _align_live_kems_navigation(content: str) -> str:
     """Make Live Data and KEMS the only product choices in the managed dashboard."""
-    content = content.replace(
-        "  - title: Live Energy\n    path: live-energy\n",
-        "  - title: Live Data\n    path: live-data\n",
-    ).replace(
-        "          # Live / observed home\n",
-        "          # Live Data\n",
-    ).replace(
-        "  - title: Simulation\n    path: simulation\n",
-        "  - title: KEMS\n    path: kems\n",
-    ).replace(
-        "        title: Simulated power — 24 hours\n",
-        "        title: KEMS power — 24 hours\n",
-    ).replace(
-        "            name: Sim battery SOC\n",
-        "            name: KEMS battery SOC\n",
-    ).replace(
-        "            name: Observed electricity\n",
-        "            name: Live Data electricity\n",
-    ).replace(
-        "            name: Simulated KEMS\n",
-        "            name: KEMS electricity\n",
-    ).replace(
-        "            name: Simulated saving\n",
-        "            name: KEMS saving\n",
+    content = (
+        content.replace(
+            "  - title: Live Energy\n    path: live-energy\n",
+            "  - title: Live Data\n    path: live-data\n",
+        )
+        .replace(
+            "          # Live / observed home\n",
+            "          # Live Data\n",
+        )
+        .replace(
+            "  - title: Simulation\n    path: simulation\n",
+            "  - title: KEMS\n    path: kems\n",
+        )
+        .replace(
+            "        title: Simulated power — 24 hours\n",
+            "        title: KEMS power — 24 hours\n",
+        )
+        .replace(
+            "            name: Sim battery SOC\n",
+            "            name: KEMS battery SOC\n",
+        )
+        .replace(
+            "            name: Observed electricity\n",
+            "            name: Live Data electricity\n",
+        )
+        .replace(
+            "            name: Simulated KEMS\n",
+            "            name: KEMS electricity\n",
+        )
+        .replace(
+            "            name: Simulated saving\n",
+            "            name: KEMS saving\n",
+        )
     )
 
     # These engines remain in code and standalone evidence dashboards, but are no
@@ -177,7 +186,10 @@ def improve_energy_bill_dashboard(content: str) -> str:
     # Put the canonical bill-equivalent comparison at the top of Overview without
     # removing operational status/advice cards that remain useful underneath it.
     overview_cards = "  - title: Overview\n    path: overview\n    icon: mdi:home-lightning-bolt\n    cards:\n"
-    if overview_cards in content and "        title: Live Data vs KEMS\n" not in content:
+    if (
+        overview_cards in content
+        and "        title: Live Data vs KEMS\n" not in content
+    ):
         content = content.replace(
             overview_cards,
             overview_cards + _OVERVIEW_CARD,
