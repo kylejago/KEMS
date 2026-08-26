@@ -132,10 +132,14 @@ def aligned_agile_control_views(
     """
     rolling = _rolling_target(simulation, agile_state)
     if rolling is None:
-        return simulation, simulation, {
-            "active": False,
-            "reason": "rolling target unavailable, incomplete, or event override active",
-        }
+        return (
+            simulation,
+            simulation,
+            {
+                "active": False,
+                "reason": "rolling target unavailable, incomplete, or event override active",
+            },
+        )
     target, plan = rolling
 
     routing_values = _routing_values(simulation, agile_state)
@@ -144,26 +148,26 @@ def aligned_agile_control_views(
     control_values = dict(routing_values)
     control_values.update(
         {
-            "current_simulated_battery_to_home_power_kw": target[
-                "battery_to_home_kw"
-            ],
-            "current_simulated_battery_export_power_kw": target[
-                "battery_export_kw"
-            ],
+            "current_simulated_battery_to_home_power_kw": target["battery_to_home_kw"],
+            "current_simulated_battery_export_power_kw": target["battery_export_kw"],
             "current_simulated_battery_power_kw": target["total_discharge_kw"],
             "target_battery_export_power_kw": target["battery_export_kw"],
         }
     )
     control_view = _replace_known(simulation, control_values)
 
-    return control_view, shadow_view, {
-        "active": True,
-        "basis": "exact current Agile rolling target + authoritative routing outcome",
-        "dispatch_mode": plan.get("dispatch_mode"),
-        "dispatch_action": plan.get("dispatch_action"),
-        "target": {key: round(value, 3) for key, value in target.items()},
-        "hardware_writes": "blocked",
-    }
+    return (
+        control_view,
+        shadow_view,
+        {
+            "active": True,
+            "basis": "exact current Agile rolling target + authoritative routing outcome",
+            "dispatch_mode": plan.get("dispatch_mode"),
+            "dispatch_action": plan.get("dispatch_action"),
+            "target": {key: round(value, 3) for key, value in target.items()},
+            "hardware_writes": "blocked",
+        },
+    )
 
 
 def align_agile_control_state(
