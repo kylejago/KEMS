@@ -12,7 +12,9 @@ PIPELINE_PATH = ROOT / "custom_components" / "kems" / "dashboard_pipeline.py"
 
 def _load_pipeline_module():
     """Load the standalone pipeline module without importing the KEMS package."""
-    spec = importlib.util.spec_from_file_location("kems_dashboard_pipeline_alpha827", PIPELINE_PATH)
+    spec = importlib.util.spec_from_file_location(
+        "kems_dashboard_pipeline_alpha827", PIPELINE_PATH
+    )
     assert spec is not None
     assert spec.loader is not None
     module = importlib.util.module_from_spec(spec)
