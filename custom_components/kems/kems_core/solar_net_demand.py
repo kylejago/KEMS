@@ -37,6 +37,19 @@ class SolarNetDemandProjection:
         return asdict(self)
 
 
+@dataclass(frozen=True, slots=True)
+class IdleSolarRouting:
+    """Solar-first AC routing while deliberate battery discharge is idle."""
+
+    solar_to_home_kw: float
+    solar_to_battery_kw: float
+    solar_export_kw: float
+    solar_curtailment_kw: float
+    grid_import_kw: float
+    grid_export_kw: float
+    kh7_ac_output_kw: float
+
+
 def _forecast_confidence(
     forecast: SolarForecastState | None,
     forecast_plan: ForecastPlanState | None,
@@ -96,12 +109,20 @@ def project_solar_net_house_demand(
     if confidence + _EPSILON < MIN_SOLAR_NET_DEMAND_CONFIDENCE_PERCENT:
         return inactive("solar forecast confidence below safe credit threshold")
 
-    remaining_hours = max((deadline_utc - now_utc).total_seconds() / 3600.0, 0.25)
+    remaining_hours = max(
+        (deadline_utc - now_utc).total_seconds() / 3600.0,
+        0.25,
+    )
     gross_average_kw = gross / remaining_hours
-    typical_kw = max(float(getattr(learned, "typical_house_load_kw", 0.0) or 0.0), 0.0)
+    typical_kw = max(
+        float(getattr(learned, "typical_house_load_kw", 0.0) or 0.0),
+        0.0,
+    )
     plan_house = getattr(forecast_plan, "expected_house_remaining_today_kwh", None)
     plan_average_kw = (
-        max(float(plan_house), 0.0) / remaining_hours if plan_house is not None else 0.0
+        max(float(plan_house), 0.0) / remaining_hours
+        if plan_house is not None
+        else 0.0
     )
     conservative_house_kw = max(gross_average_kw, typical_kw, plan_average_kw)
     if conservative_house_kw <= _EPSILON:
@@ -129,7 +150,10 @@ def project_solar_net_house_demand(
     # The fused forecast is already conservative, but retain an additional
     # confidence haircut and at least 10% of gross house demand as battery
     # protection. Rolling replanning tightens this again as the day unfolds.
-    confidence_fraction = min(max(confidence / 100.0, 0.0), MAX_SOLAR_HOUSE_CREDIT_FRACTION)
+    confidence_fraction = min(
+        max(confidence / 100.0, 0.0),
+        MAX_SOLAR_HOUSE_CREDIT_FRACTION,
+    )
     credit = min(
         raw_credit * confidence_fraction,
         gross * MAX_SOLAR_HOUSE_CREDIT_FRACTION,
@@ -151,4 +175,58 @@ def project_solar_net_house_demand(
             "high-confidence hourly solar overlaps future house demand; "
             "battery protects only the conservative net remainder"
         ),
+    )
+
+
+def route_idle_solar_first(
+    *,
+    house_kw: float,
+    solar_kw: float,
+    requested_solar_to_battery_kw: float,
+    grid_to_battery_kw: float,
+    battery_export_kw: float,
+    inverter_limit_kw: float,
+    export_limit_kw: float,
+    export_allowed: bool,
+) -> IdleSolarRouting:
+    """Route solar to the house before idle-period charging/export.
+
+    This helper is intentionally limited to a zero-battery-discharge snapshot.
+    Cheap-period grid bypass is handled by the caller and deliberate battery
+    discharge continues to use the existing shared-inverter headroom logic.
+    """
+    house = max(float(house_kw), 0.0)
+    solar = max(float(solar_kw), 0.0)
+    solar_to_home = min(house, solar)
+    remaining_solar = max(solar - solar_to_home, 0.0)
+    solar_to_battery = min(
+        max(float(requested_solar_to_battery_kw), 0.0),
+        remaining_solar,
+    )
+    remaining_solar = max(remaining_solar - solar_to_battery, 0.0)
+
+    grid_charge = max(float(grid_to_battery_kw), 0.0)
+    battery_export = max(float(battery_export_kw), 0.0)
+    inverter_limit = max(float(inverter_limit_kw), 0.0)
+    export_limit = min(max(float(export_limit_kw), 0.0), inverter_limit)
+    export_headroom = max(export_limit - battery_export, 0.0)
+    inverter_headroom = max(inverter_limit - solar_to_home, 0.0)
+    solar_export = (
+        min(remaining_solar, export_headroom, inverter_headroom)
+        if export_allowed
+        else 0.0
+    )
+    solar_curtailment = max(remaining_solar - solar_export, 0.0)
+    grid_import = max(house - solar_to_home, 0.0) + grid_charge
+    grid_export = solar_export + battery_export
+    kh7_ac_output = solar_to_home + solar_export + battery_export
+
+    return IdleSolarRouting(
+        solar_to_home_kw=round(solar_to_home, 3),
+        solar_to_battery_kw=round(solar_to_battery, 3),
+        solar_export_kw=round(solar_export, 3),
+        solar_curtailment_kw=round(solar_curtailment, 3),
+        grid_import_kw=round(grid_import, 3),
+        grid_export_kw=round(grid_export, 3),
+        kh7_ac_output_kw=round(kh7_ac_output, 3),
     )
