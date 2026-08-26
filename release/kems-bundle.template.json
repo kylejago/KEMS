@@ -42,7 +42,7 @@
   },
   "maintenance": {
     "required": true,
-    "reason": "Clarify Power Down baseline reporting: export baseline is not required, while preserving the Octopus import-baseline source completeness flag and unchanged net-meter reward maths",
+    "reason": "Use the mapped Octopus export Power Down baseline when applicable and withhold reward estimates instead of assuming zero historical export when that mapped source is unavailable; physical Power Down planning and control remain unchanged",
     "expected_downtime_minutes": 5,
     "home_assistant_restart_required": true,
     "reboot_required": false,

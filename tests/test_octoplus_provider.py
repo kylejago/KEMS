@@ -143,3 +143,56 @@ def test_missing_export_baseline_does_not_create_incomplete_state() -> None:
     assert octoplus.OctoplusProvider._combine_incomplete(False, None) is False
     assert octoplus.OctoplusProvider._combine_incomplete(True, None) is True
     assert octoplus.OctoplusProvider._combine_incomplete(None, None) is None
+
+
+def test_mapped_export_baseline_fails_closed_until_available() -> None:
+    """Never substitute zero export when an export baseline source is mapped."""
+    octoplus, _ = _load_octoplus()
+    start = datetime(2026, 11, 1, 17, 0, tzinfo=UTC)
+    imported = (0.4, 1.0, start, start + timedelta(minutes=30), False)
+    missing_export = (None, None, None, None, None)
+
+    safe_import, safe_export = octoplus.OctoplusProvider._reward_baselines(
+        imported,
+        missing_export,
+        export_configured=True,
+    )
+
+    assert safe_import[0] is None
+    assert safe_import[1] is None
+    assert safe_import[2:] == imported[2:]
+    assert safe_export == missing_export
+
+
+def test_unmapped_export_baseline_keeps_import_only_reward_baseline_available() -> None:
+    """Sites without a mapped export baseline retain the import-only baseline."""
+    octoplus, _ = _load_octoplus()
+    start = datetime(2026, 11, 1, 17, 0, tzinfo=UTC)
+    imported = (0.4, 1.0, start, start + timedelta(minutes=30), False)
+    no_export = (None, None, None, None, None)
+
+    safe_import, safe_export = octoplus.OctoplusProvider._reward_baselines(
+        imported,
+        no_export,
+        export_configured=False,
+    )
+
+    assert safe_import == imported
+    assert safe_export == no_export
+
+
+def test_mapped_export_baseline_combines_with_import_when_available() -> None:
+    """Usable import/export baseline values must both reach net reward accounting."""
+    octoplus, _ = _load_octoplus()
+    start = datetime(2026, 11, 1, 17, 0, tzinfo=UTC)
+    imported = (0.4, 1.0, start, start + timedelta(minutes=30), False)
+    exported = (0.1, 0.25, start, start + timedelta(minutes=30), False)
+
+    safe_import, safe_export = octoplus.OctoplusProvider._reward_baselines(
+        imported,
+        exported,
+        export_configured=True,
+    )
+
+    assert safe_import == imported
+    assert safe_export == exported
