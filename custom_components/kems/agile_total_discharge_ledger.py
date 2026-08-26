@@ -375,9 +375,7 @@ def _apply_total_discharge_ledger(
                 ledger.total_discharge_capacity_kwh
             ),
             "total_discharge_deadline_margin_kwh": round(deadline_margin, 3),
-            "total_discharge_unallocated_kwh": (
-                ledger.unallocated_total_discharge_kwh
-            ),
+            "total_discharge_unallocated_kwh": (ledger.unallocated_total_discharge_kwh),
             "required_total_discharge_in_current_slot_kwh": (
                 ledger.required_current_total_discharge_kwh
             ),
