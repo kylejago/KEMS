@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import importlib.util
 import sys
+from dataclasses import replace
 from pathlib import Path
 from types import ModuleType
 
@@ -211,12 +212,7 @@ def test_zero_target_shadow_tracking_is_no_longer_alpha825_mismatch() -> None:
 
 def test_active_power_down_keeps_existing_event_priority_path() -> None:
     module = _alignment_module()
-    original = SimulationState(
-        **{
-            **_base_simulation().__dict__,
-            "saving_session_active": True,
-        }
-    )
+    original = replace(_base_simulation(), saving_session_active=True)
     control_view, shadow_view, context = module.aligned_agile_control_views(
         original,
         _state(),
@@ -231,7 +227,7 @@ def test_coordinator_aligns_after_agile_update_before_shadow_validation() -> Non
     source = (ROOT / "custom_components/kems/coordinator.py").read_text()
 
     agile_update = source.index("await self._agile_smart_export.async_update")
-    views = source.index("aligned_agile_control_views")
+    views = source.index("aligned_agile_control_views(", agile_update)
     plan = source.index("control = self._control.plan", views)
     reconcile = source.index("control = align_agile_control_state", plan)
     shadow = source.index("await self._shadow_validation.async_update", reconcile)
