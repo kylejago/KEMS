@@ -10,6 +10,10 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
 
+from .agile_control_alignment import (
+    align_agile_control_state,
+    aligned_agile_control_views,
+)
 from .agile_history_backfill import AgileHistoryBackfill
 from .agile_smart_export_runtime import EfficientAgileSmartExportManager
 from .collector import Collector
@@ -215,6 +219,7 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                 forecast_plan=forecast_plan,
                 tariff=self.settings.tariff,
             )
+            agile_state = self._agile_smart_export.state
             whole_home = self._whole_home.summarise(snapshot, simulation, gas)
             stored_lifetime = await self._lifetime.async_update(
                 simulation,
@@ -234,26 +239,39 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                 snapshot,
                 self.entities.configured_snapshot_fields(),
             )
+
+            # The settled/day simulation remains the accounting authority. For
+            # current control and shadow validation only, derive transient views
+            # from the exact Agile rolling target and final routing snapshot.
+            control_simulation, shadow_simulation, _alignment = (
+                aligned_agile_control_views(simulation, agile_state)
+            )
             control = self._control.plan(
                 snapshot,
-                simulation,
+                control_simulation,
                 now,
+                self.settings.control,
+            )
+            control = align_agile_control_state(
+                control,
+                simulation,
+                agile_state,
                 self.settings.control,
             )
             await self._shadow_validation.async_update(
                 snapshot=snapshot,
-                simulation=simulation,
+                simulation=shadow_simulation,
                 control=control,
                 now=now,
                 config=self.settings.control,
-                agile_state=self._agile_smart_export.state,
+                agile_state=agile_state,
             )
             last_power_down = await self._power_down.async_update(
                 snapshot,
                 simulation,
                 control,
                 now,
-                agile_state=self._agile_smart_export.state,
+                agile_state=agile_state,
             )
             phase = self._phase(
                 learned.ready,
