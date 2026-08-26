@@ -146,13 +146,15 @@ def test_alpha828_runtime_uses_deadline_capacity_and_preserves_hardware_block() 
     )
 
 
-def test_alpha828_version_and_release_scope() -> None:
+def test_alpha828_version_and_release_contract_remains_successor_safe() -> None:
     manifest = json.loads(
         (ROOT / "custom_components" / "kems" / "manifest.json").read_text()
     )
     bundle = json.loads((ROOT / "release" / "kems-bundle.template.json").read_text())
 
-    assert manifest["version"] == "0.8.0-alpha8.28"
-    assert bundle["maintenance"]["affected_components"] == ["kems_core", "dashboard"]
+    version = manifest["version"]
+    assert version.startswith("0.8.0-alpha8.")
+    assert int(version.rsplit(".", 1)[1]) >= 28
+    assert "kems_core" in bundle["maintenance"]["affected_components"]
     assert bundle["maintenance"]["home_assistant_restart_required"] is True
     assert bundle["maintenance"]["reboot_required"] is False
