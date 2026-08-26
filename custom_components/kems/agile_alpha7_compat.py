@@ -76,6 +76,7 @@ POST_BASE_PATCHES: Final[tuple[PatchSpec, ...]] = (
     ("agile_dispatch_reconciliation", "install_dispatch_reconciliation"),
     ("agile_deadline_latch", "install_deadline_latch"),
     ("agile_runtime_reconciliation", "install_runtime_reconciliation"),
+    ("agile_solar_net_demand", "install_solar_net_demand"),
 )
 
 
