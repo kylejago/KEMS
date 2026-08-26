@@ -58,8 +58,7 @@ def test_house_reserve_is_not_assumed_to_be_guaranteed_future_discharge() -> Non
     start = datetime(2026, 8, 26, 19, 0, tzinfo=UTC)
     deadline = start + timedelta(hours=3, minutes=30)
     slots = [
-        _slot(start + timedelta(minutes=30 * index), 20.0 - index)
-        for index in range(7)
+        _slot(start + timedelta(minutes=30 * index), 20.0 - index) for index in range(7)
     ]
     plan = allocate_total_discharge_slots(
         slots=slots,
