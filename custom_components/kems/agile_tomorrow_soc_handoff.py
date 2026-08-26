@@ -168,9 +168,7 @@ class TomorrowSocHandoffAgileSmartExportManager(
         )
         state["price_quality"] = quality
         state["tomorrow_soc_handoff"] = {
-            "active": bool(
-                agile_handoff.get("active") or full_handoff.get("active")
-            ),
+            "active": bool(agile_handoff.get("active") or full_handoff.get("active")),
             "policy": (
                 "today projected pre-cheap SOC -> pre-midnight cheap charge -> "
                 "Tomorrow 00:00 SOC"
