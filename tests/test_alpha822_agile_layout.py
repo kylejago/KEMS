@@ -47,11 +47,13 @@ def test_today_and_tomorrow_are_single_readable_chronological_lists() -> None:
     for card in (today, tomorrow):
         assert card["type"] == "markdown"
         content = card["content"]
-        assert "| Time | Rate | KEMS plan and energy |" in content
+        assert "| Time | KEMS plan |" in content
+        assert "| Time | Rate | KEMS plan and energy |" not in content
         assert "{% for p in slots %}" in content
-        assert "Grid in/out" in content
-        assert "Batt out" in content
-        assert "SOC" in content
+        assert "House first — no battery export planned" in content
+        assert "Battery export" in content
+        assert "current plan snapshot" in content
+        assert "Grid in/out" not in content
 
     final_text = yaml.safe_dump(parsed, sort_keys=False)
     for old_title in (
@@ -65,20 +67,29 @@ def test_today_and_tomorrow_are_single_readable_chronological_lists() -> None:
         assert old_title not in final_text
 
 
-def test_nullable_slot_values_render_as_dash_instead_of_breaking_card() -> None:
+def test_rolling_hold_is_explained_as_a_decision_not_an_error() -> None:
+    module = _pipeline_module()
+    content = module._finalise_dashboard_bytes(SOURCE.read_bytes()).decode("utf-8")
+
+    assert "{% if 'hold' in rolling %}" in content
+    assert "House first — no battery export planned" in content
+    assert "not a waiting/error state" in content
+    assert "hold — rolling replan" not in content
+
+
+def test_nullable_slot_values_do_not_break_plan_rows() -> None:
     module = _pipeline_module()
     content = module._finalise_dashboard_bytes(SOURCE.read_bytes()).decode("utf-8")
 
     for alias, field in (
         ("gi", "grid_import_kwh"),
-        ("ge", "grid_export_kwh"),
         ("bo", "battery_export_kwh"),
         ("soc", "ending_soc_percent"),
     ):
         assert f"set {alias} = p.get('{field}')" in content
-        assert f"if {alias} is not none else '—'" in content
 
-    assert "p.get('rate_pence') is not none else '—'" in content
+    assert "p.get('rate_pence') is not none else 'Rate —'" in content
+    assert "planned_export is not none" in content
 
 
 def test_tomorrow_partial_publication_is_visible_and_aggregation_is_safe() -> None:
