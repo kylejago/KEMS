@@ -148,7 +148,7 @@ BINARY_SENSORS: tuple[KEMSBinarySensorEntityDescription, ...] = (
     ),
     KEMSBinarySensorEntityDescription(
         key="saving_session_baseline_incomplete",
-        name="Power Down baseline incomplete",
+        name="Power Down source baseline incomplete",
         icon="mdi:progress-alert",
         is_on_fn=lambda data: bool(data.simulation.saving_session_baseline_incomplete),
     ),
@@ -378,3 +378,36 @@ class KEMSBinarySensor(KEMSEntity, BinarySensorEntity):
     def is_on(self) -> bool | None:
         """Return the binary sensor state."""
         return self.entity_description.is_on_fn(self.coordinator.data)
+
+    @property
+    def extra_state_attributes(self) -> dict[str, object] | None:
+        """Explain Power Down baseline semantics without changing source truth."""
+        if self.entity_description.key != "saving_session_baseline_incomplete":
+            return None
+
+        simulation = self.coordinator.data.simulation
+        if not simulation.saving_session_joined:
+            status = "No joined Power Down"
+        elif simulation.saving_session_baseline_net_kwh is None:
+            status = "Import baseline unavailable — export baseline not required"
+        elif simulation.saving_session_baseline_incomplete:
+            status = (
+                "Import baseline available — Octopus source marks calculation "
+                "incomplete; export baseline not required"
+            )
+        else:
+            status = "Import baseline available — export baseline not required"
+
+        return {
+            "status": status,
+            "reward_baseline_net_kwh": simulation.saving_session_baseline_net_kwh,
+            "baseline_source": simulation.saving_session_baseline_source,
+            "octopus_source_calculation_incomplete": (
+                simulation.saving_session_baseline_incomplete
+            ),
+            "export_baseline_required": False,
+            "reward_basis": (
+                "import baseline minus actual net import; grid export makes net "
+                "import negative"
+            ),
+        }
