@@ -124,6 +124,21 @@ def _finalise_dashboard_bytes(payload: bytes) -> bytes:
         "sensor.kems_simulated_battery_charged_today",
     )
 
+    # The final managed dashboard, not the legacy readability compositor, is the
+    # authoritative customer path. Keep normal export income on its own row and
+    # expose the explicit settled Power Down reward as the separate account credit.
+    supplier_credit_row = (
+        "| Supplier credits | {{ ('−£%.2f' | "
+        "format((kems.get('supplier_energy_credit_pence') | float) / 100)) "
+        "if kems.get('supplier_energy_credit_pence') is not none else '—' }} |"
+    )
+    power_down_reward_row = (
+        "| Supplier rewards & credits | {{ ('−£%.2f' | "
+        "format((kems.get('power_down_reward_pence') | float) / 100)) "
+        "if kems.get('power_down_reward_pence') is not none else '—' }} |"
+    )
+    text = text.replace(supplier_credit_row, power_down_reward_row)
+
     # Aggregate Tomorrow values must tolerate partial/progressive publication and
     # current slots whose execution fields are intentionally not populated yet.
     for field in (
