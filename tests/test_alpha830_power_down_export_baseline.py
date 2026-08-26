@@ -44,7 +44,7 @@ def test_export_baseline_discovery_and_mapping_remain_supported() -> None:
 
 
 def test_power_down_reporting_exposes_baseline_readiness_without_old_claim() -> None:
-    """Alpha8.30 reports mapping/readiness instead of saying export is never required."""
+    """Alpha8.30 reports export-baseline mapping and readiness."""
     source = (ROOT / "custom_components" / "kems" / "binary_sensor.py").read_text()
 
     assert '"export_baseline_mapped": export_baseline_mapped' in source
