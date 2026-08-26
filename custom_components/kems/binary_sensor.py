@@ -386,16 +386,16 @@ class KEMSBinarySensor(KEMSEntity, BinarySensorEntity):
             return None
 
         simulation = self.coordinator.data.simulation
-        export_baseline_entity = self.coordinator.entities.saving_session_export_baseline
+        export_baseline_entity = (
+            self.coordinator.entities.saving_session_export_baseline
+        )
         export_baseline_mapped = bool(export_baseline_entity)
         reward_baseline_ready = simulation.saving_session_baseline_net_kwh is not None
 
         if not simulation.saving_session_joined:
             status = "No joined Power Down"
         elif export_baseline_mapped and not reward_baseline_ready:
-            status = (
-                "Export baseline mapped but unavailable — reward estimate withheld"
-            )
+            status = "Export baseline mapped but unavailable — reward estimate withheld"
         elif export_baseline_mapped:
             status = "Import and export baselines available — net baseline ready"
         elif reward_baseline_ready and simulation.saving_session_baseline_incomplete:
