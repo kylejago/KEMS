@@ -120,9 +120,7 @@ def project_solar_net_house_demand(
     )
     plan_house = getattr(forecast_plan, "expected_house_remaining_today_kwh", None)
     plan_average_kw = (
-        max(float(plan_house), 0.0) / remaining_hours
-        if plan_house is not None
-        else 0.0
+        max(float(plan_house), 0.0) / remaining_hours if plan_house is not None else 0.0
     )
     conservative_house_kw = max(gross_average_kw, typical_kw, plan_average_kw)
     if conservative_house_kw <= _EPSILON:
