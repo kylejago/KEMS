@@ -235,6 +235,7 @@ def test_coordinator_aligns_after_agile_update_before_shadow_validation() -> Non
     assert agile_update < views < plan < reconcile < shadow
     assert "simulation=shadow_simulation" in source[shadow : shadow + 500]
     assert "simulation=simulation" in source[source.index("return KEMSData") :]
-    assert "commands_permitted=False" in (
-        ROOT / "custom_components/kems/agile_control_alignment.py"
-    ).read_text()
+    assert (
+        "commands_permitted=False"
+        in (ROOT / "custom_components/kems/agile_control_alignment.py").read_text()
+    )
