@@ -12,7 +12,6 @@ from homeassistant.util import dt as dt_util
 from .base import HomeAssistantStateReader
 from .entity_map import KEMSEntities
 
-
 BaselineTuple = tuple[
     float | None,
     float | None,
