@@ -42,7 +42,7 @@
   },
   "maintenance": {
     "required": true,
-    "reason": "Align ControlEngine and shadow validation with the exact current Agile rolling optimiser target and authoritative routed outcome",
+    "reason": "Correct the managed KEMS dashboard Battery charged row to use the registered simulated cumulative battery-charge entity",
     "expected_downtime_minutes": 5,
     "home_assistant_restart_required": true,
     "reboot_required": false,
