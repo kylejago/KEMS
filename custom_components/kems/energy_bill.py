@@ -148,6 +148,30 @@ def _gas(
     }
 
 
+def _settled_power_down_reward(
+    data: KEMSData,
+    start: date,
+    end: date,
+    now: datetime,
+) -> float | None:
+    """Return the retained completed Power Down reward for this bill period."""
+    result = data.last_power_down
+    if (
+        not result.available
+        or result.completed_successfully is not True
+        or result.session_start is None
+        or result.bonus_pence is None
+    ):
+        return None
+
+    event_at = result.session_start
+    if event_at.tzinfo is not None and now.tzinfo is not None:
+        event_at = event_at.astimezone(now.tzinfo)
+    if not start <= event_at.date() <= end:
+        return None
+    return round(max(_f(result.bonus_pence), 0.0), 2)
+
+
 def _live(
     rows: list[Mapping[str, Any]],
     days: set[date],
@@ -174,6 +198,7 @@ def _live(
         "electricity_import_cost_pence": imported,
         "electricity_standing_charge_pence": standing,
         "electricity_export_income_pence": exported,
+        "power_down_reward_pence": 0.0,
         "supplier_energy_credit_pence": 0.0,
         "electricity_total_cost_pence": electricity_total,
         **gas,
@@ -188,18 +213,40 @@ def _live(
 
 
 def _scenario(
-    scenario: ScenarioSummary | None, gas: Mapping[str, Any]
+    scenario: ScenarioSummary | None,
+    gas: Mapping[str, Any],
+    settled_power_down_reward_pence: float | None = None,
 ) -> dict[str, Any]:
     if scenario is None or not scenario.ready:
         return {"ready": False, "total_energy_cost_pence": None}
-    electric = round(scenario.total_cost_pence, 2)
+
+    reward = (
+        round(max(settled_power_down_reward_pence, 0.0), 2)
+        if settled_power_down_reward_pence is not None
+        else round(scenario.power_down_income_pence, 2)
+    )
+    if settled_power_down_reward_pence is None:
+        electric = round(scenario.total_cost_pence, 2)
+        reward_source = "scenario_estimate"
+    else:
+        electric = round(
+            scenario.import_cost_pence
+            + scenario.standing_charge_pence
+            - scenario.export_income_pence
+            - reward,
+            2,
+        )
+        reward_source = "settled_power_down_event"
+
     gas_total = gas.get("gas_total_cost_pence")
     return {
         "ready": gas_total is not None,
         "electricity_import_cost_pence": round(scenario.import_cost_pence, 2),
         "electricity_standing_charge_pence": round(scenario.standing_charge_pence, 2),
         "electricity_export_income_pence": round(scenario.export_income_pence, 2),
-        "supplier_energy_credit_pence": round(scenario.power_down_income_pence, 2),
+        "power_down_reward_pence": reward,
+        "power_down_reward_source": reward_source,
+        "supplier_energy_credit_pence": reward,
         "electricity_total_cost_pence": electric,
         **gas,
         "total_energy_cost_pence": (
@@ -241,6 +288,7 @@ def _strategy(
     standing_by_day: Mapping[date, float],
     fallback_standing: float | None,
     label: str,
+    settled_power_down_reward_pence: float | None = None,
 ) -> dict[str, Any]:
     if not rows:
         return {"ready": False, "total_energy_cost_pence": None}
@@ -248,17 +296,30 @@ def _strategy(
     exported = round(_sum(rows, "export_income_pence"), 2)
     produced = round(_sum(rows, "energy_net_cost_pence"), 2)
     standing, estimated = _standing(days, standing_by_day, fallback_standing)
-    # This reconciliation exposes any Power Down/account credit that an older
-    # producer folded into its net result, without ever adding battery wear.
-    credit = round(max(imported + standing - exported - produced, 0.0), 2)
-    electric = round(imported + standing - exported - credit, 2)
+
+    # Older retained producers can have a reward folded into their net result.
+    # Prefer the explicit completed Power Down settlement when it is available,
+    # replacing (rather than adding to) that legacy reconciliation.
+    inferred_reward = round(max(imported + standing - exported - produced, 0.0), 2)
+    reward = (
+        round(max(settled_power_down_reward_pence, 0.0), 2)
+        if settled_power_down_reward_pence is not None
+        else inferred_reward
+    )
+    electric = round(imported + standing - exported - reward, 2)
     gas_total = gas.get("gas_total_cost_pence")
     return {
         "ready": gas_total is not None,
         "electricity_import_cost_pence": imported,
         "electricity_standing_charge_pence": standing,
         "electricity_export_income_pence": exported,
-        "supplier_energy_credit_pence": credit,
+        "power_down_reward_pence": reward,
+        "power_down_reward_source": (
+            "settled_power_down_event"
+            if settled_power_down_reward_pence is not None
+            else "legacy_reconciliation"
+        ),
+        "supplier_energy_credit_pence": reward,
         "electricity_total_cost_pence": electric,
         **gas,
         "total_energy_cost_pence": (
@@ -308,6 +369,7 @@ def build_energy_cost_comparison(
         rows = [actual[day] for day in sorted(dates)]
         live = _live(rows, dates, elec_standing, gas_standing, data, gas_available)
         gas = {name: value for name, value in live.items() if name.startswith("gas_")}
+        settled_reward = _settled_power_down_reward(data, start, end, now)
 
         if export_tariff_type == EXPORT_TARIFF_TYPE_NONE and key in {
             "today",
@@ -319,6 +381,7 @@ def build_energy_cost_comparison(
             kems = _scenario(
                 period.scenario("kems_no_export") if period else None,
                 gas,
+                settled_reward,
             )
         elif export_tariff_type in {
             EXPORT_TARIFF_TYPE_FIXED,
@@ -339,6 +402,7 @@ def build_energy_cost_comparison(
                 kems = _scenario(
                     period.scenario("kems_forecast") if period else None,
                     gas,
+                    settled_reward,
                 )
             else:
                 kems = _strategy(
@@ -348,6 +412,7 @@ def build_energy_cost_comparison(
                     elec_standing,
                     data.snapshot.electricity_standing_charge,
                     strategy_label,
+                    settled_reward,
                 )
         else:
             kems = {
@@ -378,12 +443,12 @@ def build_energy_cost_comparison(
 
     today = periods["today"]
     return {
-        "contract_version": 1,
+        "contract_version": 2,
         "headline": "Total energy cost",
         "basis": "bill_equivalent",
         "formula": (
             "electricity import + electricity standing charge - electricity export "
-            "income - supplier/account energy credits + gas usage + gas standing charge"
+            "income - settled Power Down rewards + gas usage + gas standing charge"
         ),
         "battery_wear_included": False,
         "gas_included": True,
