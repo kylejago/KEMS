@@ -27,7 +27,7 @@ def test_missing_export_baseline_does_not_change_reward_equation() -> None:
     ).read_text()
     accounting = (ROOT / "custom_components" / "kems" / "power_down.py").read_text()
 
-    assert "return max(imported, 0.0), \"import_only_assumed_zero_export\"" in simulation
+    assert 'return max(imported, 0.0), "import_only_assumed_zero_export"' in simulation
     assert "simulated_net = simulated_import_kwh - simulated_export_kwh" in simulation
     assert "reduction = max(baseline_interval - simulated_net, 0.0)" in simulation
     assert "float(imported) - float(exported or 0.0)" in accounting
