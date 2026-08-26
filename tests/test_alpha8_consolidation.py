@@ -91,9 +91,13 @@ def test_alpha8_compatibility_registry_is_complete_and_resolvable() -> None:
     assert specs
     assert len(specs) == len(set(specs)), "Compatibility installers must be unique"
     assert specs[0] == ("agile_smart_export_reporting", "install_reporting_patch")
-    assert specs[-1] == (
+    assert specs[-2] == (
         "agile_runtime_reconciliation",
         "install_runtime_reconciliation",
+    )
+    assert specs[-1] == (
+        "agile_solar_net_demand",
+        "install_solar_net_demand",
     )
 
     for module_name, installer_name in specs:
