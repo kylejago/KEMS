@@ -134,3 +134,12 @@ def test_baseline_parser_sums_periods_when_total_is_missing() -> None:
     assert parsed_start == start
     assert parsed_end == start + timedelta(minutes=30)
     assert incomplete is True
+
+
+def test_missing_export_baseline_does_not_create_incomplete_state() -> None:
+    """An absent optional export baseline must not be treated as incomplete."""
+    octoplus, _ = _load_octoplus()
+
+    assert octoplus.OctoplusProvider._combine_incomplete(False, None) is False
+    assert octoplus.OctoplusProvider._combine_incomplete(True, None) is True
+    assert octoplus.OctoplusProvider._combine_incomplete(None, None) is None
