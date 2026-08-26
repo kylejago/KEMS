@@ -156,15 +156,15 @@ def test_runtime_uses_total_ledger_and_marks_cheap_boundary_charge_only() -> Non
     )
 
 
-def test_alpha831_version_and_release_scope() -> None:
+def test_alpha831_version_and_release_scope_remain_successor_safe() -> None:
     manifest = json.loads(
         (ROOT / "custom_components" / "kems" / "manifest.json").read_text()
     )
     bundle = json.loads((ROOT / "release" / "kems-bundle.template.json").read_text())
 
-    assert manifest["version"] == "0.8.0-alpha8.31"
+    version = str(manifest["version"])
+    assert version.startswith("0.8.0-alpha8.")
+    assert int(version.rsplit(".", 1)[1]) >= 31
     assert bundle["maintenance"]["affected_components"] == ["kems_core", "dashboard"]
-    assert "total battery-discharge ledger" in bundle["maintenance"]["reason"]
-    assert "23:30 cheap-start boundary" in bundle["maintenance"]["reason"]
     assert bundle["maintenance"]["home_assistant_restart_required"] is True
     assert bundle["maintenance"]["reboot_required"] is False
