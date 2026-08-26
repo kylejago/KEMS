@@ -166,7 +166,8 @@ def _current_physical_targets(
         (
             item
             for item in capacity_segments
-            if (_dt(item.get("start")) or now_utc) <= now_utc
+            if (_dt(item.get("start")) or now_utc)
+            <= now_utc
             < (_dt(item.get("end")) or now_utc)
         ),
         capacity_segments[0] if capacity_segments else None,
@@ -305,9 +306,7 @@ def _apply_physical_slot_allocations(
         plan["current_battery_export_target_kw"] = export_target
         plan["current_battery_discharge_target_kw"] = total_target
         if export_target > _EPSILON:
-            plan["dispatch_action"] = (
-                "price-optimised physical export; house first"
-            )
+            plan["dispatch_action"] = "price-optimised physical export; house first"
 
     return plan
 
