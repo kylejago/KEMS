@@ -42,7 +42,7 @@
   },
   "maintenance": {
     "required": true,
-    "reason": "Present rolling KEMS plans as concise two-column decisions and stop exposing internal hold/replan wording in every future slot",
+    "reason": "Use high-confidence hourly solar to protect net house demand in the rolling plan and reconcile idle current routing to solar-to-home first",
     "expected_downtime_minutes": 5,
     "home_assistant_restart_required": true,
     "reboot_required": false,
