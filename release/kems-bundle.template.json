@@ -42,7 +42,7 @@
   },
   "maintenance": {
     "required": true,
-    "reason": "Make one total battery-discharge ledger authoritative through the 10% pre-cheap deadline so protected house energy is not assumed to be guaranteed future discharge, while keeping house-first routing and making the 23:30 cheap-start boundary charge-only",
+    "reason": "Chain Tomorrow simulation from today's projected pre-cheap SOC through the 23:30-to-midnight cheap-charge handoff so overnight SOC, export energy and forecast costs remain physically continuous",
     "expected_downtime_minutes": 5,
     "home_assistant_restart_required": true,
     "reboot_required": false,
