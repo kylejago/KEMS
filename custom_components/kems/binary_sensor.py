@@ -386,17 +386,27 @@ class KEMSBinarySensor(KEMSEntity, BinarySensorEntity):
             return None
 
         simulation = self.coordinator.data.simulation
+        export_baseline_entity = self.coordinator.entities.saving_session_export_baseline
+        export_baseline_mapped = bool(export_baseline_entity)
+        reward_baseline_ready = simulation.saving_session_baseline_net_kwh is not None
+
         if not simulation.saving_session_joined:
             status = "No joined Power Down"
-        elif simulation.saving_session_baseline_net_kwh is None:
-            status = "Import baseline unavailable — export baseline not required"
-        elif simulation.saving_session_baseline_incomplete:
+        elif export_baseline_mapped and not reward_baseline_ready:
             status = (
-                "Import baseline available — Octopus source marks calculation "
-                "incomplete; export baseline not required"
+                "Export baseline mapped but unavailable — reward estimate withheld"
             )
+        elif export_baseline_mapped:
+            status = "Import and export baselines available — net baseline ready"
+        elif reward_baseline_ready and simulation.saving_session_baseline_incomplete:
+            status = (
+                "Import-only baseline available — Octopus source marks calculation "
+                "incomplete; no export baseline is mapped"
+            )
+        elif reward_baseline_ready:
+            status = "Import-only baseline available — no export baseline is mapped"
         else:
-            status = "Import baseline available — export baseline not required"
+            status = "Import baseline unavailable"
 
         return {
             "status": status,
@@ -405,9 +415,11 @@ class KEMSBinarySensor(KEMSEntity, BinarySensorEntity):
             "octopus_source_calculation_incomplete": (
                 simulation.saving_session_baseline_incomplete
             ),
-            "export_baseline_required": False,
+            "export_baseline_mapped": export_baseline_mapped,
+            "export_baseline_entity_id": export_baseline_entity,
+            "reward_baseline_ready": reward_baseline_ready,
             "reward_basis": (
-                "import baseline minus actual net import; grid export makes net "
-                "import negative"
+                "import baseline minus export baseline when an export baseline is "
+                "mapped; otherwise the mapped import baseline is used"
             ),
         }
