@@ -13,6 +13,15 @@ from .base import HomeAssistantStateReader
 from .entity_map import KEMSEntities
 
 
+BaselineTuple = tuple[
+    float | None,
+    float | None,
+    datetime | None,
+    datetime | None,
+    bool | None,
+]
+
+
 @dataclass(frozen=True, slots=True)
 class OctoplusState:
     """Current or next joined Octoplus Power Down / Saving Session."""
@@ -50,6 +59,11 @@ class OctoplusProvider(HomeAssistantStateReader):
         export_baseline = self._baseline(
             self._state(self._entities.saving_session_export_baseline)
         )
+        import_baseline, export_baseline = self._reward_baselines(
+            import_baseline,
+            export_baseline,
+            export_configured=bool(self._entities.saving_session_export_baseline),
+        )
         if event is None:
             return OctoplusState(
                 import_baseline_period_kwh=import_baseline[0],
@@ -85,6 +99,52 @@ class OctoplusProvider(HomeAssistantStateReader):
             ),
         )
 
+    @staticmethod
+    def _reward_baselines(
+        import_baseline: BaselineTuple,
+        export_baseline: BaselineTuple,
+        *,
+        export_configured: bool,
+    ) -> tuple[BaselineTuple, BaselineTuple]:
+        """Fail closed when an applicable export baseline is not usable yet.
+
+        Octopus calculates Power Down rewards from the site's net change when an
+        export MPAN participates. KEMS therefore must not silently substitute zero
+        historical export when an export-baseline source has been discovered but is
+        disabled, unavailable, or not populated yet. Physical Power Down planning is
+        independent of these values and continues normally; only reward accounting is
+        withheld until the matching export baseline becomes usable.
+        """
+        if not export_configured:
+            return import_baseline, export_baseline
+
+        import_period, import_total, import_start, import_end, import_incomplete = (
+            import_baseline
+        )
+        export_period, export_total, export_start, export_end, export_incomplete = (
+            export_baseline
+        )
+        if export_period is None:
+            import_period = None
+        if export_total is None:
+            import_total = None
+        return (
+            (
+                import_period,
+                import_total,
+                import_start,
+                import_end,
+                import_incomplete,
+            ),
+            (
+                export_period,
+                export_total,
+                export_start,
+                export_end,
+                export_incomplete,
+            ),
+        )
+
     @classmethod
     def _select_joined_event(
         cls,
@@ -115,13 +175,7 @@ class OctoplusProvider(HomeAssistantStateReader):
     def _baseline(
         cls,
         state: State | None,
-    ) -> tuple[
-        float | None,
-        float | None,
-        datetime | None,
-        datetime | None,
-        bool | None,
-    ]:
+    ) -> BaselineTuple:
         if state is None:
             return None, None, None, None, None
         period = cls._number(state.state)
