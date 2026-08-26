@@ -61,15 +61,11 @@ class TotalDischargePlan:
     def to_dict(self) -> dict[str, object]:
         """Return JSON-compatible ledger evidence."""
         return {
-            "required_total_discharge_kwh": round(
-                self.required_total_discharge_kwh, 3
-            ),
+            "required_total_discharge_kwh": round(self.required_total_discharge_kwh, 3),
             "allocated_total_discharge_kwh": round(
                 self.allocated_total_discharge_kwh, 3
             ),
-            "total_discharge_capacity_kwh": round(
-                self.total_discharge_capacity_kwh, 3
-            ),
+            "total_discharge_capacity_kwh": round(self.total_discharge_capacity_kwh, 3),
             "unallocated_total_discharge_kwh": round(
                 self.unallocated_total_discharge_kwh, 3
             ),
@@ -287,9 +283,7 @@ def allocate_total_discharge_slots(
                 total_discharge_capacity_kwh=round(
                     float(item["total_capacity_kwh"]), 3
                 ),
-                house_battery_capacity_kwh=round(
-                    float(item["house_capacity_kwh"]), 3
-                ),
+                house_battery_capacity_kwh=round(float(item["house_capacity_kwh"]), 3),
                 export_capacity_kwh=round(float(item["export_capacity_kwh"]), 3),
                 planned_total_discharge_kwh=round(planned_total, 3),
                 planned_house_battery_kwh=round(planned_house, 3),
@@ -305,9 +299,7 @@ def allocate_total_discharge_slots(
         required_total_discharge_kwh=round(required, 3),
         allocated_total_discharge_kwh=round(allocated_total, 3),
         total_discharge_capacity_kwh=round(total_capacity, 3),
-        unallocated_total_discharge_kwh=round(
-            max(required - allocated_total, 0.0), 3
-        ),
+        unallocated_total_discharge_kwh=round(max(required - allocated_total, 0.0), 3),
         planned_house_battery_kwh=round(planned_house, 3),
         planned_battery_export_kwh=round(planned_export, 3),
         total_export_capacity_kwh=round(total_export_capacity, 3),
