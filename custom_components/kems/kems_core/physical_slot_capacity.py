@@ -1,12 +1,12 @@
 """Physical export-capacity allocation for KEMS rolling Agile planning.
 
 This helper turns the deadline guard's solar-aware five-minute battery-capacity
-segments into settlement-slot export capacity.  Battery discharge remains a
+segments into settlement-slot export capacity. Battery discharge remains a
 shared inverter resource: forecast/live solar occupies AC output first, any
 remaining house demand is served from the battery next, and only the residual
 battery headroom is available for deliberate grid export.
 
-The helper is intentionally pure.  It does not choose SOC targets, mutate
+The helper is intentionally pure. It does not choose SOC targets, mutate
 Home Assistant state, or authorize hardware writes.
 """
 
@@ -101,7 +101,10 @@ def _excluded(
     windows: Iterable[tuple[datetime, datetime]],
 ) -> bool:
     """Return whether a slot overlaps an absolute-priority reserved window."""
-    return any(_overlap_hours(start, end, left, right) > _EPSILON for left, right in windows)
+    return any(
+        _overlap_hours(start, end, left, right) > _EPSILON
+        for left, right in windows
+    )
 
 
 def allocate_physical_export_slots(
@@ -128,21 +131,27 @@ def allocate_physical_export_slots(
     desired = max(float(desired_export_kwh), 0.0)
     house = max(float(house_kw), 0.0)
     export_limit = max(float(export_limit_kw), 0.0)
-    windows = tuple((left.astimezone(UTC), right.astimezone(UTC)) for left, right in excluded_windows)
+    windows = tuple(
+        (left.astimezone(UTC), right.astimezone(UTC))
+        for left, right in excluded_windows
+    )
     segments = tuple(capacity_segments)
 
     candidates: list[dict[str, Any]] = []
     for slot in slots:
         if not isinstance(slot, dict):
             continue
-        start = _dt(slot.get("valid_from"))
-        end = _dt(slot.get("valid_to"))
+        raw_start = _dt(slot.get("valid_from"))
+        raw_end = _dt(slot.get("valid_to"))
         rate = _number(slot.get("rate_pence"))
-        if start is None or end is None or rate is None:
+        if raw_start is None or raw_end is None or rate is None:
             continue
-        start = max(start, now_utc)
-        end = min(end, deadline_utc)
-        if end <= start or _excluded(start, end, windows):
+        if _excluded(raw_start, raw_end, windows):
+            continue
+
+        active_start = max(raw_start, now_utc)
+        active_end = min(raw_end, deadline_utc)
+        if active_end <= active_start:
             continue
 
         capacity_kwh = 0.0
@@ -158,7 +167,12 @@ def allocate_physical_export_slots(
                 or battery_kw is None
             ):
                 continue
-            hours = _overlap_hours(start, end, segment_start, segment_end)
+            hours = _overlap_hours(
+                active_start,
+                active_end,
+                segment_start,
+                segment_end,
+            )
             if hours <= _EPSILON:
                 continue
             solar_to_home_kw = min(house, max(solar_kw, 0.0))
@@ -174,15 +188,16 @@ def allocate_physical_export_slots(
 
         candidates.append(
             {
-                "valid_from": start,
-                "valid_to": end,
+                "valid_from": raw_start,
+                "valid_to": raw_end,
                 "rate_pence": rate,
                 "capacity_kwh": max(capacity_kwh, 0.0),
                 "allocated_kwh": 0.0,
             }
         )
 
-    remaining = min(desired, sum(item["capacity_kwh"] for item in candidates))
+    total_capacity = sum(item["capacity_kwh"] for item in candidates)
+    remaining = min(desired, total_capacity)
     for item in sorted(
         candidates,
         key=lambda value: (-value["rate_pence"], value["valid_from"]),
@@ -204,7 +219,6 @@ def allocate_physical_export_slots(
         for item in sorted(candidates, key=lambda value: value["valid_from"])
     )
     allocated = sum(item.allocated_kwh for item in allocations)
-    total_capacity = sum(item.capacity_kwh for item in allocations)
     return PhysicalSlotCapacityPlan(
         desired_kwh=round(desired, 3),
         allocated_kwh=round(allocated, 3),
