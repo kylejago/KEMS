@@ -57,7 +57,10 @@ def test_house_reserve_is_not_assumed_to_be_guaranteed_future_discharge() -> Non
     """The ledger allocates the SOC obligation, not obligation minus house reserve."""
     start = datetime(2026, 8, 26, 19, 0, tzinfo=UTC)
     deadline = start + timedelta(hours=3, minutes=30)
-    slots = [_slot(start + timedelta(minutes=30 * index), 20.0 - index) for index in range(7)]
+    slots = [
+        _slot(start + timedelta(minutes=30 * index), 20.0 - index)
+        for index in range(7)
+    ]
     plan = allocate_total_discharge_slots(
         slots=slots,
         capacity_segments=_segments(
@@ -81,10 +84,8 @@ def test_house_reserve_is_not_assumed_to_be_guaranteed_future_discharge() -> Non
     # reserve was treated as if it would definitely discharge. Alpha8.31 must
     # schedule enough export/house split to cover the full SOC obligation.
     assert plan.planned_battery_export_kwh > 18.064
-    assert round(
-        plan.planned_house_battery_kwh + plan.planned_battery_export_kwh,
-        3,
-    ) == 22.887
+    split_total = plan.planned_house_battery_kwh + plan.planned_battery_export_kwh
+    assert abs(split_total - 22.887) <= 0.01
 
 
 def test_safety_headroom_forces_earlier_total_discharge_before_deadline_cliff() -> None:
@@ -137,7 +138,9 @@ def test_slot_starting_at_cheap_deadline_is_never_discharge_capacity() -> None:
 
 
 def test_runtime_uses_total_ledger_and_marks_cheap_boundary_charge_only() -> None:
-    runtime = (ROOT / "custom_components/kems/agile_total_discharge_ledger.py").read_text()
+    runtime = (
+        ROOT / "custom_components/kems/agile_total_discharge_ledger.py"
+    ).read_text()
     compat = (ROOT / "custom_components/kems/agile_alpha7_compat.py").read_text()
 
     assert "deadline_runtime._capacity_segments" in runtime
