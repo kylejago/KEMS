@@ -137,7 +137,9 @@ def aligned_agile_control_views(
             simulation,
             {
                 "active": False,
-                "reason": "rolling target unavailable, incomplete, or event override active",
+                "reason": (
+                    "rolling target unavailable, incomplete, or event override active"
+                ),
             },
         )
     target, plan = rolling
@@ -161,7 +163,9 @@ def aligned_agile_control_views(
         shadow_view,
         {
             "active": True,
-            "basis": "exact current Agile rolling target + authoritative routing outcome",
+            "basis": (
+                "exact current Agile rolling target + authoritative routing outcome"
+            ),
             "dispatch_mode": plan.get("dispatch_mode"),
             "dispatch_action": plan.get("dispatch_action"),
             "target": {key: round(value, 3) for key, value in target.items()},
