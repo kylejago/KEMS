@@ -54,7 +54,9 @@ def test_first_tomorrow_half_hour_can_only_reach_about_21_8_percent() -> None:
     assert round(ending_soc, 1) != 48.8
 
 
-def test_active_cheap_window_uses_current_soc_without_replaying_elapsed_charge() -> None:
+def test_active_cheap_window_uses_current_soc_without_replaying_elapsed_charge() -> (
+    None
+):
     midnight_soc, evidence = project_tomorrow_midnight_soc(
         now=datetime(2026, 8, 26, 23, 45, tzinfo=LONDON),
         current_soc_percent=18.0,
@@ -91,11 +93,18 @@ def test_non_wrapping_cheap_window_does_not_invent_pre_midnight_charge() -> None
 
 
 def test_runtime_rebuilds_and_republishes_tomorrow_from_midnight_handoff() -> None:
-    runtime = (ROOT / "custom_components/kems/agile_smart_export_runtime.py").read_text()
-    handoff = (ROOT / "custom_components/kems/agile_tomorrow_soc_handoff.py").read_text()
+    runtime = (
+        ROOT / "custom_components/kems/agile_smart_export_runtime.py"
+    ).read_text()
+    handoff = (
+        ROOT / "custom_components/kems/agile_tomorrow_soc_handoff.py"
+    ).read_text()
 
     assert "TomorrowSocHandoffAgileSmartExportManager" in runtime
-    assert "EfficientAgileSmartExportManager = TomorrowSocHandoffAgileSmartExportManager" in runtime
+    assert (
+        "EfficientAgileSmartExportManager = TomorrowSocHandoffAgileSmartExportManager"
+        in runtime
+    )
     assert "project_tomorrow_midnight_soc(" in handoff
     assert "self._compare_day(" in handoff
     assert 'state["tomorrow_slots"] = tomorrow_slots' in handoff
