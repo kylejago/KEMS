@@ -12,9 +12,10 @@ Home Assistant state, or authorize hardware writes.
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
-from typing import Any, Iterable
+from typing import Any
 
 _EPSILON = 1e-9
 
