@@ -26,7 +26,10 @@ from .kems_core import (
     SimulationConfig,
     SolarForecastState,
 )
-from .kems_core.solar_net_demand import project_solar_net_house_demand
+from .kems_core.solar_net_demand import (
+    project_solar_net_house_demand,
+    route_idle_solar_first,
+)
 from .tariff import TariffSettings
 
 rolling = agile_rolling_planning.rolling_runtime
@@ -140,44 +143,30 @@ def _snapshot_with_idle_solar_first(
         snapshot["solar_first_idle_routing"] = False
         return snapshot
 
-    solar_to_home = min(house, solar)
-    solar_remaining = max(solar - solar_to_home, 0.0)
-    existing_solar_charge = max(
-        _number(snapshot.get("solar_to_battery_kw")) or 0.0,
-        0.0,
+    routing = route_idle_solar_first(
+        house_kw=house,
+        solar_kw=solar,
+        requested_solar_to_battery_kw=(
+            _number(snapshot.get("solar_to_battery_kw")) or 0.0
+        ),
+        grid_to_battery_kw=_number(snapshot.get("grid_to_battery_kw")) or 0.0,
+        battery_export_kw=_number(snapshot.get("battery_export_kw")) or 0.0,
+        inverter_limit_kw=config.inverter_limit_kw,
+        export_limit_kw=config.export_limit_kw,
+        export_allowed=config.export_tariff_status == "active",
     )
-    solar_to_battery = min(existing_solar_charge, solar_remaining)
-    solar_remaining = max(solar_remaining - solar_to_battery, 0.0)
-
-    grid_to_battery = max(_number(snapshot.get("grid_to_battery_kw")) or 0.0, 0.0)
-    battery_export = max(_number(snapshot.get("battery_export_kw")) or 0.0, 0.0)
-    inverter_limit = max(config.inverter_limit_kw, 0.0)
-    export_limit = min(max(config.export_limit_kw, 0.0), inverter_limit)
-    export_allowed = config.export_tariff_status == "active"
-    export_headroom = max(export_limit - battery_export, 0.0)
-    inverter_headroom = max(inverter_limit - solar_to_home, 0.0)
-    solar_export = (
-        min(solar_remaining, export_headroom, inverter_headroom)
-        if export_allowed
-        else 0.0
-    )
-    solar_curtailment = max(solar_remaining - solar_export, 0.0)
-    grid_import = max(house - solar_to_home, 0.0) + grid_to_battery
-    grid_export = solar_export + battery_export
-    kh7_ac_output = solar_to_home + solar_export + battery_export
-
     snapshot.update(
         {
             "routing_basis": (
                 "current coordinator routing snapshot — idle solar-to-house first"
             ),
-            "solar_to_home_kw": round(solar_to_home, 3),
-            "solar_to_battery_kw": round(solar_to_battery, 3),
-            "solar_export_kw": round(solar_export, 3),
-            "grid_import_kw": round(grid_import, 3),
-            "grid_export_kw": round(grid_export, 3),
-            "solar_curtailment_kw": round(solar_curtailment, 3),
-            "normalised_kh7_ac_output_kw": round(kh7_ac_output, 3),
+            "solar_to_home_kw": routing.solar_to_home_kw,
+            "solar_to_battery_kw": routing.solar_to_battery_kw,
+            "solar_export_kw": routing.solar_export_kw,
+            "grid_import_kw": routing.grid_import_kw,
+            "grid_export_kw": routing.grid_export_kw,
+            "solar_curtailment_kw": routing.solar_curtailment_kw,
+            "normalised_kh7_ac_output_kw": routing.kh7_ac_output_kw,
             "solar_routing_basis": (
                 "outside cheap period: solar serves house first; preserve planned "
                 "solar charging, then export paid surplus within limits"
