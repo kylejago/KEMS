@@ -2,18 +2,28 @@
 
 from __future__ import annotations
 
+import importlib.util
 import json
 from pathlib import Path
 
-from custom_components.kems.dashboard_pipeline import _finalise_dashboard_bytes
-
 ROOT = Path(__file__).resolve().parents[1]
+PIPELINE_PATH = ROOT / "custom_components" / "kems" / "dashboard_pipeline.py"
+
+
+def _load_pipeline_module():
+    """Load the standalone pipeline module without importing the KEMS package."""
+    spec = importlib.util.spec_from_file_location("kems_dashboard_pipeline_alpha827", PIPELINE_PATH)
+    assert spec is not None
+    assert spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 
 def test_managed_dashboard_uses_registered_battery_charged_entity() -> None:
     """The rendered customer dashboard must not point at the old typo entity."""
     source = (ROOT / "dashboards" / "kems_master_dashboard.yaml").read_bytes()
-    rendered = _finalise_dashboard_bytes(source).decode("utf-8")
+    rendered = _load_pipeline_module()._finalise_dashboard_bytes(source).decode("utf-8")
 
     assert "sensor.kems_simulated_battery_charged_today" in rendered
     assert "sensor.kems_simulated_battery_charge_today" not in rendered
