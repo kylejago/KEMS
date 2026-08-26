@@ -42,7 +42,7 @@
   },
   "maintenance": {
     "required": true,
-    "reason": "Use high-confidence hourly solar to protect net house demand in the rolling plan and reconcile idle current routing to solar-to-home first",
+    "reason": "Align ControlEngine and shadow validation with the exact current Agile rolling optimiser target and authoritative routed outcome",
     "expected_downtime_minutes": 5,
     "home_assistant_restart_required": true,
     "reboot_required": false,
