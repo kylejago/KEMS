@@ -102,8 +102,7 @@ def _excluded(
 ) -> bool:
     """Return whether a slot overlaps an absolute-priority reserved window."""
     return any(
-        _overlap_hours(start, end, left, right) > _EPSILON
-        for left, right in windows
+        _overlap_hours(start, end, left, right) > _EPSILON for left, right in windows
     )
 
 
