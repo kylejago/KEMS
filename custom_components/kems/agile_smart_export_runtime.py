@@ -69,8 +69,11 @@ install_alpha752_tomorrow_no_reserve_rounding_patch()
 _base = install_alpha7_compatibility()
 
 from .agile_smart_export_runtime_base import *  # noqa: E402,F403
+from .agile_tomorrow_soc_handoff import (  # noqa: E402
+    TomorrowSocHandoffAgileSmartExportManager,
+)
 
-EfficientAgileSmartExportManager = _base.EfficientAgileSmartExportManager
+EfficientAgileSmartExportManager = TomorrowSocHandoffAgileSmartExportManager
 
 
 def __getattr__(name: str):
