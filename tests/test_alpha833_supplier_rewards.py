@@ -18,7 +18,8 @@ def _readability_pass():
     function = next(
         node
         for node in module.body
-        if isinstance(node, ast.FunctionDef) and node.name == "_dashboard_readability_pass"
+        if isinstance(node, ast.FunctionDef)
+        and node.name == "_dashboard_readability_pass"
     )
     isolated = ast.Module(body=[function], type_ignores=[])
     ast.fix_missing_locations(isolated)
@@ -43,7 +44,9 @@ def test_daily_costs_use_authoritative_power_down_reward_field() -> None:
     assert "electricity_export_income_pence" in rendered
 
 
-def test_power_down_reward_formats_as_separate_credit_without_export_double_count() -> None:
+def test_power_down_reward_formats_as_separate_credit_without_export_double_count() -> (
+    None
+):
     power_down_income_pence = 47.56
     export_income_pence = 57.01
 
