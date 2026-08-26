@@ -42,7 +42,7 @@
   },
   "maintenance": {
     "required": true,
-    "reason": "Use the mapped Octopus export Power Down baseline when applicable and withhold reward estimates instead of assuming zero historical export when that mapped source is unavailable; physical Power Down planning and control remain unchanged",
+    "reason": "Make one total battery-discharge ledger authoritative through the 10% pre-cheap deadline so protected house energy is not assumed to be guaranteed future discharge, while keeping house-first routing and making the 23:30 cheap-start boundary charge-only",
     "expected_downtime_minutes": 5,
     "home_assistant_restart_required": true,
     "reboot_required": false,

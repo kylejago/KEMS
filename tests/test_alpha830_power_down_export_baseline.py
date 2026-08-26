@@ -56,16 +56,16 @@ def test_power_down_reporting_exposes_baseline_readiness_without_old_claim() -> 
     assert "export baseline not required" not in source
 
 
-def test_alpha830_version_and_release_scope() -> None:
-    """Alpha8.30 remains a coordinated HA core/dashboard maintenance release."""
+def test_alpha830_release_contract_is_successor_safe() -> None:
+    """Later Alpha8 releases retain the Alpha8.30 coordinated release boundary."""
     manifest = json.loads(
         (ROOT / "custom_components" / "kems" / "manifest.json").read_text()
     )
     bundle = json.loads((ROOT / "release" / "kems-bundle.template.json").read_text())
 
-    assert manifest["version"] == "0.8.0-alpha8.30"
+    prefix = "0.8.0-alpha8."
+    assert manifest["version"].startswith(prefix)
+    assert int(manifest["version"].removeprefix(prefix)) >= 30
     assert bundle["maintenance"]["affected_components"] == ["kems_core", "dashboard"]
-    assert "export Power Down baseline" in bundle["maintenance"]["reason"]
-    assert "assuming zero historical export" in bundle["maintenance"]["reason"]
     assert bundle["maintenance"]["home_assistant_restart_required"] is True
     assert bundle["maintenance"]["reboot_required"] is False
