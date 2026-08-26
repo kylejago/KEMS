@@ -37,7 +37,9 @@ def _forecast(
     )
 
 
-def test_high_confidence_hourly_solar_reduces_only_overlapping_house_protection() -> None:
+def test_high_confidence_hourly_solar_reduces_only_overlapping_house_protection() -> (
+    None
+):
     now = datetime(2026, 8, 26, 8, 0, tzinfo=UTC)
     deadline = datetime(2026, 8, 26, 22, 30, tzinfo=UTC)
     result = project_solar_net_house_demand(
@@ -115,7 +117,9 @@ def test_solar_credit_never_removes_more_than_ninety_percent_of_house_reserve() 
     assert result.net_house_kwh >= 1.0
 
 
-def test_idle_solar_first_routing_eliminates_import_while_exporting_same_solar() -> None:
+def test_idle_solar_first_routing_eliminates_import_while_exporting_same_solar() -> (
+    None
+):
     routing = route_idle_solar_first(
         house_kw=1.003,
         solar_kw=1.035,
@@ -151,7 +155,9 @@ def test_idle_solar_first_preserves_planned_solar_charge_after_house() -> None:
     assert routing.grid_import_kw == 0.0
 
 
-def test_runtime_installs_solar_net_demand_after_existing_reconciliation_chain() -> None:
+def test_runtime_installs_solar_net_demand_after_existing_reconciliation_chain() -> (
+    None
+):
     compat = (ROOT / "custom_components/kems/agile_alpha7_compat.py").read_text()
     runtime = (ROOT / "custom_components/kems/agile_solar_net_demand.py").read_text()
 
