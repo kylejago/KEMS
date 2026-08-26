@@ -118,6 +118,12 @@ def _finalise_dashboard_bytes(payload: bytes) -> bytes:
         ),
     )
 
+    # The customer Energy today card must use the registered cumulative charge entity.
+    text = text.replace(
+        "sensor.kems_simulated_battery_charge_today",
+        "sensor.kems_simulated_battery_charged_today",
+    )
+
     # Aggregate Tomorrow values must tolerate partial/progressive publication and
     # current slots whose execution fields are intentionally not populated yet.
     for field in (
