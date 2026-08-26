@@ -58,16 +58,15 @@ def test_power_down_reward_formats_as_separate_credit_without_export_double_coun
     assert power_down_income_pence != power_down_income_pence + export_income_pence
 
 
-def test_alpha833_version_and_release_scope() -> None:
+def test_alpha833_release_contract_remains_successor_safe() -> None:
     manifest = json.loads(
         (ROOT / "custom_components" / "kems" / "manifest.json").read_text()
     )
     bundle = json.loads((ROOT / "release" / "kems-bundle.template.json").read_text())
 
-    assert manifest["version"] == "0.8.0-alpha8.33"
+    version = str(manifest["version"])
+    assert version.startswith("0.8.0-alpha8.")
+    assert int(version.rsplit(".", 1)[1]) >= 33
     assert bundle["maintenance"]["affected_components"] == ["kems_core", "dashboard"]
-    assert "Supplier rewards & credits" in bundle["maintenance"]["reason"]
-    assert "Power Down reward" in bundle["maintenance"]["reason"]
-    assert "avoiding double counting" in bundle["maintenance"]["reason"]
     assert bundle["maintenance"]["home_assistant_restart_required"] is True
     assert bundle["maintenance"]["reboot_required"] is False
