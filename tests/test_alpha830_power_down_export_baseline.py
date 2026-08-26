@@ -34,7 +34,10 @@ def test_export_baseline_discovery_and_mapping_remain_supported() -> None:
         ROOT / "custom_components" / "kems" / "providers" / "entity_map.py"
     ).read_text()
 
-    assert 'CONF_SAVING_SESSION_EXPORT_BASELINE = "saving_session_export_baseline"' in constants
+    assert (
+        'CONF_SAVING_SESSION_EXPORT_BASELINE = "saving_session_export_baseline"'
+        in constants
+    )
     assert "CONF_SAVING_SESSION_EXPORT_BASELINE," in discovery
     assert "is_export=True" in discovery
     assert "saving_session_export_baseline" in mapping
