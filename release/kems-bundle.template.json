@@ -42,7 +42,7 @@
   },
   "maintenance": {
     "required": true,
-    "reason": "Chain Tomorrow simulation from today's projected pre-cheap SOC through the 23:30-to-midnight cheap-charge handoff so overnight SOC, export energy and forecast costs remain physically continuous",
+    "reason": "Wire the KEMS Daily Costs Supplier rewards & credits row to the authoritative daily Power Down reward field while keeping normal export income separate and avoiding double counting",
     "expected_downtime_minutes": 5,
     "home_assistant_restart_required": true,
     "reboot_required": false,
