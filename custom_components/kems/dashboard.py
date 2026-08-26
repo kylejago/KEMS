@@ -80,7 +80,19 @@ def _dashboard_readability_pass(content: str) -> str:
         "{% set failure = update.attributes.get('last_error') or "
         "maintenance.attributes.get('error') %}"
     )
-    return content.replace(unsafe_failure_template, safe_failure_template)
+    content = content.replace(unsafe_failure_template, safe_failure_template)
+
+    supplier_credit_row = (
+        "| Supplier credits | {{ ('−£%.2f' | "
+        "format((kems.get('supplier_energy_credit_pence') | float) / 100)) "
+        "if kems.get('supplier_energy_credit_pence') is not none else '—' }} |"
+    )
+    supplier_rewards_row = (
+        "| Supplier rewards & credits | {{ ('−£%.2f' | "
+        "format((kems.get('power_down_income_pence') | float) / 100)) "
+        "if kems.get('power_down_income_pence') is not none else '—' }} |"
+    )
+    return content.replace(supplier_credit_row, supplier_rewards_row)
 
 
 def _combined_master_dashboard_bytes() -> bytes:
