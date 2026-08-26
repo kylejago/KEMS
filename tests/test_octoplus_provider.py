@@ -145,7 +145,7 @@ def test_missing_export_baseline_does_not_create_incomplete_state() -> None:
     assert octoplus.OctoplusProvider._combine_incomplete(None, None) is None
 
 
-def test_mapped_export_baseline_fails_reward_accounting_closed_until_available() -> None:
+def test_mapped_export_baseline_fails_closed_until_available() -> None:
     """Never substitute zero export when an export baseline source is mapped."""
     octoplus, _ = _load_octoplus()
     start = datetime(2026, 11, 1, 17, 0, tzinfo=UTC)
