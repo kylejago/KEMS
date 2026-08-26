@@ -42,7 +42,7 @@
   },
   "maintenance": {
     "required": true,
-    "reason": "Wire the KEMS Daily Costs Supplier rewards & credits row to the authoritative daily Power Down reward field while keeping normal export income separate and avoiding double counting",
+    "reason": "Carry the completed Power Down settlement into the canonical Agile bill as a separate supplier reward while preserving Agile export income and avoiding double counting",
     "expected_downtime_minutes": 5,
     "home_assistant_restart_required": true,
     "reboot_required": false,
