@@ -34,14 +34,14 @@ def test_missing_export_baseline_does_not_change_reward_equation() -> None:
 
 
 def test_alpha829_version_and_release_scope() -> None:
-    """Alpha8.29 changes KEMS core reporting only."""
+    """Alpha8.29 preserves the coordinated core/dashboard release boundary."""
     manifest = json.loads(
         (ROOT / "custom_components" / "kems" / "manifest.json").read_text()
     )
     bundle = json.loads((ROOT / "release" / "kems-bundle.template.json").read_text())
 
     assert manifest["version"] == "0.8.0-alpha8.29"
-    assert bundle["maintenance"]["affected_components"] == ["kems_core"]
+    assert bundle["maintenance"]["affected_components"] == ["kems_core", "dashboard"]
     assert "export baseline is not required" in bundle["maintenance"]["reason"]
     assert bundle["maintenance"]["home_assistant_restart_required"] is True
     assert bundle["maintenance"]["reboot_required"] is False
