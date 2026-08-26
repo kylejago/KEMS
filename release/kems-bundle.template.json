@@ -42,7 +42,7 @@
   },
   "maintenance": {
     "required": true,
-    "reason": "Correct the managed KEMS dashboard Battery charged row to use the registered simulated cumulative battery-charge entity",
+    "reason": "Make normal Agile rolling export use the same five-minute solar-aware shared-inverter capacity model as deadline safety, reserving house load before deliberate battery export",
     "expected_downtime_minutes": 5,
     "home_assistant_restart_required": true,
     "reboot_required": false,

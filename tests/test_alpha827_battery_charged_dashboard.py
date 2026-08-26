@@ -32,13 +32,16 @@ def test_managed_dashboard_uses_registered_battery_charged_entity() -> None:
 
 
 def test_alpha827_version_and_release_scope() -> None:
-    """Alpha8.27 is a core/dashboard-only corrective release."""
+    """Alpha8.27 remains present in successor core/dashboard releases."""
     manifest = json.loads(
         (ROOT / "custom_components" / "kems" / "manifest.json").read_text()
     )
     bundle = json.loads((ROOT / "release" / "kems-bundle.template.json").read_text())
 
-    assert manifest["version"] == "0.8.0-alpha8.27"
+    version = manifest["version"]
+    prefix = "0.8.0-alpha8."
+    assert version.startswith(prefix)
+    assert int(version.removeprefix(prefix)) >= 27
     assert bundle["maintenance"]["affected_components"] == ["kems_core", "dashboard"]
     assert bundle["maintenance"]["home_assistant_restart_required"] is True
     assert bundle["maintenance"]["reboot_required"] is False
