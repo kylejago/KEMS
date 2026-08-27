@@ -159,8 +159,7 @@ def _reconcile_current_slot(
         if current is None:
             selected.append(row)
     selected.sort(
-        key=lambda item: _dt(item.get("valid_from"))
-        or datetime.max.replace(tzinfo=UTC)
+        key=lambda item: _dt(item.get("valid_from")) or datetime.max.replace(tzinfo=UTC)
     )
     if selected:
         plan["selected_slots"] = selected
