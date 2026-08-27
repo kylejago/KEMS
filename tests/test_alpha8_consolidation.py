@@ -104,9 +104,14 @@ def test_alpha8_compatibility_registry_is_complete_and_resolvable() -> None:
         "agile_total_discharge_ledger",
         "install_total_discharge_ledger",
     )
+    deadline_dominance = (
+        "agile_deadline_dominance",
+        "install_deadline_dominance",
+    )
     assert specs.index(runtime_reconciliation) < specs.index(solar_net_demand)
     assert specs.index(solar_net_demand) < specs.index(total_discharge_ledger)
-    assert specs[-1] == total_discharge_ledger
+    assert specs.index(total_discharge_ledger) < specs.index(deadline_dominance)
+    assert specs[-1] == deadline_dominance
 
     for module_name, installer_name in specs:
         path = KEMS / f"{module_name}.py"
