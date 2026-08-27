@@ -42,7 +42,7 @@
   },
   "maintenance": {
     "required": true,
-    "reason": "Carry the completed Power Down settlement into the canonical Agile bill as a separate supplier reward while preserving Agile export income and avoiding double counting",
+    "reason": "Make maximum-discharge authoritative at the final Agile deadline boundary and hand Tomorrow the physically achievable pre-cheap SOC when the configured target can no longer be reached",
     "expected_downtime_minutes": 5,
     "home_assistant_restart_required": true,
     "reboot_required": false,

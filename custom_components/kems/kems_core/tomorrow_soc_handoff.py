@@ -31,6 +31,65 @@ def _finite_float(value: Any) -> float | None:
     return number
 
 
+def reconcile_precheap_projection(
+    *,
+    projected_precheap_soc_percent: float | None,
+    current_soc_percent: float | None,
+    remaining_discharge_capacity_kwh: float | None,
+    battery_capacity_kwh: float,
+    discharge_efficiency: float,
+    reserve_soc_percent: float,
+    target_physically_reachable_now: bool | None,
+) -> tuple[float | None, dict[str, Any]]:
+    """Raise a forecast SOC target to the best physically reachable SOC when needed.
+
+    The rolling deadline guard reports remaining discharge capacity on the AC
+    side. If that guard has proven the configured target unreachable, convert
+    the remaining AC capacity back to stored battery energy and use the lowest
+    SOC that can actually be reached before cheap charging starts.
+    """
+    projected = _finite_float(projected_precheap_soc_percent)
+    current = _finite_float(current_soc_percent)
+    remaining_ac = _finite_float(remaining_discharge_capacity_kwh)
+    if target_physically_reachable_now is not False:
+        return projected, {
+            "applied": False,
+            "reason": "deadline target remains physically reachable",
+            "projected_precheap_soc_percent": (
+                round(projected, 3) if projected is not None else None
+            ),
+        }
+    if current is None or remaining_ac is None:
+        return projected, {
+            "applied": False,
+            "reason": "deadline reachability evidence is incomplete",
+            "projected_precheap_soc_percent": (
+                round(projected, 3) if projected is not None else None
+            ),
+        }
+
+    capacity = max(float(battery_capacity_kwh), 0.1)
+    efficiency = min(max(float(discharge_efficiency), 0.01), 1.0)
+    reserve = min(max(float(reserve_soc_percent), 0.0), 100.0)
+    reachable = current - max(remaining_ac, 0.0) / efficiency / capacity * 100.0
+    reachable = min(max(reachable, reserve), 100.0)
+    reconciled = reachable if projected is None else max(projected, reachable)
+    reconciled = min(max(reconciled, reserve), 100.0)
+
+    return round(reconciled, 3), {
+        "applied": True,
+        "reason": "deadline target physically unreachable; use best reachable SOC",
+        "forecast_projected_precheap_soc_percent": (
+            round(projected, 3) if projected is not None else None
+        ),
+        "current_soc_percent": round(current, 3),
+        "remaining_discharge_capacity_kwh": round(max(remaining_ac, 0.0), 3),
+        "best_reachable_precheap_soc_percent": round(reachable, 3),
+        "projected_precheap_soc_percent": round(reconciled, 3),
+        "discharge_efficiency": round(efficiency, 4),
+    }
+
+
 def project_tomorrow_midnight_soc(
     *,
     now: datetime,

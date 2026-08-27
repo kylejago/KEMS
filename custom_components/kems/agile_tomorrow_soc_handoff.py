@@ -23,7 +23,10 @@ from .kems_core import (
     Snapshot,
     SolarForecastState,
 )
-from .kems_core.tomorrow_soc_handoff import project_tomorrow_midnight_soc
+from .kems_core.tomorrow_soc_handoff import (
+    project_tomorrow_midnight_soc,
+    reconcile_precheap_projection,
+)
 from .tariff import TariffSettings
 
 
@@ -102,6 +105,34 @@ class TomorrowSocHandoffAgileSmartExportManager(
             forecast_plan.projected_soc_at_cheap_start_percent
         )
 
+        rolling_plan = state.get("rolling_export_plan")
+        rolling_plan = rolling_plan if isinstance(rolling_plan, dict) else {}
+        deadline_guard = rolling_plan.get("deadline_guard")
+        deadline_guard = deadline_guard if isinstance(deadline_guard, dict) else {}
+        rolling_soc = _finite_float(deadline_guard.get("simulated_soc_percent"))
+        if rolling_soc is None:
+            rolling_soc = _finite_float(rolling_plan.get("simulated_soc_percent"))
+        remaining_capacity = _finite_float(
+            deadline_guard.get("solar_aware_remaining_capacity_kwh")
+        )
+        if remaining_capacity is None:
+            remaining_capacity = _finite_float(
+                rolling_plan.get("solar_aware_remaining_capacity_kwh")
+            )
+        reachable_flag = deadline_guard.get("target_physically_reachable_now")
+        if not isinstance(reachable_flag, bool):
+            reachable_flag = rolling_plan.get("target_physically_reachable_now")
+        reachable_flag = reachable_flag if isinstance(reachable_flag, bool) else None
+        projected_precheap, precheap_reconciliation = reconcile_precheap_projection(
+            projected_precheap_soc_percent=projected_precheap,
+            current_soc_percent=rolling_soc,
+            remaining_discharge_capacity_kwh=remaining_capacity,
+            battery_capacity_kwh=float(config.battery_capacity_kwh),
+            discharge_efficiency=float(config.discharge_efficiency),
+            reserve_soc_percent=float(config.battery_reserve_percent),
+            target_physically_reachable_now=reachable_flag,
+        )
+
         handoff_args = {
             "now": now,
             "projected_precheap_soc_percent": projected_precheap,
@@ -118,6 +149,12 @@ class TomorrowSocHandoffAgileSmartExportManager(
         full_midnight, full_handoff = project_tomorrow_midnight_soc(
             current_soc_percent=full_current,
             **handoff_args,
+        )
+        agile_handoff["precheap_projection_reconciliation"] = dict(
+            precheap_reconciliation
+        )
+        full_handoff["precheap_projection_reconciliation"] = dict(
+            precheap_reconciliation
         )
 
         tomorrow = self._compare_day(
@@ -170,7 +207,7 @@ class TomorrowSocHandoffAgileSmartExportManager(
         state["tomorrow_soc_handoff"] = {
             "active": bool(agile_handoff.get("active") or full_handoff.get("active")),
             "policy": (
-                "today projected pre-cheap SOC -> pre-midnight cheap charge -> "
+                "today achievable pre-cheap SOC -> pre-midnight cheap charge -> "
                 "Tomorrow 00:00 SOC"
             ),
             "agile": agile_handoff,
