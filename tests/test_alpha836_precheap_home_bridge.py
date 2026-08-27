@@ -208,14 +208,17 @@ def test_noncheap_grid_import_is_not_reported_as_grid_to_battery() -> None:
     assert slots[0]["grid_to_battery_kwh"] == 0.0
 
 
-def test_precheap_bridge_is_the_final_compatibility_layer() -> None:
+def test_precheap_bridge_runs_before_final_deadline_dominance() -> None:
     compat = (INTEGRATION / "agile_alpha7_compat.py").read_text(encoding="utf-8")
     bridge = (INTEGRATION / "agile_precheap_home_bridge.py").read_text(encoding="utf-8")
 
     assert compat.rfind("install_precheap_home_bridge") > compat.rfind(
-        "install_deadline_dominance"
+        "install_total_discharge_ledger"
     )
-    assert "future net house AC energy" in bridge
+    assert compat.rfind("install_deadline_dominance") > compat.rfind(
+        "install_precheap_home_bridge"
+    )
+    assert "forecast net house demand" in bridge
     assert "grid_to_battery_kwh" in bridge
     assert '"hardware_writes"' not in bridge
     assert ".services.async_call(" not in bridge
