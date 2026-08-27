@@ -158,7 +158,10 @@ def _reconcile_current_slot(
         )
         if current is None:
             selected.append(row)
-    selected.sort(key=lambda item: _dt(item.get("valid_from")) or datetime.max.replace(tzinfo=UTC))
+    selected.sort(
+        key=lambda item: _dt(item.get("valid_from"))
+        or datetime.max.replace(tzinfo=UTC)
+    )
     if selected:
         plan["selected_slots"] = selected
         plan["next_export_slot"] = next(
@@ -170,7 +173,10 @@ def _reconcile_current_slot(
             None,
         )
         plan["planned_battery_export_kwh"] = round(
-            sum(max(_number(item.get("planned_battery_export_kwh")) or 0.0, 0.0) for item in selected),
+            sum(
+                max(_number(item.get("planned_battery_export_kwh")) or 0.0, 0.0)
+                for item in selected
+            ),
             3,
         )
 
@@ -193,7 +199,9 @@ def _apply_deadline_dominance(
     if not guard.get("deadline_guard_active"):
         return plan
 
-    deadline = _dt(guard.get("deadline")) or agile._next_cheap(now, tariff).astimezone(UTC)
+    deadline = _dt(guard.get("deadline")) or agile._next_cheap(now, tariff).astimezone(
+        UTC
+    )
     segment = _current_capacity_segment(
         self,
         now=now,
