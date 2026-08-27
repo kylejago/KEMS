@@ -116,8 +116,12 @@ def test_reachable_target_keeps_forecast_projection_unchanged() -> None:
 
 def test_final_canonical_layer_runs_after_total_discharge_ledger() -> None:
     compat = (ROOT / "custom_components/kems/agile_alpha7_compat.py").read_text()
-    dominance = (ROOT / "custom_components/kems/agile_deadline_dominance.py").read_text()
-    handoff = (ROOT / "custom_components/kems/agile_tomorrow_soc_handoff.py").read_text()
+    dominance = (
+        ROOT / "custom_components/kems/agile_deadline_dominance.py"
+    ).read_text()
+    handoff = (
+        ROOT / "custom_components/kems/agile_tomorrow_soc_handoff.py"
+    ).read_text()
 
     assert compat.rfind("install_deadline_dominance") > compat.rfind(
         "install_total_discharge_ledger"
