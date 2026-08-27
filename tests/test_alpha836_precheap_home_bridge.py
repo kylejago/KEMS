@@ -63,7 +63,9 @@ def _load_modules():
     runtime_base = importlib.import_module(
         "custom_components.kems.agile_smart_export_runtime_base"
     )
-    bridge = importlib.import_module("custom_components.kems.agile_precheap_home_bridge")
+    bridge = importlib.import_module(
+        "custom_components.kems.agile_precheap_home_bridge"
+    )
     deadline = importlib.import_module("custom_components.kems.agile_deadline_dispatch")
     tariff_module = importlib.import_module("custom_components.kems.tariff")
     bridge.install_precheap_home_bridge()
@@ -81,7 +83,9 @@ def _records(agile):
     return [
         agile.Snapshot(
             timestamp=stamp,
-            current_import_rate=3.49 if stamp.hour >= 23 and stamp.minute >= 30 else 28.3,
+            current_import_rate=(
+                3.49 if stamp.hour >= 23 and stamp.minute >= 30 else 28.3
+            ),
             next_import_rate=3.49,
             electricity_standing_charge=53.7,
             off_peak=(stamp.hour >= 23 and stamp.minute >= 30) or stamp.hour == 0,
@@ -172,7 +176,9 @@ def test_partial_tomorrow_prices_do_not_force_2230_grid_import() -> None:
     row = next(
         item
         for item in plan
-        if datetime.fromisoformat(item["valid_from"]).astimezone(LONDON).strftime("%H:%M")
+        if datetime.fromisoformat(item["valid_from"])
+        .astimezone(LONDON)
+        .strftime("%H:%M")
         == "22:30"
     )
 
