@@ -42,7 +42,7 @@
   },
   "maintenance": {
     "required": true,
-    "reason": "Make maximum-discharge authoritative at the final Agile deadline boundary and hand Tomorrow the physically achievable pre-cheap SOC when the configured target can no longer be reached",
+    "reason": "Keep enough battery above the 10% reserve to serve forecast home demand until the 23:30 cheap boundary, preventing avoidable pre-cheap grid import and correcting non-cheap grid-import routing telemetry",
     "expected_downtime_minutes": 5,
     "home_assistant_restart_required": true,
     "reboot_required": false,
