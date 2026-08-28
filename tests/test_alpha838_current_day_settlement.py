@@ -23,12 +23,19 @@ def _load_helper():
     # Avoid importing Home Assistant/runtime dependencies: execute only the pure
     # helper prefix before the manager subclass definition.
     source = (INTEGRATION / "agile_current_day_settlement.py").read_text()
-    pure_source = source.split("\n\nclass SettledCurrentDayAgileSmartExportManager", 1)[0]
+    pure_source = source.split("\n\nclass SettledCurrentDayAgileSmartExportManager", 1)[
+        0
+    ]
     pure_source = pure_source.replace(
         "from .agile_tomorrow_soc_handoff import TomorrowSocHandoffAgileSmartExportManager\n",
         "",
     )
-    exec(compile(pure_source, str(INTEGRATION / "agile_current_day_settlement.py"), "exec"), module.__dict__)
+    exec(
+        compile(
+            pure_source, str(INTEGRATION / "agile_current_day_settlement.py"), "exec"
+        ),
+        module.__dict__,
+    )
     return module
 
 
@@ -222,9 +229,9 @@ def test_runtime_join_runs_after_shadow_settlement_without_hardware_writes() -> 
 
     assert "SettledCurrentDayAgileSmartExportManager" in runtime
     assert "reconcile_current_day_settlements" in coordinator
-    assert coordinator.index("await self._shadow_validation.async_update(") < coordinator.index(
-        "reconcile_current_day_settlements"
-    )
+    assert coordinator.index(
+        "await self._shadow_validation.async_update("
+    ) < coordinator.index("reconcile_current_day_settlements")
     assert ".services.async_call(" not in helper_source
     assert "providers.foxess" not in helper_source
     assert '"hardware_writes": "blocked"' in helper_source
