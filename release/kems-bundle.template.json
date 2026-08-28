@@ -42,7 +42,7 @@
   },
   "maintenance": {
     "required": true,
-    "reason": "Align current-day Agile accounting and dashboard totals",
+    "reason": "Keep current-day Agile headline cost and saving on one like-for-like net-energy basis",
     "expected_downtime_minutes": 5,
     "home_assistant_restart_required": true,
     "reboot_required": false,
