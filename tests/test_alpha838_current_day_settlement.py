@@ -26,10 +26,11 @@ def _load_helper():
     pure_source = source.split("\n\nclass SettledCurrentDayAgileSmartExportManager", 1)[
         0
     ]
-    pure_source = pure_source.replace(
-        "from .agile_tomorrow_soc_handoff import TomorrowSocHandoffAgileSmartExportManager\n",
-        "",
+    handoff_import = (
+        "from .agile_tomorrow_soc_handoff import "
+        "TomorrowSocHandoffAgileSmartExportManager\n"
     )
+    pure_source = pure_source.replace(handoff_import, "")
     exec(
         compile(
             pure_source, str(INTEGRATION / "agile_current_day_settlement.py"), "exec"
