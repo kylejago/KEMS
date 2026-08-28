@@ -151,7 +151,7 @@ def test_alpha8_13_bill_contract_survives_coordinated_successor_releases() -> No
     assert int(manifest["version"].rsplit(".", 1)[1]) >= 13
     assert bundle["components"]["panel"]["version"] == "0.8.0-alpha8-panel.1"
     for key in ("property_web", "pi_agent", "public_web"):
-        assert bundle["components"][key]["version"] == "0.8.0-alpha8-web.4"
+        assert bundle["components"][key]["version"] == "0.8.0-alpha8-web.5"
 
 
 def test_dashboard_and_web_contract_use_one_canonical_bill_state() -> None:
