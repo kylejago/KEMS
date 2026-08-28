@@ -29,7 +29,12 @@ def _load_helper():
         "from .agile_tomorrow_soc_handoff import "
         "TomorrowSocHandoffAgileSmartExportManager\n"
     )
+    settled_handoff_import = (
+        "from .agile_settled_soc_handoff import "
+        "refresh_tomorrow_handoff_from_settled_soc\n"
+    )
     pure_source = pure_source.replace(handoff_import, "")
+    pure_source = pure_source.replace(settled_handoff_import, "")
     exec(
         compile(
             pure_source,
@@ -259,6 +264,7 @@ def test_runtime_join_brackets_shadow_settlement_without_hardware_writes() -> No
     )
     assert first_reconcile < shadow_update < second_reconcile
     assert "self._publish(self._state)" in helper_source
+    assert "refresh_tomorrow_handoff_from_settled_soc(" in helper_source
     assert ".services.async_call(" not in helper_source
     assert "providers.foxess" not in helper_source
     assert '"hardware_writes": "blocked"' in helper_source
