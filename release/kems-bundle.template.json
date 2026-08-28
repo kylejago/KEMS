@@ -47,7 +47,8 @@
     "home_assistant_restart_required": true,
     "reboot_required": false,
     "affected_components": [
-      "kems_core"
+      "kems_core",
+      "dashboard"
     ]
   }
 }
