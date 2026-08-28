@@ -42,7 +42,7 @@
   },
   "maintenance": {
     "required": true,
-    "reason": "Keep enough battery above the 10% reserve to serve forecast home demand until the 23:30 cheap boundary, preventing avoidable pre-cheap grid import and correcting non-cheap grid-import routing telemetry",
+    "reason": "Carry the 23:30-to-midnight cheap-charge interval across daily replay boundaries and report canonical cheap-charge shadow targets",
     "expected_downtime_minutes": 5,
     "home_assistant_restart_required": true,
     "reboot_required": false,

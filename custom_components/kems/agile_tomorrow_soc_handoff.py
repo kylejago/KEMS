@@ -4,6 +4,11 @@ Tomorrow is a forward projection, so it must not start from the battery SOC at
 whatever time the dashboard happens to be viewed. It starts from the SOC KEMS
 projects at the overnight cheap boundary, plus cheap charging up to midnight.
 
+This module also owns local-day replay continuity. A 23:30 snapshot belongs to
+the ending day, while the 00:00 snapshot belongs to the next day; the base daily
+grouper therefore needs that exact midnight boundary appended to the ending day
+so the 23:30-to-00:00 interval is not dropped.
+
 This module changes simulation/reporting continuity only. It does not alter live
 Agile targets, ControlState/shadow commands, Power Down priority, or hardware
 write permissions.
@@ -11,7 +16,7 @@ write permissions.
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from typing import Any
 
 from . import agile_smart_export as agile
@@ -41,10 +46,109 @@ def _finite_float(value: Any) -> float | None:
     return number
 
 
+def _midnight_boundary_map(records: list[Snapshot]) -> dict[date, Snapshot]:
+    """Map each local day to its exact following 00:00 boundary snapshot."""
+    boundaries: dict[date, Snapshot] = {}
+    ordered = sorted(records, key=lambda item: item.timestamp)
+    for item in ordered:
+        local = item.timestamp.astimezone(agile.LONDON)
+        if local.hour == 0 and local.minute == 0 and local.second == 0:
+            boundaries[local.date() - timedelta(days=1)] = item
+    return boundaries
+
+
+def _persisted_ending_soc(
+    daily: dict[str, dict[str, Any]],
+    day: date,
+    key: str,
+) -> float | None:
+    """Return the immediately previous persisted strategy SOC when available."""
+    previous = daily.get((day - timedelta(days=1)).isoformat())
+    if not isinstance(previous, dict) or not previous.get("ready"):
+        return None
+    strategy = previous.get(key)
+    if not isinstance(strategy, dict):
+        return None
+    return _finite_float(strategy.get("ending_soc_percent"))
+
+
 class TomorrowSocHandoffAgileSmartExportManager(
     runtime_base.EfficientAgileSmartExportManager
 ):
-    """Rebuild Tomorrow from a physically continuous midnight SOC."""
+    """Rebuild Tomorrow and preserve physical SOC across local midnight."""
+
+    def _prepare_replay_continuity(self, records: list[Snapshot]) -> None:
+        """Capture day-boundary snapshots before the base manager groups them."""
+        ordered = sorted(records, key=lambda item: item.timestamp)
+        self._midnight_replay_boundaries = _midnight_boundary_map(ordered)
+        self._midnight_replay_first_day = (
+            ordered[0].timestamp.astimezone(agile.LONDON).date() if ordered else None
+        )
+        self._midnight_replay_seed_applied = False
+        self._midnight_replay_augmented_days: set[str] = set()
+
+    def _compare_day(
+        self,
+        records: list[Snapshot],
+        config: SimulationConfig,
+        tariff: TariffSettings,
+        agile_soc: float,
+        full_soc: float,
+        learned_forecast: float | None,
+        projection: bool = False,
+    ) -> dict[str, Any]:
+        """Delegate one day after restoring the missing midnight boundary."""
+        day_records = sorted(records, key=lambda item: item.timestamp)
+        if not day_records:
+            return super()._compare_day(
+                day_records,
+                config,
+                tariff,
+                agile_soc,
+                full_soc,
+                learned_forecast,
+                projection=projection,
+            )
+
+        day = day_records[0].timestamp.astimezone(agile.LONDON).date()
+        if not projection:
+            boundary = getattr(self, "_midnight_replay_boundaries", {}).get(day)
+            if boundary is not None and all(
+                item.timestamp != boundary.timestamp for item in day_records
+            ):
+                day_records.append(boundary)
+                day_records.sort(key=lambda item: item.timestamp)
+                getattr(self, "_midnight_replay_augmented_days", set()).add(
+                    day.isoformat()
+                )
+
+            if day == getattr(self, "_midnight_replay_first_day", None):
+                persisted_agile = _persisted_ending_soc(
+                    self._daily,
+                    day,
+                    "agile_smart_export",
+                )
+                persisted_full = _persisted_ending_soc(
+                    self._daily,
+                    day,
+                    "full_kems_forecast",
+                )
+                if persisted_agile is not None:
+                    agile_soc = persisted_agile
+                    self._midnight_replay_seed_applied = True
+                if persisted_full is not None:
+                    full_soc = persisted_full
+                    self._midnight_replay_seed_applied = True
+
+        return super()._compare_day(
+            day_records,
+            config,
+            tariff,
+            agile_soc,
+            full_soc,
+            learned_forecast,
+            projection=projection,
+        )
 
     async def async_update(
         self,
@@ -58,6 +162,7 @@ class TomorrowSocHandoffAgileSmartExportManager(
         tariff: TariffSettings,
     ) -> dict[str, Any]:
         """Correct a fresh Tomorrow projection after the canonical Alpha7 chain."""
+        self._prepare_replay_continuity(records)
         state = await super().async_update(
             records=records,
             now=now,
@@ -73,6 +178,18 @@ class TomorrowSocHandoffAgileSmartExportManager(
         if state.get("generated_at") != now.isoformat():
             return state
 
+        state["midnight_replay_continuity"] = {
+            "active": True,
+            "boundary_days_augmented": sorted(
+                getattr(self, "_midnight_replay_augmented_days", set())
+            ),
+            "persisted_first_day_seed_applied": bool(
+                getattr(self, "_midnight_replay_seed_applied", False)
+            ),
+            "policy": "23:30 cheap charge is carried through the 00:00 day boundary",
+            "hardware_writes": "blocked",
+        }
+
         local_now = now.astimezone(agile.LONDON)
         tomorrow_records = self._tomorrow_records(
             local_now,
@@ -82,6 +199,7 @@ class TomorrowSocHandoffAgileSmartExportManager(
             tariff,
         )
         if len(tomorrow_records) < 2:
+            self._state = state
             return state
 
         periods = state.get("periods")

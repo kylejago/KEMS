@@ -228,7 +228,9 @@ def test_alpha836_version_and_release_scope() -> None:
     manifest = json.loads((INTEGRATION / "manifest.json").read_text(encoding="utf-8"))
     bundle = json.loads((ROOT / "release/kems-bundle.template.json").read_text())
 
-    assert manifest["version"] == "0.8.0-alpha8.36"
+    version = str(manifest["version"])
+    assert version.startswith("0.8.0-alpha8.")
+    assert int(version.rsplit(".", 1)[-1]) >= 36
     assert bundle["maintenance"]["affected_components"] == ["kems_core", "dashboard"]
     assert bundle["maintenance"]["home_assistant_restart_required"] is True
     assert bundle["maintenance"]["reboot_required"] is False
