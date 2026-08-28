@@ -42,7 +42,7 @@
   },
   "maintenance": {
     "required": true,
-    "reason": "Keep non-cheap Agile hold slots serving house demand from battery while coordinating the bundle with KEMS Web.5",
+    "reason": "Use settled current SOC for the rolling 10%-at-cheap-start arrival reserve, enforce the hard reserve floor, and rebuild the midnight handoff from the same authority",
     "expected_downtime_minutes": 5,
     "home_assistant_restart_required": true,
     "reboot_required": false,
