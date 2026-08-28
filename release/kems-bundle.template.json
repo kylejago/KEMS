@@ -42,7 +42,7 @@
   },
   "maintenance": {
     "required": true,
-    "reason": "Settle current-day Agile export energy and financial totals from completed digital-twin outcomes",
+    "reason": "Reconcile current-day Agile settled export, battery self-use, SOC and dependent financial totals",
     "expected_downtime_minutes": 5,
     "home_assistant_restart_required": true,
     "reboot_required": false,
