@@ -80,9 +80,7 @@ def test_uploaded_2211_stale_deadline_export_is_removed_at_nine_percent() -> Non
 
     current = state["today_slots"][0]
     assert current["battery_export_kwh"] == 0.0
-    assert current["actions"] == [
-        "house first — target reached; no battery export planned"
-    ]
+    assert current["actions"] == ["10% reserve floor — no battery discharge/export"]
     assert current["rolling_action"] == current["actions"][0]
     assert current["current_soc_percent"] == 9.0
     assert current["ending_soc_percent"] is None

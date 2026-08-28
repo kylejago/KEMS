@@ -121,6 +121,7 @@ def _load_rolling_plan(deadline: datetime):
         "_number",
         "_datetime",
         "_current_agile_soc",
+        "_current_agile_soc_source",
         "_predicted_house_until_deadline",
         "_current_house_headroom_kw",
         "_rolling_plan",
@@ -209,14 +210,17 @@ def test_23_august_prices_prefer_high_feasible_slots() -> None:
     assert "23:00" not in selected
 
 
-def test_decision_evidence_reporting_only_and_rolling_runtime_frozen() -> None:
+def test_decision_evidence_reporting_only_and_rolling_successor_safe() -> None:
     evidence = EVIDENCE.read_text(encoding="utf-8")
     compat = COMPAT.read_text(encoding="utf-8")
+    runtime = ROLLING.read_text(encoding="utf-8")
+    historical = HISTORICAL_ROLLING.read_text(encoding="utf-8")
 
-    assert ROLLING.read_bytes() == HISTORICAL_ROLLING.read_bytes()
-    assert 'key=lambda value: value["rate"], reverse=True' in ROLLING.read_text(
-        encoding="utf-8"
-    )
+    assert ROLLING.read_bytes() != HISTORICAL_ROLLING.read_bytes()
+    assert 'key=lambda value: value["rate"], reverse=True' in runtime
+    assert 'key=lambda value: value["rate"], reverse=True' in historical
+    assert "settled current-day digital-twin SOC" in runtime
+    assert "settled current-day digital-twin SOC" not in historical
     assert '("agile_dashboard_parity", "install_dashboard_parity")' in compat
     assert '("agile_decision_evidence", "install_decision_evidence")' in compat
     assert compat.index(

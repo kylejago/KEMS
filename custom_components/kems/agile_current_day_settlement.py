@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
+from .agile_settled_soc_handoff import refresh_tomorrow_handoff_from_settled_soc
 from .agile_tomorrow_soc_handoff import TomorrowSocHandoffAgileSmartExportManager
 
 FIXED_EXPORT_BENCHMARK_PENCE = 12.0
@@ -400,6 +401,12 @@ class SettledCurrentDayAgileSmartExportManager(
             self._panel_config = None
             try:
                 self._publish(self._state)
+                if config is not None:
+                    refresh_tomorrow_handoff_from_settled_soc(
+                        self,
+                        now=now,
+                        config=config,
+                    )
             finally:
                 self._panel_config = panel_config
         return self.state
