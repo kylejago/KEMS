@@ -76,8 +76,8 @@ def test_alpha817_contract_survives_coordinated_successor_releases() -> None:
     assert int(manifest["version"].rsplit(".", 1)[-1]) >= 17
     assert bundle["maintenance"]["affected_components"] == ["kems_core", "dashboard"]
     assert bundle["components"]["panel"]["version"] == "0.8.0-alpha8-panel.1"
-    assert bundle["components"]["property_web"]["version"] == "0.8.0-alpha8-web.4"
-    assert bundle["components"]["pi_agent"]["version"] == "0.8.0-alpha8-web.4"
-    assert bundle["components"]["public_web"]["version"] == "0.8.0-alpha8-web.4"
+    assert bundle["components"]["property_web"]["version"] == "0.8.0-alpha8-web.5"
+    assert bundle["components"]["pi_agent"]["version"] == "0.8.0-alpha8-web.5"
+    assert bundle["components"]["public_web"]["version"] == "0.8.0-alpha8-web.5"
     assert "real_backend" not in content
     assert "commands_permitted" not in content
