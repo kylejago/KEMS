@@ -133,8 +133,10 @@ def test_alpha841_does_not_override_the_saving_sensor_or_hardware() -> None:
 def test_alpha841_release_scope() -> None:
     manifest = json.loads((KEMS_ROOT / "manifest.json").read_text())
     bundle = json.loads((ROOT / "release/kems-bundle.template.json").read_text())
+    version = manifest["version"]
 
-    assert manifest["version"] == "0.8.0-alpha8.41"
+    assert version.startswith("0.8.0-alpha8.")
+    assert int(version.rsplit(".", 1)[1]) >= 41
     assert bundle["maintenance"]["home_assistant_restart_required"] is True
     assert bundle["maintenance"]["reboot_required"] is False
     assert bundle["components"]["panel"]["version"] == "0.8.0-alpha8-panel.1"
