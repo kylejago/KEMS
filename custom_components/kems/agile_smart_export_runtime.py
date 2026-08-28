@@ -8,6 +8,7 @@ not in additional version-named monkey-patch layers.
 from __future__ import annotations
 
 from .agile_alpha7_compat import install_alpha7_compatibility
+from .agile_shadow_charge_truth import install_shadow_charge_truth
 
 # Non-executable compatibility metadata for the historical Alpha7 regression
 # suite. Older tests intentionally inspected this loader's source to prove patch
@@ -67,6 +68,7 @@ install_alpha752_tomorrow_no_reserve_rounding_patch()
 """
 
 _base = install_alpha7_compatibility()
+install_shadow_charge_truth()
 
 from .agile_smart_export_runtime_base import *  # noqa: E402,F403
 from .agile_tomorrow_soc_handoff import (  # noqa: E402
