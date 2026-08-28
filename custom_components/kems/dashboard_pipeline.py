@@ -148,12 +148,8 @@ def _finalise_dashboard_bytes(payload: bytes) -> bytes:
         "          {% set saving = bill.get('saving_pence') %}\n"
     )
     text = text.replace(home_summary_setup, home_summary_reconciled_setup, 1)
-    old_total_row = (
-        "          | **Total energy cost** | **£{{ '%.2f' | format((live_e + gas) / 100) }}** | **£{{ '%.2f' | format((kems_e + gas) / 100) }}** |\n"
-    )
-    new_total_row = (
-        "          | **Total energy cost** | **{{ ('£%.2f' | format((live_total | float) / 100)) if live_total is not none else '—' }}** | **{{ ('£%.2f' | format((kems_total | float) / 100)) if kems_total is not none else '—' }}** |\n"
-    )
+    old_total_row = "          | **Total energy cost** | **£{{ '%.2f' | format((live_e + gas) / 100) }}** | **£{{ '%.2f' | format((kems_e + gas) / 100) }}** |\n"
+    new_total_row = "          | **Total energy cost** | **{{ ('£%.2f' | format((live_total | float) / 100)) if live_total is not none else '—' }}** | **{{ ('£%.2f' | format((kems_total | float) / 100)) if kems_total is not none else '—' }}** |\n"
     text = text.replace(old_total_row, new_total_row, 1)
     old_saving_line = (
         "          **KEMS saving today:** £{{ '%.2f' | format(saving / 100) }}\n"
