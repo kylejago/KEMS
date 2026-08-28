@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 import sys
 from pathlib import Path
 from types import ModuleType, SimpleNamespace
@@ -28,6 +29,10 @@ product_types = _load(f"{PACKAGE}.product_types", KEMS_ROOT / "product_types.py"
 presentation = _load(
     f"{PACKAGE}.agile_simulation_presentation",
     KEMS_ROOT / "agile_simulation_presentation.py",
+)
+dashboard_pipeline = _load(
+    f"{PACKAGE}.dashboard_pipeline",
+    KEMS_ROOT / "dashboard_pipeline.py",
 )
 
 
@@ -97,6 +102,21 @@ def test_alpha841_whole_home_totals_remain_like_for_like() -> None:
     assert whole_home.simulated_saving_pence == 364.18
 
 
+def test_alpha841_home_summary_uses_bill_totals_for_all_in_rows() -> None:
+    payload = (KEMS_ROOT / "kems_master_dashboard.yaml").read_bytes()
+    rendered = dashboard_pipeline._finalise_dashboard_bytes(payload).decode("utf-8")
+
+    assert "{% set live_total = live_bill.get('total_energy_cost_pence') %}" in rendered
+    assert "{% set kems_total = kems_bill.get('total_energy_cost_pence') %}" in rendered
+    assert "{% set saving = bill.get('saving_pence') %}" in rendered
+    assert "format((live_e + gas) / 100)" not in rendered
+    assert "format((kems_e + gas) / 100)" not in rendered
+    assert (
+        "Total energy cost includes electricity standing charge, export income, "
+        "supplier/account credits and gas."
+    ) in rendered
+
+
 def test_alpha841_does_not_override_the_saving_sensor_or_hardware() -> None:
     coordinator = _coordinator()
 
@@ -108,3 +128,14 @@ def test_alpha841_does_not_override_the_saving_sensor_or_hardware() -> None:
     assert 'hardware_writes": "blocked' in source
     assert ".services.async_call(" not in source
     assert "safe_to_write_hardware = True" not in source
+
+
+def test_alpha841_release_scope() -> None:
+    manifest = json.loads((KEMS_ROOT / "manifest.json").read_text())
+    bundle = json.loads((ROOT / "release/kems-bundle.template.json").read_text())
+
+    assert manifest["version"] == "0.8.0-alpha8.41"
+    assert bundle["maintenance"]["home_assistant_restart_required"] is True
+    assert bundle["maintenance"]["reboot_required"] is False
+    assert bundle["components"]["panel"]["version"] == "0.8.0-alpha8-panel.1"
+    assert bundle["components"]["property_web"]["version"] == "0.8.0-alpha8-web.4"
