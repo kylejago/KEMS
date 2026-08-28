@@ -42,7 +42,7 @@
   },
   "maintenance": {
     "required": true,
-    "reason": "Make final Agile current routing authoritative for all current simulated power fields",
+    "reason": "Keep non-cheap Agile hold slots serving house demand from battery while holding deliberate battery export",
     "expected_downtime_minutes": 5,
     "home_assistant_restart_required": true,
     "reboot_required": false,
