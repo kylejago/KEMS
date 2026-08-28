@@ -20,12 +20,12 @@
       "delivery": "kems_core"
     },
     "property_web": {
-      "version": "0.8.0-alpha8-web.4",
+      "version": "0.8.0-alpha8-web.5",
       "required": true,
       "delivery": "kems_pi"
     },
     "pi_agent": {
-      "version": "0.8.0-alpha8-web.4",
+      "version": "0.8.0-alpha8-web.5",
       "required": true,
       "delivery": "kems_pi"
     },
@@ -35,14 +35,14 @@
       "delivery": "kems_pi"
     },
     "public_web": {
-      "version": "0.8.0-alpha8-web.4",
+      "version": "0.8.0-alpha8-web.5",
       "required": false,
       "delivery": "ionos-sftp"
     }
   },
   "maintenance": {
     "required": true,
-    "reason": "Keep non-cheap Agile hold slots serving house demand from battery while holding deliberate battery export",
+    "reason": "Keep non-cheap Agile hold slots serving house demand from battery while coordinating the bundle with KEMS Web.5",
     "expected_downtime_minutes": 5,
     "home_assistant_restart_required": true,
     "reboot_required": false,
