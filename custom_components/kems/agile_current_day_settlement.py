@@ -26,9 +26,7 @@ def _number(value: Any) -> float | None:
 def _sum_slots(slots: list[dict[str, Any]], field: str) -> float:
     """Sum one numeric half-hour energy field without inventing missing values."""
     return sum(
-        number
-        for item in slots
-        if (number := _number(item.get(field))) is not None
+        number for item in slots if (number := _number(item.get(field))) is not None
     )
 
 
@@ -187,9 +185,7 @@ def reconcile_current_day_settlements(
         if old_energy_net is not None
         else 0.0
     )
-    wear_rate = _number(
-        state.get("battery_wear_assumption_pence_per_discharged_kwh")
-    )
+    wear_rate = _number(state.get("battery_wear_assumption_pence_per_discharged_kwh"))
     if wear_rate is None:
         wear_rate = DEFAULT_BATTERY_WEAR_PENCE_PER_KWH
     wear_cost = round((battery_to_home_kwh + battery_export_kwh) * wear_rate, 2)
