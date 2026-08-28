@@ -275,7 +275,7 @@ def test_below_reserve_handoff_never_invents_an_upward_soc_jump() -> None:
     assert "below reserve" in evidence["reason"]
 
     midnight, handoff = project_tomorrow_midnight_soc(
-        now=datetime(2026, 8, 28, 22, 38, tzinfo=UTC),
+        now=datetime(2026, 8, 28, 21, 38, tzinfo=UTC),
         current_soc_percent=8.5,
         projected_precheap_soc_percent=projected,
         battery_capacity_kwh=56.42,
