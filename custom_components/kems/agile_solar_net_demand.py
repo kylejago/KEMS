@@ -40,6 +40,7 @@ rolling = agile_rolling_planning.rolling_runtime
 current_runtime = agile_routing.current_runtime
 deadline_runtime = agile_deadline_guard.deadline_runtime
 _EPSILON = 1e-6
+HARD_FLOOR_GUARD_MINUTES = 5.0
 
 
 def _number(value: Any) -> float | None:
@@ -147,8 +148,13 @@ def _current_physical_targets(
     now: datetime,
     house_kw: float,
     export_limit_kw: float,
+    current_soc_percent: float | None = None,
+    target_soc_percent: float | None = None,
+    battery_capacity_kwh: float | None = None,
+    discharge_efficiency: float | None = None,
+    hard_floor_guard_minutes: float = HARD_FLOOR_GUARD_MINUTES,
 ) -> tuple[float, float, float]:
-    """Return independent house/export battery targets for the active slot."""
+    """Return house/export targets while never planning through reserve SOC."""
     now_utc = now.astimezone(UTC)
     current = next(
         (item for item in allocations if item.valid_from <= now_utc < item.valid_to),
@@ -170,16 +176,52 @@ def _current_physical_targets(
 
     solar_kw = max(_number(segment.get("solar_kw")) or 0.0, 0.0)
     battery_kw = max(_number(segment.get("battery_kw")) or 0.0, 0.0)
+
+    # The rolling arrival reserve handles the long-horizon 10%-at-cheap-start
+    # trajectory. This local guard is deliberately narrow: it prevents the
+    # instantaneous battery target from crossing the absolute reserve between
+    # coordinator scans. Five minutes matches KEMS' persisted cadence and only
+    # begins tapering house discharge very close to the hard floor.
+    discharge_ceiling_kw = battery_kw
+    soc = _number(current_soc_percent)
+    target = _number(target_soc_percent)
+    capacity = _number(battery_capacity_kwh)
+    efficiency = _number(discharge_efficiency)
+    if (
+        soc is not None
+        and target is not None
+        and capacity is not None
+        and capacity > _EPSILON
+        and efficiency is not None
+        and efficiency > _EPSILON
+    ):
+        if soc <= target + _EPSILON:
+            discharge_ceiling_kw = 0.0
+        else:
+            usable_stored_kwh = max(soc - target, 0.0) / 100.0 * capacity
+            usable_ac_kwh = usable_stored_kwh * min(max(efficiency, 0.01), 1.0)
+            guard_hours = max(float(hard_floor_guard_minutes) / 60.0, _EPSILON)
+            discharge_ceiling_kw = min(
+                battery_kw,
+                usable_ac_kwh / guard_hours,
+            )
+
     solar_to_home = min(house_kw, solar_kw)
-    house_battery = min(max(house_kw - solar_to_home, 0.0), battery_kw)
+    house_battery = min(
+        max(house_kw - solar_to_home, 0.0),
+        discharge_ceiling_kw,
+    )
     physical_export = min(
-        max(battery_kw - house_battery, 0.0),
+        max(discharge_ceiling_kw - house_battery, 0.0),
         max(export_limit_kw, 0.0),
     )
 
     # A price-optimised hold applies only to deliberate battery export. The
     # household battery target remains independent so a zero-allocation slot
     # cannot turn an otherwise avoidable house deficit into premium grid import.
+    # The exception is the absolute reserve guard above: once 10% is reached,
+    # preserving battery health is physically mandatory and grid supplies the
+    # residual house load until cheap charging starts.
     paced_export = 0.0
     if current is not None and current.allocated_kwh > _EPSILON:
         remaining_hours = max(
@@ -293,9 +335,48 @@ def _apply_physical_slot_allocations(
         }
     )
 
-    # Deadline modes already own the current command and use this exact physical
-    # capacity model. For normal price dispatch, derive the current target from
-    # the reconciled allocation so ControlState/shadow consume the same plan.
+    soc = _number(plan.get("simulated_soc_percent"))
+    target_soc = _number(plan.get("target_soc_percent"))
+    if target_soc is None:
+        target_soc = max(float(config.battery_reserve_percent), 10.0)
+    reserve_headroom_ac = None
+    reserve_guard_limit_kw = None
+    if soc is not None:
+        reserve_headroom_ac = (
+            max(soc - target_soc, 0.0)
+            / 100.0
+            * max(float(config.battery_capacity_kwh), 0.0)
+            * min(max(float(config.discharge_efficiency), 0.01), 1.0)
+        )
+        reserve_guard_limit_kw = reserve_headroom_ac / (
+            HARD_FLOOR_GUARD_MINUTES / 60.0
+        )
+    floor_active = soc is not None and soc <= target_soc + _EPSILON
+    plan.update(
+        {
+            "hard_reserve_soc_percent": round(target_soc, 3),
+            "hard_reserve_floor_active": floor_active,
+            "hard_reserve_guard_minutes": HARD_FLOOR_GUARD_MINUTES,
+            "hard_reserve_headroom_ac_kwh": (
+                round(reserve_headroom_ac, 3)
+                if reserve_headroom_ac is not None
+                else None
+            ),
+            "hard_reserve_guard_limit_kw": (
+                round(reserve_guard_limit_kw, 3)
+                if reserve_guard_limit_kw is not None
+                else None
+            ),
+            "hard_reserve_policy": (
+                "never plan battery discharge below reserve; taper only within "
+                "the final five-minute reserve guard"
+            ),
+        }
+    )
+
+    # Deadline modes keep ownership of their normal command calculation. The
+    # absolute floor below is a final safety clamp only; it never changes Power
+    # Down, cheap-charge or Happy Hour ownership because those returned above.
     if mode not in {"deadline_following", "maximum_discharge"}:
         house_target, export_target, total_target = _current_physical_targets(
             allocations=physical.allocations,
@@ -303,12 +384,41 @@ def _apply_physical_slot_allocations(
             now=now,
             house_kw=house_kw,
             export_limit_kw=config.export_limit_kw,
+            current_soc_percent=soc,
+            target_soc_percent=target_soc,
+            battery_capacity_kwh=config.battery_capacity_kwh,
+            discharge_efficiency=config.discharge_efficiency,
         )
         plan["current_house_battery_kw"] = house_target
         plan["current_battery_export_target_kw"] = export_target
         plan["current_battery_discharge_target_kw"] = total_target
-        if export_target > _EPSILON:
+        if floor_active:
+            plan["dispatch_action"] = (
+                "10% reserve floor — no battery discharge/export; grid covers "
+                "residual house load until cheap charge"
+            )
+        elif export_target > _EPSILON:
             plan["dispatch_action"] = "price-optimised physical export; house first"
+    elif soc is not None and reserve_guard_limit_kw is not None:
+        house_target = max(_number(plan.get("current_house_battery_kw")) or 0.0, 0.0)
+        export_target = max(
+            _number(plan.get("current_battery_export_target_kw")) or 0.0,
+            0.0,
+        )
+        allowed_kw = max(reserve_guard_limit_kw, 0.0)
+        clamped_house = min(house_target, allowed_kw)
+        clamped_export = min(export_target, max(allowed_kw - clamped_house, 0.0))
+        plan["current_house_battery_kw"] = round(clamped_house, 3)
+        plan["current_battery_export_target_kw"] = round(clamped_export, 3)
+        plan["current_battery_discharge_target_kw"] = round(
+            clamped_house + clamped_export,
+            3,
+        )
+        if floor_active:
+            plan["dispatch_action"] = (
+                "10% reserve floor — no battery discharge/export; grid covers "
+                "residual house load until cheap charge"
+            )
 
     return plan
 
