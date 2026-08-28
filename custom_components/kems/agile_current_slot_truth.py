@@ -87,14 +87,9 @@ def _reconcile_current_slot(
         slot["battery_export_kwh"] = round(allocation, 3)
         if allocation > _EPSILON:
             action = str(
-                slot.get("rolling_action")
-                or "planned battery export — rolling replan"
+                slot.get("rolling_action") or "planned battery export — rolling replan"
             )
-        elif (
-            soc is not None
-            and target is not None
-            and soc <= target + _EPSILON
-        ):
+        elif soc is not None and target is not None and soc <= target + _EPSILON:
             action = "house first — target reached; no battery export planned"
         else:
             action = "house first — no battery export planned"
