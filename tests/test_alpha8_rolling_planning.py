@@ -54,9 +54,19 @@ def test_rolling_ownership_retires_alpha716_live_entries() -> None:
     assert not any(module in retired for module, _ in specs)
 
 
-def test_rolling_runtimes_are_byte_identical() -> None:
-    assert ROLLING_RUNTIME.read_bytes() == HISTORICAL_ROLLING.read_bytes()
+def test_rolling_runtime_has_explicit_successor_delta_only() -> None:
+    runtime = ROLLING_RUNTIME.read_text(encoding="utf-8")
+    historical = HISTORICAL_ROLLING.read_text(encoding="utf-8")
+
+    assert ROLLING_RUNTIME.read_bytes() != HISTORICAL_ROLLING.read_bytes()
     assert DASHBOARD_RUNTIME.read_bytes() == HISTORICAL_DASHBOARD.read_bytes()
+    assert "settled current-day digital-twin SOC" in runtime
+    assert '"arrival_reserve_soc_percent"' in runtime
+    assert '"arrival_reserve_policy"' in runtime
+    assert "settled current-day digital-twin SOC" not in historical
+    assert '"arrival_reserve_soc_percent"' not in historical
+    assert 'key=lambda value: value["rate"], reverse=True' in runtime
+    assert 'key=lambda value: value["rate"], reverse=True' in historical
 
 
 def test_facade_binds_only_rolling_legacy_name() -> None:
