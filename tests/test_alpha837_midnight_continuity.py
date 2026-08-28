@@ -149,8 +149,10 @@ def test_2330_charge_is_carried_across_midnight() -> None:
     manager._daily = {}
     manager._prepare_replay_continuity(records)
 
+    # 18.544% is the already-reconciled SOC at the 23:30 cheap boundary.
+    # Isolate only the missing 23:30->00:00 interval from the live evidence.
     first = manager._compare_day(
-        records[:2],
+        records[1:2],
         config,
         _tariff(tariff_module),
         18.544,
@@ -236,7 +238,7 @@ def test_shadow_truth_is_reporting_only_and_runtime_installed() -> None:
     source = (INTEGRATION / "agile_shadow_charge_truth.py").read_text()
     runtime = (INTEGRATION / "agile_smart_export_runtime.py").read_text()
 
-    assert "control.desired_charge_power_kw" in source
+    assert 'getattr(control, "desired_charge_power_kw"' in source
     assert "install_shadow_charge_truth()" in runtime
     assert runtime.index("install_shadow_charge_truth()") > runtime.index(
         "install_alpha7_compatibility()"
