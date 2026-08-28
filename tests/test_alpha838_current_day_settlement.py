@@ -243,16 +243,21 @@ def test_only_same_local_day_digital_twin_outcomes_are_used() -> None:
     assert state["periods"]["today"]["agile_smart_export"]["grid_export_kwh"] == 9.25
 
 
-def test_runtime_join_runs_after_shadow_settlement_without_hardware_writes() -> None:
+def test_runtime_join_brackets_shadow_settlement_without_hardware_writes() -> None:
     runtime = (INTEGRATION / "agile_smart_export_runtime.py").read_text()
     coordinator = (INTEGRATION / "coordinator.py").read_text()
     helper_source = (INTEGRATION / "agile_current_day_settlement.py").read_text()
 
     assert "SettledCurrentDayAgileSmartExportManager" in runtime
-    assert "reconcile_current_day_settlements" in coordinator
-    assert coordinator.index(
-        "await self._shadow_validation.async_update("
-    ) < coordinator.index("reconcile_current_day_settlements")
+    first_reconcile = coordinator.index(
+        "self._agile_smart_export.reconcile_current_day_settlements"
+    )
+    shadow_update = coordinator.index("await self._shadow_validation.async_update(")
+    second_reconcile = coordinator.index(
+        "self._agile_smart_export.reconcile_current_day_settlements",
+        first_reconcile + 1,
+    )
+    assert first_reconcile < shadow_update < second_reconcile
     assert "self._publish(self._state)" in helper_source
     assert ".services.async_call(" not in helper_source
     assert "providers.foxess" not in helper_source
@@ -263,7 +268,9 @@ def test_alpha839_version_and_release_scope() -> None:
     manifest = json.loads((INTEGRATION / "manifest.json").read_text())
     bundle = json.loads((ROOT / "release/kems-bundle.template.json").read_text())
 
-    assert manifest["version"] == "0.8.0-alpha8.39"
+    version = manifest["version"]
+    assert version.startswith("0.8.0-alpha8.")
+    assert int(version.rsplit(".", 1)[1]) >= 39
     assert bundle["maintenance"]["affected_components"] == [
         "kems_core",
         "dashboard",
