@@ -121,6 +121,7 @@ def _load_rolling_plan(deadline: datetime):
         "_number",
         "_datetime",
         "_current_agile_soc",
+        "_current_agile_soc_source",
         "_predicted_house_until_deadline",
         "_current_house_headroom_kw",
         "_rolling_plan",
