@@ -55,7 +55,9 @@ def reconcile_cheap_charge_target(
     )
     updated = dict(context)
     optimizer_target = updated.get("optimizer_target")
-    optimizer_target = dict(optimizer_target) if isinstance(optimizer_target, dict) else {}
+    optimizer_target = (
+        dict(optimizer_target) if isinstance(optimizer_target, dict) else {}
+    )
     optimizer_target["charge_kw"] = charge_kw
     updated["optimizer_target"] = optimizer_target
     parity = updated.get("parity")
