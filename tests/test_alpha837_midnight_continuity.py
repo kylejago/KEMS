@@ -150,6 +150,10 @@ def test_2330_charge_is_carried_across_midnight() -> None:
     manager._prepare_replay_continuity(records)
 
     # 18.544% is the already-reconciled SOC at the 23:30 cheap boundary.
+    # 3.5 kWh input at 95% stores 3.325 kWh: exact handoff is 24.437%.
+    expected_exact_midnight = 18.544 + (3.325 / 56.42 * 100.0)
+    assert round(expected_exact_midnight, 3) == 24.437
+
     # Isolate only the missing 23:30->00:00 interval from the live evidence.
     first = manager._compare_day(
         records[1:2],
@@ -160,7 +164,7 @@ def test_2330_charge_is_carried_across_midnight() -> None:
         None,
     )
     midnight_soc = float(first["agile_smart_export"]["ending_soc_percent"])
-    assert round(midnight_soc, 3) == 24.437
+    assert midnight_soc == 24.4
     assert "2026-08-27" in manager._midnight_replay_augmented_days
 
     second = manager._compare_day(
