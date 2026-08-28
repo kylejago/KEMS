@@ -348,9 +348,7 @@ def _apply_physical_slot_allocations(
             * max(float(config.battery_capacity_kwh), 0.0)
             * min(max(float(config.discharge_efficiency), 0.01), 1.0)
         )
-        reserve_guard_limit_kw = reserve_headroom_ac / (
-            HARD_FLOOR_GUARD_MINUTES / 60.0
-        )
+        reserve_guard_limit_kw = reserve_headroom_ac / (HARD_FLOOR_GUARD_MINUTES / 60.0)
     floor_active = soc is not None and soc <= target_soc + _EPSILON
     plan.update(
         {
