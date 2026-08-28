@@ -106,10 +106,14 @@ def reconciled_current_day_simulation(
         "simulated_import_cost_pence": round(import_cost, 2),
         "simulated_export_income_pence": round(export_income, 2),
         "simulated_grid_import_kwh": (
-            round(grid_import, 3) if grid_import is not None else simulation.simulated_grid_import_kwh
+            round(grid_import, 3)
+            if grid_import is not None
+            else simulation.simulated_grid_import_kwh
         ),
         "simulated_grid_export_kwh": (
-            round(grid_export, 3) if grid_export is not None else simulation.simulated_grid_export_kwh
+            round(grid_export, 3)
+            if grid_export is not None
+            else simulation.simulated_grid_export_kwh
         ),
         "simulated_solar_generation_kwh": (
             round(solar_generation, 3)
@@ -168,7 +172,9 @@ def reconciled_current_day_simulation(
             else simulation.exportable_battery_energy_kwh
         ),
         "reserved_for_home_kwh": (
-            round(reserved, 3) if reserved is not None else simulation.reserved_for_home_kwh
+            round(reserved, 3)
+            if reserved is not None
+            else simulation.reserved_for_home_kwh
         ),
         "projected_soc_at_cheap_period_percent": (
             round(projected_soc, 1)
