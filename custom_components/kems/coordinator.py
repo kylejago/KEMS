@@ -240,9 +240,10 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                 self.entities.configured_snapshot_fields(),
             )
 
-            # The settled/day simulation remains the accounting authority. For
-            # current control and shadow validation only, derive transient views
-            # from the exact Agile rolling target and final routing snapshot.
+            # Historical completed-day replay remains the long-term accounting
+            # authority. Current-day rolling outcomes are settled immediately
+            # after shadow validation so Today's energy and financial totals
+            # cannot lag the commands the digital twin actually executed.
             control_simulation, shadow_simulation, _alignment = (
                 aligned_agile_control_views(simulation, agile_state)
             )
@@ -266,6 +267,11 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                 config=self.settings.control,
                 agile_state=agile_state,
             )
+            self._agile_smart_export.reconcile_current_day_settlements(
+                settled_half_hours=list(self._shadow_validation._settled),
+                now=now,
+            )
+            agile_state = self._agile_smart_export.state
             last_power_down = await self._power_down.async_update(
                 snapshot,
                 simulation,
