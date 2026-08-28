@@ -88,13 +88,14 @@ def test_alpha840_coordinator_settles_before_control_and_rebuilds_after_shadow()
 
 def test_alpha840_managed_dashboard_headlines_use_reconciled_sensor_surfaces() -> None:
     """Existing dashboard bindings inherit the reconciled backend authority."""
-    dashboard = Path("custom_components/kems/kems_master_dashboard.yaml").read_text()
+    master = Path("custom_components/kems/kems_master_dashboard.yaml").read_text()
+    whole_home = Path("dashboards/kems_whole_home_analytics.yaml").read_text()
     sensor_source = Path("custom_components/kems/sensor.py").read_text()
 
-    assert "sensor.kems_simulated_kems_cost_today" in dashboard
-    assert "sensor.kems_simulated_saving_today" in dashboard
-    assert "sensor.kems_whole_home_simulated_cost_today" in dashboard
-    assert "sensor.kems_whole_home_simulated_saving_today" in dashboard
+    assert "sensor.kems_simulated_kems_cost_today" in master
+    assert "{% set kems_e = states('sensor.kems_simulated_kems_cost_today')" in master
+    assert "{% set saving = live_e - kems_e %}" in master
+    assert "sensor.kems_whole_home_simulated_cost_today" in whole_home
     assert 'key="simulated_saving_today"' in sensor_source
     assert "value_fn=lambda data: data.simulation.saving_pence" in sensor_source
     assert (
