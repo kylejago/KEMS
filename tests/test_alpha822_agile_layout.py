@@ -107,10 +107,32 @@ def test_tomorrow_partial_publication_is_visible_and_aggregation_is_safe() -> No
         assert f"p.get('{field}') | float(0)" in content
 
 
-def test_finaliser_leaves_home_view_semantically_unchanged() -> None:
+def test_finaliser_preserves_home_except_named_financial_summary() -> None:
     source = yaml.safe_load(SOURCE.read_text(encoding="utf-8"))
     final = _final_dashboard()
-    assert _view(final, "home") == _view(source, "home")
+    source_home = _view(source, "home")
+    final_home = _view(final, "home")
+
+    assert {key: value for key, value in final_home.items() if key != "cards"} == {
+        key: value for key, value in source_home.items() if key != "cards"
+    }
+    assert len(final_home["cards"]) == len(source_home["cards"])
+
+    changed = 0
+    for source_card, final_card in zip(
+        source_home["cards"], final_home["cards"], strict=True
+    ):
+        if source_card.get("title") == "Today — Live Data vs KEMS":
+            changed += 1
+            assert final_card["title"] == source_card["title"]
+            assert final_card["type"] == source_card["type"]
+            assert final_card["content"] != source_card["content"]
+            assert "sensor.kems_energy_cost_comparison" in final_card["content"]
+            assert "total_energy_cost_pence" in final_card["content"]
+            continue
+        assert final_card == source_card
+
+    assert changed == 1
 
 
 def test_finaliser_is_idempotent() -> None:
