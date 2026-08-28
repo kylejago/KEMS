@@ -19,10 +19,7 @@ def test_alpha840_live_snapshot_accounting_math() -> None:
     saving_pence = round(actual_cost_pence - simulated_cost_pence, 2)
     charged_kwh = round(solar_to_battery_kwh + grid_to_battery_kwh, 3)
     soc_delta_percent = (
-        settled_battery_export_kwh
-        / discharge_efficiency
-        / battery_capacity_kwh
-        * 100.0
+        settled_battery_export_kwh / discharge_efficiency / battery_capacity_kwh * 100.0
     )
     corrected_soc_percent = round(replay_soc_percent - soc_delta_percent, 3)
 
