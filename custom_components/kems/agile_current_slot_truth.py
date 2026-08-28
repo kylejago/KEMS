@@ -90,7 +90,7 @@ def _reconcile_current_slot(
                 slot.get("rolling_action") or "planned battery export — rolling replan"
             )
         elif soc is not None and target is not None and soc <= target + _EPSILON:
-            action = "house first — target reached; no battery export planned"
+            action = "10% reserve floor — no battery discharge/export"
         else:
             action = "house first — no battery export planned"
 
