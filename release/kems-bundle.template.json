@@ -42,13 +42,12 @@
   },
   "maintenance": {
     "required": true,
-    "reason": "Keep current-day Agile headline cost and saving on one like-for-like net-energy basis",
+    "reason": "Make final Agile current routing authoritative for all current simulated power fields",
     "expected_downtime_minutes": 5,
     "home_assistant_restart_required": true,
     "reboot_required": false,
     "affected_components": [
-      "kems_core",
-      "dashboard"
+      "kems_core"
     ]
   }
 }
