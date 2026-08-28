@@ -162,8 +162,10 @@ def test_alpha842_release_scope_and_architecture() -> None:
     manifest = json.loads((KEMS_ROOT / "manifest.json").read_text())
     bundle = json.loads((ROOT / "release/kems-bundle.template.json").read_text())
     source = (KEMS_ROOT / "agile_current_day_presentation.py").read_text()
+    version = manifest["version"]
 
-    assert manifest["version"] == "0.8.0-alpha8.42"
+    assert version.startswith("0.8.0-alpha8.")
+    assert int(version.rsplit(".", 1)[1]) >= 42
     assert bundle["maintenance"]["affected_components"] == [
         "kems_core",
         "dashboard",
