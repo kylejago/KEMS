@@ -35,6 +35,7 @@ def _target_function():
         "datetime": datetime,
         "math": math,
         "_EPSILON": 1e-6,
+        "HARD_FLOOR_GUARD_MINUTES": 5.0,
     }
     module = ast.Module(body=functions, type_ignores=[])
     ast.fix_missing_locations(module)
