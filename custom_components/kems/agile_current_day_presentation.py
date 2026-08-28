@@ -40,6 +40,77 @@ def _today_agile(state: dict[str, Any]) -> dict[str, Any] | None:
     return agile
 
 
+def _current_routing(state: dict[str, Any]) -> dict[str, Any] | None:
+    """Return the final current Agile routing snapshot when authoritative."""
+    routing = state.get("current_routing_snapshot")
+    if not isinstance(routing, dict) or not routing.get("available"):
+        return None
+    return routing
+
+
+def _current_routing_replacements(state: dict[str, Any]) -> dict[str, float]:
+    """Project canonical Agile current routing onto SimulationState power fields."""
+    routing = _current_routing(state)
+    if routing is None:
+        return {}
+
+    house = _number(routing.get("simulated_house_load_kw"))
+    solar = _number(routing.get("solar_power_kw"))
+    grid_import = _number(routing.get("grid_import_kw"))
+    grid_export = _number(routing.get("grid_export_kw"))
+    solar_to_battery = _number(routing.get("solar_to_battery_kw"))
+    grid_to_battery = _number(routing.get("grid_to_battery_kw"))
+    battery_to_home = _number(routing.get("battery_to_home_kw"))
+    battery_export = _number(routing.get("battery_export_kw"))
+    total_discharge = _number(routing.get("total_discharge_kw"))
+    kh7_output = _number(routing.get("normalised_kh7_ac_output_kw"))
+
+    battery_charge = None
+    if solar_to_battery is not None or grid_to_battery is not None:
+        battery_charge = max(solar_to_battery or 0.0, 0.0) + max(
+            grid_to_battery or 0.0,
+            0.0,
+        )
+
+    if total_discharge is None and (
+        battery_to_home is not None or battery_export is not None
+    ):
+        total_discharge = max(battery_to_home or 0.0, 0.0) + max(
+            battery_export or 0.0,
+            0.0,
+        )
+
+    battery_power = None
+    if total_discharge is not None or battery_charge is not None:
+        battery_power = max(total_discharge or 0.0, 0.0) - max(
+            battery_charge or 0.0,
+            0.0,
+        )
+
+    replacements: dict[str, float] = {}
+
+    def project(field: str, value: float | None) -> None:
+        if value is not None:
+            replacements[field] = round(value, 3)
+
+    project("current_simulated_house_load_kw", house)
+    project("current_simulated_solar_power_kw", solar)
+    project("current_simulated_grid_import_kw", grid_import)
+    project("current_simulated_grid_export_kw", grid_export)
+    project("current_simulated_battery_power_kw", battery_power)
+    project("current_simulated_battery_charge_power_kw", battery_charge)
+    project("current_simulated_solar_to_battery_power_kw", solar_to_battery)
+    project("current_simulated_battery_to_home_power_kw", battery_to_home)
+    project("current_simulated_battery_export_power_kw", battery_export)
+    project("current_simulated_total_kh7_output_kw", kh7_output)
+    if grid_import is not None:
+        grid_bypass = max(grid_import - max(grid_to_battery or 0.0, 0.0), 0.0)
+        project("current_simulated_grid_bypass_power_kw", grid_bypass)
+        project("current_simulated_total_site_import_kw", grid_import)
+    project("target_battery_export_power_kw", battery_export)
+    return replacements
+
+
 def reconciled_current_day_simulation(
     simulation: SimulationState,
     state: dict[str, Any],
@@ -49,11 +120,18 @@ def reconciled_current_day_simulation(
     The generic proposal replay remains useful as a comparison model, but once
     current-day Agile settlements have passed their accounting checks the KEMS
     headline sensors must describe the same strategy that the rolling planner,
-    Energy today card and shadow ledger are using.
+    Energy today card and shadow ledger are using. Current power fields are
+    independently projected from the final Agile routing snapshot whenever it is
+    available, so every consumer sees one answer for what KEMS is doing now.
     """
     agile = _today_agile(state)
+    routing_replacements = _current_routing_replacements(state)
     if agile is None:
-        return simulation
+        return (
+            replace(simulation, **routing_replacements)
+            if routing_replacements
+            else simulation
+        )
 
     import_cost = _number(agile.get("import_cost_pence"))
     export_income = _number(agile.get("export_income_pence"))
@@ -69,7 +147,11 @@ def reconciled_current_day_simulation(
     soc = _number(agile.get("ending_soc_percent"))
 
     if import_cost is None or export_income is None:
-        return simulation
+        return (
+            replace(simulation, **routing_replacements)
+            if routing_replacements
+            else simulation
+        )
 
     bonus = max(simulation.simulated_saving_session_bonus_pence or 0.0, 0.0)
     simulated_cost = round(import_cost - export_income - bonus, 2)
@@ -182,4 +264,5 @@ def reconciled_current_day_simulation(
             else simulation.projected_soc_at_cheap_period_percent
         ),
     }
+    replacements.update(routing_replacements)
     return replace(simulation, **replacements)

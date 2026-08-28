@@ -49,13 +49,15 @@ def test_alpha840_presentation_module_maps_headlines_to_settled_agile() -> None:
 
 
 def test_alpha840_unreconciled_state_preserves_generic_fallback() -> None:
-    """The helper must preserve the existing simulation if settlement is unsafe."""
+    """No authoritative Agile data must still preserve the generic simulation."""
     source = Path(
         "custom_components/kems/agile_current_day_presentation.py"
     ).read_text()
 
     assert "agile = _today_agile(state)" in source
-    assert "if agile is None:\n        return simulation" in source
+    assert "routing_replacements = _current_routing_replacements(state)" in source
+    assert "if agile is None:" in source
+    assert "else simulation" in source
 
 
 def test_alpha840_coordinator_settles_before_control_and_rebuilds_after_shadow() -> (
