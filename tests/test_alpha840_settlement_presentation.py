@@ -111,7 +111,9 @@ def test_alpha840_unreconciled_state_leaves_generic_simulation_untouched() -> No
     assert reconciled_current_day_simulation(original, state) is original
 
 
-def test_alpha840_coordinator_settles_before_control_and_rebuilds_after_shadow() -> None:
+def test_alpha840_coordinator_settles_before_control_and_rebuilds_after_shadow() -> (
+    None
+):
     """Control/shadow must see settled SOC and presentation must include new closes."""
     source = Path("custom_components/kems/coordinator.py").read_text()
     first_reconcile = source.index(
@@ -142,15 +144,22 @@ def test_alpha840_managed_dashboard_headlines_use_reconciled_sensor_surfaces() -
     assert "sensor.kems_simulated_saving_today" in dashboard
     assert "sensor.kems_whole_home_simulated_cost_today" in dashboard
     assert "sensor.kems_whole_home_simulated_saving_today" in dashboard
-    assert "key=\"simulated_saving_today\"" in sensor_source
+    assert 'key="simulated_saving_today"' in sensor_source
     assert "value_fn=lambda data: data.simulation.saving_pence" in sensor_source
-    assert "value_fn=lambda data: data.whole_home.simulated_total_cost_pence" in sensor_source
-    assert "value_fn=lambda data: data.whole_home.simulated_saving_pence" in sensor_source
+    assert (
+        "value_fn=lambda data: data.whole_home.simulated_total_cost_pence"
+        in sensor_source
+    )
+    assert (
+        "value_fn=lambda data: data.whole_home.simulated_saving_pence" in sensor_source
+    )
 
 
 def test_alpha840_no_hardware_write_or_version_named_patch_debt() -> None:
     """Alpha8.40 stays reporting/control-alignment only and adds no patch module."""
-    module = Path("custom_components/kems/agile_current_day_presentation.py").read_text()
+    module = Path(
+        "custom_components/kems/agile_current_day_presentation.py"
+    ).read_text()
     coordinator = Path("custom_components/kems/coordinator.py").read_text()
 
     assert "service.async_call" not in module
