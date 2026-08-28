@@ -151,11 +151,7 @@ def _current_physical_targets(
     """Return independent house/export battery targets for the active slot."""
     now_utc = now.astimezone(UTC)
     current = next(
-        (
-            item
-            for item in allocations
-            if item.valid_from <= now_utc < item.valid_to
-        ),
+        (item for item in allocations if item.valid_from <= now_utc < item.valid_to),
         None,
     )
 
