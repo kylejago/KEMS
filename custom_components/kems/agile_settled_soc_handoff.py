@@ -155,12 +155,8 @@ def refresh_tomorrow_handoff_from_settled_soc(
         current_soc_percent=full_current,
         **handoff_args,
     )
-    agile_handoff["precheap_projection_reconciliation"] = dict(
-        precheap_reconciliation
-    )
-    full_handoff["precheap_projection_reconciliation"] = dict(
-        precheap_reconciliation
-    )
+    agile_handoff["precheap_projection_reconciliation"] = dict(precheap_reconciliation)
+    full_handoff["precheap_projection_reconciliation"] = dict(precheap_reconciliation)
 
     tomorrow = manager._compare_day(
         tomorrow_records,
@@ -200,7 +196,11 @@ def refresh_tomorrow_handoff_from_settled_soc(
     quality.update(
         agile._quality(
             local_now,
-            state.get("today_slots") if isinstance(state.get("today_slots"), list) else [],
+            (
+                state.get("today_slots")
+                if isinstance(state.get("today_slots"), list)
+                else []
+            ),
             tomorrow_slots,
         )
     )
