@@ -19,7 +19,7 @@ from kems_core.tomorrow_soc_handoff import (
 ROOT = Path(__file__).parents[1]
 INTEGRATION = ROOT / "custom_components" / "kems"
 ROUTING = INTEGRATION / "agile_solar_net_demand.py"
-ROLLING = INTEGRATION / "agile_rolling_replan.py"
+ROLLING = INTEGRATION / "agile_rolling_replan_runtime.py"
 SETTLEMENT = INTEGRATION / "agile_current_day_settlement.py"
 SETTLED_HANDOFF = INTEGRATION / "agile_settled_soc_handoff.py"
 
@@ -199,6 +199,7 @@ def _rolling_plan_function():
         "datetime": datetime,
         "math": math,
         "_EPSILON": 1e-6,
+        "SAFETY_HEADROOM_MINUTES": 30,
         "agile": _Agile,
         "SimulationConfig": object,
         "TariffSettings": object,
