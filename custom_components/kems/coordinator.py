@@ -14,6 +14,7 @@ from .agile_control_alignment import (
     align_agile_control_state,
     aligned_agile_control_views,
 )
+from .agile_current_day_presentation import reconciled_current_day_simulation
 from .agile_history_backfill import AgileHistoryBackfill
 from .agile_smart_export_runtime import EfficientAgileSmartExportManager
 from .collector import Collector
@@ -184,13 +185,7 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
             self._forecast_validation.analyse(records, now)
             learned = self._learning.analyse(records, now)
             gas = self._gas.summarise(records, now)
-            advice = self._advice.evaluate(
-                snapshot,
-                learned,
-                self.settings.simulation,
-                gas,
-            )
-            simulation = self._simulation.simulate_today(
+            base_simulation = self._simulation.simulate_today(
                 records,
                 now,
                 self.settings.simulation,
@@ -219,31 +214,25 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                 forecast_plan=forecast_plan,
                 tariff=self.settings.tariff,
             )
+
+            # Settle retained completed outcomes before the rolling target,
+            # ControlState and shadow candidate are built. This prevents those
+            # layers from validating against the older replay SOC after a real
+            # simulated export has already spent that battery energy.
+            self._agile_smart_export.reconcile_current_day_settlements(
+                settled_half_hours=list(self._shadow_validation._settled),
+                now=now,
+            )
             agile_state = self._agile_smart_export.state
-            whole_home = self._whole_home.summarise(snapshot, simulation, gas)
-            stored_lifetime = await self._lifetime.async_update(
-                simulation,
-                gas,
-                now,
-                self.settings.roi,
+            simulation = reconciled_current_day_simulation(
+                base_simulation,
+                agile_state,
             )
-            lifetime = LifetimeLedger.from_dict(stored_lifetime.to_dict())
-            periods = self._lifetime.period_summaries(now)
-            roi = self._roi.evaluate(
-                lifetime,
-                simulation,
-                now,
-                self.settings.roi,
-            )
+
             quality = assess_quality(
                 snapshot,
                 self.entities.configured_snapshot_fields(),
             )
-
-            # Historical completed-day replay remains the long-term accounting
-            # authority. Current-day rolling outcomes are settled immediately
-            # after shadow validation so Today's energy and financial totals
-            # cannot lag the commands the digital twin actually executed.
             control_simulation, shadow_simulation, _alignment = (
                 aligned_agile_control_views(simulation, agile_state)
             )
@@ -267,11 +256,42 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                 config=self.settings.control,
                 agile_state=agile_state,
             )
+
+            # Capture any half-hour that settled during this scan, then rebuild
+            # the published headline simulation from the same authoritative
+            # current-day ledger. Dashboard, Pi/API consumers and financial
+            # summaries therefore all receive one coherent KEMS/Agile basis.
             self._agile_smart_export.reconcile_current_day_settlements(
                 settled_half_hours=list(self._shadow_validation._settled),
                 now=now,
             )
             agile_state = self._agile_smart_export.state
+            simulation = reconciled_current_day_simulation(
+                base_simulation,
+                agile_state,
+            )
+
+            advice = self._advice.evaluate(
+                snapshot,
+                learned,
+                self.settings.simulation,
+                gas,
+            )
+            whole_home = self._whole_home.summarise(snapshot, simulation, gas)
+            stored_lifetime = await self._lifetime.async_update(
+                simulation,
+                gas,
+                now,
+                self.settings.roi,
+            )
+            lifetime = LifetimeLedger.from_dict(stored_lifetime.to_dict())
+            periods = self._lifetime.period_summaries(now)
+            roi = self._roi.evaluate(
+                lifetime,
+                simulation,
+                now,
+                self.settings.roi,
+            )
             last_power_down = await self._power_down.async_update(
                 snapshot,
                 simulation,
