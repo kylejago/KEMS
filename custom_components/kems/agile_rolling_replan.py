@@ -53,7 +53,19 @@ def _datetime(value: Any) -> datetime | None:
 
 
 def _current_agile_soc(state: dict[str, Any]) -> float | None:
-    """Return the latest simulated SOC from today's Agile replay."""
+    """Return the best current simulated SOC, preferring settled live truth."""
+    settlement = state.get("current_day_settlement_reconciliation")
+    if isinstance(settlement, dict) and settlement.get("applied"):
+        settled = _number(settlement.get("ending_soc_percent"))
+        if settled is not None:
+            return settled
+
+    routing = state.get("current_routing_snapshot")
+    if isinstance(routing, dict) and routing.get("available"):
+        routed = _number(routing.get("simulated_soc_percent"))
+        if routed is not None:
+            return routed
+
     periods = state.get("periods")
     if not isinstance(periods, dict):
         return None
@@ -64,6 +76,19 @@ def _current_agile_soc(state: dict[str, Any]) -> float | None:
     if not isinstance(strategy, dict):
         return None
     return _number(strategy.get("ending_soc_percent"))
+
+
+def _current_agile_soc_source(state: dict[str, Any]) -> str:
+    """Describe the authority used by the current rolling SOC."""
+    settlement = state.get("current_day_settlement_reconciliation")
+    if isinstance(settlement, dict) and settlement.get("applied"):
+        if _number(settlement.get("ending_soc_percent")) is not None:
+            return "settled current-day digital-twin SOC"
+    routing = state.get("current_routing_snapshot")
+    if isinstance(routing, dict) and routing.get("available"):
+        if _number(routing.get("simulated_soc_percent")) is not None:
+            return "current routing SOC"
+    return "today Agile replay SOC"
 
 
 def _rolling_threshold(
@@ -152,6 +177,7 @@ def _rolling_plan(
 ) -> dict[str, Any]:
     """Allocate currently exportable battery energy across remaining Agile slots."""
     soc = _current_agile_soc(state)
+    soc_source = _current_agile_soc_source(state)
     effective_kw = _effective_deadline_kw(config)
     capacity = max(config.battery_capacity_kwh, 0.1)
     efficiency = max(config.discharge_efficiency, 0.01)
@@ -173,6 +199,10 @@ def _rolling_plan(
     protected_stored_kwh = min(
         target_kwh + protected_house_ac / efficiency,
         capacity,
+    )
+    arrival_reserve_soc = min(
+        max(protected_stored_kwh / capacity * 100.0, target_soc),
+        100.0,
     )
     exportable_ac = max(battery_kwh - protected_stored_kwh, 0.0) * efficiency
 
@@ -283,7 +313,15 @@ def _rolling_plan(
         "generated_at": now.isoformat(),
         "replan_policy": "every KEMS coordinator scan",
         "target_soc_percent": round(target_soc, 1),
-        "simulated_soc_percent": round(soc, 1),
+        "arrival_target_soc_percent": round(target_soc, 1),
+        "arrival_reserve_soc_percent": round(arrival_reserve_soc, 2),
+        "arrival_reserve_margin_percent": round(arrival_reserve_soc - target_soc, 2),
+        "arrival_reserve_policy": (
+            "protect target SOC plus forecast net house energy to cheap start; "
+            "the reserve declines toward target on every replan"
+        ),
+        "simulated_soc_percent": round(soc, 3),
+        "simulated_soc_source": soc_source,
         "protected_house_energy_kwh": round(protected_house_ac, 3),
         "exportable_battery_energy_kwh": round(exportable_ac, 3),
         "planned_battery_export_kwh": round(planned, 3),
