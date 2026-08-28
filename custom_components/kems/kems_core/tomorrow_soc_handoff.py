@@ -41,16 +41,41 @@ def reconcile_precheap_projection(
     reserve_soc_percent: float,
     target_physically_reachable_now: bool | None,
 ) -> tuple[float | None, dict[str, Any]]:
-    """Raise a forecast SOC target to the best physically reachable SOC when needed.
+    """Reconcile the pre-cheap SOC projection with current physical reachability.
 
     The rolling deadline guard reports remaining discharge capacity on the AC
     side. If that guard has proven the configured target unreachable, convert
     the remaining AC capacity back to stored battery energy and use the lowest
     SOC that can actually be reached before cheap charging starts.
+
+    If settled/current SOC is already below the configured reserve, no pre-cheap
+    calculation may invent an upward move to the reserve. KEMS holds the battery
+    at the physical SOC until cheap charging can genuinely raise it.
     """
     projected = _finite_float(projected_precheap_soc_percent)
     current = _finite_float(current_soc_percent)
     remaining_ac = _finite_float(remaining_discharge_capacity_kwh)
+    capacity = max(float(battery_capacity_kwh), 0.1)
+    efficiency = min(max(float(discharge_efficiency), 0.01), 1.0)
+    reserve = min(max(float(reserve_soc_percent), 0.0), 100.0)
+
+    if current is not None and current < reserve:
+        held = min(max(current, 0.0), 100.0)
+        return round(held, 3), {
+            "applied": True,
+            "reason": (
+                "current settled SOC is below reserve; hold physical SOC until "
+                "cheap charging"
+            ),
+            "forecast_projected_precheap_soc_percent": (
+                round(projected, 3) if projected is not None else None
+            ),
+            "current_soc_percent": round(current, 3),
+            "reserve_soc_percent": round(reserve, 3),
+            "projected_precheap_soc_percent": round(held, 3),
+            "discharge_efficiency": round(efficiency, 4),
+        }
+
     if target_physically_reachable_now is not False:
         return projected, {
             "applied": False,
@@ -68,9 +93,6 @@ def reconcile_precheap_projection(
             ),
         }
 
-    capacity = max(float(battery_capacity_kwh), 0.1)
-    efficiency = min(max(float(discharge_efficiency), 0.01), 1.0)
-    reserve = min(max(float(reserve_soc_percent), 0.0), 100.0)
     reachable = current - max(remaining_ac, 0.0) / efficiency / capacity * 100.0
     reachable = min(max(reachable, reserve), 100.0)
     reconciled = reachable if projected is None else max(projected, reachable)
