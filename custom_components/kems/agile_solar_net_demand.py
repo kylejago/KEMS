@@ -148,19 +148,16 @@ def _current_physical_targets(
     house_kw: float,
     export_limit_kw: float,
 ) -> tuple[float, float, float]:
-    """Return house/export/total battery targets for the active settlement slot."""
+    """Return independent house/export battery targets for the active slot."""
     now_utc = now.astimezone(UTC)
     current = next(
         (
             item
             for item in allocations
             if item.valid_from <= now_utc < item.valid_to
-            and item.allocated_kwh > _EPSILON
         ),
         None,
     )
-    if current is None:
-        return 0.0, 0.0, 0.0
 
     segment = next(
         (
@@ -183,11 +180,20 @@ def _current_physical_targets(
         max(battery_kw - house_battery, 0.0),
         max(export_limit_kw, 0.0),
     )
-    remaining_hours = max(
-        (current.valid_to - now_utc).total_seconds() / 3600.0,
-        _EPSILON,
-    )
-    paced_export = min(current.allocated_kwh / remaining_hours, physical_export)
+
+    # A price-optimised hold applies only to deliberate battery export. The
+    # household battery target remains independent so a zero-allocation slot
+    # cannot turn an otherwise avoidable house deficit into premium grid import.
+    paced_export = 0.0
+    if current is not None and current.allocated_kwh > _EPSILON:
+        remaining_hours = max(
+            (current.valid_to - now_utc).total_seconds() / 3600.0,
+            _EPSILON,
+        )
+        paced_export = min(
+            current.allocated_kwh / remaining_hours,
+            physical_export,
+        )
     total = house_battery + paced_export
     return (
         round(house_battery, 3),
