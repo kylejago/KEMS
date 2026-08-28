@@ -249,9 +249,7 @@ def reconcile_current_day_settlements(
     accounted_battery_export = round(_sum_slots(completed, "battery_export_kwh"), 3)
     replay_matched_export = round(replay_matched_export, 3)
     battery_to_home_kwh = (
-        round(replay_battery_to_home, 3)
-        if replay_battery_to_home is not None
-        else None
+        round(replay_battery_to_home, 3) if replay_battery_to_home is not None else None
     )
 
     export_income_pence = 0.0
@@ -392,12 +390,8 @@ class SettledCurrentDayAgileSmartExportManager(
             self._state,
             settled_half_hours,
             now,
-            battery_capacity_kwh=_number(
-                getattr(config, "battery_capacity_kwh", None)
-            ),
-            discharge_efficiency=_number(
-                getattr(config, "discharge_efficiency", None)
-            ),
+            battery_capacity_kwh=_number(getattr(config, "battery_capacity_kwh", None)),
+            discharge_efficiency=_number(getattr(config, "discharge_efficiency", None)),
         )
         if diagnostic.get("applied"):
             # Re-publishing regenerates the rolling plan from the corrected SOC.
