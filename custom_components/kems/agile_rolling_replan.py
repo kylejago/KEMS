@@ -81,13 +81,19 @@ def _current_agile_soc(state: dict[str, Any]) -> float | None:
 def _current_agile_soc_source(state: dict[str, Any]) -> str:
     """Describe the authority used by the current rolling SOC."""
     settlement = state.get("current_day_settlement_reconciliation")
-    if isinstance(settlement, dict) and settlement.get("applied"):
-        if _number(settlement.get("ending_soc_percent")) is not None:
-            return "settled current-day digital-twin SOC"
+    if (
+        isinstance(settlement, dict)
+        and settlement.get("applied")
+        and _number(settlement.get("ending_soc_percent")) is not None
+    ):
+        return "settled current-day digital-twin SOC"
     routing = state.get("current_routing_snapshot")
-    if isinstance(routing, dict) and routing.get("available"):
-        if _number(routing.get("simulated_soc_percent")) is not None:
-            return "current routing SOC"
+    if (
+        isinstance(routing, dict)
+        and routing.get("available")
+        and _number(routing.get("simulated_soc_percent")) is not None
+    ):
+        return "current routing SOC"
     return "today Agile replay SOC"
 
 
