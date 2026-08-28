@@ -130,16 +130,23 @@ def _finalise_dashboard_bytes(payload: bytes) -> bytes:
     # charge and supplier/account credits instead of silently labelling net + gas
     # as Total energy cost.
     home_summary_setup = (
-        "          {% set live_e = states('sensor.kems_observed_cost_today') | float(0) %}\n"
-        "          {% set kems_e = states('sensor.kems_simulated_kems_cost_today') | float(0) %}\n"
-        "          {% set gas = states('sensor.kems_gas_cost_today') | float(0) %}\n"
+        "          {% set live_e = states("
+        "'sensor.kems_observed_cost_today') | float(0) %}\n"
+        "          {% set kems_e = states("
+        "'sensor.kems_simulated_kems_cost_today') | float(0) %}\n"
+        "          {% set gas = states("
+        "'sensor.kems_gas_cost_today') | float(0) %}\n"
         "          {% set saving = live_e - kems_e %}\n"
     )
     home_summary_reconciled_setup = (
-        "          {% set live_e = states('sensor.kems_observed_cost_today') | float(0) %}\n"
-        "          {% set kems_e = states('sensor.kems_simulated_kems_cost_today') | float(0) %}\n"
-        "          {% set gas = states('sensor.kems_gas_cost_today') | float(0) %}\n"
-        "          {% set bill_periods = state_attr('sensor.kems_energy_cost_comparison', 'periods') or {} %}\n"
+        "          {% set live_e = states("
+        "'sensor.kems_observed_cost_today') | float(0) %}\n"
+        "          {% set kems_e = states("
+        "'sensor.kems_simulated_kems_cost_today') | float(0) %}\n"
+        "          {% set gas = states("
+        "'sensor.kems_gas_cost_today') | float(0) %}\n"
+        "          {% set bill_periods = state_attr("
+        "'sensor.kems_energy_cost_comparison', 'periods') or {} %}\n"
         "          {% set bill = bill_periods.get('today', {}) or {} %}\n"
         "          {% set live_bill = bill.get('live_data', {}) or {} %}\n"
         "          {% set kems_bill = bill.get('kems', {}) or {} %}\n"
@@ -148,15 +155,28 @@ def _finalise_dashboard_bytes(payload: bytes) -> bytes:
         "          {% set saving = bill.get('saving_pence') %}\n"
     )
     text = text.replace(home_summary_setup, home_summary_reconciled_setup, 1)
-    old_total_row = "          | **Total energy cost** | **£{{ '%.2f' | format((live_e + gas) / 100) }}** | **£{{ '%.2f' | format((kems_e + gas) / 100) }}** |\n"
-    new_total_row = "          | **Total energy cost** | **{{ ('£%.2f' | format((live_total | float) / 100)) if live_total is not none else '—' }}** | **{{ ('£%.2f' | format((kems_total | float) / 100)) if kems_total is not none else '—' }}** |\n"
+    old_total_row = (
+        "          | **Total energy cost** | **£{{ '%.2f' | "
+        "format((live_e + gas) / 100) }}** | **£{{ '%.2f' | "
+        "format((kems_e + gas) / 100) }}** |\n"
+    )
+    new_total_row = (
+        "          | **Total energy cost** | **{{ ('£%.2f' | "
+        "format((live_total | float) / 100)) if live_total is not none "
+        "else '—' }}** | **{{ ('£%.2f' | "
+        "format((kems_total | float) / 100)) if kems_total is not none "
+        "else '—' }}** |\n"
+    )
     text = text.replace(old_total_row, new_total_row, 1)
     old_saving_line = (
         "          **KEMS saving today:** £{{ '%.2f' | format(saving / 100) }}\n"
     )
     new_saving_line = (
-        "          **KEMS saving today:** {{ ('£%.2f' | format((saving | float) / 100)) if saving is not none else '—' }}\n\n"
-        "          Total energy cost includes electricity standing charge, export income, supplier/account credits and gas.\n"
+        "          **KEMS saving today:** {{ ('£%.2f' | "
+        "format((saving | float) / 100)) if saving is not none "
+        "else '—' }}\n\n"
+        "          Total energy cost includes electricity standing charge, "
+        "export income, supplier/account credits and gas.\n"
     )
     text = text.replace(old_saving_line, new_saving_line, 1)
 
