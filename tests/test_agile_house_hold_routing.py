@@ -118,6 +118,12 @@ def test_selected_export_slot_preserves_existing_export_pacing() -> None:
 def test_cheap_and_priority_dispatch_modes_remain_outside_this_reconciliation() -> None:
     """The canonical guard must continue to leave special dispatch modes alone."""
     source = SOURCE.read_text()
-    assert 'if mode in {"cheap_charge", "happy_hour_charge", "power_down_session"}' in source
+    assert (
+        'if mode in {"cheap_charge", "happy_hour_charge", "power_down_session"}'
+        in source
+    )
     assert 'if mode not in {"deadline_following", "maximum_discharge"}' in source
-    assert "cannot turn an otherwise avoidable house deficit into premium grid import" in source
+    assert (
+        "cannot turn an otherwise avoidable house deficit into premium grid import"
+        in source
+    )
