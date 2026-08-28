@@ -42,7 +42,7 @@
   },
   "maintenance": {
     "required": true,
-    "reason": "Reconcile current-day Agile settled export, battery self-use, SOC and dependent financial totals",
+    "reason": "Align current-day Agile accounting and dashboard totals",
     "expected_downtime_minutes": 5,
     "home_assistant_restart_required": true,
     "reboot_required": false,
