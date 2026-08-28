@@ -256,7 +256,9 @@ def test_alpha837_version_and_release_scope() -> None:
     manifest = json.loads((INTEGRATION / "manifest.json").read_text())
     bundle = json.loads((ROOT / "release/kems-bundle.template.json").read_text())
 
-    assert manifest["version"] == "0.8.0-alpha8.37"
+    version = str(manifest["version"])
+    assert version.startswith("0.8.0-alpha8.")
+    assert int(version.rsplit(".", 1)[-1]) >= 37
     assert bundle["maintenance"]["affected_components"] == [
         "kems_core",
         "dashboard",

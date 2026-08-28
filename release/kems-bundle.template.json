@@ -42,7 +42,7 @@
   },
   "maintenance": {
     "required": true,
-    "reason": "Carry the 23:30-to-midnight cheap-charge interval across daily replay boundaries and report canonical cheap-charge shadow targets",
+    "reason": "Settle current-day Agile export energy and financial totals from completed digital-twin outcomes",
     "expected_downtime_minutes": 5,
     "home_assistant_restart_required": true,
     "reboot_required": false,
