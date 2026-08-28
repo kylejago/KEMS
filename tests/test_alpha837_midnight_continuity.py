@@ -83,7 +83,9 @@ def _snapshots(agile):
     return [
         agile.Snapshot(
             timestamp=stamp,
-            current_import_rate=(3.49 if stamp.time() >= time(23, 30) or stamp.hour == 0 else 28.3),
+            current_import_rate=(
+                3.49 if stamp.time() >= time(23, 30) or stamp.hour == 0 else 28.3
+            ),
             next_import_rate=3.49,
             electricity_standing_charge=53.7,
             off_peak=stamp.time() >= time(23, 30) or stamp.hour == 0,
@@ -249,7 +251,10 @@ def test_alpha837_version_and_release_scope() -> None:
     bundle = json.loads((ROOT / "release/kems-bundle.template.json").read_text())
 
     assert manifest["version"] == "0.8.0-alpha8.37"
-    assert bundle["maintenance"]["affected_components"] == ["kems_core", "dashboard"]
+    assert bundle["maintenance"]["affected_components"] == [
+        "kems_core",
+        "dashboard",
+    ]
     assert bundle["maintenance"]["home_assistant_restart_required"] is True
     assert bundle["maintenance"]["reboot_required"] is False
     assert bundle["components"]["panel"]["version"] == "0.8.0-alpha8-panel.1"
