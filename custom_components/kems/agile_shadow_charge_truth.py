@@ -12,7 +12,6 @@ from __future__ import annotations
 from dataclasses import replace
 from typing import Any
 
-from . import agile_alpha723_shadow as shadow
 from .kems_core import ControlState
 
 _INSTALLED = False
@@ -77,6 +76,11 @@ def install_shadow_charge_truth() -> None:
     global _INSTALLED, _ORIGINAL_BUILD
     if _INSTALLED:
         return
+
+    # Keep the pure reconciliation helper independent of Home Assistant's
+    # dashboard/ESPHome imports. The preserved adapter is only needed when the
+    # runtime installer executes inside Home Assistant.
+    from . import agile_alpha723_shadow as shadow
 
     _ORIGINAL_BUILD = shadow.build_agile_shadow_command
 
