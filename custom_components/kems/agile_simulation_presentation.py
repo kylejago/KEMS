@@ -8,8 +8,11 @@ page disagree with the Agile panel and plan.
 
 Alpha8.13 keeps one user-facing KEMS product. This adapter projects Agile values
 whenever the configured export tariff is Agile Outgoing. Other tariff strategies
-continue to use the existing base simulation. Control, ROI, lifetime accounting,
-commissioning and shadow safety remain unchanged.
+continue to use the existing base simulation. Alpha8.41 keeps the headline cost
+on the reconciled ``KEMSData.simulation`` net-energy basis so the presentation
+adapter cannot add the electricity standing charge to only one side of a
+Live-vs-KEMS comparison. Control, ROI, lifetime accounting, commissioning and
+shadow safety remain unchanged.
 """
 
 from __future__ import annotations
@@ -105,6 +108,13 @@ def _sum_available(*values: Any) -> float | None:
     return sum(value or 0.0 for value in numbers)
 
 
+def _reconciled_simulation_cost(coordinator: Any) -> float | None:
+    """Return the coordinator's reconciled current-day net-energy cost."""
+    data = getattr(coordinator, "data", None)
+    simulation = getattr(data, "simulation", None)
+    return _number(getattr(simulation, "simulated_cost_pence", None))
+
+
 def _projected_value(coordinator: Any, key: str) -> object:
     """Return one Agile presentation value or ``_MISSING`` for base behaviour."""
     if not _uses_agile(coordinator):
@@ -120,7 +130,14 @@ def _projected_value(coordinator: Any, key: str) -> object:
     rolling = _rolling(state)
 
     if key == "simulated_cost_today":
-        value = _number(today.get("energy_net_cost_pence"))
+        # Alpha8.40 makes KEMSData.simulation settlement-aware. Prefer that
+        # already-reconciled net-energy figure so this late presentation layer
+        # cannot add the standing charge to only the simulated side of a
+        # Live-vs-KEMS comparison. Keep the historical replay fallback for
+        # lightweight/unit contexts where coordinator.data is not populated.
+        value = _reconciled_simulation_cost(coordinator)
+        if value is None:
+            value = _number(today.get("energy_net_cost_pence"))
         return _MISSING if value is None else round(value, 2)
     if key == "simulated_grid_import_today":
         value = _number(today.get("grid_import_kwh"))
