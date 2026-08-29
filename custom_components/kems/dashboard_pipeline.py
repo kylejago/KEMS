@@ -3,10 +3,17 @@
 from __future__ import annotations
 
 
-def _route_template_line(*, indent: str, variable: str, field: str) -> str:
+def _route_template_line(
+    *,
+    indent: str,
+    variable: str,
+    field: str,
+    trim_left: bool = False,
+) -> str:
     """Return one canonical route-label Jinja assignment."""
+    opener = "{%-" if trim_left else "{%"
     return (
-        f"{indent}{{% set {variable} = "
+        f"{indent}{opener} set {variable} = "
         f"(p.get('{field}') or 'IDLE') "
         "| replace('EXPO', 'EXPORT') %}\n"
     )
@@ -27,35 +34,38 @@ def _plan_table_card(
         f"{card}- type: markdown\n"
         f"{field}title: {title}\n"
         f"{field}content: |\n"
-        f"{content}{{% set slots = state_attr('sensor.kems_agile_slots', "
+        f"{content}{{%- set slots = state_attr('sensor.kems_agile_slots', "
         f"'{attribute}') or [] %}}\n"
-        f"{content}{{% if slots %}}\n"
+        f"{content}{{%- if slots %}}\n"
         f"{content}Future rows show the **current KEMS plan snapshot** and are "
         "recalculated continuously. Energy is the estimated activity within that "
         "half-hour (or the remaining part of the active half-hour).\n\n"
         f"{content}| Time | Price | Est. SOC | Grid | Solar | Battery |\n"
         f"{content}|---|---:|---:|---|---|---|\n"
-        f"{content}{{% for p in slots %}}\n"
-        f"{content}{{% set price = p.get('rate_pence') %}}\n"
-        f"{content}{{% set soc = p.get('flow_estimated_soc_percent') %}}\n"
+        f"{content}{{%- for p in slots %}}\n"
+        f"{content}{{%- set price = p.get('rate_pence') %}}\n"
+        f"{content}{{%- set soc = p.get('flow_estimated_soc_percent') %}}\n"
         + _route_template_line(
             indent=content,
             variable="ga",
             field="flow_grid_action",
+            trim_left=True,
         )
-        + f"{content}{{% set gk = p.get('flow_grid_kwh') %}}\n"
+        + f"{content}{{%- set gk = p.get('flow_grid_kwh') %}}\n"
         + _route_template_line(
             indent=content,
             variable="sa",
             field="flow_solar_action",
+            trim_left=True,
         )
-        + f"{content}{{% set sk = p.get('flow_solar_kwh') %}}\n"
+        + f"{content}{{%- set sk = p.get('flow_solar_kwh') %}}\n"
         + _route_template_line(
             indent=content,
             variable="ba",
             field="flow_battery_action",
+            trim_left=True,
         )
-        + f"{content}{{% set bk = p.get('flow_battery_kwh') %}}\n"
+        + f"{content}{{%- set bk = p.get('flow_battery_kwh') %}}\n"
         f"{content}| {{{{ p.get('label', '—') }}}} | "
         "{{ ('%.2f' | format(price | float(0))) ~ 'p' if price is not none "
         "else '—' }} | "
@@ -67,10 +77,10 @@ def _plan_table_card(
         "sk is not none else '—' }} | "
         "**{{ ba }}** · {{ ('%.2f kWh' | format(bk | float(0))) if "
         "bk is not none else '—' }} |\n"
-        f"{content}{{% endfor %}}\n"
-        f"{content}{{% else %}}\n"
+        f"{content}{{%- endfor %}}\n"
+        f"{content}{{%- else %}}\n"
         f"{content}{empty_message}\n"
-        f"{content}{{% endif %}}\n"
+        f"{content}{{%- endif %}}\n"
     )
 
 
