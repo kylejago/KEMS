@@ -161,7 +161,9 @@ def test_missing_exact_midnight_sample_gets_timestamp_only_boundary() -> None:
         None,
     )
     expected = 6.008 + (7.0 * (29 * 60 + 11) / 3600 * 0.95 / 56.42 * 100)
-    assert abs(float(result["agile_smart_export"]["ending_soc_percent"]) - expected) < 0.1
+    assert (
+        abs(float(result["agile_smart_export"]["ending_soc_percent"]) - expected) < 0.1
+    )
     assert "2026-08-28" in manager._midnight_replay_augmented_days
 
 
@@ -247,12 +249,14 @@ def test_only_active_cheap_handoff_is_persisted_as_rollover_authority() -> None:
     assert manager._midnight_rollover_seed_dirty is True
 
     manager._midnight_rollover_seed_dirty = False
-    manager._state["tomorrow_soc_handoff"]["agile"]["basis"] = (
-        "forecast projected SOC at cheap start"
-    )
+    manager._state["tomorrow_soc_handoff"]["agile"][
+        "basis"
+    ] = "forecast projected SOC at cheap start"
     manager._state["tomorrow_soc_handoff"]["agile"]["midnight_soc_percent"] = 99.0
     manager._capture_active_cheap_rollover_seed(now)
-    assert manager._settled_midnight_rollover_seed["agile_midnight_soc_percent"] == 11.738
+    assert (
+        manager._settled_midnight_rollover_seed["agile_midnight_soc_percent"] == 11.738
+    )
     assert manager._midnight_rollover_seed_dirty is False
 
 
