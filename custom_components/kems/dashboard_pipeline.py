@@ -26,7 +26,7 @@ def _route_template_line(
         f"{indent}{opener} set {variable} = "
         f"{_ROUTE_LABEL_DISPLAY_MAP}.get("
         f"(p.get('{field}') or 'IDLE'), "
-        f"(p.get('{field}') or 'IDLE')) %}\n"
+        f"(p.get('{field}') or 'IDLE')) %}}\n"
     )
 
 
