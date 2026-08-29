@@ -233,10 +233,11 @@ def test_alpha849_is_reporting_only_above_alpha848() -> None:
 
     assert "FlowPresentationAgileSmartExportManager" in module
     assert "CanonicalFlowAccountingAgileSmartExportManager" in runtime
-    assert (
-        "EfficientAgileSmartExportManager = CanonicalFlowAccountingAgileSmartExportManager"
-        in runtime
+    owner_assignment = (
+        "EfficientAgileSmartExportManager = "
+        "CanonicalFlowAccountingAgileSmartExportManager"
     )
+    assert owner_assignment in runtime
     assert "services.async_call" not in module
     assert "async_call(" not in module
     assert 'hardware_writes": "blocked' in module
