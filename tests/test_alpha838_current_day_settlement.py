@@ -255,6 +255,7 @@ def test_runtime_join_brackets_shadow_settlement_without_hardware_writes() -> No
     rollover_source = (INTEGRATION / "agile_midnight_rollover.py").read_text()
     flow_source = (INTEGRATION / "agile_flow_presentation.py").read_text()
     canonical_source = (INTEGRATION / "agile_canonical_flow_accounting.py").read_text()
+    live_source = (INTEGRATION / "agile_live_solar_soc_continuity.py").read_text()
 
     direct_settlement = (
         "EfficientAgileSmartExportManager = SettledCurrentDayAgileSmartExportManager"
@@ -284,11 +285,24 @@ def test_runtime_join_brackets_shadow_settlement_without_hardware_writes() -> No
         and "MidnightRolloverAgileSmartExportManager" in flow_source
         and "SettledCurrentDayAgileSmartExportManager" in rollover_source
     )
+    live_owner = (
+        "EfficientAgileSmartExportManager = "
+        "LiveSolarSocContinuityAgileSmartExportManager"
+    )
+    live_successor_settlement = (
+        live_owner in runtime
+        and "CanonicalFlowAccountingAgileSmartExportManager" in live_source
+        and "class LiveSolarSocContinuityAgileSmartExportManager" in live_source
+        and "FlowPresentationAgileSmartExportManager" in canonical_source
+        and "MidnightRolloverAgileSmartExportManager" in flow_source
+        and "SettledCurrentDayAgileSmartExportManager" in rollover_source
+    )
     assert (
         direct_settlement
         or rollover_settlement
         or flow_successor_settlement
         or canonical_successor_settlement
+        or live_successor_settlement
     )
     first_reconcile = coordinator.index(
         "self._agile_smart_export.reconcile_current_day_settlements"
@@ -310,6 +324,9 @@ def test_runtime_join_brackets_shadow_settlement_without_hardware_writes() -> No
     assert ".services.async_call(" not in canonical_source
     assert "providers.foxess" not in canonical_source
     assert 'hardware_writes": "blocked' in canonical_source
+    assert ".services.async_call(" not in live_source
+    assert "providers.foxess" not in live_source
+    assert 'hardware_writes": "blocked' in live_source
 
 
 def test_alpha839_version_and_release_scope() -> None:

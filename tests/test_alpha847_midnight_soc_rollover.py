@@ -265,6 +265,7 @@ def test_alpha847_runtime_scope_and_release_metadata() -> None:
     rollover_source = (INTEGRATION / "agile_midnight_rollover.py").read_text()
     flow_source = (INTEGRATION / "agile_flow_presentation.py").read_text()
     canonical_source = (INTEGRATION / "agile_canonical_flow_accounting.py").read_text()
+    live_source = (INTEGRATION / "agile_live_solar_soc_continuity.py").read_text()
     manifest = json.loads((INTEGRATION / "manifest.json").read_text())
     bundle = json.loads((ROOT / "release/kems-bundle.template.json").read_text())
 
@@ -278,7 +279,17 @@ def test_alpha847_runtime_scope_and_release_metadata() -> None:
         and "FlowPresentationAgileSmartExportManager" in canonical_source
         and "class CanonicalFlowAccountingAgileSmartExportManager" in canonical_source
     )
-    assert direct_flow or canonical_flow
+    live_owner = (
+        "EfficientAgileSmartExportManager = "
+        "LiveSolarSocContinuityAgileSmartExportManager"
+    )
+    live_flow = (
+        live_owner in runtime
+        and "CanonicalFlowAccountingAgileSmartExportManager" in live_source
+        and "class LiveSolarSocContinuityAgileSmartExportManager" in live_source
+        and "FlowPresentationAgileSmartExportManager" in canonical_source
+    )
+    assert direct_flow or canonical_flow or live_flow
     assert "MidnightRolloverAgileSmartExportManager" in flow_source
     assert "SettledCurrentDayAgileSmartExportManager" not in runtime
     assert ".services.async_call(" not in rollover_source
@@ -287,6 +298,9 @@ def test_alpha847_runtime_scope_and_release_metadata() -> None:
     assert ".services.async_call(" not in canonical_source
     assert "providers.foxess" not in canonical_source
     assert 'hardware_writes": "blocked' in canonical_source
+    assert ".services.async_call(" not in live_source
+    assert "providers.foxess" not in live_source
+    assert 'hardware_writes": "blocked' in live_source
 
     version = str(manifest["version"])
     assert version.startswith("0.8.0-alpha8.")

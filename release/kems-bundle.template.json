@@ -42,7 +42,7 @@
   },
   "maintenance": {
     "required": true,
-    "reason": "Make the active Grid/Solar/Battery row mirror canonical current routing, preserve live replay solar in Today export accounting, and use explicit EXPORT labels for pure export routes",
+    "reason": "Accumulate elapsed canonical solar export into Today accounting and make active/future displayed SOC continuous with canonical current SOC and displayed battery flows",
     "expected_downtime_minutes": 5,
     "home_assistant_restart_required": true,
     "reboot_required": false,
