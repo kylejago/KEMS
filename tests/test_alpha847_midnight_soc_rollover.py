@@ -264,9 +264,7 @@ def test_alpha847_runtime_scope_and_release_metadata() -> None:
     runtime = (INTEGRATION / "agile_smart_export_runtime.py").read_text()
     rollover_source = (INTEGRATION / "agile_midnight_rollover.py").read_text()
     flow_source = (INTEGRATION / "agile_flow_presentation.py").read_text()
-    canonical_source = (
-        INTEGRATION / "agile_canonical_flow_accounting.py"
-    ).read_text()
+    canonical_source = (INTEGRATION / "agile_canonical_flow_accounting.py").read_text()
     manifest = json.loads((INTEGRATION / "manifest.json").read_text())
     bundle = json.loads((ROOT / "release/kems-bundle.template.json").read_text())
 
