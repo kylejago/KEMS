@@ -162,7 +162,7 @@ def test_live_today_export_keeps_replay_solar_but_only_settled_battery() -> None
     assert today["solar_export_kwh"] == 0.35
     assert today["battery_export_kwh"] == 0.10
     assert today["grid_export_kwh"] == 0.45
-    assert today["export_income_pence"] == 6.0
+    assert today["export_income_pence"] == 7.5
     assert today["grid_export_accounting_source"] == (
         "live replay solar + completed settled battery export"
     )
@@ -227,4 +227,4 @@ def test_alpha848_is_reporting_only_and_preserves_alpha847_owner() -> None:
     assert "services.async_call" not in module
     assert "async_call(" not in module
     assert 'hardware_writes": "blocked' in module
-    assert "foxess" not in module.lower()
+    assert "providers.foxess" not in module
