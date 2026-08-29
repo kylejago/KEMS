@@ -83,6 +83,7 @@ def test_today_and_tomorrow_are_full_width_chronological_flow_tables() -> None:
         assert "half-hour" in content
         assert "| Time | KEMS plan |" not in content
         assert "<br>" not in content
+        assert "%}}" not in content
         assert "**{{ ga }}** ·" in content
         assert "**{{ sa }}** ·" in content
         assert "**{{ ba }}** ·" in content
@@ -111,6 +112,7 @@ def test_kems_page_keeps_only_a_compact_now_next_plan_summary() -> None:
     assert "flow_grid_action" in content
     assert "flow_solar_action" in content
     assert "flow_battery_action" in content
+    assert "%}}" not in content
     assert "Use the **Agile Plan** tab" in content
     assert not any(
         card.get("title") == "Today's KEMS plan — 00:00 to 23:30"
@@ -148,6 +150,7 @@ def test_flow_table_uses_canonical_route_labels_and_energy_totals() -> None:
         assert f"p.get('{field}')" in content
 
     assert "replace('EXPO', 'EXPORT')" in content
+    assert "%}}" not in content
     assert "**{{ ga }}** ·" in content
     assert "**{{ sa }}** ·" in content
     assert "**{{ ba }}** ·" in content
