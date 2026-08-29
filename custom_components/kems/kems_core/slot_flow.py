@@ -121,9 +121,7 @@ def build_slot_flow(
         "flow_battery_to_home_kwh": round(battery_home, 3),
         "flow_battery_export_kwh": round(battery_export, 3),
         "flow_checks": {
-            "grid_export_balance": abs(
-                grid_export - (solar_export + battery_export)
-            )
+            "grid_export_balance": abs(grid_export - (solar_export + battery_export))
             <= 0.002,
             "solar_destinations_within_generation": (
                 solar_destination_total <= solar_generation + 0.002
