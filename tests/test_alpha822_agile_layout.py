@@ -38,11 +38,34 @@ def _card(view: dict, title: str) -> dict:
     return next(card for card in view["cards"] if card.get("title") == title)
 
 
-def test_today_and_tomorrow_are_single_chronological_flow_tables() -> None:
-    parsed = _final_dashboard()
+def _stack_card(stack: dict, title: str) -> dict:
+    return next(card for card in stack["cards"] if card.get("title") == title)
 
-    today = _card(_view(parsed, "kems"), "Today's KEMS plan — 00:00 to 23:30")
-    tomorrow = _card(_view(parsed, "tomorrow"), "Tomorrow's KEMS plan — 00:00 to 23:30")
+
+def test_agile_plan_is_a_native_full_width_panel_view() -> None:
+    parsed = _final_dashboard()
+    agile = _view(parsed, "agile-plan")
+
+    assert agile["title"] == "Agile Plan"
+    assert agile["icon"] == "mdi:table-large"
+    assert agile["type"] == "panel"
+    assert len(agile["cards"]) == 1
+
+    stack = agile["cards"][0]
+    assert stack["type"] == "vertical-stack"
+    assert len(stack["cards"]) == 3
+    assert stack["cards"][0]["type"] == "markdown"
+    assert "# Agile Plan" in stack["cards"][0]["content"]
+    assert "Full-width" in stack["cards"][0]["content"]
+
+
+def test_today_and_tomorrow_are_full_width_chronological_flow_tables() -> None:
+    parsed = _final_dashboard()
+    agile = _view(parsed, "agile-plan")
+    stack = agile["cards"][0]
+
+    today = _stack_card(stack, "Today's KEMS plan — 00:00 to 23:30")
+    tomorrow = _stack_card(stack, "Tomorrow's KEMS plan — 00:00 to 23:30")
 
     for card in (today, tomorrow):
         assert card["type"] == "markdown"
@@ -59,6 +82,10 @@ def test_today_and_tomorrow_are_single_chronological_flow_tables() -> None:
         assert "current KEMS plan snapshot" in content
         assert "half-hour" in content
         assert "| Time | KEMS plan |" not in content
+        assert "<br>" not in content
+        assert "**{{ ga }}** ·" in content
+        assert "**{{ sa }}** ·" in content
+        assert "**{{ ba }}** ·" in content
 
     final_text = yaml.safe_dump(parsed, sort_keys=False)
     for old_title in (
@@ -70,6 +97,39 @@ def test_today_and_tomorrow_are_single_chronological_flow_tables() -> None:
         "Tomorrow — 16:00 to 23:30",
     ):
         assert old_title not in final_text
+
+
+def test_kems_page_keeps_only_a_compact_now_next_plan_summary() -> None:
+    parsed = _final_dashboard()
+    kems = _view(parsed, "kems")
+    summary = _card(kems, "Current and next Agile slots")
+
+    assert summary["type"] == "markdown"
+    content = summary["content"]
+    assert "'NOW' if loop.index0 == 0 else 'NEXT'" in content
+    assert "flow_estimated_soc_percent" in content
+    assert "flow_grid_action" in content
+    assert "flow_solar_action" in content
+    assert "flow_battery_action" in content
+    assert "Use the **Agile Plan** tab" in content
+    assert not any(
+        card.get("title") == "Today's KEMS plan — 00:00 to 23:30"
+        for card in kems["cards"]
+    )
+
+
+def test_tomorrow_page_points_to_full_width_agile_plan() -> None:
+    parsed = _final_dashboard()
+    tomorrow = _view(parsed, "tomorrow")
+    pointer = _card(tomorrow, "Agile half-hour plan")
+
+    assert pointer["type"] == "markdown"
+    assert "**Agile Plan** tab" in pointer["content"]
+    assert "full dashboard width" in pointer["content"]
+    assert not any(
+        card.get("title") == "Tomorrow's KEMS plan — 00:00 to 23:30"
+        for card in tomorrow["cards"]
+    )
 
 
 def test_flow_table_uses_canonical_route_labels_and_energy_totals() -> None:
@@ -87,9 +147,10 @@ def test_flow_table_uses_canonical_route_labels_and_energy_totals() -> None:
     ):
         assert f"p.get('{field}')" in content
 
-    assert "**{{ ga }}**<br>" in content
-    assert "**{{ sa }}**<br>" in content
-    assert "**{{ ba }}**<br>" in content
+    assert "replace('EXPO', 'EXPORT')" in content
+    assert "**{{ ga }}** ·" in content
+    assert "**{{ sa }}** ·" in content
+    assert "**{{ ba }}** ·" in content
     assert "%.2f kWh" in content
     assert "%.1f%%" in content
 
