@@ -78,14 +78,14 @@ def test_user_example_reconciles_grid_solar_and_battery() -> None:
         basis="regression fixture",
     )
 
-    assert flow["flow_grid_action"] == "EXPO"
+    assert flow["flow_grid_action"] == "EXPORT"
     assert flow["flow_grid_export_kwh"] == 3.9
     assert flow["flow_grid_kwh"] == 3.9
     assert flow["flow_solar_action"] == "HOME/EXPO"
     assert flow["flow_solar_kwh"] == 2.3
     assert flow["flow_solar_to_home_kwh"] == 0.5
     assert flow["flow_solar_export_kwh"] == 1.8
-    assert flow["flow_battery_action"] == "EXPO"
+    assert flow["flow_battery_action"] == "EXPORT"
     assert flow["flow_battery_kwh"] == 2.1
     assert flow["flow_battery_export_kwh"] == 2.1
     assert flow["flow_estimated_soc_percent"] == 72.4
@@ -208,10 +208,10 @@ def test_active_slot_uses_remaining_projection_contract() -> None:
     slot = state["today_slots"][0]
     assert slot["flow_scope"] == "remaining slot"
     assert slot["flow_estimated_soc_percent"] == 72.4
-    assert slot["flow_grid_action"] == "EXPO"
+    assert slot["flow_grid_action"] == "EXPORT"
     assert slot["flow_grid_export_kwh"] == 3.9
     assert slot["flow_solar_action"] == "HOME/EXPO"
-    assert slot["flow_battery_action"] == "EXPO"
+    assert slot["flow_battery_action"] == "EXPORT"
 
 
 def test_alpha848_is_reporting_only_and_preserves_alpha847_owner() -> None:
@@ -219,11 +219,10 @@ def test_alpha848_is_reporting_only_and_preserves_alpha847_owner() -> None:
     runtime = Path("custom_components/kems/agile_smart_export_runtime.py").read_text()
 
     assert "MidnightRolloverAgileSmartExportManager" in module
-    assert "FlowPresentationAgileSmartExportManager" in runtime
-    assert (
-        "EfficientAgileSmartExportManager = FlowPresentationAgileSmartExportManager"
-        in runtime
-    )
+    assert "CanonicalFlowAccountingAgileSmartExportManager" in runtime
+    assert "FlowPresentationAgileSmartExportManager" in Path(
+        "custom_components/kems/agile_canonical_flow_accounting.py"
+    ).read_text()
     assert "services.async_call" not in module
     assert "async_call(" not in module
     assert 'hardware_writes": "blocked' in module
