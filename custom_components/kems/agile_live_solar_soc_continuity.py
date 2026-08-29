@@ -397,8 +397,7 @@ def _rebase_display_soc(
         slot for slot in state.get("today_slots", []) or [] if isinstance(slot, dict)
     ]
     slots.sort(
-        key=lambda slot: _dt(slot.get("valid_from"))
-        or datetime.max.replace(tzinfo=UTC)
+        key=lambda slot: _dt(slot.get("valid_from")) or datetime.max.replace(tzinfo=UTC)
     )
     active_index = next(
         (
