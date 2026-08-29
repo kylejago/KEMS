@@ -263,10 +263,12 @@ def test_only_active_cheap_handoff_is_persisted_as_rollover_authority() -> None:
 def test_alpha847_runtime_scope_and_release_metadata() -> None:
     runtime = (INTEGRATION / "agile_smart_export_runtime.py").read_text()
     rollover_source = (INTEGRATION / "agile_midnight_rollover.py").read_text()
+    flow_source = (INTEGRATION / "agile_flow_presentation.py").read_text()
     manifest = json.loads((INTEGRATION / "manifest.json").read_text())
     bundle = json.loads((ROOT / "release/kems-bundle.template.json").read_text())
 
-    assert "MidnightRolloverAgileSmartExportManager" in runtime
+    assert "FlowPresentationAgileSmartExportManager" in runtime
+    assert "MidnightRolloverAgileSmartExportManager" in flow_source
     assert "SettledCurrentDayAgileSmartExportManager" not in runtime
     assert ".services.async_call(" not in rollover_source
     assert "providers.foxess" not in rollover_source
@@ -281,5 +283,5 @@ def test_alpha847_runtime_scope_and_release_metadata() -> None:
     ]
     assert bundle["maintenance"]["home_assistant_restart_required"] is True
     assert bundle["maintenance"]["reboot_required"] is False
-    assert bundle["components"]["property_web"]["version"] == "0.8.0-alpha8-web.5"
+    assert bundle["components"]["property_web"]["version"] == "0.8.0-alpha8-web.7"
     assert bundle["components"]["panel"]["version"] == "0.8.0-alpha8-panel.1"
