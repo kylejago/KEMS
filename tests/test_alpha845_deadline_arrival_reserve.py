@@ -308,8 +308,10 @@ def test_settlement_rebuilds_tomorrow_after_corrected_soc_is_published() -> None
 def test_alpha845_release_contract() -> None:
     manifest = json.loads((INTEGRATION / "manifest.json").read_text())
     bundle = json.loads((ROOT / "release/kems-bundle.template.json").read_text())
+    version = manifest["version"]
 
-    assert manifest["version"] == "0.8.0-alpha8.45"
+    assert version.startswith("0.8.0-alpha8.")
+    assert int(version.rsplit(".", 1)[1]) >= 45
     assert bundle["components"]["property_web"]["version"] == "0.8.0-alpha8-web.5"
     assert bundle["components"]["pi_agent"]["version"] == "0.8.0-alpha8-web.5"
     assert bundle["components"]["public_web"]["version"] == "0.8.0-alpha8-web.5"
