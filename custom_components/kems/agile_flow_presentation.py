@@ -91,10 +91,13 @@ def _forecast_solar_kwh(
     for item in forecast.hourly or ():
         hour_start = item.timestamp.astimezone(UTC)
         hour_end = hour_start + timedelta(hours=1)
-        overlap = max(
-            (min(end_utc, hour_end) - max(start_utc, hour_start)).total_seconds(),
-            0.0,
-        ) / 3600.0
+        overlap = (
+            max(
+                (min(end_utc, hour_end) - max(start_utc, hour_start)).total_seconds(),
+                0.0,
+            )
+            / 3600.0
+        )
         if overlap > 0.0:
             total += max(float(item.solar_energy_kwh), 0.0) * overlap
     return total
@@ -362,7 +365,9 @@ def _future_today_projection(
             battery -= battery_export / discharge_efficiency
             grid_import = max(remaining_house - battery_home, 0.0)
 
-        battery = min(max(battery, capacity * config.battery_reserve_percent / 100.0), capacity)
+        battery = min(
+            max(battery, capacity * config.battery_reserve_percent / 100.0), capacity
+        )
         output[str(slot.get("valid_from") or "")] = {
             "grid_import_kwh": grid_import,
             "solar_generation_kwh": solar_generation,
@@ -391,9 +396,7 @@ def _exact_flow_values(slot: dict[str, Any], *, completed: bool) -> dict[str, An
         "battery_export_kwh": _effective_battery_export(slot, completed=completed),
         "estimated_soc_percent": _number(slot.get("ending_soc_percent")),
         "basis": (
-            "settled/replayed KEMS slot"
-            if completed
-            else "KEMS forecast replay"
+            "settled/replayed KEMS slot" if completed else "KEMS forecast replay"
         ),
         "scope": "full slot",
     }
@@ -455,11 +458,7 @@ def _live_replay_solar_accounting(
         if rate is not None:
             solar_income += solar_export * rate
         end = _dt(slot.get("valid_to"))
-        if (
-            end is not None
-            and end <= now_utc
-            and slot.get("settlement_source")
-        ):
+        if end is not None and end <= now_utc and slot.get("settlement_source"):
             battery_export = max(_number(slot.get("battery_export_kwh")) or 0.0, 0.0)
             settled_battery_export += battery_export
             if rate is not None:
@@ -502,7 +501,9 @@ def _live_replay_solar_accounting(
                 2,
             ),
             "weighted_achieved_export_rate_pence": (
-                round(export_income / grid_export, 4) if grid_export > _EPSILON else None
+                round(export_income / grid_export, 4)
+                if grid_export > _EPSILON
+                else None
             ),
             "solar_export_accounting_source": (
                 "Agile day replay through latest recorder sample"
@@ -523,9 +524,9 @@ def _live_replay_solar_accounting(
         state["current_day_settlement_reconciliation"] = diagnostic
     checks = diagnostic.get("accounting_checks")
     checks = dict(checks) if isinstance(checks, dict) else {}
-    checks["grid_export_balance"] = abs(
-        grid_export - (replay_solar_export + settled_battery_export)
-    ) <= 0.002
+    checks["grid_export_balance"] = (
+        abs(grid_export - (replay_solar_export + settled_battery_export)) <= 0.002
+    )
     checks["future_planned_battery_export_excluded"] = True
     diagnostic.update(
         {
