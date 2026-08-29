@@ -42,7 +42,7 @@
   },
   "maintenance": {
     "required": true,
-    "reason": "Use settled current SOC for the rolling 10%-at-cheap-start arrival reserve, enforce the hard reserve floor, and rebuild the midnight handoff from the same authority",
+    "reason": "Keep conservative house power for future Agile capacity planning while using the live coordinator house load for instantaneous solar-first battery routing, eliminating avoidable day-rate grid import",
     "expected_downtime_minutes": 5,
     "home_assistant_restart_required": true,
     "reboot_required": false,
