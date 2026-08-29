@@ -220,9 +220,10 @@ def test_alpha848_is_reporting_only_and_preserves_alpha847_owner() -> None:
 
     assert "MidnightRolloverAgileSmartExportManager" in module
     assert "CanonicalFlowAccountingAgileSmartExportManager" in runtime
-    assert "FlowPresentationAgileSmartExportManager" in Path(
-        "custom_components/kems/agile_canonical_flow_accounting.py"
-    ).read_text()
+    assert (
+        "FlowPresentationAgileSmartExportManager"
+        in Path("custom_components/kems/agile_canonical_flow_accounting.py").read_text()
+    )
     assert "services.async_call" not in module
     assert "async_call(" not in module
     assert 'hardware_writes": "blocked' in module
