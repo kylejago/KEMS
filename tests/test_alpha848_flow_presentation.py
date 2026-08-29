@@ -217,13 +217,22 @@ def test_active_slot_uses_remaining_projection_contract() -> None:
 def test_alpha848_is_reporting_only_and_preserves_alpha847_owner() -> None:
     module = Path("custom_components/kems/agile_flow_presentation.py").read_text()
     runtime = Path("custom_components/kems/agile_smart_export_runtime.py").read_text()
+    canonical = Path(
+        "custom_components/kems/agile_canonical_flow_accounting.py"
+    ).read_text()
+    successor = Path(
+        "custom_components/kems/agile_live_solar_soc_continuity.py"
+    ).read_text()
 
     assert "MidnightRolloverAgileSmartExportManager" in module
-    assert "CanonicalFlowAccountingAgileSmartExportManager" in runtime
-    assert (
-        "FlowPresentationAgileSmartExportManager"
-        in Path("custom_components/kems/agile_canonical_flow_accounting.py").read_text()
+    assert "FlowPresentationAgileSmartExportManager" in canonical
+    assert "CanonicalFlowAccountingAgileSmartExportManager" in successor
+    assert "LiveSolarSocContinuityAgileSmartExportManager" in runtime
+    owner_assignment = (
+        "EfficientAgileSmartExportManager = "
+        "LiveSolarSocContinuityAgileSmartExportManager"
     )
+    assert owner_assignment in runtime
     assert "services.async_call" not in module
     assert "async_call(" not in module
     assert 'hardware_writes": "blocked' in module
