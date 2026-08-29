@@ -2,19 +2,70 @@
 
 from __future__ import annotations
 
+import importlib
+import importlib.util
+import sys
+import types
 from datetime import UTC, datetime
 from pathlib import Path
 
-from custom_components.kems.agile_flow_presentation import (
-    _attach_flow_contract,
-    _live_replay_solar_accounting,
-)
-from custom_components.kems.kems_core.slot_flow import build_slot_flow
+ROOT = Path(__file__).parents[1]
+INTEGRATION = ROOT / "custom_components" / "kems"
+
+
+def _load_modules():
+    """Load the Agile runtime without requiring Home Assistant in unit tests."""
+    aiohttp = types.ModuleType("aiohttp")
+    aiohttp.ClientError = type("ClientError", (Exception,), {})
+    sys.modules.setdefault("aiohttp", aiohttp)
+
+    homeassistant = types.ModuleType("homeassistant")
+    homeassistant.__path__ = []
+    core = types.ModuleType("homeassistant.core")
+    core.HomeAssistant = object
+    helpers = types.ModuleType("homeassistant.helpers")
+    helpers.__path__ = []
+    aiohttp_client = types.ModuleType("homeassistant.helpers.aiohttp_client")
+    aiohttp_client.async_get_clientsession = lambda hass: None
+    storage = types.ModuleType("homeassistant.helpers.storage")
+
+    class Store:
+        def __class_getitem__(cls, item):
+            return cls
+
+    storage.Store = Store
+    sys.modules.setdefault("homeassistant", homeassistant)
+    sys.modules.setdefault("homeassistant.core", core)
+    sys.modules.setdefault("homeassistant.helpers", helpers)
+    sys.modules.setdefault("homeassistant.helpers.aiohttp_client", aiohttp_client)
+    sys.modules.setdefault("homeassistant.helpers.storage", storage)
+
+    custom_components = types.ModuleType("custom_components")
+    custom_components.__path__ = [str(ROOT / "custom_components")]
+    package = types.ModuleType("custom_components.kems")
+    package.__path__ = [str(INTEGRATION)]
+    sys.modules.setdefault("custom_components", custom_components)
+    sys.modules.setdefault("custom_components.kems", package)
+
+    agile_name = "custom_components.kems.agile_smart_export"
+    spec = importlib.util.spec_from_file_location(
+        agile_name,
+        INTEGRATION / "agile_smart_export.py",
+    )
+    assert spec is not None and spec.loader is not None
+    agile = importlib.util.module_from_spec(spec)
+    sys.modules[agile_name] = agile
+    spec.loader.exec_module(agile)
+
+    flow = importlib.import_module("custom_components.kems.agile_flow_presentation")
+    slot_flow = importlib.import_module("custom_components.kems.kems_core.slot_flow")
+    return flow, slot_flow
 
 
 def test_user_example_reconciles_grid_solar_and_battery() -> None:
     """The dashboard must preserve the exact source breakdown requested live."""
-    flow = build_slot_flow(
+    _, slot_flow = _load_modules()
+    flow = slot_flow.build_slot_flow(
         grid_import_kwh=0.0,
         solar_generation_kwh=2.3,
         solar_to_home_kwh=0.5,
@@ -42,7 +93,8 @@ def test_user_example_reconciles_grid_solar_and_battery() -> None:
 
 
 def test_slot_flow_reports_mixed_routes_and_charge() -> None:
-    flow = build_slot_flow(
+    _, slot_flow = _load_modules()
+    flow = slot_flow.build_slot_flow(
         grid_import_kwh=3.0,
         solar_generation_kwh=1.5,
         solar_to_home_kwh=0.5,
@@ -66,6 +118,7 @@ def test_slot_flow_reports_mixed_routes_and_charge() -> None:
 
 
 def test_live_today_export_keeps_replay_solar_but_only_settled_battery() -> None:
+    flow_module, _ = _load_modules()
     now = datetime(2026, 8, 29, 9, 18, tzinfo=UTC)
     state = {
         "battery_wear_assumption_pence_per_discharged_kwh": 2.0,
@@ -83,7 +136,7 @@ def test_live_today_export_keeps_replay_solar_but_only_settled_battery() -> None
                 "valid_to": "2026-08-29T09:30:00+00:00",
                 "rate_pence": 20.0,
                 "solar_export_kwh": 0.15,
-                # Deliberately non-zero: this is current/future plan, not settlement.
+                # Deliberately non-zero: current/future plan, not settlement.
                 "battery_export_kwh": 2.10,
             },
         ],
@@ -103,7 +156,7 @@ def test_live_today_export_keeps_replay_solar_but_only_settled_battery() -> None
         },
     }
 
-    _live_replay_solar_accounting(state, now=now)
+    flow_module._live_replay_solar_accounting(state, now=now)
 
     today = state["periods"]["today"]["agile_smart_export"]
     assert today["solar_export_kwh"] == 0.35
@@ -120,6 +173,7 @@ def test_live_today_export_keeps_replay_solar_but_only_settled_battery() -> None
 
 
 def test_active_slot_uses_remaining_projection_contract() -> None:
+    flow_module, _ = _load_modules()
     now = datetime(2026, 8, 29, 9, 18, tzinfo=UTC)
     key = "2026-08-29T09:00:00+00:00"
     state = {
@@ -149,7 +203,7 @@ def test_active_slot_uses_remaining_projection_contract() -> None:
         }
     }
 
-    _attach_flow_contract(state, now=now, future_today=future)
+    flow_module._attach_flow_contract(state, now=now, future_today=future)
 
     slot = state["today_slots"][0]
     assert slot["flow_scope"] == "remaining slot"
