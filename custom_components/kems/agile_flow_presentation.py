@@ -577,7 +577,7 @@ class FlowPresentationAgileSmartExportManager(MidnightRolloverAgileSmartExportMa
         forecast_plan: ForecastPlanState,
         tariff: TariffSettings,
     ) -> dict[str, Any]:
-        state = await super().async_update(
+        await super().async_update(
             records=records,
             now=now,
             config=config,
