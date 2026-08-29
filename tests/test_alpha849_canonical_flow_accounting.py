@@ -226,7 +226,9 @@ def test_captured_live_solar_survives_completed_slot_settlement() -> None:
 
 
 def test_alpha849_is_reporting_only_above_alpha848() -> None:
-    module = Path("custom_components/kems/agile_canonical_flow_accounting.py").read_text()
+    module = Path(
+        "custom_components/kems/agile_canonical_flow_accounting.py"
+    ).read_text()
     runtime = Path("custom_components/kems/agile_smart_export_runtime.py").read_text()
 
     assert "FlowPresentationAgileSmartExportManager" in module
