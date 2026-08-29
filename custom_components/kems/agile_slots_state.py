@@ -30,6 +30,13 @@ def _attributes(coordinator: Any) -> dict[str, Any]:
     if not isinstance(tomorrow_slots, list):
         tomorrow_slots = []
 
+    periods = state.get("periods")
+    periods = periods if isinstance(periods, dict) else {}
+    today = periods.get("today")
+    today = today if isinstance(today, dict) else {}
+    today_agile = today.get("agile_smart_export")
+    today_agile = today_agile if isinstance(today_agile, dict) else {}
+
     today_expected = int(quality.get("today_expected") or 48)
     tomorrow_expected = int(quality.get("tomorrow_expected") or 48)
     today_count = int(quality.get("today_count") or len(today_slots))
@@ -54,6 +61,10 @@ def _attributes(coordinator: Any) -> dict[str, Any]:
         "tomorrow_missing_labels": quality.get("tomorrow_missing_labels") or [],
         "today_slots": today_slots,
         "tomorrow_slots": tomorrow_slots,
+        "today_agile": today_agile,
+        "current_day_settlement_reconciliation": state.get(
+            "current_day_settlement_reconciliation"
+        ),
         "reporting_only": True,
         "hardware_writes": "blocked",
     }
