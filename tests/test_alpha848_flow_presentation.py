@@ -166,8 +166,11 @@ def test_alpha848_is_reporting_only_and_preserves_alpha847_owner() -> None:
 
     assert "MidnightRolloverAgileSmartExportManager" in module
     assert "FlowPresentationAgileSmartExportManager" in runtime
-    assert "EfficientAgileSmartExportManager = FlowPresentationAgileSmartExportManager" in runtime
+    assert (
+        "EfficientAgileSmartExportManager = FlowPresentationAgileSmartExportManager"
+        in runtime
+    )
     assert "services.async_call" not in module
     assert "async_call(" not in module
-    assert "hardware_writes\": \"blocked" in module
+    assert 'hardware_writes": "blocked' in module
     assert "foxess" not in module.lower()
