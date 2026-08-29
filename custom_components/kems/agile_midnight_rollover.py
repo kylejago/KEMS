@@ -68,9 +68,7 @@ def _seed_is_valid(seed: Any) -> bool:
     return target.date() == source.date() + timedelta(days=1)
 
 
-class MidnightRolloverAgileSmartExportManager(
-    SettledCurrentDayAgileSmartExportManager
-):
+class MidnightRolloverAgileSmartExportManager(SettledCurrentDayAgileSmartExportManager):
     """Preserve settled pre-midnight SOC as the following day's Agile seed."""
 
     def __init__(self, hass: HomeAssistant, entry_id: str, history_days: int) -> None:
@@ -204,9 +202,7 @@ class MidnightRolloverAgileSmartExportManager(
             return
 
         reconciliation = state.get("settled_soc_handoff_reconciliation")
-        reconciliation = (
-            reconciliation if isinstance(reconciliation, dict) else {}
-        )
+        reconciliation = reconciliation if isinstance(reconciliation, dict) else {}
         settled_soc = _number(reconciliation.get("settled_current_soc_percent"))
         seed = {
             "source_date": local_now.date().isoformat(),
