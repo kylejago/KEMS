@@ -15,7 +15,13 @@ Alpha8.53 uses Jinja left-whitespace control for the detailed Agile table loop a
 | 17:00 | 23.93p | 64.0% | EXPORT · 2.85 kWh | HOME · 0.45 kWh | EXPORT · 2.85 kWh |
 ```
 
-The table remains sourced only from the canonical Alpha8.48+ `flow_*` presentation fields. Display-only `EXPO` abbreviations still expand to `EXPORT`.
+The table remains sourced only from the canonical Alpha8.48+ `flow_*` presentation fields.
+
+## Exact route-label expansion
+
+The new rendered regression also reproduced the `EXPORTRT` text visible in the Alpha8.52 field screenshot. The old dashboard helper used a raw `replace('EXPO', 'EXPORT')`; because the canonical standalone label is already `EXPORT`, that substring replacement turned `EXPORT` into `EXPORTRT`.
+
+Alpha8.53 removes substring replacement entirely. It uses an exact display-label lookup for the compact mixed-route vocabulary emitted by the canonical slot-flow contract. A legitimate canonical `EXPORT` therefore remains `EXPORT`, while compact mixed labels such as `HOME/EXPO` display as `HOME/EXPORT`. This is presentation-only; the canonical `flow_*` values are unchanged.
 
 ## Rendered regression proof
 
@@ -24,6 +30,7 @@ The dashboard regression suite now renders representative Agile slot data with J
 - the header, separator and data rows are consecutive Markdown lines;
 - there is no blank line before the first data row;
 - the user's mixed-flow example renders as Solar `HOME/EXPORT · 2.30 kWh`, Battery `EXPORT · 2.10 kWh`, and Grid `EXPORT · 3.90 kWh`;
+- canonical `EXPORT` is never mutated to `EXPORTRT`;
 - canonical `flow_*` fields remain the only routing and energy source for the table.
 
 Jinja2 is added only to the development/test requirements so CI can prove the rendered Markdown structure. There is no new runtime dependency for KEMS.
