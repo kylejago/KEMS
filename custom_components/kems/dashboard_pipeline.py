@@ -29,11 +29,17 @@ def _plan_table_card(
         f"{content}{{% for p in slots %}}\n"
         f"{content}{{% set price = p.get('rate_pence') %}}\n"
         f"{content}{{% set soc = p.get('flow_estimated_soc_percent') %}}\n"
-        f"{content}{{% set ga = (p.get('flow_grid_action') or 'IDLE') | replace('EXPO', 'EXPORT') %}}\n"
+        f"{content}{{% set ga = "
+        "(p.get('flow_grid_action') or 'IDLE') "
+        "| replace('EXPO', 'EXPORT') %}}\n"
         f"{content}{{% set gk = p.get('flow_grid_kwh') %}}\n"
-        f"{content}{{% set sa = (p.get('flow_solar_action') or 'IDLE') | replace('EXPO', 'EXPORT') %}}\n"
+        f"{content}{{% set sa = "
+        "(p.get('flow_solar_action') or 'IDLE') "
+        "| replace('EXPO', 'EXPORT') %}}\n"
         f"{content}{{% set sk = p.get('flow_solar_kwh') %}}\n"
-        f"{content}{{% set ba = (p.get('flow_battery_action') or 'IDLE') | replace('EXPO', 'EXPORT') %}}\n"
+        f"{content}{{% set ba = "
+        "(p.get('flow_battery_action') or 'IDLE') "
+        "| replace('EXPO', 'EXPORT') %}}\n"
         f"{content}{{% set bk = p.get('flow_battery_kwh') %}}\n"
         f"{content}| {{{{ p.get('label', '—') }}}} | "
         "{{ ('%.2f' | format(price | float(0))) ~ 'p' if price is not none "
@@ -59,14 +65,19 @@ def _compact_plan_summary_card() -> str:
         "      - type: markdown\n"
         "        title: Current and next Agile slots\n"
         "        content: |\n"
-        "          {% set today = state_attr('sensor.kems_agile_slots', 'today_slots') or [] %}\n"
-        "          {% set tomorrow = state_attr('sensor.kems_agile_slots', 'tomorrow_slots') or [] %}\n"
+        "          {% set today = state_attr("
+        "'sensor.kems_agile_slots', 'today_slots') or [] %}\n"
+        "          {% set tomorrow = state_attr("
+        "'sensor.kems_agile_slots', 'tomorrow_slots') or [] %}\n"
         "          {% set slots = today + tomorrow %}\n"
         "          {% set minute = 0 if now().minute < 30 else 30 %}\n"
-        "          {% set current_label = '%02d:%02d' | format(now().hour, minute) %}\n"
-        "          {% set ns = namespace(current=none, next=none, seen=false) %}\n"
+        "          {% set current_label = "
+        "'%02d:%02d' | format(now().hour, minute) %}\n"
+        "          {% set ns = "
+        "namespace(current=none, next=none, seen=false) %}\n"
         "          {% for p in slots %}\n"
-        "            {% if ns.current is none and p.get('label') == current_label %}\n"
+        "            {% if ns.current is none and "
+        "p.get('label') == current_label %}\n"
         "              {% set ns.current = p %}\n"
         "              {% set ns.seen = true %}\n"
         "            {% elif ns.seen and ns.next is none %}\n"
@@ -78,20 +89,38 @@ def _compact_plan_summary_card() -> str:
         "          {% if p %}\n"
         "          {% set price = p.get('rate_pence') %}\n"
         "          {% set soc = p.get('flow_estimated_soc_percent') %}\n"
-        "          {% set ga = (p.get('flow_grid_action') or 'IDLE') | replace('EXPO', 'EXPORT') %}\n"
+        "          {% set ga = "
+        "(p.get('flow_grid_action') or 'IDLE') "
+        "| replace('EXPO', 'EXPORT') %}\n"
         "          {% set gk = p.get('flow_grid_kwh') %}\n"
-        "          {% set sa = (p.get('flow_solar_action') or 'IDLE') | replace('EXPO', 'EXPORT') %}\n"
+        "          {% set sa = "
+        "(p.get('flow_solar_action') or 'IDLE') "
+        "| replace('EXPO', 'EXPORT') %}\n"
         "          {% set sk = p.get('flow_solar_kwh') %}\n"
-        "          {% set ba = (p.get('flow_battery_action') or 'IDLE') | replace('EXPO', 'EXPORT') %}\n"
+        "          {% set ba = "
+        "(p.get('flow_battery_action') or 'IDLE') "
+        "| replace('EXPO', 'EXPORT') %}\n"
         "          {% set bk = p.get('flow_battery_kwh') %}\n"
-        "          **{{ 'NOW' if loop.index0 == 0 else 'NEXT' }} — {{ p.get('label', '—') }} · {{ ('%.2f' | format(price | float(0))) ~ 'p' if price is not none else '—' }} · est. SOC {{ ('%.1f%%' | format(soc | float(0))) if soc is not none else '—' }}**  \n"
-        "          Grid **{{ ga }} · {{ ('%.2f kWh' | format(gk | float(0))) if gk is not none else '—' }}** · Solar **{{ sa }} · {{ ('%.2f kWh' | format(sk | float(0))) if sk is not none else '—' }}** · Battery **{{ ba }} · {{ ('%.2f kWh' | format(bk | float(0))) if bk is not none else '—' }}**\n\n"
+        "          **{{ 'NOW' if loop.index0 == 0 else 'NEXT' }} — "
+        "{{ p.get('label', '—') }} · "
+        "{{ ('%.2f' | format(price | float(0))) ~ 'p' "
+        "if price is not none else '—' }} · est. SOC "
+        "{{ ('%.1f%%' | format(soc | float(0))) "
+        "if soc is not none else '—' }}**  \n"
+        "          Grid **{{ ga }} · "
+        "{{ ('%.2f kWh' | format(gk | float(0))) "
+        "if gk is not none else '—' }}** · Solar **{{ sa }} · "
+        "{{ ('%.2f kWh' | format(sk | float(0))) "
+        "if sk is not none else '—' }}** · Battery **{{ ba }} · "
+        "{{ ('%.2f kWh' | format(bk | float(0))) "
+        "if bk is not none else '—' }}**\n\n"
         "          {% endif %}\n"
         "          {% endfor %}\n"
         "          {% if ns.current is none %}\n"
         "          Current slot summary is not available yet.\n\n"
         "          {% endif %}\n"
-        "          Use the **Agile Plan** tab for the full-width Today and Tomorrow half-hour schedule.\n"
+        "          Use the **Agile Plan** tab for the full-width Today and "
+        "Tomorrow half-hour schedule.\n"
     )
 
 
@@ -101,7 +130,9 @@ def _tomorrow_plan_pointer_card() -> str:
         "      - type: markdown\n"
         "        title: Agile half-hour plan\n"
         "        content: |\n"
-        "          The full 48-slot Today and Tomorrow flow schedule is now on the **Agile Plan** tab, where Home Assistant can give the table the full dashboard width.\n"
+        "          The full 48-slot Today and Tomorrow flow schedule is now on "
+        "the **Agile Plan** tab, where Home Assistant can give the table the "
+        "full dashboard width.\n"
     )
 
 
@@ -118,8 +149,11 @@ def _agile_plan_view() -> str:
         "          - type: markdown\n"
         "            content: |\n"
         "              # Agile Plan\n"
-        "              Full-width KEMS half-hour plan. Each source/grid cell shows the planned route and its total estimated energy for that slot.\n\n"
-        "              The active half-hour shows the remaining-slot estimate; future rows show the current continuously recalculated KEMS plan snapshot.\n"
+        "              Full-width KEMS half-hour plan. Each source/grid cell "
+        "shows the planned route and its total estimated energy for that slot.\n\n"
+        "              The active half-hour shows the remaining-slot estimate; "
+        "future rows show the current continuously recalculated KEMS plan "
+        "snapshot.\n"
         + _plan_table_card(
             title="Today's KEMS plan — 00:00 to 23:30",
             attribute="today_slots",
@@ -160,11 +194,15 @@ def _finalise_dashboard_bytes(payload: bytes) -> bytes:
 
     # Alpha8.52: keep the normal KEMS/Tomorrow masonry pages compact and move the
     # canonical Alpha8.48+ slot-flow tables onto one native full-width panel view.
-    text = text.replace(
-        "          The plan is split into three readable sections below instead of one 48-row table.\n",
-        "          Current and next slots are summarised below. Use the **Agile Plan** tab for the full-width Today and Tomorrow schedule.\n",
-        1,
+    old_plan_note = (
+        "          The plan is split into three readable sections below instead "
+        "of one 48-row table.\n"
     )
+    new_plan_note = (
+        "          Current and next slots are summarised below. Use the "
+        "**Agile Plan** tab for the full-width Today and Tomorrow schedule.\n"
+    )
+    text = text.replace(old_plan_note, new_plan_note, 1)
     text = _replace_split_plan_cards(
         text,
         first_title="Today — 00:00 to 07:30",
