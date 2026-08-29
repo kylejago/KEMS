@@ -117,6 +117,16 @@ def _physical_house_kw(self) -> float:
     return 0.0
 
 
+def _current_house_kw(self, *, fallback: float) -> float:
+    """Return the latest coordinator house power for instantaneous routing."""
+    records = list(getattr(self, "_panel_today_records", []) or [])
+    if records:
+        value = _number(getattr(records[-1], "house_load_kw", None))
+        if value is not None:
+            return max(value, 0.0)
+    return max(float(fallback), 0.0)
+
+
 def _power_down_windows(plan: dict[str, Any]) -> tuple[tuple[datetime, datetime], ...]:
     """Return absolute-priority Power Down windows already reserved by the plan."""
     context = plan.get("power_down_priority")
@@ -264,7 +274,8 @@ def _apply_physical_slot_allocations(
         config=config,
     )
     desired = max(_number(plan.get("planned_battery_export_kwh")) or 0.0, 0.0)
-    house_kw = _physical_house_kw(self)
+    future_house_kw = _physical_house_kw(self)
+    current_house_kw = _current_house_kw(self, fallback=future_house_kw)
     slots = list(state.get("today_slots", []) or [])
     physical = allocate_physical_export_slots(
         slots=slots,
@@ -272,7 +283,7 @@ def _apply_physical_slot_allocations(
         now=now,
         deadline=deadline,
         desired_export_kwh=desired,
-        house_kw=house_kw,
+        house_kw=future_house_kw,
         export_limit_kw=config.export_limit_kw,
         excluded_windows=_power_down_windows(plan),
     )
@@ -328,6 +339,8 @@ def _apply_physical_slot_allocations(
                 "5-minute solar-aware shared-inverter headroom; house first"
             ),
             "physical_slot_capacity_house_kw": physical.house_kw,
+            "current_routing_house_kw": round(current_house_kw, 3),
+            "current_routing_house_source": "latest coordinator house_load_kw",
             "physical_slot_capacity_kwh": physical.total_capacity_kwh,
             "physical_slot_unallocated_required_export_kwh": physical.unallocated_kwh,
             "physical_slot_capacity": physical.to_dict(),
@@ -380,7 +393,7 @@ def _apply_physical_slot_allocations(
             allocations=physical.allocations,
             capacity_segments=segments,
             now=now,
-            house_kw=house_kw,
+            house_kw=current_house_kw,
             export_limit_kw=config.export_limit_kw,
             current_soc_percent=soc,
             target_soc_percent=target_soc,
