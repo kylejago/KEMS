@@ -123,8 +123,13 @@ def test_current_routing_wiring_keeps_forecast_capacity_but_uses_live_house() ->
     """Static guard: future capacity and instantaneous routing have distinct inputs."""
     source = SOURCE.read_text()
     assert "future_house_kw = _physical_house_kw(self)" in source
-    assert "current_house_kw = _current_house_kw(self, fallback=future_house_kw)" in source
+    assert (
+        "current_house_kw = _current_house_kw(self, fallback=future_house_kw)" in source
+    )
     assert "house_kw=future_house_kw," in source
     assert "house_kw=current_house_kw," in source
-    assert 'if mode in {"cheap_charge", "happy_hour_charge", "power_down_session"}' in source
+    assert (
+        'if mode in {"cheap_charge", "happy_hour_charge", "power_down_session"}'
+        in source
+    )
     assert 'if mode not in {"deadline_following", "maximum_discharge"}' in source
