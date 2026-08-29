@@ -42,7 +42,7 @@
   },
   "maintenance": {
     "required": true,
-    "reason": "Keep conservative house power for future Agile capacity planning while using the live coordinator house load for instantaneous solar-first battery routing, eliminating avoidable day-rate grid import",
+    "reason": "Preserve the settled/current Agile SOC through the local-midnight replay rollover, including a timestamp-only boundary when recorder samples straddle 00:00, so cheap charging cannot be replaced by a stale replay SOC",
     "expected_downtime_minutes": 5,
     "home_assistant_restart_required": true,
     "reboot_required": false,
