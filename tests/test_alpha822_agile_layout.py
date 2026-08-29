@@ -85,9 +85,12 @@ def test_today_and_tomorrow_are_full_width_chronological_flow_tables() -> None:
         assert "| Time | KEMS plan |" not in content
         assert "<br>" not in content
         assert "%}}" not in content
-        assert "**{{ ga }}** ·" in content
-        assert "**{{ sa }}** ·" in content
-        assert "**{{ ba }}** ·" in content
+        assert "p.get('flow_basis') == 'settled/replayed KEMS slot'" in content
+        assert "p.get('actions') == ['future slot']" in content
+        assert "**NO DATA** · —" in content
+        assert "~ ga ~ '** · '" in content
+        assert "~ sa ~ '** · '" in content
+        assert "~ ba ~ '** · '" in content
 
     final_text = yaml.safe_dump(parsed, sort_keys=False)
     for old_title in (
@@ -212,9 +215,12 @@ def test_flow_table_uses_canonical_route_labels_and_energy_totals() -> None:
     assert "'HOME/EXPO': 'HOME/EXPORT'" in content
     assert "replace('EXPO', 'EXPORT')" not in content
     assert "%}}" not in content
-    assert "**{{ ga }}** ·" in content
-    assert "**{{ sa }}** ·" in content
-    assert "**{{ ba }}** ·" in content
+    assert "p.get('flow_basis') == 'settled/replayed KEMS slot'" in content
+    assert "p.get('actions') == ['future slot']" in content
+    assert "**NO DATA** · —" in content
+    assert "~ ga ~ '** · '" in content
+    assert "~ sa ~ '** · '" in content
+    assert "~ ba ~ '** · '" in content
     assert "%.2f kWh" in content
     assert "%.1f%%" in content
 
