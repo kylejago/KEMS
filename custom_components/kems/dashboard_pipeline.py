@@ -3,6 +3,15 @@
 from __future__ import annotations
 
 
+def _route_template_line(*, indent: str, variable: str, field: str) -> str:
+    """Return one canonical route-label Jinja assignment."""
+    return (
+        f"{indent}{{% set {variable} = "
+        f"(p.get('{field}') or 'IDLE') "
+        "| replace('EXPO', 'EXPORT') %}\n"
+    )
+
+
 def _plan_table_card(
     *,
     title: str,
@@ -29,18 +38,24 @@ def _plan_table_card(
         f"{content}{{% for p in slots %}}\n"
         f"{content}{{% set price = p.get('rate_pence') %}}\n"
         f"{content}{{% set soc = p.get('flow_estimated_soc_percent') %}}\n"
-        f"{content}{{% set ga = "
-        "(p.get('flow_grid_action') or 'IDLE') "
-        "| replace('EXPO', 'EXPORT') %}}\n"
-        f"{content}{{% set gk = p.get('flow_grid_kwh') %}}\n"
-        f"{content}{{% set sa = "
-        "(p.get('flow_solar_action') or 'IDLE') "
-        "| replace('EXPO', 'EXPORT') %}}\n"
-        f"{content}{{% set sk = p.get('flow_solar_kwh') %}}\n"
-        f"{content}{{% set ba = "
-        "(p.get('flow_battery_action') or 'IDLE') "
-        "| replace('EXPO', 'EXPORT') %}}\n"
-        f"{content}{{% set bk = p.get('flow_battery_kwh') %}}\n"
+        + _route_template_line(
+            indent=content,
+            variable="ga",
+            field="flow_grid_action",
+        )
+        + f"{content}{{% set gk = p.get('flow_grid_kwh') %}}\n"
+        + _route_template_line(
+            indent=content,
+            variable="sa",
+            field="flow_solar_action",
+        )
+        + f"{content}{{% set sk = p.get('flow_solar_kwh') %}}\n"
+        + _route_template_line(
+            indent=content,
+            variable="ba",
+            field="flow_battery_action",
+        )
+        + f"{content}{{% set bk = p.get('flow_battery_kwh') %}}\n"
         f"{content}| {{{{ p.get('label', '—') }}}} | "
         "{{ ('%.2f' | format(price | float(0))) ~ 'p' if price is not none "
         "else '—' }} | "
@@ -61,6 +76,7 @@ def _plan_table_card(
 
 def _compact_plan_summary_card() -> str:
     """Return a narrow-card-friendly NOW/NEXT Agile flow summary."""
+    indent = "          "
     return (
         "      - type: markdown\n"
         "        title: Current and next Agile slots\n"
@@ -89,18 +105,24 @@ def _compact_plan_summary_card() -> str:
         "          {% if p %}\n"
         "          {% set price = p.get('rate_pence') %}\n"
         "          {% set soc = p.get('flow_estimated_soc_percent') %}\n"
-        "          {% set ga = "
-        "(p.get('flow_grid_action') or 'IDLE') "
-        "| replace('EXPO', 'EXPORT') %}\n"
-        "          {% set gk = p.get('flow_grid_kwh') %}\n"
-        "          {% set sa = "
-        "(p.get('flow_solar_action') or 'IDLE') "
-        "| replace('EXPO', 'EXPORT') %}\n"
-        "          {% set sk = p.get('flow_solar_kwh') %}\n"
-        "          {% set ba = "
-        "(p.get('flow_battery_action') or 'IDLE') "
-        "| replace('EXPO', 'EXPORT') %}\n"
-        "          {% set bk = p.get('flow_battery_kwh') %}\n"
+        + _route_template_line(
+            indent=indent,
+            variable="ga",
+            field="flow_grid_action",
+        )
+        + "          {% set gk = p.get('flow_grid_kwh') %}\n"
+        + _route_template_line(
+            indent=indent,
+            variable="sa",
+            field="flow_solar_action",
+        )
+        + "          {% set sk = p.get('flow_solar_kwh') %}\n"
+        + _route_template_line(
+            indent=indent,
+            variable="ba",
+            field="flow_battery_action",
+        )
+        + "          {% set bk = p.get('flow_battery_kwh') %}\n"
         "          **{{ 'NOW' if loop.index0 == 0 else 'NEXT' }} — "
         "{{ p.get('label', '—') }} · "
         "{{ ('%.2f' | format(price | float(0))) ~ 'p' "
