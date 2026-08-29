@@ -156,6 +156,7 @@ def test_rendered_agile_rows_remain_inside_one_markdown_table() -> None:
     assert "2.10 kWh" in rendered
     assert "3.90 kWh" in rendered
     assert "HOME/EXPO" not in rendered
+    assert "EXPORTRT" not in rendered
 
 
 def test_kems_page_keeps_only_a_compact_now_next_plan_summary() -> None:
@@ -207,7 +208,9 @@ def test_flow_table_uses_canonical_route_labels_and_energy_totals() -> None:
     ):
         assert f"p.get('{field}')" in content
 
-    assert "replace('EXPO', 'EXPORT')" in content
+    assert "'EXPO': 'EXPORT'" in content
+    assert "'HOME/EXPO': 'HOME/EXPORT'" in content
+    assert "replace('EXPO', 'EXPORT')" not in content
     assert "%}}" not in content
     assert "**{{ ga }}** ·" in content
     assert "**{{ sa }}** ·" in content
