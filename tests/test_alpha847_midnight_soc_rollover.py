@@ -264,15 +264,29 @@ def test_alpha847_runtime_scope_and_release_metadata() -> None:
     runtime = (INTEGRATION / "agile_smart_export_runtime.py").read_text()
     rollover_source = (INTEGRATION / "agile_midnight_rollover.py").read_text()
     flow_source = (INTEGRATION / "agile_flow_presentation.py").read_text()
+    canonical_source = (INTEGRATION / "agile_canonical_flow_accounting.py").read_text()
     manifest = json.loads((INTEGRATION / "manifest.json").read_text())
     bundle = json.loads((ROOT / "release/kems-bundle.template.json").read_text())
 
-    assert "FlowPresentationAgileSmartExportManager" in runtime
+    direct_flow = "FlowPresentationAgileSmartExportManager" in runtime
+    canonical_owner = (
+        "EfficientAgileSmartExportManager = "
+        "CanonicalFlowAccountingAgileSmartExportManager"
+    )
+    canonical_flow = (
+        canonical_owner in runtime
+        and "FlowPresentationAgileSmartExportManager" in canonical_source
+        and "class CanonicalFlowAccountingAgileSmartExportManager" in canonical_source
+    )
+    assert direct_flow or canonical_flow
     assert "MidnightRolloverAgileSmartExportManager" in flow_source
     assert "SettledCurrentDayAgileSmartExportManager" not in runtime
     assert ".services.async_call(" not in rollover_source
     assert "providers.foxess" not in rollover_source
     assert '"hardware_writes": "blocked"' in rollover_source
+    assert ".services.async_call(" not in canonical_source
+    assert "providers.foxess" not in canonical_source
+    assert 'hardware_writes": "blocked' in canonical_source
 
     version = str(manifest["version"])
     assert version.startswith("0.8.0-alpha8.")

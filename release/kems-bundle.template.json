@@ -42,7 +42,7 @@
   },
   "maintenance": {
     "required": true,
-    "reason": "Publish reconciled per-slot Grid/Solar/Battery flow presentation and keep live replay solar export visible in Today accounting while deliberate battery export remains settlement-only",
+    "reason": "Make the active Grid/Solar/Battery row mirror canonical current routing, preserve live replay solar in Today export accounting, and use explicit EXPORT labels for pure export routes",
     "expected_downtime_minutes": 5,
     "home_assistant_restart_required": true,
     "reboot_required": false,
