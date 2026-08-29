@@ -253,6 +253,7 @@ def test_runtime_join_brackets_shadow_settlement_without_hardware_writes() -> No
     coordinator = (INTEGRATION / "coordinator.py").read_text()
     helper_source = (INTEGRATION / "agile_current_day_settlement.py").read_text()
     rollover_source = (INTEGRATION / "agile_midnight_rollover.py").read_text()
+    flow_source = (INTEGRATION / "agile_flow_presentation.py").read_text()
 
     direct_settlement = (
         "EfficientAgileSmartExportManager = SettledCurrentDayAgileSmartExportManager"
@@ -264,7 +265,14 @@ def test_runtime_join_brackets_shadow_settlement_without_hardware_writes() -> No
         and "SettledCurrentDayAgileSmartExportManager" in rollover_source
         and "class MidnightRolloverAgileSmartExportManager" in rollover_source
     )
-    assert direct_settlement or rollover_settlement
+    flow_successor_settlement = (
+        "EfficientAgileSmartExportManager = FlowPresentationAgileSmartExportManager"
+        in runtime
+        and "MidnightRolloverAgileSmartExportManager" in flow_source
+        and "class FlowPresentationAgileSmartExportManager" in flow_source
+        and "SettledCurrentDayAgileSmartExportManager" in rollover_source
+    )
+    assert direct_settlement or rollover_settlement or flow_successor_settlement
     first_reconcile = coordinator.index(
         "self._agile_smart_export.reconcile_current_day_settlements"
     )
@@ -298,4 +306,4 @@ def test_alpha839_version_and_release_scope() -> None:
     assert bundle["maintenance"]["home_assistant_restart_required"] is True
     assert bundle["maintenance"]["reboot_required"] is False
     assert bundle["components"]["panel"]["version"] == "0.8.0-alpha8-panel.1"
-    assert bundle["components"]["property_web"]["version"] == "0.8.0-alpha8-web.5"
+    assert bundle["components"]["property_web"]["version"] == "0.8.0-alpha8-web.7"

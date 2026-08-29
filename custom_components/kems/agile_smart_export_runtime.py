@@ -70,12 +70,12 @@ install_alpha752_tomorrow_no_reserve_rounding_patch()
 _base = install_alpha7_compatibility()
 install_shadow_charge_truth()
 
-from .agile_midnight_rollover import (  # noqa: E402
-    MidnightRolloverAgileSmartExportManager,
+from .agile_flow_presentation import (  # noqa: E402
+    FlowPresentationAgileSmartExportManager,
 )
 from .agile_smart_export_runtime_base import *  # noqa: E402,F403
 
-EfficientAgileSmartExportManager = MidnightRolloverAgileSmartExportManager
+EfficientAgileSmartExportManager = FlowPresentationAgileSmartExportManager
 
 
 def __getattr__(name: str):
