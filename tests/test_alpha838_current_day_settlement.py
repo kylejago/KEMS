@@ -254,6 +254,9 @@ def test_runtime_join_brackets_shadow_settlement_without_hardware_writes() -> No
     helper_source = (INTEGRATION / "agile_current_day_settlement.py").read_text()
     rollover_source = (INTEGRATION / "agile_midnight_rollover.py").read_text()
     flow_source = (INTEGRATION / "agile_flow_presentation.py").read_text()
+    canonical_source = (
+        INTEGRATION / "agile_canonical_flow_accounting.py"
+    ).read_text()
 
     direct_settlement = (
         "EfficientAgileSmartExportManager = SettledCurrentDayAgileSmartExportManager"
@@ -272,7 +275,23 @@ def test_runtime_join_brackets_shadow_settlement_without_hardware_writes() -> No
         and "class FlowPresentationAgileSmartExportManager" in flow_source
         and "SettledCurrentDayAgileSmartExportManager" in rollover_source
     )
-    assert direct_settlement or rollover_settlement or flow_successor_settlement
+    canonical_owner = (
+        "EfficientAgileSmartExportManager = "
+        "CanonicalFlowAccountingAgileSmartExportManager"
+    )
+    canonical_successor_settlement = (
+        canonical_owner in runtime
+        and "FlowPresentationAgileSmartExportManager" in canonical_source
+        and "class CanonicalFlowAccountingAgileSmartExportManager" in canonical_source
+        and "MidnightRolloverAgileSmartExportManager" in flow_source
+        and "SettledCurrentDayAgileSmartExportManager" in rollover_source
+    )
+    assert (
+        direct_settlement
+        or rollover_settlement
+        or flow_successor_settlement
+        or canonical_successor_settlement
+    )
     first_reconcile = coordinator.index(
         "self._agile_smart_export.reconcile_current_day_settlements"
     )
@@ -290,6 +309,9 @@ def test_runtime_join_brackets_shadow_settlement_without_hardware_writes() -> No
     assert ".services.async_call(" not in rollover_source
     assert "providers.foxess" not in rollover_source
     assert '"hardware_writes": "blocked"' in rollover_source
+    assert ".services.async_call(" not in canonical_source
+    assert "providers.foxess" not in canonical_source
+    assert 'hardware_writes": "blocked' in canonical_source
 
 
 def test_alpha839_version_and_release_scope() -> None:
