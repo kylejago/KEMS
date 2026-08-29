@@ -38,7 +38,9 @@ def _render(slots: list[dict]) -> str:
         assert entity_id == "sensor.kems_agile_slots"
         return slots if attribute == "today_slots" else []
 
-    return Environment(autoescape=False).from_string(content).render(state_attr=state_attr)
+    return (
+        Environment(autoescape=False).from_string(content).render(state_attr=state_attr)
+    )
 
 
 def _slot(
