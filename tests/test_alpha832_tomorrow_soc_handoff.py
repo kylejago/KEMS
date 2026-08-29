@@ -102,9 +102,7 @@ def test_runtime_rebuilds_and_republishes_tomorrow_from_midnight_handoff() -> No
     successor = (
         ROOT / "custom_components/kems/agile_current_day_settlement.py"
     ).read_text()
-    rollover = (
-        ROOT / "custom_components/kems/agile_midnight_rollover.py"
-    ).read_text()
+    rollover = (ROOT / "custom_components/kems/agile_midnight_rollover.py").read_text()
 
     # Alpha8.32's Tomorrow handoff may remain the direct runtime manager or be
     # inherited by later canonical managers. Either way the handoff must stay
