@@ -230,12 +230,16 @@ def test_alpha849_is_reporting_only_above_alpha848() -> None:
         "custom_components/kems/agile_canonical_flow_accounting.py"
     ).read_text()
     runtime = Path("custom_components/kems/agile_smart_export_runtime.py").read_text()
+    successor = Path(
+        "custom_components/kems/agile_live_solar_soc_continuity.py"
+    ).read_text()
 
     assert "FlowPresentationAgileSmartExportManager" in module
-    assert "CanonicalFlowAccountingAgileSmartExportManager" in runtime
+    assert "CanonicalFlowAccountingAgileSmartExportManager" in successor
+    assert "LiveSolarSocContinuityAgileSmartExportManager" in runtime
     owner_assignment = (
         "EfficientAgileSmartExportManager = "
-        "CanonicalFlowAccountingAgileSmartExportManager"
+        "LiveSolarSocContinuityAgileSmartExportManager"
     )
     assert owner_assignment in runtime
     assert "services.async_call" not in module
