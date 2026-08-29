@@ -6,6 +6,7 @@ import importlib.util
 from pathlib import Path
 
 import yaml
+from jinja2 import Environment
 
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / "dashboards" / "kems_master_dashboard.yaml"
@@ -71,7 +72,7 @@ def test_today_and_tomorrow_are_full_width_chronological_flow_tables() -> None:
         assert card["type"] == "markdown"
         content = card["content"]
         assert "| Time | Price | Est. SOC | Grid | Solar | Battery |" in content
-        assert "{% for p in slots %}" in content
+        assert "{%- for p in slots %}" in content
         assert "flow_estimated_soc_percent" in content
         assert "flow_grid_action" in content
         assert "flow_grid_kwh" in content
@@ -98,6 +99,61 @@ def test_today_and_tomorrow_are_full_width_chronological_flow_tables() -> None:
         "Tomorrow — 16:00 to 23:30",
     ):
         assert old_title not in final_text
+
+
+def test_rendered_agile_rows_remain_inside_one_markdown_table() -> None:
+    parsed = _final_dashboard()
+    agile = _view(parsed, "agile-plan")
+    stack = agile["cards"][0]
+    today = _stack_card(stack, "Today's KEMS plan — 00:00 to 23:30")
+    slots = [
+        {
+            "label": "16:30",
+            "rate_pence": 23.57,
+            "flow_estimated_soc_percent": 68.7,
+            "flow_grid_action": "EXPORT",
+            "flow_grid_kwh": 3.90,
+            "flow_solar_action": "HOME/EXPO",
+            "flow_solar_kwh": 2.30,
+            "flow_battery_action": "EXPORT",
+            "flow_battery_kwh": 2.10,
+        },
+        {
+            "label": "17:00",
+            "rate_pence": 23.93,
+            "flow_estimated_soc_percent": 64.0,
+            "flow_grid_action": "EXPORT",
+            "flow_grid_kwh": 2.85,
+            "flow_solar_action": "HOME",
+            "flow_solar_kwh": 0.45,
+            "flow_battery_action": "EXPORT",
+            "flow_battery_kwh": 2.85,
+        },
+    ]
+
+    def state_attr(entity_id: str, attribute: str):
+        assert entity_id == "sensor.kems_agile_slots"
+        return slots if attribute == "today_slots" else []
+
+    rendered = Environment(autoescape=False).from_string(today["content"]).render(
+        state_attr=state_attr
+    )
+    expected_table = (
+        "| Time | Price | Est. SOC | Grid | Solar | Battery |\n"
+        "|---|---:|---:|---|---|---|\n"
+        "| 16:30 | 23.57p | 68.7% | **EXPORT** · 3.90 kWh | "
+        "**HOME/EXPORT** · 2.30 kWh | **EXPORT** · 2.10 kWh |\n"
+        "| 17:00 | 23.93p | 64.0% | **EXPORT** · 2.85 kWh | "
+        "**HOME** · 0.45 kWh | **EXPORT** · 2.85 kWh |"
+    )
+
+    assert expected_table in rendered
+    assert "\n\n| 16:30" not in rendered
+    assert "|---|---:|---:|---|---|---|\n| 16:30" in rendered
+    assert "2.30 kWh" in rendered
+    assert "2.10 kWh" in rendered
+    assert "3.90 kWh" in rendered
+    assert "HOME/EXPO" not in rendered
 
 
 def test_kems_page_keeps_only_a_compact_now_next_plan_summary() -> None:
