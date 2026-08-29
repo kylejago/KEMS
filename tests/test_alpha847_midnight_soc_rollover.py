@@ -7,7 +7,7 @@ import importlib.util
 import json
 import sys
 import types
-from datetime import date, datetime, time, timedelta
+from datetime import date, datetime, time
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -156,11 +156,11 @@ def test_missing_exact_midnight_sample_gets_timestamp_only_boundary() -> None:
         records[:2],
         _config(agile),
         _tariff(tariff_module),
-        6.008,
-        6.008,
+        18.544,
+        18.544,
         None,
     )
-    expected = 6.008 + (7.0 * (29 * 60 + 11) / 3600 * 0.95 / 56.42 * 100)
+    expected = 18.544 + (7.0 * (29 * 60 + 11) / 3600 * 0.95 / 56.42 * 100)
     assert (
         abs(float(result["agile_smart_export"]["ending_soc_percent"]) - expected) < 0.1
     )
