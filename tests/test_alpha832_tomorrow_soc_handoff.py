@@ -104,6 +104,9 @@ def test_runtime_rebuilds_and_republishes_tomorrow_from_midnight_handoff() -> No
     ).read_text()
     rollover = (ROOT / "custom_components/kems/agile_midnight_rollover.py").read_text()
     flow = (ROOT / "custom_components/kems/agile_flow_presentation.py").read_text()
+    canonical = (
+        ROOT / "custom_components/kems/agile_canonical_flow_accounting.py"
+    ).read_text()
 
     # Alpha8.32's Tomorrow handoff may remain the direct runtime manager or be
     # inherited by later canonical managers. Either way the handoff must stay
@@ -134,11 +137,24 @@ def test_runtime_rebuilds_and_republishes_tomorrow_from_midnight_handoff() -> No
         and "SettledCurrentDayAgileSmartExportManager" in rollover
         and "TomorrowSocHandoffAgileSmartExportManager" in successor
     )
+    canonical_owner = (
+        "EfficientAgileSmartExportManager = "
+        "CanonicalFlowAccountingAgileSmartExportManager"
+    )
+    canonical_successor_handoff = (
+        canonical_owner in runtime
+        and "FlowPresentationAgileSmartExportManager" in canonical
+        and "class CanonicalFlowAccountingAgileSmartExportManager" in canonical
+        and "MidnightRolloverAgileSmartExportManager" in flow
+        and "SettledCurrentDayAgileSmartExportManager" in rollover
+        and "TomorrowSocHandoffAgileSmartExportManager" in successor
+    )
     assert (
         direct_handoff
         or settlement_successor_handoff
         or rollover_successor_handoff
         or flow_successor_handoff
+        or canonical_successor_handoff
     )
     assert "project_tomorrow_midnight_soc(" in handoff
     assert "self._compare_day(" in handoff
