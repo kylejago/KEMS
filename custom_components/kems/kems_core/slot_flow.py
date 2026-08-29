@@ -27,9 +27,13 @@ def _number(value: Any) -> float | None:
 
 
 def _route_label(routes: tuple[tuple[str, float | None], ...]) -> str:
-    """Join the non-zero routes using the compact dashboard vocabulary."""
+    """Join non-zero routes using the compact dashboard vocabulary."""
     labels = [label for label, value in routes if (value or 0.0) > _EPSILON]
-    return "/".join(labels) if labels else "IDLE"
+    if not labels:
+        return "IDLE"
+    if labels == ["EXPO"]:
+        return "EXPORT"
+    return "/".join(labels)
 
 
 def build_slot_flow(
