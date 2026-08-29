@@ -38,7 +38,7 @@ def _card(view: dict, title: str) -> dict:
     return next(card for card in view["cards"] if card.get("title") == title)
 
 
-def test_today_and_tomorrow_are_single_readable_chronological_lists() -> None:
+def test_today_and_tomorrow_are_single_chronological_flow_tables() -> None:
     parsed = _final_dashboard()
 
     today = _card(_view(parsed, "kems"), "Today's KEMS plan — 00:00 to 23:30")
@@ -47,13 +47,18 @@ def test_today_and_tomorrow_are_single_readable_chronological_lists() -> None:
     for card in (today, tomorrow):
         assert card["type"] == "markdown"
         content = card["content"]
-        assert "| Time | KEMS plan |" in content
-        assert "| Time | Rate | KEMS plan and energy |" not in content
+        assert "| Time | Price | Est. SOC | Grid | Solar | Battery |" in content
         assert "{% for p in slots %}" in content
-        assert "House first — no battery export planned" in content
-        assert "Battery export" in content
-        assert "current plan snapshot" in content
-        assert "Grid in/out" not in content
+        assert "flow_estimated_soc_percent" in content
+        assert "flow_grid_action" in content
+        assert "flow_grid_kwh" in content
+        assert "flow_solar_action" in content
+        assert "flow_solar_kwh" in content
+        assert "flow_battery_action" in content
+        assert "flow_battery_kwh" in content
+        assert "current KEMS plan snapshot" in content
+        assert "half-hour" in content
+        assert "| Time | KEMS plan |" not in content
 
     final_text = yaml.safe_dump(parsed, sort_keys=False)
     for old_title in (
@@ -67,29 +72,35 @@ def test_today_and_tomorrow_are_single_readable_chronological_lists() -> None:
         assert old_title not in final_text
 
 
-def test_rolling_hold_is_explained_as_a_decision_not_an_error() -> None:
+def test_flow_table_uses_canonical_route_labels_and_energy_totals() -> None:
     module = _pipeline_module()
     content = module._finalise_dashboard_bytes(SOURCE.read_bytes()).decode("utf-8")
 
-    assert "{% if 'hold' in rolling %}" in content
-    assert "House first — no battery export planned" in content
-    assert "not a waiting/error state" in content
-    assert "hold — rolling replan" not in content
-
-
-def test_nullable_slot_values_do_not_break_plan_rows() -> None:
-    module = _pipeline_module()
-    content = module._finalise_dashboard_bytes(SOURCE.read_bytes()).decode("utf-8")
-
-    for alias, field in (
-        ("gi", "grid_import_kwh"),
-        ("bo", "battery_export_kwh"),
-        ("soc", "ending_soc_percent"),
+    for field in (
+        "flow_grid_action",
+        "flow_grid_kwh",
+        "flow_solar_action",
+        "flow_solar_kwh",
+        "flow_battery_action",
+        "flow_battery_kwh",
+        "flow_estimated_soc_percent",
     ):
-        assert f"set {alias} = p.get('{field}')" in content
+        assert f"p.get('{field}')" in content
 
-    assert "p.get('rate_pence') is not none else 'Rate —'" in content
-    assert "planned_export is not none" in content
+    assert "**{{ ga }}**<br>" in content
+    assert "**{{ sa }}**<br>" in content
+    assert "**{{ ba }}**<br>" in content
+    assert "%.2f kWh" in content
+    assert "%.1f%%" in content
+
+
+def test_table_does_not_rederive_routing_from_legacy_slot_fields() -> None:
+    module = _pipeline_module()
+    content = module._finalise_dashboard_bytes(SOURCE.read_bytes()).decode("utf-8")
+
+    assert "rolling_planned_battery_export_kwh" not in content
+    assert "House first — no battery export planned" not in content
+    assert "{% if 'hold' in rolling %}" not in content
 
 
 def test_tomorrow_partial_publication_is_visible_and_aggregation_is_safe() -> None:
