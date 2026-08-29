@@ -254,9 +254,7 @@ def test_runtime_join_brackets_shadow_settlement_without_hardware_writes() -> No
     helper_source = (INTEGRATION / "agile_current_day_settlement.py").read_text()
     rollover_source = (INTEGRATION / "agile_midnight_rollover.py").read_text()
     flow_source = (INTEGRATION / "agile_flow_presentation.py").read_text()
-    canonical_source = (
-        INTEGRATION / "agile_canonical_flow_accounting.py"
-    ).read_text()
+    canonical_source = (INTEGRATION / "agile_canonical_flow_accounting.py").read_text()
 
     direct_settlement = (
         "EfficientAgileSmartExportManager = SettledCurrentDayAgileSmartExportManager"
