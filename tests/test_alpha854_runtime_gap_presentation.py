@@ -13,7 +13,9 @@ PIPELINE = ROOT / "custom_components" / "kems" / "dashboard_pipeline.py"
 
 
 def _pipeline_module():
-    spec = importlib.util.spec_from_file_location("kems_dashboard_pipeline_alpha854", PIPELINE)
+    spec = importlib.util.spec_from_file_location(
+        "kems_dashboard_pipeline_alpha854", PIPELINE
+    )
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
@@ -36,11 +38,7 @@ def _render(slots: list[dict]) -> str:
         assert entity_id == "sensor.kems_agile_slots"
         return slots if attribute == "today_slots" else []
 
-    return (
-        Environment(autoescape=False)
-        .from_string(content)
-        .render(state_attr=state_attr)
-    )
+    return Environment(autoescape=False).from_string(content).render(state_attr=state_attr)
 
 
 def _slot(
