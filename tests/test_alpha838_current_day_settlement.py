@@ -252,8 +252,19 @@ def test_runtime_join_brackets_shadow_settlement_without_hardware_writes() -> No
     runtime = (INTEGRATION / "agile_smart_export_runtime.py").read_text()
     coordinator = (INTEGRATION / "coordinator.py").read_text()
     helper_source = (INTEGRATION / "agile_current_day_settlement.py").read_text()
+    rollover_source = (INTEGRATION / "agile_midnight_rollover.py").read_text()
 
-    assert "SettledCurrentDayAgileSmartExportManager" in runtime
+    direct_settlement = (
+        "EfficientAgileSmartExportManager = SettledCurrentDayAgileSmartExportManager"
+        in runtime
+    )
+    rollover_settlement = (
+        "EfficientAgileSmartExportManager = MidnightRolloverAgileSmartExportManager"
+        in runtime
+        and "SettledCurrentDayAgileSmartExportManager" in rollover_source
+        and "class MidnightRolloverAgileSmartExportManager" in rollover_source
+    )
+    assert direct_settlement or rollover_settlement
     first_reconcile = coordinator.index(
         "self._agile_smart_export.reconcile_current_day_settlements"
     )
@@ -268,6 +279,9 @@ def test_runtime_join_brackets_shadow_settlement_without_hardware_writes() -> No
     assert ".services.async_call(" not in helper_source
     assert "providers.foxess" not in helper_source
     assert '"hardware_writes": "blocked"' in helper_source
+    assert ".services.async_call(" not in rollover_source
+    assert "providers.foxess" not in rollover_source
+    assert '"hardware_writes": "blocked"' in rollover_source
 
 
 def test_alpha839_version_and_release_scope() -> None:
