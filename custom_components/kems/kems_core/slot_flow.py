@@ -68,7 +68,7 @@ def build_slot_flow(
     battery_charge = solar_battery + grid_battery
     if solar_generation is None:
         # This fallback is only for older retained rows where KEMS did not keep
-        # source-side generation.  New/current rows publish the real source sum.
+        # source-side generation. New/current rows publish the real source sum.
         solar_generation = solar_home + solar_export
         if solar_battery > _EPSILON:
             solar_generation += solar_battery
@@ -83,10 +83,19 @@ def build_slot_flow(
 
     grid_activity = grid_import + grid_export
     battery_activity = battery_home + battery_export + battery_charge
-    grid_balance = abs(grid_export - (solar_export + battery_export)) <= 0.002
-    battery_discharge_balance = abs(
-        (battery_home + battery_export) - (battery_home + battery_export)
-    ) <= 0.002
+    solar_destination_total = solar_home + solar_battery + solar_export
+    component_values = (
+        grid_import,
+        grid_export,
+        solar_generation,
+        solar_home,
+        solar_battery,
+        solar_export,
+        grid_battery,
+        battery_home,
+        battery_export,
+        battery_charge,
+    )
 
     return {
         "flow_basis": basis,
@@ -112,7 +121,14 @@ def build_slot_flow(
         "flow_battery_to_home_kwh": round(battery_home, 3),
         "flow_battery_export_kwh": round(battery_export, 3),
         "flow_checks": {
-            "grid_export_balance": grid_balance,
-            "battery_discharge_balance": battery_discharge_balance,
+            "grid_export_balance": abs(
+                grid_export - (solar_export + battery_export)
+            )
+            <= 0.002,
+            "solar_destinations_within_generation": (
+                solar_destination_total <= solar_generation + 0.002
+            ),
+            "grid_charge_within_import": grid_battery <= grid_import + 0.002,
+            "components_non_negative": all(value >= 0.0 for value in component_values),
         },
     }
