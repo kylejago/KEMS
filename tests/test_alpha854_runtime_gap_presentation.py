@@ -100,7 +100,7 @@ def test_recorded_historical_idle_remains_idle_zero() -> None:
         "| 12:30 | 15.91p | 71.2% | **IDLE** · 0.00 kWh | "
         "**IDLE** · 0.00 kWh | **IDLE** · 0.00 kWh |"
     ) in rendered
-    assert "NO DATA" not in rendered
+    assert "| 12:30 | 15.91p | 71.2% | **NO DATA** · —" not in rendered
 
 
 def test_future_placeholder_is_not_mislabelled_as_historical_gap() -> None:
@@ -119,7 +119,7 @@ def test_future_placeholder_is_not_mislabelled_as_historical_gap() -> None:
         "| 13:00 | 15.91p | 72.5% | **IDLE** · 0.00 kWh | "
         "**IDLE** · 0.00 kWh | **IDLE** · 0.00 kWh |"
     ) in rendered
-    assert "NO DATA" not in rendered
+    assert "| 13:00 | 15.91p | 72.5% | **NO DATA** · —" not in rendered
 
 
 def test_gap_detection_reuses_existing_retained_evidence_contract() -> None:
