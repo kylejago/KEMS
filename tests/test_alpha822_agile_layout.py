@@ -135,8 +135,10 @@ def test_rendered_agile_rows_remain_inside_one_markdown_table() -> None:
         assert entity_id == "sensor.kems_agile_slots"
         return slots if attribute == "today_slots" else []
 
-    rendered = Environment(autoescape=False).from_string(today["content"]).render(
-        state_attr=state_attr
+    rendered = (
+        Environment(autoescape=False)
+        .from_string(today["content"])
+        .render(state_attr=state_attr)
     )
     expected_table = (
         "| Time | Price | Est. SOC | Grid | Solar | Battery |\n"
