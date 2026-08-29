@@ -20,12 +20,12 @@
       "delivery": "kems_core"
     },
     "property_web": {
-      "version": "0.8.0-alpha8-web.5",
+      "version": "0.8.0-alpha8-web.7",
       "required": true,
       "delivery": "kems_pi"
     },
     "pi_agent": {
-      "version": "0.8.0-alpha8-web.5",
+      "version": "0.8.0-alpha8-web.7",
       "required": true,
       "delivery": "kems_pi"
     },
@@ -35,14 +35,14 @@
       "delivery": "kems_pi"
     },
     "public_web": {
-      "version": "0.8.0-alpha8-web.5",
+      "version": "0.8.0-alpha8-web.7",
       "required": false,
       "delivery": "ionos-sftp"
     }
   },
   "maintenance": {
     "required": true,
-    "reason": "Preserve the settled/current Agile SOC through the local-midnight replay rollover, including a timestamp-only boundary when recorder samples straddle 00:00, so cheap charging cannot be replaced by a stale replay SOC",
+    "reason": "Publish reconciled per-slot Grid/Solar/Battery flow presentation and keep live replay solar export visible in Today accounting while deliberate battery export remains settlement-only",
     "expected_downtime_minutes": 5,
     "home_assistant_restart_required": true,
     "reboot_required": false,
