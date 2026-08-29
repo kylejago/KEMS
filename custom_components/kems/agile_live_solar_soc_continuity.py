@@ -169,9 +169,6 @@ def _integrated_increment(
         average_rate = (previous_rate + current_rate) / 2.0
         income = energy * average_rate
     elif previous_end == current_start:
-        # Do not interpolate a routing decision across a half-hour boundary.
-        # Treat each canonical snapshot as locally constant only up to/from its
-        # own declared validity edge, bounded by the same small sample gap.
         previous_left = max(previous_ts, previous_start)
         previous_right = previous_end
         current_left = current_start
@@ -454,7 +451,7 @@ def _rebase_display_soc(
         "active_pre_rebase_soc_percent": old_active_soc,
         "active_rebased_soc_percent": round(corrected_active_soc, 3),
         "rebased_rows": rebased_rows,
-        "basis": "canonical current SOC propagated through displayed battery-flow deltas",
+        "basis": "canonical SOC + displayed battery-flow deltas",
         "reporting_only": True,
         "hardware_writes": "blocked",
     }
