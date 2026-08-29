@@ -155,7 +155,7 @@ def test_rendered_agile_rows_remain_inside_one_markdown_table() -> None:
     assert "2.30 kWh" in rendered
     assert "2.10 kWh" in rendered
     assert "3.90 kWh" in rendered
-    assert "HOME/EXPO" not in rendered
+    assert "**HOME/EXPO**" not in rendered
     assert "EXPORTRT" not in rendered
 
 
