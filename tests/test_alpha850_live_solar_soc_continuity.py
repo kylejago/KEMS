@@ -161,7 +161,9 @@ def test_elapsed_solar_uses_canonical_samples_not_remaining_forecast() -> None:
     assert diagnostic["all_accounting_checks_passed"]
 
 
-def test_idle_active_soc_stays_canonical_and_future_soc_replays_displayed_flows() -> None:
+def test_idle_active_soc_stays_canonical_and_future_soc_replays_displayed_flows() -> (
+    None
+):
     continuity, kems_core = _load_modules()
     now = datetime(2026, 8, 29, 14, 5, 29, tzinfo=UTC)
     state = {
@@ -229,5 +231,5 @@ def test_alpha850_is_reporting_only_above_alpha849() -> None:
     assert owner_assignment in runtime
     assert "services.async_call" not in module
     assert "async_call(" not in module
-    assert 'hardware_writes\": \"blocked' in module
+    assert 'hardware_writes": "blocked' in module
     assert "providers.foxess" not in module
