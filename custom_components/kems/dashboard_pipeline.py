@@ -2,6 +2,16 @@
 
 from __future__ import annotations
 
+_ROUTE_LABEL_DISPLAY_MAP = (
+    "{'EXPO': 'EXPORT', "
+    "'IMPORT/EXPO': 'IMPORT/EXPORT', "
+    "'HOME/EXPO': 'HOME/EXPORT', "
+    "'BATT/EXPO': 'BATT/EXPORT', "
+    "'HOME/BATT/EXPO': 'HOME/BATT/EXPORT', "
+    "'EXPO/CHARGE': 'EXPORT/CHARGE', "
+    "'HOME/EXPO/CHARGE': 'HOME/EXPORT/CHARGE'}"
+)
+
 
 def _route_template_line(
     *,
@@ -14,8 +24,9 @@ def _route_template_line(
     opener = "{%-" if trim_left else "{%"
     return (
         f"{indent}{opener} set {variable} = "
-        f"(p.get('{field}') or 'IDLE') "
-        "| replace('EXPO', 'EXPORT') %}\n"
+        f"{_ROUTE_LABEL_DISPLAY_MAP}.get("
+        f"(p.get('{field}') or 'IDLE'), "
+        f"(p.get('{field}') or 'IDLE')) %}\n"
     )
 
 
