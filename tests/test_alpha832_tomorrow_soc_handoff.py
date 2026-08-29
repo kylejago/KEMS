@@ -107,6 +107,9 @@ def test_runtime_rebuilds_and_republishes_tomorrow_from_midnight_handoff() -> No
     canonical = (
         ROOT / "custom_components/kems/agile_canonical_flow_accounting.py"
     ).read_text()
+    live = (
+        ROOT / "custom_components/kems/agile_live_solar_soc_continuity.py"
+    ).read_text()
 
     # Alpha8.32's Tomorrow handoff may remain the direct runtime manager or be
     # inherited by later canonical managers. Either way the handoff must stay
@@ -149,12 +152,26 @@ def test_runtime_rebuilds_and_republishes_tomorrow_from_midnight_handoff() -> No
         and "SettledCurrentDayAgileSmartExportManager" in rollover
         and "TomorrowSocHandoffAgileSmartExportManager" in successor
     )
+    live_owner = (
+        "EfficientAgileSmartExportManager = "
+        "LiveSolarSocContinuityAgileSmartExportManager"
+    )
+    live_successor_handoff = (
+        live_owner in runtime
+        and "CanonicalFlowAccountingAgileSmartExportManager" in live
+        and "class LiveSolarSocContinuityAgileSmartExportManager" in live
+        and "FlowPresentationAgileSmartExportManager" in canonical
+        and "MidnightRolloverAgileSmartExportManager" in flow
+        and "SettledCurrentDayAgileSmartExportManager" in rollover
+        and "TomorrowSocHandoffAgileSmartExportManager" in successor
+    )
     assert (
         direct_handoff
         or settlement_successor_handoff
         or rollover_successor_handoff
         or flow_successor_handoff
         or canonical_successor_handoff
+        or live_successor_handoff
     )
     assert "project_tomorrow_midnight_soc(" in handoff
     assert "self._compare_day(" in handoff
@@ -169,7 +186,7 @@ def test_alpha832_release_contract_remains_successor_safe() -> None:
     manifest = json.loads(
         (ROOT / "custom_components" / "kems" / "manifest.json").read_text()
     )
-    bundle = json.loads((ROOT / "release" / "kems-bundle.template.json").read_text())
+    bundle = json.loads((ROOT / "release/kems-bundle.template.json").read_text())
 
     version = str(manifest["version"])
     assert version.startswith("0.8.0-alpha8.")
