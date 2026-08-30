@@ -12,6 +12,8 @@ Alpha8.56 is a narrowly bounded canonical flow-precision correction following Al
 
 The regression reproduces the 30 Aug 11:30 slot: 1.315 kW conservative house demand over a half-hour, 0.315 kWh solar-to-home, 0.342 kWh rounded planned battery-to-home and ample battery headroom. The canonical projection closes the approximately 0.0005 kWh quantisation remainder with battery-to-home and publishes Grid IDLE / 0.000 kWh.
 
+A companion regression exhausts the physical discharge limit and proves a genuine residual remains Grid IMPORT rather than being suppressed by the precision tolerance.
+
 ## Protected boundaries
 
 No export ranking, solar storage economics, reserve policy, Power Down, Happy Hour, EV policy, cheap-window routing, FoxESS commissioning or real hardware writes are changed. Real hardware writes remain blocked.
