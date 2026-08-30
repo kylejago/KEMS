@@ -28,6 +28,7 @@ from .kems_core.slot_flow import build_slot_flow
 from .tariff import TariffSettings
 
 _EPSILON = 1e-6
+_GRID_IMPORT_PRECISION_KWH = 0.001
 
 
 def _number(value: Any) -> float | None:
@@ -210,6 +211,32 @@ def _conservative_house_kw(self, learned: LearnedState) -> float:
     return max(learned_value if learned_value is not None else 0.4, 0.0)
 
 
+def _close_home_precision_residual(
+    *,
+    remaining_house_kwh: float,
+    battery_home_kwh: float,
+    battery_energy_kwh: float,
+    floor_kwh: float,
+    discharge_limit_kwh: float,
+    discharge_efficiency: float,
+) -> float:
+    """Close only quantisation-sized home residuals with usable battery."""
+    remaining_house = max(remaining_house_kwh, 0.0)
+    battery_home = min(max(battery_home_kwh, 0.0), remaining_house)
+    residual = max(remaining_house - battery_home, 0.0)
+    if residual <= _EPSILON or residual > _GRID_IMPORT_PRECISION_KWH + _EPSILON:
+        return battery_home
+
+    discharge_headroom = max(discharge_limit_kwh - battery_home, 0.0)
+    battery_headroom = max(
+        (battery_energy_kwh - floor_kwh) * max(discharge_efficiency, 0.01),
+        0.0,
+    )
+    if min(discharge_headroom, battery_headroom) + _EPSILON < residual:
+        return battery_home
+    return remaining_house
+
+
 def _future_today_projection(
     self,
     state: dict[str, Any],
@@ -330,7 +357,19 @@ def _future_today_projection(
         else:
             solar_home = min(solar_generation, house, inverter_limit)
             remaining_house = max(house - solar_home, 0.0)
+            floor_kwh = capacity * precheap_target / 100.0
             battery_home = min(battery_home, remaining_house)
+            battery_home = _close_home_precision_residual(
+                remaining_house_kwh=remaining_house,
+                battery_home_kwh=battery_home,
+                battery_energy_kwh=battery,
+                floor_kwh=floor_kwh,
+                discharge_limit_kwh=min(
+                    discharge_limit,
+                    max(inverter_limit - solar_home, 0.0),
+                ),
+                discharge_efficiency=discharge_efficiency,
+            )
             battery -= battery_home / discharge_efficiency
             solar_left = max(solar_generation - solar_home, 0.0)
             best_future = _best_future_rate(slots, start, deadline)
@@ -338,7 +377,6 @@ def _future_today_projection(
                 best_future * charge_efficiency * discharge_efficiency
                 - agile.BATTERY_WEAR_PENCE_PER_KWH
             )
-            floor_kwh = capacity * precheap_target / 100.0
             if (
                 solar_left > _EPSILON
                 and battery < capacity - _EPSILON
