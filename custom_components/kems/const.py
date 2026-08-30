@@ -85,7 +85,7 @@ CONF_MANUAL_OFFPEAK_RATE = "manual_offpeak_rate_pence"
 CONF_MANUAL_STANDING_CHARGE = "manual_standing_charge_pence"
 CONF_MANUAL_OFFPEAK_START = "manual_offpeak_start"
 CONF_MANUAL_OFFPEAK_END = "manual_offpeak_end"
-# Legacy option retained for config-entry compatibility. Alpha7.34+ ignores it.
+# Opt-in Intelligent extra-slot authority; omitted legacy entries remain disabled.
 CONF_INTELLIGENT_SLOTS_ENABLED = "intelligent_slots_enabled"
 
 CONF_SCAN_INTERVAL = "scan_interval_seconds"
