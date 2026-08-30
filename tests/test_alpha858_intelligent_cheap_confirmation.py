@@ -7,7 +7,11 @@ from datetime import UTC, datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
 from custom_components.kems.agile_smart_export import AgileRate, AgileSmartExportManager
-from custom_components.kems.kems_core import SimulationConfig, SimulationEngine, Snapshot
+from custom_components.kems.kems_core import (
+    SimulationConfig,
+    SimulationEngine,
+    Snapshot,
+)
 from custom_components.kems.tariff import TariffSettings, resolve_tariff
 
 LONDON = ZoneInfo("Europe/London")
@@ -177,7 +181,9 @@ def test_full_kems_cheap_slot_routes_solar_to_battery_before_grid_charge() -> No
     assert float(result.simulated_grid_import_kwh or 0.0) >= 3.0
 
 
-def test_agile_replay_cheap_slot_routes_solar_to_battery_even_with_positive_export() -> None:
+def test_agile_replay_cheap_slot_routes_solar_to_battery_even_with_positive_export() -> (
+    None
+):
     """Positive Outgoing Agile price must not beat cheap-slot battery refill priority."""
     records = _cheap_records()
     config = SimulationConfig(
