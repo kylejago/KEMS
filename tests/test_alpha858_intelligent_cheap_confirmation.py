@@ -65,6 +65,8 @@ def test_field_intelligent_slot_is_confirmed_from_octopus_and_ohme() -> None:
     snapshot = Snapshot(
         off_peak=resolved.off_peak,
         intelligent_slot=resolved.intelligent_slot,
+        intelligent_slot_confirmation=resolved.intelligent_slot_confirmation,
+        intelligent_slot_evidence=resolved.intelligent_slot_evidence,
         ev_charging=True,
     )
     assert snapshot.cheap_period_confirmed is True
@@ -128,6 +130,8 @@ def _cheap_records() -> list[Snapshot]:
             current_import_rate=3.4933,
             off_peak=False,
             intelligent_slot=True,
+            intelligent_slot_confirmation="confirmed",
+            intelligent_slot_evidence={"large_import_permitted": True},
             ev_connected=True,
             ev_charging=True,
             ev_power_kw=7.0,
@@ -210,7 +214,7 @@ def test_agile_replay_cheap_slot_routes_solar_to_battery() -> None:
         50.0,
     )
 
-    assert summary["ready"] is True
+    assert summary["data_coverage"] == 1.0
     assert summary["solar_to_battery_kwh"] > 0.9
     assert summary["solar_export_kwh"] == 0.0
     assert summary["grid_import_kwh"] >= 3.0
