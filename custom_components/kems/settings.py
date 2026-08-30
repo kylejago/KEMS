@@ -121,9 +121,7 @@ class KEMSSettings:
                     time(5, 30),
                 ),
                 # Intelligent extra slots remain opt-in and fail closed by default.
-                intelligent_slots_enabled=bool(
-                    values[CONF_INTELLIGENT_SLOTS_ENABLED]
-                ),
+                intelligent_slots_enabled=bool(values[CONF_INTELLIGENT_SLOTS_ENABLED]),
             ),
             simulation=SimulationConfig(
                 battery_capacity_kwh=float(values[CONF_BATTERY_CAPACITY]),
