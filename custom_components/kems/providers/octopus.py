@@ -123,13 +123,15 @@ class OctopusProvider(HomeAssistantStateReader):
 
         # Alpha8.58 uses the Octopus current-demand sensor only as corroborating
         # evidence for a daytime Intelligent import. It is not a tariff source and
-        # does not become part of tariff freshness/staleness accounting.
+        # does not become part of tariff freshness/staleness accounting. Some unit
+        # and legacy entity maps intentionally omit these optional fields, so read
+        # them defensively rather than making corroboration a provider prerequisite.
         demand_entity = next(
             (
                 entity_id
                 for entity_id in (
-                    self._entities.grid_import_kw,
-                    self._entities.house_load_kw,
+                    getattr(self._entities, "grid_import_kw", None),
+                    getattr(self._entities, "house_load_kw", None),
                 )
                 if entity_id and entity_id.startswith("sensor.octopus_energy_")
             ),
