@@ -1,6 +1,6 @@
 # KEMS 0.8.0-alpha8.57
 
-Alpha8.57 replaces the Alpha8.56 fixed 1 Wh precision tolerance with a canonical house-first discharge reconciliation proven from the 30 Aug Alpha8.56 field diagnostic.
+Alpha8.57 replaces the Alpha8.56 fixed 1 Wh precision tolerance with a canonical house-first discharge reconciliation proven from the 30 Aug Alpha8.56 field diagnostic. This is a routing invariant rather than a wider numeric tolerance.
 
 ## Changed
 
