@@ -181,10 +181,8 @@ def test_full_kems_cheap_slot_routes_solar_to_battery_before_grid_charge() -> No
     assert float(result.simulated_grid_import_kwh or 0.0) >= 3.0
 
 
-def test_agile_replay_cheap_slot_routes_solar_to_battery_even_with_positive_export() -> (
-    None
-):
-    """Positive Outgoing Agile price must not beat cheap-slot battery refill priority."""
+def test_agile_replay_cheap_slot_prioritises_solar_charge() -> None:
+    """Positive Outgoing price must not beat cheap-slot battery refill priority."""
     records = _cheap_records()
     config = SimulationConfig(
         battery_capacity_kwh=56.42,
