@@ -153,7 +153,7 @@ def test_physical_discharge_limit_preserves_a_real_grid_shortfall() -> None:
     slot_flow = _load_slot_flow_module()
     published = slot_flow.build_slot_flow(**projection)
     assert published["flow_grid_action"] == "IMPORT"
-    assert published["flow_grid_import_kwh"] == pytest.approx(0.043)
+    assert published["flow_grid_import_kwh"] == round(projection["grid_import_kwh"], 3)
 
 
 def test_sub_wh_residual_is_not_closed_without_discharge_headroom() -> None:
