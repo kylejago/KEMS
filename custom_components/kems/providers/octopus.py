@@ -30,6 +30,7 @@ class OctopusState:
     intelligent_slot: bool | None = None
     next_offpeak_start: datetime | None = None
     offpeak_end: datetime | None = None
+    current_demand_kw: float | None = None
     source_age_seconds: dict[str, float] = field(default_factory=dict)
     stale_fields: tuple[str, ...] = ()
     source_data_age_seconds: float | None = None
@@ -120,6 +121,26 @@ class OctopusProvider(HomeAssistantStateReader):
             # never a still-authoritative cheap-period signal.
             intelligent_slot = False
 
+        # Alpha8.58 uses the Octopus current-demand sensor only as corroborating
+        # evidence for a daytime Intelligent import. It is not a tariff source and
+        # does not become part of tariff freshness/staleness accounting.
+        demand_entity = next(
+            (
+                entity_id
+                for entity_id in (
+                    self._entities.grid_import_kw,
+                    self._entities.house_load_kw,
+                )
+                if entity_id and entity_id.startswith("sensor.octopus_energy_")
+            ),
+            None,
+        )
+        current_demand_kw = self._fresh_power_kw(
+            demand_entity,
+            self._stale_data_seconds,
+            reference,
+        )
+
         state = OctopusState(
             current_import_rate=fresh_rate(
                 "current_import_rate",
@@ -147,6 +168,7 @@ class OctopusProvider(HomeAssistantStateReader):
                 "offpeak_end",
                 self._entities.offpeak_end,
             ),
+            current_demand_kw=current_demand_kw,
             source_age_seconds=ages,
             stale_fields=tuple(sorted(stale)),
             source_data_age_seconds=max(ages.values()) if ages else None,
