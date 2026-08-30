@@ -20,12 +20,12 @@
       "delivery": "kems_core"
     },
     "property_web": {
-      "version": "0.8.0-alpha8-web.7",
+      "version": "0.8.0-alpha8-web.8",
       "required": true,
       "delivery": "kems_pi"
     },
     "pi_agent": {
-      "version": "0.8.0-alpha8-web.7",
+      "version": "0.8.0-alpha8-web.8",
       "required": true,
       "delivery": "kems_pi"
     },
@@ -35,14 +35,14 @@
       "delivery": "kems_pi"
     },
     "public_web": {
-      "version": "0.8.0-alpha8-web.7",
+      "version": "0.8.0-alpha8-web.8",
       "required": false,
       "delivery": "ionos-sftp"
     }
   },
   "maintenance": {
     "required": true,
-    "reason": "Accumulate elapsed canonical solar export into Today accounting and make active/future displayed SOC continuous with canonical current SOC and displayed battery flows",
+    "reason": "Align the coordinated KEMS bundle with the released KEMS Web 0.8.0-alpha8-web.8 baseline; no runtime control logic changes",
     "expected_downtime_minutes": 5,
     "home_assistant_restart_required": true,
     "reboot_required": false,
