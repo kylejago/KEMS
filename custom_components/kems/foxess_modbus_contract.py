@@ -98,8 +98,7 @@ def foxess_modbus_contract_snapshot() -> dict[str, Any]:
         "reviewed_upstream_version": FOXESS_MODBUS_REVIEWED_VERSION,
         "kh_families": list(FOXESS_MODBUS_KH_FAMILIES),
         "required_telemetry": {
-            key: dict(value)
-            for key, value in FOXESS_MODBUS_REQUIRED_TELEMETRY.items()
+            key: dict(value) for key, value in FOXESS_MODBUS_REQUIRED_TELEMETRY.items()
         },
         "battery_power_fallback": {
             key: dict(value)
@@ -109,9 +108,7 @@ def foxess_modbus_contract_snapshot() -> dict[str, Any]:
             key: dict(value)
             for key, value in FOXESS_MODBUS_OPTIONAL_DIAGNOSTICS.items()
         },
-        "known_writable_capabilities": dict(
-            FOXESS_MODBUS_KNOWN_WRITABLE_CAPABILITIES
-        ),
+        "known_writable_capabilities": dict(FOXESS_MODBUS_KNOWN_WRITABLE_CAPABILITIES),
         "writes_permitted": False,
         "hardware_writes": "blocked",
         "control_scope": "catalogue only; no FoxESS write path is enabled",

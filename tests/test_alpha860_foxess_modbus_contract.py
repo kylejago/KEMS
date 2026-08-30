@@ -80,10 +80,7 @@ def test_v115_kh_contract_is_read_only_and_uses_direct_battery_power() -> None:
     assert snapshot["reviewed_upstream_version"] == "1.15.0"
     assert snapshot["kh_families"] == ["KH_PRE119", "KH_PRE133", "KH_133"]
     assert snapshot["required_telemetry"]["battery_soc"]["key"] == "battery_soc"
-    assert (
-        snapshot["required_telemetry"]["battery_power_kw"]["key"]
-        == "invbatpower"
-    )
+    assert snapshot["required_telemetry"]["battery_power_kw"]["key"] == "invbatpower"
     assert snapshot["battery_power_fallback"]["battery_voltage"]["key"] == (
         "invbatvolt"
     )
@@ -165,7 +162,9 @@ def test_real_v115_kh_inventory_auto_maps_all_required_kems_sources() -> None:
     }
 
 
-def test_invbat_voltage_current_are_valid_fallback_without_replacing_direct_power() -> None:
+def test_invbat_voltage_current_are_valid_fallback_without_replacing_direct_power() -> (
+    None
+):
     """KH inverter voltage/current may support fallback while power stays primary."""
     constants, discovery, _ = _load_modules()
     candidates = [
