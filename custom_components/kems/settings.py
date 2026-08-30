@@ -40,6 +40,7 @@ from .const import (
     CONF_GRANTS_REBATES,
     CONF_GRID_STABILITY_SECONDS,
     CONF_HISTORY_DAYS,
+    CONF_INTELLIGENT_SLOTS_ENABLED,
     CONF_INVERTER_LIMIT,
     CONF_ISLAND_RESERVE_PERCENT,
     CONF_MANUAL_DAY_RATE,
@@ -119,9 +120,8 @@ class KEMSSettings:
                     values.get(CONF_MANUAL_OFFPEAK_END),
                     time(5, 30),
                 ),
-                # Alpha7.34 makes the configured overnight schedule the only
-                # cheap-control authority. Legacy persisted options are inert.
-                intelligent_slots_enabled=False,
+                # Intelligent extra slots remain opt-in and fail closed by default.
+                intelligent_slots_enabled=bool(values[CONF_INTELLIGENT_SLOTS_ENABLED]),
             ),
             simulation=SimulationConfig(
                 battery_capacity_kwh=float(values[CONF_BATTERY_CAPACITY]),
