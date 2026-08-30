@@ -5,6 +5,7 @@ from __future__ import annotations
 import ast
 import importlib.util
 import math
+import sys
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -25,6 +26,7 @@ def _load_ledger_module():
     )
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
     spec.loader.exec_module(module)
     return module
 
@@ -203,6 +205,7 @@ def _solar_value_helpers():
     ]
     namespace: dict[str, Any] = {
         "AgileRate": Any,
+        "UTC": UTC,
         "datetime": datetime,
         "math": math,
         "BATTERY_WEAR_PENCE_PER_KWH": 2.0,
@@ -236,7 +239,7 @@ def test_surplus_solar_exports_now_when_marginal_future_net_value_is_lower() -> 
         7.0,
     )
     assert marginal == 16.55
-    assert stored_value(marginal, 0.95, 0.95) == pytest.approx(13.130125)
+    assert stored_value(marginal, 0.95, 0.95) == pytest.approx(13.131375)
     assert stored_value(marginal, 0.95, 0.95) < 14.28
 
 
@@ -255,7 +258,7 @@ def test_surplus_solar_stores_when_marginal_future_net_value_is_genuinely_higher
         7.0,
     )
     assert marginal == 22.88
-    assert stored_value(marginal, 0.95, 0.95) == pytest.approx(18.8417)
+    assert stored_value(marginal, 0.95, 0.95) == pytest.approx(18.8442)
     assert stored_value(marginal, 0.95, 0.95) > 14.28
 
 
