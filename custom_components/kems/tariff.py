@@ -157,8 +157,7 @@ def _intelligent_extra_slot_evidence(
         live_offpeak_end,
     )
     power_active = (
-        ev_power_kw is not None
-        and float(ev_power_kw) >= INTELLIGENT_EV_MIN_POWER_KW
+        ev_power_kw is not None and float(ev_power_kw) >= INTELLIGENT_EV_MIN_POWER_KW
     )
     soc_plausible = ev_soc is None or 0.0 <= float(ev_soc) <= 100.0
     price_corroborated = _rate_matches_cheap(
@@ -278,22 +277,20 @@ def resolve_tariff(
             },
         )
 
-    extra_slot_confirmed, confirmation, evidence = (
-        _intelligent_extra_slot_evidence(
-            settings=settings,
-            now=now,
-            live_current_import_rate=live_current_import_rate,
-            live_next_import_rate=live_next_import_rate,
-            live_off_peak=live_off_peak,
-            live_intelligent_slot=live_intelligent_slot,
-            live_next_offpeak_start=live_next_offpeak_start,
-            live_offpeak_end=live_offpeak_end,
-            live_current_demand_kw=live_current_demand_kw,
-            ev_connected=ev_connected,
-            ev_charging=ev_charging,
-            ev_power_kw=ev_power_kw,
-            ev_soc=ev_soc,
-        )
+    extra_slot_confirmed, confirmation, evidence = _intelligent_extra_slot_evidence(
+        settings=settings,
+        now=now,
+        live_current_import_rate=live_current_import_rate,
+        live_next_import_rate=live_next_import_rate,
+        live_off_peak=live_off_peak,
+        live_intelligent_slot=live_intelligent_slot,
+        live_next_offpeak_start=live_next_offpeak_start,
+        live_offpeak_end=live_offpeak_end,
+        live_current_demand_kw=live_current_demand_kw,
+        ev_connected=ev_connected,
+        ev_charging=ev_charging,
+        ev_power_kw=ev_power_kw,
+        ev_soc=ev_soc,
     )
 
     used_live = any(
