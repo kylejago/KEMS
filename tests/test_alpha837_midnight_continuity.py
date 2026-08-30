@@ -149,18 +149,31 @@ def test_2330_charge_is_carried_across_midnight() -> None:
     manager._daily = {}
     manager._prepare_replay_continuity(records)
 
+    # 18.544% is the already-reconciled SOC at the 23:30 cheap boundary.
+    # 3.5 kWh input at 95% stores 3.325 kWh: exact handoff is 24.437%.
     expected_exact_midnight = 18.544 + (3.325 / 56.42 * 100.0)
     assert round(expected_exact_midnight, 3) == 24.437
 
+    # Isolate only the missing 23:30->00:00 interval from the live evidence.
     first = manager._compare_day(
-        records[1:2], config, _tariff(tariff_module), 18.544, 18.544, None
+        records[1:2],
+        config,
+        _tariff(tariff_module),
+        18.544,
+        18.544,
+        None,
     )
     midnight_soc = float(first["agile_smart_export"]["ending_soc_percent"])
     assert midnight_soc == 24.4
     assert "2026-08-27" in manager._midnight_replay_augmented_days
 
     second = manager._compare_day(
-        records[2:], config, _tariff(tariff_module), midnight_soc, midnight_soc, None
+        records[2:],
+        config,
+        _tariff(tariff_module),
+        midnight_soc,
+        midnight_soc,
+        None,
     )
     assert round(float(second["agile_smart_export"]["ending_soc_percent"]), 1) == 30.3
 
@@ -182,7 +195,12 @@ def test_first_replay_day_uses_persisted_previous_soc() -> None:
     manager._prepare_replay_continuity(records)
 
     result = manager._compare_day(
-        records, config, _tariff(tariff_module), 18.544, 18.544, None
+        records,
+        config,
+        _tariff(tariff_module),
+        18.544,
+        18.544,
+        None,
     )
     assert manager._midnight_replay_seed_applied is True
     assert round(float(result["agile_smart_export"]["ending_soc_percent"]), 1) == 30.3
@@ -207,7 +225,9 @@ def test_shadow_cheap_charge_target_mirrors_canonical_control() -> None:
     }
 
     corrected, updated = charge_truth.reconcile_cheap_charge_target(
-        candidate, context, control
+        candidate,
+        context,
+        control,
     )
     assert corrected is not None
     assert corrected.desired_charge_power_kw == 7.0
@@ -239,7 +259,10 @@ def test_alpha837_version_and_release_scope() -> None:
     version = str(manifest["version"])
     assert version.startswith("0.8.0-alpha8.")
     assert int(version.rsplit(".", 1)[-1]) >= 37
-    assert bundle["maintenance"]["affected_components"] == ["kems_core", "dashboard"]
+    assert bundle["maintenance"]["affected_components"] == [
+        "kems_core",
+        "dashboard",
+    ]
     assert bundle["maintenance"]["home_assistant_restart_required"] is True
     assert bundle["maintenance"]["reboot_required"] is False
     assert bundle["components"]["panel"]["version"] == "0.8.0-alpha8-panel.1"
