@@ -100,6 +100,30 @@ def _rolling_target(
     ):
         return None
 
+    dispatch_mode = str(plan.get("dispatch_mode") or "")
+    if dispatch_mode == "cheap_charge":
+        routing = agile_state.get("current_routing_snapshot")
+        charge = None
+        if isinstance(routing, dict) and routing.get("available"):
+            solar_charge = _number(routing.get("solar_to_battery_kw"))
+            grid_charge = _number(routing.get("grid_to_battery_kw"))
+            if solar_charge is not None or grid_charge is not None:
+                charge = max((solar_charge or 0.0) + (grid_charge or 0.0), 0.0)
+        if charge is None:
+            charge = max(
+                _number(simulation.current_simulated_battery_charge_power_kw) or 0.0,
+                0.0,
+            )
+        return (
+            {
+                "charge_kw": charge,
+                "battery_to_home_kw": 0.0,
+                "battery_export_kw": 0.0,
+                "total_discharge_kw": 0.0,
+            },
+            plan,
+        )
+
     target_home = _number(plan.get("current_house_battery_kw"))
     target_discharge = _number(plan.get("current_battery_discharge_target_kw"))
     target_export = _number(plan.get("current_battery_export_target_kw"))
@@ -111,6 +135,7 @@ def _rolling_target(
     target_discharge = max(target_discharge, target_home + target_export, 0.0)
     return (
         {
+            "charge_kw": 0.0,
             "battery_to_home_kw": target_home,
             "battery_export_kw": target_export,
             "total_discharge_kw": target_discharge,
@@ -150,9 +175,12 @@ def aligned_agile_control_views(
     control_values = dict(routing_values)
     control_values.update(
         {
+            "current_simulated_battery_charge_power_kw": target["charge_kw"],
             "current_simulated_battery_to_home_power_kw": target["battery_to_home_kw"],
             "current_simulated_battery_export_power_kw": target["battery_export_kw"],
-            "current_simulated_battery_power_kw": target["total_discharge_kw"],
+            "current_simulated_battery_power_kw": (
+                target["total_discharge_kw"] - target["charge_kw"]
+            ),
             "target_battery_export_power_kw": target["battery_export_kw"],
         }
     )
@@ -195,8 +223,10 @@ def align_agile_control_state(
     solar = max(control.virtual_scenario_solar_power_kw, 0.0)
     total_output = solar + target["total_discharge_kw"]
     target_within_limits = bool(
-        target["total_discharge_kw"] <= config.max_discharge_kw + 1e-6
+        target["charge_kw"] <= config.max_charge_kw + 1e-6
+        and target["total_discharge_kw"] <= config.max_discharge_kw + 1e-6
         and target["battery_export_kw"] <= config.export_limit_kw + 1e-6
+        and not (target["charge_kw"] > 1e-6 and target["total_discharge_kw"] > 1e-6)
         and total_output <= config.inverter_limit_kw + 1e-6
         and not control.site_import_limit_exceeded
     )
@@ -212,9 +242,11 @@ def align_agile_control_state(
         control,
         operating_reason=f"agile_rolling_{dispatch_mode}",
         desired_work_mode=(
-            "Feed-in First" if target["battery_export_kw"] > 0.01 else "Self Use"
+            control.desired_work_mode
+            if target["charge_kw"] > 0.01
+            else ("Feed-in First" if target["battery_export_kw"] > 0.01 else "Self Use")
         ),
-        desired_charge_power_kw=0.0,
+        desired_charge_power_kw=round(target["charge_kw"], 3),
         desired_battery_to_home_power_kw=round(target["battery_to_home_kw"], 3),
         desired_battery_export_power_kw=round(target["battery_export_kw"], 3),
         desired_total_discharge_power_kw=round(target["total_discharge_kw"], 3),

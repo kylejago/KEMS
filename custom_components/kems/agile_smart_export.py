@@ -702,14 +702,31 @@ class AgileSmartExportManager:
 
                 solar_left = max(solar_kwh - solar_home, 0)
                 next_cheap = _next_cheap(current.timestamp, tariff)
-                best_future = _best_rate(
+                future_exportable = max(battery - floor, 0.0) * max(
+                    config.discharge_efficiency,
+                    0.01,
+                )
+                potential_charge_input = min(
+                    solar_left,
+                    charge_limit,
+                    max(capacity - battery, 0.0) / max(config.charge_efficiency, 0.01),
+                )
+                potential_future_export = (
+                    potential_charge_input
+                    * max(config.charge_efficiency, 0.0)
+                    * max(config.discharge_efficiency, 0.0)
+                )
+                marginal_future = _threshold(
                     rates,
                     current.timestamp + timedelta(seconds=1),
                     next_cheap,
+                    future_exportable + potential_future_export,
+                    max(config.max_discharge_kw, 0.0),
                 )
-                stored_value = (
-                    best_future * config.charge_efficiency * config.discharge_efficiency
-                    - BATTERY_WEAR_PENCE_PER_KWH
+                stored_value = _stored_solar_net_value_pence(
+                    marginal_future,
+                    config.charge_efficiency,
+                    config.discharge_efficiency,
                 )
                 if (
                     solar_left
@@ -1500,6 +1517,19 @@ def _threshold(
         math.ceil(energy / max(max_kw * 0.5, 0.001)),
     )
     return values[min(needed, len(values)) - 1]
+
+
+def _stored_solar_net_value_pence(
+    future_rate_pence: float | None,
+    charge_efficiency: float,
+    discharge_efficiency: float,
+) -> float:
+    """Return net pence value of storing one input kWh of surplus solar."""
+    rate = max(float(future_rate_pence or 0.0), 0.0)
+    charge = min(max(float(charge_efficiency), 0.0), 1.0)
+    discharge = min(max(float(discharge_efficiency), 0.0), 1.0)
+    discharged_fraction = charge * discharge
+    return max(rate - BATTERY_WEAR_PENCE_PER_KWH, 0.0) * discharged_fraction
 
 
 def _best_rate(

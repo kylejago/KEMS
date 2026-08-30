@@ -251,11 +251,42 @@ def allocate_total_discharge_slots(
     required_current = max(required + safety - future_capacity, 0.0)
 
     remaining = min(required, total_capacity)
+
+    # Solar is already deducted when house_capacity_kwh is calculated. Spend
+    # the protected battery-discharge budget on the remaining house demand in
+    # chronological order before price-ranking any discretionary export. A
+    # price hold therefore means "do not export", never "buy premium grid
+    # energy while usable battery energy remains above the protected floor".
+    for item in sorted(candidates, key=lambda value: value["valid_from"]):
+        if remaining <= _EPSILON:
+            break
+        house_dispatch = min(
+            item["house_capacity_kwh"],
+            item["total_capacity_kwh"],
+            remaining,
+        )
+        item["allocation_kwh"] = house_dispatch
+        remaining -= house_dispatch
+
+    # Preserve the rolling deadline safety guard, but only with discharge
+    # budget left after mandatory home service. It may move discretionary
+    # discharge into the current slot; it may not displace future house energy
+    # and manufacture avoidable day-rate import.
     if current is not None and remaining > _EPSILON:
-        forced = min(required_current, current_capacity, remaining)
-        current["allocation_kwh"] = forced
+        required_extra = max(
+            required_current - current["allocation_kwh"],
+            0.0,
+        )
+        forced = min(
+            required_extra,
+            max(current_capacity - current["allocation_kwh"], 0.0),
+            remaining,
+        )
+        current["allocation_kwh"] += forced
         remaining -= forced
 
+    # Only energy left after the household has been protected is discretionary
+    # export. Rank that remainder by Agile Outgoing price as before.
     for item in sorted(
         candidates,
         key=lambda value: (-value["rate_pence"], value["valid_from"]),
