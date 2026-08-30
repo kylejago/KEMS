@@ -312,8 +312,8 @@ def test_alpha845_release_contract() -> None:
 
     assert version.startswith("0.8.0-alpha8.")
     assert int(version.rsplit(".", 1)[1]) >= 45
-    assert bundle["components"]["property_web"]["version"] == "0.8.0-alpha8-web.7"
-    assert bundle["components"]["pi_agent"]["version"] == "0.8.0-alpha8-web.7"
-    assert bundle["components"]["public_web"]["version"] == "0.8.0-alpha8-web.7"
+    assert bundle["components"]["property_web"]["version"] == "0.8.0-alpha8-web.8"
+    assert bundle["components"]["pi_agent"]["version"] == "0.8.0-alpha8-web.8"
+    assert bundle["components"]["public_web"]["version"] == "0.8.0-alpha8-web.8"
     assert bundle["components"]["panel"]["version"] == "0.8.0-alpha8-panel.1"
     assert bundle["maintenance"]["affected_components"] == ["kems_core", "dashboard"]
