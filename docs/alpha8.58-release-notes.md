@@ -16,6 +16,8 @@ Large daytime import is permitted only when the enabled Intelligent policy is co
 
 The field case from 30 Aug 2026 is explicitly locked: Octopus Energy may still report 28.3036p/kWh while the separate Intelligent integration reports the active dispatch. With a 17:33-18:00 Intelligent window, next rate 3.4933p/kWh, Ohme charging at 7.326 kW and site demand 8.682 kW, KEMS must recognise the slot as cheap and use 3.4933p/kWh for simulation/control planning.
 
+Rate and demand checks are corroborating evidence rather than independent permission: neither a cheap-looking rate nor a high site demand can authorise daytime battery import without the active Intelligent window and live Ohme charging confirmation.
+
 Any stale, absent or contradictory primary evidence fails closed to normal day-rate routing. The configured 23:30-05:30 overnight cheap window remains independently authoritative and does not require EV charging.
 
 ## Solar during confirmed cheap periods
