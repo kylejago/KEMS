@@ -226,9 +226,7 @@ def align_agile_control_state(
         target["charge_kw"] <= config.max_charge_kw + 1e-6
         and target["total_discharge_kw"] <= config.max_discharge_kw + 1e-6
         and target["battery_export_kw"] <= config.export_limit_kw + 1e-6
-        and not (
-            target["charge_kw"] > 1e-6 and target["total_discharge_kw"] > 1e-6
-        )
+        and not (target["charge_kw"] > 1e-6 and target["total_discharge_kw"] > 1e-6)
         and total_output <= config.inverter_limit_kw + 1e-6
         and not control.site_import_limit_exceeded
     )
@@ -246,11 +244,7 @@ def align_agile_control_state(
         desired_work_mode=(
             control.desired_work_mode
             if target["charge_kw"] > 0.01
-            else (
-                "Feed-in First"
-                if target["battery_export_kw"] > 0.01
-                else "Self Use"
-            )
+            else ("Feed-in First" if target["battery_export_kw"] > 0.01 else "Self Use")
         ),
         desired_charge_power_kw=round(target["charge_kw"], 3),
         desired_battery_to_home_power_kw=round(target["battery_to_home_kw"], 3),

@@ -709,8 +709,7 @@ class AgileSmartExportManager:
                 potential_charge_input = min(
                     solar_left,
                     charge_limit,
-                    max(capacity - battery, 0.0)
-                    / max(config.charge_efficiency, 0.01),
+                    max(capacity - battery, 0.0) / max(config.charge_efficiency, 0.01),
                 )
                 potential_future_export = (
                     potential_charge_input

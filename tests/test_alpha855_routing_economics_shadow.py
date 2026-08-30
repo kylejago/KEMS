@@ -20,7 +20,9 @@ AGILE = ROOT / "custom_components" / "kems" / "agile_smart_export.py"
 
 
 def _load_ledger_module():
-    spec = importlib.util.spec_from_file_location("alpha855_discharge_slot_ledger", LEDGER)
+    spec = importlib.util.spec_from_file_location(
+        "alpha855_discharge_slot_ledger", LEDGER
+    )
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
@@ -73,7 +75,9 @@ def test_future_hold_slots_serve_home_before_discretionary_export() -> None:
     assert peak.planned_battery_export_kwh == pytest.approx(0.5)
 
 
-def test_grid_residual_only_appears_after_protected_battery_budget_is_exhausted() -> None:
+def test_grid_residual_only_appears_after_protected_battery_budget_is_exhausted() -> (
+    None
+):
     """Chronological home service stops only when the SOC-protected budget ends."""
     ledger = _load_ledger_module()
     start = datetime(2026, 8, 30, 20, 30, tzinfo=UTC)
@@ -236,7 +240,9 @@ def test_surplus_solar_exports_now_when_marginal_future_net_value_is_lower() -> 
     assert stored_value(marginal, 0.95, 0.95) < 14.28
 
 
-def test_surplus_solar_stores_when_marginal_future_net_value_is_genuinely_higher() -> None:
+def test_surplus_solar_stores_when_marginal_future_net_value_is_genuinely_higher() -> (
+    None
+):
     """A still-unfilled 22.88p slot comfortably beats direct 14.28p export."""
     threshold, stored_value = _solar_value_helpers()
     start = datetime(2026, 8, 30, 8, 30, tzinfo=UTC)
@@ -269,7 +275,10 @@ def test_alpha855_keeps_special_dispatch_and_hardware_boundaries() -> None:
         ROOT / "custom_components" / "kems" / "agile_total_discharge_ledger.py"
     ).read_text()
     alignment_source = ALIGNMENT.read_text()
-    assert 'mode in {"cheap_charge", "happy_hour_charge", "power_down_session"}' in ledger_source
+    assert (
+        'mode in {"cheap_charge", "happy_hour_charge", "power_down_session"}'
+        in ledger_source
+    )
     assert '"hardware_writes": "blocked"' in ledger_source
     assert "commands_permitted=False" in alignment_source
     assert "real_backend_available=False" in alignment_source
