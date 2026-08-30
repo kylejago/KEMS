@@ -27,7 +27,7 @@ def test_release_bundle_renders_exact_coordinated_alpha8_targets() -> None:
     property_web = str(bundle["components"]["property_web"]["version"])
     pi_agent = str(bundle["components"]["pi_agent"]["version"])
     public_web = str(bundle["components"]["public_web"]["version"])
-    assert property_web == pi_agent == public_web == "0.8.0-alpha8-web.8"
+    assert property_web == pi_agent == public_web == "0.8.0-alpha8-web.9"
     assert bundle["components"]["property_web"]["required"] is True
     assert bundle["components"]["pi_agent"]["required"] is True
     assert bundle["components"]["public_web"]["required"] is False
@@ -37,7 +37,7 @@ def test_release_bundle_renders_exact_coordinated_alpha8_targets() -> None:
     assert affected[:2] == ["kems_core", "dashboard"]
     assert set(affected) <= set(bundle["components"])
     assert bundle["maintenance"]["reboot_required"] is False
-    assert "Web 0.8.0-alpha8-web.8" in bundle["maintenance"]["reason"]
+    assert "Web 0.8.0-alpha8-web.9" in bundle["maintenance"]["reason"]
     assert "canonical solar export" not in bundle["maintenance"]["reason"]
 
 
