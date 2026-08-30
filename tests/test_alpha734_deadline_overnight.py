@@ -89,22 +89,21 @@ def test_tonights_29_percent_example_would_enter_guard_before_2200() -> None:
     assert guarded_start < datetime(2026, 8, 19, 22, 0, tzinfo=LONDON)
 
 
-def test_extra_intelligent_slots_are_not_control_authoritative() -> None:
-    """Only the configured overnight schedule may be marked cheap for KEMS."""
+def test_alpha734_legacy_extra_slot_block_is_superseded_safely() -> None:
+    """Alpha8.58 may restore extras only behind a fail-closed evidence gate."""
     source = TARIFF.read_text(encoding="utf-8")
-    assert "extra_slot_confirmed" not in source
-    assert "off_peak=schedule_offpeak" in source
-    assert "intelligent_slot=False" in source
-    assert "next_offpeak_start=manual_next_start" in source
-    assert "offpeak_end=manual_end" in source
-    assert "live_off_peak if" not in source
+    assert "_intelligent_extra_slot_evidence" in source
+    assert "large_import_permitted" in source
+    assert "automatic_intelligent_extra" in source
+    assert "INTELLIGENT_EV_MIN_POWER_KW" in source
+    assert "settings.intelligent_slots_enabled" in source
 
 
-def test_retained_intelligent_slot_snapshot_cannot_become_cheap() -> None:
-    """Old Intelligent/EV observations must also be inert during replay."""
+def test_retained_intelligent_observation_is_not_rewritten_by_history() -> None:
+    """Historical raw flags remain data; only live tariff resolution grants import."""
     old_extra_slot = Snapshot(
         off_peak=False,
-        intelligent_slot=True,
+        intelligent_slot=False,
         ev_charging=True,
     )
     overnight = Snapshot(
