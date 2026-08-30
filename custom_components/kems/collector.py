@@ -39,7 +39,7 @@ class Collector:
         now = dt_util.now()
         octopus = self._octopus.get_state(now)
         gas = self._gas.get_state()
-        ohme = self._ohme.get_state()
+        ohme = self._ohme.get_state(now)
         foxess = self._foxess.get_state(now)
         octoplus = self._octoplus.get_state(now)
         tariff = resolve_tariff(
@@ -55,6 +55,10 @@ class Collector:
             live_offpeak_end=octopus.offpeak_end,
             ev_charging=ohme.charging,
             fallback_export_rate=self._settings.simulation.export_rate_pence,
+            ev_connected=ohme.connected,
+            ev_power_kw=ohme.power_kw,
+            ev_soc=ohme.vehicle_soc,
+            live_current_demand_kw=octopus.current_demand_kw,
         )
 
         return Snapshot(
@@ -71,6 +75,8 @@ class Collector:
             intelligent_slot=tariff.intelligent_slot,
             next_offpeak_start=tariff.next_offpeak_start,
             offpeak_end=tariff.offpeak_end,
+            intelligent_slot_confirmation=tariff.intelligent_slot_confirmation,
+            intelligent_slot_evidence=tariff.intelligent_slot_evidence,
             saving_session_joined=octoplus.joined,
             saving_session_active=octoplus.active,
             saving_session_id=octoplus.event_id,

@@ -26,6 +26,8 @@ class Snapshot:
     intelligent_slot: bool | None = None
     next_offpeak_start: datetime | None = None
     offpeak_end: datetime | None = None
+    intelligent_slot_confirmation: str | None = None
+    intelligent_slot_evidence: dict[str, Any] = field(default_factory=dict)
 
     saving_session_joined: bool = False
     saving_session_active: bool = False
