@@ -26,7 +26,7 @@ class Collector:
         octoplus: OctoplusProvider,
         settings: KEMSSettings,
     ) -> None:
-        """Initialise the coordinator."""
+        """Initialise the collector."""
         self._octopus = octopus
         self._gas = gas
         self._ohme = ohme

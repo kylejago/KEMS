@@ -260,15 +260,13 @@ class SimulationEngine:
                     or 0.0
                 )
             elif current.cheap_period_confirmed:
+                # Confirmed cheap import is the deliberate exception to normal
+                # solar-to-home routing: Grid serves the house/EV while every
+                # available unit of PV is offered to the battery first. Grid then
+                # fills only the remaining battery charge request. This avoids
+                # exporting PV while buying cheap energy to charge the battery.
+                house_grid_kwh = actual_house_kwh
                 if no_export_mode:
-                    solar_to_home = min(
-                        solar_energy,
-                        actual_house_kwh,
-                        inverter_capacity,
-                    )
-                    interval_solar_to_home = solar_to_home
-                    house_grid_kwh = max(actual_house_kwh - solar_to_home, 0.0)
-                    solar_surplus_kwh = max(solar_energy - solar_to_home, 0.0)
                     forecast_required = self._no_export_requirement_after_cheap(
                         today,
                         index + 1,
@@ -281,68 +279,53 @@ class SimulationEngine:
                         capacity,
                         config,
                     )
-                    charge_room_input_kwh = max(
-                        target_stored_kwh - battery_kwh,
-                        0.0,
-                    ) / max(config.charge_efficiency, 0.01)
-                    solar_charge_input_kwh = min(
-                        solar_surplus_kwh,
-                        max(config.max_charge_kw, 0.0) * hours,
-                        charge_room_input_kwh,
-                    )
-                    stored_from_solar = (
-                        solar_charge_input_kwh * config.charge_efficiency
-                    )
-                    battery_kwh += stored_from_solar
-                    battery_charge += stored_from_solar
-                    interval_solar_to_battery = stored_from_solar
-                    remaining_charge_power_kwh = max(
-                        max(config.max_charge_kw, 0.0) * hours - solar_charge_input_kwh,
-                        0.0,
-                    )
-                    site_charge_headroom_kwh = float("inf")
-                    if config.site_import_limit_kw is not None:
-                        site_charge_headroom_kwh = max(
-                            config.site_import_limit_kw * hours - house_grid_kwh,
-                            0.0,
-                        )
-                    grid_charge_input_kwh = min(
-                        remaining_charge_power_kwh,
-                        max(target_stored_kwh - battery_kwh, 0.0)
-                        / max(config.charge_efficiency, 0.01),
-                        site_charge_headroom_kwh,
-                    )
-                    stored_from_grid = grid_charge_input_kwh * config.charge_efficiency
-                    battery_kwh += stored_from_grid
-                    battery_charge += stored_from_grid
-                    interval_grid_to_battery = stored_from_grid
-                    interval_import = house_grid_kwh + grid_charge_input_kwh
-                    interval_export = 0.0
-                    interval_curtailment = max(
-                        solar_surplus_kwh - solar_charge_input_kwh,
-                        0.0,
-                    )
                 else:
-                    house_grid_kwh = actual_house_kwh
-                    site_charge_headroom_kwh = float("inf")
-                    if config.site_import_limit_kw is not None:
-                        site_charge_headroom_kwh = max(
-                            config.site_import_limit_kw * hours - house_grid_kwh,
-                            0.0,
-                        )
-                    charge_input_kwh = min(
-                        max(config.max_charge_kw, 0.0) * hours,
-                        max(capacity - battery_kwh, 0.0)
-                        / max(config.charge_efficiency, 0.01),
-                        site_charge_headroom_kwh,
+                    target_stored_kwh = capacity
+
+                charge_power_budget_kwh = max(config.max_charge_kw, 0.0) * hours
+                charge_room_input_kwh = max(
+                    target_stored_kwh - battery_kwh,
+                    0.0,
+                ) / max(config.charge_efficiency, 0.01)
+                solar_charge_input_kwh = min(
+                    solar_energy,
+                    charge_power_budget_kwh,
+                    charge_room_input_kwh,
+                )
+                stored_from_solar = solar_charge_input_kwh * config.charge_efficiency
+                battery_kwh += stored_from_solar
+                battery_charge += stored_from_solar
+                interval_solar_to_battery = stored_from_solar
+
+                remaining_charge_power_kwh = max(
+                    charge_power_budget_kwh - solar_charge_input_kwh,
+                    0.0,
+                )
+                site_charge_headroom_kwh = float("inf")
+                if config.site_import_limit_kw is not None:
+                    site_charge_headroom_kwh = max(
+                        config.site_import_limit_kw * hours - house_grid_kwh,
+                        0.0,
                     )
-                    stored_from_grid = charge_input_kwh * config.charge_efficiency
-                    battery_kwh += stored_from_grid
-                    battery_charge += stored_from_grid
-                    interval_grid_to_battery = stored_from_grid
-                    interval_import = house_grid_kwh + charge_input_kwh
+                grid_charge_input_kwh = min(
+                    remaining_charge_power_kwh,
+                    max(target_stored_kwh - battery_kwh, 0.0)
+                    / max(config.charge_efficiency, 0.01),
+                    site_charge_headroom_kwh,
+                )
+                stored_from_grid = grid_charge_input_kwh * config.charge_efficiency
+                battery_kwh += stored_from_grid
+                battery_charge += stored_from_grid
+                interval_grid_to_battery = stored_from_grid
+                interval_import = house_grid_kwh + grid_charge_input_kwh
+
+                solar_left_kwh = max(solar_energy - solar_charge_input_kwh, 0.0)
+                if no_export_mode:
+                    interval_export = 0.0
+                    interval_curtailment = solar_left_kwh
+                else:
                     interval_export, interval_curtailment = self._limit_export(
-                        solar_energy,
+                        solar_left_kwh,
                         export_capacity,
                     )
                     interval_solar_export = interval_export

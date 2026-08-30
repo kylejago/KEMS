@@ -630,23 +630,24 @@ class AgileSmartExportManager:
                 grid_import = load_kwh
                 target = capacity * _overnight_target(current, config) / 100
                 solar_left = solar_kwh
-                if rate <= 0:
-                    charge = min(
-                        solar_left,
-                        charge_limit,
-                        max(target - battery, 0) / max(config.charge_efficiency, 0.01),
-                    )
-                    solar_battery = charge * config.charge_efficiency
-                    battery += solar_battery
-                    solar_left -= charge
-                    if charge:
-                        actions.append("store solar")
+
+                # Cheap import deliberately powers the house/EV from Grid. PV is
+                # more valuable filling battery headroom than being exported while
+                # Grid simultaneously charges the battery, so PV consumes the
+                # shared charge-power budget before Grid charging is considered.
+                solar_charge = min(
+                    solar_left,
+                    charge_limit,
+                    max(target - battery, 0) / max(config.charge_efficiency, 0.01),
+                )
+                solar_battery = solar_charge * config.charge_efficiency
+                battery += solar_battery
+                solar_left -= solar_charge
+                if solar_charge:
+                    actions.append("store solar")
+
                 grid_charge = min(
-                    max(
-                        charge_limit
-                        - solar_battery / max(config.charge_efficiency, 0.01),
-                        0,
-                    ),
+                    max(charge_limit - solar_charge, 0.0),
                     max(target - battery, 0) / max(config.charge_efficiency, 0.01),
                 )
                 if config.site_import_limit_kw is not None:
@@ -662,6 +663,7 @@ class AgileSmartExportManager:
                 grid_import += grid_charge
                 if grid_charge:
                     actions.append("cheap charge")
+
                 if rate > 0:
                     solar_export = min(solar_left, export_limit)
                     curtailed = max(solar_left - solar_export, 0)
