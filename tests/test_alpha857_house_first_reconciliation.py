@@ -151,7 +151,9 @@ def test_house_wins_by_reducing_export_when_discharge_ceiling_is_full() -> None:
     assert projection["battery_to_home_kwh"] == pytest.approx(0.8)
     assert projection["battery_export_kwh"] == pytest.approx(2.7)
     assert projection["grid_import_kwh"] == 0.0
-    assert projection["battery_to_home_kwh"] + projection["battery_export_kwh"] == pytest.approx(3.5)
+    assert projection["battery_to_home_kwh"] + projection[
+        "battery_export_kwh"
+    ] == pytest.approx(3.5)
 
 
 def test_real_physical_shortfall_imports_only_after_export_is_removed() -> None:
