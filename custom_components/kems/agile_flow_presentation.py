@@ -28,7 +28,6 @@ from .kems_core.slot_flow import build_slot_flow
 from .tariff import TariffSettings
 
 _EPSILON = 1e-6
-_GRID_IMPORT_PRECISION_KWH = 0.001
 
 
 def _number(value: Any) -> float | None:
@@ -220,21 +219,25 @@ def _close_home_precision_residual(
     discharge_limit_kwh: float,
     discharge_efficiency: float,
 ) -> float:
-    """Close only quantisation-sized home residuals with usable battery."""
-    remaining_house = max(remaining_house_kwh, 0.0)
-    battery_home = min(max(battery_home_kwh, 0.0), remaining_house)
-    residual = max(remaining_house - battery_home, 0.0)
-    if residual <= _EPSILON or residual > _GRID_IMPORT_PRECISION_KWH + _EPSILON:
-        return battery_home
+    """Reconcile future daytime battery discharge to the house-first invariant.
 
-    discharge_headroom = max(discharge_limit_kwh - battery_home, 0.0)
+    ``battery_home_kwh`` remains in the signature for compatibility with the
+    Alpha8.56 regression boundary, but the canonical future projection must not
+    preserve a rounded/planned home allocation when physical battery headroom can
+    cover more of the house.  Outside cheap periods, usable battery AC therefore
+    serves the remaining house demand before Grid.
+    """
+    del battery_home_kwh
+    remaining_house = max(remaining_house_kwh, 0.0)
     battery_headroom = max(
         (battery_energy_kwh - floor_kwh) * max(discharge_efficiency, 0.01),
         0.0,
     )
-    if min(discharge_headroom, battery_headroom) + _EPSILON < residual:
-        return battery_home
-    return remaining_house
+    usable_discharge = min(
+        max(discharge_limit_kwh, 0.0),
+        battery_headroom,
+    )
+    return min(remaining_house, usable_discharge)
 
 
 def _future_today_projection(
@@ -392,6 +395,8 @@ def _future_today_projection(
                 solar_left -= solar_charge_input
             battery_export = min(
                 battery_export,
+                max(discharge_limit - battery_home, 0.0),
+                max(inverter_limit - solar_home - battery_home, 0.0),
                 max((battery - floor_kwh) * discharge_efficiency, 0.0),
                 max(export_limit, 0.0),
             )
