@@ -20,12 +20,12 @@
       "delivery": "kems_core"
     },
     "property_web": {
-      "version": "0.8.0-alpha8-web.8",
+      "version": "0.8.0-alpha8-web.9",
       "required": true,
       "delivery": "kems_pi"
     },
     "pi_agent": {
-      "version": "0.8.0-alpha8-web.8",
+      "version": "0.8.0-alpha8-web.9",
       "required": true,
       "delivery": "kems_pi"
     },
@@ -35,14 +35,14 @@
       "delivery": "kems_pi"
     },
     "public_web": {
-      "version": "0.8.0-alpha8-web.8",
+      "version": "0.8.0-alpha8-web.9",
       "required": false,
       "delivery": "ionos-sftp"
     }
   },
   "maintenance": {
     "required": true,
-    "reason": "Align the coordinated KEMS bundle with the released KEMS Web 0.8.0-alpha8-web.8 baseline; no runtime control logic changes",
+    "reason": "Coordinate the released KEMS Web 0.8.0-alpha8-web.9 redeploy so Web.8 appliances receive a real update transition and fresh PWA shell; no runtime control logic changes",
     "expected_downtime_minutes": 5,
     "home_assistant_restart_required": true,
     "reboot_required": false,
