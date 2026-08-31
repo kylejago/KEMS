@@ -78,7 +78,12 @@ def rebase_day_summary_deadline_from_rolling(
     target = _number(guard.get("target_soc_percent"))
     reachable = bool(guard.get("target_physically_reachable_now"))
 
-    if settled_soc is None or guard_soc is None or required is None or remaining is None:
+    if (
+        settled_soc is None
+        or guard_soc is None
+        or required is None
+        or remaining is None
+    ):
         diagnostic = {
             "active": True,
             "applied": False,
@@ -108,7 +113,9 @@ def rebase_day_summary_deadline_from_rolling(
 
     agile.update(
         {
-            "deadline_target_soc_percent": round(target, 2) if target is not None else None,
+            "deadline_target_soc_percent": (
+                round(target, 2) if target is not None else None
+            ),
             "deadline_time": guard.get("deadline"),
             "deadline_status": status,
             "deadline_effective_discharge_kw": (
@@ -124,9 +131,7 @@ def rebase_day_summary_deadline_from_rolling(
                 round(required_average, 3) if required_average is not None else None
             ),
             "deadline_minimum_reachable_soc_percent": (
-                round(minimum_reachable, 2)
-                if minimum_reachable is not None
-                else None
+                round(minimum_reachable, 2) if minimum_reachable is not None else None
             ),
             "deadline_soc_authority": "settled current-day digital-twin SOC",
             "deadline_metrics_source": "post-settlement rolling deadline guard",
