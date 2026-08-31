@@ -90,7 +90,9 @@ def _load_deadline_guard():
     sys.modules[events.__name__] = events
 
     name = "custom_components.kems.agile_deadline_guard_runtime"
-    spec = importlib.util.spec_from_file_location(name, KEMS / "agile_deadline_guard_runtime.py")
+    spec = importlib.util.spec_from_file_location(
+        name, KEMS / "agile_deadline_guard_runtime.py"
+    )
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     sys.modules[name] = module
@@ -243,12 +245,12 @@ def test_settlement_rebases_stale_day_deadline_metrics_from_current_guard() -> N
 
 def test_alpha863_keeps_real_hardware_writes_blocked() -> None:
     deadline_source = (KEMS / "agile_deadline_guard_runtime.py").read_text()
-    consistency_source = (
-        KEMS / "agile_deadline_settlement_consistency.py"
-    ).read_text()
+    consistency_source = (KEMS / "agile_deadline_settlement_consistency.py").read_text()
     runtime_source = (KEMS / "agile_smart_export_runtime.py").read_text()
 
-    assert "Weekend Happy Hour event priority blocks battery discharge" in deadline_source
+    assert (
+        "Weekend Happy Hour event priority blocks battery discharge" in deadline_source
+    )
     assert "happy_hour_deadline_obligation_kwh" in deadline_source
     assert "DeadlineSettlementConsistencyAgileSmartExportManager" in runtime_source
     assert "services.async_call" not in consistency_source
