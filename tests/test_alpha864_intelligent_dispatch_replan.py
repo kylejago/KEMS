@@ -277,7 +277,9 @@ def test_confirmed_dispatch_handover_blocks_stale_discharge_and_exports() -> Non
 def test_start_and_end_transitions_are_explicit() -> None:
     module, SimulationConfig, Snapshot, TariffSettings, _ = _load_module()
     manager = module.IntelligentDispatchReplanAgileSmartExportManager()
-    manager._hass = types.SimpleNamespace(states=types.SimpleNamespace(get=lambda _: None))
+    manager._hass = types.SimpleNamespace(
+        states=types.SimpleNamespace(get=lambda _: None)
+    )
     manager._set = lambda *args, **kwargs: None
     manager._test_simulation = types.SimpleNamespace(
         current_simulated_house_load_kw=0.8,
@@ -322,6 +324,8 @@ def test_start_and_end_transitions_are_explicit() -> None:
             tariff=TariffSettings(),
         )
     )
-    assert manager._state["intelligent_dispatch_replan"]["transition"] == "confirmed_end"
+    assert (
+        manager._state["intelligent_dispatch_replan"]["transition"] == "confirmed_end"
+    )
     assert manager._state["intelligent_dispatch_replan"]["plan_invalidated"] is True
     assert manager._state["intelligent_dispatch_replan"]["active"] is False
