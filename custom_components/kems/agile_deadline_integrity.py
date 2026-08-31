@@ -89,9 +89,7 @@ def _happy_hour_deadline_context(
 
     charge_kw = max(_number(charge.get("charge_target_kw")) or 0.0, 0.0)
     blocked_hours = (blocked_end - blocked_start).total_seconds() / 3600.0
-    stored_charge_kwh = (
-        charge_kw * blocked_hours * max(config.charge_efficiency, 0.01)
-    )
+    stored_charge_kwh = charge_kw * blocked_hours * max(config.charge_efficiency, 0.01)
     discharge_obligation_kwh = stored_charge_kwh * max(
         config.discharge_efficiency, 0.01
     )
@@ -130,9 +128,7 @@ def _protected_capacity_segments(
     )
     blocked_start = happy_hour.get("blocked_start")
     blocked_end = happy_hour.get("blocked_end")
-    if not isinstance(blocked_start, datetime) or not isinstance(
-        blocked_end, datetime
-    ):
+    if not isinstance(blocked_start, datetime) or not isinstance(blocked_end, datetime):
         return segments
 
     protected: list[dict[str, Any]] = []
@@ -153,9 +149,7 @@ def _protected_capacity_segments(
             midpoint = piece_start + (piece_end - piece_start) / 2
             blocked = blocked_start <= midpoint < blocked_end
             battery_kw = (
-                0.0
-                if blocked
-                else max(_number(segment.get("battery_kw")) or 0.0, 0.0)
+                0.0 if blocked else max(_number(segment.get("battery_kw")) or 0.0, 0.0)
             )
             hours = (piece_end - piece_start).total_seconds() / 3600.0
             piece = dict(segment)
@@ -235,8 +229,7 @@ def _deadline_guard_context(
     margin = remaining_capacity - required_ac
     latest_safe = deadline_runtime._latest_safe_start(segments, required_ac)
     guarded_start = (
-        latest_safe
-        - timedelta(minutes=deadline_runtime.DEADLINE_GUARD_MINUTES)
+        latest_safe - timedelta(minutes=deadline_runtime.DEADLINE_GUARD_MINUTES)
         if latest_safe is not None
         else now_utc
     )
@@ -370,9 +363,7 @@ def _active_happy_hour_charge_cap(
         "current_soc_required_discharge_kwh": round(current_required, 3),
         "post_event_discharge_capacity_kwh": round(post_event_capacity, 3),
         "safe_additional_discharge_obligation_kwh": round(safe_extra_ac, 3),
-        "bounded_additional_discharge_obligation_kwh": round(
-            bounded_obligation, 3
-        ),
+        "bounded_additional_discharge_obligation_kwh": round(bounded_obligation, 3),
         "target_reachable_with_bounded_charge": reachable_with_bound,
         "reason": (
             "Happy Hour charge capped to preserve pre-cheap SOC recoverability"
@@ -587,9 +578,10 @@ def install_deadline_integrity() -> None:
             targets["deadline_guard"] = dict(guard)
             if not guard.get("happy_hour_deadline_protected"):
                 return targets
-            if guard.get("happy_hour_active_now") and str(
-                targets.get("mode") or ""
-            ) == "happy_hour_charge":
+            if (
+                guard.get("happy_hour_active_now")
+                and str(targets.get("mode") or "") == "happy_hour_charge"
+            ):
                 return _apply_active_happy_hour_cap(
                     targets,
                     guard,
