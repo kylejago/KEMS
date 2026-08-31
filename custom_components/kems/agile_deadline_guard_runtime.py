@@ -139,9 +139,7 @@ def _happy_hour_deadline_context(
         charge = {}
     charge_kw = max(_number(charge.get("charge_target_kw")) or 0.0, 0.0)
     blocked_hours = (blocked_end - blocked_start).total_seconds() / 3600.0
-    stored_charge_kwh = (
-        charge_kw * blocked_hours * max(config.charge_efficiency, 0.01)
-    )
+    stored_charge_kwh = charge_kw * blocked_hours * max(config.charge_efficiency, 0.01)
     discharge_obligation_kwh = stored_charge_kwh * max(
         config.discharge_efficiency, 0.01
     )
@@ -181,11 +179,7 @@ def _capacity_segments(
         blocked_start = max(blocked_start, start)
     if blocked_end is not None:
         blocked_end = min(blocked_end, finish)
-    if (
-        blocked_start is None
-        or blocked_end is None
-        or blocked_end <= blocked_start
-    ):
+    if blocked_start is None or blocked_end is None or blocked_end <= blocked_start:
         blocked_start = None
         blocked_end = None
 
@@ -314,6 +308,10 @@ def _deadline_guard_context(
         _number(happy_hour.get("additional_discharge_obligation_kwh")) or 0.0,
         0.0,
     )
+    happy_hour_stored_charge = max(
+        _number(happy_hour.get("remaining_stored_charge_kwh")) or 0.0,
+        0.0,
+    )
     required_ac = current_soc_required_ac + happy_hour_obligation
     blocked_start = happy_hour.get("blocked_start")
     blocked_end = happy_hour.get("blocked_end")
@@ -353,11 +351,12 @@ def _deadline_guard_context(
         0,
     )
     maximum_stored_discharge = remaining_capacity / efficiency
+    projected_battery_kwh = min(battery_kwh + happy_hour_stored_charge, capacity)
     minimum_reachable_soc = max(
-        min(max(soc, 0.0), 100.0)
-        - maximum_stored_discharge / capacity * 100.0,
+        (projected_battery_kwh - maximum_stored_discharge) / capacity * 100.0,
         target_soc if reachable else 0.0,
     )
+    minimum_reachable_soc = min(max(minimum_reachable_soc, 0.0), 100.0)
     return {
         "available": True,
         "mode": mode,
