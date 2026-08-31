@@ -211,8 +211,6 @@ def _cheap_snapshot(
     # Confirmed cheap import is authoritative: Grid supplies the house while
     # battery discharge/export are blocked. The existing Alpha8.58 simulation
     # already routes PV to battery first and exports only remaining PV.
-    battery_home = 0.0
-    battery_export = 0.0
     grid_to_battery = max(battery_charge - solar_to_battery, 0.0)
     solar_export = max(grid_export, 0.0)
     solar_ac_after_charge = max(solar - solar_to_battery - solar_export, 0.0)
@@ -256,7 +254,8 @@ def _cheap_snapshot(
         "normalised_kh7_ac_output_kw": round(total_ac, 3),
         "simulated_soc_percent": _number(simulation.simulated_battery_soc),
         "battery_candidate_basis": (
-            "confirmed Intelligent cheap simulation; rolling export candidate suppressed"
+            "confirmed Intelligent cheap simulation; rolling export candidate "
+            "suppressed"
         ),
         "solar_routing_basis": "current proposal digital-twin routed AC",
         "reporting_only": True,
