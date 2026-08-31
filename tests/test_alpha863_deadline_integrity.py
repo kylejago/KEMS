@@ -14,8 +14,8 @@ ROOT = Path(__file__).parents[1]
 KEMS = ROOT / "custom_components" / "kems"
 
 
-def _load_deadline_guard():
-    """Load deadline math with lightweight dependency stubs."""
+def _load_deadline_integrity():
+    """Load canonical deadline integrity with lightweight dependency stubs."""
     custom_components = sys.modules.setdefault(
         "custom_components", types.ModuleType("custom_components")
     )
@@ -25,7 +25,11 @@ def _load_deadline_guard():
     sys.modules["custom_components.kems"] = package
 
     alpha717 = types.ModuleType("custom_components.kems.agile_alpha717_dispatch")
-    alpha717._dispatch_targets = lambda *args, **kwargs: {}
+
+    def base_dispatch(self, state, plan, **kwargs):
+        return dict(state.get("_base_targets", {}))
+
+    alpha717._dispatch_targets = base_dispatch
     sys.modules[alpha717.__name__] = alpha717
 
     alpha731 = types.ModuleType("custom_components.kems.agile_alpha731_solar_headroom")
@@ -37,7 +41,9 @@ def _load_deadline_guard():
 
     rolling = types.ModuleType("custom_components.kems.agile_rolling_replan")
     rolling._current_agile_soc = lambda state: float(state["soc"])
-    rolling._rolling_plan = lambda *args, **kwargs: {}
+    rolling._rolling_plan = lambda self, state, **kwargs: dict(
+        state.get("_base_plan", {})
+    )
     sys.modules[rolling.__name__] = rolling
 
     agile = types.ModuleType("custom_components.kems.agile_smart_export")
@@ -89,15 +95,34 @@ def _load_deadline_guard():
     events = types.ModuleType("custom_components.kems.agile_event_priority_runtime")
     sys.modules[events.__name__] = events
 
-    name = "custom_components.kems.agile_deadline_guard_runtime"
+    deadline_name = "custom_components.kems.agile_deadline_guard_runtime"
     spec = importlib.util.spec_from_file_location(
-        name, KEMS / "agile_deadline_guard_runtime.py"
+        deadline_name,
+        KEMS / "agile_deadline_guard_runtime.py",
+    )
+    assert spec is not None and spec.loader is not None
+    deadline_runtime = importlib.util.module_from_spec(spec)
+    sys.modules[deadline_name] = deadline_runtime
+    spec.loader.exec_module(deadline_runtime)
+
+    deadline_facade = types.ModuleType("custom_components.kems.agile_deadline_guard")
+    deadline_facade.deadline_runtime = deadline_runtime
+    sys.modules[deadline_facade.__name__] = deadline_facade
+
+    event_facade = types.ModuleType("custom_components.kems.agile_event_priority")
+    event_facade.event_runtime = events
+    sys.modules[event_facade.__name__] = event_facade
+
+    name = "custom_components.kems.agile_deadline_integrity"
+    spec = importlib.util.spec_from_file_location(
+        name,
+        KEMS / "agile_deadline_integrity.py",
     )
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     sys.modules[name] = module
     spec.loader.exec_module(module)
-    return module, SimulationConfig, TariffSettings, events
+    return module, SimulationConfig, TariffSettings, events, alpha717, rolling
 
 
 def _load_deadline_consistency():
@@ -141,27 +166,32 @@ def _load_deadline_consistency():
     return module, SimulationConfig
 
 
+def _configure_happy_hour(events, *, start, end):
+    events._happy_hour_event = lambda self: {
+        "enabled": True,
+        "source": "octopus_energy",
+        "start": start,
+        "end": end,
+        "duration_hours": (end - start).total_seconds() / 3600.0,
+    }
+    events._happy_hour_charge_target = lambda self, event, cfg: {
+        "charge_target_kw": 7.0,
+    }
+
+
 def test_happy_hour_moves_deadline_guard_earlier_and_blocks_event_capacity() -> None:
-    guard, SimulationConfig, TariffSettings, events = _load_deadline_guard()
+    integrity, SimulationConfig, TariffSettings, events, _, _ = (
+        _load_deadline_integrity()
+    )
     config = SimulationConfig()
     now = datetime(2026, 8, 31, 19, 30, tzinfo=UTC)
     event_start = datetime(2026, 8, 31, 20, 0, tzinfo=UTC)
     event_end = datetime(2026, 8, 31, 21, 0, tzinfo=UTC)
     deadline = datetime(2026, 8, 31, 22, 30, tzinfo=UTC)
     tariff = TariffSettings(deadline)
+    _configure_happy_hour(events, start=event_start, end=event_end)
 
-    events._happy_hour_event = lambda self: {
-        "enabled": True,
-        "source": "octopus_energy",
-        "start": event_start,
-        "end": event_end,
-        "duration_hours": 1,
-    }
-    events._happy_hour_charge_target = lambda self, event, cfg: {
-        "charge_target_kw": 7.0,
-    }
-
-    protected = guard._deadline_guard_context(
+    protected = integrity._deadline_guard_context(
         object(),
         {"soc": 24.0},
         now=now,
@@ -170,7 +200,7 @@ def test_happy_hour_moves_deadline_guard_earlier_and_blocks_event_capacity() -> 
     )
 
     events._happy_hour_event = lambda self: {"enabled": False}
-    ordinary = guard._deadline_guard_context(
+    ordinary = integrity._deadline_guard_context(
         object(),
         {"soc": 24.0},
         now=now,
@@ -189,6 +219,114 @@ def test_happy_hour_moves_deadline_guard_earlier_and_blocks_event_capacity() -> 
     assert protected["required_discharge_kwh"] > ordinary["required_discharge_kwh"]
     assert protected["latest_safe_export_start"] < ordinary["latest_safe_export_start"]
     assert protected["deadline_guard_active"]
+
+
+def test_future_happy_hour_deadline_guard_overrides_event_hold_when_required() -> None:
+    integrity, SimulationConfig, TariffSettings, events, alpha717, _ = (
+        _load_deadline_integrity()
+    )
+    config = SimulationConfig()
+    now = datetime(2026, 8, 31, 19, 30, tzinfo=UTC)
+    deadline = datetime(2026, 8, 31, 22, 30, tzinfo=UTC)
+    _configure_happy_hour(
+        events,
+        start=datetime(2026, 8, 31, 20, 0, tzinfo=UTC),
+        end=datetime(2026, 8, 31, 21, 0, tzinfo=UTC),
+    )
+    state = {
+        "soc": 24.0,
+        "_base_targets": {
+            "mode": "happy_hour_hold",
+            "action": "Hold battery for the scheduled Weekend Happy Hour",
+            "house_battery_kw": 0.0,
+            "battery_export_target_kw": 0.0,
+            "battery_discharge_target_kw": 0.0,
+            "battery_charge_target_kw": 0.0,
+            "solar_aware_inverter_headroom": {
+                "battery_inverter_headroom_kw": 7.0,
+            },
+        },
+    }
+
+    integrity.install_deadline_integrity()
+    targets = alpha717._dispatch_targets(
+        object(),
+        state,
+        {},
+        now=now,
+        config=config,
+        tariff=TariffSettings(deadline),
+    )
+
+    assert targets["mode"] == "deadline_following"
+    assert targets["battery_export_target_kw"] == pytest.approx(7.0)
+    assert targets["battery_discharge_target_kw"] == pytest.approx(7.0)
+    assert targets["battery_charge_target_kw"] == 0.0
+    assert targets["deadline_integrity_override"]
+    assert targets["happy_hour_deadline_override"]
+    assert targets["deadline_guard"]["happy_hour_deadline_protected"]
+
+
+def test_active_happy_hour_charge_is_bounded_to_keep_target_recoverable() -> None:
+    integrity, SimulationConfig, TariffSettings, events, alpha717, rolling = (
+        _load_deadline_integrity()
+    )
+    config = SimulationConfig()
+    now = datetime(2026, 8, 31, 20, 15, tzinfo=UTC)
+    event_start = datetime(2026, 8, 31, 20, 0, tzinfo=UTC)
+    event_end = datetime(2026, 8, 31, 21, 0, tzinfo=UTC)
+    deadline = datetime(2026, 8, 31, 22, 30, tzinfo=UTC)
+    _configure_happy_hour(events, start=event_start, end=event_end)
+    state = {
+        "soc": 24.0,
+        "_base_targets": {
+            "mode": "happy_hour_charge",
+            "action": "Weekend Happy Hour — charge battery at maximum safe rate",
+            "house_battery_kw": 0.0,
+            "battery_export_target_kw": 0.0,
+            "battery_discharge_target_kw": 0.0,
+            "battery_charge_target_kw": 7.0,
+            "happy_hour": {"charge_target_kw": 7.0},
+        },
+        "_base_plan": {
+            "dispatch_mode": "happy_hour_charge",
+            "current_battery_charge_target_kw": 7.0,
+            "happy_hour_plan": {"charge_target_kw": 7.0},
+        },
+    }
+
+    integrity.install_deadline_integrity()
+    tariff = TariffSettings(deadline)
+    targets = alpha717._dispatch_targets(
+        object(),
+        state,
+        {},
+        now=now,
+        config=config,
+        tariff=tariff,
+    )
+
+    safe_kw = targets["battery_charge_target_kw"]
+    assert targets["mode"] == "happy_hour_charge"
+    assert targets["battery_export_target_kw"] == 0.0
+    assert targets["battery_discharge_target_kw"] == 0.0
+    assert 0.0 < safe_kw < 7.0
+    assert safe_kw == pytest.approx(4.426, abs=0.01)
+    assert targets["happy_hour_charge_limited_by_deadline"]
+    assert targets["deadline_guard"]["target_physically_reachable_now"] is False
+    assert targets["deadline_guard"][
+        "target_physically_reachable_with_bounded_happy_hour"
+    ]
+
+    plan = rolling._rolling_plan(
+        object(),
+        state,
+        now=now,
+        config=config,
+        tariff=tariff,
+    )
+    assert plan["current_battery_charge_target_kw"] == pytest.approx(safe_kw)
+    assert plan["happy_hour_charge_limited_by_deadline"]
 
 
 def test_settlement_rebases_stale_day_deadline_metrics_from_current_guard() -> None:
@@ -243,16 +381,22 @@ def test_settlement_rebases_stale_day_deadline_metrics_from_current_guard() -> N
     assert diagnostic["hardware_writes"] == "blocked"
 
 
-def test_alpha863_keeps_real_hardware_writes_blocked() -> None:
-    deadline_source = (KEMS / "agile_deadline_guard_runtime.py").read_text()
+def test_alpha863_preserves_frozen_runtime_and_blocks_real_hardware_writes() -> None:
+    frozen = (KEMS / "agile_deadline_guard_runtime.py").read_text()
+    historical = (KEMS / "agile_alpha734_deadline_guard.py").read_text()
+    integrity_source = (KEMS / "agile_deadline_integrity.py").read_text()
     consistency_source = (KEMS / "agile_deadline_settlement_consistency.py").read_text()
     runtime_source = (KEMS / "agile_smart_export_runtime.py").read_text()
 
+    assert frozen == historical
     assert (
-        "Weekend Happy Hour event priority blocks battery discharge" in deadline_source
+        "Weekend Happy Hour event priority blocks battery discharge" in integrity_source
     )
-    assert "happy_hour_deadline_obligation_kwh" in deadline_source
+    assert "happy_hour_deadline_obligation_kwh" in integrity_source
+    assert "install_deadline_integrity()" in runtime_source
     assert "DeadlineSettlementConsistencyAgileSmartExportManager" in runtime_source
+    assert "services.async_call" not in integrity_source
+    assert "providers.foxess" not in integrity_source
     assert "services.async_call" not in consistency_source
     assert "providers.foxess" not in consistency_source
     assert '"hardware_writes": "blocked"' in consistency_source

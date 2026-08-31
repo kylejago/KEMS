@@ -42,7 +42,7 @@
   },
   "maintenance": {
     "required": true,
-    "reason": "Protect the pre-cheap SOC deadline across Weekend Happy Hour charging and rebase Today deadline diagnostics from settled SOC; no hardware write changes",
+    "reason": "Protect the pre-cheap SOC deadline across Weekend Happy Hour charging and rebase Today deadline diagnostics from settled SOC; coordinated with Web 0.8.0-alpha8-web.9; no hardware write changes",
     "expected_downtime_minutes": 5,
     "home_assistant_restart_required": true,
     "reboot_required": false,

@@ -12,12 +12,6 @@ inside a ten-minute guard before the latest safe start KEMS requests the full
 safe battery path.  If the target is already physically unreachable, the
 existing maximum-discharge failsafe remains in charge.
 
-Weekend Happy Hour is part of the physical deadline model.  A known Happy Hour
-blocks battery discharge while the free-charge event is active and its remaining
-stored charge is treated as energy that must be discharged again before the
-pre-cheap target.  That moves the latest-safe export start earlier instead of
-allowing a late free charge to make the target physically unreachable.
-
 This remains simulation/shadow only.  Real hardware writes are still gated by
 commissioning and the hardware backend.
 """
@@ -53,22 +47,6 @@ def _number(value: Any) -> float | None:
     return number if math.isfinite(number) else None
 
 
-def _dt(value: Any) -> datetime | None:
-    """Return one timezone-aware UTC timestamp when possible."""
-    if isinstance(value, datetime):
-        parsed = value
-    elif value is not None:
-        try:
-            parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
-        except (TypeError, ValueError):
-            return None
-    else:
-        return None
-    if parsed.tzinfo is None:
-        parsed = parsed.replace(tzinfo=UTC)
-    return parsed.astimezone(UTC)
-
-
 def _forecast_solar_kw(self, moment: datetime) -> float | None:
     """Return forecast average solar kW for the hour containing ``moment``."""
     forecast = getattr(self, "_kems_alpha734_forecast", None)
@@ -98,92 +76,18 @@ def _current_proposal_solar_kw(self, config: SimulationConfig) -> float | None:
     return _number(evidence.get("routed_solar_ac_kw"))
 
 
-def _happy_hour_deadline_context(
-    self,
-    *,
-    now: datetime,
-    deadline: datetime,
-    config: SimulationConfig,
-) -> dict[str, Any]:
-    """Return the remaining Happy Hour charge/discharge deadline obligation.
-
-    Event priority deliberately blocks battery discharge during Happy Hour.  A
-    future or active free charge also increases stored battery energy.  Both
-    effects must therefore be represented when working backwards from the
-    pre-cheap SOC target.
-    """
-    try:
-        from . import agile_event_priority_runtime as events
-
-        event = events._happy_hour_event(self)
-    except (AttributeError, ImportError, TypeError, ValueError):
-        return {"active": False, "reason": "Happy Hour unavailable"}
-
-    if not isinstance(event, dict) or not event.get("enabled"):
-        return {"active": False, "reason": "Happy Hour disabled"}
-    start = _dt(event.get("start"))
-    end = _dt(event.get("end"))
-    if start is None or end is None or end <= start:
-        return {"active": False, "reason": "Happy Hour window unavailable"}
-
-    now_utc = now.astimezone(UTC)
-    deadline_utc = deadline.astimezone(UTC)
-    blocked_start = max(start, now_utc)
-    blocked_end = min(end, deadline_utc)
-    if blocked_end <= blocked_start:
-        return {"active": False, "reason": "Happy Hour outside current deadline"}
-
-    try:
-        charge = events._happy_hour_charge_target(self, event, config)
-    except (AttributeError, TypeError, ValueError):
-        charge = {}
-    charge_kw = max(_number(charge.get("charge_target_kw")) or 0.0, 0.0)
-    blocked_hours = (blocked_end - blocked_start).total_seconds() / 3600.0
-    stored_charge_kwh = charge_kw * blocked_hours * max(config.charge_efficiency, 0.01)
-    discharge_obligation_kwh = stored_charge_kwh * max(
-        config.discharge_efficiency, 0.01
-    )
-    return {
-        "active": True,
-        "source": event.get("source"),
-        "start": start.isoformat(),
-        "end": end.isoformat(),
-        "blocked_start": blocked_start,
-        "blocked_end": blocked_end,
-        "blocked_hours": blocked_hours,
-        "charge_target_kw": charge_kw,
-        "remaining_stored_charge_kwh": stored_charge_kwh,
-        "additional_discharge_obligation_kwh": discharge_obligation_kwh,
-        "reason": (
-            "Happy Hour blocks discharge and replenishes battery before cheap start"
-        ),
-    }
-
-
 def _capacity_segments(
     self,
     *,
     now: datetime,
     deadline: datetime,
     config: SimulationConfig,
-    blocked_start: datetime | None = None,
-    blocked_end: datetime | None = None,
 ) -> list[dict[str, Any]]:
     """Build conservative solar-aware battery-output capacity to the deadline."""
     start = now.astimezone(UTC)
     finish = deadline.astimezone(UTC)
     if finish <= start:
         return []
-
-    blocked_start = blocked_start.astimezone(UTC) if blocked_start is not None else None
-    blocked_end = blocked_end.astimezone(UTC) if blocked_end is not None else None
-    if blocked_start is not None:
-        blocked_start = max(blocked_start, start)
-    if blocked_end is not None:
-        blocked_end = min(blocked_end, finish)
-    if blocked_start is None or blocked_end is None or blocked_end <= blocked_start:
-        blocked_start = None
-        blocked_end = None
 
     effective_kw = _effective_deadline_kw(config)
     current_solar = _current_proposal_solar_kw(self, config)
@@ -193,11 +97,6 @@ def _capacity_segments(
     step = timedelta(minutes=CAPACITY_STEP_MINUTES)
     while cursor < finish:
         end = min(cursor + step, finish)
-        # Split at Happy Hour boundaries so a partial five-minute segment is
-        # never incorrectly counted as discharge-capable event time.
-        for boundary in (blocked_start, blocked_end):
-            if boundary is not None and cursor < boundary < end:
-                end = boundary
         midpoint = cursor + (end - cursor) / 2
         forecast_solar = _forecast_solar_kw(self, midpoint)
         if first and current_solar is not None:
@@ -216,22 +115,11 @@ def _capacity_segments(
             basis = "no solar evidence"
 
         routed_solar = min(max(solar_kw, 0.0), max(config.inverter_limit_kw, 0.0))
-        happy_hour_blocked = bool(
-            blocked_start is not None
-            and blocked_end is not None
-            and blocked_start <= midpoint < blocked_end
+        battery_kw = min(
+            max(effective_kw, 0.0),
+            max(config.inverter_limit_kw - routed_solar, 0.0),
+            max(config.max_discharge_kw, 0.0),
         )
-        battery_kw = (
-            0.0
-            if happy_hour_blocked
-            else min(
-                max(effective_kw, 0.0),
-                max(config.inverter_limit_kw - routed_solar, 0.0),
-                max(config.max_discharge_kw, 0.0),
-            )
-        )
-        if happy_hour_blocked:
-            basis = "Weekend Happy Hour event priority blocks battery discharge"
         hours = (end - cursor).total_seconds() / 3600.0
         segments.append(
             {
@@ -242,7 +130,6 @@ def _capacity_segments(
                 "battery_kw": battery_kw,
                 "capacity_kwh": battery_kw * hours,
                 "basis": basis,
-                "happy_hour_blocked": happy_hour_blocked,
             }
         )
         cursor = end
@@ -299,32 +186,8 @@ def _deadline_guard_context(
 
     battery_kwh = capacity * min(max(soc, 0.0), 100.0) / 100.0
     target_kwh = capacity * target_soc / 100.0
-    current_soc_required_ac = max(battery_kwh - target_kwh, 0.0) * efficiency
-    happy_hour = _happy_hour_deadline_context(
-        self,
-        now=now,
-        deadline=deadline,
-        config=config,
-    )
-    happy_hour_obligation = max(
-        _number(happy_hour.get("additional_discharge_obligation_kwh")) or 0.0,
-        0.0,
-    )
-    happy_hour_stored_charge = max(
-        _number(happy_hour.get("remaining_stored_charge_kwh")) or 0.0,
-        0.0,
-    )
-    required_ac = current_soc_required_ac + happy_hour_obligation
-    blocked_start = happy_hour.get("blocked_start")
-    blocked_end = happy_hour.get("blocked_end")
-    segments = _capacity_segments(
-        self,
-        now=now,
-        deadline=deadline,
-        config=config,
-        blocked_start=blocked_start if isinstance(blocked_start, datetime) else None,
-        blocked_end=blocked_end if isinstance(blocked_end, datetime) else None,
-    )
+    required_ac = max(battery_kwh - target_kwh, 0.0) * efficiency
+    segments = _capacity_segments(self, now=now, deadline=deadline, config=config)
     remaining_capacity = sum(float(item["capacity_kwh"]) for item in segments)
     margin = remaining_capacity - required_ac
     latest_safe = _latest_safe_start(segments, required_ac)
@@ -352,13 +215,6 @@ def _deadline_guard_context(
         math.floor(max(margin, 0.0) / max(effective_kw * 0.5, 0.001)),
         0,
     )
-    maximum_stored_discharge = remaining_capacity / efficiency
-    projected_battery_kwh = min(battery_kwh + happy_hour_stored_charge, capacity)
-    minimum_reachable_soc = max(
-        (projected_battery_kwh - maximum_stored_discharge) / capacity * 100.0,
-        target_soc if reachable else 0.0,
-    )
-    minimum_reachable_soc = min(max(minimum_reachable_soc, 0.0), 100.0)
     return {
         "available": True,
         "mode": mode,
@@ -366,11 +222,9 @@ def _deadline_guard_context(
         "deadline": deadline.isoformat(),
         "target_soc_percent": round(target_soc, 1),
         "simulated_soc_percent": round(soc, 2),
-        "current_soc_required_discharge_kwh": round(current_soc_required_ac, 3),
         "required_discharge_kwh": round(required_ac, 3),
         "solar_aware_remaining_capacity_kwh": round(remaining_capacity, 3),
         "solar_aware_deadline_margin_kwh": round(margin, 3),
-        "minimum_reachable_soc_percent": round(minimum_reachable_soc, 2),
         "target_physically_reachable_now": reachable,
         "latest_safe_export_start": latest_safe.isoformat() if latest_safe else None,
         "guarded_latest_safe_export_start": guarded_start.isoformat(),
@@ -379,25 +233,10 @@ def _deadline_guard_context(
         "current_battery_headroom_kw": round(current_battery_headroom, 3),
         "required_average_discharge_kw": round(required_ac / hours, 3),
         "skippable_half_hours": skippable_half_hours,
-        "capacity_model": (
-            "5-minute solar-aware shared-inverter headroom; Happy Hour "
-            "charge/discharge window protected"
-            if happy_hour.get("active")
-            else "5-minute solar-aware shared-inverter headroom"
-        ),
+        "capacity_model": "5-minute solar-aware shared-inverter headroom",
         "forecast_solar_used": any(
             item.get("basis") == "KEMS hourly solar forecast" for item in segments
         ),
-        "happy_hour_deadline_protected": bool(happy_hour.get("active")),
-        "happy_hour_deadline_obligation_kwh": round(happy_hour_obligation, 3),
-        "happy_hour_discharge_blocked_hours": round(
-            max(_number(happy_hour.get("blocked_hours")) or 0.0, 0.0), 3
-        ),
-        "happy_hour_deadline_context": {
-            key: value
-            for key, value in happy_hour.items()
-            if key not in {"blocked_start", "blocked_end"}
-        },
     }
 
 
@@ -563,13 +402,9 @@ def install_alpha734_deadline_guard_patch() -> None:
                     "target_physically_reachable_now",
                     "solar_aware_remaining_capacity_kwh",
                     "solar_aware_deadline_margin_kwh",
-                    "minimum_reachable_soc_percent",
                     "skippable_half_hours",
                     "capacity_model",
                     "forecast_solar_used",
-                    "happy_hour_deadline_protected",
-                    "happy_hour_deadline_obligation_kwh",
-                    "happy_hour_discharge_blocked_hours",
                 ):
                     plan[key] = guard.get(key)
             return plan
