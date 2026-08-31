@@ -70,12 +70,12 @@ install_alpha752_tomorrow_no_reserve_rounding_patch()
 _base = install_alpha7_compatibility()
 install_shadow_charge_truth()
 
-from .agile_live_solar_soc_continuity import (  # noqa: E402
-    LiveSolarSocContinuityAgileSmartExportManager,
+from .agile_deadline_settlement_consistency import (  # noqa: E402
+    DeadlineSettlementConsistencyAgileSmartExportManager,
 )
 from .agile_smart_export_runtime_base import *  # noqa: E402,F403
 
-EfficientAgileSmartExportManager = LiveSolarSocContinuityAgileSmartExportManager
+EfficientAgileSmartExportManager = DeadlineSettlementConsistencyAgileSmartExportManager
 
 
 def __getattr__(name: str):
