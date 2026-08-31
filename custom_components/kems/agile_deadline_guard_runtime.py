@@ -154,7 +154,9 @@ def _happy_hour_deadline_context(
         "charge_target_kw": charge_kw,
         "remaining_stored_charge_kwh": stored_charge_kwh,
         "additional_discharge_obligation_kwh": discharge_obligation_kwh,
-        "reason": "Happy Hour blocks discharge and replenishes battery before cheap start",
+        "reason": (
+            "Happy Hour blocks discharge and replenishes battery before cheap start"
+        ),
     }
 
 
@@ -378,8 +380,8 @@ def _deadline_guard_context(
         "required_average_discharge_kw": round(required_ac / hours, 3),
         "skippable_half_hours": skippable_half_hours,
         "capacity_model": (
-            "5-minute solar-aware shared-inverter headroom; Happy Hour charge/discharge "
-            "window protected"
+            "5-minute solar-aware shared-inverter headroom; Happy Hour "
+            "charge/discharge window protected"
             if happy_hour.get("active")
             else "5-minute solar-aware shared-inverter headroom"
         ),
