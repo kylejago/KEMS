@@ -249,8 +249,9 @@ def test_future_happy_hour_deadline_guard_overrides_event_hold_when_required() -
     }
 
     integrity.install_deadline_integrity()
+    manager = types.SimpleNamespace()
     targets = alpha717._dispatch_targets(
-        object(),
+        manager,
         state,
         {},
         now=now,
@@ -297,8 +298,9 @@ def test_active_happy_hour_charge_is_bounded_to_keep_target_recoverable() -> Non
 
     integrity.install_deadline_integrity()
     tariff = TariffSettings(deadline)
+    manager = types.SimpleNamespace()
     targets = alpha717._dispatch_targets(
-        object(),
+        manager,
         state,
         {},
         now=now,
@@ -319,7 +321,7 @@ def test_active_happy_hour_charge_is_bounded_to_keep_target_recoverable() -> Non
     ]
 
     plan = rolling._rolling_plan(
-        object(),
+        manager,
         state,
         now=now,
         config=config,
