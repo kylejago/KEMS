@@ -61,7 +61,9 @@ def rebase_day_summary_deadline_from_rolling(
         diagnostic = {
             "active": False,
             "applied": False,
-            "reason": "settled Today Agile summary or rolling deadline guard unavailable",
+            "reason": (
+                "settled Today Agile summary or rolling deadline guard unavailable"
+            ),
             "reporting_only": True,
             "hardware_writes": "blocked",
         }
