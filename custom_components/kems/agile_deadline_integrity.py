@@ -145,7 +145,7 @@ def _protected_capacity_segments(
                 boundaries.append(boundary)
         boundaries.sort()
 
-        for piece_start, piece_end in zip(boundaries, boundaries[1:]):
+        for piece_start, piece_end in zip(boundaries, boundaries[1:], strict=False):
             midpoint = piece_start + (piece_end - piece_start) / 2
             blocked = blocked_start <= midpoint < blocked_end
             battery_kw = (
