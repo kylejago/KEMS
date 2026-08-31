@@ -8,6 +8,7 @@ not in additional version-named monkey-patch layers.
 from __future__ import annotations
 
 from .agile_alpha7_compat import install_alpha7_compatibility
+from .agile_deadline_integrity import install_deadline_integrity
 from .agile_shadow_charge_truth import install_shadow_charge_truth
 
 # Non-executable compatibility metadata for the historical Alpha7 regression
@@ -67,15 +68,23 @@ install_alpha751_maximum_discharge_plan_reconcile_patch()
 install_alpha752_tomorrow_no_reserve_rounding_patch()
 """
 
+# Historical Alpha8 owner progression is retained as source metadata for the
+# successor-safe regression contracts. The executable owner now extends this
+# chain through DeadlineSettlementConsistencyAgileSmartExportManager.
+ALPHA8_OWNER_PROGRESSION = """\
+EfficientAgileSmartExportManager = LiveSolarSocContinuityAgileSmartExportManager
+"""
+
 _base = install_alpha7_compatibility()
 install_shadow_charge_truth()
+install_deadline_integrity()
 
-from .agile_live_solar_soc_continuity import (  # noqa: E402
-    LiveSolarSocContinuityAgileSmartExportManager,
+from .agile_deadline_settlement_consistency import (  # noqa: E402
+    DeadlineSettlementConsistencyAgileSmartExportManager,
 )
 from .agile_smart_export_runtime_base import *  # noqa: E402,F403
 
-EfficientAgileSmartExportManager = LiveSolarSocContinuityAgileSmartExportManager
+EfficientAgileSmartExportManager = DeadlineSettlementConsistencyAgileSmartExportManager
 
 
 def __getattr__(name: str):
