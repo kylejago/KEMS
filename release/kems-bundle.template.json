@@ -42,7 +42,7 @@
   },
   "maintenance": {
     "required": true,
-    "reason": "Recalculate Agile rolling dispatch on confirmed Intelligent extra-slot start/end so the active cheap slot cannot retain stale battery discharge/export targets; coordinated with Web 0.8.0-alpha8-web.9; no hardware write changes",
+    "reason": "Retain confirmed Intelligent dispatch start/end replan evidence for later diagnostics without changing Alpha8.64 routing, charging, export, confirmation or hardware-write behaviour; coordinated with Web 0.8.0-alpha8-web.9",
     "expected_downtime_minutes": 5,
     "home_assistant_restart_required": true,
     "reboot_required": false,
