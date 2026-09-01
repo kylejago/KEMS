@@ -70,7 +70,7 @@ install_alpha752_tomorrow_no_reserve_rounding_patch()
 
 # Historical Alpha8 owner progression is retained as source metadata for the
 # successor-safe regression contracts. The executable owner now extends this
-# chain through IntelligentDispatchObservabilityAgileSmartExportManager.
+# chain through TotalDischargeFlowParityAgileSmartExportManager.
 ALPHA8_OWNER_PROGRESSION = """\
 EfficientAgileSmartExportManager = LiveSolarSocContinuityAgileSmartExportManager
 EfficientAgileSmartExportManager = DeadlineSettlementConsistencyAgileSmartExportManager
@@ -78,13 +78,17 @@ EfficientAgileSmartExportManager = IntelligentDispatchReplanAgileSmartExportMana
 EfficientAgileSmartExportManager = (
     IntelligentDispatchObservabilityAgileSmartExportManager
 )
+EfficientAgileSmartExportManager = TotalDischargeFlowParityAgileSmartExportManager
 """
 
 _base = install_alpha7_compatibility()
 install_shadow_charge_truth()
 install_deadline_integrity()
 
-from .agile_intelligent_dispatch_observability import (  # noqa: E402
+from .agile_flow_total_discharge_parity import (  # noqa: E402
+    TotalDischargeFlowParityAgileSmartExportManager,
+)
+from .agile_intelligent_dispatch_observability import (  # noqa: E402,F401
     IntelligentDispatchObservabilityAgileSmartExportManager,
 )
 from .agile_intelligent_dispatch_replan import (  # noqa: E402
@@ -94,9 +98,7 @@ from .agile_smart_export_runtime_base import *  # noqa: E402,F403
 
 install_intelligent_dispatch_replan()
 
-EfficientAgileSmartExportManager = (
-    IntelligentDispatchObservabilityAgileSmartExportManager
-)
+EfficientAgileSmartExportManager = TotalDischargeFlowParityAgileSmartExportManager
 
 
 def __getattr__(name: str):
