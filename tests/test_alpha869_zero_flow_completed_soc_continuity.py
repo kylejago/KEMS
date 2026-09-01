@@ -153,8 +153,17 @@ def _state(routing_home_kw: float = 0.0) -> dict[str, Any]:
 def test_live_zero_flow_active_slot_allows_completed_soc_backcast() -> None:
     backcast = _backcast_function()
     state = _state()
-    assert backcast(state, now=datetime(2026, 9, 1, 22, 5, 25, tzinfo=UTC), config=_config()) == 3
-    assert [row["flow_estimated_soc_percent"] for row in state["today_slots"][:3]] == [14.1, 10.0, 9.8]
+    assert (
+        backcast(
+            state, now=datetime(2026, 9, 1, 22, 5, 25, tzinfo=UTC), config=_config()
+        )
+        == 3
+    )
+    assert [row["flow_estimated_soc_percent"] for row in state["today_slots"][:3]] == [
+        14.1,
+        10.0,
+        9.8,
+    ]
     diagnostic = state["completed_flow_soc_continuity"]
     assert diagnostic["canonical_zero_flow_fallback_used"] is True
     assert diagnostic["active_elapsed_battery_delta_kwh"] == pytest.approx(0.0)
@@ -165,7 +174,12 @@ def test_live_zero_flow_active_slot_allows_completed_soc_backcast() -> None:
 def test_zero_flow_fallback_fails_closed_when_live_routing_is_nonzero() -> None:
     backcast = _backcast_function()
     state = _state(routing_home_kw=0.1)
-    assert backcast(state, now=datetime(2026, 9, 1, 22, 5, 25, tzinfo=UTC), config=_config()) == 0
+    assert (
+        backcast(
+            state, now=datetime(2026, 9, 1, 22, 5, 25, tzinfo=UTC), config=_config()
+        )
+        == 0
+    )
     diagnostic = state["completed_flow_soc_continuity"]
     assert diagnostic["reason"] == "active elapsed battery energy unavailable"
     assert diagnostic["canonical_zero_flow_fallback_used"] is False
@@ -174,7 +188,9 @@ def test_zero_flow_fallback_fails_closed_when_live_routing_is_nonzero() -> None:
 
 def test_alpha869_contract_survives_reporting_only_successors() -> None:
     manifest = json.loads((KEMS / "manifest.json").read_text(encoding="utf-8"))
-    bundle = json.loads((ROOT / "release" / "kems-bundle.template.json").read_text(encoding="utf-8"))
+    bundle = json.loads(
+        (ROOT / "release" / "kems-bundle.template.json").read_text(encoding="utf-8")
+    )
     source = PARITY.read_text(encoding="utf-8")
     runtime = (KEMS / "agile_smart_export_runtime.py").read_text(encoding="utf-8")
 
