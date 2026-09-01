@@ -73,14 +73,12 @@ class IntelligentDispatchObservabilityAgileSmartExportManager(
         last_start = _retained_copy(
             getattr(self, "_alpha865_last_confirmed_start", None)
         )
-        last_end = _retained_copy(
-            getattr(self, "_alpha865_last_confirmed_end", None)
-        )
+        last_end = _retained_copy(getattr(self, "_alpha865_last_confirmed_end", None))
         history = [
             dict(item)
-            for item in list(
-                getattr(self, "_alpha865_transition_history", ()) or ()
-            )[-_HISTORY_LIMIT:]
+            for item in list(getattr(self, "_alpha865_transition_history", ()) or ())[
+                -_HISTORY_LIMIT:
+            ]
             if isinstance(item, dict)
         ]
 
