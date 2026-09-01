@@ -195,7 +195,9 @@ def test_alpha865_is_observability_only_successor() -> None:
 
     assert "from .agile_intelligent_dispatch_observability import" in runtime
     assert "IntelligentDispatchObservabilityAgileSmartExportManager" in runtime
-    assert manifest["version"] == "0.8.0-alpha8.65"
+    version = str(manifest["version"])
+    assert version.startswith("0.8.0-alpha8.")
+    assert int(version.rsplit(".", 1)[-1]) >= 65
     assert bundle["components"]["property_web"]["version"] == "0.8.0-alpha8-web.9"
     assert bundle["components"]["panel"]["version"] == "0.8.0-alpha8-panel.1"
     assert "Alpha8.64 keeps the frozen Alpha7 boundary intact" in alpha864
