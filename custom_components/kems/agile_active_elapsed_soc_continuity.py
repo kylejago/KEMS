@@ -271,7 +271,8 @@ def _reconcile_completed_from_persisted_decisions(
         diagnostic["canonical_decision_discharge_ac_kwh"] = round(
             float(estimate["discharge_ac_kwh"]), 6
         )
-        diagnostic.update(_REPORTING_CONTRACT)
+        diagnostic["reporting_only"] = True
+        diagnostic["hardware_writes"] = "blocked"
     return corrected
 
 
