@@ -130,15 +130,15 @@ def reconcile_cheap_charge_target(
             abs(corrected.desired_total_discharge_power_kw - discharge_kw) <= 0.001
         )
 
-    corrected_home = _number(
-        getattr(corrected, "desired_battery_to_home_power_kw", 0.0)
-    ) or 0.0
-    corrected_export = _number(
-        getattr(corrected, "desired_battery_export_power_kw", 0.0)
-    ) or 0.0
-    corrected_discharge = _number(
-        getattr(corrected, "desired_total_discharge_power_kw", 0.0)
-    ) or 0.0
+    corrected_home = (
+        _number(getattr(corrected, "desired_battery_to_home_power_kw", 0.0)) or 0.0
+    )
+    corrected_export = (
+        _number(getattr(corrected, "desired_battery_export_power_kw", 0.0)) or 0.0
+    )
+    corrected_discharge = (
+        _number(getattr(corrected, "desired_total_discharge_power_kw", 0.0)) or 0.0
+    )
     routing_matches = all(
         (
             abs(corrected_home - home_kw) <= 0.001,
