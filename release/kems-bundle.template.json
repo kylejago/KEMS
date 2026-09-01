@@ -42,13 +42,13 @@
   },
   "maintenance": {
     "required": true,
-    "reason": "Retain confirmed Intelligent dispatch start/end replan evidence for later diagnostics without changing Alpha8.64 routing, charging, export, confirmation or hardware-write behaviour; coordinated with Web 0.8.0-alpha8-web.9",
+    "reason": "Keep the customer-facing Agile slot compatibility entity in canonical flow/SOC presentation parity so Pi/Web Today rows cannot fall back to stale settled values; reporting-only, with Web 0.8.0-alpha8-web.9 and panel 0.8.0-alpha8-panel.1 unchanged",
     "expected_downtime_minutes": 5,
     "home_assistant_restart_required": true,
     "reboot_required": false,
     "affected_components": [
       "kems_core",
-      "dashboard"
+      "property_web"
     ]
   }
 }
