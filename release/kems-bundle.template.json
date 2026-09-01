@@ -42,7 +42,7 @@
   },
   "maintenance": {
     "required": true,
-    "reason": "Keep future Today flow/SOC presentation in rolling total-discharge parity by carrying house-first battery discharge alongside planned export; reporting-only, with Web 0.8.0-alpha8-web.9 and panel 0.8.0-alpha8-panel.1 unchanged",
+    "reason": "Keep completed Today display SOC continuous with the settled current-day battery state by backcasting completed displayed battery energy from the canonical active SOC; reporting-only, with Web 0.8.0-alpha8-web.9 and panel 0.8.0-alpha8-panel.1 unchanged",
     "expected_downtime_minutes": 5,
     "home_assistant_restart_required": true,
     "reboot_required": false,
