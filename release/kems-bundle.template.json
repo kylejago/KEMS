@@ -42,7 +42,7 @@
   },
   "maintenance": {
     "required": true,
-    "reason": "Keep completed Today display SOC continuous with the settled current-day battery state by backcasting completed displayed battery energy from the canonical active SOC; reporting-only, with Web 0.8.0-alpha8-web.9 and panel 0.8.0-alpha8-panel.1 unchanged",
+    "reason": "Complete Today SOC continuity when legacy active elapsed-energy fields are unavailable but canonical current routing positively proves zero battery charge, home discharge, and export; reporting-only, with Web 0.8.0-alpha8-web.9 and panel 0.8.0-alpha8-panel.1 unchanged",
     "expected_downtime_minutes": 5,
     "home_assistant_restart_required": true,
     "reboot_required": false,
