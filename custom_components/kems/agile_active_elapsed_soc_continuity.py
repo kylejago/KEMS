@@ -32,6 +32,7 @@ _EPSILON = 1e-6
 _POWER_TOLERANCE_KW = 0.05
 _INITIAL_DECISION_GRACE_SECONDS = 120.0
 _PRIOR_DECISION_MAX_AGE_SECONDS = 300.0
+_REPORTING_CONTRACT = {"reporting_only": True, "hardware_writes": "blocked"}
 
 
 def _decision_target(
@@ -270,8 +271,7 @@ def _reconcile_completed_from_persisted_decisions(
         diagnostic["canonical_decision_discharge_ac_kwh"] = round(
             float(estimate["discharge_ac_kwh"]), 6
         )
-        diagnostic["reporting_only"] = True
-        diagnostic["hardware_writes"] = "blocked"
+        diagnostic.update(_REPORTING_CONTRACT)
     return corrected
 
 
