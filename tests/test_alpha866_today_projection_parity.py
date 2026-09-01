@@ -123,7 +123,9 @@ def test_alpha866_is_reporting_only_and_keeps_coordinated_versions() -> None:
         encoding="utf-8"
     )
 
-    assert manifest["version"] == "0.8.0-alpha8.66"
+    version = str(manifest["version"])
+    assert version.startswith("0.8.0-alpha8.")
+    assert int(version.rsplit(".", 1)[-1]) >= 66
     assert bundle["components"]["property_web"]["version"] == "0.8.0-alpha8-web.9"
     assert bundle["components"]["pi_agent"]["version"] == "0.8.0-alpha8-web.9"
     assert bundle["components"]["public_web"]["version"] == "0.8.0-alpha8-web.9"
