@@ -82,10 +82,13 @@ def reconcile_cheap_charge_target(
     replacements: dict[str, Any] = {
         "desired_work_mode": control.desired_work_mode,
         "desired_charge_power_kw": charge_kw,
-        "desired_battery_to_home_power_kw": home_kw,
-        "desired_battery_export_power_kw": export_kw,
-        "desired_total_discharge_power_kw": discharge_kw,
     }
+    if hasattr(candidate, "desired_battery_to_home_power_kw"):
+        replacements["desired_battery_to_home_power_kw"] = home_kw
+    if hasattr(candidate, "desired_battery_export_power_kw"):
+        replacements["desired_battery_export_power_kw"] = export_kw
+    if hasattr(candidate, "desired_total_discharge_power_kw"):
+        replacements["desired_total_discharge_power_kw"] = discharge_kw
     if hasattr(candidate, "desired_grid_export_allowed"):
         replacements["desired_grid_export_allowed"] = grid_export_allowed
     if total_output_kw is not None and hasattr(candidate, "total_kh7_ac_output_kw"):
@@ -126,14 +129,21 @@ def reconcile_cheap_charge_target(
         parity["discharge_target_matches_optimizer"] = (
             abs(corrected.desired_total_discharge_power_kw - discharge_kw) <= 0.001
         )
+
+    corrected_home = _number(
+        getattr(corrected, "desired_battery_to_home_power_kw", 0.0)
+    ) or 0.0
+    corrected_export = _number(
+        getattr(corrected, "desired_battery_export_power_kw", 0.0)
+    ) or 0.0
+    corrected_discharge = _number(
+        getattr(corrected, "desired_total_discharge_power_kw", 0.0)
+    ) or 0.0
     routing_matches = all(
         (
-            abs(_number(getattr(corrected, "desired_battery_to_home_power_kw", 0.0)) or 0.0 - home_kw)
-            <= 0.001,
-            abs(_number(getattr(corrected, "desired_battery_export_power_kw", 0.0)) or 0.0 - export_kw)
-            <= 0.001,
-            abs(_number(getattr(corrected, "desired_total_discharge_power_kw", 0.0)) or 0.0 - discharge_kw)
-            <= 0.001,
+            abs(corrected_home - home_kw) <= 0.001,
+            abs(corrected_export - export_kw) <= 0.001,
+            abs(corrected_discharge - discharge_kw) <= 0.001,
         )
     )
     if hasattr(corrected, "desired_grid_export_allowed"):
