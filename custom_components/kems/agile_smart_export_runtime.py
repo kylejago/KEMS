@@ -88,6 +88,9 @@ install_deadline_integrity()
 from .agile_flow_total_discharge_parity import (  # noqa: E402
     TotalDischargeFlowParityAgileSmartExportManager,
 )
+from .agile_intelligent_dispatch_observability import (  # noqa: E402
+    IntelligentDispatchObservabilityAgileSmartExportManager,
+)
 from .agile_intelligent_dispatch_replan import (  # noqa: E402
     install_intelligent_dispatch_replan,
 )
