@@ -243,16 +243,48 @@ def _reconcile_completed_settled_soc(
 
     active = slots[active_index]
     elapsed_delta = _active_elapsed_battery_delta_kwh(active, config)
+    elapsed_delta_source = "legacy elapsed active battery energy"
+    zero_flow_fallback_used = False
     if elapsed_delta is None:
-        state["completed_flow_soc_continuity"] = {
-            "active": True,
-            "applied": False,
-            "reason": "active elapsed battery energy unavailable",
-            "generated_at": generated_at.isoformat(),
-            "reporting_only": True,
-            "hardware_writes": "blocked",
+        zero_flow_values = {
+            "flow_charge": _number(active.get("flow_battery_charge_kwh")),
+            "flow_home": _number(active.get("flow_battery_to_home_kwh")),
+            "flow_export": _number(active.get("flow_battery_export_kwh")),
+            "planned_total": _number(active.get("planned_total_battery_discharge_kwh")),
+            "planned_home": _number(active.get("planned_battery_to_home_kwh")),
+            "planned_export": _number(active.get("rolling_planned_battery_export_kwh")),
+            "routing_charge": _number(routing.get("grid_to_battery_kw")),
+            "routing_home": _number(routing.get("battery_to_home_kw")),
+            "routing_export": _number(routing.get("battery_export_kw")),
         }
-        return 0
+        zero_flow_proven = (
+            active.get("rolling_current_slot") is True
+            and active.get("current_slot_plan_reconciled") is True
+            and active.get("flow_routing_authority") == "current_routing_snapshot"
+            and active.get("flow_scope") == "remaining slot"
+            and all(value is not None for value in zero_flow_values.values())
+            and all(
+                abs(float(value)) <= _FLOW_TOLERANCE_KWH
+                for value in zero_flow_values.values()
+                if value is not None
+            )
+        )
+        if zero_flow_proven:
+            elapsed_delta = 0.0
+            elapsed_delta_source = "canonical current routing proven zero battery flow"
+            zero_flow_fallback_used = True
+        else:
+            state["completed_flow_soc_continuity"] = {
+                "active": True,
+                "applied": False,
+                "reason": "active elapsed battery energy unavailable",
+                "generated_at": generated_at.isoformat(),
+                "canonical_zero_flow_fallback_used": False,
+                "canonical_zero_flow_proven": False,
+                "reporting_only": True,
+                "hardware_writes": "blocked",
+            }
+            return 0
 
     current_kwh = min(max(current_soc, 0.0), 100.0) * capacity / 100.0
     boundary_kwh = current_kwh - elapsed_delta
@@ -266,6 +298,7 @@ def _reconcile_completed_settled_soc(
             "reason": "active-slot backcast falls outside battery capacity",
             "generated_at": generated_at.isoformat(),
             "current_soc_percent": round(current_soc, 3),
+            "canonical_zero_flow_fallback_used": zero_flow_fallback_used,
             "reporting_only": True,
             "hardware_writes": "blocked",
         }
@@ -364,6 +397,9 @@ def _reconcile_completed_settled_soc(
         "current_soc_percent": round(current_soc, 3),
         "active_start_soc_percent": round(active_start_soc, 3),
         "active_projected_end_soc_percent": active_projected_end,
+        "active_elapsed_battery_delta_kwh": round(elapsed_delta, 6),
+        "active_elapsed_battery_delta_source": elapsed_delta_source,
+        "canonical_zero_flow_fallback_used": zero_flow_fallback_used,
         "completed_rows_rebased": corrected,
         "earliest_rebased_label": earliest_label,
         "latest_rebased_label": latest_label,
