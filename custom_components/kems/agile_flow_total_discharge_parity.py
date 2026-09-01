@@ -88,7 +88,9 @@ def _reconcile_future_total_discharge_flow(state: dict[str, Any]) -> int:
             battery_to_home_kwh=planned_home,
             battery_export_kwh=planned_export,
             estimated_soc_percent=_number(slot.get("flow_estimated_soc_percent")),
-            basis=str(slot.get("flow_basis") or "KEMS forecast + final rolling allocation"),
+            basis=str(
+                slot.get("flow_basis") or "KEMS forecast + final rolling allocation"
+            ),
             scope=str(slot.get("flow_scope") or "full slot"),
         )
         slot.update(values)
