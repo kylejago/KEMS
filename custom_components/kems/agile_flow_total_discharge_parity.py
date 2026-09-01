@@ -142,9 +142,7 @@ def _active_elapsed_battery_delta_kwh(
     efficiency = max(float(config.discharge_efficiency), _EPSILON)
     elapsed_export = max(fields["grid_export"] - fields["solar_export"], 0.0)
     elapsed_discharge = max(fields["battery_home"], 0.0) + elapsed_export
-    elapsed_charge = max(fields["solar_charge"], 0.0) + max(
-        fields["grid_charge"], 0.0
-    )
+    elapsed_charge = max(fields["solar_charge"], 0.0) + max(fields["grid_charge"], 0.0)
     return elapsed_charge - (elapsed_discharge / efficiency)
 
 
@@ -178,7 +176,9 @@ def _maximum_full_slot_soc_swing_percent(config: SimulationConfig) -> float | No
     return max(discharge_stored_kwh, charge_stored_kwh) / capacity * 100.0
 
 
-def _settled_rollover_seed_soc(state: dict[str, Any], active: dict[str, Any]) -> float | None:
+def _settled_rollover_seed_soc(
+    state: dict[str, Any], active: dict[str, Any]
+) -> float | None:
     """Return the persisted SOC seed for this local day when it still matches."""
     continuity = state.get("midnight_replay_continuity")
     continuity = continuity if isinstance(continuity, dict) else {}
