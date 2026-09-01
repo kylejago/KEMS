@@ -75,7 +75,9 @@ ALPHA8_OWNER_PROGRESSION = """\
 EfficientAgileSmartExportManager = LiveSolarSocContinuityAgileSmartExportManager
 EfficientAgileSmartExportManager = DeadlineSettlementConsistencyAgileSmartExportManager
 EfficientAgileSmartExportManager = IntelligentDispatchReplanAgileSmartExportManager
-EfficientAgileSmartExportManager = IntelligentDispatchObservabilityAgileSmartExportManager
+EfficientAgileSmartExportManager = (
+    IntelligentDispatchObservabilityAgileSmartExportManager
+)
 """
 
 _base = install_alpha7_compatibility()
