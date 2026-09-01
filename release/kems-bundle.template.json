@@ -48,7 +48,7 @@
     "reboot_required": false,
     "affected_components": [
       "kems_core",
-      "property_web"
+      "dashboard"
     ]
   }
 }
