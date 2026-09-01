@@ -92,7 +92,9 @@ from .agile_smart_export_runtime_base import *  # noqa: E402,F403
 
 install_intelligent_dispatch_replan()
 
-EfficientAgileSmartExportManager = IntelligentDispatchObservabilityAgileSmartExportManager
+EfficientAgileSmartExportManager = (
+    IntelligentDispatchObservabilityAgileSmartExportManager
+)
 
 
 def __getattr__(name: str):
