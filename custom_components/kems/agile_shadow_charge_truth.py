@@ -69,6 +69,13 @@ def reconcile_cheap_charge_target(
         ),
         3,
     )
+    grid_export_allowed = bool(
+        getattr(
+            control,
+            "desired_grid_export_allowed",
+            getattr(candidate, "desired_grid_export_allowed", False),
+        )
+    )
     total_output_kw = _number(getattr(control, "total_kh7_ac_output_kw", None))
     headroom_kw = _number(getattr(control, "kh7_output_headroom_kw", None))
 
@@ -78,11 +85,12 @@ def reconcile_cheap_charge_target(
         "desired_battery_to_home_power_kw": home_kw,
         "desired_battery_export_power_kw": export_kw,
         "desired_total_discharge_power_kw": discharge_kw,
-        "desired_grid_export_allowed": bool(control.desired_grid_export_allowed),
     }
-    if total_output_kw is not None:
+    if hasattr(candidate, "desired_grid_export_allowed"):
+        replacements["desired_grid_export_allowed"] = grid_export_allowed
+    if total_output_kw is not None and hasattr(candidate, "total_kh7_ac_output_kw"):
         replacements["total_kh7_ac_output_kw"] = round(max(total_output_kw, 0.0), 3)
-    if headroom_kw is not None:
+    if headroom_kw is not None and hasattr(candidate, "kh7_output_headroom_kw"):
         replacements["kh7_output_headroom_kw"] = round(max(headroom_kw, 0.0), 3)
     corrected = replace(candidate, **replacements)
 
@@ -106,24 +114,33 @@ def reconcile_cheap_charge_target(
     parity["charge_target_matches_canonical_control"] = (
         abs(corrected.desired_charge_power_kw - charge_kw) <= 0.001
     )
-    parity["house_target_matches_optimizer"] = (
-        abs(corrected.desired_battery_to_home_power_kw - home_kw) <= 0.001
-    )
-    parity["export_target_matches_optimizer"] = (
-        abs(corrected.desired_battery_export_power_kw - export_kw) <= 0.001
-    )
-    parity["discharge_target_matches_optimizer"] = (
-        abs(corrected.desired_total_discharge_power_kw - discharge_kw) <= 0.001
-    )
-    parity["cheap_charge_routing_matches_canonical_control"] = all(
+    if hasattr(corrected, "desired_battery_to_home_power_kw"):
+        parity["house_target_matches_optimizer"] = (
+            abs(corrected.desired_battery_to_home_power_kw - home_kw) <= 0.001
+        )
+    if hasattr(corrected, "desired_battery_export_power_kw"):
+        parity["export_target_matches_optimizer"] = (
+            abs(corrected.desired_battery_export_power_kw - export_kw) <= 0.001
+        )
+    if hasattr(corrected, "desired_total_discharge_power_kw"):
+        parity["discharge_target_matches_optimizer"] = (
+            abs(corrected.desired_total_discharge_power_kw - discharge_kw) <= 0.001
+        )
+    routing_matches = all(
         (
-            abs(corrected.desired_battery_to_home_power_kw - home_kw) <= 0.001,
-            abs(corrected.desired_battery_export_power_kw - export_kw) <= 0.001,
-            abs(corrected.desired_total_discharge_power_kw - discharge_kw) <= 0.001,
-            corrected.desired_grid_export_allowed
-            == bool(control.desired_grid_export_allowed),
+            abs(_number(getattr(corrected, "desired_battery_to_home_power_kw", 0.0)) or 0.0 - home_kw)
+            <= 0.001,
+            abs(_number(getattr(corrected, "desired_battery_export_power_kw", 0.0)) or 0.0 - export_kw)
+            <= 0.001,
+            abs(_number(getattr(corrected, "desired_total_discharge_power_kw", 0.0)) or 0.0 - discharge_kw)
+            <= 0.001,
         )
     )
+    if hasattr(corrected, "desired_grid_export_allowed"):
+        routing_matches = routing_matches and (
+            corrected.desired_grid_export_allowed == grid_export_allowed
+        )
+    parity["cheap_charge_routing_matches_canonical_control"] = routing_matches
     updated["parity"] = parity
     updated["parity_passed"] = all(parity.values())
     updated["cheap_charge_target_reconciled"] = True
