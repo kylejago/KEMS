@@ -193,10 +193,8 @@ def test_alpha865_is_observability_only_successor() -> None:
         encoding="utf-8"
     )
 
-    assert (
-        "EfficientAgileSmartExportManager = "
-        "IntelligentDispatchObservabilityAgileSmartExportManager"
-    ) in runtime
+    assert "from .agile_intelligent_dispatch_observability import" in runtime
+    assert "IntelligentDispatchObservabilityAgileSmartExportManager" in runtime
     assert manifest["version"] == "0.8.0-alpha8.65"
     assert bundle["components"]["property_web"]["version"] == "0.8.0-alpha8-web.9"
     assert bundle["components"]["panel"]["version"] == "0.8.0-alpha8-panel.1"
