@@ -122,7 +122,9 @@ def _integrate_active_decision_energy(
         if duration_hours > 0.0:
             charge_kw, discharge_kw = current_target
             segment_charge_input = charge_kw * duration_hours
-            segment_stored_charge = segment_charge_input * float(config.charge_efficiency)
+            segment_stored_charge = segment_charge_input * float(
+                config.charge_efficiency
+            )
             segment_discharge = discharge_kw * duration_hours
             charge_input_kwh += segment_charge_input
             stored_charge_kwh += segment_stored_charge
@@ -298,7 +300,9 @@ class ActiveElapsedSocContinuityAgileSmartExportManager(
                 if isinstance(decisions, list):
                     _reconcile_completed_from_persisted_decisions(
                         state,
-                        decisions=[item for item in decisions if isinstance(item, dict)],
+                        decisions=[
+                            item for item in decisions if isinstance(item, dict)
+                        ],
                         now=now,
                         config=config,
                     )
