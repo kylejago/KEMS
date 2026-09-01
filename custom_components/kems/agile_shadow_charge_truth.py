@@ -1,10 +1,11 @@
-"""Canonical cheap-charge truth for Agile shadow reporting.
+"""Canonical cheap-charge routing truth for Agile shadow reporting.
 
-The preserved Alpha7.23 shadow adapter was intentionally export-centric and set
-charge power to zero. During a confirmed cheap-charge command that makes the
-settled shadow target disagree with the canonical ControlState even though the
-digital twin charges correctly. This adapter mirrors only the already-planned
-canonical charge command; it never creates a charge target or writes hardware.
+The preserved Alpha7.23 shadow adapter was intentionally export-centric. During
+a confirmed cheap-charge command it can retain raw house demand as battery-to-
+home while the canonical ControlState correctly routes the house from Grid and
+requests zero battery discharge. This reporting-only adapter mirrors the already-
+planned canonical cheap-charge command into shadow evidence; it never creates a
+control target or writes hardware.
 """
 
 from __future__ import annotations
@@ -47,27 +48,115 @@ def reconcile_cheap_charge_target(
         return candidate, context
 
     charge_kw = round(max(charge_kw, 0.0), 3)
-    corrected = replace(
-        candidate,
-        desired_work_mode=control.desired_work_mode,
-        desired_charge_power_kw=charge_kw,
+    home_kw = round(
+        max(
+            _number(getattr(control, "desired_battery_to_home_power_kw", None)) or 0.0,
+            0.0,
+        ),
+        3,
     )
+    export_kw = round(
+        max(
+            _number(getattr(control, "desired_battery_export_power_kw", None)) or 0.0,
+            0.0,
+        ),
+        3,
+    )
+    discharge_kw = round(
+        max(
+            _number(getattr(control, "desired_total_discharge_power_kw", None)) or 0.0,
+            0.0,
+        ),
+        3,
+    )
+    grid_export_allowed = bool(
+        getattr(
+            control,
+            "desired_grid_export_allowed",
+            getattr(candidate, "desired_grid_export_allowed", False),
+        )
+    )
+    total_output_kw = _number(getattr(control, "total_kh7_ac_output_kw", None))
+    headroom_kw = _number(getattr(control, "kh7_output_headroom_kw", None))
+
+    replacements: dict[str, Any] = {
+        "desired_work_mode": control.desired_work_mode,
+        "desired_charge_power_kw": charge_kw,
+    }
+    if hasattr(candidate, "desired_battery_to_home_power_kw"):
+        replacements["desired_battery_to_home_power_kw"] = home_kw
+    if hasattr(candidate, "desired_battery_export_power_kw"):
+        replacements["desired_battery_export_power_kw"] = export_kw
+    if hasattr(candidate, "desired_total_discharge_power_kw"):
+        replacements["desired_total_discharge_power_kw"] = discharge_kw
+    if hasattr(candidate, "desired_grid_export_allowed"):
+        replacements["desired_grid_export_allowed"] = grid_export_allowed
+    if total_output_kw is not None and hasattr(candidate, "total_kh7_ac_output_kw"):
+        replacements["total_kh7_ac_output_kw"] = round(max(total_output_kw, 0.0), 3)
+    if headroom_kw is not None and hasattr(candidate, "kh7_output_headroom_kw"):
+        replacements["kh7_output_headroom_kw"] = round(max(headroom_kw, 0.0), 3)
+    corrected = replace(candidate, **replacements)
+
     updated = dict(context)
     optimizer_target = updated.get("optimizer_target")
     optimizer_target = (
         dict(optimizer_target) if isinstance(optimizer_target, dict) else {}
     )
-    optimizer_target["charge_kw"] = charge_kw
+    optimizer_target.update(
+        {
+            "charge_kw": charge_kw,
+            "battery_to_home_kw": home_kw,
+            "battery_export_kw": export_kw,
+            "total_discharge_kw": discharge_kw,
+        }
+    )
     updated["optimizer_target"] = optimizer_target
+
     parity = updated.get("parity")
     parity = dict(parity) if isinstance(parity, dict) else {}
     parity["charge_target_matches_canonical_control"] = (
         abs(corrected.desired_charge_power_kw - charge_kw) <= 0.001
     )
+    if hasattr(corrected, "desired_battery_to_home_power_kw"):
+        parity["house_target_matches_optimizer"] = (
+            abs(corrected.desired_battery_to_home_power_kw - home_kw) <= 0.001
+        )
+    if hasattr(corrected, "desired_battery_export_power_kw"):
+        parity["export_target_matches_optimizer"] = (
+            abs(corrected.desired_battery_export_power_kw - export_kw) <= 0.001
+        )
+    if hasattr(corrected, "desired_total_discharge_power_kw"):
+        parity["discharge_target_matches_optimizer"] = (
+            abs(corrected.desired_total_discharge_power_kw - discharge_kw) <= 0.001
+        )
+
+    corrected_home = (
+        _number(getattr(corrected, "desired_battery_to_home_power_kw", 0.0)) or 0.0
+    )
+    corrected_export = (
+        _number(getattr(corrected, "desired_battery_export_power_kw", 0.0)) or 0.0
+    )
+    corrected_discharge = (
+        _number(getattr(corrected, "desired_total_discharge_power_kw", 0.0)) or 0.0
+    )
+    routing_matches = all(
+        (
+            abs(corrected_home - home_kw) <= 0.001,
+            abs(corrected_export - export_kw) <= 0.001,
+            abs(corrected_discharge - discharge_kw) <= 0.001,
+        )
+    )
+    if hasattr(corrected, "desired_grid_export_allowed"):
+        routing_matches = routing_matches and (
+            corrected.desired_grid_export_allowed == grid_export_allowed
+        )
+    parity["cheap_charge_routing_matches_canonical_control"] = routing_matches
     updated["parity"] = parity
     updated["parity_passed"] = all(parity.values())
     updated["cheap_charge_target_reconciled"] = True
     updated["charge_target_source"] = "canonical ControlState"
+    updated["cheap_charge_routing_source"] = "canonical ControlState"
+    updated["hardware_writes"] = "blocked"
     return corrected, updated
 
 

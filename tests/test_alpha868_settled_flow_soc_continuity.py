@@ -274,7 +274,11 @@ def test_alpha868_is_reporting_only_and_keeps_runtime_owner_and_coordination() -
     source = PARITY.read_text(encoding="utf-8")
     runtime = (KEMS / "agile_smart_export_runtime.py").read_text(encoding="utf-8")
 
-    assert manifest["version"] in {"0.8.0-alpha8.68", "0.8.0-alpha8.69"}
+    assert manifest["version"] in {
+        "0.8.0-alpha8.68",
+        "0.8.0-alpha8.69",
+        "0.8.0-alpha8.70",
+    }
     assert bundle["components"]["property_web"]["version"] == "0.8.0-alpha8-web.9"
     assert bundle["components"]["pi_agent"]["version"] == "0.8.0-alpha8-web.9"
     assert bundle["components"]["public_web"]["version"] == "0.8.0-alpha8-web.9"
