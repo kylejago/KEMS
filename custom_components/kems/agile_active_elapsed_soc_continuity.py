@@ -45,6 +45,8 @@ def _decision_target(
     discharge = _number(target.get("total_discharge_kw"))
     if charge is None or discharge is None:
         return None
+    if charge < -_EPSILON or discharge < -_EPSILON:
+        return None
     charge = max(charge, 0.0)
     discharge = max(discharge, 0.0)
     if charge > _EPSILON and discharge > _EPSILON:
@@ -107,6 +109,7 @@ def _integrate_active_decision_energy(
     cursor = active_start
     current_target = initial[2]
     stored_delta = 0.0
+    stored_charge_kwh = 0.0
     charge_input_kwh = 0.0
     discharge_ac_kwh = 0.0
     segments = 0
@@ -118,13 +121,14 @@ def _integrate_active_decision_energy(
         duration_hours = max((timestamp - cursor).total_seconds(), 0.0) / 3600.0
         if duration_hours > 0.0:
             charge_kw, discharge_kw = current_target
-            charge_input_kwh += charge_kw * duration_hours
-            discharge_ac_kwh += discharge_kw * duration_hours
-            stored_delta += (
-                charge_kw * duration_hours * float(config.charge_efficiency)
-                - discharge_kw
-                * duration_hours
-                / max(float(config.discharge_efficiency), _EPSILON)
+            segment_charge_input = charge_kw * duration_hours
+            segment_stored_charge = segment_charge_input * float(config.charge_efficiency)
+            segment_discharge = discharge_kw * duration_hours
+            charge_input_kwh += segment_charge_input
+            stored_charge_kwh += segment_stored_charge
+            discharge_ac_kwh += segment_discharge
+            stored_delta += segment_stored_charge - segment_discharge / max(
+                float(config.discharge_efficiency), _EPSILON
             )
             segments += 1
         current_target = target
@@ -134,13 +138,14 @@ def _integrate_active_decision_energy(
     duration_hours = max((elapsed_end - cursor).total_seconds(), 0.0) / 3600.0
     if duration_hours > 0.0:
         charge_kw, discharge_kw = current_target
-        charge_input_kwh += charge_kw * duration_hours
-        discharge_ac_kwh += discharge_kw * duration_hours
-        stored_delta += (
-            charge_kw * duration_hours * float(config.charge_efficiency)
-            - discharge_kw
-            * duration_hours
-            / max(float(config.discharge_efficiency), _EPSILON)
+        segment_charge_input = charge_kw * duration_hours
+        segment_stored_charge = segment_charge_input * float(config.charge_efficiency)
+        segment_discharge = discharge_kw * duration_hours
+        charge_input_kwh += segment_charge_input
+        stored_charge_kwh += segment_stored_charge
+        discharge_ac_kwh += segment_discharge
+        stored_delta += segment_stored_charge - segment_discharge / max(
+            float(config.discharge_efficiency), _EPSILON
         )
         segments += 1
 
@@ -149,6 +154,7 @@ def _integrate_active_decision_energy(
         return None
     return {
         "stored_delta_kwh": stored_delta,
+        "stored_charge_kwh": stored_charge_kwh,
         "charge_input_kwh": charge_input_kwh,
         "discharge_ac_kwh": discharge_ac_kwh,
         "elapsed_seconds": elapsed_seconds,
@@ -203,11 +209,11 @@ def _reconcile_completed_from_persisted_decisions(
         return 0
 
     # Alpha8.68's pure backcast helper consumes the historical elapsed fields.
-    # Populate them only for this call from the integrated canonical target
-    # energy, then restore the row before it is published. Charge is supplied as
-    # stored energy because the helper's legacy charge fields represent battery
-    # energy; total AC discharge is supplied as synthetic battery export so the
-    # existing discharge-efficiency accounting remains authoritative.
+    # Populate them only for this call from integrated canonical target energy,
+    # then restore the row before publication. Stored charge is supplied directly
+    # because that legacy helper treats charge fields as battery energy; total AC
+    # discharge is represented as synthetic battery export so its established
+    # discharge-efficiency accounting remains authoritative.
     keys = (
         "grid_export_kwh",
         "solar_export_kwh",
@@ -220,7 +226,7 @@ def _reconcile_completed_from_persisted_decisions(
     active["solar_export_kwh"] = 0.0
     active["battery_to_home_kwh"] = 0.0
     active["solar_to_battery_kwh"] = 0.0
-    active["grid_to_battery_kwh"] = max(float(estimate["stored_delta_kwh"]), 0.0)
+    active["grid_to_battery_kwh"] = max(float(estimate["stored_charge_kwh"]), 0.0)
     try:
         corrected = _reconcile_completed_settled_soc(state, now=now, config=config)
     finally:
@@ -255,6 +261,9 @@ def _reconcile_completed_from_persisted_decisions(
         diagnostic["canonical_decision_initial_source"] = estimate["initial_source"]
         diagnostic["canonical_decision_charge_input_kwh"] = round(
             float(estimate["charge_input_kwh"]), 6
+        )
+        diagnostic["canonical_decision_stored_charge_kwh"] = round(
+            float(estimate["stored_charge_kwh"]), 6
         )
         diagnostic["canonical_decision_discharge_ac_kwh"] = round(
             float(estimate["discharge_ac_kwh"]), 6
