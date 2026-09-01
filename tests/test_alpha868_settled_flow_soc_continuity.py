@@ -165,11 +165,14 @@ def test_live_settled_boundary_replaces_impossible_replay_soc_jump() -> None:
         ],
     }
 
-    assert backcast(
-        state,
-        now=datetime(2026, 9, 1, 20, 53, 21, tzinfo=UTC),
-        config=_config(),
-    ) == 4
+    assert (
+        backcast(
+            state,
+            now=datetime(2026, 9, 1, 20, 53, 21, tzinfo=UTC),
+            config=_config(),
+        )
+        == 4
+    )
 
     completed = state["today_slots"][:4]
     assert [slot["flow_estimated_soc_percent"] for slot in completed] == [
@@ -179,9 +182,12 @@ def test_live_settled_boundary_replaces_impossible_replay_soc_jump() -> None:
         20.7,
     ]
     assert state["today_slots"][4]["flow_estimated_soc_percent"] == 14.7
-    assert [
-        slot["flow_soc_pre_settlement_backcast_percent"] for slot in completed
-    ] == [53.2, 51.9, 45.2, 42.5]
+    assert [slot["flow_soc_pre_settlement_backcast_percent"] for slot in completed] == [
+        53.2,
+        51.9,
+        45.2,
+        42.5,
+    ]
     assert all(slot["flow_settled_soc_backcast_applied"] for slot in completed)
 
     diagnostic = state["completed_flow_soc_continuity"]
@@ -247,11 +253,14 @@ def test_backcast_can_reconstruct_the_persisted_local_day_seed() -> None:
         ],
     }
 
-    assert backcast(
-        state,
-        now=datetime(2026, 9, 1, 0, 10, tzinfo=UTC),
-        config=_config(),
-    ) == 2
+    assert (
+        backcast(
+            state,
+            now=datetime(2026, 9, 1, 0, 10, tzinfo=UTC),
+            config=_config(),
+        )
+        == 2
+    )
     diagnostic = state["completed_flow_soc_continuity"]
     assert diagnostic["reached_day_start"] is True
     assert diagnostic["reconstructed_day_start_soc_percent"] == pytest.approx(54.664)
