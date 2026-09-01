@@ -49,15 +49,24 @@ def reconcile_cheap_charge_target(
 
     charge_kw = round(max(charge_kw, 0.0), 3)
     home_kw = round(
-        max(_number(getattr(control, "desired_battery_to_home_power_kw", None)) or 0.0, 0.0),
+        max(
+            _number(getattr(control, "desired_battery_to_home_power_kw", None)) or 0.0,
+            0.0,
+        ),
         3,
     )
     export_kw = round(
-        max(_number(getattr(control, "desired_battery_export_power_kw", None)) or 0.0, 0.0),
+        max(
+            _number(getattr(control, "desired_battery_export_power_kw", None)) or 0.0,
+            0.0,
+        ),
         3,
     )
     discharge_kw = round(
-        max(_number(getattr(control, "desired_total_discharge_power_kw", None)) or 0.0, 0.0),
+        max(
+            _number(getattr(control, "desired_total_discharge_power_kw", None)) or 0.0,
+            0.0,
+        ),
         3,
     )
     total_output_kw = _number(getattr(control, "total_kh7_ac_output_kw", None))
