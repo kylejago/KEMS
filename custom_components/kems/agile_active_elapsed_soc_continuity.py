@@ -47,7 +47,7 @@ def _decision_target(
     discharge = _number(target.get("total_discharge_kw"))
     if charge is None or discharge is None:
         return None
-    if charge < -_EPSILON or discharge < -EPSILON:
+    if charge < -_EPSILON or discharge < -_EPSILON:
         return None
     charge = max(charge, 0.0)
     discharge = max(discharge, 0.0)
