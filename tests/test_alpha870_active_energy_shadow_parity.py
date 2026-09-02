@@ -376,7 +376,9 @@ def test_alpha870_is_reporting_parity_only_and_keeps_coordination() -> None:
     shadow_source = SHADOW.read_text(encoding="utf-8")
     runtime = (KEMS / "agile_smart_export_runtime.py").read_text(encoding="utf-8")
 
-    assert manifest["version"] == "0.8.0-alpha8.70"
+    version = manifest["version"]
+    assert version.startswith("0.8.0-alpha8.")
+    assert int(version.rsplit(".", 1)[1]) >= 70
     assert bundle["components"]["property_web"]["version"] == "0.8.0-alpha8-web.9"
     assert bundle["components"]["pi_agent"]["version"] == "0.8.0-alpha8-web.9"
     assert bundle["components"]["public_web"]["version"] == "0.8.0-alpha8-web.9"

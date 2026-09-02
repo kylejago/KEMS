@@ -88,6 +88,9 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
         self._whole_home = WholeHomeEngine()
         self._control = ControlEngine()
         self._shadow_validation = ShadowValidationRecorder(hass, entry.entry_id)
+        self._agile_smart_export.bind_persisted_agile_decision_provider(
+            lambda: getattr(self._shadow_validation, "_agile_decisions", [])
+        )
         self._lifetime = LifetimeLedgerRecorder(hass, entry.entry_id)
         self._power_down = PowerDownHistoryRecorder(hass, entry.entry_id)
         self._roi = ROIEngine()
