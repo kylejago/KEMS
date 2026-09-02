@@ -42,7 +42,7 @@
   },
   "maintenance": {
     "required": true,
-    "reason": "Close restart-safe Today SOC continuity using persisted canonical Agile charge/total-discharge decisions and reconcile cheap-charge Agile shadow routing to canonical ControlState; reporting/parity only, with Web 0.8.0-alpha8-web.9 and panel 0.8.0-alpha8-panel.1 unchanged",
+    "reason": "Wire restart-safe Today SOC continuity to ShadowValidationRecorder-owned persisted canonical Agile decisions after Home Assistant restart; reporting-only, with Web 0.8.0-alpha8-web.9 and panel 0.8.0-alpha8-panel.1 unchanged",
     "expected_downtime_minutes": 5,
     "home_assistant_restart_required": true,
     "reboot_required": false,
