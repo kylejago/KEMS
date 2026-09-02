@@ -42,7 +42,7 @@
   },
   "maintenance": {
     "required": true,
-    "reason": "Wire restart-safe Today SOC continuity to ShadowValidationRecorder-owned persisted canonical Agile decisions after Home Assistant restart; reporting-only, with Web 0.8.0-alpha8-web.9 and panel 0.8.0-alpha8-panel.1 unchanged",
+    "reason": "Correct restart-only Today SOC display anchoring when persisted Agile decisions prove the restored settled SOC is still the active-slot boundary; preserve provider-source diagnostics and keep routing/optimiser state unchanged; reporting-only, with Web 0.8.0-alpha8-web.9 and panel 0.8.0-alpha8-panel.1 unchanged",
     "expected_downtime_minutes": 5,
     "home_assistant_restart_required": true,
     "reboot_required": false,
