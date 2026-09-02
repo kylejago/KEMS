@@ -15,6 +15,7 @@ writes.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import Any
 
 from .agile_flow_total_discharge_parity import (
@@ -46,7 +47,7 @@ def _decision_target(
     discharge = _number(target.get("total_discharge_kw"))
     if charge is None or discharge is None:
         return None
-    if charge < -_EPSILON or discharge < -_EPSILON:
+    if charge < -_EPSILON or discharge < -EPSILON:
         return None
     charge = max(charge, 0.0)
     discharge = max(discharge, 0.0)
@@ -281,6 +282,41 @@ class ActiveElapsedSocContinuityAgileSmartExportManager(
 ):
     """Publish Today SOC with restart-safe active-slot elapsed-energy evidence."""
 
+    def bind_persisted_agile_decision_provider(
+        self,
+        provider: Callable[[], list[dict[str, Any]]],
+    ) -> None:
+        """Bind the recorder-owned persisted Agile decision history read-only."""
+        if not callable(provider):
+            raise TypeError("persisted Agile decision provider must be callable")
+        self._persisted_agile_decision_provider = provider
+
+    def _persisted_agile_decision_history(
+        self,
+    ) -> tuple[list[dict[str, Any]], str | None]:
+        """Return a detached decision snapshot and its ownership source."""
+        provider = getattr(self, "_persisted_agile_decision_provider", None)
+        if callable(provider):
+            try:
+                decisions = provider()
+            except Exception:
+                return [], "ShadowValidationRecorder provider unavailable"
+            if not isinstance(decisions, list):
+                return [], "ShadowValidationRecorder provider invalid"
+            return (
+                [dict(item) for item in decisions if isinstance(item, dict)],
+                "ShadowValidationRecorder persisted Agile decisions",
+            )
+
+        # Compatibility for isolated/unit callers that pre-date Alpha8.71.
+        decisions = getattr(self, "_agile_decisions", None)
+        if isinstance(decisions, list):
+            return (
+                [dict(item) for item in decisions if isinstance(item, dict)],
+                "manager-local compatibility decision history",
+            )
+        return [], None
+
     def _publish(self, state: dict[str, Any]) -> None:
         # Reproduce the existing final reporting sequence so the persisted
         # decision fallback runs before the underlying publisher snapshots state.
@@ -297,13 +333,17 @@ class ActiveElapsedSocContinuityAgileSmartExportManager(
                 config=config,
             )
             if corrected <= 0:
-                decisions = getattr(self, "_agile_decisions", None)
-                if isinstance(decisions, list):
+                decisions, history_source = self._persisted_agile_decision_history()
+                if history_source is not None:
+                    diagnostic = state.get("completed_flow_soc_continuity")
+                    if isinstance(diagnostic, dict):
+                        diagnostic["canonical_decision_provider_bound"] = callable(
+                            getattr(self, "_persisted_agile_decision_provider", None)
+                        )
+                        diagnostic["canonical_decision_history_source"] = history_source
                     _reconcile_completed_from_persisted_decisions(
                         state,
-                        decisions=[
-                            item for item in decisions if isinstance(item, dict)
-                        ],
+                        decisions=decisions,
                         now=now,
                         config=config,
                     )
