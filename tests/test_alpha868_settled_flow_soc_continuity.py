@@ -148,13 +148,11 @@ def test_live_settled_boundary_replaces_impossible_replay_soc_jump() -> None:
                 "local_from": "2026-09-01T21:30:00+01:00",
                 "valid_from": "2026-09-01T20:30:00+00:00",
                 "valid_to": "2026-09-01T21:00:00+00:00",
-                # Elapsed manager/replay energy through 21:53.
                 "grid_export_kwh": 2.176,
                 "solar_export_kwh": 0.0,
                 "battery_to_home_kwh": 0.274,
                 "solar_to_battery_kwh": 0.0,
                 "grid_to_battery_kwh": 0.0,
-                # Alpha8.67 canonical remaining-slot presentation.
                 "flow_estimated_soc_percent": 14.7,
                 "flow_battery_charge_kwh": 0.0,
                 "flow_battery_to_home_kwh": 0.086,
@@ -274,11 +272,9 @@ def test_alpha868_is_reporting_only_and_keeps_runtime_owner_and_coordination() -
     source = PARITY.read_text(encoding="utf-8")
     runtime = (KEMS / "agile_smart_export_runtime.py").read_text(encoding="utf-8")
 
-    assert manifest["version"] in {
-        "0.8.0-alpha8.68",
-        "0.8.0-alpha8.69",
-        "0.8.0-alpha8.70",
-    }
+    version = manifest["version"]
+    assert version.startswith("0.8.0-alpha8.")
+    assert int(version.rsplit(".", 1)[1]) >= 68
     assert bundle["components"]["property_web"]["version"] == "0.8.0-alpha8-web.9"
     assert bundle["components"]["pi_agent"]["version"] == "0.8.0-alpha8-web.9"
     assert bundle["components"]["public_web"]["version"] == "0.8.0-alpha8-web.9"
