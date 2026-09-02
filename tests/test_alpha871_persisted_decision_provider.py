@@ -143,7 +143,10 @@ def test_publish_consumes_recorder_provider_when_manager_has_no_local_history() 
     manager._publish(state)
 
     assert state["completed_flow_soc_continuity"]["applied"] is True
-    assert state["completed_flow_soc_continuity"]["canonical_decision_provider_bound"] is True
+    assert (
+        state["completed_flow_soc_continuity"]["canonical_decision_provider_bound"]
+        is True
+    )
     assert (
         state["completed_flow_soc_continuity"]["canonical_decision_history_source"]
         == "ShadowValidationRecorder persisted Agile decisions"
