@@ -112,7 +112,9 @@ def test_already_continuous_elapsed_current_soc_is_not_reanchored() -> None:
     assert _candidate_function()(state, _config()) is None
 
 
-def test_boundary_reconciliation_uses_temporary_display_soc_and_restores_routing() -> None:
+def test_boundary_reconciliation_uses_temporary_display_soc_and_restores_routing() -> (
+    None
+):
     tree = ast.parse(ANCHOR.read_text(encoding="utf-8"))
     names = {
         "_restart_boundary_anchor_candidate",
@@ -139,9 +141,7 @@ def test_boundary_reconciliation_uses_temporary_display_soc_and_restores_routing
         captures["reconcile_soc"] = state["current_routing_snapshot"][
             "simulated_soc_percent"
         ]
-        captures["synthetic_grid_export"] = state["today_slots"][0][
-            "grid_export_kwh"
-        ]
+        captures["synthetic_grid_export"] = state["today_slots"][0]["grid_export_kwh"]
         # Mirror the real helper replacing the diagnostic dictionary.
         state["completed_flow_soc_continuity"] = {
             "active": True,
@@ -209,9 +209,9 @@ def test_boundary_reconciliation_uses_temporary_display_soc_and_restores_routing
     )
     assert diagnostic["canonical_decision_routing_soc_unchanged"] is True
     assert diagnostic["canonical_decision_routing_soc_percent"] == pytest.approx(63.195)
-    assert diagnostic["canonical_decision_display_current_soc_percent"] == pytest.approx(
-        60.878
-    )
+    assert diagnostic[
+        "canonical_decision_display_current_soc_percent"
+    ] == pytest.approx(60.878)
     assert diagnostic["hardware_writes"] == "blocked"
 
 
