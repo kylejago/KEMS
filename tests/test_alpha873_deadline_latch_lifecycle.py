@@ -145,7 +145,9 @@ def test_sep2_identityless_latch_cannot_force_sep3_686p_export() -> None:
         return _economic_targets()
 
     def forbidden_rebalance(*args, **kwargs):
-        raise AssertionError("stale prior-day latch must not rebalance the current slot")
+        raise AssertionError(
+            "stale prior-day latch must not rebalance the current slot"
+        )
 
     ns["_original_deadline_latch_dispatch"] = original
     ns["reconciliation"] = SimpleNamespace(
@@ -166,7 +168,10 @@ def test_sep2_identityless_latch_cannot_force_sep3_686p_export() -> None:
     assert targets["deadline_latch_active"] is False
     assert targets["deadline_latch_released"] == "deadline_identity_missing"
     assert manager._kems_deadline_discharge_latch is None
-    assert sum(item["planned_battery_export_kwh"] for item in plan["selected_slots"]) == 5.218
+    assert (
+        sum(item["planned_battery_export_kwh"] for item in plan["selected_slots"])
+        == 5.218
+    )
     assert [item["rate_pence"] for item in plan["selected_slots"]] == [24.73, 24.29]
     assert state["home_away_mode"] == "home"
 
@@ -317,9 +322,9 @@ def test_target_and_original_deadline_release_semantics_remain_unchanged() -> No
         == "target_reached"
     )
 
-    next_guard = _economic_targets(
-        deadline="2026-09-04T22:30:00+00:00", soc=13.4
-    )["deadline_guard"]
+    next_guard = _economic_targets(deadline="2026-09-04T22:30:00+00:00", soc=13.4)[
+        "deadline_guard"
+    ]
     assert (
         ns["_release_reason"](
             latch,
