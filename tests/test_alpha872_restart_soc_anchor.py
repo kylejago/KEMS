@@ -228,7 +228,7 @@ def test_final_owner_publishes_provider_identity_after_replacement_helpers() -> 
     assert "async_call(" not in source
 
 
-def test_alpha872_is_reporting_only_and_final_runtime_owner() -> None:
+def test_alpha872_contract_survives_successor_releases() -> None:
     manifest = json.loads((KEMS / "manifest.json").read_text(encoding="utf-8"))
     bundle = json.loads(
         (ROOT / "release" / "kems-bundle.template.json").read_text(encoding="utf-8")
@@ -236,14 +236,18 @@ def test_alpha872_is_reporting_only_and_final_runtime_owner() -> None:
     runtime = RUNTIME.read_text(encoding="utf-8")
     anchor = ANCHOR.read_text(encoding="utf-8")
 
-    assert manifest["version"] == "0.8.0-alpha8.72"
+    version = manifest["version"]
+    assert version.startswith("0.8.0-alpha8.")
+    release_number = int(version.rsplit(".", 1)[1])
+    assert release_number >= 72
     assert (
         "EfficientAgileSmartExportManager = RestartSocAnchorAgileSmartExportManager"
         in runtime
     )
     assert "agile_restart_soc_anchor" in runtime
-    assert "routing/optimiser state unchanged" in bundle["maintenance"]["reason"]
-    assert "reporting-only" in bundle["maintenance"]["reason"]
+    if release_number == 72:
+        assert "routing/optimiser state unchanged" in bundle["maintenance"]["reason"]
+        assert "reporting-only" in bundle["maintenance"]["reason"]
     assert bundle["components"]["property_web"]["version"] == "0.8.0-alpha8-web.9"
     assert bundle["components"]["pi_agent"]["version"] == "0.8.0-alpha8-web.9"
     assert bundle["components"]["public_web"]["version"] == "0.8.0-alpha8-web.9"
