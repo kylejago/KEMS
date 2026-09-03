@@ -139,9 +139,7 @@ def test_physical_source_aliases_are_explicit_commissioning_evidence() -> None:
     duplicates = authority.duplicate_physical_sources(mappings)
 
     assert duplicates == {
-        fallback: tuple(
-            sorted((constants.CONF_GRID_IMPORT, constants.CONF_HOUSE_LOAD))
-        )
+        fallback: tuple(sorted((constants.CONF_GRID_IMPORT, constants.CONF_HOUSE_LOAD)))
     }
 
 
