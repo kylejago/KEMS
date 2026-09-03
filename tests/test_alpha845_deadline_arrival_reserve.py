@@ -1,4 +1,9 @@
-"""Regression coverage for Alpha8.45 deadline-arrival reserve ownership."""
+"""Regression coverage for deadline-arrival reserve ownership.
+
+Alpha8.75 supersedes the Alpha8.45 assumption that the 10% optimiser target is
+an absolute house-discharge floor. The target still constrains deliberate
+export, while house-first battery supply continues outside confirmed cheap time.
+"""
 
 from __future__ import annotations
 
@@ -62,7 +67,7 @@ def _segment(start: datetime, *, solar_kw: float = 0.0) -> dict[str, Any]:
     }
 
 
-def test_absolute_ten_percent_floor_stops_house_and_export_discharge() -> None:
+def test_ten_percent_planning_target_stops_export_but_keeps_house_bridge() -> None:
     target = _routing_target()
     start = datetime(2026, 8, 28, 21, 30, tzinfo=UTC)
     allocation = _Allocation(start, start + timedelta(minutes=30), 1.0)
@@ -79,21 +84,21 @@ def test_absolute_ten_percent_floor_stops_house_and_export_discharge() -> None:
         discharge_efficiency=0.95,
     )
 
-    assert house == 0.0
+    assert house == 2.0
     assert export == 0.0
-    assert total == 0.0
+    assert total == 2.0
 
 
-def test_five_minute_guard_tapers_only_very_close_to_floor() -> None:
+def test_five_minute_guard_tapers_only_discretionary_export_near_target() -> None:
     target = _routing_target()
     start = datetime(2026, 8, 28, 21, 30, tzinfo=UTC)
-    allocation = _Allocation(start, start + timedelta(minutes=30), 0.0)
+    allocation = _Allocation(start, start + timedelta(minutes=30), 1.0)
 
     house, export, total = target(
         allocations=(allocation,),
         capacity_segments=[_segment(start)],
         now=start,
-        house_kw=2.0,
+        house_kw=0.5,
         export_limit_kw=7.0,
         current_soc_percent=10.2,
         target_soc_percent=10.0,
@@ -103,10 +108,10 @@ def test_five_minute_guard_tapers_only_very_close_to_floor() -> None:
 
     usable_ac_kwh = 0.2 / 100.0 * 56.42 * 0.95
     expected_limit_kw = usable_ac_kwh / (5.0 / 60.0)
-    assert house == round(expected_limit_kw, 3) == 1.286
-    assert export == 0.0
-    assert total == house
-    assert total * (5.0 / 60.0) <= usable_ac_kwh + 0.0001
+    assert house == 0.5
+    assert export == round(expected_limit_kw - house, 3) == 0.786
+    assert total == round(expected_limit_kw, 3) == 1.286
+    assert export > 0.0
 
 
 def test_house_first_routing_is_unchanged_when_safely_above_floor() -> None:

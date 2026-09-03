@@ -124,7 +124,4 @@ def test_cheap_and_priority_dispatch_modes_remain_outside_this_reconciliation() 
         in source
     )
     assert 'if mode not in {"deadline_following", "maximum_discharge"}' in source
-    assert (
-        "cannot turn an otherwise avoidable house deficit into premium grid import"
-        in source
-    )
+    assert "cannot turn an avoidable house deficit into" in source

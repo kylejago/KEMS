@@ -42,7 +42,7 @@
   },
   "maintenance": {
     "required": true,
-    "reason": "Keep instantaneous non-cheap net house demand as a battery-to-home floor whenever ordinary Agile has protected discharge energy available, so the total-discharge ledger paces only discretionary export and cannot create avoidable day-rate grid import; preserve reserve, cheap-window and higher-priority event paths; shadow-only, with Web 0.8.0-alpha8-web.9 and panel 0.8.0-alpha8-panel.1 unchanged",
+    "reason": "Treat the 10% overnight SOC as a planning target rather than a day-rate-import floor: once the target is reached, stop deliberate battery export but continue house-first battery discharge until confirmed cheap charging begins, bounded by real physical battery/inverter power and preserving cheap-window, Happy Hour, Power Down and deadline ownership; eliminate avoidable day-rate grid import; shadow-only, with Web 0.8.0-alpha8-web.9 and panel 0.8.0-alpha8-panel.1 unchanged",
     "expected_downtime_minutes": 5,
     "home_assistant_restart_required": true,
     "reboot_required": false,
