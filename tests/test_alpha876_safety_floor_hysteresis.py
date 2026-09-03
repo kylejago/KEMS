@@ -61,22 +61,28 @@ def test_planning_target_is_at_least_fifteen_percent() -> None:
 
 def test_hard_floor_activates_at_ten_and_releases_only_at_twelve() -> None:
     latch = _helpers()["_hard_safety_floor_latched"]
-    owner = SimpleNamespace()
+    owner = SimpleNamespace(_dirty=False)
 
     assert latch(owner, 10.1) is False
+    assert owner._dirty is False
     assert latch(owner, 10.0) is True
+    assert owner._dirty is True
+    owner._dirty = False
     assert latch(owner, 10.1) is True
     assert latch(owner, 11.9) is True
+    assert owner._dirty is False
     assert latch(owner, 12.0) is False
+    assert owner._dirty is True
     assert latch(owner, 11.5) is False
 
 
 def test_unknown_soc_cannot_silently_release_an_active_safety_latch() -> None:
     latch = _helpers()["_hard_safety_floor_latched"]
-    owner = SimpleNamespace(_kems_hard_safety_floor_latched=True)
+    owner = SimpleNamespace(_kems_hard_safety_floor_latched=True, _dirty=False)
 
     assert latch(owner, None) is True
     assert owner._kems_hard_safety_floor_latched is True
+    assert owner._dirty is False
 
 
 def test_active_floor_stops_house_export_and_future_export_plan() -> None:
@@ -105,6 +111,7 @@ def test_active_floor_stops_house_export_and_future_export_plan() -> None:
     assert result["next_export_slot"] is None
     assert result["hard_safety_floor_active"] is True
     assert result["hard_reserve_floor_active"] is True
+    assert result["hard_safety_floor_persisted"] is True
 
 
 def test_active_floor_overrides_power_down_battery_discharge() -> None:
@@ -191,9 +198,13 @@ def test_alpha876_scope_install_order_and_release_metadata() -> None:
     assert runtime.index("install_intelligent_dispatch_replan()") < runtime.index(
         "install_agile_safety_floor()"
     )
+    assert "build_safety_floor_manager(" in runtime
     assert "float(values[CONF_BATTERY_RESERVE]),\n                    15.0" in settings
     assert "HARD_SAFETY_FLOOR_SOC_PERCENT = 10.0" in source
     assert "HARD_SAFETY_RECOVERY_SOC_PERCENT = 12.0" in source
+    assert "agile_safety_floor" in source
+    assert 'data.get("hard_safety_floor_latched", False)' in source
+    assert '"hard_safety_floor_latched": bool(' in source
     assert '"hardware_writes": "blocked"' in source
     assert ".services.async_call(" not in source
     assert "providers.foxess" not in source
