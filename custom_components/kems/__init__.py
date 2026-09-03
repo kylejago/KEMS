@@ -12,6 +12,7 @@ from .agile_simulation_presentation import install_agile_simulation_presentation
 from .agile_slots_state import async_setup_agile_slots_state
 from .collector import Collector
 from .const import (
+    CONF_BATTERY_RESERVE,
     CONF_EV_POWER,
     CONF_EXPORT_LIMIT,
     CONF_EXPORT_RATE,
@@ -28,6 +29,7 @@ from .const import (
     CONF_SIMULATION_STRATEGY,
     CONF_SITE_IMPORT_LIMIT,
     CONF_TARIFF_MODE,
+    DEFAULT_OPTIONS,
 )
 from .coordinator import KEMSCoordinator
 from .dashboard import async_sync_managed_dashboard
@@ -64,6 +66,17 @@ PLATFORMS: list[Platform] = [
 ]
 
 
+def _alpha876_planning_options(options: dict[str, object]) -> dict[str, object]:
+    """Migrate legacy sub-15% reserve values to the new planning target floor."""
+    planning_minimum = float(DEFAULT_OPTIONS[CONF_BATTERY_RESERVE])
+    try:
+        configured = float(options.get(CONF_BATTERY_RESERVE, planning_minimum))
+    except (TypeError, ValueError):
+        configured = planning_minimum
+    options[CONF_BATTERY_RESERVE] = max(configured, planning_minimum)
+    return options
+
+
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up KEMS from a config entry."""
     # Alpha8.19 keeps the existing billing state but replaces the historical
@@ -75,6 +88,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     except (OSError, ValueError):
         LOGGER.exception(
             "Unable to update the managed KEMS dashboard; continuing KEMS setup"
+        )
+
+    options = _alpha876_planning_options(dict(entry.options))
+    if options != dict(entry.options):
+        hass.config_entries.async_update_entry(entry, options=options)
+        LOGGER.info(
+            "KEMS migrated the legacy battery reserve to a minimum 15%% "
+            "optimiser target; the independent hard safety floor remains 10%%"
         )
 
     validation = await async_validate_entity_mappings(hass, dict(entry.data))
@@ -90,7 +111,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         accepted=enriched, rejected=validation.rejected
     )
     entities = KEMSEntities.from_entry_data(enriched)
-    settings = KEMSSettings.from_options(entry.options)
+    settings = KEMSSettings.from_options(options)
     collector = Collector(
         octopus=OctopusProvider(
             hass, entities, stale_data_seconds=settings.control.stale_data_seconds
@@ -111,7 +132,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         settings,
         source_validation=source_validation,
     )
-    configure_ev_charge_policy(coordinator._control, entry.options)
+    configure_ev_charge_policy(coordinator._control, options)
 
     await coordinator.async_config_entry_first_refresh()
     entry.runtime_data = coordinator
@@ -149,7 +170,7 @@ async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         return False
 
     data = dict(entry.data)
-    options = dict(entry.options)
+    options = _alpha876_planning_options(dict(entry.options))
     old_ev_power = data.pop("ev_power", None)
     if old_ev_power and not data.get(CONF_EV_POWER):
         data[CONF_EV_POWER] = old_ev_power
