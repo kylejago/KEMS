@@ -64,11 +64,10 @@ def test_dispatch_diagnostic_has_no_obsolete_second_reserve_target() -> None:
 def test_frozen_alpha7_regression_evidence_remains_non_runtime() -> None:
     """Historical files stay as evidence; live registries remain canonical names."""
     source = COMPAT.read_text(encoding="utf-8")
+    normalised = " ".join(source.split())
 
-    assert (
-        "Historical version-named modules remain packaged regression evidence" in source
-    )
-    assert "New Alpha8 behaviour must be implemented in canonical modules" in source
+    assert "Historical version-named modules remain packaged regression evidence" in source
+    assert "New Alpha8 behaviour must be implemented in canonical modules" in normalised
     assert "agile_alpha730" not in source
     assert "agile_alpha8" not in source
 
