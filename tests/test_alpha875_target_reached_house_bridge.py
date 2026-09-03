@@ -62,7 +62,9 @@ def test_sep3_2158_live_target_reached_case_keeps_house_off_day_rate_grid() -> N
     """Reproduce the Alpha8.74 21:58 BST import transition at 9.958% SOC."""
     target = _helpers()["_current_physical_targets"]
     now = datetime(2026, 9, 3, 20, 58, tzinfo=UTC)
-    allocation = _Allocation(now - timedelta(minutes=28), now + timedelta(minutes=2), 1.0)
+    allocation = _Allocation(
+        now - timedelta(minutes=28), now + timedelta(minutes=2), 1.0
+    )
 
     house, export, total = target(
         allocations=(allocation,),
@@ -185,7 +187,10 @@ def test_alpha875_scope_priority_and_hardware_isolation() -> None:
     assert bundle["components"]["panel"]["version"] == "0.8.0-alpha8-panel.1"
     assert "planning target" in bundle["maintenance"]["reason"].lower()
     assert "avoidable day-rate" in bundle["maintenance"]["reason"].lower()
-    assert 'if mode in {"cheap_charge", "happy_hour_charge", "power_down_session"}' in source
+    assert (
+        'if mode in {"cheap_charge", "happy_hour_charge", "power_down_session"}'
+        in source
+    )
     assert 'if mode not in {"deadline_following", "maximum_discharge"}' in source
     assert '"planning_target_house_bridge_active": target_reached' in source
     assert '"hard_reserve_floor_active": False' in source
