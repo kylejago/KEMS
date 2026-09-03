@@ -146,7 +146,9 @@ def test_cheap_charge_keeps_ownership_so_latched_battery_can_recover() -> None:
     assert result["hard_safety_charge_recovery_active"] is True
 
 
-def test_recovered_battery_resumes_house_bridge_but_planning_target_remains_fifteen() -> None:
+def test_recovered_battery_resumes_house_bridge_but_planning_target_remains_fifteen() -> (
+    None
+):
     apply_floor = _helpers()["_apply_hard_safety_floor"]
     plan = {
         "available": True,
