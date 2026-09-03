@@ -70,7 +70,7 @@ install_alpha752_tomorrow_no_reserve_rounding_patch()
 
 # Historical Alpha8 owner progression is retained as source metadata for the
 # successor-safe regression contracts. The executable owner now extends this
-# chain through RestartSocAnchorAgileSmartExportManager.
+# chain through the restart-safe safety-floor manager built below.
 ALPHA8_OWNER_PROGRESSION = """\
 EfficientAgileSmartExportManager = LiveSolarSocContinuityAgileSmartExportManager
 EfficientAgileSmartExportManager = DeadlineSettlementConsistencyAgileSmartExportManager
@@ -102,11 +102,18 @@ from .agile_intelligent_dispatch_replan import (  # noqa: E402
 from .agile_restart_soc_anchor import (  # noqa: E402
     RestartSocAnchorAgileSmartExportManager,
 )
+from .agile_safety_floor import (  # noqa: E402
+    build_safety_floor_manager,
+    install_agile_safety_floor,
+)
 from .agile_smart_export_runtime_base import *  # noqa: E402,F403
 
 install_intelligent_dispatch_replan()
+install_agile_safety_floor()
 
-EfficientAgileSmartExportManager = RestartSocAnchorAgileSmartExportManager
+EfficientAgileSmartExportManager = build_safety_floor_manager(
+    RestartSocAnchorAgileSmartExportManager
+)
 
 
 def __getattr__(name: str):

@@ -153,7 +153,9 @@ DEFAULT_OPTIONS = {
     CONF_SCAN_INTERVAL: DEFAULT_SCAN_INTERVAL_SECONDS,
     CONF_HISTORY_DAYS: DEFAULT_HISTORY_DAYS,
     CONF_BATTERY_CAPACITY: 56.42,
-    CONF_BATTERY_RESERVE: 10.0,
+    # Alpha8.76: this is the optimiser/planning target. The independent hard
+    # battery safety floor remains fixed at 10% with release at 12%.
+    CONF_BATTERY_RESERVE: 15.0,
     CONF_BATTERY_INITIAL: 10.0,
     CONF_MAX_CHARGE: 7.0,
     CONF_MAX_DISCHARGE: 7.0,

@@ -42,7 +42,7 @@
   },
   "maintenance": {
     "required": true,
-    "reason": "Treat the 10% overnight SOC as a planning target rather than a day-rate-import floor: once the target is reached, stop deliberate battery export but continue house-first battery discharge until confirmed cheap charging begins, bounded by real physical battery/inverter power and preserving cheap-window, Happy Hour, Power Down and deadline ownership; eliminate avoidable day-rate grid import; shadow-only, with Web 0.8.0-alpha8-web.9 and panel 0.8.0-alpha8-panel.1 unchanged",
+    "reason": "Separate the Full KEMS Agile battery hierarchy into a 15% optimiser target, 10% absolute safety floor and 12% recovery threshold: house-first operation may bridge below the planning target, but at or below 10% all normal battery discharge including house, export, deadline and Power Down discharge is stopped until SOC recovers to at least 12%; confirmed cheap/Happy Hour charging may recover the battery; hardware writes remain blocked; Web 0.8.0-alpha8-web.9 and panel 0.8.0-alpha8-panel.1 unchanged",
     "expected_downtime_minutes": 5,
     "home_assistant_restart_required": true,
     "reboot_required": false,

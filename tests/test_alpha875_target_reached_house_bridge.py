@@ -176,8 +176,11 @@ def test_alpha875_scope_priority_and_hardware_isolation() -> None:
         (ROOT / "release" / "kems-bundle.template.json").read_text(encoding="utf-8")
     )
     source = SOURCE.read_text(encoding="utf-8")
+    version = manifest["version"]
 
-    assert manifest["version"] == "0.8.0-alpha8.75"
+    assert version.startswith("0.8.0-alpha8.")
+    release_number = int(version.rsplit(".", 1)[1])
+    assert release_number >= 75
     assert bundle["maintenance"]["affected_components"] == ["kems_core", "dashboard"]
     assert bundle["maintenance"]["home_assistant_restart_required"] is True
     assert bundle["maintenance"]["reboot_required"] is False
@@ -185,8 +188,9 @@ def test_alpha875_scope_priority_and_hardware_isolation() -> None:
     assert bundle["components"]["pi_agent"]["version"] == "0.8.0-alpha8-web.9"
     assert bundle["components"]["public_web"]["version"] == "0.8.0-alpha8-web.9"
     assert bundle["components"]["panel"]["version"] == "0.8.0-alpha8-panel.1"
-    assert "planning target" in bundle["maintenance"]["reason"].lower()
-    assert "avoidable day-rate" in bundle["maintenance"]["reason"].lower()
+    if release_number == 75:
+        assert "planning target" in bundle["maintenance"]["reason"].lower()
+        assert "avoidable day-rate" in bundle["maintenance"]["reason"].lower()
     assert (
         'if mode in {"cheap_charge", "happy_hour_charge", "power_down_session"}'
         in source
