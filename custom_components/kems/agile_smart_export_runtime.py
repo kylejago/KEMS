@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from .agile_alpha7_compat import install_alpha7_compatibility
 from .agile_deadline_integrity import install_deadline_integrity
+from .agile_safety_floor import install_agile_safety_floor
 from .agile_shadow_charge_truth import install_shadow_charge_truth
 
 # Non-executable compatibility metadata for the historical Alpha7 regression
@@ -105,6 +106,7 @@ from .agile_restart_soc_anchor import (  # noqa: E402
 from .agile_smart_export_runtime_base import *  # noqa: E402,F403
 
 install_intelligent_dispatch_replan()
+install_agile_safety_floor()
 
 EfficientAgileSmartExportManager = RestartSocAnchorAgileSmartExportManager
 
