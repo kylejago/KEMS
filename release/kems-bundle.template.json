@@ -42,7 +42,7 @@
   },
   "maintenance": {
     "required": true,
-    "reason": "Correct restart-only Today SOC display anchoring when persisted Agile decisions prove the restored settled SOC is still the active-slot boundary; preserve provider-source diagnostics and keep routing/optimiser state unchanged; reporting-only, with Web 0.8.0-alpha8-web.9 and panel 0.8.0-alpha8-panel.1 unchanged",
+    "reason": "Bind the Agile deadline latch to its own immutable deadline identity so an identityless or prior-horizon latch cannot borrow a later guard deadline and force stale low-value export; preserve same-deadline anti-oscillation and existing deadline/event priority; shadow-only, with Web 0.8.0-alpha8-web.9 and panel 0.8.0-alpha8-panel.1 unchanged",
     "expected_downtime_minutes": 5,
     "home_assistant_restart_required": true,
     "reboot_required": false,

@@ -5,6 +5,12 @@ suppress an already-active deadline guard, allow the optimiser to wait again,
 and later fall into ``maximum_discharge`` after the 10% target had become
 physically unreachable.
 
+Alpha8.73 binds that durable latch to its own immutable guarded-deadline
+identity. An identityless latch may not persist, and a later guard may not lend
+its newer deadline to an older latch. This prevents prior-day emergency state
+from sliding onto the next planning horizon while preserving same-deadline
+anti-oscillation protection.
+
 Once a guarded deadline has activated, price optimisation may not reassert
 control until the target is reached or the guarded cheap-window deadline begins.
 Power Down / Happy Hour / other explicit higher-priority modes are not replaced.
@@ -63,7 +69,14 @@ def _soc_and_target(guard: dict[str, Any]) -> tuple[float | None, float | None]:
 
 
 def _deadline_from(latch: dict[str, Any], guard: dict[str, Any]) -> datetime | None:
-    return _datetime(latch.get("deadline")) or _datetime(guard.get("deadline"))
+    """Return only the immutable deadline owned by the active latch.
+
+    ``guard`` is intentionally ignored. Before Alpha8.73 an identityless old
+    latch borrowed the currently recalculated guard deadline, allowing the old
+    activation to slide into a new planning day.
+    """
+    del guard
+    return _datetime(latch.get("deadline"))
 
 
 def _release_reason(
@@ -77,9 +90,16 @@ def _release_reason(
         and soc <= target + _SOC_TOLERANCE_PERCENT
     ):
         return "target_reached"
+
     deadline = _deadline_from(latch, guard)
-    if deadline is not None and now.astimezone(UTC) >= deadline:
+    if deadline is None:
+        return "deadline_identity_missing"
+    if now.astimezone(UTC) >= deadline:
         return "cheap_window_started"
+
+    current_deadline = _datetime(guard.get("deadline"))
+    if current_deadline is not None and current_deadline != deadline:
+        return "deadline_identity_advanced"
     return None
 
 
@@ -91,13 +111,15 @@ def _suppressed_active_guard(targets: dict[str, Any], guard: dict[str, Any]) -> 
 
 
 def _new_latch(guard: dict[str, Any], *, now: datetime) -> dict[str, Any]:
-    """Create durable per-manager latch evidence."""
+    """Create durable per-manager latch evidence bound to one deadline."""
     _, target = _soc_and_target(guard)
     deadline = _datetime(guard.get("deadline"))
+    if deadline is None:
+        return {}
     return {
         "active": True,
         "activated_at": now.astimezone(UTC).isoformat(),
-        "deadline": deadline.isoformat() if deadline is not None else None,
+        "deadline": deadline.isoformat(),
         "target_soc_percent": target,
         "reason": "guarded latest-safe-start reached",
     }
@@ -159,6 +181,7 @@ def _apply_latch(
             "deadline_guard_suppressed_by_plan_coverage": False,
             "deadline_latch_active": True,
             "deadline_latch_activated_at": latch.get("activated_at"),
+            "deadline_latch_deadline": latch.get("deadline"),
         }
     )
     guard.update(
@@ -168,12 +191,14 @@ def _apply_latch(
             "suppressed_by_economic_plan_coverage": False,
             "deadline_latch_active": True,
             "deadline_latch_activated_at": latch.get("activated_at"),
+            "deadline_latch_deadline": latch.get("deadline"),
             "deadline_latch_reason": latch.get("reason"),
         }
     )
     plan["deadline_guard_suppressed_by_plan_coverage"] = False
     plan["deadline_latch_active"] = True
     plan["deadline_latch_activated_at"] = latch.get("activated_at")
+    plan["deadline_latch_deadline"] = latch.get("deadline")
 
     evidence = targets.get("solar_aware_inverter_headroom")
     if isinstance(evidence, dict):
@@ -231,8 +256,10 @@ def _dispatch_with_deadline_latch(
             setattr(self, _LATCH_ATTR, None)
             targets["deadline_latch_active"] = False
             targets["deadline_latch_released"] = release
+            targets["deadline_latch_released_deadline"] = latch.get("deadline")
             guard["deadline_latch_active"] = False
             guard["deadline_latch_released"] = release
+            guard["deadline_latch_released_deadline"] = latch.get("deadline")
             targets["deadline_guard"] = guard
             return targets
 
@@ -240,7 +267,14 @@ def _dispatch_with_deadline_latch(
     suppression_attempt = _suppressed_active_guard(targets, guard)
     if not latch and (mode in _DEADLINE_MODES or suppression_attempt):
         latch = _new_latch(guard, now=now)
-        setattr(self, _LATCH_ATTR, dict(latch))
+        if latch:
+            setattr(self, _LATCH_ATTR, dict(latch))
+        else:
+            targets["deadline_latch_active"] = False
+            targets["deadline_latch_not_armed"] = "deadline_identity_missing"
+            guard["deadline_latch_active"] = False
+            guard["deadline_latch_not_armed"] = "deadline_identity_missing"
+            targets["deadline_guard"] = guard
 
     if not latch:
         return targets
@@ -250,13 +284,18 @@ def _dispatch_with_deadline_latch(
     # already released it.
     if mode not in _PRICE_MODES and mode != "maximum_discharge":
         targets["deadline_latch_active"] = True
+        targets["deadline_latch_activated_at"] = latch.get("activated_at")
+        targets["deadline_latch_deadline"] = latch.get("deadline")
         targets["deadline_latch_deferred_by_mode"] = mode
         return targets
 
     if mode == "maximum_discharge":
         targets["deadline_latch_active"] = True
+        targets["deadline_latch_activated_at"] = latch.get("activated_at")
+        targets["deadline_latch_deadline"] = latch.get("deadline")
         guard["deadline_latch_active"] = True
         guard["deadline_latch_activated_at"] = latch.get("activated_at")
+        guard["deadline_latch_deadline"] = latch.get("deadline")
         targets["deadline_guard"] = guard
         return targets
 
