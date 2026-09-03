@@ -15,6 +15,8 @@ KEMS = ROOT / "custom_components" / "kems"
 SOURCE = KEMS / "agile_safety_floor.py"
 RUNTIME = KEMS / "agile_smart_export_runtime.py"
 SETTINGS = KEMS / "settings.py"
+SETUP = KEMS / "__init__.py"
+CONSTS = KEMS / "const.py"
 
 
 @dataclass(frozen=True)
@@ -51,12 +53,40 @@ def _helpers() -> dict[str, Any]:
     return namespace
 
 
+def _migration_helper():
+    tree = ast.parse(SETUP.read_text(encoding="utf-8"), filename=str(SETUP))
+    function = next(
+        node
+        for node in tree.body
+        if isinstance(node, ast.FunctionDef)
+        and node.name == "_alpha876_planning_options"
+    )
+    namespace: dict[str, Any] = {
+        "CONF_BATTERY_RESERVE": "battery_reserve_percent",
+        "DEFAULT_OPTIONS": {"battery_reserve_percent": 15.0},
+    }
+    module = ast.Module(body=[function], type_ignores=[])
+    ast.fix_missing_locations(module)
+    exec(compile(module, SETUP.as_posix(), "exec"), namespace)
+    return namespace["_alpha876_planning_options"]
+
+
 def test_planning_target_is_at_least_fifteen_percent() -> None:
     planning_config = _helpers()["_planning_config"]
 
     assert planning_config(_Config(10.0)).battery_reserve_percent == 15.0
     assert planning_config(_Config(15.0)).battery_reserve_percent == 15.0
     assert planning_config(_Config(20.0)).battery_reserve_percent == 20.0
+
+
+def test_legacy_stored_reserve_migrates_to_fifteen_percent() -> None:
+    migrate = _migration_helper()
+
+    assert migrate({"battery_reserve_percent": 10.0})["battery_reserve_percent"] == 15.0
+    assert migrate({"battery_reserve_percent": 20.0})["battery_reserve_percent"] == 20.0
+    assert migrate({"battery_reserve_percent": "unknown"})[
+        "battery_reserve_percent"
+    ] == 15.0
 
 
 def test_hard_floor_activates_at_ten_and_releases_only_at_twelve() -> None:
@@ -181,6 +211,8 @@ def test_alpha876_scope_install_order_and_release_metadata() -> None:
     )
     runtime = RUNTIME.read_text(encoding="utf-8")
     settings = SETTINGS.read_text(encoding="utf-8")
+    setup = SETUP.read_text(encoding="utf-8")
+    consts = CONSTS.read_text(encoding="utf-8")
     source = SOURCE.read_text(encoding="utf-8")
 
     assert manifest["version"] == "0.8.0-alpha8.76"
@@ -200,6 +232,10 @@ def test_alpha876_scope_install_order_and_release_metadata() -> None:
     )
     assert "build_safety_floor_manager(" in runtime
     assert "float(values[CONF_BATTERY_RESERVE]),\n                    15.0" in settings
+    assert "CONF_BATTERY_RESERVE: 15.0" in consts
+    assert "_alpha876_planning_options(dict(entry.options))" in setup
+    assert "KEMSSettings.from_options(options)" in setup
+    assert "configure_ev_charge_policy(coordinator._control, options)" in setup
     assert "HARD_SAFETY_FLOOR_SOC_PERCENT = 10.0" in source
     assert "HARD_SAFETY_RECOVERY_SOC_PERCENT = 12.0" in source
     assert "agile_safety_floor" in source
