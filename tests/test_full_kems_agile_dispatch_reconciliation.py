@@ -193,12 +193,16 @@ def test_reconciliation_is_the_last_canonical_runtime_boundary() -> None:
     assert "agile_alpha8" not in MODULE.name
 
 
-def test_user_policy_stays_100_percent_charge_and_10_percent_reserve() -> None:
+def test_user_policy_stays_100_percent_charge_with_one_reserve_hierarchy() -> None:
     source = MODULE.read_text(encoding="utf-8")
     core = CORE.read_text(encoding="utf-8")
 
     assert '"charge_target_soc_percent": 100.0' in source
-    assert '"battery_reserve_target_soc_percent": 10.0' in source
+    assert '"planning_target_soc_percent": planning_target' in source
+    assert 'rolling_plan.get("hard_safety_floor_soc_percent")' in source
+    assert 'rolling_plan.get("hard_safety_recovery_soc_percent")' in source
+    assert '"reserve_hierarchy_source": "final rolling_export_plan"' in source
+    assert '"battery_reserve_target_soc_percent"' not in source
     assert "forecast_maximum_overnight_soc_percent=100.0" in source
     assert "config.battery_reserve_percent" in core
     assert "recharge_feasibility_floor" not in source
