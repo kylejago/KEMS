@@ -81,7 +81,9 @@ def test_uploaded_1920_case_covers_live_net_house_instead_of_importing() -> None
     assert max(1.313 - 0.035 - house_kw, 0.0) == 0.0
 
 
-def test_house_floor_applies_even_when_price_ledger_did_not_select_current_slot() -> None:
+def test_house_floor_applies_even_when_price_ledger_did_not_select_current_slot() -> (
+    None
+):
     """A price hold may suppress export, never ordinary non-cheap home service."""
     target = _target_function()
     now = datetime(2026, 9, 3, 18, 20, 46, 349216, tzinfo=UTC)
@@ -152,7 +154,9 @@ def test_discretionary_export_remains_price_paced_after_house_is_served() -> Non
 def test_higher_priority_modes_and_hardware_boundary_are_unchanged() -> None:
     runtime = RUNTIME.read_text()
 
-    assert 'mode in {"cheap_charge", "happy_hour_charge", "power_down_session"}' in runtime
+    assert (
+        'mode in {"cheap_charge", "happy_hour_charge", "power_down_session"}' in runtime
+    )
     assert 'mode not in {"deadline_following", "maximum_discharge"}' in runtime
     assert "house_floor_available=normal_required > _EPSILON" in runtime
     assert '"hardware_writes": "blocked"' in runtime
