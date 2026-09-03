@@ -230,8 +230,7 @@ def _physical_source_uniqueness_check(
         )
 
     detail = "; ".join(
-        f"{entity_id} -> {', '.join(keys)}"
-        for entity_id, keys in duplicates.items()
+        f"{entity_id} -> {', '.join(keys)}" for entity_id, keys in duplicates.items()
     )
     foxess_duplicate = any(
         _entity_platform(hass, entity_id) == FOXESS_PLATFORM for entity_id in duplicates
