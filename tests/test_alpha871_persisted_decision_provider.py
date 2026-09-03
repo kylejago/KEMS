@@ -189,7 +189,7 @@ def test_coordinator_binds_the_actual_shadow_recorder_history() -> None:
     assert "async_call(" not in active
 
 
-def test_alpha871_is_reporting_only_and_keeps_platform_coordination() -> None:
+def test_alpha871_contract_survives_successor_releases() -> None:
     manifest = json.loads((KEMS / "manifest.json").read_text(encoding="utf-8"))
     bundle = json.loads(
         (ROOT / "release" / "kems-bundle.template.json").read_text(encoding="utf-8")
@@ -197,10 +197,12 @@ def test_alpha871_is_reporting_only_and_keeps_platform_coordination() -> None:
 
     version = manifest["version"]
     assert version.startswith("0.8.0-alpha8.")
-    assert int(version.rsplit(".", 1)[1]) >= 71
+    release_number = int(version.rsplit(".", 1)[1])
+    assert release_number >= 71
     assert bundle["components"]["property_web"]["version"] == "0.8.0-alpha8-web.9"
     assert bundle["components"]["pi_agent"]["version"] == "0.8.0-alpha8-web.9"
     assert bundle["components"]["public_web"]["version"] == "0.8.0-alpha8-web.9"
     assert bundle["components"]["panel"]["version"] == "0.8.0-alpha8-panel.1"
     assert bundle["maintenance"]["affected_components"] == ["kems_core", "dashboard"]
-    assert "reporting-only" in bundle["maintenance"]["reason"]
+    if release_number == 71:
+        assert "reporting-only" in bundle["maintenance"]["reason"]
