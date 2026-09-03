@@ -42,7 +42,7 @@
   },
   "maintenance": {
     "required": true,
-    "reason": "Bind the Agile deadline latch to its own immutable deadline identity so an identityless or prior-horizon latch cannot borrow a later guard deadline and force stale low-value export; preserve same-deadline anti-oscillation and existing deadline/event priority; shadow-only, with Web 0.8.0-alpha8-web.9 and panel 0.8.0-alpha8-panel.1 unchanged",
+    "reason": "Keep instantaneous non-cheap net house demand as a battery-to-home floor whenever ordinary Agile has protected discharge energy available, so the total-discharge ledger paces only discretionary export and cannot create avoidable day-rate grid import; preserve reserve, cheap-window and higher-priority event paths; shadow-only, with Web 0.8.0-alpha8-web.9 and panel 0.8.0-alpha8-panel.1 unchanged",
     "expected_downtime_minutes": 5,
     "home_assistant_restart_required": true,
     "reboot_required": false,
