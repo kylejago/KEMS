@@ -335,20 +335,24 @@ def test_target_and_original_deadline_release_semantics_remain_unchanged() -> No
     )
 
 
-def test_alpha873_version_scope_and_hardware_isolation() -> None:
+def test_alpha873_contract_survives_successor_releases() -> None:
     manifest = json.loads((KEMS / "manifest.json").read_text(encoding="utf-8"))
     bundle = json.loads(
         (ROOT / "release" / "kems-bundle.template.json").read_text(encoding="utf-8")
     )
     source = LATCH.read_text(encoding="utf-8")
 
-    assert manifest["version"] == "0.8.0-alpha8.73"
+    version = manifest["version"]
+    assert version.startswith("0.8.0-alpha8.")
+    release_number = int(version.rsplit(".", 1)[1])
+    assert release_number >= 73
     assert bundle["maintenance"]["affected_components"] == ["kems_core", "dashboard"]
     assert bundle["maintenance"]["home_assistant_restart_required"] is True
     assert bundle["maintenance"]["reboot_required"] is False
     assert bundle["components"]["panel"]["version"] == "0.8.0-alpha8-panel.1"
     assert bundle["components"]["property_web"]["version"] == "0.8.0-alpha8-web.9"
-    assert "deadline latch" in bundle["maintenance"]["reason"].lower()
+    if release_number == 73:
+        assert "deadline latch" in bundle["maintenance"]["reason"].lower()
     assert ".services.async_call(" not in source
     assert "providers.foxess" not in source
     assert "commands_permitted = True" not in source

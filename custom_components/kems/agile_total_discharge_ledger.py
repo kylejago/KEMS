@@ -13,6 +13,12 @@ capacity as the deadline guard. Each selected slot then splits that total batter
 discharge house-first and grid-export second. If actual house demand changes, the
 current export split changes rather than the required total discharge.
 
+Alpha8.74 makes live net house demand a floor on the current battery-to-home
+split whenever ordinary Agile still has discharge energy available above its
+protected target. The settlement ledger continues to pace discretionary export,
+but it may no longer pace the home below instantaneous net demand and create
+avoidable day-rate import.
+
 The cheap-start boundary is exclusive: a settlement slot beginning at the cheap
 start is charge territory and can never be published as a discharge/export slot.
 Real hardware writes remain blocked.
@@ -162,8 +168,9 @@ def _current_total_discharge_targets(
     now: datetime,
     house_kw: float,
     export_limit_kw: float,
+    house_floor_available: bool,
 ) -> tuple[float, float, float] | None:
-    """Pace the selected current total discharge, then split it house-first."""
+    """Serve live net house demand first and pace only discretionary export."""
     now_utc = now.astimezone(UTC)
     current = next(
         (
@@ -174,7 +181,7 @@ def _current_total_discharge_targets(
         ),
         None,
     )
-    if current is None:
+    if current is None and not house_floor_available:
         return None
 
     segment = next(
@@ -192,19 +199,22 @@ def _current_total_discharge_targets(
 
     solar_kw = max(_number(segment.get("solar_kw")) or 0.0, 0.0)
     battery_kw = max(_number(segment.get("battery_kw")) or 0.0, 0.0)
-    remaining_hours = max(
-        (current.valid_to - now_utc).total_seconds() / 3600.0,
-        _EPSILON,
-    )
-    requested_total = min(
-        current.planned_total_discharge_kwh / remaining_hours,
-        battery_kw,
-    )
+    paced_total_kw = 0.0
+    if current is not None:
+        remaining_hours = max(
+            (current.valid_to - now_utc).total_seconds() / 3600.0,
+            _EPSILON,
+        )
+        paced_total_kw = min(
+            current.planned_total_discharge_kwh / remaining_hours,
+            battery_kw,
+        )
+
     solar_to_home_kw = min(max(house_kw, 0.0), solar_kw)
-    house_battery_kw = min(
-        max(house_kw - solar_to_home_kw, 0.0),
-        requested_total,
-    )
+    net_house_kw = max(house_kw - solar_to_home_kw, 0.0)
+    house_floor_kw = min(net_house_kw, battery_kw) if house_floor_available else 0.0
+    requested_total = min(max(paced_total_kw, house_floor_kw), battery_kw)
+    house_battery_kw = min(net_house_kw, requested_total)
     export_kw = min(
         max(requested_total - house_battery_kw, 0.0),
         max(export_limit_kw, 0.0),
@@ -381,7 +391,8 @@ def _apply_total_discharge_ledger(
             ),
             "total_discharge_capacity_model": (
                 "5-minute solar-aware shared-inverter total-discharge ledger; "
-                "house first; cheap-start exclusive"
+                "live house-first floor; price-paced discretionary export; "
+                "cheap-start exclusive"
             ),
             "total_discharge_ledger": ledger.to_dict(),
             "hardware_writes": "blocked",
@@ -395,6 +406,7 @@ def _apply_total_discharge_ledger(
             now=now,
             house_kw=_current_house_kw(self, planning_house_kw),
             export_limit_kw=config.export_limit_kw,
+            house_floor_available=normal_required > _EPSILON,
         )
         if targets is not None:
             house_target, export_target, total_target = targets
