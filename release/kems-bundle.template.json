@@ -42,7 +42,7 @@
   },
   "maintenance": {
     "required": true,
-    "reason": "Separate the Full KEMS Agile battery hierarchy into a 15% optimiser target, 10% absolute safety floor and 12% recovery threshold: house-first operation may bridge below the planning target, but at or below 10% all normal battery discharge including house, export, deadline and Power Down discharge is stopped until SOC recovers to at least 12%; confirmed cheap/Happy Hour charging may recover the battery; hardware writes remain blocked; Web 0.8.0-alpha8-web.9 and panel 0.8.0-alpha8-panel.1 unchanged",
+    "reason": "Commissioning-readiness cleanup: make validated source mappings authoritative across restarts, permit automatic replacement only by an explicitly higher-priority platform such as FoxESS over the Octopus pre-install demand fallback, fail commissioning evidence when commissioned physical telemetry roles alias the same source entity, and expose the canonical 15% planning / 10% hard safety / 12% recovery hierarchy from the final rolling export plan; historical compatibility evidence remains non-runtime, real hardware writes remain blocked, and Web 0.8.0-alpha8-web.9 and panel 0.8.0-alpha8-panel.1 are unchanged",
     "expected_downtime_minutes": 5,
     "home_assistant_restart_required": true,
     "reboot_required": false,

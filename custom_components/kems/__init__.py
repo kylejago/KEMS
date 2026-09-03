@@ -51,6 +51,7 @@ from .providers.octoplus import OctoplusProvider
 from .providers.octopus import OctopusProvider
 from .providers.ohme import OhmeProvider
 from .settings import KEMSSettings
+from .source_authority import async_reconcile_source_mappings
 from .update_orchestrator import async_unload_update_orchestrator
 from .update_orchestrator_convergent import async_setup_update_orchestrator
 
@@ -100,15 +101,38 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     validation = await async_validate_entity_mappings(hass, dict(entry.data))
     discovery = await async_discover_entities(hass)
-    enriched = {**validation.accepted, **discovery.mappings}
+    authority = await async_reconcile_source_mappings(
+        hass,
+        validation.accepted,
+        discovery.mappings,
+    )
+    final_validation = await async_validate_entity_mappings(hass, authority.mappings)
+    enriched = final_validation.accepted
 
     if enriched != dict(entry.data):
         hass.config_entries.async_update_entry(entry, data=enriched)
     if validation.rejected:
         LOGGER.warning("KEMS rejected unsafe source mappings: %s", validation.summary())
+    if authority.upgrades:
+        LOGGER.info(
+            "KEMS promoted source mappings to higher-priority platforms: %s",
+            authority.upgrades,
+        )
+    if final_validation.rejected:
+        LOGGER.warning(
+            "KEMS rejected reconciled source mappings: %s",
+            final_validation.summary(),
+        )
 
+    unresolved_rejected = {
+        key: details
+        for key, details in validation.rejected.items()
+        if key not in enriched
+    }
+    unresolved_rejected.update(final_validation.rejected)
     source_validation = SourceValidationResult(
-        accepted=enriched, rejected=validation.rejected
+        accepted=enriched,
+        rejected=unresolved_rejected,
     )
     entities = KEMSEntities.from_entry_data(enriched)
     settings = KEMSSettings.from_options(options)

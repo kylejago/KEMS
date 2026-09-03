@@ -11,7 +11,9 @@ post-plan parity only:
 * completed Happy Hour planning auto-clears while retaining one completed-event
   record for same-day/history replay evidence.
 
-The 100% charge target and 10% reserve/export target are deliberately unchanged.
+The 100% charge target is deliberately unchanged. Reserve diagnostics are sourced
+from the final rolling plan so the 15% planning target, 10% absolute safety floor
+and 12% recovery threshold cannot drift into a second hard-coded policy copy.
 This module remains simulation/shadow only and cannot enable hardware writes.
 """
 
@@ -585,6 +587,14 @@ def _install_publish_reconciliation() -> None:
         if isinstance(happy, dict):
             _schedule_completed_event_auto_clear(self, happy)
 
+        rolling_plan = state.get("rolling_export_plan")
+        rolling_plan = rolling_plan if isinstance(rolling_plan, dict) else {}
+        planning_target = _number(rolling_plan.get("planning_target_soc_percent"))
+        if planning_target is None:
+            planning_target = _number(rolling_plan.get("target_soc_percent"))
+        if planning_target is None and isinstance(config, SimulationConfig):
+            planning_target = _number(config.battery_reserve_percent)
+
         state["dispatch_reconciliation"] = {
             "available": True,
             "happy_hour_replay_owner": "Agile day ledger",
@@ -592,7 +602,14 @@ def _install_publish_reconciliation() -> None:
             "shadow_charge_parity": True,
             "happy_hour_planning_auto_clear": True,
             "charge_target_soc_percent": 100.0,
-            "battery_reserve_target_soc_percent": 10.0,
+            "planning_target_soc_percent": planning_target,
+            "hard_safety_floor_soc_percent": _number(
+                rolling_plan.get("hard_safety_floor_soc_percent")
+            ),
+            "hard_safety_recovery_soc_percent": _number(
+                rolling_plan.get("hard_safety_recovery_soc_percent")
+            ),
+            "reserve_hierarchy_source": "final rolling_export_plan",
             "hardware_writes": "blocked",
         }
 

@@ -23,6 +23,7 @@ from .const import (
 from .entity import KEMSEntity
 from .kems_core.commissioning_evidence import assess_foxess_telemetry_stability
 from .panel import PANEL_CONFIG_VERSION, panel_health_snapshot
+from .source_authority import PHYSICAL_SOURCE_KEYS, duplicate_physical_sources
 
 PASS = "PASS"
 WAIT = "WAIT"
@@ -199,6 +200,56 @@ def _foxess_registered_entities(hass: HomeAssistant) -> list[str]:
     return sorted(result)
 
 
+def _physical_source_authority(
+    hass: HomeAssistant,
+    mappings: Mapping[str, str],
+) -> dict[str, dict[str, Any]]:
+    """Expose one commissioning-facing owner for every physical telemetry role."""
+    return {
+        key: {
+            "entity_id": mappings.get(key),
+            "platform": _entity_platform(hass, mappings.get(key)),
+            "available": _entity_available(hass, mappings.get(key)),
+        }
+        for key in PHYSICAL_SOURCE_KEYS
+    }
+
+
+def _physical_source_uniqueness_check(
+    hass: HomeAssistant,
+    mappings: Mapping[str, str],
+) -> dict[str, Any]:
+    """Require distinct FoxESS telemetry entities for distinct physical roles."""
+    duplicates = duplicate_physical_sources(mappings)
+    if not duplicates:
+        return _check(
+            "physical_source_uniqueness",
+            "Physical source uniqueness",
+            PASS,
+            "No physical telemetry entity is assigned to multiple KEMS roles",
+        )
+
+    detail = "; ".join(
+        f"{entity_id} -> {', '.join(keys)}" for entity_id, keys in duplicates.items()
+    )
+    foxess_duplicate = any(
+        _entity_platform(hass, entity_id) == FOXESS_PLATFORM for entity_id in duplicates
+    )
+    if foxess_duplicate:
+        return _check(
+            "physical_source_uniqueness",
+            "Physical source uniqueness",
+            FAIL,
+            f"Duplicate commissioned physical source mapping: {detail}",
+        )
+    return _check(
+        "physical_source_uniqueness",
+        "Physical source uniqueness",
+        WAIT,
+        f"Pre-install fallback shares physical roles: {detail}; waiting for FoxESS",
+    )
+
+
 def build_commissioning_snapshot(hass: HomeAssistant, coordinator) -> dict[str, Any]:
     """Build the complete read-only commissioning readiness payload."""
     data = coordinator.data
@@ -210,6 +261,8 @@ def build_commissioning_snapshot(hass: HomeAssistant, coordinator) -> dict[str, 
         for key, entity_id in sorted(mappings.items())
         if _entity_platform(hass, entity_id) == FOXESS_PLATFORM
     }
+    physical_source_authority = _physical_source_authority(hass, mappings)
+    physical_source_duplicates = duplicate_physical_sources(mappings)
 
     checks: list[dict[str, Any]] = []
     checks.append(
@@ -282,6 +335,8 @@ def build_commissioning_snapshot(hass: HomeAssistant, coordinator) -> dict[str, 
         _source_check(hass, mappings, CONF_GRID_EXPORT, "Grid export mapping")
     )
     checks.append(_source_check(hass, mappings, CONF_HOUSE_LOAD, "House load mapping"))
+    source_uniqueness_check = _physical_source_uniqueness_check(hass, mappings)
+    checks.append(source_uniqueness_check)
 
     mapping_checks = {item["key"]: item for item in checks}
     foxess_physical_mappings_ready = all(
@@ -293,6 +348,7 @@ def build_commissioning_snapshot(hass: HomeAssistant, coordinator) -> dict[str, 
             CONF_GRID_IMPORT,
             CONF_GRID_EXPORT,
             CONF_HOUSE_LOAD,
+            "physical_source_uniqueness",
         )
     )
     records = tuple(getattr(getattr(coordinator, "_history", None), "records", ()))
@@ -611,6 +667,11 @@ def build_commissioning_snapshot(hass: HomeAssistant, coordinator) -> dict[str, 
         "foxess_registered_entity_count": len(foxess_registered),
         "foxess_registered_entities": foxess_registered,
         "foxess_mappings": foxess_mappings,
+        "physical_source_authority": physical_source_authority,
+        "duplicate_physical_sources": {
+            entity_id: list(keys)
+            for entity_id, keys in physical_source_duplicates.items()
+        },
         "foxess_telemetry_mapping_gate_passed": foxess_physical_mappings_ready,
         "foxess_telemetry_stability": telemetry_evidence_payload,
         "configured_battery_power_positive_is_discharge": (
