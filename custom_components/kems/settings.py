@@ -125,7 +125,14 @@ class KEMSSettings:
             ),
             simulation=SimulationConfig(
                 battery_capacity_kwh=float(values[CONF_BATTERY_CAPACITY]),
-                battery_reserve_percent=float(values[CONF_BATTERY_RESERVE]),
+                # Alpha8.76 separates the optimiser target from the absolute
+                # physical safety floor. Existing entries may still store the
+                # historical 10% reserve option; Agile planning now protects at
+                # least 15%, while the final safety owner stops discharge at 10%.
+                battery_reserve_percent=max(
+                    float(values[CONF_BATTERY_RESERVE]),
+                    15.0,
+                ),
                 battery_initial_percent=float(values[CONF_BATTERY_INITIAL]),
                 max_charge_kw=min(
                     float(values[CONF_MAX_CHARGE]),
