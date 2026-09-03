@@ -9,8 +9,10 @@ until the absolute 10% safety floor is reached.
 At or below 10%, this layer latches a discharge stop: house discharge, deliberate
 export, deadline discharge and Power Down battery discharge are all blocked.
 The latch remains active through the recovery band and releases only once SOC is
-at least 12%. Confirmed cheap/Happy Hour charging keeps its higher-priority charge
-ownership while the latch is active so the battery can recover.
+at least 12%. The latch is persisted independently so a Home Assistant restart
+cannot bypass the recovery threshold. Confirmed cheap/Happy Hour charging keeps
+its higher-priority charge ownership while the latch is active so the battery can
+recover.
 
 This remains simulation/shadow only. Real hardware writes stay blocked.
 """
@@ -22,13 +24,17 @@ from dataclasses import replace
 from datetime import datetime
 from typing import Any
 
+from homeassistant.helpers.storage import Store
+
 from .agile_rolling_planning import rolling_runtime as rolling
+from .const import DOMAIN
 from .kems_core import SimulationConfig
 from .tariff import TariffSettings
 
 PLANNING_TARGET_SOC_PERCENT = 15.0
 HARD_SAFETY_FLOOR_SOC_PERCENT = 10.0
 HARD_SAFETY_RECOVERY_SOC_PERCENT = 12.0
+SAFETY_STORE_VERSION = 1
 _EPSILON = 1e-6
 
 
@@ -52,8 +58,9 @@ def _planning_config(config: SimulationConfig) -> SimulationConfig:
 
 
 def _hard_safety_floor_latched(self: Any, soc: float | None) -> bool:
-    """Update and return the 10% stop / 12% recovery hysteresis latch."""
-    latched = bool(getattr(self, "_kems_hard_safety_floor_latched", False))
+    """Update and return the restart-safe 10% stop / 12% recovery latch."""
+    previous = bool(getattr(self, "_kems_hard_safety_floor_latched", False))
+    latched = previous
     if soc is None:
         return latched
 
@@ -64,6 +71,8 @@ def _hard_safety_floor_latched(self: Any, soc: float | None) -> bool:
         latched = True
 
     self._kems_hard_safety_floor_latched = latched
+    if latched != previous and hasattr(self, "_dirty"):
+        self._dirty = True
     return latched
 
 
@@ -88,6 +97,7 @@ def _apply_hard_safety_floor(
             "hard_safety_floor_soc_percent": HARD_SAFETY_FLOOR_SOC_PERCENT,
             "hard_safety_recovery_soc_percent": HARD_SAFETY_RECOVERY_SOC_PERCENT,
             "hard_safety_floor_active": latched,
+            "hard_safety_floor_persisted": True,
             "hard_reserve_soc_percent": HARD_SAFETY_FLOOR_SOC_PERCENT,
             "hard_reserve_floor_active": latched,
             "hard_reserve_policy": (
@@ -99,7 +109,7 @@ def _apply_hard_safety_floor(
     )
 
     # Charging ownership is allowed to recover the battery. The safety latch is
-    # retained in diagnostics and will clear only once a later scan sees >=12%.
+    # retained in diagnostics and clears only once a later scan sees >=12%.
     if mode in {"cheap_charge", "happy_hour_charge"}:
         plan["hard_safety_charge_recovery_active"] = latched
         return plan
@@ -151,6 +161,40 @@ def _rolling_plan_with_hard_safety_floor(
     soc = _number(plan.get("simulated_soc_percent"))
     latched = _hard_safety_floor_latched(self, soc)
     return _apply_hard_safety_floor(plan, soc=soc, latched=latched)
+
+
+def build_safety_floor_manager(base_class: type) -> type:
+    """Return a manager that persists only the independent safety latch."""
+
+    class SafetyFloorAgileSmartExportManager(base_class):
+        def __init__(self, hass: Any, entry_id: str, history_days: int) -> None:
+            super().__init__(hass, entry_id, history_days)
+            self._kems_hard_safety_floor_latched = False
+            self._kems_safety_store: Store[dict[str, Any]] = Store(
+                hass,
+                SAFETY_STORE_VERSION,
+                f"{DOMAIN}.{entry_id}.agile_safety_floor",
+            )
+
+        async def async_load(self) -> None:
+            await super().async_load()
+            data = await self._kems_safety_store.async_load() or {}
+            self._kems_hard_safety_floor_latched = bool(
+                data.get("hard_safety_floor_latched", False)
+            )
+
+        async def async_save(self) -> None:
+            await super().async_save()
+            await self._kems_safety_store.async_save(
+                {
+                    "hard_safety_floor_latched": bool(
+                        self._kems_hard_safety_floor_latched
+                    )
+                }
+            )
+
+    SafetyFloorAgileSmartExportManager.__name__ = "SafetyFloorAgileSmartExportManager"
+    return SafetyFloorAgileSmartExportManager
 
 
 def install_agile_safety_floor() -> None:
