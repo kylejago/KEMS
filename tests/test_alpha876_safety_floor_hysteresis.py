@@ -84,9 +84,10 @@ def test_legacy_stored_reserve_migrates_to_fifteen_percent() -> None:
 
     assert migrate({"battery_reserve_percent": 10.0})["battery_reserve_percent"] == 15.0
     assert migrate({"battery_reserve_percent": 20.0})["battery_reserve_percent"] == 20.0
-    assert migrate({"battery_reserve_percent": "unknown"})[
-        "battery_reserve_percent"
-    ] == 15.0
+    assert (
+        migrate({"battery_reserve_percent": "unknown"})["battery_reserve_percent"]
+        == 15.0
+    )
 
 
 def test_hard_floor_activates_at_ten_and_releases_only_at_twelve() -> None:
