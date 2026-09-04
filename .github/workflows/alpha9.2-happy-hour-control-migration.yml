@@ -1,0 +1,1433 @@
+name: Alpha9.2 Happy Hour control migration
+
+on:
+  push:
+    branches:
+      - feature/alpha9.2-happy-hour-hourly-cap-ohme
+    paths:
+      - .github/workflows/alpha9.2-happy-hour-control-migration.yml
+
+permissions:
+  contents: write
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/alpha9.2-happy-hour-hourly-cap-ohme
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install development tools
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements-dev.txt
+
+      - name: Apply Alpha9.2 implementation
+        shell: bash
+        run: |
+          python <<'PY'
+          from pathlib import Path
+
+          ROOT = Path('.')
+          KEMS = ROOT / 'custom_components' / 'kems'
+
+          def replace_once(path: Path, old: str, new: str) -> None:
+              text = path.read_text(encoding='utf-8')
+              if text.count(old) != 1:
+                  raise SystemExit(f'{path}: expected one occurrence, found {text.count(old)} for {old!r}')
+              path.write_text(text.replace(old, new, 1), encoding='utf-8')
+
+          budget = r'''"""Strict per-reward-hour Weekend Happy Hour budgeting.
+
+          Each Octopus Happy Hour reward owns an independent 16 kWh import bucket.
+          Unused allowance never carries into the next reward hour and future reward
+          allowance can never be borrowed early. Battery charging is reserved first,
+          unavoidable home import is protected next, and the EV may use only the
+          remaining allowance. Once the current reward-hour cap is exhausted KEMS
+          immediately falls back to the normal tariff/dispatch logic.
+          """
+
+          from __future__ import annotations
+
+          from dataclasses import replace
+          from datetime import UTC, datetime, timedelta
+          import math
+          from typing import Any, Iterable
+
+          from .happy_hour import HAPPY_HOUR_FAIR_USE_KWH_PER_REWARD
+
+          _EPSILON = 1e-6
+          _MAX_LEDGER_GAP = timedelta(minutes=10)
+
+
+          def _number(value: Any) -> float | None:
+              if value is None or isinstance(value, bool):
+                  return None
+              try:
+                  result = float(value)
+              except (TypeError, ValueError):
+                  return None
+              return result if math.isfinite(result) else None
+
+
+          def _dt(value: Any) -> datetime | None:
+              if isinstance(value, datetime):
+                  parsed = value
+              elif isinstance(value, str) and value.strip():
+                  try:
+                      parsed = datetime.fromisoformat(value.strip().replace("Z", "+00:00"))
+                  except ValueError:
+                      return None
+              else:
+                  return None
+              if parsed.tzinfo is None:
+                  parsed = parsed.replace(tzinfo=UTC)
+              return parsed.astimezone(UTC)
+
+
+          def reward_hour_windows(start: datetime, end: datetime) -> list[tuple[datetime, datetime]]:
+              """Return independent one-hour reward windows, capped at two rewards."""
+              start = start.astimezone(UTC)
+              end = end.astimezone(UTC)
+              windows: list[tuple[datetime, datetime]] = []
+              cursor = start
+              while cursor < end and len(windows) < 2:
+                  window_end = min(cursor + timedelta(hours=1), end)
+                  windows.append((cursor, window_end))
+                  cursor = window_end
+              return windows
+
+
+          def integrate_power_kwh(
+              records: Iterable[Any],
+              *,
+              start: datetime,
+              end: datetime,
+              field: str,
+              cap_kwh: float | None = None,
+          ) -> tuple[float, bool, datetime | None]:
+              """Integrate one observed kW field and report ledger coverage/cap time."""
+              start = start.astimezone(UTC)
+              end = end.astimezone(UTC)
+              if end <= start:
+                  return 0.0, True, None
+
+              samples: list[tuple[datetime, float]] = []
+              for record in records:
+                  timestamp = _dt(getattr(record, "timestamp", None))
+                  power = _number(getattr(record, field, None))
+                  if timestamp is None or power is None:
+                      continue
+                  samples.append((timestamp, max(power, 0.0)))
+              samples.sort(key=lambda item: item[0])
+              if not samples:
+                  return 0.0, False, None
+
+              seed = next((item for item in reversed(samples) if item[0] <= start), None)
+              coverage = bool(
+                  seed is not None and start - seed[0] <= _MAX_LEDGER_GAP
+              )
+              if seed is not None:
+                  cursor = start
+                  current_power = seed[1]
+              else:
+                  first = next((item for item in samples if start < item[0] <= end), None)
+                  if first is None:
+                      return 0.0, False, None
+                  cursor = first[0]
+                  current_power = first[1]
+
+              energy = 0.0
+              cap_at: datetime | None = None
+              for timestamp, power in samples:
+                  if timestamp <= cursor or timestamp <= start:
+                      continue
+                  if timestamp > end:
+                      break
+                  gap = timestamp - cursor
+                  if gap > _MAX_LEDGER_GAP:
+                      coverage = False
+                  increment = current_power * gap.total_seconds() / 3600.0
+                  if (
+                      cap_kwh is not None
+                      and cap_at is None
+                      and current_power > _EPSILON
+                      and energy + increment >= cap_kwh
+                  ):
+                      cap_at = cursor + timedelta(
+                          hours=max(cap_kwh - energy, 0.0) / current_power
+                      )
+                  energy += increment
+                  cursor = timestamp
+                  current_power = power
+
+              if cursor < end:
+                  gap = end - cursor
+                  if gap > _MAX_LEDGER_GAP:
+                      coverage = False
+                  increment = current_power * gap.total_seconds() / 3600.0
+                  if (
+                      cap_kwh is not None
+                      and cap_at is None
+                      and current_power > _EPSILON
+                      and energy + increment >= cap_kwh
+                  ):
+                      cap_at = cursor + timedelta(
+                          hours=max(cap_kwh - energy, 0.0) / current_power
+                      )
+                  energy += increment
+
+              return round(max(energy, 0.0), 4), coverage, cap_at
+
+
+          def reward_hour_ledger(
+              records: Iterable[Any],
+              *,
+              start: datetime,
+              end: datetime,
+              now: datetime,
+          ) -> list[dict[str, Any]]:
+              """Return independent 16 kWh ledgers; allowance is never pooled."""
+              now_utc = now.astimezone(UTC)
+              output: list[dict[str, Any]] = []
+              cap = float(HAPPY_HOUR_FAIR_USE_KWH_PER_REWARD)
+              for index, (bucket_start, bucket_end) in enumerate(
+                  reward_hour_windows(start, end), start=1
+              ):
+                  cutoff = min(max(now_utc, bucket_start), bucket_end)
+                  if cutoff <= bucket_start:
+                      used, coverage, cap_at = 0.0, False, None
+                  else:
+                      used, coverage, cap_at = integrate_power_kwh(
+                          records,
+                          start=bucket_start,
+                          end=cutoff,
+                          field="grid_import_kw",
+                          cap_kwh=cap,
+                      )
+                  cap_reached = used >= cap - 0.001
+                  authority_end = (
+                      cap_at
+                      if coverage and cap_at is not None
+                      else cutoff if coverage else bucket_start
+                  )
+                  output.append(
+                      {
+                          "index": index,
+                          "start": bucket_start.isoformat(),
+                          "end": bucket_end.isoformat(),
+                          "cap_kwh": cap,
+                          "import_kwh": round(used, 3),
+                          "remaining_kwh": round(max(cap - used, 0.0), 3),
+                          "coverage_complete": coverage,
+                          "cap_reached": cap_reached,
+                          "cap_reached_at": cap_at.isoformat() if cap_at else None,
+                          "authority_end": authority_end.isoformat(),
+                          "authority_duration_hours": round(
+                              max(
+                                  (authority_end - bucket_start).total_seconds()
+                                  / 3600.0,
+                                  0.0,
+                              ),
+                              4,
+                          ),
+                      }
+                  )
+              return output
+
+
+          def allocate_reward_hour(
+              *,
+              remaining_kwh: float,
+              hours_remaining: float,
+              home_grid_kw: float,
+              battery_headroom_stored_kwh: float,
+              charge_efficiency: float,
+              max_charge_kw: float,
+              inverter_limit_kw: float,
+              site_import_limit_kw: float | None,
+          ) -> dict[str, float]:
+              """Reserve battery first, home next, then expose only EV remainder."""
+              remaining = max(float(remaining_kwh), 0.0)
+              hours = max(float(hours_remaining), 0.0)
+              home_kw = max(float(home_grid_kw), 0.0)
+              efficiency = max(float(charge_efficiency), 0.01)
+              projected_home = min(home_kw * hours, remaining)
+
+              battery_power_limit = min(
+                  max(float(max_charge_kw), 0.0),
+                  max(float(inverter_limit_kw), 0.0),
+              )
+              if site_import_limit_kw is not None and float(site_import_limit_kw) > 0:
+                  battery_power_limit = min(
+                      battery_power_limit,
+                      max(float(site_import_limit_kw) - home_kw, 0.0),
+                  )
+              battery_input_headroom = max(
+                  float(battery_headroom_stored_kwh), 0.0
+              ) / efficiency
+              battery_max_input = min(
+                  battery_input_headroom,
+                  battery_power_limit * hours,
+              )
+              battery_reserved = min(
+                  battery_max_input,
+                  max(remaining - projected_home, 0.0),
+              )
+              battery_target_kw = (
+                  min(battery_power_limit, battery_reserved / hours)
+                  if hours > _EPSILON
+                  else 0.0
+              )
+              ev_allowance = max(
+                  remaining - projected_home - battery_reserved,
+                  0.0,
+              )
+              return {
+                  "projected_home_import_kwh_remaining": round(projected_home, 3),
+                  "battery_reserved_input_kwh_remaining": round(battery_reserved, 3),
+                  "battery_charge_target_kw": round(battery_target_kw, 3),
+                  "ev_allowance_kwh_remaining": round(ev_allowance, 3),
+              }
+
+
+          def _latest_record(self: Any, now: datetime) -> Any | None:
+              records = list(getattr(self, "_panel_today_records", []) or [])
+              now_utc = now.astimezone(UTC)
+              candidates = [
+                  record
+                  for record in records
+                  if (_dt(getattr(record, "timestamp", None)) or now_utc) <= now_utc
+              ]
+              return candidates[-1] if candidates else (records[-1] if records else None)
+
+
+          def _home_grid_kw(self: Any, context: dict[str, Any], now: datetime) -> tuple[float, float, float, float]:
+              latest = _latest_record(self, now)
+              house = _number(getattr(latest, "house_load_kw", None)) if latest else None
+              ev = _number(getattr(latest, "ev_power_kw", None)) if latest else None
+              solar = _number(getattr(latest, "solar_power_kw", None)) if latest else None
+              grid = _number(getattr(latest, "grid_import_kw", None)) if latest else None
+              if house is None:
+                  house = _number(context.get("expected_house_import_kw")) or 0.0
+              ev = max(ev or 0.0, 0.0)
+              solar = max(solar or 0.0, 0.0)
+              non_ev_house = max(house - ev, 0.0)
+              home_grid = max(non_ev_house - solar, 0.0)
+              return home_grid, max(house, 0.0), ev, max(grid or 0.0, 0.0)
+
+
+          def _adjusted_headroom(
+              state: dict[str, Any], context: dict[str, Any], config: Any
+          ) -> float:
+              capacity = max(float(config.battery_capacity_kwh), 0.1)
+              soc = _number(state.get("happy_hour_adjusted_soc_percent"))
+              if soc is None:
+                  soc = _number(context.get("current_simulated_soc_percent"))
+              if soc is not None:
+                  return capacity * (100.0 - min(max(soc, 0.0), 100.0)) / 100.0
+              return max(_number(context.get("current_battery_headroom_kwh")) or 0.0, 0.0)
+
+
+          def decorate_happy_hour_context(
+              self: Any,
+              state: dict[str, Any],
+              context: dict[str, Any],
+              *,
+              now: datetime,
+              config: Any,
+              power_down: dict[str, Any],
+          ) -> dict[str, Any]:
+              """Attach the strict hourly ledger and current battery/EV allocation."""
+              start = _dt(context.get("start"))
+              end = _dt(context.get("end"))
+              if start is None or end is None or end <= start:
+                  return context
+              records = list(getattr(self, "_panel_today_records", []) or [])
+              ledgers = reward_hour_ledger(records, start=start, end=end, now=now)
+              context["reward_cap_kwh_per_hour"] = float(
+                  HAPPY_HOUR_FAIR_USE_KWH_PER_REWARD
+              )
+              context["reward_hour_count"] = len(ledgers)
+              context["reward_hours"] = ledgers
+              context["reward_allowance_is_pooled"] = False
+              context["unused_reward_allowance_carries_forward"] = False
+              context["future_reward_allowance_can_be_borrowed"] = False
+              context["base_happy_hour_charge_target_kw"] = max(
+                  _number(context.get("charge_target_kw")) or 0.0, 0.0
+              )
+
+              now_utc = now.astimezone(UTC)
+              current = next(
+                  (
+                      item
+                      for item in ledgers
+                      if (_dt(item["start"]) or start)
+                      <= now_utc
+                      < (_dt(item["end"]) or end)
+                  ),
+                  None,
+              )
+              if current is None:
+                  context["happy_hour_import_authority_active"] = False
+                  context["ev_happy_hour_allowed"] = False
+                  return context
+
+              bucket_end = _dt(current["end"]) or end
+              hours_remaining = max(
+                  (bucket_end - now_utc).total_seconds() / 3600.0, 0.0
+              )
+              home_grid_kw, house_kw, ev_kw, observed_grid_kw = _home_grid_kw(
+                  self, context, now
+              )
+              allocation = allocate_reward_hour(
+                  remaining_kwh=float(current["remaining_kwh"]),
+                  hours_remaining=hours_remaining,
+                  home_grid_kw=home_grid_kw,
+                  battery_headroom_stored_kwh=_adjusted_headroom(
+                      state, context, config
+                  ),
+                  charge_efficiency=float(config.charge_efficiency),
+                  max_charge_kw=float(config.max_charge_kw),
+                  inverter_limit_kw=float(config.inverter_limit_kw),
+                  site_import_limit_kw=config.site_import_limit_kw,
+              )
+              context.update(
+                  {
+                      "current_reward_hour_index": int(current["index"]),
+                      "current_reward_hour_start": current["start"],
+                      "current_reward_hour_end": current["end"],
+                      "current_reward_hour_import_kwh": current["import_kwh"],
+                      "current_reward_hour_remaining_kwh": current["remaining_kwh"],
+                      "current_reward_hour_cap_reached": current["cap_reached"],
+                      "current_reward_hour_ledger_complete": current[
+                          "coverage_complete"
+                      ],
+                      "current_reward_hour_cap_reached_at": current[
+                          "cap_reached_at"
+                      ],
+                      "hours_remaining_in_reward_hour": round(hours_remaining, 4),
+                      "projected_non_ev_home_grid_kw": round(home_grid_kw, 3),
+                      "observed_house_load_kw": round(house_kw, 3),
+                      "observed_ev_power_kw": round(ev_kw, 3),
+                      "observed_grid_import_kw": round(observed_grid_kw, 3),
+                      **allocation,
+                  }
+              )
+
+              if power_down.get("active") or context.get("mode") == "power_down_override":
+                  context["happy_hour_import_authority_active"] = False
+                  context["ev_happy_hour_allowed"] = False
+                  return context
+
+              if not current["coverage_complete"]:
+                  context.update(
+                      {
+                          "mode": "budget_wait",
+                          "status": "Waiting for a complete reward-hour import ledger — normal tariff logic",
+                          "charge_target_kw": 0.0,
+                          "happy_hour_import_authority_active": False,
+                          "ev_happy_hour_allowed": False,
+                      }
+                  )
+                  return context
+
+              if current["cap_reached"]:
+                  context.update(
+                      {
+                          "mode": "cap_reached",
+                          "status": (
+                              f"Reward hour {current['index']} reached 16 kWh — normal tariff logic"
+                          ),
+                          "charge_target_kw": 0.0,
+                          "happy_hour_import_authority_active": False,
+                          "ev_happy_hour_allowed": False,
+                      }
+                  )
+                  return context
+
+              context.update(
+                  {
+                      "mode": "charging",
+                      "charge_target_kw": allocation["battery_charge_target_kw"],
+                      "happy_hour_import_authority_active": True,
+                      "ev_happy_hour_allowed": (
+                          allocation["ev_allowance_kwh_remaining"] > 0.10
+                      ),
+                      "status": (
+                          f"Reward hour {current['index']}: "
+                          f"{float(current['remaining_kwh']):.2f} kWh remaining; "
+                          f"battery {allocation['battery_charge_target_kw']:.2f} kW first"
+                      ),
+                  }
+              )
+              return context
+
+
+          def _corrected_soc_with_hourly_budget(
+              runtime: Any,
+              self: Any,
+              state: dict[str, Any],
+              context: dict[str, Any],
+              *,
+              now: datetime,
+              config: Any,
+              power_down: dict[str, Any],
+          ) -> float | None:
+              """Correct SOC only across reward-hour intervals with free-import authority."""
+              base_soc = runtime._base_soc(state)
+              start = _dt(context.get("start"))
+              if base_soc is None or start is None or now.astimezone(UTC) < start:
+                  return None
+              if context.get("power_down_overlap") and power_down.get("active"):
+                  return None
+
+              intervals: list[tuple[datetime, datetime]] = []
+              for bucket in context.get("reward_hours", []):
+                  if not isinstance(bucket, dict) or not bucket.get("coverage_complete"):
+                      continue
+                  bucket_start = _dt(bucket.get("start"))
+                  authority_end = _dt(bucket.get("authority_end"))
+                  if bucket_start is None or authority_end is None or authority_end <= bucket_start:
+                      continue
+                  intervals.append((bucket_start, authority_end))
+              if not intervals:
+                  return None
+
+              active_hours = sum(
+                  (finish - begin).total_seconds() / 3600.0
+                  for begin, finish in intervals
+              )
+              charge_kw = max(
+                  _number(context.get("base_happy_hour_charge_target_kw")) or 0.0,
+                  0.0,
+              )
+              free_stored = (
+                  charge_kw * active_hours * max(float(config.charge_efficiency), 0.01)
+              )
+
+              replay_discharge_ac = 0.0
+              for slot in state.get("today_slots", []):
+                  if not isinstance(slot, dict):
+                      continue
+                  slot_start = _dt(slot.get("valid_from"))
+                  slot_end = _dt(slot.get("valid_to"))
+                  if slot_start is None or slot_end is None or slot_end <= slot_start:
+                      continue
+                  slot_hours = (slot_end - slot_start).total_seconds() / 3600.0
+                  overlap = 0.0
+                  for begin, finish in intervals:
+                      overlap += max(
+                          (
+                              min(slot_end, finish) - max(slot_start, begin)
+                          ).total_seconds()
+                          / 3600.0,
+                          0.0,
+                      )
+                  if overlap <= _EPSILON:
+                      continue
+                  fraction = min(overlap / max(slot_hours, _EPSILON), 1.0)
+                  replay_discharge_ac += fraction * max(
+                      _number(slot.get("battery_to_home_kwh")) or 0.0, 0.0
+                  )
+                  replay_discharge_ac += fraction * max(
+                      _number(slot.get("battery_export_kwh")) or 0.0, 0.0
+                  )
+
+              capacity = max(float(config.battery_capacity_kwh), 0.1)
+              base_stored = capacity * min(max(base_soc, 0.0), 100.0) / 100.0
+              corrected = min(
+                  base_stored
+                  + replay_discharge_ac / max(float(config.discharge_efficiency), 0.01)
+                  + free_stored,
+                  capacity,
+              )
+              return round(100.0 * corrected / capacity, 2)
+
+
+          def apply_happy_hour_control(control: Any, snapshot: Any, context: dict[str, Any]):
+              """Overlay Happy Hour EV permission without widening normal cheap authority."""
+              if not context.get("happy_hour_import_authority_active"):
+                  return control
+              ev_allowed = bool(
+                  getattr(snapshot, "ev_connected", False)
+                  and context.get("ev_happy_hour_allowed")
+              )
+              return replace(
+                  control,
+                  operating_reason="happy_hour_reward_hour",
+                  desired_charge_power_kw=max(
+                      _number(context.get("charge_target_kw")) or 0.0, 0.0
+                  ),
+                  desired_ev_charging_allowed=ev_allowed,
+                  desired_battery_to_home_power_kw=0.0,
+                  desired_battery_export_power_kw=0.0,
+                  desired_total_discharge_power_kw=0.0,
+                  desired_grid_export_allowed=False,
+              )
+
+
+          def install_happy_hour_budget() -> None:
+              """Install strict hourly budgeting after automatic/retained HH discovery."""
+              from . import agile_event_priority_runtime as runtime
+
+              original_context = runtime._happy_hour_context
+              if getattr(original_context, "_kems_hourly_happy_hour_budget", False):
+                  return
+
+              def context_with_hourly_budget(
+                  self,
+                  state,
+                  *,
+                  now,
+                  config,
+                  tariff,
+                  power_down,
+                  safe_available_kwh=None,
+              ):
+                  context = original_context(
+                      self,
+                      state,
+                      now=now,
+                      config=config,
+                      tariff=tariff,
+                      power_down=power_down,
+                      safe_available_kwh=safe_available_kwh,
+                  )
+                  return decorate_happy_hour_context(
+                      self,
+                      state,
+                      context,
+                      now=now,
+                      config=config,
+                      power_down=power_down,
+                  )
+
+              context_with_hourly_budget._kems_hourly_happy_hour_budget = True
+              runtime._happy_hour_context = context_with_hourly_budget
+
+              original_corrected = runtime._corrected_happy_hour_soc
+
+              def corrected_with_hourly_budget(
+                  self,
+                  state,
+                  context,
+                  *,
+                  now,
+                  config,
+                  power_down,
+              ):
+                  if context.get("reward_hours"):
+                      return _corrected_soc_with_hourly_budget(
+                          runtime,
+                          self,
+                          state,
+                          context,
+                          now=now,
+                          config=config,
+                          power_down=power_down,
+                      )
+                  return original_corrected(
+                      self,
+                      state,
+                      context,
+                      now=now,
+                      config=config,
+                      power_down=power_down,
+                  )
+
+              corrected_with_hourly_budget._kems_hourly_happy_hour_budget = True
+              runtime._corrected_happy_hour_soc = corrected_with_hourly_budget
+          '''
+          # Strip the workflow indentation introduced by the YAML here-doc.
+          import textwrap
+          (KEMS / 'happy_hour_budget.py').write_text(textwrap.dedent(budget), encoding='utf-8')
+
+          ohme = r'''"""Narrow opt-in Ohme control for an automatically verified Happy Hour.
+
+          This is deliberately not general EV control. KEMS may temporarily select
+          Ohme ``Max charge`` only while an automatic/retained Octopus Happy Hour has
+          active per-reward-hour import authority. When that authority ends KEMS
+          restores the mode it observed before taking ownership. FoxESS writes remain
+          completely separate and blocked.
+          """
+
+          from __future__ import annotations
+
+          import asyncio
+          from datetime import UTC, datetime
+          from typing import Any
+
+          from homeassistant.helpers import entity_registry as er
+          from homeassistant.helpers.storage import Store
+
+          from .const import (
+              CONF_HAPPY_HOUR_OHME_CONTROL_ENABLED,
+              DOMAIN,
+              STORAGE_NAMESPACE,
+          )
+
+          STORAGE_VERSION = 1
+          MAX_SAFE_SCAN_SECONDS = 120
+          ASSUMED_OHME_MAX_CHARGE_KW = 7.4
+          _EXPECTED_MODES = {"smart charge", "max charge", "paused"}
+          _HAPPY_HOUR_SENSOR = "sensor.kems_agile_happy_hour_plan"
+
+
+          def _normalise(value: Any) -> str:
+              return str(value or "").strip().casefold()
+
+
+          def ohme_happy_hour_write_decision(
+              *,
+              enabled: bool,
+              automatic_source: bool,
+              authority_active: bool,
+              ledger_complete: bool,
+              ev_connected: bool,
+              data_fresh: bool,
+              plan_safe: bool,
+              grid_available: bool,
+              island_mode_active: bool,
+              power_down_active: bool,
+              emergency_stop: bool,
+              scan_interval_seconds: int,
+              reward_remaining_kwh: float,
+              ev_allowance_kwh: float,
+              projected_home_grid_kw: float,
+              battery_charge_target_kw: float,
+          ) -> tuple[bool, str, float]:
+              """Return whether KEMS may force Ohme Max charge this scan."""
+              if not enabled:
+                  return False, "Ohme Happy Hour control disabled", 0.0
+              if not automatic_source:
+                  return False, "Happy Hour is not automatically verified by Octopus", 0.0
+              if emergency_stop:
+                  return False, "KEMS emergency stop is active", 0.0
+              if power_down_active:
+                  return False, "Power Down has priority", 0.0
+              if not authority_active:
+                  return False, "Happy Hour import authority is not active", 0.0
+              if not ledger_complete:
+                  return False, "Reward-hour import ledger is incomplete", 0.0
+              if not ev_connected:
+                  return False, "EV is not connected", 0.0
+              if not data_fresh or not plan_safe or not grid_available or island_mode_active:
+                  return False, "Control safety envelope is not healthy", 0.0
+              if scan_interval_seconds > MAX_SAFE_SCAN_SECONDS:
+                  return False, "KEMS scan interval is too slow for a hard 16 kWh cap", 0.0
+
+              expected_site_kw = max(projected_home_grid_kw, 0.0) + max(
+                  battery_charge_target_kw, 0.0
+              ) + ASSUMED_OHME_MAX_CHARGE_KW
+              guard_kwh = expected_site_kw * max(scan_interval_seconds, 1) / 3600.0 + 0.05
+              ev_guard_kwh = (
+                  ASSUMED_OHME_MAX_CHARGE_KW
+                  * max(scan_interval_seconds, 1)
+                  / 3600.0
+                  + 0.05
+              )
+              if reward_remaining_kwh <= guard_kwh:
+                  return False, "Reward-hour cap guard reached", round(guard_kwh, 3)
+              if ev_allowance_kwh <= ev_guard_kwh:
+                  return False, "No safe EV allowance remains after battery/home reserve", round(guard_kwh, 3)
+              return True, "Automatic Happy Hour EV allowance available", round(guard_kwh, 3)
+
+
+          class OhmeHappyHourController:
+              """Own only the temporary Ohme mode change KEMS itself initiated."""
+
+              def __init__(self, hass: Any, entry: Any, *, ev_status_entity: str | None) -> None:
+                  self._hass = hass
+                  self._entry = entry
+                  self._ev_status_entity = ev_status_entity
+                  self._store = Store(
+                      hass,
+                      STORAGE_VERSION,
+                      f"{DOMAIN}.{entry.entry_id}.{STORAGE_NAMESPACE}.happy_hour_ohme",
+                  )
+                  self._owned = False
+                  self._previous_mode: str | None = None
+                  self._event_start: str | None = None
+                  self._last_command: str | None = None
+                  self._last_result = "Never commanded"
+                  self._last_command_at: str | None = None
+                  self._restore_attempts = 0
+                  self._status: dict[str, Any] = {}
+
+              @property
+              def status(self) -> dict[str, Any]:
+                  return dict(self._status)
+
+              async def async_setup(self) -> None:
+                  data = await self._store.async_load()
+                  if isinstance(data, dict):
+                      self._owned = bool(data.get("owned"))
+                      self._previous_mode = data.get("previous_mode")
+                      self._event_start = data.get("event_start")
+
+              async def _async_save(self) -> None:
+                  await self._store.async_save(
+                      {
+                          "owned": self._owned,
+                          "previous_mode": self._previous_mode,
+                          "event_start": self._event_start,
+                      }
+                  )
+
+              def _charge_mode_entity(self) -> str | None:
+                  registry = er.async_get(self._hass)
+                  device_id = None
+                  if self._ev_status_entity:
+                      status_entry = registry.async_get(self._ev_status_entity)
+                      device_id = status_entry.device_id if status_entry else None
+
+                  candidates: list[str] = []
+                  for entry in registry.entities.values():
+                      if entry.platform != "ohme" or not entry.entity_id.startswith("select."):
+                          continue
+                      if device_id is not None and entry.device_id != device_id:
+                          continue
+                      state = self._hass.states.get(entry.entity_id)
+                      options = {
+                          _normalise(item)
+                          for item in ((state.attributes.get("options") if state else None) or [])
+                      }
+                      text = _normalise(
+                          " ".join(
+                              (
+                                  entry.entity_id,
+                                  str(entry.original_name or ""),
+                                  str(state.attributes.get("friendly_name", "") if state else ""),
+                              )
+                          )
+                      )
+                      if _EXPECTED_MODES.issubset(options) and "charge" in text and "mode" in text:
+                          candidates.append(entry.entity_id)
+                  if len(candidates) == 1:
+                      return candidates[0]
+
+                  if device_id is not None:
+                      return None
+                  return candidates[0] if len(candidates) == 1 else None
+
+              def _exact_option(self, entity_id: str, requested: str) -> str | None:
+                  state = self._hass.states.get(entity_id)
+                  if state is None:
+                      return None
+                  for option in state.attributes.get("options", []) or []:
+                      if _normalise(option) == _normalise(requested):
+                          return str(option)
+                  return None
+
+              async def _async_set_mode(self, entity_id: str, requested: str) -> bool:
+                  option = self._exact_option(entity_id, requested)
+                  if option is None:
+                      self._last_result = f"Ohme option unavailable: {requested}"
+                      return False
+                  try:
+                      async with asyncio.timeout(15):
+                          await self._hass.services.async_call(
+                              "select",
+                              "select_option",
+                              {"entity_id": entity_id, "option": option},
+                              blocking=True,
+                          )
+                  except Exception as err:  # Home Assistant service/network boundary
+                      self._last_result = f"Ohme write failed: {err}"
+                      return False
+
+                  self._last_command = option
+                  self._last_command_at = datetime.now(UTC).isoformat()
+                  observed = self._hass.states.get(entity_id)
+                  if observed is not None and _normalise(observed.state) == _normalise(option):
+                      self._last_result = f"Confirmed {option}"
+                  else:
+                      self._last_result = f"Requested {option}; readback pending"
+                  return True
+
+              async def _async_restore(self, entity_id: str | None) -> None:
+                  if not self._owned:
+                      return
+                  if entity_id is None:
+                      self._last_result = "Cannot restore Ohme mode: charge-mode entity unavailable"
+                      return
+                  state = self._hass.states.get(entity_id)
+                  current = _normalise(state.state if state else None)
+                  target = self._previous_mode or "Smart charge"
+                  if _normalise(target) == "max charge":
+                      target = "Smart charge"
+                  if current and current != "max charge":
+                      self._owned = False
+                      self._restore_attempts = 0
+                      await self._async_save()
+                      return
+                  if self._restore_attempts >= 3:
+                      self._last_result = f"Restore failed after 3 attempts; target was {target}"
+                      return
+                  self._restore_attempts += 1
+                  if await self._async_set_mode(entity_id, target):
+                      observed = self._hass.states.get(entity_id)
+                      if observed is not None and _normalise(observed.state) != "max charge":
+                          self._owned = False
+                          self._restore_attempts = 0
+                          await self._async_save()
+
+              def _publish(self, payload: dict[str, Any]) -> None:
+                  self._status = dict(payload)
+                  state = self._hass.states.get(_HAPPY_HOUR_SENSOR)
+                  if state is None:
+                      return
+                  attrs = dict(state.attributes)
+                  attrs["ohme_control"] = dict(payload)
+                  attrs["ohme_control_status"] = payload.get("status")
+                  attrs["ohme_charge_mode_entity"] = payload.get("entity_id")
+                  attrs["ohme_control_write_enabled"] = payload.get("enabled")
+                  self._hass.states.async_set(_HAPPY_HOUR_SENSOR, state.state, attrs)
+
+              async def async_update(
+                  self,
+                  *,
+                  snapshot: Any,
+                  control: Any,
+                  happy_hour: dict[str, Any],
+                  power_down: dict[str, Any],
+                  scan_interval_seconds: int,
+                  emergency_stop: bool,
+              ) -> dict[str, Any]:
+                  enabled = bool(
+                      self._entry.options.get(
+                          CONF_HAPPY_HOUR_OHME_CONTROL_ENABLED,
+                          False,
+                      )
+                  )
+                  entity_id = self._charge_mode_entity()
+                  state = self._hass.states.get(entity_id) if entity_id else None
+                  observed_mode = state.state if state is not None else None
+                  automatic_source = bool(
+                      happy_hour.get("source") == "octopus_energy"
+                      and str(happy_hour.get("automatic_status") or "").endswith("active")
+                  )
+                  allow, reason, guard_kwh = ohme_happy_hour_write_decision(
+                      enabled=enabled,
+                      automatic_source=automatic_source,
+                      authority_active=bool(
+                          happy_hour.get("happy_hour_import_authority_active")
+                      ),
+                      ledger_complete=bool(
+                          happy_hour.get("current_reward_hour_ledger_complete")
+                      ),
+                      ev_connected=bool(getattr(snapshot, "ev_connected", False)),
+                      data_fresh=bool(getattr(control, "data_fresh", False)),
+                      plan_safe=bool(getattr(control, "plan_safe", False)),
+                      grid_available=bool(getattr(control, "grid_available", False)),
+                      island_mode_active=bool(
+                          getattr(control, "island_mode_active", False)
+                      ),
+                      power_down_active=bool(power_down.get("active")),
+                      emergency_stop=emergency_stop,
+                      scan_interval_seconds=int(scan_interval_seconds),
+                      reward_remaining_kwh=float(
+                          happy_hour.get("current_reward_hour_remaining_kwh") or 0.0
+                      ),
+                      ev_allowance_kwh=float(
+                          happy_hour.get("ev_allowance_kwh_remaining") or 0.0
+                      ),
+                      projected_home_grid_kw=float(
+                          happy_hour.get("projected_non_ev_home_grid_kw") or 0.0
+                      ),
+                      battery_charge_target_kw=float(
+                          happy_hour.get("charge_target_kw") or 0.0
+                      ),
+                  )
+
+                  if allow and entity_id is not None:
+                      if _normalise(observed_mode) == "max charge":
+                          if self._owned:
+                              reason = "KEMS-owned Ohme Max charge active"
+                          else:
+                              reason = "Ohme already in Max charge; KEMS did not take ownership"
+                      else:
+                          if not self._owned:
+                              if observed_mode is None:
+                                  allow = False
+                                  reason = "Cannot preserve prior Ohme mode before Max charge"
+                              else:
+                                  self._previous_mode = observed_mode
+                                  self._event_start = str(happy_hour.get("start") or "")
+                          if allow and await self._async_set_mode(entity_id, "Max charge"):
+                              self._owned = True
+                              self._restore_attempts = 0
+                              await self._async_save()
+                  elif self._owned:
+                      await self._async_restore(entity_id)
+
+                  payload = {
+                      "enabled": enabled,
+                      "entity_id": entity_id,
+                      "observed_mode": observed_mode,
+                      "owned_by_kems": self._owned,
+                      "previous_mode": self._previous_mode,
+                      "automatic_source_eligible": automatic_source,
+                      "max_charge_allowed_this_scan": allow,
+                      "reason": reason,
+                      "reward_cap_guard_kwh": guard_kwh,
+                      "last_command": self._last_command,
+                      "last_result": self._last_result,
+                      "last_command_at": self._last_command_at,
+                      "status": (
+                          "Max charge active"
+                          if self._owned and allow
+                          else "Restoring normal mode"
+                          if self._owned
+                          else reason
+                      ),
+                  }
+                  self._publish(payload)
+                  return payload
+
+              async def async_shutdown(self) -> None:
+                  if self._owned:
+                      await self._async_restore(self._charge_mode_entity())
+          '''
+          (KEMS / 'happy_hour_ohme_control.py').write_text(textwrap.dedent(ohme), encoding='utf-8')
+
+          tests = r'''"""Alpha9.2 strict Happy Hour reward-hour and Ohme-control contracts."""
+
+          from __future__ import annotations
+
+          from datetime import UTC, datetime, timedelta
+          from pathlib import Path
+          from types import SimpleNamespace
+
+          from custom_components.kems.happy_hour_budget import (
+              allocate_reward_hour,
+              apply_happy_hour_control,
+              reward_hour_ledger,
+              reward_hour_windows,
+          )
+          from custom_components.kems.happy_hour_ohme_control import (
+              ohme_happy_hour_write_decision,
+          )
+          from kems_core import ControlState, Snapshot
+
+          START = datetime(2026, 9, 5, 13, 0, tzinfo=UTC)
+
+
+          def _record(at: datetime, import_kw: float) -> SimpleNamespace:
+              return SimpleNamespace(timestamp=at, grid_import_kw=import_kw)
+
+
+          def test_two_hour_happy_hour_is_two_independent_16kwh_buckets() -> None:
+              end = START + timedelta(hours=2)
+              windows = reward_hour_windows(START, end)
+              assert windows == [
+                  (START, START + timedelta(hours=1)),
+                  (START + timedelta(hours=1), end),
+              ]
+
+              records = [
+                  _record(START - timedelta(minutes=1), 12.0),
+                  _record(START + timedelta(hours=1), 0.0),
+              ]
+              ledger = reward_hour_ledger(
+                  records,
+                  start=START,
+                  end=end,
+                  now=START + timedelta(hours=1),
+              )
+              assert ledger[0]["import_kwh"] == 12.0
+              assert ledger[0]["remaining_kwh"] == 4.0
+              assert ledger[1]["remaining_kwh"] == 16.0
+              assert ledger[1]["cap_kwh"] == 16.0
+
+
+          def test_reward_hour_cap_does_not_borrow_from_second_hour() -> None:
+              records = [
+                  _record(START - timedelta(minutes=1), 20.0),
+                  _record(START + timedelta(hours=1), 0.0),
+              ]
+              ledger = reward_hour_ledger(
+                  records,
+                  start=START,
+                  end=START + timedelta(hours=2),
+                  now=START + timedelta(hours=1),
+              )
+              assert ledger[0]["cap_reached"] is True
+              assert ledger[0]["remaining_kwh"] == 0.0
+              assert ledger[1]["remaining_kwh"] == 16.0
+
+
+          def test_battery_is_reserved_before_home_then_ev_gets_remainder() -> None:
+              allocation = allocate_reward_hour(
+                  remaining_kwh=16.0,
+                  hours_remaining=1.0,
+                  home_grid_kw=1.0,
+                  battery_headroom_stored_kwh=20.0,
+                  charge_efficiency=1.0,
+                  max_charge_kw=7.0,
+                  inverter_limit_kw=7.0,
+                  site_import_limit_kw=None,
+              )
+              assert allocation["battery_reserved_input_kwh_remaining"] == 7.0
+              assert allocation["projected_home_import_kwh_remaining"] == 1.0
+              assert allocation["ev_allowance_kwh_remaining"] == 8.0
+              assert allocation["battery_charge_target_kw"] == 7.0
+
+
+          def test_full_battery_releases_reward_allowance_to_home_and_ev() -> None:
+              allocation = allocate_reward_hour(
+                  remaining_kwh=16.0,
+                  hours_remaining=1.0,
+                  home_grid_kw=1.0,
+                  battery_headroom_stored_kwh=0.0,
+                  charge_efficiency=0.95,
+                  max_charge_kw=7.0,
+                  inverter_limit_kw=7.0,
+                  site_import_limit_kw=None,
+              )
+              assert allocation["battery_reserved_input_kwh_remaining"] == 0.0
+              assert allocation["ev_allowance_kwh_remaining"] == 15.0
+
+
+          def test_happy_hour_ev_overlay_is_separate_from_normal_cheap_authority() -> None:
+              snapshot = Snapshot(
+                  timestamp=START,
+                  off_peak=False,
+                  intelligent_slot=False,
+                  ev_connected=True,
+              )
+              base = ControlState(
+                  desired_ev_charging_allowed=False,
+                  desired_battery_to_home_power_kw=2.0,
+                  desired_battery_export_power_kw=3.0,
+                  desired_total_discharge_power_kw=5.0,
+              )
+              active = apply_happy_hour_control(
+                  base,
+                  snapshot,
+                  {
+                      "happy_hour_import_authority_active": True,
+                      "ev_happy_hour_allowed": True,
+                      "charge_target_kw": 7.0,
+                  },
+              )
+              assert active.desired_ev_charging_allowed is True
+              assert active.desired_charge_power_kw == 7.0
+              assert active.desired_total_discharge_power_kw == 0.0
+              assert active.desired_grid_export_allowed is False
+
+              capped = apply_happy_hour_control(
+                  base,
+                  snapshot,
+                  {
+                      "happy_hour_import_authority_active": False,
+                      "current_reward_hour_cap_reached": True,
+                  },
+              )
+              assert capped == base
+
+
+          def test_ohme_write_requires_automatic_happy_hour_and_cap_margin() -> None:
+              common = dict(
+                  enabled=True,
+                  authority_active=True,
+                  ledger_complete=True,
+                  ev_connected=True,
+                  data_fresh=True,
+                  plan_safe=True,
+                  grid_available=True,
+                  island_mode_active=False,
+                  power_down_active=False,
+                  emergency_stop=False,
+                  scan_interval_seconds=60,
+                  reward_remaining_kwh=8.0,
+                  ev_allowance_kwh=5.0,
+                  projected_home_grid_kw=1.0,
+                  battery_charge_target_kw=7.0,
+              )
+              allowed, _, _ = ohme_happy_hour_write_decision(
+                  automatic_source=True, **common
+              )
+              assert allowed is True
+              manual, _, _ = ohme_happy_hour_write_decision(
+                  automatic_source=False, **common
+              )
+              assert manual is False
+              near_cap, _, _ = ohme_happy_hour_write_decision(
+                  automatic_source=True,
+                  **{**common, "reward_remaining_kwh": 0.2},
+              )
+              assert near_cap is False
+
+
+          def test_ohme_write_path_is_narrow_and_foxess_remains_absent() -> None:
+              source = (
+                  Path(__file__).parents[1]
+                  / "custom_components/kems/happy_hour_ohme_control.py"
+              ).read_text(encoding="utf-8")
+              assert '"select",\n                "select_option"' in source
+              assert 'happy_hour.get("source") == "octopus_energy"' in source
+              assert "foxess" not in source.casefold()
+          '''
+          (ROOT / 'tests/test_alpha9_2_happy_hour.py').write_text(textwrap.dedent(tests), encoding='utf-8')
+
+          # Version and explicit opt-in.
+          replace_once(KEMS / 'manifest.json', '"version": "0.9.0-alpha9.1"', '"version": "0.9.0-alpha9.2"')
+          replace_once(
+              KEMS / 'const.py',
+              'CONF_EV_SOC = "ev_soc"\n',
+              'CONF_EV_SOC = "ev_soc"\nCONF_HAPPY_HOUR_OHME_CONTROL_ENABLED = "happy_hour_ohme_control_enabled"\n',
+          )
+          replace_once(
+              KEMS / 'const.py',
+              '    CONF_INTELLIGENT_SLOTS_ENABLED: False,\n',
+              '    CONF_INTELLIGENT_SLOTS_ENABLED: False,\n    CONF_HAPPY_HOUR_OHME_CONTROL_ENABLED: False,\n',
+          )
+
+          # Install the canonical Alpha9.2 budget layer after automatic/retained discovery.
+          replace_once(
+              KEMS / 'agile_alpha7_compat.py',
+              '    ("happy_hour_retention", "install_happy_hour_retention"),\n',
+              '    ("happy_hour_retention", "install_happy_hour_retention"),\n    ("happy_hour_budget", "install_happy_hour_budget"),\n',
+          )
+
+          # Happy Hour charge is a real charging target in the control-alignment view.
+          replace_once(
+              KEMS / 'agile_control_alignment.py',
+              '    if dispatch_mode == "cheap_charge":\n',
+              '    if dispatch_mode in {"cheap_charge", "happy_hour_charge"}:\n',
+          )
+
+          # Correct stale wording: confirmed daytime Intelligent dispatches already are cheap authority.
+          replace_once(
+              KEMS / 'kems_core/ev_charge_policy.py',
+              'The default policy permits EV charging only in the authoritative configured\n23:30-05:30 cheap window. Daytime Intelligent slots and Agile prices do not\nwiden that window. Optional surplus and disabled modes remain explicit user\nchoices.\n',
+              'The default policy permits EV charging in the authoritative configured\n23:30-05:30 cheap window and in a daytime Intelligent slot only when KEMS has\nfail-closed multi-signal confirmation that the slot is genuinely cheap. Raw or\nstale Intelligent flags and Agile prices do not widen that authority. Happy Hour\nis a separate reward-hour authority. Optional surplus and disabled modes remain\nexplicit user choices.\n',
+          )
+          replace_once(
+              KEMS / 'ev_policy_dashboard.py',
+              '**Default EV cheap-window mode** permits charging only in the configured **23:30–05:30** overnight window. Daytime Intelligent slots and Agile prices do not widen it. Power Down remains higher priority.\n',
+              '**Default EV cheap-window mode** permits charging in the configured **23:30–05:30** overnight window and in a daytime Intelligent slot only after KEMS has fail-closed confirmation that it is genuinely cheap. Raw/unconfirmed Intelligent flags and Agile prices do not widen it. Happy Hour is a separate per-reward-hour authority. Power Down remains higher priority.\n',
+          )
+
+          # Add the explicit hardware-write opt-in switch.
+          replace_once(
+              KEMS / 'switch.py',
+              'from .const import CONF_CONTROL_ENABLED, CONF_EMERGENCY_STOP\n',
+              'from .const import (\n    CONF_CONTROL_ENABLED,\n    CONF_EMERGENCY_STOP,\n    CONF_HAPPY_HOUR_OHME_CONTROL_ENABLED,\n)\n',
+          )
+          replace_once(
+              KEMS / 'switch.py',
+              '        KEMSWeekendHappyHourPlanningSwitch(coordinator),\n',
+              '        KEMSWeekendHappyHourPlanningSwitch(coordinator),\n        KEMSHappyHourOhmeControlSwitch(coordinator),\n',
+          )
+          switch_append = r'''
+
+          class KEMSHappyHourOhmeControlSwitch(KEMSEntity, SwitchEntity):
+              """Explicitly allow KEMS to own Ohme mode during automatic Happy Hour."""
+
+              _attr_name = "Happy Hour Ohme control"
+              _attr_icon = "mdi:ev-station"
+
+              def __init__(self, coordinator) -> None:
+                  super().__init__(coordinator, "happy_hour_ohme_control")
+
+              @property
+              def is_on(self) -> bool:
+                  return bool(
+                      self.coordinator.entry.options.get(
+                          CONF_HAPPY_HOUR_OHME_CONTROL_ENABLED,
+                          False,
+                      )
+                  )
+
+              async def async_turn_on(self, **kwargs) -> None:
+                  await async_set_runtime_option(
+                      self.hass,
+                      self.coordinator.entry,
+                      CONF_HAPPY_HOUR_OHME_CONTROL_ENABLED,
+                      True,
+                  )
+
+              async def async_turn_off(self, **kwargs) -> None:
+                  await async_set_runtime_option(
+                      self.hass,
+                      self.coordinator.entry,
+                      CONF_HAPPY_HOUR_OHME_CONTROL_ENABLED,
+                      False,
+                  )
+          '''
+          with (KEMS / 'switch.py').open('a', encoding='utf-8') as handle:
+              handle.write(textwrap.dedent(switch_append))
+
+          # Surface hourly budget and the opt-in on the Happy Hour card.
+          replace_once(
+              KEMS / 'happy_hour_auto.py',
+              "          **Duration:** {{ state_attr('sensor.kems_agile_happy_hour_plan', 'duration_hours') or '—' }} h  \\n          **Automatic source:**",
+              "          **Duration:** {{ state_attr('sensor.kems_agile_happy_hour_plan', 'duration_hours') or '—' }} h  \\n          **Reward hour:** {{ state_attr('sensor.kems_agile_happy_hour_plan', 'current_reward_hour_index') or '—' }} / {{ state_attr('sensor.kems_agile_happy_hour_plan', 'reward_hour_count') or '—' }}  \\n          **Hour import:** {{ state_attr('sensor.kems_agile_happy_hour_plan', 'current_reward_hour_import_kwh') or 0 }} / 16 kWh  \\n          **Hour remaining:** {{ state_attr('sensor.kems_agile_happy_hour_plan', 'current_reward_hour_remaining_kwh') or '—' }} kWh  \\n          **Battery reserved:** {{ state_attr('sensor.kems_agile_happy_hour_plan', 'battery_reserved_input_kwh_remaining') or 0 }} kWh  \\n          **EV allowance:** {{ state_attr('sensor.kems_agile_happy_hour_plan', 'ev_allowance_kwh_remaining') or 0 }} kWh  \\n          **Ohme control:** {{ state_attr('sensor.kems_agile_happy_hour_plan', 'ohme_control_status') or 'not armed' }}  \\n          **Automatic source:**",
+          )
+          replace_once(
+              KEMS / 'happy_hour_auto.py',
+              '          - switch.kems_weekend_happy_hour_planning\n',
+              '          - switch.kems_weekend_happy_hour_planning\n          - switch.kems_happy_hour_ohme_control\n',
+          )
+
+          # Coordinator owns the narrow write controller, after shadow evidence is captured.
+          replace_once(
+              KEMS / 'coordinator.py',
+              'from .history import HistoryRecorder\n',
+              'from .history import HistoryRecorder\nfrom .happy_hour_budget import apply_happy_hour_control\nfrom .happy_hour_ohme_control import OhmeHappyHourController\n',
+          )
+          replace_once(
+              KEMS / 'coordinator.py',
+              '        self._control = ControlEngine()\n',
+              '        self._control = ControlEngine()\n        self._happy_hour_ohme = OhmeHappyHourController(\n            hass, entry, ev_status_entity=entities.ev_status\n        )\n',
+          )
+          replace_once(
+              KEMS / 'coordinator.py',
+              '        await self._history.async_load()\n',
+              '        await self._happy_hour_ohme.async_setup()\n        await self._history.async_load()\n',
+          )
+          replace_once(
+              KEMS / 'coordinator.py',
+              '            control = align_agile_control_state(\n                control,\n                simulation,\n                agile_state,\n                self.settings.control,\n            )\n            await self._shadow_validation.async_update(\n',
+              '            control = align_agile_control_state(\n                control,\n                simulation,\n                agile_state,\n                self.settings.control,\n            )\n            happy_hour_plan = agile_state.get("happy_hour_plan")\n            if not isinstance(happy_hour_plan, dict):\n                happy_hour_plan = {}\n            power_down_plan = agile_state.get("power_down_priority")\n            if not isinstance(power_down_plan, dict):\n                power_down_plan = {}\n            control = apply_happy_hour_control(control, snapshot, happy_hour_plan)\n            await self._shadow_validation.async_update(\n',
+          )
+          replace_once(
+              KEMS / 'coordinator.py',
+              '                agile_state=agile_state,\n            )\n\n            # Capture any half-hour that settled during this scan, then rebuild\n',
+              '                agile_state=agile_state,\n            )\n            await self._happy_hour_ohme.async_update(\n                snapshot=snapshot,\n                control=control,\n                happy_hour=happy_hour_plan,\n                power_down=power_down_plan,\n                scan_interval_seconds=self.settings.scan_interval_seconds,\n                emergency_stop=self.settings.control.emergency_stop,\n            )\n\n            # Capture any half-hour that settled during this scan, then rebuild\n',
+          )
+          replace_once(
+              KEMS / 'coordinator.py',
+              '    async def async_shutdown(self) -> None:\n        """Flush retained KEMS state before unloading."""\n        await self._history.async_save()\n',
+              '    async def async_shutdown(self) -> None:\n        """Flush retained KEMS state before unloading."""\n        await self._happy_hour_ohme.async_shutdown()\n        await self._history.async_save()\n',
+          )
+          replace_once(
+              KEMS / 'coordinator.py',
+              '    @property\n    def agile_history_backfill_state(self) -> dict:\n',
+              '    @property\n    def happy_hour_ohme_control_state(self) -> dict:\n        """Return the narrow Happy Hour Ohme-control audit state."""\n        return self._happy_hour_ohme.status\n\n    @property\n    def agile_history_backfill_state(self) -> dict:\n',
+          )
+
+          # Diagnostics explicitly distinguish the Ohme exception from blocked FoxESS writes.
+          replace_once(
+              KEMS / 'diagnostics.py',
+              '        "agile_smart_export": coordinator.agile_smart_export_state,\n',
+              '        "agile_smart_export": coordinator.agile_smart_export_state,\n        "happy_hour_ohme_control": coordinator.happy_hour_ohme_control_state,\n',
+          )
+
+          replace_once(
+              KEMS / '__init__.py',
+              '        "KEMS initialised with read-only control lab; real hardware writes are blocked"\n',
+              '        "KEMS initialised; FoxESS writes remain blocked and Happy Hour Ohme control is explicit opt-in"\n',
+          )
+
+          # Regression: raw daytime Intelligent is inert, confirmed dispatch is valid cheap authority.
+          ev_test = ROOT / 'tests/test_ev_charge_policy.py'
+          marker = '''def test_default_negative_daytime_price_does_not_authorise_ev() -> None:\n'''
+          addition = '''def test_confirmed_daytime_intelligent_dispatch_authorises_ev() -> None:\n    state = ControlEngine().plan(\n        _snapshot(\n            intelligent_slot=True,\n            ev_charging=True,\n            intelligent_slot_evidence={"large_import_permitted": True},\n        ),\n        _simulation(),\n        NOW,\n        ControlConfig(),\n    )\n    assert state.desired_ev_charging_allowed is True\n    assert state.desired_total_discharge_power_kw == 0.0\n\n\n'''
+          replace_once(ev_test, marker, addition + marker)
+
+          # Current Alpha9 contracts: KEMS advances alone, and only the narrow Ohme path writes.
+          alpha9 = ROOT / 'tests/test_alpha9_baseline.py'
+          replace_once(alpha9, 'assert manifest["version"] == "0.9.0-alpha9.1"', 'assert manifest["version"] == "0.9.0-alpha9.2"')
+          replace_once(
+              alpha9,
+              'def test_alpha9_baseline_cannot_enable_real_hardware_writes() -> None:\n',
+              'def test_alpha9_foxess_write_boundary_remains_closed() -> None:\n',
+          )
+          with alpha9.open('a', encoding='utf-8') as handle:
+              handle.write(textwrap.dedent(r'''
+
+              def test_alpha9_2_ohme_write_is_narrow_and_explicitly_opt_in() -> None:
+                  source = (KEMS / "happy_hour_ohme_control.py").read_text(encoding="utf-8")
+                  assert "CONF_HAPPY_HOUR_OHME_CONTROL_ENABLED" in source
+                  assert 'happy_hour.get("source") == "octopus_energy"' in source
+                  assert '"select",' in source and '"select_option",' in source
+                  assert "foxess" not in source.casefold()
+              '''))
+
+          # Coordinated release metadata: KEMS only; the other three tracks remain .0.
+          replace_once(
+              ROOT / 'release/kems-bundle.template.json',
+              'Alpha9 coordinated parity baseline; Alpha9.1 KEMS-only dashboard presentation patch: keep dynamic Component verification and Recent updates Markdown rows contiguous so Home Assistant renders them as tables; Pi Web remains 0.9.0-alpha9-web.0, Public Web remains 0.9.0-alpha9-public.0, Panel remains 0.9.0-alpha9-panel.0, the canonical 15% optimisation target / 10% hard floor / 12% recovery battery safety policy is unchanged; FoxESS hardware writes hard-blocked until physical commissioning is complete',
+              'Alpha9 coordinated parity baseline; Alpha9.2 KEMS-only Happy Hour policy/control patch: enforce an independent 16 kWh cap in every reward hour with no carry or borrowing, reserve maximum useful battery charge first, protect home demand, expose only the remainder to EV charging, and fall back immediately to normal tariff logic when the current reward-hour cap is exhausted; confirmed Intelligent extra slots remain valid cheap authority, raw/unconfirmed slots remain inert; optional Ohme Max charge control is explicit opt-in and automatic-Happy-Hour-only with previous-mode restoration; Pi Web remains 0.9.0-alpha9-web.0, Public Web remains 0.9.0-alpha9-public.0, Panel remains 0.9.0-alpha9-panel.0; canonical 15% optimisation target / 10% hard floor / 12% recovery remains unchanged; FoxESS hardware writes hard-blocked until physical commissioning is complete',
+          )
+
+          docs = ROOT / 'docs/ALPHA9.md'
+          docs.write_text(
+              docs.read_text(encoding='utf-8')
+              + textwrap.dedent(r'''
+
+              ## Alpha9.2 KEMS-only Happy Hour policy/control patch
+
+              - KEMS: `0.9.0-alpha9.2`
+              - Pi Web remains: `0.9.0-alpha9-web.0`
+              - Public Web remains: `0.9.0-alpha9-public.0`
+              - Panel remains: `0.9.0-alpha9-panel.0`
+
+              Alpha9.2 makes Weekend Happy Hour a strict per-reward-hour import authority. Every booked reward hour has its own **16 kWh** cap. Unused allowance does not carry into the next hour and a later reward hour cannot be borrowed early. The active-hour budget reserves the maximum useful battery charge first, protects projected non-EV home import next, and exposes only the remainder to EV charging. Once the current reward-hour ledger reaches 16 kWh, Happy Hour authority ends for the rest of that reward hour and KEMS immediately returns to normal tariff logic; an independently confirmed overnight/Intelligent cheap authority may still permit import, but Happy Hour alone cannot cause paid expensive import beyond its cap.
+
+              The default EV policy continues to allow the configured overnight cheap window plus a daytime Intelligent dispatch only after KEMS' existing fail-closed multi-signal confirmation. Raw/stale Intelligent flags and Agile price alone do not authorise EV charging. Happy Hour is separate from Intelligent dispatch authority.
+
+              Alpha9.2 also adds an explicit opt-in **Happy Hour Ohme control** switch. When enabled, KEMS may temporarily select the Ohme `Max charge` mode only for an automatically verified active Octopus Happy Hour with a complete hourly import ledger, a healthy safety envelope and sufficient allowance remaining after the battery/home reserve. KEMS preserves the pre-event Ohme mode and restores it when its Happy Hour authority ends. Manual Happy Hour fallback remains planning/shadow only and cannot start the car. Slow scans, Power Down, emergency stop, island operation, stale/unsafe data or an incomplete reward ledger all fail closed.
+
+              This is the only new physical/cloud write path in Alpha9.2. **FoxESS writes remain hard-blocked** pending physical commissioning and parity proof.
+              '''),
+              encoding='utf-8',
+          )
+          PY
+
+      - name: Sync packaged dashboard
+        run: python scripts/sync_packaged_dashboard.py
+
+      - name: Format touched Python
+        run: |
+          python -m black \
+            custom_components/kems/happy_hour_budget.py \
+            custom_components/kems/happy_hour_ohme_control.py \
+            custom_components/kems/const.py \
+            custom_components/kems/agile_alpha7_compat.py \
+            custom_components/kems/agile_control_alignment.py \
+            custom_components/kems/kems_core/ev_charge_policy.py \
+            custom_components/kems/ev_policy_dashboard.py \
+            custom_components/kems/switch.py \
+            custom_components/kems/happy_hour_auto.py \
+            custom_components/kems/coordinator.py \
+            custom_components/kems/diagnostics.py \
+            custom_components/kems/__init__.py \
+            tests/test_ev_charge_policy.py \
+            tests/test_alpha9_baseline.py \
+            tests/test_alpha9_2_happy_hour.py
+
+      - name: Packaged dashboard is current
+        run: python scripts/sync_packaged_dashboard.py --check
+
+      - name: Black
+        run: python -m black --check --diff .
+
+      - name: Ruff
+        run: python -m ruff check .
+
+      - name: Pytest
+        run: python -m pytest
+
+      - name: Compile Python source
+        run: python -m compileall -q custom_components tests
+
+      - name: Commit only after complete green gate
+        shell: bash
+        run: |
+          rm .github/workflows/alpha9.2-happy-hour-control-migration.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Alpha9.2: enforce hourly Happy Hour cap and opt-in Ohme control"
+          git push origin HEAD:feature/alpha9.2-happy-hour-hourly-cap-ohme
