@@ -1,0 +1,248 @@
+name: Alpha9.1 component table migration
+
+on:
+  push:
+    branches:
+      - fix/alpha9.1-component-verification-markdown
+
+permissions:
+  contents: write
+
+jobs:
+  migrate:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Apply Alpha9.1 cosmetic-only patch
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import json
+
+          manifest_path = Path("custom_components/kems/manifest.json")
+          manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+          assert manifest["version"] == "0.9.0-alpha9.0", manifest["version"]
+          manifest["version"] = "0.9.0-alpha9.1"
+          manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+
+          dashboard_path = Path("dashboards/kems_master_dashboard.yaml")
+          text = dashboard_path.read_text(encoding="utf-8")
+
+          def patch_dynamic_table(text: str, title: str, next_title: str, loop_var: str, empty_var: str) -> str:
+              start_marker = f"        title: {title}\n"
+              end_marker = f"        title: {next_title}\n"
+              start = text.index(start_marker)
+              end = text.index(end_marker, start)
+              block = text[start:end]
+              old = block
+              block = block.replace(
+                  f"{{% for {loop_var} %}}",
+                  f"{{% for {loop_var} -%}}",
+                  1,
+              )
+              block = block.replace("{% endfor %}", "{% endfor -%}", 1)
+              block = block.replace(
+                  f"{{% if not {empty_var} %}}",
+                  f"{{% if not {empty_var} -%}}",
+                  1,
+              )
+              if block == old:
+                  raise AssertionError(f"No whitespace controls changed in {title}")
+              return text[:start] + block + text[end:]
+
+          text = patch_dynamic_table(
+              text,
+              "Component verification",
+              "Recent updates — latest 5",
+              "c in components",
+              "components",
+          )
+          text = patch_dynamic_table(
+              text,
+              "Recent updates — latest 5",
+              "",  # handled below because this is the final card
+              "h in (history | reverse | list)[0:5]",
+              "history",
+          ) if False else text
+
+          recent_start = text.index("        title: Recent updates — latest 5\n")
+          recent_block = text[recent_start:]
+          old_recent = recent_block
+          recent_block = recent_block.replace(
+              "{% for h in (history | reverse | list)[0:5] %}",
+              "{% for h in (history | reverse | list)[0:5] -%}",
+              1,
+          )
+          recent_block = recent_block.replace("{% endfor %}", "{% endfor -%}", 1)
+          recent_block = recent_block.replace(
+              "{% if not history %}",
+              "{% if not history -%}",
+              1,
+          )
+          if recent_block == old_recent:
+              raise AssertionError("No whitespace controls changed in Recent updates")
+          text = text[:recent_start] + recent_block
+          dashboard_path.write_text(text, encoding="utf-8")
+
+          bundle_path = Path("release/kems-bundle.template.json")
+          bundle = json.loads(bundle_path.read_text(encoding="utf-8"))
+          assert bundle["components"]["panel"]["version"] == "0.9.0-alpha9-panel.0"
+          assert bundle["components"]["property_web"]["version"] == "0.9.0-alpha9-web.0"
+          assert bundle["components"]["public_web"]["version"] == "0.9.0-alpha9-public.0"
+          bundle["maintenance"]["reason"] = (
+              "Alpha9.1 KEMS-only dashboard presentation patch: keep dynamic Component verification "
+              "and Recent updates Markdown rows contiguous so Home Assistant renders them as tables; "
+              "Pi Web remains 0.9.0-alpha9-web.0, Public Web remains 0.9.0-alpha9-public.0, Panel remains "
+              "0.9.0-alpha9-panel.0, the canonical 15% optimisation target / 10% hard floor / 12% recovery "
+              "battery safety policy is unchanged, and real FoxESS hardware writes remain hard-blocked "
+              "until physical commissioning is complete"
+          )
+          bundle_path.write_text(json.dumps(bundle, indent=2) + "\n", encoding="utf-8")
+
+          docs_path = Path("docs/ALPHA9.md")
+          docs = docs_path.read_text(encoding="utf-8")
+          addition = """
+
+          ## Alpha9.1 KEMS-only dashboard patch
+
+          - KEMS: `0.9.0-alpha9.1`
+          - Pi Web remains: `0.9.0-alpha9-web.0`
+          - Public Web remains: `0.9.0-alpha9-public.0`
+          - Panel remains: `0.9.0-alpha9-panel.0`
+
+          Alpha9.1 is presentation-only. It trims Jinja control-block whitespace around the dynamic **Component verification** and **Recent updates** Markdown rows so Home Assistant keeps those rows inside their tables. It does not change optimisation, simulation, commissioning, panel firmware, web behaviour or FoxESS write safety.
+          """.strip("\n")
+          assert "## Alpha9.1 KEMS-only dashboard patch" not in docs
+          docs_path.write_text(docs.rstrip() + "\n\n" + addition + "\n", encoding="utf-8")
+          PY
+
+          cat > tests/test_alpha91_component_table_markdown.py <<'PYTEST'
+          """Regression guards for Alpha9.1 dynamic Markdown table rendering."""
+
+          from __future__ import annotations
+
+          import textwrap
+          from pathlib import Path
+
+          from jinja2 import Template
+
+          ROOT = Path(__file__).parents[1]
+          DASHBOARD = ROOT / "dashboards" / "kems_master_dashboard.yaml"
+
+
+          def _card_template(title: str, next_title: str | None = None) -> str:
+              text = DASHBOARD.read_text(encoding="utf-8")
+              title_marker = f"        title: {title}\n"
+              start = text.index(title_marker)
+              content_start = text.index("        content: |\n", start) + len("        content: |\n")
+              if next_title is None:
+                  end = len(text)
+              else:
+                  end = text.index(f"        title: {next_title}\n", content_start)
+                  prior_card = text.rfind("      - type: markdown\n", content_start, end)
+                  if prior_card >= content_start:
+                      end = prior_card
+              return textwrap.dedent(text[content_start:end]).rstrip()
+
+
+          def test_component_verification_rows_render_contiguously() -> None:
+              card = _card_template("Component verification", "Recent updates — latest 5")
+              components = [
+                  {
+                      "key": "kems_core",
+                      "installed": "0.9.0-alpha9.1",
+                      "target": "0.9.0-alpha9.1",
+                      "status": "current",
+                  },
+                  {
+                      "key": "property_web",
+                      "installed": None,
+                      "target": "0.9.0-alpha9-web.0",
+                      "status": "delegated",
+                  },
+              ]
+
+              def state_attr(_entity: str, attribute: str):
+                  return components if attribute == "components" else None
+
+              rendered = Template(card).render(state_attr=state_attr)
+              lines = [line for line in rendered.splitlines() if line]
+              assert lines[:4] == [
+                  "| Component | Installed | Target | Status |",
+                  "|---|---|---|---|",
+                  "| kems_core | 0.9.0-alpha9.1 | 0.9.0-alpha9.1 | current |",
+                  "| property_web | — | 0.9.0-alpha9-web.0 | delegated |",
+              ]
+              assert "\n\n| kems_core" not in rendered
+              assert "\n\n| property_web" not in rendered
+
+
+          def test_recent_update_rows_render_contiguously() -> None:
+              card = _card_template("Recent updates — latest 5")
+              history = [
+                  {
+                      "completed_at": "2026-09-04T22:07:45+01:00",
+                      "bundle": "0.9.0-alpha9.0",
+                      "result": "success",
+                  },
+                  {
+                      "completed_at": "2026-09-04T23:00:00+01:00",
+                      "bundle": "0.9.0-alpha9.1",
+                      "result": "success",
+                  },
+              ]
+
+              def state_attr(_entity: str, attribute: str):
+                  return history if attribute == "history" else None
+
+              rendered = Template(card).render(state_attr=state_attr)
+              lines = [line for line in rendered.splitlines() if line]
+              assert lines[:4] == [
+                  "| Completed | Bundle | Result |",
+                  "|---|---|---|",
+                  "| 2026-09-04T23:00:00 | 0.9.0-alpha9.1 | success |",
+                  "| 2026-09-04T22:07:45 | 0.9.0-alpha9.0 | success |",
+              ]
+              assert "\n\n| 2026-09-04T23:00:00" not in rendered
+          PYTEST
+
+          python scripts/sync_packaged_dashboard.py
+
+      - name: Install development tools
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements-dev.txt
+
+      - name: Gate formatting and full test suite before commit
+        run: |
+          python scripts/sync_packaged_dashboard.py --check
+          python -m black --check --diff .
+          python -m ruff check .
+          python -m pytest
+          python -m compileall -q custom_components tests
+
+      - name: Commit only after the gate passes
+        run: |
+          rm .github/workflows/alpha91-component-table-migration.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add custom_components/kems/manifest.json \
+                  dashboards/kems_master_dashboard.yaml \
+                  custom_components/kems/kems_master_dashboard.yaml \
+                  release/kems-bundle.template.json \
+                  docs/ALPHA9.md \
+                  tests/test_alpha91_component_table_markdown.py \
+                  .github/workflows/alpha91-component-table-migration.yml
+          git diff --cached --check
+          git commit -m "Fix Alpha9.1 dynamic dashboard Markdown tables"
+          git push origin HEAD:fix/alpha9.1-component-verification-markdown
