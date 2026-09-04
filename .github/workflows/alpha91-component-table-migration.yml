@@ -97,8 +97,8 @@ jobs:
               "keep dynamic Component verification and Recent updates Markdown rows contiguous so Home "
               "Assistant renders them as tables; Pi Web remains 0.9.0-alpha9-web.0, Public Web remains "
               "0.9.0-alpha9-public.0, Panel remains 0.9.0-alpha9-panel.0, the canonical 15% optimisation "
-              "target / 10% hard floor / 12% recovery battery safety policy is unchanged, and real FoxESS "
-              "hardware writes remain hard-blocked until physical commissioning is complete"
+              "target / 10% hard floor / 12% recovery battery safety policy is unchanged; FoxESS hardware "
+              "writes hard-blocked until physical commissioning is complete"
           )
           bundle_path.write_text(json.dumps(bundle, indent=2) + "\n", encoding="utf-8")
 
