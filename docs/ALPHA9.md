@@ -21,6 +21,8 @@ Real FoxESS control remains fail-closed until physical device mapping, commissio
 
 Alpha9.0 is not releasable until the frozen exact branch heads pass their complete validation suites, fresh pull-request checks pass on those same heads, main is confirmed not to have drifted, and the guarded merges and post-merge exact-main proofs succeed.
 
+The frozen Alpha9.0 candidate carries generation-aware historical release contracts: current-version assertions accept the Alpha9 generation reset while immutable Alpha8 release-note evidence remains pinned to its original release identities.
+
 ## Why Alpha9
 
 Alpha8 accumulated the implementation, parity work and cleanup needed to establish a clean product boundary. Alpha9 provides a single coordinated baseline from which KEMS, Pi Web, Public Web and Panel can advance independently without losing the ability to state an exact compatible four-track set.
