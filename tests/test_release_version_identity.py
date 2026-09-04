@@ -17,7 +17,7 @@ def test_manifest_is_the_only_literal_runtime_release_identity() -> None:
     version = str(manifest["version"])
     const_lines = CONST.read_text(encoding="utf-8").splitlines()
 
-    assert version.startswith("0.8.0-alpha8.")
+    assert version.startswith(("0.8.0-alpha8.", "0.9.0-alpha9."))
     assert not any(line.startswith("VERSION =") for line in const_lines)
     entity = ENTITY.read_text(encoding="utf-8")
     assert 'with_name("manifest.json")' in entity

@@ -36,7 +36,7 @@ def test_managed_panel_keeps_known_working_hardware_and_simple_product_modes() -
 def test_alpha8_panel_uses_current_agile_routing_snapshot_feed() -> None:
     """Full KEMS Agile keeps the final coherent routing feed in Alpha8."""
     content = PACKAGED.read_text(encoding="utf-8")
-    assert 'panel_config_version: "0.8.0-alpha8-panel.1"' in content
+    assert 'panel_config_version: "0.9.0-alpha9-panel.0"' in content
     sync = (ROOT / "custom_components" / "kems" / "dashboard.py").read_text(
         encoding="utf-8"
     )
@@ -184,7 +184,7 @@ def test_managed_panel_reports_alpha8_firmware_for_ota_verification() -> None:
     panel_health = (ROOT / "custom_components" / "kems" / "panel.py").read_text(
         encoding="utf-8"
     )
-    assert 'PANEL_CONFIG_VERSION = "0.8.0-alpha8-panel.1"' in panel_health
+    assert 'PANEL_CONFIG_VERSION = "0.9.0-alpha9-panel.0"' in panel_health
 
 
 def test_managed_panel_ota_tracks_queue_and_reconnect_health() -> None:
@@ -197,5 +197,5 @@ def test_managed_panel_ota_tracks_queue_and_reconnect_health() -> None:
     )
     assert 'last_ota_result="queued"' in sync
     assert "async_verify_panel_firmware" in sync
-    assert 'PANEL_CONFIG_VERSION = "0.8.0-alpha8-panel.1"' in panel_health
+    assert 'PANEL_CONFIG_VERSION = "0.9.0-alpha9-panel.0"' in panel_health
     assert 'status="Success"' in panel_health

@@ -15,8 +15,8 @@ def test_alpha8_8_retention_contract_survives_later_alpha8_releases() -> None:
     manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
     bundle = json.loads(BUNDLE.read_text(encoding="utf-8"))
 
-    assert str(manifest["version"]).startswith("0.8.0-alpha8.")
-    assert bundle["components"]["panel"]["version"] == "0.8.0-alpha8-panel.1"
+    assert str(manifest["version"]).startswith(("0.8.0-alpha8.", "0.9.0-alpha9."))
+    assert bundle["components"]["panel"]["version"] == "0.9.0-alpha9-panel.0"
     web_versions = {
         bundle["components"]["property_web"]["version"],
         bundle["components"]["pi_agent"]["version"],
@@ -38,7 +38,7 @@ def test_alpha8_8_notes_lock_retention_and_safety_scope() -> None:
     assert "newer current/future manual Happy Hour" in text
     assert "35 days" in text
     assert "0.8.0-alpha8-web.2` (unchanged)" in text
-    assert "0.8.0-alpha8-panel.1` (unchanged)" in text
+    assert "0.9.0-alpha9-panel.0` (unchanged)" in text
     assert "no Home Assistant service call to Octopus or Ohme" in text
     assert "no FoxESS hardware write" in text
     assert "Real hardware writes remain blocked" in text

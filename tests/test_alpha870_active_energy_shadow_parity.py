@@ -377,12 +377,12 @@ def test_alpha870_is_reporting_parity_only_and_keeps_coordination() -> None:
     runtime = (KEMS / "agile_smart_export_runtime.py").read_text(encoding="utf-8")
 
     version = manifest["version"]
-    assert version.startswith("0.8.0-alpha8.")
+    assert version.startswith(("0.8.0-alpha8.", "0.9.0-alpha9."))
     assert int(version.rsplit(".", 1)[1]) >= 70
     assert bundle["components"]["property_web"]["version"] == "0.8.0-alpha8-web.9"
     assert bundle["components"]["pi_agent"]["version"] == "0.8.0-alpha8-web.9"
     assert bundle["components"]["public_web"]["version"] == "0.8.0-alpha8-web.9"
-    assert bundle["components"]["panel"]["version"] == "0.8.0-alpha8-panel.1"
+    assert bundle["components"]["panel"]["version"] == "0.9.0-alpha9-panel.0"
     assert bundle["maintenance"]["affected_components"] == ["kems_core", "dashboard"]
     assert "persisted Agile charge/total-discharge decisions" in active_source
     assert "canonical_decision_elapsed_fallback_used" in active_source

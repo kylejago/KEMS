@@ -164,7 +164,7 @@ def test_alpha842_release_scope_and_architecture() -> None:
     source = (KEMS_ROOT / "agile_current_day_presentation.py").read_text()
     version = manifest["version"]
 
-    assert version.startswith("0.8.0-alpha8.")
+    assert version.startswith(("0.8.0-alpha8.", "0.9.0-alpha9."))
     assert int(version.rsplit(".", 1)[1]) >= 42
     assert bundle["maintenance"]["affected_components"] == [
         "kems_core",
@@ -172,7 +172,7 @@ def test_alpha842_release_scope_and_architecture() -> None:
     ]
     assert bundle["maintenance"]["home_assistant_restart_required"] is True
     assert bundle["maintenance"]["reboot_required"] is False
-    assert bundle["components"]["panel"]["version"] == "0.8.0-alpha8-panel.1"
+    assert bundle["components"]["panel"]["version"] == "0.9.0-alpha9-panel.0"
     assert bundle["components"]["property_web"]["version"] == "0.8.0-alpha8-web.9"
     assert bundle["components"]["pi_agent"]["version"] == "0.8.0-alpha8-web.9"
     assert bundle["components"]["public_web"]["version"] == "0.8.0-alpha8-web.9"

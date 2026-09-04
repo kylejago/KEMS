@@ -189,7 +189,7 @@ def test_alpha832_release_contract_remains_successor_safe() -> None:
     bundle = json.loads((ROOT / "release/kems-bundle.template.json").read_text())
 
     version = str(manifest["version"])
-    assert version.startswith("0.8.0-alpha8.")
+    assert version.startswith(("0.8.0-alpha8.", "0.9.0-alpha9."))
     assert int(version.rsplit(".", 1)[1]) >= 32
     assert bundle["maintenance"]["affected_components"] == ["kems_core", "dashboard"]
     assert bundle["maintenance"]["home_assistant_restart_required"] is True

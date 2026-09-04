@@ -196,13 +196,13 @@ def test_alpha871_contract_survives_successor_releases() -> None:
     )
 
     version = manifest["version"]
-    assert version.startswith("0.8.0-alpha8.")
+    assert version.startswith(("0.8.0-alpha8.", "0.9.0-alpha9."))
     release_number = int(version.rsplit(".", 1)[1])
     assert release_number >= 71
     assert bundle["components"]["property_web"]["version"] == "0.8.0-alpha8-web.9"
     assert bundle["components"]["pi_agent"]["version"] == "0.8.0-alpha8-web.9"
     assert bundle["components"]["public_web"]["version"] == "0.8.0-alpha8-web.9"
-    assert bundle["components"]["panel"]["version"] == "0.8.0-alpha8-panel.1"
+    assert bundle["components"]["panel"]["version"] == "0.9.0-alpha9-panel.0"
     assert bundle["maintenance"]["affected_components"] == ["kems_core", "dashboard"]
     if release_number == 71:
         assert "reporting-only" in bundle["maintenance"]["reason"]

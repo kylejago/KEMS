@@ -21,7 +21,7 @@ def test_managed_panel_packaged_source_matches_current_health_version() -> None:
     assert health_match is not None
     source_version = panel_match.group(1)
     health_version = health_match.group(1)
-    assert source_version == "0.8.0-alpha8-panel.1"
+    assert source_version == "0.9.0-alpha9-panel.0"
     assert health_version == source_version
     assert not (KEMS / "panel_ev_policy.py").exists()
     assert "PANEL6_VERSION_LINE" not in dashboard

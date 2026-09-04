@@ -63,7 +63,7 @@ def test_alpha830_release_contract_is_successor_safe() -> None:
     )
     bundle = json.loads((ROOT / "release" / "kems-bundle.template.json").read_text())
 
-    prefix = "0.8.0-alpha8."
+    prefix = "0.9.0-alpha9."
     assert manifest["version"].startswith(prefix)
     assert int(manifest["version"].removeprefix(prefix)) >= 30
     assert bundle["maintenance"]["affected_components"] == ["kems_core", "dashboard"]

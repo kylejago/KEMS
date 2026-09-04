@@ -217,7 +217,7 @@ def test_alpha876_scope_install_order_and_release_metadata() -> None:
     source = SOURCE.read_text(encoding="utf-8")
 
     version = str(manifest["version"])
-    assert version.startswith("0.8.0-alpha8.")
+    assert version.startswith(("0.8.0-alpha8.", "0.9.0-alpha9."))
     assert int(version.rsplit(".", 1)[1]) >= 76
     assert bundle["maintenance"]["affected_components"] == ["kems_core", "dashboard"]
     assert bundle["maintenance"]["home_assistant_restart_required"] is True
@@ -225,7 +225,7 @@ def test_alpha876_scope_install_order_and_release_metadata() -> None:
     assert bundle["components"]["property_web"]["version"] == "0.8.0-alpha8-web.9"
     assert bundle["components"]["pi_agent"]["version"] == "0.8.0-alpha8-web.9"
     assert bundle["components"]["public_web"]["version"] == "0.8.0-alpha8-web.9"
-    assert bundle["components"]["panel"]["version"] == "0.8.0-alpha8-panel.1"
+    assert bundle["components"]["panel"]["version"] == "0.9.0-alpha9-panel.0"
     reason = bundle["maintenance"]["reason"].lower()
     assert "15%" in reason
     assert "10%" in reason

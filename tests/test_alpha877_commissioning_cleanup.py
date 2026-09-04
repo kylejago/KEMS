@@ -82,13 +82,13 @@ def test_alpha877_release_contract_is_successor_safe() -> None:
     )
 
     version = str(manifest["version"])
-    assert version.startswith("0.8.0-alpha8.")
+    assert version.startswith(("0.8.0-alpha8.", "0.9.0-alpha9."))
     assert int(version.rsplit(".", 1)[1]) >= 77
     assert bundle["maintenance"]["affected_components"] == ["kems_core", "dashboard"]
     assert bundle["components"]["property_web"]["version"] == "0.8.0-alpha8-web.9"
     assert bundle["components"]["pi_agent"]["version"] == "0.8.0-alpha8-web.9"
     assert bundle["components"]["public_web"]["version"] == "0.8.0-alpha8-web.9"
-    assert bundle["components"]["panel"]["version"] == "0.8.0-alpha8-panel.1"
+    assert bundle["components"]["panel"]["version"] == "0.9.0-alpha9-panel.0"
     reason = bundle["maintenance"]["reason"].lower()
     assert "15%" in reason and "10%" in reason and "12%" in reason
     assert "hardware writes" in reason and "blocked" in reason

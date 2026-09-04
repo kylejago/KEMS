@@ -37,9 +37,9 @@ def test_alpha816_safety_and_external_release_contract_survives_successors() -> 
     bundle = json.loads(BUNDLE_PATH.read_text(encoding="utf-8"))
     content = PIPELINE_PATH.read_text(encoding="utf-8")
 
-    assert manifest["version"].startswith("0.8.0-alpha8.")
+    assert manifest["version"].startswith(("0.8.0-alpha8.", "0.9.0-alpha9."))
     assert int(manifest["version"].rsplit(".", 1)[-1]) >= 19
-    assert bundle["components"]["panel"]["version"] == "0.8.0-alpha8-panel.1"
+    assert bundle["components"]["panel"]["version"] == "0.9.0-alpha9-panel.0"
     assert bundle["components"]["property_web"]["version"] == "0.8.0-alpha8-web.9"
     assert bundle["components"]["pi_agent"]["version"] == "0.8.0-alpha8-web.9"
     assert bundle["components"]["public_web"]["version"] == "0.8.0-alpha8-web.9"

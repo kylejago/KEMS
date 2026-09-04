@@ -9,7 +9,7 @@ ROOT = Path(__file__).resolve().parents[1]
 def test_alpha732_platform_contract_is_retained_in_alpha8() -> None:
     manifest = json.loads((ROOT / "custom_components/kems/manifest.json").read_text())
     template = json.loads((ROOT / "release/kems-bundle.template.json").read_text())
-    assert str(manifest["version"]).startswith("0.8.0-alpha8.")
+    assert str(manifest["version"]).startswith(("0.8.0-alpha8.", "0.9.0-alpha9."))
 
     property_web = str(template["components"]["property_web"]["version"])
     pi_agent = str(template["components"]["pi_agent"]["version"])
@@ -18,7 +18,7 @@ def test_alpha732_platform_contract_is_retained_in_alpha8() -> None:
     assert property_web.startswith("0.8.0-alpha8-web.")
     assert int(property_web.rsplit(".", 1)[1]) >= 2
     assert template["components"]["public_web"]["required"] is False
-    assert template["components"]["panel"]["version"] == "0.8.0-alpha8-panel.1"
+    assert template["components"]["panel"]["version"] == "0.9.0-alpha9-panel.0"
 
 
 def test_alpha732_is_behaviour_freeze_not_another_agile_patch() -> None:

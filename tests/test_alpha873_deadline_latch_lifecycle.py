@@ -343,13 +343,13 @@ def test_alpha873_contract_survives_successor_releases() -> None:
     source = LATCH.read_text(encoding="utf-8")
 
     version = manifest["version"]
-    assert version.startswith("0.8.0-alpha8.")
+    assert version.startswith(("0.8.0-alpha8.", "0.9.0-alpha9."))
     release_number = int(version.rsplit(".", 1)[1])
     assert release_number >= 73
     assert bundle["maintenance"]["affected_components"] == ["kems_core", "dashboard"]
     assert bundle["maintenance"]["home_assistant_restart_required"] is True
     assert bundle["maintenance"]["reboot_required"] is False
-    assert bundle["components"]["panel"]["version"] == "0.8.0-alpha8-panel.1"
+    assert bundle["components"]["panel"]["version"] == "0.9.0-alpha9-panel.0"
     assert bundle["components"]["property_web"]["version"] == "0.8.0-alpha8-web.9"
     if release_number == 73:
         assert "deadline latch" in bundle["maintenance"]["reason"].lower()

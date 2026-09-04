@@ -16,8 +16,8 @@ def test_alpha8_keeps_web19_plus_branding_contract_and_exact_svg_brand() -> None
     bundle = json.loads((ROOT / "release/kems-bundle.template.json").read_text())
     branding = (ROOT / "docs/branding.md").read_text()
 
-    assert str(manifest["version"]).startswith("0.8.0-alpha8.")
-    assert bundle["components"]["panel"]["version"] == "0.8.0-alpha8-panel.1"
+    assert str(manifest["version"]).startswith(("0.8.0-alpha8.", "0.9.0-alpha9."))
+    assert bundle["components"]["panel"]["version"] == "0.9.0-alpha9-panel.0"
     web_versions = {
         str(bundle["components"][component]["version"])
         for component in ("property_web", "pi_agent", "public_web")

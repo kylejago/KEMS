@@ -17,7 +17,7 @@ DOC = ROOT / "docs" / "alpha751-maximum-discharge-plan-reconcile.md"
 
 def test_alpha751_version_and_module_parse() -> None:
     manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
-    assert str(manifest["version"]).startswith("0.8.0-alpha8.")
+    assert str(manifest["version"]).startswith(("0.8.0-alpha8.", "0.9.0-alpha9."))
     ast.parse(PATCH.read_text(encoding="utf-8"))
 
 

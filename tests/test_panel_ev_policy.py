@@ -16,7 +16,7 @@ def _packaged() -> str:
 
 def test_packaged_panel_reports_panel1_and_reads_ev_policy() -> None:
     content = _packaged()
-    assert 'panel_config_version: "0.8.0-alpha8-panel.1"' in content
+    assert 'panel_config_version: "0.9.0-alpha9-panel.0"' in content
     assert "ev_allowed: binary_sensor.kems_ev_charging_allowed_by_control" in content
     assert "id: ha_ev_allowed" in content
     assert "entity_id: ${ev_allowed}" in content

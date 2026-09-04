@@ -178,7 +178,7 @@ def test_alpha875_scope_priority_and_hardware_isolation() -> None:
     source = SOURCE.read_text(encoding="utf-8")
     version = manifest["version"]
 
-    assert version.startswith("0.8.0-alpha8.")
+    assert version.startswith(("0.8.0-alpha8.", "0.9.0-alpha9."))
     release_number = int(version.rsplit(".", 1)[1])
     assert release_number >= 75
     assert bundle["maintenance"]["affected_components"] == ["kems_core", "dashboard"]
@@ -187,7 +187,7 @@ def test_alpha875_scope_priority_and_hardware_isolation() -> None:
     assert bundle["components"]["property_web"]["version"] == "0.8.0-alpha8-web.9"
     assert bundle["components"]["pi_agent"]["version"] == "0.8.0-alpha8-web.9"
     assert bundle["components"]["public_web"]["version"] == "0.8.0-alpha8-web.9"
-    assert bundle["components"]["panel"]["version"] == "0.8.0-alpha8-panel.1"
+    assert bundle["components"]["panel"]["version"] == "0.9.0-alpha9-panel.0"
     if release_number == 75:
         assert "planning target" in bundle["maintenance"]["reason"].lower()
         assert "avoidable day-rate" in bundle["maintenance"]["reason"].lower()

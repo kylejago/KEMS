@@ -57,9 +57,9 @@ def test_alpha8_12_release_contract_survives_later_coordinated_alpha8() -> None:
     bundle = json.loads(BUNDLE.read_text(encoding="utf-8"))
 
     version = str(manifest["version"])
-    assert version.startswith("0.8.0-alpha8.")
+    assert version.startswith(("0.8.0-alpha8.", "0.9.0-alpha9."))
     assert int(version.rsplit(".", 1)[1]) >= 12
-    assert bundle["components"]["panel"]["version"] == "0.8.0-alpha8-panel.1"
+    assert bundle["components"]["panel"]["version"] == "0.9.0-alpha9-panel.0"
 
     web_versions = {
         str(bundle["components"][key]["version"])

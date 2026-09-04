@@ -12,7 +12,7 @@ def test_coordinated_release_keeps_web_panel_and_brand_contract() -> None:
     branding = (ROOT / "docs/branding.md").read_text()
 
     version = str(manifest["version"])
-    assert version.startswith("0.8.0-alpha8.")
+    assert version.startswith(("0.8.0-alpha8.", "0.9.0-alpha9."))
     assert bundle["bundle"] == "__RELEASE_VERSION__"
     assert bundle["components"]["kems_core"]["version"] == "__RELEASE_VERSION__"
     assert bundle["components"]["dashboard"]["version"] == "__RELEASE_VERSION__"
@@ -26,7 +26,7 @@ def test_coordinated_release_keeps_web_panel_and_brand_contract() -> None:
     web_version = web_versions.pop()
     assert web_version.startswith("0.8.0-alpha8-web.")
     assert int(web_version.rsplit(".", 1)[1]) >= 2
-    assert bundle["components"]["panel"]["version"] == "0.8.0-alpha8-panel.1"
+    assert bundle["components"]["panel"]["version"] == "0.9.0-alpha9-panel.0"
 
     assert "docs/assets/kems-logo-master.svg" in branding
     assert "single source of truth" in branding

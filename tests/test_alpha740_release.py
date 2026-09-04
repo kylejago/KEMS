@@ -17,7 +17,7 @@ def test_alpha740_bundle_capabilities_continue_in_alpha8() -> None:
     web_version = web_versions.pop()
     assert web_version.startswith("0.8.0-alpha8-web.")
     assert int(web_version.rsplit(".", 1)[1]) >= 2
-    assert bundle["components"]["panel"]["version"] == "0.8.0-alpha8-panel.1"
+    assert bundle["components"]["panel"]["version"] == "0.9.0-alpha9-panel.0"
 
 
 def test_alpha740_dashboard_inserts_agile_and_compare_command_cards() -> None:

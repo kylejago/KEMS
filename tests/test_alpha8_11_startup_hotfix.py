@@ -25,9 +25,9 @@ def test_alpha8_11_release_identity_keeps_web_and_panel_coordinated() -> None:
     manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
     bundle = json.loads(BUNDLE.read_text(encoding="utf-8"))
 
-    assert str(manifest["version"]).startswith("0.8.0-alpha8.")
+    assert str(manifest["version"]).startswith(("0.8.0-alpha8.", "0.9.0-alpha9."))
     assert int(str(manifest["version"]).rsplit(".", 1)[1]) >= 11
-    assert bundle["components"]["panel"]["version"] == "0.8.0-alpha8-panel.1"
+    assert bundle["components"]["panel"]["version"] == "0.9.0-alpha9-panel.0"
     web_versions = {
         str(bundle["components"][key]["version"])
         for key in ("property_web", "pi_agent", "public_web")

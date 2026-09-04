@@ -70,7 +70,7 @@ def test_alpha8_5_notes_lock_ev_policy_and_shadow_only_scope() -> None:
     assert "EV disabled" in text
     assert "23:30–05:30" in text
     assert "0.8.0-alpha8-web.2" in text
-    assert "0.8.0-alpha8-panel.1" in text
+    assert "0.9.0-alpha9-panel.0" in text
     assert "does not fabricate an overnight shifted-energy replay" in text
     assert "no Home Assistant service call to Ohme" in text
     assert "no FoxESS hardware write" in text
@@ -85,7 +85,7 @@ def test_alpha8_6_notes_document_dashboard_setup_hotfix() -> None:
     assert "full-kems-agile" in text
     assert "presentation transform cannot stop" in text
     assert "0.8.0-alpha8-web.2` (unchanged)" in text
-    assert "0.8.0-alpha8-panel.1` (unchanged)" in text
+    assert "0.9.0-alpha9-panel.0` (unchanged)" in text
     assert "no Home Assistant service call to Ohme" in text
     assert "no FoxESS hardware write" in text
 
@@ -100,7 +100,7 @@ def test_alpha8_7_notes_document_automatic_octopus_happy_hour() -> None:
     assert "Manual fallback" in text
     assert "code-less weekend" in text
     assert "0.8.0-alpha8-web.2` (unchanged)" in text
-    assert "0.8.0-alpha8-panel.1` (unchanged)" in text
+    assert "0.9.0-alpha9-panel.0` (unchanged)" in text
     assert "no Home Assistant service call to Octopus" in text
     assert "no Home Assistant service call to Ohme" in text
     assert "no FoxESS hardware write" in text

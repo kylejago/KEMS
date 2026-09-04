@@ -16,7 +16,7 @@ DOC = ROOT / "docs" / "agile-solar-aware-inverter-headroom.md"
 
 def test_alpha731_baseline_is_retained_in_alpha8() -> None:
     manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
-    assert str(manifest["version"]).startswith("0.8.0-alpha8.")
+    assert str(manifest["version"]).startswith(("0.8.0-alpha8.", "0.9.0-alpha9."))
     assert PATCH.exists()
 
 

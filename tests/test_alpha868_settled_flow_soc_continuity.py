@@ -273,12 +273,12 @@ def test_alpha868_is_reporting_only_and_keeps_runtime_owner_and_coordination() -
     runtime = (KEMS / "agile_smart_export_runtime.py").read_text(encoding="utf-8")
 
     version = manifest["version"]
-    assert version.startswith("0.8.0-alpha8.")
+    assert version.startswith(("0.8.0-alpha8.", "0.9.0-alpha9."))
     assert int(version.rsplit(".", 1)[1]) >= 68
     assert bundle["components"]["property_web"]["version"] == "0.8.0-alpha8-web.9"
     assert bundle["components"]["pi_agent"]["version"] == "0.8.0-alpha8-web.9"
     assert bundle["components"]["public_web"]["version"] == "0.8.0-alpha8-web.9"
-    assert bundle["components"]["panel"]["version"] == "0.8.0-alpha8-panel.1"
+    assert bundle["components"]["panel"]["version"] == "0.9.0-alpha9-panel.0"
     assert bundle["maintenance"]["affected_components"] == ["kems_core", "dashboard"]
     assert "_reconcile_completed_settled_soc" in source
     assert "flow_settled_soc_backcast_applied" in source

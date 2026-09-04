@@ -19,9 +19,9 @@ def test_alpha8_10_release_identity_and_coordinated_versions_survive_later_alpha
     manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
     bundle = json.loads(BUNDLE.read_text(encoding="utf-8"))
 
-    assert str(manifest["version"]).startswith("0.8.0-alpha8.")
+    assert str(manifest["version"]).startswith(("0.8.0-alpha8.", "0.9.0-alpha9."))
     assert int(str(manifest["version"]).rsplit(".", 1)[1]) >= 10
-    assert bundle["components"]["panel"]["version"] == "0.8.0-alpha8-panel.1"
+    assert bundle["components"]["panel"]["version"] == "0.9.0-alpha9-panel.0"
     web_versions = {
         str(bundle["components"][key]["version"])
         for key in ("property_web", "pi_agent", "public_web")
@@ -39,7 +39,7 @@ def test_alpha8_10_notes_lock_reconciliation_and_shadow_scope() -> None:
 
     assert "0.8.0-alpha8.10" in notes
     assert "0.8.0-alpha8-web.3" in notes
-    assert "0.8.0-alpha8-panel.1" in notes
+    assert "0.9.0-alpha9-panel.0" in notes
     assert "missing future Agile price" in notes
     assert "current_routing_snapshot" in notes
     assert "planned net site energy" in notes
