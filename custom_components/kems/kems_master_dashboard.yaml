@@ -828,10 +828,10 @@ views:
           {% set components = state_attr('sensor.kems_update_status', 'components') or [] %}
           | Component | Installed | Target | Status |
           |---|---|---|---|
-          {% for c in components %}
+          {% for c in components -%}
           | {{ c.get('key', '—') }} | {{ c.get('installed') or '—' }} | {{ c.get('target') or '—' }} | {{ c.get('status') or '—' }} |
-          {% endfor %}
-          {% if not components %}
+          {% endfor -%}
+          {% if not components -%}
           | — | — | — | Waiting for update check |
           {% endif %}
 
@@ -841,10 +841,10 @@ views:
           {% set history = state_attr('sensor.kems_update_status', 'history') or [] %}
           | Completed | Bundle | Result |
           |---|---|---|
-          {% for h in (history | reverse | list)[0:5] %}
+          {% for h in (history | reverse | list)[0:5] -%}
           | {{ (h.get('completed_at') or h.get('updated_at') or '—')[:19] }} | {{ h.get('bundle') or h.get('target') or '—' }} | {{ h.get('result') or h.get('status') or '—' }} |
-          {% endfor %}
-          {% if not history %}
+          {% endfor -%}
+          {% if not history -%}
           | — | — | No completed updates recorded |
           {% endif %}
 

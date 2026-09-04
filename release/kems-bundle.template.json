@@ -42,7 +42,7 @@
   },
   "maintenance": {
     "required": true,
-    "reason": "Alpha9 coordinated parity baseline: preserve the proven Alpha8.79 KEMS control/shadow behaviour and canonical battery safety thresholds (15% optimisation target, 10% hard floor, 12% recovery), align Pi Web at 0.9.0-alpha9-web.0, establish independent Public Web identity at 0.9.0-alpha9-public.0, move the managed panel identity to 0.9.0-alpha9-panel.0, and keep real FoxESS hardware writes hard-blocked until physical commissioning is complete",
+    "reason": "Alpha9 coordinated parity baseline; Alpha9.1 KEMS-only dashboard presentation patch: keep dynamic Component verification and Recent updates Markdown rows contiguous so Home Assistant renders them as tables; Pi Web remains 0.9.0-alpha9-web.0, Public Web remains 0.9.0-alpha9-public.0, Panel remains 0.9.0-alpha9-panel.0, the canonical 15% optimisation target / 10% hard floor / 12% recovery battery safety policy is unchanged; FoxESS hardware writes hard-blocked until physical commissioning is complete",
     "expected_downtime_minutes": 5,
     "home_assistant_restart_required": true,
     "reboot_required": false,
