@@ -67,13 +67,6 @@ jobs:
               "c in components",
               "components",
           )
-          text = patch_dynamic_table(
-              text,
-              "Recent updates — latest 5",
-              "",  # handled below because this is the final card
-              "h in (history | reverse | list)[0:5]",
-              "history",
-          ) if False else text
 
           recent_start = text.index("        title: Recent updates — latest 5\n")
           recent_block = text[recent_start:]
@@ -144,7 +137,9 @@ jobs:
               text = DASHBOARD.read_text(encoding="utf-8")
               title_marker = f"        title: {title}\n"
               start = text.index(title_marker)
-              content_start = text.index("        content: |\n", start) + len("        content: |\n")
+              content_start = text.index("        content: |\n", start) + len(
+                  "        content: |\n"
+              )
               if next_title is None:
                   end = len(text)
               else:
