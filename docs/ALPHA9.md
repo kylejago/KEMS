@@ -35,3 +35,5 @@ Alpha8 accumulated the implementation, parity work and cleanup needed to establi
 - Panel remains: `0.9.0-alpha9-panel.0`
 
 Alpha9.1 is presentation-only. It trims Jinja control-block whitespace around the dynamic **Component verification** and **Recent updates** Markdown rows so Home Assistant keeps those rows inside their tables. It does not change optimisation, simulation, commissioning, panel firmware, web behaviour or FoxESS write safety.
+
+Candidate validation note: Alpha9.1 is frozen as a KEMS-only presentation patch; Pi Web, Public Web and Panel remain on their Alpha9.0 baselines.
