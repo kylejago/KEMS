@@ -482,7 +482,8 @@ def build_commissioning_snapshot(hass: HomeAssistant, coordinator) -> dict[str, 
                 PASS,
                 (
                     f"{telemetry_evidence.complete_samples}/"
-                    f"{telemetry_evidence.samples} fresh FoxESS samples complete; max gap="
+                    f"{telemetry_evidence.samples} fresh FoxESS samples complete; "
+                    "max gap="
                     f"{telemetry_evidence.maximum_gap_seconds}s; allowed <= "
                     f"{telemetry_evidence.allowed_gap_seconds}s"
                 ),
