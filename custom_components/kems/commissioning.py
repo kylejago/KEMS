@@ -10,6 +10,7 @@ from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_registry as er
 
+from .commissioning_session import collect_foxess_session_records
 from .const import (
     CONF_BATTERY_CURRENT,
     CONF_BATTERY_POWER,
@@ -21,7 +22,11 @@ from .const import (
     CONF_SOLAR_POWER,
 )
 from .entity import KEMSEntity
-from .kems_core.commissioning_evidence import assess_foxess_telemetry_stability
+from .kems_core.commissioning_evidence import (
+    assess_foxess_power_balance,
+    assess_foxess_telemetry_stability,
+    assess_foxess_unit_contract,
+)
 from .panel import PANEL_CONFIG_VERSION, panel_health_snapshot
 from .source_authority import PHYSICAL_SOURCE_KEYS, duplicate_physical_sources
 
@@ -63,6 +68,17 @@ def _entity_available(hass: HomeAssistant, entity_id: str | None) -> bool:
         return False
     state = hass.states.get(entity_id)
     return state is not None and state.state not in {"unknown", "unavailable"}
+
+
+def _entity_unit(hass: HomeAssistant, entity_id: str | None) -> str | None:
+    """Return the raw Home Assistant unit exposed by one source entity."""
+    if not entity_id:
+        return None
+    state = hass.states.get(entity_id)
+    if state is None:
+        return None
+    value = state.attributes.get("unit_of_measurement")
+    return str(value) if value is not None else None
 
 
 def _source_check(
@@ -138,6 +154,55 @@ def _battery_power_source_check(
         WAIT,
         "Waiting for FoxESS battery power or battery voltage/current sources",
     )
+
+
+def _foxess_unit_evidence(
+    hass: HomeAssistant,
+    mappings: Mapping[str, str],
+):
+    """Return the raw-unit contract and deterministic source signature."""
+    common_sources = (
+        ("battery_soc", CONF_BATTERY_SOC),
+        ("solar_power_kw", CONF_SOLAR_POWER),
+        ("house_load_kw", CONF_HOUSE_LOAD),
+        ("grid_import_kw", CONF_GRID_IMPORT),
+        ("grid_export_kw", CONF_GRID_EXPORT),
+    )
+    source_units: dict[str, str | None] = {}
+    signature: list[tuple[str, str | None]] = []
+
+    for role, key in common_sources:
+        entity_id = mappings.get(key)
+        unit = _entity_unit(hass, entity_id)
+        source_units[role] = unit
+        identity = f"{entity_id}|{unit}" if entity_id else None
+        signature.append((role, identity))
+
+    direct = mappings.get(CONF_BATTERY_POWER)
+    direct_is_foxess = bool(
+        direct and _entity_platform(hass, direct) == FOXESS_PLATFORM
+    )
+    battery_power_derived = not direct_is_foxess
+    if battery_power_derived:
+        for role, key in (
+            ("battery_voltage", CONF_BATTERY_VOLTAGE),
+            ("battery_current", CONF_BATTERY_CURRENT),
+        ):
+            entity_id = mappings.get(key)
+            unit = _entity_unit(hass, entity_id)
+            source_units[role] = unit
+            identity = f"{entity_id}|{unit}" if entity_id else None
+            signature.append((role, identity))
+    else:
+        unit = _entity_unit(hass, direct)
+        source_units["battery_power_kw"] = unit
+        signature.append(("battery_power_kw", f"{direct}|{unit}" if direct else None))
+
+    evidence = assess_foxess_unit_contract(
+        source_units,
+        battery_power_derived=battery_power_derived,
+    )
+    return evidence, tuple(sorted(signature)), battery_power_derived
 
 
 def _detect_battery_power_convention(
@@ -351,14 +416,58 @@ def build_commissioning_snapshot(hass: HomeAssistant, coordinator) -> dict[str, 
             "physical_source_uniqueness",
         )
     )
-    records = tuple(getattr(getattr(coordinator, "_history", None), "records", ()))
-    telemetry_evidence_payload: dict[str, Any] | None = None
+
+    unit_evidence, source_signature, battery_power_derived = _foxess_unit_evidence(
+        hass,
+        mappings,
+    )
+    unit_evidence_payload = unit_evidence.to_dict()
     if not foxess_physical_mappings_ready:
+        unit_check = _check(
+            "foxess_unit_contract",
+            "FoxESS raw unit contract",
+            WAIT,
+            "Waiting for all required live FoxESS physical telemetry mappings",
+        )
+    elif unit_evidence.ready:
+        unit_check = _check(
+            "foxess_unit_contract",
+            "FoxESS raw unit contract",
+            PASS,
+            (
+                f"{unit_evidence.checked_fields}/{unit_evidence.required_fields} "
+                "raw source units match the KEMS normalisation contract"
+            ),
+        )
+    else:
+        unit_check = _check(
+            "foxess_unit_contract",
+            "FoxESS raw unit contract",
+            FAIL,
+            (
+                f"{unit_evidence.state}: missing={list(unit_evidence.missing_fields)}; "
+                f"mismatched={list(unit_evidence.mismatched_fields)}"
+            ),
+        )
+    checks.append(unit_check)
+
+    foxess_evidence_sources_ready = (
+        foxess_physical_mappings_ready and unit_evidence.ready
+    )
+    records, session_metadata = collect_foxess_session_records(
+        coordinator,
+        source_signature=source_signature,
+        snapshot=data.snapshot,
+        ready=foxess_evidence_sources_ready,
+    )
+
+    telemetry_evidence_payload: dict[str, Any] | None = None
+    if not foxess_evidence_sources_ready:
         telemetry_check = _check(
             "foxess_telemetry_stability",
             "FoxESS telemetry stability",
             WAIT,
-            "Waiting for all required live FoxESS physical telemetry mappings",
+            "Waiting for mapped FoxESS sources with a valid raw-unit contract",
         )
     else:
         telemetry_evidence = assess_foxess_telemetry_stability(
@@ -373,7 +482,8 @@ def build_commissioning_snapshot(hass: HomeAssistant, coordinator) -> dict[str, 
                 PASS,
                 (
                     f"{telemetry_evidence.complete_samples}/"
-                    f"{telemetry_evidence.samples} complete; max gap="
+                    f"{telemetry_evidence.samples} fresh FoxESS samples complete; "
+                    "max gap="
                     f"{telemetry_evidence.maximum_gap_seconds}s; allowed <= "
                     f"{telemetry_evidence.allowed_gap_seconds}s"
                 ),
@@ -386,7 +496,7 @@ def build_commissioning_snapshot(hass: HomeAssistant, coordinator) -> dict[str, 
                 (
                     f"{telemetry_evidence.state}: "
                     f"{telemetry_evidence.complete_samples}/"
-                    f"{telemetry_evidence.samples} complete; "
+                    f"{telemetry_evidence.samples} fresh samples complete; "
                     f"{telemetry_evidence.completeness_percent:.1f}%"
                 ),
             )
@@ -412,12 +522,12 @@ def build_commissioning_snapshot(hass: HomeAssistant, coordinator) -> dict[str, 
     configured_positive_is_discharge = bool(
         coordinator.settings.simulation.battery_power_positive_is_discharge
     )
-    if battery_power_check["status"] != PASS:
+    if not foxess_evidence_sources_ready:
         battery_direction = _check(
             "battery_power_direction",
             "Battery power direction",
             WAIT,
-            "Battery power must be mapped before direction can be verified",
+            "Waiting for valid fresh-session FoxESS telemetry sources",
         )
     elif detected_positive_is_discharge is None:
         battery_direction = _check(
@@ -425,8 +535,8 @@ def build_commissioning_snapshot(hass: HomeAssistant, coordinator) -> dict[str, 
             "Battery power direction",
             WAIT,
             (
-                "Waiting for SOC movement while battery power is above 0.25 kW "
-                f"({direction_samples} evidence sample(s))"
+                "Waiting for fresh-session SOC movement while battery power is above "
+                f"0.25 kW ({direction_samples} evidence sample(s))"
             ),
         )
     elif detected_positive_is_discharge == configured_positive_is_discharge:
@@ -505,6 +615,64 @@ def build_commissioning_snapshot(hass: HomeAssistant, coordinator) -> dict[str, 
             ),
         )
     checks.append(grid_direction_check)
+
+    power_balance_evidence_payload: dict[str, Any] | None = None
+    if not foxess_evidence_sources_ready:
+        power_balance_check = _check(
+            "foxess_power_balance",
+            "FoxESS whole-site power balance",
+            WAIT,
+            "Waiting for valid fresh-session FoxESS telemetry sources",
+        )
+    elif battery_direction["status"] != PASS:
+        power_balance_check = _check(
+            "foxess_power_balance",
+            "FoxESS whole-site power balance",
+            WAIT,
+            "Waiting for the battery power sign convention to be proven",
+        )
+    else:
+        power_balance_evidence = assess_foxess_power_balance(
+            records,
+            positive_is_discharge=configured_positive_is_discharge,
+        )
+        power_balance_evidence_payload = power_balance_evidence.to_dict()
+        if power_balance_evidence.ready:
+            power_balance_check = _check(
+                "foxess_power_balance",
+                "FoxESS whole-site power balance",
+                PASS,
+                (
+                    f"{power_balance_evidence.balanced_samples}/"
+                    f"{power_balance_evidence.eligible_samples} eligible fresh samples "
+                    f"balanced ({power_balance_evidence.balance_percent:.1f}%); max "
+                    f"residual={power_balance_evidence.maximum_absolute_residual_kw} kW"
+                ),
+            )
+        elif power_balance_evidence.state in {"collecting", "incomplete"}:
+            power_balance_check = _check(
+                "foxess_power_balance",
+                "FoxESS whole-site power balance",
+                WAIT,
+                (
+                    f"{power_balance_evidence.state}: "
+                    f"{power_balance_evidence.eligible_samples}/"
+                    f"{power_balance_evidence.samples} fresh samples eligible"
+                ),
+            )
+        else:
+            power_balance_check = _check(
+                "foxess_power_balance",
+                "FoxESS whole-site power balance",
+                FAIL,
+                (
+                    f"{power_balance_evidence.state}: "
+                    f"{power_balance_evidence.balance_percent:.1f}% balanced; mean "
+                    f"residual={power_balance_evidence.mean_absolute_residual_kw} kW; "
+                    f"max={power_balance_evidence.maximum_absolute_residual_kw} kW"
+                ),
+            )
+    checks.append(power_balance_check)
 
     limits = {
         "inverter_limit_kw": data.simulation.inverter_limit_kw,
@@ -598,7 +766,7 @@ def build_commissioning_snapshot(hass: HomeAssistant, coordinator) -> dict[str, 
             "Real hardware write lock",
             PASS if not data.control.commands_permitted else FAIL,
             (
-                "Real inverter writes remain hard-blocked in this commissioning PR"
+                "Real inverter writes remain hard-blocked in Alpha8.78 telemetry proof"
                 if not data.control.commands_permitted
                 else "Unexpected: control commands are currently permitted"
             ),
@@ -653,6 +821,22 @@ def build_commissioning_snapshot(hass: HomeAssistant, coordinator) -> dict[str, 
     else:
         state = "Ready for Shadow"
 
+    telemetry_proof_checks = {
+        item["key"]: item["status"]
+        for item in checks
+        if item["key"]
+        in {
+            "foxess_unit_contract",
+            "foxess_telemetry_stability",
+            "battery_power_direction",
+            "grid_direction",
+            "foxess_power_balance",
+        }
+    }
+    foxess_telemetry_proof_ready = bool(telemetry_proof_checks) and all(
+        status == PASS for status in telemetry_proof_checks.values()
+    )
+
     return {
         "state": state,
         "ready_for_shadow": state == "Ready for Shadow",
@@ -673,7 +857,13 @@ def build_commissioning_snapshot(hass: HomeAssistant, coordinator) -> dict[str, 
             for entity_id, keys in physical_source_duplicates.items()
         },
         "foxess_telemetry_mapping_gate_passed": foxess_physical_mappings_ready,
+        "foxess_evidence_sources_ready": foxess_evidence_sources_ready,
+        "foxess_unit_contract": unit_evidence_payload,
+        "foxess_battery_power_derived": battery_power_derived,
+        "foxess_commissioning_session": session_metadata,
         "foxess_telemetry_stability": telemetry_evidence_payload,
+        "foxess_power_balance": power_balance_evidence_payload,
+        "foxess_telemetry_proof_ready": foxess_telemetry_proof_ready,
         "configured_battery_power_positive_is_discharge": (
             configured_positive_is_discharge
         ),
