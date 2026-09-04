@@ -92,8 +92,7 @@ def collect_foxess_session_records(
         "started_at": _timestamp_text(session.get("started_at")),
         "reset_reason": reset_reason or session.get("reset_reason"),
         "source_signature": [
-            {"role": role, "identity": identity}
-            for role, identity in source_signature
+            {"role": role, "identity": identity} for role, identity in source_signature
         ],
     }
     return tuple(records), metadata
