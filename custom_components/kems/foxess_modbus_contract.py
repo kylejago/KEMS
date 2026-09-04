@@ -1,4 +1,4 @@
-"""Frozen FoxESS Modbus KH commissioning contract."""
+"""Frozen FoxESS Modbus KH commissioning and command-shadow contract."""
 
 from __future__ import annotations
 
@@ -77,16 +77,18 @@ FOXESS_MODBUS_OPTIONAL_DIAGNOSTICS: Final = {
     "pv4_power": {"key": "pv4_power", "name": "PV4 Power"},
 }
 
-# The upstream integration exposes writable configuration entities for KH. KEMS
-# records their existence only; Alpha8.60 does not map, call, or write any of them.
+# Writable entities reviewed from upstream v1.15.0. Alpha8.79 may discover and
+# read a small subset for command-shadow parity, but never calls or writes them.
 FOXESS_MODBUS_KNOWN_WRITABLE_CAPABILITIES: Final = {
     "work_mode": "Work Mode",
+    "force_charge_power": "Force Charge Power (remote control, kW)",
+    "force_discharge_power": "Force Discharge Power (remote control, kW)",
     "max_charge_current": "Max Charge Current",
     "max_discharge_current": "Max Discharge Current",
     "min_soc": "Min SoC",
     "max_soc": "Max SoC",
     "min_soc_on_grid": "Min SoC (On Grid)",
-    "export_power_limit": "Export Power Limit (KH_133)",
+    "export_power_limit": "Export Power Limit (KH_133, W)",
     "import_power_limit": "Import Power Limit (KH_133)",
 }
 
@@ -111,5 +113,8 @@ def foxess_modbus_contract_snapshot() -> dict[str, Any]:
         "known_writable_capabilities": dict(FOXESS_MODBUS_KNOWN_WRITABLE_CAPABILITIES),
         "writes_permitted": False,
         "hardware_writes": "blocked",
-        "control_scope": "catalogue only; no FoxESS write path is enabled",
+        "maximum_allowed_stage": "shadow",
+        "control_scope": (
+            "read-only command translation/parity; no FoxESS write path is enabled"
+        ),
     }
