@@ -1,4 +1,4 @@
-"""Regression coverage for the packaged KEMS panel.1 EV policy."""
+"""Regression coverage for the packaged KEMS panel.1 authority and EV policy."""
 
 from __future__ import annotations
 
