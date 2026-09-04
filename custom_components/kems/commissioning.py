@@ -196,9 +196,7 @@ def _foxess_unit_evidence(
     else:
         unit = _entity_unit(hass, direct)
         source_units["battery_power_kw"] = unit
-        signature.append(
-            ("battery_power_kw", f"{direct}|{unit}" if direct else None)
-        )
+        signature.append(("battery_power_kw", f"{direct}|{unit}" if direct else None))
 
     evidence = assess_foxess_unit_contract(
         source_units,
