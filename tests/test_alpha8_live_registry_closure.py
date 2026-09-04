@@ -74,7 +74,7 @@ def test_registry_closure_preserves_history_version_and_hardware_boundary() -> N
 
     assert "ALPHA7_COMPATIBILITY_ORDER" in loader
     assert "install_dashboard_consolidation()" in loader
-    assert str(manifest["version"]).startswith("0.8.0-alpha8.")
+    assert str(manifest["version"]).startswith(("0.8.0-alpha8.", "0.9.0-alpha9."))
     assert list(KEMS.glob("agile_alpha7*.py"))
 
     assert ".services.async_call(" not in dashboard

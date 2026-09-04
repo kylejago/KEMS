@@ -15,17 +15,17 @@
       "delivery": "kems_core"
     },
     "panel": {
-      "version": "0.8.0-alpha8-panel.1",
+      "version": "0.9.0-alpha9-panel.0",
       "required": false,
       "delivery": "kems_core"
     },
     "property_web": {
-      "version": "0.8.0-alpha8-web.9",
+      "version": "0.9.0-alpha9-web.0",
       "required": true,
       "delivery": "kems_pi"
     },
     "pi_agent": {
-      "version": "0.8.0-alpha8-web.9",
+      "version": "0.9.0-alpha9-web.0",
       "required": true,
       "delivery": "kems_pi"
     },
@@ -35,20 +35,24 @@
       "delivery": "kems_pi"
     },
     "public_web": {
-      "version": "0.8.0-alpha8-web.9",
+      "version": "0.9.0-alpha9-public.0",
       "required": false,
       "delivery": "ionos-sftp"
     }
   },
   "maintenance": {
     "required": true,
-    "reason": "FoxESS telemetry commissioning proof: require authoritative unique FoxESS physical mappings, validate raw source units before accepting normalised telemetry, collect commissioning evidence only in a fresh non-persistent coordinator-session window that resets on restart/source/unit changes, prove battery/grid direction and repeated whole-site power balance from that same window, preserve the canonical 15% planning target / 10% hard safety floor / 12% recovery hierarchy, and keep real hardware writes hard-blocked; Web 0.8.0-alpha8-web.9 and panel 0.8.0-alpha8-panel.1 are unchanged",
+    "reason": "Alpha9 coordinated parity baseline: preserve the proven Alpha8.79 KEMS control/shadow behaviour and canonical battery safety thresholds (15% optimisation target, 10% hard floor, 12% recovery), align Pi Web at 0.9.0-alpha9-web.0, establish independent Public Web identity at 0.9.0-alpha9-public.0, move the managed panel identity to 0.9.0-alpha9-panel.0, and keep real FoxESS hardware writes hard-blocked until physical commissioning is complete",
     "expected_downtime_minutes": 5,
     "home_assistant_restart_required": true,
     "reboot_required": false,
     "affected_components": [
       "kems_core",
-      "dashboard"
+      "dashboard",
+      "panel",
+      "property_web",
+      "pi_agent",
+      "public_web"
     ]
   }
 }

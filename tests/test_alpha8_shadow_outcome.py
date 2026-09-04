@@ -155,7 +155,10 @@ def test_historical_metadata_and_alpha8_version_remain_unchanged() -> None:
     assert "install_alpha723_shadow_patch" in loader
     assert "install_alpha724_outcome_parity_patch" in loader
     assert "ALPHA7_COMPATIBILITY_ORDER" in loader
-    assert '"version": "0.8.0-alpha8.' in manifest
+    assert any(
+        marker in manifest
+        for marker in ('"version": "0.8.0-alpha8.', '"version": "0.9.0-alpha9.')
+    )
 
 
 def test_shadow_outcome_cannot_enable_real_hardware_writes() -> None:

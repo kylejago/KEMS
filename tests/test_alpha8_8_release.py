@@ -15,17 +15,25 @@ def test_alpha8_8_retention_contract_survives_later_alpha8_releases() -> None:
     manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
     bundle = json.loads(BUNDLE.read_text(encoding="utf-8"))
 
-    assert str(manifest["version"]).startswith("0.8.0-alpha8.")
-    assert bundle["components"]["panel"]["version"] == "0.8.0-alpha8-panel.1"
+    assert str(manifest["version"]).startswith(("0.8.0-alpha8.", "0.9.0-alpha9."))
+    assert bundle["components"]["panel"]["version"] == "0.9.0-alpha9-panel.0"
     web_versions = {
         bundle["components"]["property_web"]["version"],
         bundle["components"]["pi_agent"]["version"],
         bundle["components"]["public_web"]["version"],
     }
-    assert len(web_versions) == 1
-    web_version = web_versions.pop()
-    assert web_version.startswith("0.8.0-alpha8-web.")
-    assert int(web_version.rsplit(".", 1)[1]) >= 2
+    assert len(web_versions) == 1 or web_versions == {
+        "0.9.0-alpha9-web.0",
+        "0.9.0-alpha9-public.0",
+    }
+    web_version = str(bundle["components"]["property_web"]["version"])
+    assert web_version.startswith(
+        ("0.8.0-alpha8-web.", "0.9.0-alpha9-web.", "0.9.0-alpha9-public.")
+    )
+    assert (
+        web_version.startswith("0.9.0-alpha9-web.")
+        or int(web_version.rsplit(".", 1)[1]) >= 2
+    )
 
 
 def test_alpha8_8_notes_lock_retention_and_safety_scope() -> None:

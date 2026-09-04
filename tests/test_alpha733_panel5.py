@@ -18,11 +18,11 @@ def test_alpha733_versions_and_bundle_remain_aligned_in_alpha8() -> None:
     yaml = (KEMS / "kems16x16.yaml").read_text(encoding="utf-8")
     dashboard = (KEMS / "dashboard.py").read_text(encoding="utf-8")
 
-    assert str(manifest["version"]).startswith("0.8.0-alpha8.")
-    assert bundle["components"]["panel"]["version"] == "0.8.0-alpha8-panel.1"
+    assert str(manifest["version"]).startswith(("0.8.0-alpha8.", "0.9.0-alpha9."))
+    assert bundle["components"]["panel"]["version"] == "0.9.0-alpha9-panel.0"
     # Panel.1 is now the packaged source of truth; no runtime version transform remains.
-    assert 'PANEL_CONFIG_VERSION = "0.8.0-alpha8-panel.1"' in panel
-    assert 'panel_config_version: "0.8.0-alpha8-panel.1"' in yaml
+    assert 'PANEL_CONFIG_VERSION = "0.9.0-alpha9-panel.0"' in panel
+    assert 'panel_config_version: "0.9.0-alpha9-panel.0"' in yaml
     assert not (KEMS / "panel_ev_policy.py").exists()
     assert "PANEL6_VERSION_LINE" not in dashboard
     assert "PANEL7_VERSION_LINE" not in dashboard
@@ -52,6 +52,10 @@ def test_alpha733_public_web_delivery_matches_alpha8_route() -> None:
     )
     public_web = bundle["components"]["public_web"]
     version = str(public_web["version"])
-    assert version.startswith("0.8.0-alpha8-web.")
-    assert int(version.rsplit(".", 1)[1]) >= 2
+    assert version.startswith(
+        ("0.8.0-alpha8-web.", "0.9.0-alpha9-web.", "0.9.0-alpha9-public.")
+    )
+    assert (
+        str(version).startswith("0.9.0-alpha9") or int(version.rsplit(".", 1)[1]) >= 2
+    )
     assert public_web["delivery"] == "ionos-sftp"

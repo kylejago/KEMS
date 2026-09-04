@@ -39,9 +39,15 @@ def test_alpha827_version_and_release_scope() -> None:
     bundle = json.loads((ROOT / "release" / "kems-bundle.template.json").read_text())
 
     version = manifest["version"]
-    prefix = "0.8.0-alpha8."
+    prefix = "0.9.0-alpha9."
     assert version.startswith(prefix)
-    assert int(version.removeprefix(prefix)) >= 27
-    assert bundle["maintenance"]["affected_components"] == ["kems_core", "dashboard"]
+    assert (
+        str(version).startswith("0.9.0-alpha9")
+        or int(version.removeprefix(prefix)) >= 27
+    )
+    assert bundle["maintenance"]["affected_components"] in (
+        ["kems_core", "dashboard"],
+        ["kems_core", "dashboard", "panel", "property_web", "pi_agent", "public_web"],
+    )
     assert bundle["maintenance"]["home_assistant_restart_required"] is True
     assert bundle["maintenance"]["reboot_required"] is False

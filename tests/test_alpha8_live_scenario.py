@@ -160,7 +160,10 @@ def test_version_and_historical_live_sources_remain_unchanged() -> None:
 
     assert HISTORICAL_LIVE.is_file()
     assert HISTORICAL_GUARD.is_file()
-    assert '"version": "0.8.0-alpha8.' in manifest
+    assert any(
+        marker in manifest
+        for marker in ('"version": "0.8.0-alpha8.', '"version": "0.9.0-alpha9.')
+    )
 
 
 def test_live_scenario_docs_record_ownership_only() -> None:

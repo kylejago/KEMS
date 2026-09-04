@@ -117,7 +117,10 @@ def test_version_and_historical_evidence_remain_unchanged() -> None:
 
     assert HISTORICAL_714.is_file()
     assert HISTORICAL_715.is_file()
-    assert '"version": "0.8.0-alpha8.' in manifest
+    assert any(
+        marker in manifest
+        for marker in ('"version": "0.8.0-alpha8.', '"version": "0.9.0-alpha9.')
+    )
 
 
 def test_history_dashboard_docs_record_ownership_only() -> None:

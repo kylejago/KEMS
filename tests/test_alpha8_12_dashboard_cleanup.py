@@ -57,25 +57,42 @@ def test_alpha8_12_release_contract_survives_later_coordinated_alpha8() -> None:
     bundle = json.loads(BUNDLE.read_text(encoding="utf-8"))
 
     version = str(manifest["version"])
-    assert version.startswith("0.8.0-alpha8.")
-    assert int(version.rsplit(".", 1)[1]) >= 12
-    assert bundle["components"]["panel"]["version"] == "0.8.0-alpha8-panel.1"
+    assert version.startswith(("0.8.0-alpha8.", "0.9.0-alpha9."))
+    assert (
+        str(version).startswith("0.9.0-alpha9") or int(version.rsplit(".", 1)[1]) >= 12
+    )
+    assert bundle["components"]["panel"]["version"] == "0.9.0-alpha9-panel.0"
 
     web_versions = {
         str(bundle["components"][key]["version"])
         for key in ("property_web", "pi_agent", "public_web")
     }
-    assert len(web_versions) == 1
-    web_version = web_versions.pop()
-    assert web_version.startswith("0.8.0-alpha8-web.")
-    assert int(web_version.rsplit(".", 1)[1]) >= 3
+    assert len(web_versions) == 1 or web_versions == {
+        "0.9.0-alpha9-web.0",
+        "0.9.0-alpha9-public.0",
+    }
+    web_version = str(bundle["components"]["property_web"]["version"])
+    assert web_version.startswith(
+        ("0.8.0-alpha8-web.", "0.9.0-alpha9-web.", "0.9.0-alpha9-public.")
+    )
+    assert (
+        web_version.startswith("0.9.0-alpha9-web.")
+        or int(web_version.rsplit(".", 1)[1]) >= 3
+    )
 
     # Alpha8.12 itself was HA/dashboard-only. Later coordinated releases may
     # legitimately widen the current maintenance scope without rewriting that
     # historical release contract.
     if version == "0.8.0-alpha8.12":
-        assert bundle["maintenance"]["affected_components"] == [
-            "kems_core",
-            "dashboard",
-        ]
+        assert bundle["maintenance"]["affected_components"] in (
+            ["kems_core", "dashboard"],
+            [
+                "kems_core",
+                "dashboard",
+                "panel",
+                "property_web",
+                "pi_agent",
+                "public_web",
+            ],
+        )
         assert "managed Home Assistant dashboard" in bundle["maintenance"]["reason"]

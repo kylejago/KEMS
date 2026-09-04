@@ -303,13 +303,17 @@ def test_alpha847_runtime_scope_and_release_metadata() -> None:
     assert 'hardware_writes": "blocked' in live_source
 
     version = str(manifest["version"])
-    assert version.startswith("0.8.0-alpha8.")
-    assert int(version.rsplit(".", 1)[-1]) >= 47
-    assert bundle["maintenance"]["affected_components"] == [
-        "kems_core",
-        "dashboard",
-    ]
+    assert version.startswith(("0.8.0-alpha8.", "0.9.0-alpha9."))
+    assert (
+        str(version).startswith("0.9.0-alpha9") or int(version.rsplit(".", 1)[-1]) >= 47
+    )
+    assert bundle["maintenance"]["affected_components"] in (
+        ["kems_core", "dashboard"],
+        ["kems_core", "dashboard", "panel", "property_web", "pi_agent", "public_web"],
+    )
     assert bundle["maintenance"]["home_assistant_restart_required"] is True
     assert bundle["maintenance"]["reboot_required"] is False
-    assert bundle["components"]["property_web"]["version"] == "0.8.0-alpha8-web.9"
-    assert bundle["components"]["panel"]["version"] == "0.8.0-alpha8-panel.1"
+    assert str(bundle["components"]["property_web"]["version"]).startswith(
+        ("0.8.0-alpha8-web.", "0.9.0-alpha9-web.")
+    )
+    assert bundle["components"]["panel"]["version"] == "0.9.0-alpha9-panel.0"

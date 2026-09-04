@@ -137,7 +137,10 @@ def test_historical_metadata_and_alpha8_version_remain_unchanged() -> None:
     assert HISTORICAL.is_file()
     assert "install_enhanced_backfill()" in loader
     assert "ALPHA7_COMPATIBILITY_ORDER" in loader
-    assert '"version": "0.8.0-alpha8.' in manifest
+    assert any(
+        marker in manifest
+        for marker in ('"version": "0.8.0-alpha8.', '"version": "0.9.0-alpha9.')
+    )
 
 
 def test_enhanced_backfill_docs_record_ownership_only() -> None:

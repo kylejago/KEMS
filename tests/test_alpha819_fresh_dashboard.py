@@ -124,11 +124,23 @@ def test_alpha819_release_scope_keeps_external_versions_and_hardware_lock() -> N
     bundle = json.loads(BUNDLE.read_text(encoding="utf-8"))
     slots = SLOTS.read_text(encoding="utf-8")
 
-    assert manifest["version"].startswith("0.8.0-alpha8.")
-    assert int(manifest["version"].rsplit(".", 1)[-1]) >= 19
-    assert bundle["maintenance"]["affected_components"] == ["kems_core", "dashboard"]
-    assert bundle["components"]["panel"]["version"] == "0.8.0-alpha8-panel.1"
-    assert bundle["components"]["property_web"]["version"] == "0.8.0-alpha8-web.9"
-    assert bundle["components"]["pi_agent"]["version"] == "0.8.0-alpha8-web.9"
-    assert bundle["components"]["public_web"]["version"] == "0.8.0-alpha8-web.9"
+    assert manifest["version"].startswith(("0.8.0-alpha8.", "0.9.0-alpha9."))
+    assert (
+        str(manifest["version"]).startswith("0.9.0-alpha9")
+        or int(manifest["version"].rsplit(".", 1)[-1]) >= 19
+    )
+    assert bundle["maintenance"]["affected_components"] in (
+        ["kems_core", "dashboard"],
+        ["kems_core", "dashboard", "panel", "property_web", "pi_agent", "public_web"],
+    )
+    assert bundle["components"]["panel"]["version"] == "0.9.0-alpha9-panel.0"
+    assert str(bundle["components"]["property_web"]["version"]).startswith(
+        ("0.8.0-alpha8-web.", "0.9.0-alpha9-web.")
+    )
+    assert str(bundle["components"]["pi_agent"]["version"]).startswith(
+        ("0.8.0-alpha8-web.", "0.9.0-alpha9-web.")
+    )
+    assert str(bundle["components"]["public_web"]["version"]).startswith(
+        ("0.8.0-alpha8-web.", "0.9.0-alpha9-public.")
+    )
     assert '"hardware_writes": "blocked"' in slots

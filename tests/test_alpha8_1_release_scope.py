@@ -16,7 +16,7 @@ def test_alpha8_1_safety_scope_remains_blocked_in_later_alpha8_releases() -> Non
     )
     commissioning = (INTEGRATION / "commissioning.py").read_text(encoding="utf-8")
 
-    assert str(manifest["version"]).startswith("0.8.0-alpha8.")
+    assert str(manifest["version"]).startswith(("0.8.0-alpha8.", "0.9.0-alpha9."))
     assert '"hardware_writes": "blocked"' in shadow
     assert '"real_backend_available": False' in shadow
     assert '"commands_permitted": False' in shadow

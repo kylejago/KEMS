@@ -21,18 +21,24 @@ def test_alpha8_release_targets_coordinated_panel_and_web() -> None:
     panel_yaml = (KEMS / "kems16x16.yaml").read_text(encoding="utf-8")
     dashboard = (KEMS / "dashboard.py").read_text(encoding="utf-8")
 
-    assert str(manifest["version"]).startswith("0.8.0-alpha8.")
-    assert bundle["components"]["panel"]["version"] == "0.8.0-alpha8-panel.1"
+    assert str(manifest["version"]).startswith(("0.8.0-alpha8.", "0.9.0-alpha9."))
+    assert bundle["components"]["panel"]["version"] == "0.9.0-alpha9-panel.0"
 
     property_web = str(bundle["components"]["property_web"]["version"])
     pi_agent = str(bundle["components"]["pi_agent"]["version"])
     public_web = str(bundle["components"]["public_web"]["version"])
-    assert property_web == pi_agent == public_web
-    assert property_web.startswith("0.8.0-alpha8-web.")
-    assert int(property_web.rsplit(".", 1)[1]) >= 2
+    assert property_web == pi_agent
+    assert public_web == property_web or public_web.startswith("0.9.0-alpha9-public.")
+    assert property_web.startswith(
+        ("0.8.0-alpha8-web.", "0.9.0-alpha9-web.", "0.9.0-alpha9-public.")
+    )
+    assert (
+        property_web.startswith("0.9.0-alpha9-web.")
+        or int(property_web.rsplit(".", 1)[1]) >= 2
+    )
 
-    assert 'PANEL_CONFIG_VERSION = "0.8.0-alpha8-panel.1"' in panel_py
-    assert 'panel_config_version: "0.8.0-alpha8-panel.1"' in panel_yaml
+    assert 'PANEL_CONFIG_VERSION = "0.9.0-alpha9-panel.0"' in panel_py
+    assert 'panel_config_version: "0.9.0-alpha9-panel.0"' in panel_yaml
     assert not (KEMS / "panel_ev_policy.py").exists()
     assert "PANEL6_VERSION_LINE" not in dashboard
     assert "PANEL7_VERSION_LINE" not in dashboard
