@@ -1,0 +1,103 @@
+name: Publish KEMS Panel release
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - 'panel-v*'
+    paths:
+      - 'custom_components/kems/panel.py'
+      - 'custom_components/kems/kems16x16.yaml'
+      - '.github/workflows/publish-panel-release.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: publish-kems-panel-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Resolve Panel version
+        id: meta
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION=$(python - <<'PY'
+          import re
+          from pathlib import Path
+          source = Path('custom_components/kems/panel.py').read_text()
+          match = re.search(r'^PANEL_CONFIG_VERSION = "([^"]+)"$', source, re.MULTILINE)
+          if not match:
+              raise SystemExit('PANEL_CONFIG_VERSION not found')
+          print(match.group(1))
+          PY
+          )
+          YAML_VERSION=$(python - <<'PY'
+          import re
+          from pathlib import Path
+          source = Path('custom_components/kems/kems16x16.yaml').read_text()
+          match = re.search(r'^\s*panel_config_version: "([^"]+)"$', source, re.MULTILINE)
+          if not match:
+              raise SystemExit('panel_config_version substitution not found')
+          print(match.group(1))
+          PY
+          )
+          [ "$VERSION" = "$YAML_VERSION" ] || { echo "Panel Python/YAML version mismatch: $VERSION != $YAML_VERSION" >&2; exit 1; }
+          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+-alpha[0-9]+-panel\.[0-9]+$ ]] || { echo "Invalid Panel version: $VERSION" >&2; exit 1; }
+          TAG="panel-v${VERSION}"
+          if [[ "$GITHUB_REF" == refs/tags/panel-v* ]]; then
+            [ "$GITHUB_REF_NAME" = "$TAG" ] || { echo "Tag $GITHUB_REF_NAME does not match $TAG" >&2; exit 1; }
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Check whether release already exists
+        id: existing
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.meta.outputs.tag }}
+        shell: bash
+        run: |
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build Panel release asset
+        if: steps.existing.outputs.exists != 'true'
+        id: build
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION='${{ steps.meta.outputs.version }}'
+          NAME="kems-panel-${VERSION}.yaml"
+          cp custom_components/kems/kems16x16.yaml "$NAME"
+          sha256sum "$NAME" > "$NAME.sha256"
+          echo "yaml=$NAME" >> "$GITHUB_OUTPUT"
+          echo "checksum=$NAME.sha256" >> "$GITHUB_OUTPUT"
+
+      - name: Publish GitHub Release
+        if: steps.existing.outputs.exists != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          VERSION='${{ steps.meta.outputs.version }}'
+          TAG='${{ steps.meta.outputs.tag }}'
+          gh release create "$TAG" \
+            '${{ steps.build.outputs.yaml }}' \
+            '${{ steps.build.outputs.checksum }}' \
+            --target "$GITHUB_SHA" \
+            --title "KEMS Panel ${VERSION}" \
+            --generate-notes \
+            --prerelease
