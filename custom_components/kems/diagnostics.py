@@ -12,6 +12,7 @@ from homeassistant.util import dt as dt_util
 
 from .commissioning import build_commissioning_snapshot
 from .coordinator import KEMSCoordinator
+from .foxess_command_shadow import build_foxess_command_shadow_snapshot
 from .foxess_modbus_contract import foxess_modbus_contract_snapshot
 from .panel import panel_health_snapshot
 from .providers.octopus import DEFAULT_INTELLIGENT_STALE_DATA_SECONDS
@@ -151,6 +152,10 @@ async def async_get_config_entry_diagnostics(
             "sign_convention": "positive = import, negative = export",
         },
         "foxess_modbus_contract": foxess_modbus_contract_snapshot(),
+        "foxess_command_shadow": build_foxess_command_shadow_snapshot(
+            hass,
+            coordinator,
+        ),
         "learning": asdict(data.learned),
         "gas": asdict(data.gas),
         "advice": {

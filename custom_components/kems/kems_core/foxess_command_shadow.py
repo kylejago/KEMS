@@ -1,7 +1,7 @@
 """Pure FoxESS command-shadow translation for KEMS.
 
 This module deliberately contains no Home Assistant service calls, Modbus client,
-or write path.  It translates the already-authoritative KEMS ControlState into
+or write path. It translates the already-authoritative KEMS ControlState into
 the FoxESS Modbus v1.15.0 control surface KEMS would eventually request, then
 compares that proposal with read-only observed entity state.
 """
@@ -18,9 +18,11 @@ PASS = "PASS"
 WAIT = "WAIT"
 DIFF = "DIFF"
 MATCH = "MATCH"
+NOT_REQUIRED = "NOT_REQUIRED"
 
 
 def _number(value: object) -> float | None:
+    """Return one numeric observation or None."""
     if value is None or isinstance(value, bool):
         return None
     try:
@@ -29,7 +31,12 @@ def _number(value: object) -> float | None:
         return None
 
 
-def _same_number(expected: float, observed: object, tolerance: float = 0.05) -> bool | None:
+def _same_number(
+    expected: float,
+    observed: object,
+    tolerance: float = 0.05,
+) -> bool | None:
+    """Compare one numeric shadow field with a small device-level tolerance."""
     actual = _number(observed)
     if actual is None:
         return None
@@ -42,11 +49,12 @@ def _field_parity(
     *,
     tolerance: float | None = None,
 ) -> dict[str, Any]:
+    """Return MATCH/DIFF/WAIT for one proposed FoxESS field."""
     if expected is None:
         return {
             "expected": None,
             "observed": observed,
-            "status": "NOT_REQUIRED",
+            "status": NOT_REQUIRED,
         }
     if observed is None:
         return {"expected": expected, "observed": None, "status": WAIT}
@@ -54,7 +62,11 @@ def _field_parity(
         same = _same_number(float(expected), observed, tolerance)
         status = WAIT if same is None else MATCH if same else DIFF
     else:
-        status = MATCH if str(observed).casefold() == str(expected).casefold() else DIFF
+        status = (
+            MATCH
+            if str(observed).casefold().strip() == str(expected).casefold().strip()
+            else DIFF
+        )
     return {"expected": expected, "observed": observed, "status": status}
 
 
@@ -67,16 +79,18 @@ def build_foxess_command_shadow(
     """Translate one KEMS decision into a zero-write FoxESS command proposal.
 
     FoxESS Modbus v1.15.0 exposes Force Charge and Force Discharge as virtual
-    Work Mode options backed by its remote-control manager.  Force Charge Power
-    and Force Discharge Power are native kW controls.  The KH_133 export limit
-    is native W.  KEMS records those exact units here but never invokes them.
+    Work Mode options backed by its remote-control manager. Force Charge Power
+    and Force Discharge Power are native kW controls. KH_133's export limit is
+    native W. KEMS records those exact semantics here but never invokes them.
     """
     observed_values = dict(observed or {})
     desired_export = max(control.desired_battery_export_power_kw, 0.0)
     desired_charge = max(control.desired_charge_power_kw, 0.0)
 
     translation_status = PASS
-    translation_reason = "KEMS decision has an exact reviewed FoxESS shadow representation"
+    translation_reason = (
+        "KEMS decision has an exact reviewed FoxESS shadow representation"
+    )
     proposed_work_mode: str | None = None
     force_charge_power_kw: float | None = None
     force_discharge_power_kw: float | None = None
@@ -84,9 +98,20 @@ def build_foxess_command_shadow(
     if control.operating_reason == "emergency_stop":
         translation_status = WAIT
         translation_reason = "Emergency stop forbids a new FoxESS command"
+    elif not control.data_fresh:
+        translation_status = WAIT
+        translation_reason = "Stale KEMS source data forbids a FoxESS command"
     elif not control.plan_safe:
         translation_status = WAIT
-        translation_reason = "Unsafe KEMS plan must not be translated into a hardware command"
+        translation_reason = (
+            "Unsafe KEMS plan must not be translated into a hardware command"
+        )
+    elif control.island_mode_active or control.desired_work_mode == "Self Use / EPS":
+        translation_status = WAIT
+        translation_reason = (
+            "EPS/island semantics require commissioned inverter-state proof; "
+            "Alpha8.79 will not guess a grid-connected work-mode write"
+        )
     elif control.desired_work_mode in {"No change", "Stop KEMS writes"}:
         translation_status = WAIT
         translation_reason = "KEMS explicitly requests no hardware state change"
@@ -94,20 +119,13 @@ def build_foxess_command_shadow(
         proposed_work_mode = "Force Charge"
         force_charge_power_kw = round(desired_charge, 3)
     elif desired_export > 0.001:
-        # The upstream Force Discharge Power control is documented as the power
-        # fed into the grid.  KEMS therefore translates deliberate battery
-        # export only; battery-to-home remains an observed/self-use flow, not a
-        # separately invented FoxESS command.
+        # The upstream Force Discharge Power control is the deliberate grid-feed
+        # request. Battery-to-home remains an observed/self-use flow and must
+        # never be added to the force-discharge setpoint.
         proposed_work_mode = "Force Discharge"
         force_discharge_power_kw = round(desired_export, 3)
     elif control.desired_work_mode in {"Self Use", "Feed-in First"}:
         proposed_work_mode = control.desired_work_mode
-    elif control.desired_work_mode == "Self Use / EPS":
-        translation_status = WAIT
-        translation_reason = (
-            "EPS/island fallback semantics require commissioned inverter-state proof; "
-            "Alpha8.79 will not guess a grid-connected work-mode write"
-        )
     else:
         translation_status = WAIT
         translation_reason = f"Unreviewed KEMS work mode: {control.desired_work_mode}"
@@ -115,50 +133,58 @@ def build_foxess_command_shadow(
     proposed_export_limit_w = round(
         (export_limit_kw if control.desired_grid_export_allowed else 0.0) * 1000
     )
-    proposed_min_soc = round(control.desired_min_soc_percent, 1)
+    proposed_min_soc_on_grid = round(control.desired_min_soc_percent, 1)
 
     proposed = {
         "work_mode": proposed_work_mode,
         "force_charge_power_kw": force_charge_power_kw,
         "force_discharge_power_kw": force_discharge_power_kw,
-        "min_soc_percent": proposed_min_soc,
+        "min_soc_on_grid_percent": proposed_min_soc_on_grid,
         "export_power_limit_w": proposed_export_limit_w,
-        "charge_enabled": bool(proposed_work_mode == "Force Charge" and desired_charge > 0),
+        "charge_enabled": bool(
+            proposed_work_mode == "Force Charge" and desired_charge > 0
+        ),
         "discharge_enabled": bool(
             proposed_work_mode == "Force Discharge" and desired_export > 0
         ),
         "grid_export_allowed": bool(control.desired_grid_export_allowed),
-        "remote_control_required": proposed_work_mode in {"Force Charge", "Force Discharge"},
-        "schedule_strategy": "FoxESS remote-control virtual work mode; no KEMS schedule write",
+        "remote_control_required": proposed_work_mode
+        in {"Force Charge", "Force Discharge"},
+        "schedule_strategy": (
+            "FoxESS remote-control virtual work mode; no KEMS schedule write"
+        ),
     }
 
     parity = {
-        "work_mode": _field_parity(proposed_work_mode, observed_values.get("work_mode")),
+        "work_mode": _field_parity(
+            proposed_work_mode,
+            observed_values.get("work_mode"),
+        ),
         "force_charge_power_kw": _field_parity(
             force_charge_power_kw,
-            observed_values.get("force_charge_power"),
+            observed_values.get("force_charge_power_kw"),
             tolerance=0.05,
         ),
         "force_discharge_power_kw": _field_parity(
             force_discharge_power_kw,
-            observed_values.get("force_discharge_power"),
+            observed_values.get("force_discharge_power_kw"),
             tolerance=0.05,
         ),
-        "min_soc_percent": _field_parity(
-            proposed_min_soc,
-            observed_values.get("min_soc"),
+        "min_soc_on_grid_percent": _field_parity(
+            proposed_min_soc_on_grid,
+            observed_values.get("min_soc_on_grid_percent"),
             tolerance=0.5,
         ),
         "export_power_limit_w": _field_parity(
             proposed_export_limit_w,
-            observed_values.get("export_power_limit"),
+            observed_values.get("export_power_limit_w"),
             tolerance=1.0,
         ),
     }
     required = [
         value["status"]
         for value in parity.values()
-        if value["status"] != "NOT_REQUIRED"
+        if value["status"] != NOT_REQUIRED
     ]
     if translation_status != PASS:
         observed_parity = WAIT
@@ -169,8 +195,8 @@ def build_foxess_command_shadow(
     elif any(status == DIFF for status in required):
         observed_parity = DIFF
         parity_reason = (
-            "Observed FoxESS state differs from the proposed command; this is expected "
-            "while Alpha8.79 is shadow-only and sends no commands"
+            "Observed FoxESS state differs from the proposed command; this is "
+            "expected while Alpha8.79 is shadow-only and sends no commands"
         )
     else:
         observed_parity = MATCH
@@ -187,8 +213,9 @@ def build_foxess_command_shadow(
         "requested_total_discharge_power_kw": round(
             max(control.desired_total_discharge_power_kw, 0.0), 3
         ),
-        "requested_min_soc_percent": proposed_min_soc,
+        "requested_min_soc_on_grid_percent": proposed_min_soc_on_grid,
         "desired_grid_export_allowed": bool(control.desired_grid_export_allowed),
+        "data_fresh": bool(control.data_fresh),
         "plan_safe": bool(control.plan_safe),
     }
 
