@@ -154,7 +154,9 @@ def test_alpha828_version_and_release_contract_remains_successor_safe() -> None:
 
     version = manifest["version"]
     assert version.startswith(("0.8.0-alpha8.", "0.9.0-alpha9."))
-    assert int(version.rsplit(".", 1)[1]) >= 28
+    assert (
+        str(version).startswith("0.9.0-alpha9") or int(version.rsplit(".", 1)[1]) >= 28
+    )
     assert "kems_core" in bundle["maintenance"]["affected_components"]
     assert bundle["maintenance"]["home_assistant_restart_required"] is True
     assert bundle["maintenance"]["reboot_required"] is False

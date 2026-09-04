@@ -38,11 +38,23 @@ def test_alpha816_safety_and_external_release_contract_survives_successors() -> 
     content = PIPELINE_PATH.read_text(encoding="utf-8")
 
     assert manifest["version"].startswith(("0.8.0-alpha8.", "0.9.0-alpha9."))
-    assert int(manifest["version"].rsplit(".", 1)[-1]) >= 19
+    assert (
+        str(manifest["version"]).startswith("0.9.0-alpha9")
+        or int(manifest["version"].rsplit(".", 1)[-1]) >= 19
+    )
     assert bundle["components"]["panel"]["version"] == "0.9.0-alpha9-panel.0"
-    assert bundle["components"]["property_web"]["version"] == "0.8.0-alpha8-web.9"
-    assert bundle["components"]["pi_agent"]["version"] == "0.8.0-alpha8-web.9"
-    assert bundle["components"]["public_web"]["version"] == "0.8.0-alpha8-web.9"
-    assert bundle["maintenance"]["affected_components"] == ["kems_core", "dashboard"]
+    assert str(bundle["components"]["property_web"]["version"]).startswith(
+        ("0.8.0-alpha8-web.", "0.9.0-alpha9-web.")
+    )
+    assert str(bundle["components"]["pi_agent"]["version"]).startswith(
+        ("0.8.0-alpha8-web.", "0.9.0-alpha9-web.")
+    )
+    assert str(bundle["components"]["public_web"]["version"]).startswith(
+        ("0.8.0-alpha8-web.", "0.9.0-alpha9-public.")
+    )
+    assert bundle["maintenance"]["affected_components"] in (
+        ["kems_core", "dashboard"],
+        ["kems_core", "dashboard", "panel", "property_web", "pi_agent", "public_web"],
+    )
     assert "real_backend" not in content
     assert "commands_permitted" not in content

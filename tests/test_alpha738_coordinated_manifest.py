@@ -22,10 +22,18 @@ def test_coordinated_release_keeps_web_panel_and_brand_contract() -> None:
         str(bundle["components"]["pi_agent"]["version"]),
         str(bundle["components"]["public_web"]["version"]),
     }
-    assert len(web_versions) == 1
-    web_version = web_versions.pop()
-    assert web_version.startswith("0.8.0-alpha8-web.")
-    assert int(web_version.rsplit(".", 1)[1]) >= 2
+    assert len(web_versions) == 1 or web_versions == {
+        "0.9.0-alpha9-web.0",
+        "0.9.0-alpha9-public.0",
+    }
+    web_version = str(bundle["components"]["property_web"]["version"])
+    assert web_version.startswith(
+        ("0.8.0-alpha8-web.", "0.9.0-alpha9-web.", "0.9.0-alpha9-public.")
+    )
+    assert (
+        web_version.startswith("0.9.0-alpha9-web.")
+        or int(web_version.rsplit(".", 1)[1]) >= 2
+    )
     assert bundle["components"]["panel"]["version"] == "0.9.0-alpha9-panel.0"
 
     assert "docs/assets/kems-logo-master.svg" in branding

@@ -16,29 +16,37 @@ module = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(module)
 
 
-def test_release_bundle_renders_exact_coordinated_alpha8_targets() -> None:
-    """A release should carry exact Alpha8 targets for every participating component."""
-    bundle = module.render_bundle(TEMPLATE, "v0.8.0-alpha8.7")
-    assert bundle["bundle"] == "0.8.0-alpha8.7"
-    assert bundle["components"]["kems_core"]["version"] == "0.8.0-alpha8.7"
-    assert bundle["components"]["dashboard"]["version"] == "0.8.0-alpha8.7"
+def test_release_bundle_renders_exact_coordinated_alpha9_targets() -> None:
+    """The current template must render the exact four-track Alpha9 baseline."""
+    bundle = module.render_bundle(TEMPLATE, "v0.9.0-alpha9.0")
+    assert bundle["bundle"] == "0.9.0-alpha9.0"
+    assert bundle["components"]["kems_core"]["version"] == "0.9.0-alpha9.0"
+    assert bundle["components"]["dashboard"]["version"] == "0.9.0-alpha9.0"
     assert bundle["components"]["panel"]["version"] == "0.9.0-alpha9-panel.0"
-
-    property_web = str(bundle["components"]["property_web"]["version"])
-    pi_agent = str(bundle["components"]["pi_agent"]["version"])
-    public_web = str(bundle["components"]["public_web"]["version"])
-    assert property_web == pi_agent == public_web == "0.8.0-alpha8-web.9"
+    assert bundle["components"]["property_web"]["version"] == "0.9.0-alpha9-web.0"
+    assert bundle["components"]["pi_agent"]["version"] == "0.9.0-alpha9-web.0"
+    assert bundle["components"]["public_web"]["version"] == "0.9.0-alpha9-public.0"
     assert bundle["components"]["property_web"]["required"] is True
     assert bundle["components"]["pi_agent"]["required"] is True
     assert bundle["components"]["public_web"]["required"] is False
     assert bundle["components"]["public_web"]["delivery"] == "ionos-sftp"
 
     affected = bundle["maintenance"]["affected_components"]
-    assert affected[:2] == ["kems_core", "dashboard"]
-    assert set(affected) <= set(bundle["components"])
+    assert affected == [
+        "kems_core",
+        "dashboard",
+        "panel",
+        "property_web",
+        "pi_agent",
+        "public_web",
+    ]
     assert bundle["maintenance"]["reboot_required"] is False
-    assert "Web 0.8.0-alpha8-web.9" in bundle["maintenance"]["reason"]
-    assert "canonical solar export" not in bundle["maintenance"]["reason"]
+    reason = bundle["maintenance"]["reason"]
+    assert "Alpha9 coordinated parity baseline" in reason
+    assert "0.9.0-alpha9-web.0" in reason
+    assert "0.9.0-alpha9-public.0" in reason
+    assert "0.9.0-alpha9-panel.0" in reason
+    assert "hardware writes hard-blocked" in reason
 
 
 def test_bundle_contract_rejects_mismatched_appliance_versions() -> None:

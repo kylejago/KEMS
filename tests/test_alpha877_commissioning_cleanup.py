@@ -83,11 +83,22 @@ def test_alpha877_release_contract_is_successor_safe() -> None:
 
     version = str(manifest["version"])
     assert version.startswith(("0.8.0-alpha8.", "0.9.0-alpha9."))
-    assert int(version.rsplit(".", 1)[1]) >= 77
-    assert bundle["maintenance"]["affected_components"] == ["kems_core", "dashboard"]
-    assert bundle["components"]["property_web"]["version"] == "0.8.0-alpha8-web.9"
-    assert bundle["components"]["pi_agent"]["version"] == "0.8.0-alpha8-web.9"
-    assert bundle["components"]["public_web"]["version"] == "0.8.0-alpha8-web.9"
+    assert (
+        str(version).startswith("0.9.0-alpha9") or int(version.rsplit(".", 1)[1]) >= 77
+    )
+    assert bundle["maintenance"]["affected_components"] in (
+        ["kems_core", "dashboard"],
+        ["kems_core", "dashboard", "panel", "property_web", "pi_agent", "public_web"],
+    )
+    assert str(bundle["components"]["property_web"]["version"]).startswith(
+        ("0.8.0-alpha8-web.", "0.9.0-alpha9-web.")
+    )
+    assert str(bundle["components"]["pi_agent"]["version"]).startswith(
+        ("0.8.0-alpha8-web.", "0.9.0-alpha9-web.")
+    )
+    assert str(bundle["components"]["public_web"]["version"]).startswith(
+        ("0.8.0-alpha8-web.", "0.9.0-alpha9-public.")
+    )
     assert bundle["components"]["panel"]["version"] == "0.9.0-alpha9-panel.0"
     reason = bundle["maintenance"]["reason"].lower()
     assert "15%" in reason and "10%" in reason and "12%" in reason

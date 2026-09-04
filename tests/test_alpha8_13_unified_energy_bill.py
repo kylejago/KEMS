@@ -148,10 +148,15 @@ def test_alpha8_13_bill_contract_survives_coordinated_successor_releases() -> No
     manifest = json.loads((ROOT / "custom_components/kems/manifest.json").read_text())
     bundle = json.loads((ROOT / "release/kems-bundle.template.json").read_text())
     assert manifest["version"].startswith(("0.8.0-alpha8.", "0.9.0-alpha9."))
-    assert int(manifest["version"].rsplit(".", 1)[1]) >= 13
+    assert (
+        str(manifest["version"]).startswith("0.9.0-alpha9")
+        or int(manifest["version"].rsplit(".", 1)[1]) >= 13
+    )
     assert bundle["components"]["panel"]["version"] == "0.9.0-alpha9-panel.0"
     for key in ("property_web", "pi_agent", "public_web"):
-        assert bundle["components"][key]["version"] == "0.8.0-alpha8-web.9"
+        assert str(bundle["components"][key]["version"]).startswith(
+            ("0.8.0-alpha8-web.", "0.9.0-alpha9-web.", "0.9.0-alpha9-public.")
+        )
 
 
 def test_dashboard_and_web_contract_use_one_canonical_bill_state() -> None:

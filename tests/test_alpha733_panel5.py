@@ -52,6 +52,10 @@ def test_alpha733_public_web_delivery_matches_alpha8_route() -> None:
     )
     public_web = bundle["components"]["public_web"]
     version = str(public_web["version"])
-    assert version.startswith("0.8.0-alpha8-web.")
-    assert int(version.rsplit(".", 1)[1]) >= 2
+    assert version.startswith(
+        ("0.8.0-alpha8-web.", "0.9.0-alpha9-web.", "0.9.0-alpha9-public.")
+    )
+    assert (
+        str(version).startswith("0.9.0-alpha9") or int(version.rsplit(".", 1)[1]) >= 2
+    )
     assert public_web["delivery"] == "ionos-sftp"

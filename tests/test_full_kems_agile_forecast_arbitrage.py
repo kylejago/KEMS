@@ -275,4 +275,7 @@ def test_forecast_arbitrage_cannot_enable_hardware_writes_or_bump_release() -> N
     assert "providers.foxess" not in source
     assert "commands_permitted = True" not in source
     assert "safe_to_write_hardware = True" not in source
-    assert '"version": "0.8.0-alpha8.' in manifest
+    assert any(
+        marker in manifest
+        for marker in ('"version": "0.8.0-alpha8.', '"version": "0.9.0-alpha9.')
+    )

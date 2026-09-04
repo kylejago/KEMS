@@ -140,7 +140,10 @@ def test_historical_loader_metadata_and_alpha8_version_remain_unchanged() -> Non
     assert "install_alpha725_nonzero_export_proof_patch" in loader
     assert "install_alpha726_provisional_planning_patch" in loader
     assert "ALPHA7_COMPATIBILITY_ORDER" in loader
-    assert '"version": "0.8.0-alpha8.' in manifest
+    assert any(
+        marker in manifest
+        for marker in ('"version": "0.8.0-alpha8.', '"version": "0.9.0-alpha9.')
+    )
 
 
 def test_proof_planning_cannot_enable_real_hardware_writes() -> None:

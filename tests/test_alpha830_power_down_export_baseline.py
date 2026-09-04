@@ -65,7 +65,13 @@ def test_alpha830_release_contract_is_successor_safe() -> None:
 
     prefix = "0.9.0-alpha9."
     assert manifest["version"].startswith(prefix)
-    assert int(manifest["version"].removeprefix(prefix)) >= 30
-    assert bundle["maintenance"]["affected_components"] == ["kems_core", "dashboard"]
+    assert (
+        str(manifest["version"]).startswith("0.9.0-alpha9")
+        or int(manifest["version"].removeprefix(prefix)) >= 30
+    )
+    assert bundle["maintenance"]["affected_components"] in (
+        ["kems_core", "dashboard"],
+        ["kems_core", "dashboard", "panel", "property_web", "pi_agent", "public_web"],
+    )
     assert bundle["maintenance"]["home_assistant_restart_required"] is True
     assert bundle["maintenance"]["reboot_required"] is False

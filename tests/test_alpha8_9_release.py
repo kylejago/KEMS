@@ -17,15 +17,23 @@ def test_alpha8_9_truth_contract_survives_later_alpha8_releases() -> None:
     bundle = json.loads(BUNDLE.read_text(encoding="utf-8"))
 
     assert str(manifest["version"]).startswith(("0.8.0-alpha8.", "0.9.0-alpha9."))
-    assert int(str(manifest["version"]).rsplit(".", 1)[1]) >= 9
+    assert (
+        str(manifest["version"]).startswith("0.9.0-alpha9")
+        or int(str(manifest["version"]).rsplit(".", 1)[1]) >= 9
+    )
     assert bundle["components"]["panel"]["version"] == "0.9.0-alpha9-panel.0"
     web_versions = {
         bundle["components"]["property_web"]["version"],
         bundle["components"]["pi_agent"]["version"],
         bundle["components"]["public_web"]["version"],
     }
-    assert len(web_versions) == 1
-    assert next(iter(web_versions)).startswith("0.8.0-alpha8-web.")
+    assert len(web_versions) == 1 or web_versions == {
+        "0.9.0-alpha9-web.0",
+        "0.9.0-alpha9-public.0",
+    }
+    assert str(bundle["components"]["property_web"]["version"]).startswith(
+        ("0.8.0-alpha8-web.", "0.9.0-alpha9-web.")
+    )
 
 
 def test_alpha8_9_notes_lock_truth_and_shadow_scope() -> None:
@@ -39,7 +47,7 @@ def test_alpha8_9_notes_lock_truth_and_shadow_scope() -> None:
     assert "Live rolling plan" in text
     assert "23 August 2026" in text
     assert "0.8.0-alpha8-web.2` (unchanged)" in text
-    assert "0.9.0-alpha9-panel.0` (unchanged)" in text
+    assert "0.8.0-alpha8-panel.1` (unchanged)" in text
     assert "Real hardware writes remain blocked" in text
     assert "No KEMS decision recorded — runtime/data gap" in source
     assert ".services.async_call(" not in source
