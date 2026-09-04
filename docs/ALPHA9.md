@@ -17,6 +17,10 @@ Alpha9.0 preserves the proven Alpha8.79 KEMS runtime and the Web.11/Panel.1 beha
 
 Real FoxESS control remains fail-closed until physical device mapping, commissioning, parity and first-write safety gates are proven. In particular, Alpha9.0 does not set `commands_permitted` or `safe_to_write_hardware` true and does not add Home Assistant service calls for physical control.
 
+## Validation boundary
+
+Alpha9.0 is not releasable until the frozen exact branch heads pass their complete validation suites, fresh pull-request checks pass on those same heads, main is confirmed not to have drifted, and the guarded merges and post-merge exact-main proofs succeed.
+
 ## Why Alpha9
 
 Alpha8 accumulated the implementation, parity work and cleanup needed to establish a clean product boundary. Alpha9 provides a single coordinated baseline from which KEMS, Pi Web, Public Web and Panel can advance independently without losing the ability to state an exact compatible four-track set.
