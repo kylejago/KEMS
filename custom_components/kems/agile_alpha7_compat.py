@@ -60,7 +60,6 @@ POST_BASE_PATCHES: Final[tuple[PatchSpec, ...]] = (
     ("agile_dashboard_parity", "install_dashboard_parity"),
     ("agile_decision_evidence", "install_decision_evidence"),
     ("ev_policy_dashboard", "install_ev_policy_dashboard"),
-    ("panel_ev_policy", "install_panel_ev_policy"),
     ("agile_progressive_publication", "install_progressive_publication_planning"),
     ("agile_full_battery_routing", "install_full_battery_routing"),
     ("agile_deadline_plan_reconciliation", "install_deadline_plan_coverage"),

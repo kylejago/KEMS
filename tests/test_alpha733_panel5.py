@@ -16,16 +16,14 @@ def test_alpha733_versions_and_bundle_remain_aligned_in_alpha8() -> None:
     )
     panel = (KEMS / "panel.py").read_text(encoding="utf-8")
     yaml = (KEMS / "kems16x16.yaml").read_text(encoding="utf-8")
-    transform = (KEMS / "panel_ev_policy.py").read_text(encoding="utf-8")
     dashboard = (KEMS / "dashboard.py").read_text(encoding="utf-8")
 
     assert str(manifest["version"]).startswith("0.8.0-alpha8.")
     assert bundle["components"]["panel"]["version"] == "0.8.0-alpha8-panel.1"
-    assert 'PANEL_EV_POLICY_VERSION = "0.8.0-alpha8-panel.1"' in transform
-    # Alpha8.5 intentionally keeps the proven panel.0 source template intact;
-    # panel.1 is the runtime-managed transform that HA validates and OTA-delivers.
-    assert 'PANEL_CONFIG_VERSION = "0.8.0-alpha8-panel.0"' in panel
-    assert 'panel_config_version: "0.8.0-alpha8-panel.0"' in yaml
+    # Panel.1 is now the packaged source of truth; no runtime version transform remains.
+    assert 'PANEL_CONFIG_VERSION = "0.8.0-alpha8-panel.1"' in panel
+    assert 'panel_config_version: "0.8.0-alpha8-panel.1"' in yaml
+    assert not (KEMS / "panel_ev_policy.py").exists()
     assert "PANEL6_VERSION_LINE" not in dashboard
     assert "PANEL7_VERSION_LINE" not in dashboard
     assert "return PACKAGED_PANEL_PATH.read_bytes()" in dashboard

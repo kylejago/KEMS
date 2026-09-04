@@ -4,7 +4,7 @@ substitutions:
   device_name: kems16x16
   friendly_name: "KEMS16x16"
   led_pin: GPIO21
-  panel_config_version: "0.8.0-alpha8-panel.0"
+  panel_config_version: "0.8.0-alpha8-panel.1"
   kems_status: sensor.kems_status
   live_battery_soc: sensor.kems_battery_state_of_charge
   live_battery_power: sensor.kems_battery_power
@@ -12,24 +12,16 @@ substitutions:
   live_grid_export: sensor.kems_grid_export
   ev_connected: binary_sensor.kems_ev_connected
   ev_charging: binary_sensor.kems_ev_charging
+  ev_allowed: binary_sensor.kems_ev_charging_allowed_by_control
   grid_available: binary_sensor.kems_grid_available_for_control
   cheap_period: binary_sensor.kems_cheap_period_confirmed
   island_mode: binary_sensor.kems_whole_house_island_mode
   live_cost_today: sensor.kems_observed_cost_today
-  scenario_no_system: sensor.kems_compare_no_system_cost_today
-  scenario_solar_only: sensor.kems_compare_solar_only_cost_today
   scenario_solar_battery: sensor.kems_compare_solar_and_battery_cost_today
-  scenario_kems_no_export: sensor.kems_compare_kems_no_export_cost_today
-  scenario_full_kems: sensor.kems_compare_full_kems_cost_today
   scenario_full_kems_forecast: sensor.kems_compare_full_kems_forecast_cost_today
   scenario_agile: sensor.kems_agile_smart_export_cost_today
-  scenario_no_system_flow: sensor.kems_compare_no_system_flow_now
-  scenario_solar_only_flow: sensor.kems_compare_solar_only_flow_now
   scenario_solar_battery_flow: sensor.kems_compare_solar_and_battery_flow_now
-  scenario_kems_no_export_flow: sensor.kems_compare_kems_no_export_flow_now
-  scenario_full_kems_flow: sensor.kems_compare_full_kems_flow_now
   scenario_full_kems_forecast_flow: sensor.kems_compare_full_kems_forecast_flow_now
-  scenario_full_island_flow: sensor.kems_compare_full_island_flow_now
   scenario_agile_flow: sensor.kems_panel_full_kems_agile_flow_now
 esphome:
   name: ${device_name}
@@ -98,26 +90,11 @@ text_sensor:
     id: ha_kems_status
     entity_id: ${kems_status}
   - platform: homeassistant
-    id: ha_no_system_flow
-    entity_id: ${scenario_no_system_flow}
-  - platform: homeassistant
-    id: ha_solar_only_flow
-    entity_id: ${scenario_solar_only_flow}
-  - platform: homeassistant
     id: ha_solar_battery_flow
     entity_id: ${scenario_solar_battery_flow}
   - platform: homeassistant
-    id: ha_kems_no_export_flow
-    entity_id: ${scenario_kems_no_export_flow}
-  - platform: homeassistant
-    id: ha_full_kems_flow
-    entity_id: ${scenario_full_kems_flow}
-  - platform: homeassistant
     id: ha_full_kems_forecast_flow
     entity_id: ${scenario_full_kems_forecast_flow}
-  - platform: homeassistant
-    id: ha_full_island_flow
-    entity_id: ${scenario_full_island_flow}
   - platform: homeassistant
     id: ha_agile_flow
     entity_id: ${scenario_agile_flow}
@@ -138,20 +115,8 @@ sensor:
     id: ha_live_cost_today
     entity_id: ${live_cost_today}
   - platform: homeassistant
-    id: ha_no_system_cost
-    entity_id: ${scenario_no_system}
-  - platform: homeassistant
-    id: ha_solar_only_cost
-    entity_id: ${scenario_solar_only}
-  - platform: homeassistant
     id: ha_solar_battery_cost
     entity_id: ${scenario_solar_battery}
-  - platform: homeassistant
-    id: ha_kems_no_export_cost
-    entity_id: ${scenario_kems_no_export}
-  - platform: homeassistant
-    id: ha_full_kems_cost
-    entity_id: ${scenario_full_kems}
   - platform: homeassistant
     id: ha_full_kems_forecast_cost
     entity_id: ${scenario_full_kems_forecast}
@@ -165,6 +130,9 @@ binary_sensor:
   - platform: homeassistant
     id: ha_ev_charging
     entity_id: ${ev_charging}
+  - platform: homeassistant
+    id: ha_ev_allowed
+    entity_id: ${ev_allowed}
   - platform: homeassistant
     id: ha_grid_available
     entity_id: ${grid_available}
@@ -501,6 +469,12 @@ display:
       }
       const bool ev_connected = id(ha_ev_connected).state;
       const bool ev_charging = id(ha_ev_charging).state;
+      const bool ev_allowed_by_kems = id(ha_ev_allowed).state;
+      const bool agile_ev_mode = selected_scenario == 7;
+      const bool ev_blocked_by_kems =
+        agile_ev_mode && ev_connected && !ev_allowed_by_kems;
+      const bool ev_charging_for_display =
+        ev_charging && (!agile_ev_mode || ev_allowed_by_kems);
       const bool grid_available = id(ha_grid_available).state;
       const bool grid_available_for_display = grid_available;
       float battery_soc = NAN;
@@ -557,35 +531,17 @@ display:
       } else {
         const float POWER_DEADBAND_KW = 0.03f;
         const int s = selected_scenario;
-        float scenario_cost[8] = {
-          id(ha_no_system_cost).state,
-          id(ha_solar_only_cost).state,
-          id(ha_solar_battery_cost).state,
-          id(ha_kems_no_export_cost).state,
-          id(ha_full_kems_cost).state,
-          id(ha_full_kems_forecast_cost).state,
-          NAN,
-          id(ha_agile_cost).state
-        };
         const std::string *flow_state = nullptr;
-        if (s == 0) {
-          flow_state = &id(ha_no_system_flow).state;
-        } else if (s == 1) {
-          flow_state = &id(ha_solar_only_flow).state;
-        } else if (s == 2) {
+        if (s == 2) {
+          cost_today = id(ha_solar_battery_cost).state;
           flow_state = &id(ha_solar_battery_flow).state;
-        } else if (s == 3) {
-          flow_state = &id(ha_kems_no_export_flow).state;
-        } else if (s == 4) {
-          flow_state = &id(ha_full_kems_flow).state;
         } else if (s == 5) {
+          cost_today = id(ha_full_kems_forecast_cost).state;
           flow_state = &id(ha_full_kems_forecast_flow).state;
-        } else if (s == 6) {
-          flow_state = &id(ha_full_island_flow).state;
         } else if (s == 7) {
+          cost_today = id(ha_agile_cost).state;
           flow_state = &id(ha_agile_flow).state;
         }
-        cost_today = scenario_cost[s];
         float house_power = -1.0f;
         float solar_power = -1.0f;
         float grid_import_power = -1.0f;
@@ -665,11 +621,11 @@ display:
       const bool source_solar_active = solar_bus_active;
       const bool source_battery_active = battery_to_bus_active;
       const bool ev_from_grid =
-        ev_charging && source_grid_active;
+        ev_charging_for_display && source_grid_active;
       const bool ev_from_solar =
-        ev_charging && source_solar_active;
+        ev_charging_for_display && source_solar_active;
       const bool ev_from_battery =
-        ev_charging && source_battery_active;
+        ev_charging_for_display && source_battery_active;
       it.fill(OFF);
       rect(2, 2, 5, 3, RAINBOW);     // GRID
       rect(12, 2, 15, 3, RAINBOW);   // COST
@@ -752,7 +708,9 @@ display:
       } else if (battery_to_bus_active) {
         flow_horizontal(11, 8, 14, 9, GREEN, GREEN, -1);
       }
-      if (ev_charging) {
+      if (ev_blocked_by_kems) {
+        rect(7, 15, 10, 16, RED);
+      } else if (ev_charging_for_display) {
         rect(7, 15, 10, 16, pulse(MAGENTA));
         if (ev_from_grid && ev_from_solar && ev_from_battery) {
           flow_vertical_dual(

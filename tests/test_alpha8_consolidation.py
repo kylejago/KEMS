@@ -40,7 +40,6 @@ def test_alpha8_release_family_is_coordinated() -> None:
     )
     panel_manager = (KEMS / "panel.py").read_text(encoding="utf-8")
     panel_yaml = (KEMS / "kems16x16.yaml").read_text(encoding="utf-8")
-    panel_transform = (KEMS / "panel_ev_policy.py").read_text(encoding="utf-8")
 
     assert str(manifest["version"]).startswith("0.8.0-alpha8.")
     assert bundle["components"]["panel"]["version"] == "0.8.0-alpha8-panel.1"
@@ -52,9 +51,9 @@ def test_alpha8_release_family_is_coordinated() -> None:
     web_version = web_versions.pop()
     assert web_version.startswith("0.8.0-alpha8-web.")
     assert int(web_version.rsplit(".", 1)[1]) >= 3
-    assert 'PANEL_CONFIG_VERSION = "0.8.0-alpha8-panel.0"' in panel_manager
-    assert 'panel_config_version: "0.8.0-alpha8-panel.0"' in panel_yaml
-    assert 'PANEL_EV_POLICY_VERSION = "0.8.0-alpha8-panel.1"' in panel_transform
+    assert 'PANEL_CONFIG_VERSION = "0.8.0-alpha8-panel.1"' in panel_manager
+    assert 'panel_config_version: "0.8.0-alpha8-panel.1"' in panel_yaml
+    assert not (KEMS / "panel_ev_policy.py").exists()
 
 
 def test_runtime_entrypoint_has_one_executable_alpha7_compatibility_boundary() -> None:
