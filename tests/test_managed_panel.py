@@ -56,10 +56,16 @@ def test_panel_subscribes_only_to_reachable_scenario_feeds() -> None:
     content = PACKAGED.read_text(encoding="utf-8")
     for active in (
         "scenario_solar_battery: sensor.kems_compare_solar_and_battery_cost_today",
-        "scenario_full_kems_forecast: sensor.kems_compare_full_kems_forecast_cost_today",
+        (
+            "scenario_full_kems_forecast: "
+            "sensor.kems_compare_full_kems_forecast_cost_today"
+        ),
         "scenario_agile: sensor.kems_agile_smart_export_cost_today",
         "scenario_solar_battery_flow: sensor.kems_compare_solar_and_battery_flow_now",
-        "scenario_full_kems_forecast_flow: sensor.kems_compare_full_kems_forecast_flow_now",
+        (
+            "scenario_full_kems_forecast_flow: "
+            "sensor.kems_compare_full_kems_forecast_flow_now"
+        ),
         "scenario_agile_flow: sensor.kems_panel_full_kems_agile_flow_now",
     ):
         assert active in content
