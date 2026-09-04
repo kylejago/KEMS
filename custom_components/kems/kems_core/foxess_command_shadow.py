@@ -182,9 +182,7 @@ def build_foxess_command_shadow(
         ),
     }
     required = [
-        value["status"]
-        for value in parity.values()
-        if value["status"] != NOT_REQUIRED
+        value["status"] for value in parity.values() if value["status"] != NOT_REQUIRED
     ]
     if translation_status != PASS:
         observed_parity = WAIT

@@ -169,8 +169,7 @@ def test_diagnostics_contract_and_release_identity_expose_shadow_only_scope() ->
     manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
 
     assert (
-        '"foxess_command_shadow": build_foxess_command_shadow_snapshot'
-        in diagnostics
+        '"foxess_command_shadow": build_foxess_command_shadow_snapshot' in diagnostics
     )
     assert '"force_charge_power"' in contract
     assert '"force_discharge_power"' in contract
