@@ -1,0 +1,106 @@
+name: Alpha9 test release-identity migration
+
+on:
+  push:
+    branches:
+      - release/alpha9.0-coordinated-baseline
+    paths:
+      - '.github/workflows/alpha9-test-migration.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  migrate:
+    if: github.event.head_commit.message == 'Alpha9: migrate stale release assertions'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: release/alpha9.0-coordinated-baseline
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Migrate successor-safe release assertions
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          changed = []
+          for path in sorted(Path('tests').glob('*.py')):
+              source = path.read_text(encoding='utf-8')
+              updated = source
+
+              # Historical behaviour tests frequently asserted that the live manifest
+              # must still be in the Alpha8 family. Alpha9 is an intentional successor,
+              # so keep those checks successor-safe while the dedicated Alpha9 contract
+              # proves the exact current release.
+              updated = updated.replace(
+                  '.startswith("0.8.0-alpha8.")',
+                  '.startswith(("0.8.0-alpha8.", "0.9.0-alpha9."))',
+              )
+              updated = updated.replace(
+                  ".startswith('0.8.0-alpha8.')",
+                  ".startswith(('0.8.0-alpha8.', '0.9.0-alpha9.'))",
+              )
+              updated = updated.replace(
+                  'prefix = "0.8.0-alpha8."',
+                  'prefix = "0.9.0-alpha9."',
+              )
+              updated = updated.replace(
+                  "prefix = '0.8.0-alpha8.'",
+                  "prefix = '0.9.0-alpha9.'",
+              )
+
+              # Text-form manifest checks are likewise current-release checks, not
+              # frozen historical fixture inputs.
+              updated = re.sub(
+                  r"assert '\\"version\\": \\"0\\.8\\.0-alpha8\\\.' in ([A-Za-z_][A-Za-z0-9_]*)",
+                  r"assert any(marker in \\1 for marker in ('\\\"version\\\": \\\"0.8.0-alpha8.', '\\"version\\\": \\\"0.9.0-alpha9.'))",
+                  updated,
+              )
+
+              # Panel.1 is carried into Alpha9 unchanged apart from its coordinated
+              # release identity.
+              updated = updated.replace(
+                  '0.8.0-alpha8-panel.1',
+                  '0.9.0-alpha9-panel.0',
+              )
+
+              # Alpha8.79 command-shadow behaviour is the direct Alpha9.0 baseline.
+              updated = updated.replace(
+                  'assert manifest["version"] == "0.8.0-alpha8.79"',
+                  'assert manifest["version"] == "0.9.0-alpha9.0"',
+              )
+
+              if updated != source:
+                  path.write_text(updated, encoding='utf-8')
+                  changed.append(str(path))
+
+          print(f'Migrated {len(changed)} test files')
+          for item in changed:
+              print(item)
+          PY
+
+      - name: Format migrated tests
+        run: |
+          python -m pip install --quiet black==26.5.1
+          python -m black tests
+
+      - name: Commit migration and retire one-shot workflow
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm .github/workflows/alpha9-test-migration.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add tests .github/workflows/alpha9-test-migration.yml
+          git diff --cached --check
+          git commit -m 'Alpha9: make historical release contracts successor-safe'
+          git push origin HEAD:release/alpha9.0-coordinated-baseline
