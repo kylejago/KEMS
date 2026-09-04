@@ -1,12 +1,19 @@
 from __future__ import annotations
 
+import importlib.util
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from types import SimpleNamespace
 
-from custom_components.kems.commissioning_session import (
-    collect_foxess_session_records,
+_SESSION_PATH = Path("custom_components/kems/commissioning_session.py")
+_SESSION_SPEC = importlib.util.spec_from_file_location(
+    "kems_alpha878_commissioning_session",
+    _SESSION_PATH,
 )
+assert _SESSION_SPEC is not None and _SESSION_SPEC.loader is not None
+_SESSION_MODULE = importlib.util.module_from_spec(_SESSION_SPEC)
+_SESSION_SPEC.loader.exec_module(_SESSION_MODULE)
+collect_foxess_session_records = _SESSION_MODULE.collect_foxess_session_records
 
 
 def _snapshot(at: datetime):
