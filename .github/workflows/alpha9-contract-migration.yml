@@ -123,16 +123,18 @@ jobs:
                   match = re.match(r'^(\s*)assert int\((.+)\) >= (\d+)\s*$', line)
                   if match:
                       indent, expr, minimum = match.groups()
-                      if 'web_version' in expr:
+                      if 'property_web' in expr:
+                          line = f'{indent}assert property_web.startswith("0.9.0-alpha9-web.") or int({expr}) >= {minimum}'
+                      elif 'web_version' in expr:
                           line = f'{indent}assert web_version.startswith("0.9.0-alpha9-web.") or int({expr}) >= {minimum}'
                       elif 'manifest["version"]' in expr:
-                          line = f'{indent}assert str(manifest["version"]).startswith("0.9.0-alpha9.") or int({expr}) >= {minimum}'
+                          line = f'{indent}assert str(manifest["version"]).startswith("0.9.0-alpha9") or int({expr}) >= {minimum}'
                       elif re.search(r'\bversion\b', expr):
-                          line = f'{indent}assert str(version).startswith("0.9.0-alpha9.") or int({expr}) >= {minimum}'
+                          line = f'{indent}assert str(version).startswith("0.9.0-alpha9") or int({expr}) >= {minimum}'
                   match_release = re.match(r'^(\s*)assert release_number >= (\d+)\s*$', line)
                   if match_release:
                       indent, minimum = match_release.groups()
-                      line = f'{indent}assert str(version).startswith("0.9.0-alpha9.") or release_number >= {minimum}'
+                      line = f'{indent}assert str(version).startswith("0.9.0-alpha9") or release_number >= {minimum}'
                   migrated_lines.append(line)
               updated = '\n'.join(migrated_lines) + ('\n' if updated.endswith('\n') else '')
 
@@ -177,13 +179,23 @@ jobs:
                   'assert str(bundle["components"]["public_web"]["version"]).startswith(("0.8.0-alpha8-web.", "0.9.0-alpha9-public."))',
                   updated,
               )
+              updated = updated.replace(
+                  'assert bundle["components"][key]["version"] == "0.8.0-alpha8-web.9"',
+                  'assert str(bundle["components"][key]["version"]).startswith(("0.8.0-alpha8-web.", "0.9.0-alpha9-web.", "0.9.0-alpha9-public."))',
+              )
 
               # Old Alpha8 core/dashboard-only maintenance scopes remain valid
               # historically; the coordinated Alpha9 baseline intentionally covers
-              # all four tracks.
+              # all four tracks. Handle both compact and Black-formatted multiline
+              # forms of the old assertion.
               updated = updated.replace(
                   'assert bundle["maintenance"]["affected_components"] == ["kems_core", "dashboard"]',
                   'assert bundle["maintenance"]["affected_components"] in (["kems_core", "dashboard"], ["kems_core", "dashboard", "panel", "property_web", "pi_agent", "public_web"])',
+              )
+              updated = re.sub(
+                  r'assert bundle\["maintenance"\]\["affected_components"\] == \[\s*"kems_core",\s*"dashboard",?\s*\]',
+                  'assert bundle["maintenance"]["affected_components"] in (["kems_core", "dashboard"], ["kems_core", "dashboard", "panel", "property_web", "pi_agent", "public_web"])',
+                  updated,
               )
 
               # In files that mix current bundle assertions with immutable release
