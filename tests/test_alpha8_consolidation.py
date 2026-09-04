@@ -1,8 +1,7 @@
-"""Alpha8 coordinated consolidation contracts.
+"""Alpha8 consolidation history plus the current coordinated release contract.
 
-These tests keep Alpha8 on a staged refactor/parity path: proven Alpha7.52
-behaviour remains behind one compatibility boundary while version-named runtime
-patches are progressively retired into canonical modules.
+The historical tests keep the proven Alpha7.52 compatibility boundary intact while
+current release assertions prove the independently versioned Alpha9 product tracks.
 """
 
 from __future__ import annotations
@@ -33,7 +32,7 @@ def _compat_specs() -> list[tuple[str, str]]:
     return specs
 
 
-def test_alpha8_release_family_is_coordinated() -> None:
+def test_current_release_family_is_coordinated() -> None:
     manifest = json.loads((KEMS / "manifest.json").read_text(encoding="utf-8"))
     bundle = json.loads(
         (ROOT / "release/kems-bundle.template.json").read_text(encoding="utf-8")
@@ -41,18 +40,18 @@ def test_alpha8_release_family_is_coordinated() -> None:
     panel_manager = (KEMS / "panel.py").read_text(encoding="utf-8")
     panel_yaml = (KEMS / "kems16x16.yaml").read_text(encoding="utf-8")
 
-    assert str(manifest["version"]).startswith("0.8.0-alpha8.")
-    assert bundle["components"]["panel"]["version"] == "0.8.0-alpha8-panel.1"
-    web_versions = {
+    assert manifest["version"] == "0.9.0-alpha9.0"
+    assert bundle["components"]["panel"]["version"] == "0.9.0-alpha9-panel.0"
+    pi_versions = {
         str(bundle["components"][key]["version"])
-        for key in ("property_web", "pi_agent", "public_web")
+        for key in ("property_web", "pi_agent")
     }
-    assert len(web_versions) == 1
-    web_version = web_versions.pop()
-    assert web_version.startswith("0.8.0-alpha8-web.")
-    assert int(web_version.rsplit(".", 1)[1]) >= 3
-    assert 'PANEL_CONFIG_VERSION = "0.8.0-alpha8-panel.1"' in panel_manager
-    assert 'panel_config_version: "0.8.0-alpha8-panel.1"' in panel_yaml
+    assert pi_versions == {"0.9.0-alpha9-web.0"}
+    assert bundle["components"]["public_web"]["version"] == (
+        "0.9.0-alpha9-public.0"
+    )
+    assert 'PANEL_CONFIG_VERSION = "0.9.0-alpha9-panel.0"' in panel_manager
+    assert 'panel_config_version: "0.9.0-alpha9-panel.0"' in panel_yaml
     assert not (KEMS / "panel_ev_policy.py").exists()
 
 
