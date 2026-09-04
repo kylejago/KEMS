@@ -42,7 +42,7 @@
   },
   "maintenance": {
     "required": true,
-    "reason": "FoxESS telemetry commissioning proof: require authoritative unique FoxESS physical mappings, validate raw source units before accepting normalised telemetry, collect commissioning evidence only in a fresh non-persistent coordinator-session window that resets on restart/source/unit changes, prove battery/grid direction and repeated whole-site power balance from that same window, and keep real hardware writes hard-blocked; Web 0.8.0-alpha8-web.9 and panel 0.8.0-alpha8-panel.1 are unchanged",
+    "reason": "FoxESS telemetry commissioning proof: require authoritative unique FoxESS physical mappings, validate raw source units before accepting normalised telemetry, collect commissioning evidence only in a fresh non-persistent coordinator-session window that resets on restart/source/unit changes, prove battery/grid direction and repeated whole-site power balance from that same window, preserve the canonical 15% planning target / 10% hard safety floor / 12% recovery hierarchy, and keep real hardware writes hard-blocked; Web 0.8.0-alpha8-web.9 and panel 0.8.0-alpha8-panel.1 are unchanged",
     "expected_downtime_minutes": 5,
     "home_assistant_restart_required": true,
     "reboot_required": false,
