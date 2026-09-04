@@ -36,7 +36,7 @@ def test_managed_panel_keeps_known_working_hardware_and_simple_product_modes() -
 def test_alpha8_panel_uses_current_agile_routing_snapshot_feed() -> None:
     """Full KEMS Agile keeps the final coherent routing feed in Alpha8."""
     content = PACKAGED.read_text(encoding="utf-8")
-    assert 'panel_config_version: "0.8.0-alpha8-panel.0"' in content
+    assert 'panel_config_version: "0.8.0-alpha8-panel.1"' in content
     sync = (ROOT / "custom_components" / "kems" / "dashboard.py").read_text(
         encoding="utf-8"
     )
@@ -49,6 +49,45 @@ def test_alpha8_panel_uses_current_agile_routing_snapshot_feed() -> None:
     assert "id: ha_agile_flow" in content
     assert "flow_state = &id(ha_agile_flow).state;" in content
     assert '"SE=%f,GB=%f,BH=%f,BE=%f,SOC=%f"' in content
+
+
+def test_panel_subscribes_only_to_reachable_scenario_feeds() -> None:
+    """The four display modes must not subscribe to retired scenario entities."""
+    content = PACKAGED.read_text(encoding="utf-8")
+    for active in (
+        "scenario_solar_battery: sensor.kems_compare_solar_and_battery_cost_today",
+        "scenario_full_kems_forecast: sensor.kems_compare_full_kems_forecast_cost_today",
+        "scenario_agile: sensor.kems_agile_smart_export_cost_today",
+        "scenario_solar_battery_flow: sensor.kems_compare_solar_and_battery_flow_now",
+        "scenario_full_kems_forecast_flow: sensor.kems_compare_full_kems_forecast_flow_now",
+        "scenario_agile_flow: sensor.kems_panel_full_kems_agile_flow_now",
+    ):
+        assert active in content
+    for retired in (
+        "scenario_no_system",
+        "scenario_solar_only",
+        "scenario_kems_no_export",
+        "scenario_full_kems:",
+        "scenario_no_system_flow",
+        "scenario_solar_only_flow",
+        "scenario_kems_no_export_flow",
+        "scenario_full_kems_flow",
+        "scenario_full_island_flow",
+        "ha_no_system_cost",
+        "ha_solar_only_cost",
+        "ha_kems_no_export_cost",
+        "ha_full_kems_cost",
+        "ha_no_system_flow",
+        "ha_solar_only_flow",
+        "ha_kems_no_export_flow",
+        "ha_full_kems_flow",
+        "ha_full_island_flow",
+        "scenario_cost[8]",
+    ):
+        assert retired not in content
+    assert "selected_scenario = 2;" in content
+    assert "selected_scenario = 5;" in content
+    assert "selected_scenario = 7;" in content
 
 
 def test_panel_routes_battery_export_visually_through_house_bus() -> None:
@@ -131,7 +170,7 @@ def test_managed_panel_has_startup_and_ota_completion_animation() -> None:
 
 
 def test_managed_panel_reports_alpha8_firmware_for_ota_verification() -> None:
-    """The generated ESP32 config must report the Alpha8 target after OTA."""
+    """The generated ESP32 config must report the Alpha8 panel.1 target after OTA."""
     content = PACKAGED.read_text(encoding="utf-8")
     assert 'name: "Panel Firmware Version"' in content
     assert "id: panel_firmware_version" in content
@@ -139,7 +178,7 @@ def test_managed_panel_reports_alpha8_firmware_for_ota_verification() -> None:
     panel_health = (ROOT / "custom_components" / "kems" / "panel.py").read_text(
         encoding="utf-8"
     )
-    assert 'PANEL_CONFIG_VERSION = "0.8.0-alpha8-panel.0"' in panel_health
+    assert 'PANEL_CONFIG_VERSION = "0.8.0-alpha8-panel.1"' in panel_health
 
 
 def test_managed_panel_ota_tracks_queue_and_reconnect_health() -> None:
@@ -152,5 +191,5 @@ def test_managed_panel_ota_tracks_queue_and_reconnect_health() -> None:
     )
     assert 'last_ota_result="queued"' in sync
     assert "async_verify_panel_firmware" in sync
-    assert 'PANEL_CONFIG_VERSION = "0.8.0-alpha8-panel.0"' in panel_health
+    assert 'PANEL_CONFIG_VERSION = "0.8.0-alpha8-panel.1"' in panel_health
     assert 'status="Success"' in panel_health
