@@ -26,3 +26,14 @@ The frozen Alpha9.0 candidate carries generation-aware historical release contra
 ## Why Alpha9
 
 Alpha8 accumulated the implementation, parity work and cleanup needed to establish a clean product boundary. Alpha9 provides a single coordinated baseline from which KEMS, Pi Web, Public Web and Panel can advance independently without losing the ability to state an exact compatible four-track set.
+
+## Alpha9.1 KEMS-only dashboard patch
+
+- KEMS: `0.9.0-alpha9.1`
+- Pi Web remains: `0.9.0-alpha9-web.0`
+- Public Web remains: `0.9.0-alpha9-public.0`
+- Panel remains: `0.9.0-alpha9-panel.0`
+
+Alpha9.1 is presentation-only. It trims Jinja control-block whitespace around the dynamic **Component verification** and **Recent updates** Markdown rows so Home Assistant keeps those rows inside their tables. It does not change optimisation, simulation, commissioning, panel firmware, web behaviour or FoxESS write safety.
+
+Candidate validation note: Alpha9.1 is frozen as a KEMS-only presentation patch; Pi Web, Public Web and Panel remain on their Alpha9.0 baselines.

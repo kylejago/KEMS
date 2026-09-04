@@ -175,4 +175,4 @@ def test_diagnostics_contract_and_release_identity_expose_shadow_only_scope() ->
     assert '"force_discharge_power"' in contract
     assert '"writes_permitted": False' in contract
     assert '"hardware_writes": "blocked"' in contract
-    assert manifest["version"] == "0.9.0-alpha9.0"
+    assert manifest["version"].startswith("0.9.0-alpha9.")
