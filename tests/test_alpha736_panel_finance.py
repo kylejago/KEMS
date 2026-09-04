@@ -19,7 +19,6 @@ def test_alpha8_release_targets_coordinated_panel_and_web() -> None:
     )
     panel_py = (KEMS / "panel.py").read_text(encoding="utf-8")
     panel_yaml = (KEMS / "kems16x16.yaml").read_text(encoding="utf-8")
-    panel_transform = (KEMS / "panel_ev_policy.py").read_text(encoding="utf-8")
     dashboard = (KEMS / "dashboard.py").read_text(encoding="utf-8")
 
     assert str(manifest["version"]).startswith("0.8.0-alpha8.")
@@ -32,9 +31,9 @@ def test_alpha8_release_targets_coordinated_panel_and_web() -> None:
     assert property_web.startswith("0.8.0-alpha8-web.")
     assert int(property_web.rsplit(".", 1)[1]) >= 2
 
-    assert 'PANEL_CONFIG_VERSION = "0.8.0-alpha8-panel.0"' in panel_py
-    assert 'panel_config_version: "0.8.0-alpha8-panel.0"' in panel_yaml
-    assert 'PANEL_EV_POLICY_VERSION = "0.8.0-alpha8-panel.1"' in panel_transform
+    assert 'PANEL_CONFIG_VERSION = "0.8.0-alpha8-panel.1"' in panel_py
+    assert 'panel_config_version: "0.8.0-alpha8-panel.1"' in panel_yaml
+    assert not (KEMS / "panel_ev_policy.py").exists()
     assert "PANEL6_VERSION_LINE" not in dashboard
     assert "PANEL7_VERSION_LINE" not in dashboard
     assert "return PACKAGED_PANEL_PATH.read_bytes()" in dashboard
