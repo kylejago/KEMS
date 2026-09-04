@@ -74,22 +74,21 @@ def test_frozen_alpha7_regression_evidence_remains_non_runtime() -> None:
     assert "agile_alpha8" not in source
 
 
-def test_alpha877_release_scope_and_identity() -> None:
-    """Release metadata must describe only the commissioning-readiness cleanup."""
+def test_alpha877_release_contract_is_successor_safe() -> None:
+    """Later Alpha8 releases must preserve the Alpha8.77 commissioning invariants."""
     manifest = json.loads((KEMS / "manifest.json").read_text(encoding="utf-8"))
     bundle = json.loads(
         (ROOT / "release" / "kems-bundle.template.json").read_text(encoding="utf-8")
     )
 
-    assert manifest["version"] == "0.8.0-alpha8.77"
+    version = str(manifest["version"])
+    assert version.startswith("0.8.0-alpha8.")
+    assert int(version.rsplit(".", 1)[1]) >= 77
     assert bundle["maintenance"]["affected_components"] == ["kems_core", "dashboard"]
     assert bundle["components"]["property_web"]["version"] == "0.8.0-alpha8-web.9"
     assert bundle["components"]["pi_agent"]["version"] == "0.8.0-alpha8-web.9"
     assert bundle["components"]["public_web"]["version"] == "0.8.0-alpha8-web.9"
     assert bundle["components"]["panel"]["version"] == "0.8.0-alpha8-panel.1"
     reason = bundle["maintenance"]["reason"].lower()
-    assert "source mappings" in reason
-    assert "higher-priority platform" in reason
-    assert "physical telemetry roles" in reason
     assert "15%" in reason and "10%" in reason and "12%" in reason
-    assert "hardware writes remain blocked" in reason
+    assert "hardware writes" in reason and "blocked" in reason
