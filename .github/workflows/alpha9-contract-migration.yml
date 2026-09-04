@@ -23,7 +23,7 @@ jobs:
         with:
           python-version: '3.13'
 
-      - name: Migrate Alpha8 release metadata assertions across generation reset
+      - name: Migrate historical contracts across the Alpha9 generation reset
         shell: bash
         run: |
           set -euo pipefail
@@ -33,7 +33,6 @@ jobs:
           import re
           import subprocess
 
-          TESTS = Path('tests')
           changed = []
 
           def main_source(path: Path) -> str:
@@ -45,58 +44,111 @@ jobs:
               )
               return result.stdout if result.returncode == 0 else ''
 
-          for path in sorted(TESTS.glob('*.py')):
+          for path in sorted(Path('tests').glob('*.py')):
               source = path.read_text(encoding='utf-8')
+              baseline = main_source(path)
               updated = source
 
-              # Text-form checks against the live manifest must accept the Alpha9
-              # generation reset while still proving that the historical module is
-              # packaged in the current integration.
+              # The first bulk attempt corrupted several immutable release-note
+              # expectations. This file is notes-only, so restore its proven main
+              # version exactly before doing any successor migration.
+              if path.name == 'test_release_notes.py' and baseline:
+                  updated = baseline
+
+              # The portable bundle test is about the CURRENT template. Rebase its
+              # exact target to Alpha9 instead of rendering an Alpha8 tag through an
+              # Alpha9 template.
+              if path.name == 'test_update_bundle.py':
+                  replacement = '''def test_release_bundle_renders_exact_coordinated_alpha9_targets() -> None:
+    """The current template must render the exact four-track Alpha9 baseline."""
+    bundle = module.render_bundle(TEMPLATE, "v0.9.0-alpha9.0")
+    assert bundle["bundle"] == "0.9.0-alpha9.0"
+    assert bundle["components"]["kems_core"]["version"] == "0.9.0-alpha9.0"
+    assert bundle["components"]["dashboard"]["version"] == "0.9.0-alpha9.0"
+    assert bundle["components"]["panel"]["version"] == "0.9.0-alpha9-panel.0"
+    assert bundle["components"]["property_web"]["version"] == "0.9.0-alpha9-web.0"
+    assert bundle["components"]["pi_agent"]["version"] == "0.9.0-alpha9-web.0"
+    assert bundle["components"]["public_web"]["version"] == "0.9.0-alpha9-public.0"
+    assert bundle["components"]["property_web"]["required"] is True
+    assert bundle["components"]["pi_agent"]["required"] is True
+    assert bundle["components"]["public_web"]["required"] is False
+    assert bundle["components"]["public_web"]["delivery"] == "ionos-sftp"
+
+    affected = bundle["maintenance"]["affected_components"]
+    assert affected == [
+        "kems_core",
+        "dashboard",
+        "panel",
+        "property_web",
+        "pi_agent",
+        "public_web",
+    ]
+    assert bundle["maintenance"]["reboot_required"] is False
+    reason = bundle["maintenance"]["reason"]
+    assert "Alpha9 coordinated parity baseline" in reason
+    assert "0.9.0-alpha9-web.0" in reason
+    assert "0.9.0-alpha9-public.0" in reason
+    assert "0.9.0-alpha9-panel.0" in reason
+    assert "hardware writes hard-blocked" in reason
+
+
+def test_bundle_contract_rejects_mismatched_appliance_versions() -> None:'''
+                  updated = re.sub(
+                      r'def test_release_bundle_renders_exact_coordinated_alpha8_targets\(\) -> None:\n.*?\n\ndef test_bundle_contract_rejects_mismatched_appliance_versions\(\) -> None:',
+                      replacement,
+                      updated,
+                      count=1,
+                      flags=re.S,
+                  )
+
+              # Text-form current-manifest checks are generation-aware.
               updated = updated.replace(
                   "assert '\"version\": \"0.8.0-alpha8.' in manifest",
                   "assert any(marker in manifest for marker in ('\"version\": \"0.8.0-alpha8.', '\"version\": \"0.9.0-alpha9.'))",
               )
 
-              # A new generation legitimately resets its release counter to .0.
-              # Old milestone tests keep their Alpha8 numeric floor when running on
-              # Alpha8, but Alpha9 itself is already a successor to every Alpha8.x.
-              updated = re.sub(
-                  r'(?m)^(\s*)assert int\(version\.rsplit\("\\\.", 1\)\[(-?1|1)\]\) >= (\d+)\s*$',
-                  lambda m: f'{m.group(1)}assert version.startswith("0.9.0-alpha9.") or int(version.rsplit(".", 1)[{m.group(2)}]) >= {m.group(3)}',
-                  updated,
-              )
-              updated = re.sub(
-                  r'(?m)^(\s*)assert int\(manifest\["version"\]\.rsplit\("\\\.", 1\)\[(-?1|1)\]\) >= (\d+)\s*$',
-                  lambda m: f'{m.group(1)}assert str(manifest["version"]).startswith("0.9.0-alpha9.") or int(manifest["version"].rsplit(".", 1)[{m.group(2)}]) >= {m.group(3)}',
-                  updated,
-              )
-              updated = re.sub(
-                  r'(?m)^(\s*)assert int\(str\(manifest\["version"\]\)\.rsplit\("\\\.", 1\)\[(-?1|1)\]\) >= (\d+)\s*$',
-                  lambda m: f'{m.group(1)}assert str(manifest["version"]).startswith("0.9.0-alpha9.") or int(str(manifest["version"]).rsplit(".", 1)[{m.group(2)}]) >= {m.group(3)}',
-                  updated,
-              )
-              updated = re.sub(
-                  r'(?m)^(\s*)assert int\(version\.removeprefix\(prefix\)\) >= (\d+)\s*$',
-                  lambda m: f'{m.group(1)}assert version.startswith("0.9.0-alpha9.") or int(version.removeprefix(prefix)) >= {m.group(2)}',
-                  updated,
-              )
-              updated = re.sub(
-                  r'(?m)^(\s*)assert release_number >= (\d+)\s*$',
-                  lambda m: f'{m.group(1)}assert version.startswith("0.9.0-alpha9.") or release_number >= {m.group(2)}',
-                  updated,
+              # Current release-family prefixes. Alpha9 resets counters and Public
+              # Web now has its own release family.
+              updated = updated.replace(
+                  '.startswith("0.8.0-alpha8-web.")',
+                  '.startswith(("0.8.0-alpha8-web.", "0.9.0-alpha9-web.", "0.9.0-alpha9-public."))',
               )
 
-              # Property Web and the Pi agent remain one version track. Public Web
-              # becomes independent in Alpha9, so old three-way equality checks must
-              # accept the intentional split rather than forcing version coupling.
+              # Convert direct numeric milestone assertions line-by-line. Alpha8
+              # retains its historical minimum; Alpha9 is already the successor.
+              migrated_lines = []
+              for line in updated.splitlines():
+                  match = re.match(r'^(\s*)assert int\((.+)\) >= (\d+)\s*$', line)
+                  if match:
+                      indent, expr, minimum = match.groups()
+                      if 'web_version' in expr:
+                          line = f'{indent}assert web_version.startswith("0.9.0-alpha9-web.") or int({expr}) >= {minimum}'
+                      elif 'manifest["version"]' in expr:
+                          line = f'{indent}assert str(manifest["version"]).startswith("0.9.0-alpha9.") or int({expr}) >= {minimum}'
+                      elif re.search(r'\bversion\b', expr):
+                          line = f'{indent}assert str(version).startswith("0.9.0-alpha9.") or int({expr}) >= {minimum}'
+                  match_release = re.match(r'^(\s*)assert release_number >= (\d+)\s*$', line)
+                  if match_release:
+                      indent, minimum = match_release.groups()
+                      line = f'{indent}assert str(version).startswith("0.9.0-alpha9.") or release_number >= {minimum}'
+                  migrated_lines.append(line)
+              updated = '\n'.join(migrated_lines) + ('\n' if updated.endswith('\n') else '')
+
+              # Exact old three-way coupling first, then generic equality. Property
+              # Web + Pi remain coupled; Public Web may be independently versioned.
+              updated = updated.replace(
+                  'assert property_web == pi_agent == public_web == "0.8.0-alpha8-web.9"',
+                  'assert property_web == pi_agent\n    assert property_web.startswith(("0.8.0-alpha8-web.", "0.9.0-alpha9-web."))\n    assert public_web == property_web or public_web.startswith("0.9.0-alpha9-public.")',
+              )
               updated = updated.replace(
                   'assert property_web == pi_agent == public_web',
                   'assert property_web == pi_agent\n    assert public_web == property_web or public_web.startswith("0.9.0-alpha9-public.")',
               )
               updated = updated.replace(
-                  'assert property_web == pi_agent == public_web == "0.8.0-alpha8-web.9"',
-                  'assert property_web == pi_agent\n    assert property_web.startswith(("0.8.0-alpha8-web.", "0.9.0-alpha9-web."))\n    assert public_web == property_web or public_web.startswith("0.9.0-alpha9-public.")',
+                  'assert property_web.startswith("0.8.0-alpha8-web.")',
+                  'assert property_web.startswith(("0.8.0-alpha8-web.", "0.9.0-alpha9-web."))',
               )
+
               updated = updated.replace(
                   'assert len(web_versions) == 1',
                   'assert len(web_versions) == 1 or web_versions == {"0.9.0-alpha9-web.0", "0.9.0-alpha9-public.0"}',
@@ -106,16 +158,12 @@ jobs:
                   'web_version = str(bundle["components"]["property_web"]["version"])',
               )
               updated = updated.replace(
-                  'next(iter(web_versions)).startswith("0.8.0-alpha8-web.")',
+                  'next(iter(web_versions)).startswith(("0.8.0-alpha8-web.", "0.9.0-alpha9-web.", "0.9.0-alpha9-public."))',
                   'str(bundle["components"]["property_web"]["version"]).startswith(("0.8.0-alpha8-web.", "0.9.0-alpha9-web."))',
               )
-              updated = updated.replace(
-                  'web_version.startswith("0.8.0-alpha8-web.")',
-                  'web_version.startswith(("0.8.0-alpha8-web.", "0.9.0-alpha9-web."))',
-              )
 
-              # Direct current-bundle assertions from old tests are compatibility
-              # assertions now. The dedicated Alpha9 baseline test owns exact pins.
+              # Direct current-bundle pins from historical tests are compatibility
+              # assertions. test_alpha9_baseline.py owns the exact current pins.
               for component in ('property_web', 'pi_agent'):
                   updated = re.sub(
                       rf'assert bundle\["components"\]\["{component}"\]\["version"\] == "0\.8\.0-alpha8-web\.\d+"',
@@ -128,21 +176,27 @@ jobs:
                   updated,
               )
 
-              # If the failed first migration altered an assertion about immutable
-              # historical release-note text, restore that assertion from main. Do
-              # not rewrite current bundle/panel assertions.
-              baseline = main_source(path)
-              for var in ('text', 'notes'):
-                  current_pat = re.compile(
-                      rf'(?m)^\s*assert "0\.9\.0-alpha9-panel\.0([^"\n]*)" in {var}\s*$'
+              # Old Alpha8 core/dashboard-only maintenance scopes remain valid
+              # historically; the coordinated Alpha9 baseline intentionally covers
+              # all four tracks.
+              updated = updated.replace(
+                  'assert bundle["maintenance"]["affected_components"] == ["kems_core", "dashboard"]',
+                  'assert bundle["maintenance"]["affected_components"] in (["kems_core", "dashboard"], ["kems_core", "dashboard", "panel", "property_web", "pi_agent", "public_web"])',
+              )
+
+              # In files that mix current bundle assertions with immutable release
+              # notes, restore the note-specific panel assertion from main. These
+              # files each contain one such note assertion.
+              if path.name in {'test_alpha8_8_release.py', 'test_alpha8_9_release.py', 'test_alpha8_10_release.py'} and baseline:
+                  main_note = re.search(
+                      r'(?m)^(\s*assert "0\.8\.0-alpha8-panel\.[^"\n]*" in (?:text|notes)\s*)$',
+                      baseline,
                   )
-                  main_pat = re.compile(
-                      rf'(?m)^(\s*assert "0\.8\.0-alpha8-panel\.[^"\n]*" in {var}\s*)$'
+                  updated = re.sub(
+                      r'(?m)^\s*assert "0\.9\.0-alpha9-panel\.0[^"\n]*" in (?:text|notes)\s*$',
+                      main_note.group(1) if main_note else r'\g<0>',
+                      updated,
                   )
-                  if current_pat.search(updated):
-                      match = main_pat.search(baseline)
-                      if match:
-                          updated = current_pat.sub(match.group(1), updated)
 
               if updated != source:
                   path.write_text(updated, encoding='utf-8')
