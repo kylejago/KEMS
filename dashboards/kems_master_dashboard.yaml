@@ -822,6 +822,34 @@ views:
                 entity: sensor.kems_control_preflight
                 name: Control preflight
 
+      - type: grid
+        columns: 2
+        square: false
+        cards:
+          - type: entities
+            title: Happy Hour
+            show_header_toggle: false
+            entities:
+              - entity: switch.kems_weekend_happy_hour_planning
+                name: Manual fallback planning
+              - entity: datetime.kems_weekend_happy_hour_start
+                name: Manual event start
+              - entity: select.kems_weekend_happy_hour_duration
+                name: Event duration
+              - entity: switch.kems_happy_hour_ohme_control
+                name: Allow Ohme control
+
+          - type: markdown
+            title: Happy Hour policy
+            content: |
+              **Automatic Octopus detection remains primary.** Manual planning is the fallback when KEMS cannot confidently identify the booked event.
+
+              **Reward cap:** **16 kWh per reward hour**, independently. Unused allowance never carries forward and KEMS never borrows from a later reward hour.
+
+              KEMS reserves the maximum useful battery charge first, protects unavoidable home demand inside the same hourly cap, then makes only the remainder available to the EV. When that reward hour reaches its cap, Happy Hour import authority ends immediately and normal tariff logic resumes.
+
+              **Ohme control is opt-in** and only operates for an automatically verified Happy Hour; it does not turn a manual fallback into charger-write authority.
+
       - type: markdown
         title: Component verification
         content: |
