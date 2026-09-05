@@ -131,6 +131,28 @@ def test_battery_is_reserved_before_home_then_ev_gets_remainder() -> None:
     assert allocation["battery_charge_target_kw"] == 7.0
 
 
+def test_hard_cap_clips_battery_request_for_non_curtailable_home_before_ev() -> None:
+    allocation = allocate_reward_hour(
+        remaining_kwh=8.0,
+        hours_remaining=1.0,
+        home_grid_kw=4.0,
+        battery_headroom_stored_kwh=20.0,
+        charge_efficiency=1.0,
+        max_charge_kw=7.0,
+        inverter_limit_kw=7.0,
+        site_import_limit_kw=None,
+    )
+    assert allocation["battery_reserved_input_kwh_remaining"] == 4.0
+    assert allocation["projected_home_import_kwh_remaining"] == 4.0
+    assert allocation["ev_allowance_kwh_remaining"] == 0.0
+    assert (
+        allocation["battery_reserved_input_kwh_remaining"]
+        + allocation["projected_home_import_kwh_remaining"]
+        + allocation["ev_allowance_kwh_remaining"]
+        <= 8.0
+    )
+
+
 def test_full_battery_releases_reward_allowance_to_home_and_ev() -> None:
     allocation = allocate_reward_hour(
         remaining_kwh=16.0,

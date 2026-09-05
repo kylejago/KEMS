@@ -208,13 +208,11 @@ def allocate_reward_hour(
     inverter_limit_kw: float,
     site_import_limit_kw: float | None,
 ) -> dict[str, float]:
-    """Reserve battery first, home next, then expose only EV remainder."""
+    """Request battery first, protect non-curtailable home, then expose EV remainder."""
     remaining = max(float(remaining_kwh), 0.0)
     hours = max(float(hours_remaining), 0.0)
     home_kw = max(float(home_grid_kw), 0.0)
     efficiency = max(float(charge_efficiency), 0.01)
-    projected_home = min(home_kw * hours, remaining)
-
     battery_power_limit = min(
         max(float(max_charge_kw), 0.0),
         max(float(inverter_limit_kw), 0.0),
@@ -225,12 +223,17 @@ def allocate_reward_hour(
             max(float(site_import_limit_kw) - home_kw, 0.0),
         )
     battery_input_headroom = max(float(battery_headroom_stored_kwh), 0.0) / efficiency
-    battery_max_input = min(
+    battery_requested = min(
         battery_input_headroom,
         battery_power_limit * hours,
     )
+
+    # Battery is the first controllable request. Household demand cannot be
+    # curtailed, so the admitted battery reservation is clipped only when
+    # required to keep battery + home inside this reward hour's hard cap.
+    projected_home = min(home_kw * hours, remaining)
     battery_reserved = min(
-        battery_max_input,
+        battery_requested,
         max(remaining - projected_home, 0.0),
     )
     battery_target_kw = (
