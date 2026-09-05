@@ -22,6 +22,8 @@ from .const import NAME
 from .entity_discovery import SourceValidationResult
 from .forecast_validation import ForecastValidationRecorder
 from .forecasting import SolarForecastCoordinator
+from .happy_hour_budget import apply_happy_hour_control
+from .happy_hour_ohme_control import OhmeHappyHourController
 from .history import HistoryRecorder
 from .kems_core import (
     AdviceEngine,
@@ -87,6 +89,9 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
         )
         self._whole_home = WholeHomeEngine()
         self._control = ControlEngine()
+        self._happy_hour_ohme = OhmeHappyHourController(
+            hass, entry, ev_status_entity=entities.ev_status
+        )
         self._shadow_validation = ShadowValidationRecorder(hass, entry.entry_id)
         self._agile_smart_export.bind_persisted_agile_decision_provider(
             lambda: getattr(self._shadow_validation, "_agile_decisions", [])
@@ -120,12 +125,18 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
         return self._agile_smart_export.state
 
     @property
+    def happy_hour_ohme_control_state(self) -> dict:
+        """Return the narrow Happy Hour Ohme-control audit state."""
+        return self._happy_hour_ohme.status
+
+    @property
     def agile_history_backfill_state(self) -> dict:
         """Return Home Assistant statistics backfill diagnostics."""
         return self._agile_history_backfill.state
 
     async def _async_setup(self) -> None:
         """Load retained learning history and permanent supporting ledgers."""
+        await self._happy_hour_ohme.async_setup()
         await self._history.async_load()
         await self._forecast_validation.async_load()
         await self._lifetime.async_load()
@@ -251,6 +262,13 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                 agile_state,
                 self.settings.control,
             )
+            happy_hour_plan = agile_state.get("happy_hour_plan")
+            if not isinstance(happy_hour_plan, dict):
+                happy_hour_plan = {}
+            power_down_plan = agile_state.get("power_down_priority")
+            if not isinstance(power_down_plan, dict):
+                power_down_plan = {}
+            control = apply_happy_hour_control(control, snapshot, happy_hour_plan)
             await self._shadow_validation.async_update(
                 snapshot=snapshot,
                 simulation=shadow_simulation,
@@ -258,6 +276,14 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                 now=now,
                 config=self.settings.control,
                 agile_state=agile_state,
+            )
+            await self._happy_hour_ohme.async_update(
+                snapshot=snapshot,
+                control=control,
+                happy_hour=happy_hour_plan,
+                power_down=power_down_plan,
+                scan_interval_seconds=self.settings.scan_interval_seconds,
+                emergency_stop=self.settings.control.emergency_stop,
             )
 
             # Capture any half-hour that settled during this scan, then rebuild
@@ -369,6 +395,7 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
 
     async def async_shutdown(self) -> None:
         """Flush retained KEMS state before unloading."""
+        await self._happy_hour_ohme.async_shutdown()
         await self._history.async_save()
         await self._forecast_validation.async_save()
         await self._lifetime.async_save()

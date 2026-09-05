@@ -7,7 +7,11 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import CONF_CONTROL_ENABLED, CONF_EMERGENCY_STOP
+from .const import (
+    CONF_CONTROL_ENABLED,
+    CONF_EMERGENCY_STOP,
+    CONF_HAPPY_HOUR_OHME_CONTROL_ENABLED,
+)
 from .entity import KEMSEntity
 from .happy_hour import CONF_HAPPY_HOUR_ENABLED
 from .runtime_options import async_set_runtime_option
@@ -25,6 +29,7 @@ async def async_setup_entry(
         KEMSEmergencyStopSwitch(coordinator),
         KEMSMasterControlEnableSwitch(coordinator),
         KEMSWeekendHappyHourPlanningSwitch(coordinator),
+        KEMSHappyHourOhmeControlSwitch(coordinator),
     ]
     entities.extend(build_update_switch_entities(hass, coordinator, entry))
     async_add_entities(entities)
@@ -128,5 +133,40 @@ class KEMSWeekendHappyHourPlanningSwitch(KEMSEntity, SwitchEntity):
             self.hass,
             self.coordinator.entry,
             CONF_HAPPY_HOUR_ENABLED,
+            False,
+        )
+
+
+class KEMSHappyHourOhmeControlSwitch(KEMSEntity, SwitchEntity):
+    """Explicitly allow KEMS to own Ohme mode during automatic Happy Hour."""
+
+    _attr_name = "Happy Hour Ohme control"
+    _attr_icon = "mdi:ev-station"
+
+    def __init__(self, coordinator) -> None:
+        super().__init__(coordinator, "happy_hour_ohme_control")
+
+    @property
+    def is_on(self) -> bool:
+        return bool(
+            self.coordinator.entry.options.get(
+                CONF_HAPPY_HOUR_OHME_CONTROL_ENABLED,
+                False,
+            )
+        )
+
+    async def async_turn_on(self, **kwargs) -> None:
+        await async_set_runtime_option(
+            self.hass,
+            self.coordinator.entry,
+            CONF_HAPPY_HOUR_OHME_CONTROL_ENABLED,
+            True,
+        )
+
+    async def async_turn_off(self, **kwargs) -> None:
+        await async_set_runtime_option(
+            self.hass,
+            self.coordinator.entry,
+            CONF_HAPPY_HOUR_OHME_CONTROL_ENABLED,
             False,
         )

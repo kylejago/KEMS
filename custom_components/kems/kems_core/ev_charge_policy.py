@@ -1,9 +1,11 @@
 """Selectable EV charging policy for the KEMS shadow-control contract.
 
-The default policy permits EV charging only in the authoritative configured
-23:30-05:30 cheap window. Daytime Intelligent slots and Agile prices do not
-widen that window. Optional surplus and disabled modes remain explicit user
-choices.
+The default policy permits EV charging in the authoritative configured
+23:30-05:30 cheap window and in a daytime Intelligent slot only when KEMS has
+fail-closed multi-signal confirmation that the slot is genuinely cheap. Raw or
+stale Intelligent flags and Agile prices do not widen that authority. Happy Hour
+is a separate reward-hour authority. Optional surplus and disabled modes remain
+explicit user choices.
 
 This module changes desired/shadow commands only. It never calls Home Assistant
 services or a charger/inverter hardware backend.

@@ -40,7 +40,7 @@ def test_current_release_family_is_coordinated() -> None:
     panel_manager = (KEMS / "panel.py").read_text(encoding="utf-8")
     panel_yaml = (KEMS / "kems16x16.yaml").read_text(encoding="utf-8")
 
-    assert manifest["version"] == "0.9.0-alpha9.1"
+    assert manifest["version"] == "0.9.0-alpha9.2"
     assert bundle["components"]["panel"]["version"] == "0.9.0-alpha9-panel.0"
     pi_versions = {
         str(bundle["components"][key]["version"])
