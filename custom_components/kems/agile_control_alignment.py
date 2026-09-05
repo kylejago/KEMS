@@ -101,7 +101,7 @@ def _rolling_target(
         return None
 
     dispatch_mode = str(plan.get("dispatch_mode") or "")
-    if dispatch_mode == "cheap_charge":
+    if dispatch_mode in {"cheap_charge", "happy_hour_charge"}:
         routing = agile_state.get("current_routing_snapshot")
         charge = None
         if isinstance(routing, dict) and routing.get("available"):

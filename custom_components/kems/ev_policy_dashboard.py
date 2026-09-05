@@ -45,7 +45,7 @@ _EV_CARDS = r"""      - type: grid
               **Decision:** {% if not connected %}EV not connected{% elif allowed and charging %}CHARGING ALLOWED{% elif allowed %}PLUGGED IN — ALLOWED{% else %}PLUGGED IN — BLOCKED BY KEMS{% endif %}  
               **Battery protection:** {% if connected and (allowed or charging) %}battery discharge/export isolated for the EV policy{% else %}normal KEMS routing{% endif %}.  
 
-              **Default EV cheap-window mode** permits charging only in the configured **23:30–05:30** overnight window. Daytime Intelligent slots and Agile prices do not widen it. Power Down remains higher priority.
+              **Default EV cheap-window mode** permits charging in the configured **23:30–05:30** overnight window and in a daytime Intelligent slot only after KEMS has fail-closed confirmation that it is genuinely cheap. Raw/unconfirmed Intelligent flags and Agile prices do not widen it. Happy Hour is a separate per-reward-hour authority. Power Down remains higher priority.
 
               *EV policy is shadow-only: KEMS reports what the charger should do but does not issue an Ohme control write.*
 """

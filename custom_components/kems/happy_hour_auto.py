@@ -336,8 +336,7 @@ _AUTO_DASHBOARD_INSERT = """          This page keeps the operating view deliber
           **Plan:** {{ states('sensor.kems_agile_happy_hour_plan') }}  
           **Start:** {{ state_attr('sensor.kems_agile_happy_hour_plan', 'start') or '—' }}  
           **End:** {{ state_attr('sensor.kems_agile_happy_hour_plan', 'end') or '—' }}  
-          **Duration:** {{ state_attr('sensor.kems_agile_happy_hour_plan', 'duration_hours') or '—' }} h  
-          **Automatic source:** {{ auto or 'waiting for Octopus Power Up data' }}
+          **Duration:** {{ state_attr('sensor.kems_agile_happy_hour_plan', 'duration_hours') or '—' }} h  \n          **Reward hour:** {{ state_attr('sensor.kems_agile_happy_hour_plan', 'current_reward_hour_index') or '—' }} / {{ state_attr('sensor.kems_agile_happy_hour_plan', 'reward_hour_count') or '—' }}  \n          **Hour import:** {{ state_attr('sensor.kems_agile_happy_hour_plan', 'current_reward_hour_import_kwh') or 0 }} / 16 kWh  \n          **Hour remaining:** {{ state_attr('sensor.kems_agile_happy_hour_plan', 'current_reward_hour_remaining_kwh') or '—' }} kWh  \n          **Battery reserved:** {{ state_attr('sensor.kems_agile_happy_hour_plan', 'battery_reserved_input_kwh_remaining') or 0 }} kWh  \n          **EV allowance:** {{ state_attr('sensor.kems_agile_happy_hour_plan', 'ev_allowance_kwh_remaining') or 0 }} kWh  \n          **Automatic source:** {{ auto or 'waiting for Octopus Power Up data' }}
 
           {% if src == 'octopus_energy' %}
           Book Weekend Happy Hour in Octopus; KEMS has detected the event automatically. The controls below are fallback only.
@@ -350,6 +349,7 @@ _AUTO_DASHBOARD_INSERT = """          This page keeps the operating view deliber
         show_header_toggle: false
         entities:
           - switch.kems_weekend_happy_hour_planning
+          - switch.kems_happy_hour_ohme_control
           - datetime.kems_weekend_happy_hour_start
           - select.kems_weekend_happy_hour_duration
           - sensor.kems_agile_happy_hour_plan

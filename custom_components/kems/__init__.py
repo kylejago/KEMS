@@ -175,7 +175,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     install_agile_simulation_presentation()
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     LOGGER.info(
-        "KEMS initialised with read-only control lab; real hardware writes are blocked"
+        "KEMS initialised; FoxESS writes remain blocked and Happy Hour "
+        "Ohme control is explicit opt-in"
     )
     return True
 

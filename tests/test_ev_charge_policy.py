@@ -54,6 +54,21 @@ def test_default_daytime_intelligent_slot_does_not_authorise_ev() -> None:
     assert state.desired_ev_charging_allowed is False
 
 
+def test_confirmed_daytime_intelligent_dispatch_authorises_ev() -> None:
+    state = ControlEngine().plan(
+        _snapshot(
+            intelligent_slot=True,
+            ev_charging=True,
+            intelligent_slot_evidence={"large_import_permitted": True},
+        ),
+        _simulation(),
+        NOW,
+        ControlConfig(),
+    )
+    assert state.desired_ev_charging_allowed is True
+    assert state.desired_total_discharge_power_kw == 0.0
+
+
 def test_default_negative_daytime_price_does_not_authorise_ev() -> None:
     state = ControlEngine().plan(
         _snapshot(current_import_rate=-4.5), _simulation(), NOW, ControlConfig()
