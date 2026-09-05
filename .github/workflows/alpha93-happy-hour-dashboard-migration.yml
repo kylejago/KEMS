@@ -1,0 +1,146 @@
+name: Alpha9.3 Happy Hour dashboard migration
+
+on:
+  push:
+    branches:
+      - fix/alpha9.3-happy-hour-dashboard
+    paths:
+      - .github/workflows/alpha93-happy-hour-dashboard-migration.yml
+
+permissions:
+  contents: write
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/alpha9.3-happy-hour-dashboard
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Apply narrow Alpha9.3 patch
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          root = Path('.')
+          dashboard = root / 'dashboards/kems_master_dashboard.yaml'
+          text = dashboard.read_text(encoding='utf-8')
+          marker = """      - type: markdown
+        title: Component verification
+"""
+          assert text.count(marker) == 1, 'System component-verification marker changed'
+          block = """      - type: grid
+        columns: 2
+        square: false
+        cards:
+          - type: entities
+            title: Happy Hour
+            show_header_toggle: false
+            entities:
+              - entity: switch.kems_weekend_happy_hour_planning
+                name: Manual fallback planning
+              - entity: datetime.kems_weekend_happy_hour_start
+                name: Manual event start
+              - entity: select.kems_weekend_happy_hour_duration
+                name: Event duration
+              - entity: switch.kems_happy_hour_ohme_control
+                name: Allow Ohme control
+
+          - type: markdown
+            title: Happy Hour policy
+            content: |
+              **Automatic Octopus detection remains primary.** Manual planning is the fallback when KEMS cannot confidently identify the booked event.
+
+              **Reward cap:** **16 kWh per reward hour**, independently. Unused allowance never carries forward and KEMS never borrows from a later reward hour.
+
+              KEMS reserves the maximum useful battery charge first, protects unavoidable home demand inside the same hourly cap, then makes only the remainder available to the EV. When that reward hour reaches its cap, Happy Hour import authority ends immediately and normal tariff logic resumes.
+
+              **Ohme control is opt-in** and only operates for an automatically verified Happy Hour; it does not turn a manual fallback into charger-write authority.
+
+"""
+          assert 'title: Happy Hour\n' not in text, 'Happy Hour dashboard card already present'
+          dashboard.write_text(text.replace(marker, block + marker, 1), encoding='utf-8')
+
+          manifest = root / 'custom_components/kems/manifest.json'
+          m = manifest.read_text(encoding='utf-8')
+          assert '"version": "0.9.0-alpha9.2"' in m
+          manifest.write_text(m.replace('"version": "0.9.0-alpha9.2"', '"version": "0.9.0-alpha9.3"', 1), encoding='utf-8')
+
+          for test_name in ('tests/test_alpha9_baseline.py', 'tests/test_alpha8_consolidation.py'):
+              path = root / test_name
+              t = path.read_text(encoding='utf-8')
+              assert '0.9.0-alpha9.2' in t, f'expected current version pin missing in {test_name}'
+              path.write_text(t.replace('0.9.0-alpha9.2', '0.9.0-alpha9.3', 1), encoding='utf-8')
+
+          bundle = root / 'release/kems-bundle.template.json'
+          b = bundle.read_text(encoding='utf-8')
+          old_reason = 'Alpha9 coordinated parity baseline; Alpha9.2 KEMS-only Happy Hour policy/control patch:'
+          assert old_reason in b
+          start = b.index('    "reason": "') + len('    "reason": "')
+          end = b.index('",\n    "expected_downtime_minutes"', start)
+          reason = ('Alpha9 coordinated parity baseline; Alpha9.3 KEMS-only dashboard restoration: '
+                    'restore the Weekend Happy Hour manual fallback start/duration/planning controls and the explicit '
+                    'Ohme Happy Hour opt-in to the managed System dashboard, and surface the proven Alpha9.2 '
+                    '16 kWh-per-reward-hour/no-carry policy; no Happy Hour runtime, optimiser, FoxESS, Pi Web, '
+                    'Public Web or Panel behaviour changes; Pi Web remains 0.9.0-alpha9-web.0, Public Web remains '
+                    '0.9.0-alpha9-public.0, Panel remains 0.9.0-alpha9-panel.0; canonical 15% optimisation target / '
+                    '10% hard floor / 12% recovery remains unchanged; FoxESS hardware writes hard-blocked until '
+                    'physical commissioning is complete')
+          bundle.write_text(b[:start] + reason + b[end:], encoding='utf-8')
+
+          docs = root / 'docs/ALPHA9.md'
+          d = docs.read_text(encoding='utf-8')
+          assert '## Alpha9.3 Happy Hour dashboard restoration' not in d
+          d += """
+
+## Alpha9.3 Happy Hour dashboard restoration
+
+Alpha9.3 is a KEMS-only presentation release. It restores the Happy Hour controls that were omitted when the managed dashboard was rebuilt/compacted: manual fallback planning, event start, event duration, and the explicit Ohme Happy Hour control opt-in.
+
+The System page also states the already-proven Alpha9.2 policy: every reward hour has its own 16 kWh cap with no carry or borrowing; useful battery charging is reserved first while unavoidable home demand is protected inside the cap; the EV receives only the remainder; and once the current reward-hour cap is exhausted KEMS immediately returns to normal tariff logic. Automatic Octopus detection remains primary and manual fallback does not grant Ohme charger-write authority.
+
+No Happy Hour runtime/allocator behaviour changes in Alpha9.3. FoxESS hardware writes remain blocked. Pi Web stays `0.9.0-alpha9-web.0`, Public Web stays `0.9.0-alpha9-public.0`, and Panel stays `0.9.0-alpha9-panel.0`.
+"""
+          docs.write_text(d, encoding='utf-8')
+
+          test = root / 'tests/test_alpha93_happy_hour_dashboard.py'
+          test.write_text('''"""Alpha9.3 managed-dashboard Happy Hour restoration contract."""\n\nfrom pathlib import Path\n\nROOT = Path(__file__).resolve().parents[1]\nSOURCE = ROOT / "dashboards/kems_master_dashboard.yaml"\nPACKAGED = ROOT / "custom_components/kems/kems_master_dashboard.yaml"\n\n\ndef test_alpha93_restores_all_happy_hour_controls_to_system_dashboard() -> None:\n    content = SOURCE.read_text(encoding="utf-8")\n    for entity in (\n        "switch.kems_weekend_happy_hour_planning",\n        "datetime.kems_weekend_happy_hour_start",\n        "select.kems_weekend_happy_hour_duration",\n        "switch.kems_happy_hour_ohme_control",\n    ):\n        assert entity in content\n    assert "16 kWh per reward hour" in content\n    assert "Unused allowance never carries forward" in content\n    assert "normal tariff logic resumes" in content\n    assert "Ohme control is opt-in" in content\n\n\ndef test_alpha93_packaged_dashboard_matches_source() -> None:\n    assert PACKAGED.read_bytes() == SOURCE.read_bytes()\n''', encoding='utf-8')
+          PY
+
+          python scripts/sync_packaged_dashboard.py
+
+      - name: Install development tools
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements-dev.txt
+
+      - name: Packaged dashboard is current
+        run: python scripts/sync_packaged_dashboard.py --check
+
+      - name: Black
+        run: python -m black --check --diff .
+
+      - name: Ruff
+        run: python -m ruff check .
+
+      - name: Pytest
+        run: python -m pytest
+
+      - name: Compile Python source
+        run: python -m compileall -q custom_components tests
+
+      - name: Commit gated product patch
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add dashboards/kems_master_dashboard.yaml custom_components/kems/kems_master_dashboard.yaml custom_components/kems/manifest.json release/kems-bundle.template.json docs/ALPHA9.md tests/test_alpha9_baseline.py tests/test_alpha8_consolidation.py tests/test_alpha93_happy_hour_dashboard.py
+          git diff --cached --quiet && { echo 'No product changes to commit'; exit 1; }
+          git commit -m 'KEMS Alpha9.3: restore Happy Hour dashboard controls'
+          git push origin HEAD:fix/alpha9.3-happy-hour-dashboard
