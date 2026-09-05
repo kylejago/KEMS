@@ -53,3 +53,12 @@ The default EV policy continues to allow the configured overnight cheap window p
 Alpha9.2 also adds an explicit opt-in **Happy Hour Ohme control** switch. When enabled, KEMS may temporarily select the Ohme `Max charge` mode only for an automatically verified active Octopus Happy Hour with a complete hourly import ledger, a healthy safety envelope and sufficient allowance remaining after the battery/home reserve. KEMS preserves the pre-event Ohme mode and restores it when its Happy Hour authority ends. Manual Happy Hour fallback remains planning/shadow only and cannot start the car. Slow scans, Power Down, emergency stop, island operation, stale/unsafe data or an incomplete reward ledger all fail closed.
 
 This is the only new physical/cloud write path in Alpha9.2. **FoxESS writes remain hard-blocked** pending physical commissioning and parity proof.
+
+
+## Alpha9.3 Happy Hour dashboard restoration
+
+Alpha9.3 is a KEMS-only presentation release. It restores the Happy Hour controls that were omitted when the managed dashboard was rebuilt/compacted: manual fallback planning, event start, event duration, and the explicit Ohme Happy Hour control opt-in.
+
+The System page also states the already-proven Alpha9.2 policy: every reward hour has its own 16 kWh cap with no carry or borrowing; useful battery charging is reserved first while unavoidable home demand is protected inside the cap; the EV receives only the remainder; and once the current reward-hour cap is exhausted KEMS immediately returns to normal tariff logic. Automatic Octopus detection remains primary and manual fallback does not grant Ohme charger-write authority.
+
+No Happy Hour runtime/allocator behaviour changes in Alpha9.3. FoxESS hardware writes remain blocked. Pi Web stays `0.9.0-alpha9-web.0`, Public Web stays `0.9.0-alpha9-public.0`, and Panel stays `0.9.0-alpha9-panel.0`.

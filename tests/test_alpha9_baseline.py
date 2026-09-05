@@ -15,7 +15,7 @@ def test_alpha9_four_track_versions_are_explicit() -> None:
         (ROOT / "release/kems-bundle.template.json").read_text(encoding="utf-8")
     )
 
-    assert manifest["version"] == "0.9.0-alpha9.2"
+    assert manifest["version"] == "0.9.0-alpha9.3"
     assert bundle["components"]["panel"]["version"] == "0.9.0-alpha9-panel.0"
     assert bundle["components"]["property_web"]["version"] == "0.9.0-alpha9-web.0"
     assert bundle["components"]["pi_agent"]["version"] == "0.9.0-alpha9-web.0"

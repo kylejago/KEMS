@@ -42,7 +42,7 @@
   },
   "maintenance": {
     "required": true,
-    "reason": "Alpha9 coordinated parity baseline; Alpha9.2 KEMS-only Happy Hour policy/control patch: enforce an independent 16 kWh cap in every reward hour with no carry or borrowing, reserve maximum useful battery charge first, protect home demand, expose only the remainder to EV charging, and fall back immediately to normal tariff logic when the current reward-hour cap is exhausted; confirmed Intelligent extra slots remain valid cheap authority, raw/unconfirmed slots remain inert; optional Ohme Max charge control is explicit opt-in and automatic-Happy-Hour-only with previous-mode restoration; Pi Web remains 0.9.0-alpha9-web.0, Public Web remains 0.9.0-alpha9-public.0, Panel remains 0.9.0-alpha9-panel.0; canonical 15% optimisation target / 10% hard floor / 12% recovery remains unchanged; FoxESS hardware writes hard-blocked until physical commissioning is complete",
+    "reason": "Alpha9 coordinated parity baseline; Alpha9.3 KEMS-only dashboard restoration: restore the Weekend Happy Hour manual fallback start/duration/planning controls and the explicit Ohme Happy Hour opt-in to the managed System dashboard, and surface the proven Alpha9.2 16 kWh-per-reward-hour/no-carry policy; no Happy Hour runtime, optimiser, FoxESS, Pi Web, Public Web or Panel behaviour changes; Pi Web remains 0.9.0-alpha9-web.0, Public Web remains 0.9.0-alpha9-public.0, Panel remains 0.9.0-alpha9-panel.0; canonical 15% optimisation target / 10% hard floor / 12% recovery remains unchanged; FoxESS hardware writes hard-blocked until physical commissioning is complete",
     "expected_downtime_minutes": 5,
     "home_assistant_restart_required": true,
     "reboot_required": false,
