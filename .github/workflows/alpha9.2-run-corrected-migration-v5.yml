@@ -1,0 +1,209 @@
+name: Alpha9.2 clean core-test gated candidate
+
+on:
+  push:
+    branches:
+      - feature/alpha9.2-happy-hour-hourly-cap-ohme
+    paths:
+      - .github/workflows/alpha9.2-run-corrected-migration-v5.yml
+
+permissions:
+  contents: write
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/alpha9.2-happy-hour-hourly-cap-ohme
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install development tools
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements-dev.txt
+
+      - name: Rebuild exact v3 candidate
+        shell: bash
+        run: |
+          python <<'PY'
+          from pathlib import Path
+
+          lines = Path(
+              '.github/workflows/alpha9.2-run-corrected-migration-v3.yml'
+          ).read_text(encoding='utf-8').splitlines()
+          scripts = []
+          index = 0
+          while index < len(lines):
+              if lines[index].strip() != "python <<'PY'":
+                  index += 1
+                  continue
+              start = index + 1
+              end = next(
+                  pos for pos in range(start, len(lines)) if lines[pos].strip() == 'PY'
+              )
+              scripts.append(
+                  '\n'.join(
+                      line[10:] if line.startswith('          ') else line
+                      for line in lines[start:end]
+                  )
+                  + '\n'
+              )
+              index = end + 1
+          if len(scripts) < 2:
+              raise SystemExit(f'expected at least two v3 staging scripts, found {len(scripts)}')
+          for number, script in enumerate(scripts[:2], start=1):
+              exec(
+                  compile(script, f'<alpha9.2-v3-stage-{number}>', 'exec'),
+                  {'__name__': '__main__'},
+              )
+          PY
+
+      - name: Make Alpha9.2 tests Home Assistant independent
+        shell: bash
+        run: |
+          python <<'PY'
+          from pathlib import Path
+          import textwrap
+
+          path = Path('tests/test_alpha9_2_happy_hour.py')
+          text = path.read_text(encoding='utf-8')
+          core_import = 'from kems_core import ControlState, Snapshot\n'
+          if text.count(core_import) != 1:
+              raise SystemExit(
+                  f'expected one kems_core import, found {text.count(core_import)}'
+              )
+          text = text.replace(core_import, '', 1)
+          simple_import = 'from types import SimpleNamespace\n'
+          if text.count(simple_import) != 1:
+              raise SystemExit(
+                  f'expected one SimpleNamespace import, found {text.count(simple_import)}'
+              )
+          text = text.replace(
+              simple_import,
+              simple_import + '\n' + core_import,
+              1,
+          )
+
+          start = text.index('from custom_components.kems.happy_hour_budget import (')
+          end = text.index('START = datetime(2026, 9, 5, 13, 0, tzinfo=UTC)')
+          harness = '''import importlib.util
+          import sys
+          import types
+
+          INTEGRATION_DIR = Path(__file__).parents[1] / "custom_components" / "kems"
+
+
+          def _install_package_stubs() -> None:
+              custom_components = sys.modules.setdefault(
+                  "custom_components", types.ModuleType("custom_components")
+              )
+              custom_components.__path__ = [str(INTEGRATION_DIR.parent)]
+              package = sys.modules.setdefault(
+                  "custom_components.kems", types.ModuleType("custom_components.kems")
+              )
+              package.__path__ = [str(INTEGRATION_DIR)]
+
+              homeassistant = sys.modules.setdefault(
+                  "homeassistant", types.ModuleType("homeassistant")
+              )
+              helpers = sys.modules.setdefault(
+                  "homeassistant.helpers", types.ModuleType("homeassistant.helpers")
+              )
+              entity_registry = sys.modules.setdefault(
+                  "homeassistant.helpers.entity_registry",
+                  types.ModuleType("homeassistant.helpers.entity_registry"),
+              )
+              storage = sys.modules.setdefault(
+                  "homeassistant.helpers.storage",
+                  types.ModuleType("homeassistant.helpers.storage"),
+              )
+              storage.Store = object
+              helpers.entity_registry = entity_registry
+              helpers.storage = storage
+              homeassistant.helpers = helpers
+
+
+          def _load_kems_module(name: str):
+              full_name = f"custom_components.kems.{name}"
+              spec = importlib.util.spec_from_file_location(
+                  full_name, INTEGRATION_DIR / f"{name}.py"
+              )
+              if spec is None or spec.loader is None:
+                  raise RuntimeError(f"Unable to load {name}")
+              module = importlib.util.module_from_spec(spec)
+              sys.modules[full_name] = module
+              spec.loader.exec_module(module)
+              return module
+
+
+          _install_package_stubs()
+          _budget = _load_kems_module("happy_hour_budget")
+          _ohme = _load_kems_module("happy_hour_ohme_control")
+
+          allocate_reward_hour = _budget.allocate_reward_hour
+          apply_happy_hour_control = _budget.apply_happy_hour_control
+          reward_hour_ledger = _budget.reward_hour_ledger
+          reward_hour_windows = _budget.reward_hour_windows
+          ohme_happy_hour_write_decision = _ohme.ohme_happy_hour_write_decision
+
+          '''
+          text = text[:start] + textwrap.dedent(harness) + text[end:]
+          path.write_text(text, encoding='utf-8')
+          PY
+
+      - name: Format generated candidate
+        run: |
+          python -m ruff check --fix \
+            custom_components/kems/happy_hour_budget.py \
+            custom_components/kems/happy_hour_ohme_control.py \
+            custom_components/kems/coordinator.py \
+            tests/test_alpha9_2_happy_hour.py
+          python -m black \
+            custom_components/kems/happy_hour_budget.py \
+            custom_components/kems/happy_hour_ohme_control.py \
+            custom_components/kems/const.py \
+            custom_components/kems/agile_alpha7_compat.py \
+            custom_components/kems/agile_control_alignment.py \
+            custom_components/kems/kems_core/ev_charge_policy.py \
+            custom_components/kems/ev_policy_dashboard.py \
+            custom_components/kems/switch.py \
+            custom_components/kems/happy_hour_auto.py \
+            custom_components/kems/coordinator.py \
+            custom_components/kems/diagnostics.py \
+            custom_components/kems/__init__.py \
+            tests/test_ev_charge_policy.py \
+            tests/test_alpha9_baseline.py \
+            tests/test_alpha9_2_happy_hour.py
+          python scripts/sync_packaged_dashboard.py
+
+      - name: Packaged dashboard is current
+        run: python scripts/sync_packaged_dashboard.py --check
+
+      - name: Black
+        run: python -m black --check --diff .
+
+      - name: Ruff
+        run: python -m ruff check .
+
+      - name: Pytest
+        run: python -m pytest
+
+      - name: Compile Python source
+        run: python -m compileall -q custom_components tests
+
+      - name: Commit product files only after complete green gate
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git reset -- .github/workflows/
+          git diff --cached --quiet && { echo 'No product changes to commit'; exit 1; }
+          git commit -m "Alpha9.2: enforce hourly Happy Hour cap and opt-in Ohme control"
+          git push origin HEAD:feature/alpha9.2-happy-hour-hourly-cap-ohme
