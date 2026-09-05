@@ -1,0 +1,93 @@
+name: Alpha9.2 battery-first cap safety gate
+
+on:
+  push:
+    branches:
+      - feature/alpha9.2-happy-hour-hourly-cap-ohme
+    paths:
+      - .github/workflows/alpha9.2-priority-safety-fix.yml
+
+permissions:
+  contents: write
+
+jobs:
+  validate-and-commit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/alpha9.2-happy-hour-hourly-cap-ohme
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install development tools
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements-dev.txt
+
+      - name: Clarify battery-first allocation under hard-cap safety
+        shell: bash
+        run: |
+          python <<'PY'
+          from pathlib import Path
+
+          def replace_once(path: str, old: str, new: str) -> None:
+              target = Path(path)
+              text = target.read_text(encoding="utf-8")
+              if text.count(old) != 1:
+                  raise SystemExit(
+                      f"{target}: expected one occurrence, found {text.count(old)}"
+                  )
+              target.write_text(text.replace(old, new, 1), encoding="utf-8")
+
+          replace_once(
+              "custom_components/kems/happy_hour_budget.py",
+              '    """Reserve battery first, home next, then expose only EV remainder."""\n',
+              '    """Request battery first, protect non-curtailable home, then expose EV remainder."""\n',
+          )
+
+          old = '''    projected_home = min(home_kw * hours, remaining)\n\n    battery_power_limit = min(\n        max(float(max_charge_kw), 0.0),\n        max(float(inverter_limit_kw), 0.0),\n    )\n    if site_import_limit_kw is not None and float(site_import_limit_kw) > 0:\n        battery_power_limit = min(\n            battery_power_limit,\n            max(float(site_import_limit_kw) - home_kw, 0.0),\n        )\n    battery_input_headroom = max(float(battery_headroom_stored_kwh), 0.0) / efficiency\n    battery_max_input = min(\n        battery_input_headroom,\n        battery_power_limit * hours,\n    )\n    battery_reserved = min(\n        battery_max_input,\n        max(remaining - projected_home, 0.0),\n    )\n'''
+          new = '''    battery_power_limit = min(\n        max(float(max_charge_kw), 0.0),\n        max(float(inverter_limit_kw), 0.0),\n    )\n    if site_import_limit_kw is not None and float(site_import_limit_kw) > 0:\n        battery_power_limit = min(\n            battery_power_limit,\n            max(float(site_import_limit_kw) - home_kw, 0.0),\n        )\n    battery_input_headroom = max(float(battery_headroom_stored_kwh), 0.0) / efficiency\n    battery_requested = min(\n        battery_input_headroom,\n        battery_power_limit * hours,\n    )\n\n    # Battery is the first controllable request. Household demand cannot be\n    # curtailed, so the admitted battery reservation is clipped only when\n    # required to keep battery + home inside this reward hour's hard cap.\n    projected_home = min(home_kw * hours, remaining)\n    battery_reserved = min(\n        battery_requested,\n        max(remaining - projected_home, 0.0),\n    )\n'''
+          replace_once("custom_components/kems/happy_hour_budget.py", old, new)
+
+          marker = '''def test_full_battery_releases_reward_allowance_to_home_and_ev() -> None:\n'''
+          test = '''def test_hard_cap_clips_battery_request_for_non_curtailable_home_before_ev() -> None:\n    allocation = allocate_reward_hour(\n        remaining_kwh=8.0,\n        hours_remaining=1.0,\n        home_grid_kw=4.0,\n        battery_headroom_stored_kwh=20.0,\n        charge_efficiency=1.0,\n        max_charge_kw=7.0,\n        inverter_limit_kw=7.0,\n        site_import_limit_kw=None,\n    )\n    assert allocation["battery_reserved_input_kwh_remaining"] == 4.0\n    assert allocation["projected_home_import_kwh_remaining"] == 4.0\n    assert allocation["ev_allowance_kwh_remaining"] == 0.0\n    assert (\n        allocation["battery_reserved_input_kwh_remaining"]\n        + allocation["projected_home_import_kwh_remaining"]\n        + allocation["ev_allowance_kwh_remaining"]\n        <= 8.0\n    )\n\n\n'''
+          target = Path("tests/test_alpha9_2_happy_hour.py")
+          text = target.read_text(encoding="utf-8")
+          if text.count(marker) != 1:
+              raise SystemExit(f"expected one insertion marker, found {text.count(marker)}")
+          target.write_text(text.replace(marker, test + marker, 1), encoding="utf-8")
+          PY
+
+      - name: Format candidate
+        run: |
+          python -m ruff check --fix custom_components/kems/happy_hour_budget.py tests/test_alpha9_2_happy_hour.py
+          python -m black custom_components/kems/happy_hour_budget.py tests/test_alpha9_2_happy_hour.py
+
+      - name: Packaged dashboard is current
+        run: python scripts/sync_packaged_dashboard.py --check
+
+      - name: Black
+        run: python -m black --check --diff .
+
+      - name: Ruff
+        run: python -m ruff check .
+
+      - name: Pytest
+        run: python -m pytest
+
+      - name: Compile Python source
+        run: python -m compileall -q custom_components tests
+
+      - name: Commit product fix only after complete green gate
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add custom_components/kems/happy_hour_budget.py tests/test_alpha9_2_happy_hour.py
+          git diff --cached --quiet && { echo 'No product changes to commit'; exit 1; }
+          git commit -m "Alpha9.2: preserve hard cap while prioritising battery request"
+          git push origin HEAD:feature/alpha9.2-happy-hour-hourly-cap-ohme
