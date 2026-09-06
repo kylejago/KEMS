@@ -86,9 +86,7 @@ def test_alpha910_compare_today_uses_current_scenario_and_flat_live_totals() -> 
     compare_start = content.index("\n  - title: Compare\n")
     next_view = content.find("\n  - title:", compare_start + 20)
     compare = (
-        content[compare_start:]
-        if next_view < 0
-        else content[compare_start:next_view]
+        content[compare_start:] if next_view < 0 else content[compare_start:next_view]
     )
 
     assert "sensor.kems_compare_no_system_cost_today" in compare
@@ -101,7 +99,9 @@ def test_alpha910_compare_today_uses_current_scenario_and_flat_live_totals() -> 
     assert "p.get('live_data', {})" not in compare
 
 
-def test_alpha910_does_not_fabricate_historical_slot_data_or_replace_period_engine() -> None:
+def test_alpha910_does_not_fabricate_historical_slot_data_or_replace_period_engine() -> (
+    None
+):
     source = SOURCE.read_text(encoding="utf-8")
     dashboard = DASHBOARD.read_text(encoding="utf-8")
 
