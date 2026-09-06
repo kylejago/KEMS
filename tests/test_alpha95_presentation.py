@@ -1,4 +1,4 @@
-"""Alpha9.5 presentation contracts plus Alpha9.6-Alpha9.8 recovery hardening."""
+"""Alpha9.5 presentation contracts plus Alpha9.6-Alpha9.10 recovery hardening."""
 
 from __future__ import annotations
 
@@ -26,8 +26,17 @@ def _pure_helpers() -> dict[str, Any]:
         "_KEMS_DAILY_NEW",
         "_KEMS_HOME_ENERGY_OLD",
         "_KEMS_HOME_ENERGY_NEW",
+        "_HOME_RECONCILED_OLD",
+        "_HOME_RECONCILED_NEW",
+        "_KEMS_DAILY_CARD_NEW",
+        "_COMPARE_WITHOUT_KEMS_NEW",
+        "_COMPARE_LIVE_NEW",
+        "_COMPARE_KEMS_NEW",
+        "_COMPARE_SIDE_BY_SIDE_NEW",
     }
     functions = {
+        "_replace_between",
+        "_improve_alpha910_today_presentation",
         "improve_alpha95_dashboard",
         "_improve_dashboard_bytes",
         "_finite",
