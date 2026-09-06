@@ -50,15 +50,15 @@ def _pure_helpers() -> dict[str, Any]:
     return namespace
 
 
-def _pure_panel_helpers() -> dict[str, Any]:
-    """Load the compact panel projector without importing Home Assistant."""
+def _panel_runtime_fixture() -> SimpleNamespace:
+    """Load frozen panel formatting helpers without importing Home Assistant."""
     tree = ast.parse(PANEL_SOURCE_PATH.read_text(encoding="utf-8"))
     assignments = {
         "_LIVE_SENSOR",
         "_LEGACY_PANEL_FLOW_SENSOR",
         "_PANEL_FLOW_SENSOR",
     }
-    functions = {"_number", "_value", "_compact_flow", "_publish_panel_flow_state"}
+    functions = {"_number", "_value", "_compact_flow"}
     body: list[ast.stmt] = []
     for node in tree.body:
         if isinstance(node, ast.Assign):
@@ -73,7 +73,30 @@ def _pure_panel_helpers() -> dict[str, Any]:
     module = ast.fix_missing_locations(ast.Module(body=body, type_ignores=[]))
     namespace: dict[str, Any] = {"Any": Any, "math": math}
     exec(compile(module, str(PANEL_SOURCE_PATH), "exec"), namespace)
-    return namespace
+    return SimpleNamespace(
+        _LIVE_SENSOR=namespace["_LIVE_SENSOR"],
+        _LEGACY_PANEL_FLOW_SENSOR=namespace["_LEGACY_PANEL_FLOW_SENSOR"],
+        _PANEL_FLOW_SENSOR=namespace["_PANEL_FLOW_SENSOR"],
+        _compact_flow=namespace["_compact_flow"],
+    )
+
+
+def _alpha97_projection_helper():
+    """Load Alpha9.7's local panel projection against the frozen formatter."""
+    tree = ast.parse(SOURCE_PATH.read_text(encoding="utf-8"))
+    functions = [
+        node
+        for node in tree.body
+        if isinstance(node, ast.FunctionDef) and node.name == "_publish_panel_flow_state"
+    ]
+    assert len(functions) == 1
+    module = ast.fix_missing_locations(ast.Module(body=functions, type_ignores=[]))
+    namespace: dict[str, Any] = {
+        "Any": Any,
+        "panel_runtime": _panel_runtime_fixture(),
+    }
+    exec(compile(module, str(SOURCE_PATH), "exec"), namespace)
+    return namespace["_publish_panel_flow_state"]
 
 
 def test_alpha95_current_day_cards_use_stable_flat_entities() -> None:
@@ -151,7 +174,7 @@ def test_alpha95_panel_soc_keeps_authoritative_routing_soc_when_present() -> Non
 
 
 def test_alpha97_panel_projection_is_standalone_and_preserves_soc() -> None:
-    helper = _pure_panel_helpers()["_publish_panel_flow_state"]
+    helper = _alpha97_projection_helper()
     writes: list[tuple[str, object, dict[str, Any]]] = []
 
     class States:
@@ -207,7 +230,7 @@ def test_alpha97_install_never_reinstalls_legacy_panel_wrapper() -> None:
 
     assert "install_alpha736_panel_flow_patch" not in repair
     assert "install_alpha736_panel_flow_patch()" in product
-    assert "_publish_panel_flow_state" in repair
+    assert "def _publish_panel_flow_state" in repair
     assert "_publish_panel_flow_state(self, enriched)" in install
     assert install.index("original_publish(self, enriched)") < install.index(
         "_publish_panel_flow_state(self, enriched)"
