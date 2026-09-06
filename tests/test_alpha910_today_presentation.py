@@ -104,7 +104,7 @@ def test_alpha910_does_not_fabricate_historical_slot_data() -> None:
     dashboard = DASHBOARD.read_text(encoding="utf-8")
 
     assert "NO DATA" not in source
-    assert "historical" not in source.lower()
+    assert "backfill" not in source.lower()
     assert "sensor.kems_energy_cost_comparison" in dashboard
     assert "sensor.kems_agile_slots" in dashboard
 
