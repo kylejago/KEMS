@@ -178,7 +178,9 @@ def test_alpha98_panel_soc_accepts_explicit_startup_virtual_soc() -> None:
     class States:
         @staticmethod
         def get(_entity_id: str):
-            raise AssertionError("HA fallback must not be queried when startup SOC exists")
+            raise AssertionError(
+                "HA fallback must not be queried when startup SOC exists"
+            )
 
     manager = SimpleNamespace(_hass=SimpleNamespace(states=States()))
     original = {
@@ -267,8 +269,7 @@ def test_alpha98_unavailable_panel_flow_keeps_only_valid_virtual_soc() -> None:
     )
 
     assert flow == (
-        "H=-1,S=-1,GI=-1,GE=-1,SH=-1,SB=-1,SE=-1,"
-        "GB=-1,BH=-1,BE=-1,SOC=68.6"
+        "H=-1,S=-1,GI=-1,GE=-1,SH=-1,SB=-1,SE=-1," "GB=-1,BH=-1,BE=-1,SOC=68.6"
     )
 
 
@@ -315,9 +316,9 @@ def test_alpha97_install_never_reinstalls_legacy_panel_wrapper() -> None:
     assert install.index("original_publish(self, state)") < install.index(
         "enriched = _state_with_panel_soc(self, state)"
     )
-    assert install.index("enriched = _state_with_panel_soc(self, state)") < install.index(
-        "_publish_panel_flow_state(self, enriched)"
-    )
+    assert install.index(
+        "enriched = _state_with_panel_soc(self, state)"
+    ) < install.index("_publish_panel_flow_state(self, enriched)")
     assert "publish_with_alpha95_panel_soc._kems_alpha736_panel_flow = True" in install
     assert "alpha736_original_publish = publish" in panel
 
