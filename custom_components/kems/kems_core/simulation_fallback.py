@@ -62,7 +62,9 @@ def resolve_octopus_current_demand_entity(
         if derived not in candidates:
             candidates.append(derived)
 
-    return next((entity_id for entity_id in candidates if state_exists(entity_id)), None)
+    return next(
+        (entity_id for entity_id in candidates if state_exists(entity_id)), None
+    )
 
 
 @dataclass(frozen=True, slots=True)
