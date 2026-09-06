@@ -34,9 +34,7 @@ def test_alpha95_current_day_cards_use_stable_flat_entities() -> None:
     assert "kems.get('home_energy_kwh')" not in content
 
 
-def test_alpha95_panel_soc_uses_current_virtual_soc_when_routing_snapshot_lacks_it() -> (
-    None
-):
+def test_alpha95_panel_soc_falls_back_to_virtual_soc() -> None:
     class States:
         @staticmethod
         def get(entity_id: str):
@@ -74,9 +72,7 @@ def test_alpha95_panel_soc_keeps_authoritative_routing_soc_when_present() -> Non
     assert _state_with_panel_soc(manager, state) is state
 
 
-def test_alpha95_installs_before_dashboard_sync_and_restores_panel_flow_publisher() -> (
-    None
-):
+def test_alpha95_installs_before_dashboard_sync_and_restores_panel_flow() -> None:
     setup = (KEMS / "__init__.py").read_text(encoding="utf-8")
     repair = (KEMS / "alpha95_presentation.py").read_text(encoding="utf-8")
 
