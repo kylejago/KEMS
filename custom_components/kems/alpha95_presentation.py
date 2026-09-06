@@ -13,8 +13,8 @@ from __future__ import annotations
 import math
 from typing import Any
 
+from . import agile_panel_presentation_runtime as panel_runtime
 from . import agile_smart_export_runtime_base as agile_runtime
-from .agile_panel_presentation_runtime import _publish_panel_flow_state
 
 _SIMULATED_SOC_ENTITY = "sensor.kems_simulated_battery_state_of_charge"
 
@@ -140,6 +140,35 @@ def _state_with_panel_soc(manager: Any, state: dict[str, Any]) -> dict[str, Any]
     enriched_snapshot["simulated_soc_percent"] = soc
     enriched["current_routing_snapshot"] = enriched_snapshot
     return enriched
+
+
+def _publish_panel_flow_state(manager: Any, state: dict[str, Any]) -> None:
+    """Project compact panel state without invoking or rewiring a publisher."""
+    snapshot = state.get("current_routing_snapshot")
+    if not isinstance(snapshot, dict):
+        snapshot = {"available": False}
+
+    flow = panel_runtime._compact_flow(snapshot)
+    attributes = {
+        "version": "0.7.0-alpha7.36",
+        "source": "current_routing_snapshot",
+        "reporting_only": True,
+        "routing_action": snapshot.get("routing_action"),
+        "dispatch_mode": snapshot.get("dispatch_mode"),
+        "simulated_soc_percent": snapshot.get("simulated_soc_percent"),
+    }
+    manager._set(panel_runtime._LEGACY_PANEL_FLOW_SENSOR, flow, attributes)
+    manager._set(panel_runtime._PANEL_FLOW_SENSOR, flow, attributes)
+
+    live_state = manager._hass.states.get(panel_runtime._LIVE_SENSOR)
+    if live_state is not None:
+        live_attributes = dict(live_state.attributes)
+        live_attributes["simulated_soc_percent"] = snapshot.get(
+            "simulated_soc_percent"
+        )
+        live_attributes["panel_flow_state"] = flow
+        live_attributes["panel_flow_source"] = panel_runtime._PANEL_FLOW_SENSOR
+        manager._set(panel_runtime._LIVE_SENSOR, live_state.state, live_attributes)
 
 
 def install_alpha95_presentation() -> None:
