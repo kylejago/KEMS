@@ -85,7 +85,11 @@ def test_alpha910_compare_today_uses_current_scenario_and_flat_live_totals() -> 
     content = improve(_post_pipeline_fixture())
     compare_start = content.index("\n  - title: Compare\n")
     next_view = content.find("\n  - title:", compare_start + 20)
-    compare = content[compare_start:] if next_view < 0 else content[compare_start:next_view]
+    compare = (
+        content[compare_start:]
+        if next_view < 0
+        else content[compare_start:next_view]
+    )
 
     assert "sensor.kems_compare_no_system_cost_today" in compare
     assert "sensor.kems_compare_full_kems_cost_today" in compare
