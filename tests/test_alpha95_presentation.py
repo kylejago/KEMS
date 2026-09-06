@@ -87,7 +87,8 @@ def _alpha97_projection_helper():
     functions = [
         node
         for node in tree.body
-        if isinstance(node, ast.FunctionDef) and node.name == "_publish_panel_flow_state"
+        if isinstance(node, ast.FunctionDef)
+        and node.name == "_publish_panel_flow_state"
     ]
     assert len(functions) == 1
     module = ast.fix_missing_locations(ast.Module(body=functions, type_ignores=[]))
