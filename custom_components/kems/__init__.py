@@ -10,7 +10,11 @@ from homeassistant.core import HomeAssistant
 
 from .agile_simulation_presentation import install_agile_simulation_presentation
 from .agile_slots_state import async_setup_agile_slots_state
-from .alpha95_presentation import install_alpha95_presentation
+from .alpha95_presentation import (
+    install_alpha95_presentation,
+    publish_alpha98_panel_projection,
+)
+from .alpha98_startup_recovery import async_recover_alpha98_startup_sources
 from .collector import Collector
 from .const import (
     CONF_BATTERY_RESERVE,
@@ -161,6 +165,22 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     configure_ev_charge_policy(coordinator._control, options)
 
     await coordinator.async_config_entry_first_refresh()
+    recovered_fields = await async_recover_alpha98_startup_sources(hass, coordinator)
+    if recovered_fields:
+        LOGGER.info(
+            "KEMS Alpha9.8 recovered late startup sources with one bounded refresh: %s",
+            ", ".join(recovered_fields),
+        )
+
+    # The Alpha9.7 recursion-safe panel projection is deliberately independent of
+    # physical FoxESS telemetry. Reproject once after startup analysis using the
+    # coordinator's valid virtual SOC so the panel does not display SOC=-1 merely
+    # because instantaneous routing evidence arrived late during Home Assistant boot.
+    publish_alpha98_panel_projection(
+        coordinator._agile_smart_export,
+        coordinator.data.simulation.simulated_battery_soc,
+    )
+
     entry.runtime_data = coordinator
     async_setup_energy_bill_state(hass, entry, coordinator)
     async_setup_agile_slots_state(hass, entry, coordinator)
