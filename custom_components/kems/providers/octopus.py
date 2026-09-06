@@ -8,6 +8,7 @@ from datetime import datetime
 from homeassistant.core import HomeAssistant
 from homeassistant.util import dt as dt_util
 
+from ..kems_core.simulation_fallback import resolve_octopus_current_demand_entity
 from .base import HomeAssistantStateReader
 from .entity_map import KEMSEntities
 
@@ -31,6 +32,8 @@ class OctopusState:
     next_offpeak_start: datetime | None = None
     offpeak_end: datetime | None = None
     current_demand_kw: float | None = None
+    current_demand_source_entity: str | None = None
+    current_demand_age_seconds: float | None = None
     source_age_seconds: dict[str, float] = field(default_factory=dict)
     stale_fields: tuple[str, ...] = ()
     source_data_age_seconds: float | None = None
@@ -121,22 +124,22 @@ class OctopusProvider(HomeAssistantStateReader):
             # never a still-authoritative cheap-period signal.
             intelligent_slot = False
 
-        # Alpha8.58 uses the Octopus current-demand sensor only as corroborating
-        # evidence for a daytime Intelligent import. It is not a tariff source and
-        # does not become part of tariff freshness/staleness accounting. Some unit
-        # and legacy entity maps intentionally omit these optional fields, so read
-        # them defensively rather than making corroboration a provider prerequisite.
-        demand_entity = next(
-            (
-                entity_id
-                for entity_id in (
-                    getattr(self._entities, "grid_import_kw", None),
-                    getattr(self._entities, "house_load_kw", None),
-                )
-                if entity_id and entity_id.startswith("sensor.octopus_energy_")
+        # Alpha9.9 keeps Octopus current-demand available to the virtual
+        # simulation even after source authority has promoted the shared physical
+        # house/grid roles to FoxESS Modbus. Existing Octopus mappings remain the
+        # first choice; otherwise recover the exact sibling of the configured
+        # Octopus current-rate entity. Freshness is still enforced independently.
+        demand_entity = resolve_octopus_current_demand_entity(
+            house_load_entity=getattr(self._entities, "house_load_kw", None),
+            grid_import_entity=getattr(self._entities, "grid_import_kw", None),
+            current_import_rate_entity=getattr(
+                self._entities,
+                "current_import_rate",
+                None,
             ),
-            None,
+            state_exists=lambda entity_id: self._hass.states.get(entity_id) is not None,
         )
+        demand_age = self._report_age_seconds(demand_entity, reference)
         current_demand_kw = self._fresh_power_kw(
             demand_entity,
             self._stale_data_seconds,
@@ -171,6 +174,10 @@ class OctopusProvider(HomeAssistantStateReader):
                 self._entities.offpeak_end,
             ),
             current_demand_kw=current_demand_kw,
+            current_demand_source_entity=demand_entity,
+            current_demand_age_seconds=(
+                round(demand_age, 1) if demand_age is not None else None
+            ),
             source_age_seconds=ages,
             stale_fields=tuple(sorted(stale)),
             source_data_age_seconds=max(ages.values()) if ages else None,
