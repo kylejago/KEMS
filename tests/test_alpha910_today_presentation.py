@@ -99,9 +99,7 @@ def test_alpha910_compare_today_uses_current_scenario_and_flat_live_totals() -> 
     assert "p.get('live_data', {})" not in compare
 
 
-def test_alpha910_does_not_fabricate_historical_slot_data_or_replace_period_engine() -> (
-    None
-):
+def test_alpha910_does_not_fabricate_historical_slot_data() -> None:
     source = SOURCE.read_text(encoding="utf-8")
     dashboard = DASHBOARD.read_text(encoding="utf-8")
 
