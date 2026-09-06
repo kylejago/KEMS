@@ -757,9 +757,10 @@ class SimulationEngine:
         capacity = max(config.battery_capacity_kwh, 0.1)
         reserve_kwh = capacity * config.battery_reserve_percent / 100
         if battery_kwh is None:
+            fresh_battery_soc = _fresh_snapshot_value(snapshot, "battery_soc")
             starting_soc = (
-                snapshot.battery_soc
-                if snapshot.battery_soc is not None
+                fresh_battery_soc
+                if fresh_battery_soc is not None
                 else config.battery_initial_percent
             )
             battery_kwh = capacity * min(max(starting_soc, 0.0), 100.0) / 100
@@ -885,12 +886,13 @@ class SimulationEngine:
         ).total_seconds() > 12 * 3600:
             return initial
         if len(previous_day_records) < 2:
-            if latest_previous.battery_soc is None:
+            previous_soc = _fresh_snapshot_value(latest_previous, "battery_soc")
+            if previous_soc is None:
                 return initial
             observed = (
                 capacity
                 * min(
-                    max(latest_previous.battery_soc, 0.0),
+                    max(previous_soc, 0.0),
                     100.0,
                 )
                 / 100

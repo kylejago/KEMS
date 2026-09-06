@@ -118,6 +118,64 @@ def test_stale_required_house_and_grid_evidence_still_fails_closed() -> None:
     assert result.data_coverage == 0.0
 
 
+def test_single_sample_does_not_adopt_stale_physical_soc() -> None:
+    timestamp = datetime(2026, 9, 6, 8, 0, tzinfo=UTC)
+    snapshot = Snapshot(
+        timestamp=timestamp,
+        current_import_rate=28.3,
+        house_load_kw=1.2,
+        grid_import_kw=1.2,
+        battery_soc=99.0,
+        solar_power_kw=None,
+        stale_fields=("battery_soc", "solar_power_kw"),
+    )
+    result = SimulationEngine().simulate_today(
+        [snapshot],
+        timestamp + timedelta(minutes=1),
+        SimulationConfig(
+            battery_initial_percent=50.0,
+            proposal_solar_enabled=True,
+        ),
+        current_snapshot=snapshot,
+    )
+
+    assert result.simulated_battery_soc == 50.0
+    assert result.proposal_solar_active is True
+
+
+def test_midnight_carry_does_not_adopt_stale_previous_physical_soc() -> None:
+    previous = Snapshot(
+        timestamp=datetime(2026, 9, 5, 23, 45, tzinfo=UTC),
+        current_import_rate=28.3,
+        house_load_kw=1.2,
+        grid_import_kw=1.2,
+        battery_soc=99.0,
+        stale_fields=("battery_soc",),
+    )
+    current_start = datetime(2026, 9, 6, 0, 0, tzinfo=UTC)
+    current = [
+        Snapshot(
+            timestamp=current_start + timedelta(minutes=15 * index),
+            current_import_rate=28.3,
+            house_load_kw=0.0,
+            grid_import_kw=0.0,
+            battery_soc=None,
+            stale_fields=("battery_soc",),
+        )
+        for index in range(4)
+    ]
+    result = SimulationEngine().simulate_today(
+        [previous, *current],
+        current[-1].timestamp + timedelta(minutes=1),
+        SimulationConfig(battery_initial_percent=50.0),
+        current_snapshot=current[-1],
+    )
+
+    assert result.ready is True
+    assert result.data_coverage == 100.0
+    assert result.simulated_battery_soc == 50.0
+
+
 def test_foxess_binding_separates_commands_from_sensor_readback_without_writes() -> (
     None
 ):
