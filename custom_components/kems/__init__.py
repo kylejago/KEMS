@@ -10,6 +10,7 @@ from homeassistant.core import HomeAssistant
 
 from .agile_simulation_presentation import install_agile_simulation_presentation
 from .agile_slots_state import async_setup_agile_slots_state
+from .alpha95_presentation import install_alpha95_presentation
 from .collector import Collector
 from .const import (
     CONF_BATTERY_RESERVE,
@@ -84,6 +85,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # dashboard compositor with one fresh packaged customer dashboard.
     install_energy_bill_dashboard_patch()
     install_dashboard_pipeline()
+    install_alpha95_presentation()
     try:
         await async_sync_managed_dashboard(hass)
     except (OSError, ValueError):
