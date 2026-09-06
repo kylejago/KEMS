@@ -5,6 +5,7 @@ from __future__ import annotations
 from homeassistant.util import dt as dt_util
 
 from .kems_core import Snapshot
+from .kems_core.simulation_fallback import apply_simulation_demand_fallback
 from .providers.foxess import FoxESSProvider
 from .providers.gas import GasProvider
 from .providers.octoplus import OctoplusProvider
@@ -61,6 +62,20 @@ class Collector:
             live_current_demand_kw=octopus.current_demand_kw,
         )
 
+        # Keep physical FoxESS source authority intact for commissioning and
+        # control, but do not let an uncommissioned/unavailable Modbus mapping
+        # remove the fresh Octopus demand evidence used by virtual replay. The
+        # helper retains/adds the physical stale flags while recording a separate
+        # simulation-only provenance marker in source_age_seconds.
+        demand = apply_simulation_demand_fallback(
+            physical_house_load_kw=foxess.house_load_kw,
+            physical_grid_import_kw=foxess.grid_import_kw,
+            physical_source_age_seconds=foxess.source_age_seconds,
+            physical_stale_fields=foxess.stale_fields,
+            fallback_demand_kw=octopus.current_demand_kw,
+            fallback_age_seconds=octopus.current_demand_age_seconds,
+        )
+
         return Snapshot(
             timestamp=now,
             current_import_rate=tariff.current_import_rate,
@@ -107,17 +122,17 @@ class Collector:
             ev_charging=ohme.charging,
             ev_power_kw=ohme.power_kw,
             ev_soc=ohme.vehicle_soc,
-            house_load_kw=foxess.house_load_kw,
+            house_load_kw=demand.house_load_kw,
             battery_soc=foxess.battery_soc,
             battery_power_kw=foxess.battery_power_kw,
             solar_power_kw=foxess.solar_power_kw,
-            grid_import_kw=foxess.grid_import_kw,
+            grid_import_kw=demand.grid_import_kw,
             grid_export_kw=foxess.grid_export_kw,
             raw_grid_import_kw=foxess.raw_grid_import_kw,
             raw_grid_export_kw=foxess.raw_grid_export_kw,
             grid_flow_mode=foxess.grid_flow_mode,
-            source_age_seconds=foxess.source_age_seconds,
-            stale_fields=foxess.stale_fields,
+            source_age_seconds=demand.source_age_seconds,
+            stale_fields=demand.stale_fields,
             source_data_age_seconds=foxess.source_data_age_seconds,
             tariff_source_age_seconds=octopus.source_age_seconds,
             tariff_stale_fields=octopus.stale_fields,
