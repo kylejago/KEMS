@@ -181,7 +181,8 @@ def test_unmarked_stale_house_and_grid_still_fail_simulation_closed() -> None:
     assert result.data_coverage == 0.0
 
 
-def test_hardware_control_remains_fail_closed_while_fallback_drives_simulation() -> None:
+def test_hardware_control_remains_fail_closed_while_fallback_drives_simulation(
+) -> None:
     """Simulation health must not turn Octopus demand into hardware authority."""
     records = _fallback_records()
     now = records[-1].timestamp + timedelta(minutes=1)
