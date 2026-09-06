@@ -352,13 +352,11 @@ class ScenarioComparisonEngine:
                 continue
             for key in names:
                 acc[key]["intervals"] += 1
-            if current.stale_fields or following.stale_fields:
-                continue
             load_kw = _load_kw(current)
             if load_kw is None or _load_kw(following) is None:
                 continue
             rate = current.current_import_rate
-            if rate is None:
+            if rate is None or "current_import_rate" in current.tariff_stale_fields:
                 continue
             for key in names:
                 acc[key]["covered"] += 1
@@ -535,7 +533,7 @@ class ScenarioComparisonEngine:
             "battery_to_home": None,
             "battery_export": None,
         }
-        if snapshot is None or snapshot.stale_fields:
+        if snapshot is None:
             return {
                 SCENARIO_NO_SYSTEM: dict(empty),
                 SCENARIO_SOLAR_ONLY: dict(empty),
@@ -849,8 +847,6 @@ class ScenarioComparisonEngine:
             if hours <= 0:
                 continue
             intervals += 1
-            if current.stale_fields or following.stale_fields:
-                continue
             recorded_load_kw = _load_kw(current)
             load_kw, ev_shed_kw = _island_load_components(current)
             following_load_kw, _ = _island_load_components(following)

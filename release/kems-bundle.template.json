@@ -42,7 +42,7 @@
   },
   "maintenance": {
     "required": true,
-    "reason": "Alpha9 coordinated parity baseline; Alpha9.3 KEMS-only dashboard restoration: restore the Weekend Happy Hour manual fallback start/duration/planning controls and the explicit Ohme Happy Hour opt-in to the managed System dashboard, and surface the proven Alpha9.2 16 kWh-per-reward-hour/no-carry policy; no Happy Hour runtime, optimiser, FoxESS, Pi Web, Public Web or Panel behaviour changes; Pi Web remains 0.9.0-alpha9-web.0, Public Web remains 0.9.0-alpha9-public.0, Panel remains 0.9.0-alpha9-panel.0; canonical 15% optimisation target / 10% hard floor / 12% recovery remains unchanged; FoxESS hardware writes hard-blocked until physical commissioning is complete",
+    "reason": "Alpha9 coordinated parity baseline; Alpha9.4 KEMS-only simulation/commissioning separation: keep virtual/current-day simulations driven by fresh house/tariff evidence plus proposal/forecast solar when uncommissioned FoxESS telemetry is offline, and domain-scope FoxESS command binding to writable select/number entities with sensor counterparts retained as read-only evidence; no Happy Hour, optimiser, FoxESS write, Pi Web, Public Web or Panel behaviour changes; Pi Web remains 0.9.0-alpha9-web.0, Public Web remains 0.9.0-alpha9-public.0, Panel remains 0.9.0-alpha9-panel.0; canonical 15% optimisation target / 10% hard floor / 12% recovery remains unchanged; FoxESS hardware writes hard-blocked until physical commissioning is complete",
     "expected_downtime_minutes": 5,
     "home_assistant_restart_required": true,
     "reboot_required": false,
