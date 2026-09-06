@@ -65,10 +65,8 @@ def _compact_flow(snapshot: dict[str, Any]) -> str:
     )
 
 
-def _publish_with_panel_flow(self, state: dict[str, Any]) -> None:
-    """Republish the final Agile routing snapshot for Panel6."""
-    alpha736_original_publish(self, state)
-
+def _publish_panel_flow_state(self: Any, state: dict[str, Any]) -> None:
+    """Publish the compact panel projection without invoking another publisher."""
     snapshot = state.get("current_routing_snapshot")
     if not isinstance(snapshot, dict):
         snapshot = {"available": False}
@@ -95,6 +93,12 @@ def _publish_with_panel_flow(self, state: dict[str, Any]) -> None:
         live_attributes["panel_flow_state"] = flow
         live_attributes["panel_flow_source"] = _PANEL_FLOW_SENSOR
         self._set(_LIVE_SENSOR, live_state.state, live_attributes)
+
+
+def _publish_with_panel_flow(self, state: dict[str, Any]) -> None:
+    """Republish the final Agile routing snapshot for Panel6."""
+    alpha736_original_publish(self, state)
+    _publish_panel_flow_state(self, state)
 
 
 def install_alpha736_panel_flow_patch() -> None:
