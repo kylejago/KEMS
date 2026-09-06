@@ -6,6 +6,7 @@ on:
       - fix/alpha9.4-simulation-commissioning-separation
     paths:
       - .github/workflows/alpha94-edge-audit.yml
+      - tools/alpha94_edge_audit.py
 
 permissions:
   contents: write
