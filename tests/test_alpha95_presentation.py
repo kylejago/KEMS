@@ -1,4 +1,4 @@
-"""Alpha9.5 presentation contracts plus Alpha9.6 recovery hardening."""
+"""Alpha9.5 presentation contracts plus Alpha9.6/Alpha9.7 recovery hardening."""
 
 from __future__ import annotations
 
@@ -12,6 +12,7 @@ ROOT = Path(__file__).resolve().parents[1]
 KEMS = ROOT / "custom_components" / "kems"
 DASHBOARD = ROOT / "dashboards" / "kems_master_dashboard.yaml"
 SOURCE_PATH = KEMS / "alpha95_presentation.py"
+PANEL_SOURCE_PATH = KEMS / "agile_panel_presentation_runtime.py"
 
 
 def _pure_helpers() -> dict[str, Any]:
@@ -47,6 +48,56 @@ def _pure_helpers() -> dict[str, Any]:
     namespace: dict[str, Any] = {"Any": Any, "math": math}
     exec(compile(module, str(SOURCE_PATH), "exec"), namespace)
     return namespace
+
+
+def _panel_runtime_fixture() -> SimpleNamespace:
+    """Load frozen panel formatting helpers without importing Home Assistant."""
+    tree = ast.parse(PANEL_SOURCE_PATH.read_text(encoding="utf-8"))
+    assignments = {
+        "_LIVE_SENSOR",
+        "_LEGACY_PANEL_FLOW_SENSOR",
+        "_PANEL_FLOW_SENSOR",
+    }
+    functions = {"_number", "_value", "_compact_flow"}
+    body: list[ast.stmt] = []
+    for node in tree.body:
+        if isinstance(node, ast.Assign):
+            names = {
+                target.id for target in node.targets if isinstance(target, ast.Name)
+            }
+            if names & assignments:
+                body.append(node)
+        elif isinstance(node, ast.FunctionDef) and node.name in functions:
+            body.append(node)
+
+    module = ast.fix_missing_locations(ast.Module(body=body, type_ignores=[]))
+    namespace: dict[str, Any] = {"Any": Any, "math": math}
+    exec(compile(module, str(PANEL_SOURCE_PATH), "exec"), namespace)
+    return SimpleNamespace(
+        _LIVE_SENSOR=namespace["_LIVE_SENSOR"],
+        _LEGACY_PANEL_FLOW_SENSOR=namespace["_LEGACY_PANEL_FLOW_SENSOR"],
+        _PANEL_FLOW_SENSOR=namespace["_PANEL_FLOW_SENSOR"],
+        _compact_flow=namespace["_compact_flow"],
+    )
+
+
+def _alpha97_projection_helper():
+    """Load Alpha9.7's local panel projection against the frozen formatter."""
+    tree = ast.parse(SOURCE_PATH.read_text(encoding="utf-8"))
+    functions = [
+        node
+        for node in tree.body
+        if isinstance(node, ast.FunctionDef)
+        and node.name == "_publish_panel_flow_state"
+    ]
+    assert len(functions) == 1
+    module = ast.fix_missing_locations(ast.Module(body=functions, type_ignores=[]))
+    namespace: dict[str, Any] = {
+        "Any": Any,
+        "panel_runtime": _panel_runtime_fixture(),
+    }
+    exec(compile(module, str(SOURCE_PATH), "exec"), namespace)
+    return namespace["_publish_panel_flow_state"]
 
 
 def test_alpha95_current_day_cards_use_stable_flat_entities() -> None:
@@ -123,13 +174,78 @@ def test_alpha95_panel_soc_keeps_authoritative_routing_soc_when_present() -> Non
     assert helper(manager, state) is state
 
 
-def test_alpha96_install_is_retry_safe_before_legacy_panel_reinstall() -> None:
+def test_alpha97_panel_projection_is_standalone_and_preserves_soc() -> None:
+    helper = _alpha97_projection_helper()
+    writes: list[tuple[str, object, dict[str, Any]]] = []
+
+    class States:
+        @staticmethod
+        def get(entity_id: str):
+            assert entity_id == "sensor.kems_agile_live_scenario"
+            return SimpleNamespace(state="ready", attributes={"existing": True})
+
+    manager = SimpleNamespace(
+        _hass=SimpleNamespace(states=States()),
+        _set=lambda entity_id, state, attributes: writes.append(
+            (entity_id, state, attributes)
+        ),
+    )
+    state = {
+        "current_routing_snapshot": {
+            "available": True,
+            "simulated_house_load_kw": 1.2,
+            "solar_power_kw": 0.5,
+            "grid_import_kw": 0.0,
+            "grid_export_kw": 0.3,
+            "solar_to_home_kw": 0.5,
+            "solar_to_battery_kw": 0.0,
+            "solar_export_kw": 0.0,
+            "grid_to_battery_kw": 0.0,
+            "battery_to_home_kw": 0.7,
+            "battery_export_kw": 0.3,
+            "simulated_soc_percent": 76.0,
+            "routing_action": "HOME/EXPORT",
+            "dispatch_mode": "battery",
+        }
+    }
+
+    helper(manager, state)
+
+    assert [item[0] for item in writes] == [
+        "sensor.kems_agile_smart_export_flow_now",
+        "sensor.kems_panel_full_kems_agile_flow_now",
+        "sensor.kems_agile_live_scenario",
+    ]
+    assert "SOC=76.0" in str(writes[0][1])
+    assert writes[0][2]["simulated_soc_percent"] == 76.0
+    assert writes[2][2]["panel_flow_source"] == (
+        "sensor.kems_panel_full_kems_agile_flow_now"
+    )
+
+
+def test_alpha97_install_never_reinstalls_legacy_panel_wrapper() -> None:
+    repair = SOURCE_PATH.read_text(encoding="utf-8")
+    panel = PANEL_SOURCE_PATH.read_text(encoding="utf-8")
+    product = (KEMS / "agile_product_presentation.py").read_text(encoding="utf-8")
+    install = repair[repair.index("def install_alpha95_presentation()") :]
+
+    assert "install_alpha736_panel_flow_patch" not in repair
+    assert "install_alpha736_panel_flow_patch()" in product
+    assert "def _publish_panel_flow_state" in repair
+    assert "_publish_panel_flow_state(self, enriched)" in install
+    assert install.index("original_publish(self, enriched)") < install.index(
+        "_publish_panel_flow_state(self, enriched)"
+    )
+    assert "publish_with_alpha95_panel_soc._kems_alpha736_panel_flow = True" in install
+    assert "alpha736_original_publish = publish" in panel
+
+
+def test_alpha96_install_remains_retry_safe() -> None:
     repair = SOURCE_PATH.read_text(encoding="utf-8")
     install = repair[repair.index("def install_alpha95_presentation()") :]
 
     guard = 'if getattr(publish, "_kems_alpha95_panel_soc", False):'
     assert guard in install
-    assert install.index(guard) < install.index("install_alpha736_panel_flow_patch()")
     assert (
         "dashboard._combined_master_dashboard_bytes = dashboard_bytes_with_alpha95"
         in install
@@ -137,7 +253,6 @@ def test_alpha96_install_is_retry_safe_before_legacy_panel_reinstall() -> None:
     assert (
         "convergent._managed_dashboard_bytes = dashboard_bytes_with_alpha95" in install
     )
-    assert "publish_with_alpha95_panel_soc._kems_alpha736_panel_flow = True" in install
 
 
 def test_alpha95_installs_before_dashboard_sync_and_restores_panel_flow() -> None:
@@ -148,7 +263,7 @@ def test_alpha95_installs_before_dashboard_sync_and_restores_panel_flow() -> Non
     assert setup.index("install_alpha95_presentation()") < setup.index(
         "await async_sync_managed_dashboard(hass)"
     )
-    assert "install_alpha736_panel_flow_patch()" in repair
+    assert "_publish_panel_flow_state" in repair
     assert "sensor.kems_simulated_battery_state_of_charge" in repair
 
 

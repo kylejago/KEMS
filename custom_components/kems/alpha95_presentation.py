@@ -1,4 +1,4 @@
-"""Alpha9.5 customer presentation repair, hardened by Alpha9.6.
+"""Alpha9.5 customer presentation repair, hardened by Alpha9.6 and Alpha9.7.
 
 Keep current-day dashboard totals on the stable flat KEMS entities and restore the
 HA-side Full KEMS Agile panel flow publisher.  This module is reporting-only: it
@@ -13,8 +13,8 @@ from __future__ import annotations
 import math
 from typing import Any
 
+from . import agile_panel_presentation_runtime as panel_runtime
 from . import agile_smart_export_runtime_base as agile_runtime
-from .agile_panel_presentation_runtime import install_alpha736_panel_flow_patch
 
 _SIMULATED_SOC_ENTITY = "sensor.kems_simulated_battery_state_of_charge"
 
@@ -142,8 +142,35 @@ def _state_with_panel_soc(manager: Any, state: dict[str, Any]) -> dict[str, Any]
     return enriched
 
 
+def _publish_panel_flow_state(manager: Any, state: dict[str, Any]) -> None:
+    """Project compact panel state without invoking or rewiring a publisher."""
+    snapshot = state.get("current_routing_snapshot")
+    if not isinstance(snapshot, dict):
+        snapshot = {"available": False}
+
+    flow = panel_runtime._compact_flow(snapshot)
+    attributes = {
+        "version": "0.7.0-alpha7.36",
+        "source": "current_routing_snapshot",
+        "reporting_only": True,
+        "routing_action": snapshot.get("routing_action"),
+        "dispatch_mode": snapshot.get("dispatch_mode"),
+        "simulated_soc_percent": snapshot.get("simulated_soc_percent"),
+    }
+    manager._set(panel_runtime._LEGACY_PANEL_FLOW_SENSOR, flow, attributes)
+    manager._set(panel_runtime._PANEL_FLOW_SENSOR, flow, attributes)
+
+    live_state = manager._hass.states.get(panel_runtime._LIVE_SENSOR)
+    if live_state is not None:
+        live_attributes = dict(live_state.attributes)
+        live_attributes["simulated_soc_percent"] = snapshot.get("simulated_soc_percent")
+        live_attributes["panel_flow_state"] = flow
+        live_attributes["panel_flow_source"] = panel_runtime._PANEL_FLOW_SENSOR
+        manager._set(panel_runtime._LIVE_SENSOR, live_state.state, live_attributes)
+
+
 def install_alpha95_presentation() -> None:
-    """Install the Alpha9.5 presentation repair exactly once across HA retries."""
+    """Install the presentation repair exactly once without rewiring legacy globals."""
     from . import dashboard
     from . import update_orchestrator_convergent as convergent
 
@@ -157,27 +184,24 @@ def install_alpha95_presentation() -> None:
         dashboard._combined_master_dashboard_bytes = dashboard_bytes_with_alpha95
         convergent._managed_dashboard_bytes = dashboard_bytes_with_alpha95
 
-    # A failed Home Assistant setup is retried in the same Python process. Once
-    # Alpha9.5 already owns the publisher, return before calling the older panel
-    # installer again; reinstalling it would rewrite its global original-publish
-    # pointer back to this wrapper and create an infinite recursion loop.
     publish = agile_runtime.EfficientAgileSmartExportManager._publish
     if getattr(publish, "_kems_alpha95_panel_soc", False):
         return
 
-    # Restore the HA-side compact flow publisher expected by the already-shipped
-    # alpha9-panel.0 firmware. No panel firmware change is required.
-    install_alpha736_panel_flow_patch()
-
-    publish = agile_runtime.EfficientAgileSmartExportManager._publish
+    # The compatibility chain already installed the historical panel wrapper once.
+    # Reinstalling it here would overwrite that module's global original-publisher
+    # pointer with a later chain that already contains the first wrapper, creating
+    # an immediate recursion loop. Wrap only the final publisher and project the
+    # panel state directly after the existing chain completes.
     original_publish = publish
 
     def publish_with_alpha95_panel_soc(self: Any, state: dict[str, Any]) -> None:
-        original_publish(self, _state_with_panel_soc(self, state))
+        enriched = _state_with_panel_soc(self, state)
+        original_publish(self, enriched)
+        _publish_panel_flow_state(self, enriched)
 
     publish_with_alpha95_panel_soc._kems_alpha95_panel_soc = True
-    if getattr(original_publish, "_kems_alpha736_panel_flow", False):
-        publish_with_alpha95_panel_soc._kems_alpha736_panel_flow = True
+    publish_with_alpha95_panel_soc._kems_alpha736_panel_flow = True
     agile_runtime.EfficientAgileSmartExportManager._publish = (
         publish_with_alpha95_panel_soc
     )
