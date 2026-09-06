@@ -6,13 +6,15 @@ does not alter optimisation, control eligibility, FoxESS commissioning, or any
 hardware-write boundary.
 """
 
+# ruff: noqa: E501
+
 from __future__ import annotations
 
 import math
 from typing import Any
 
-from .agile_panel_presentation_runtime import install_alpha736_panel_flow_patch
 from . import agile_smart_export_runtime_base as agile_runtime
+from .agile_panel_presentation_runtime import install_alpha736_panel_flow_patch
 
 _SIMULATED_SOC_ENTITY = "sensor.kems_simulated_battery_state_of_charge"
 
