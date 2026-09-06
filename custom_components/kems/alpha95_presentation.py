@@ -1,4 +1,4 @@
-"""Alpha9.5 customer presentation repair, hardened by Alpha9.6.
+"""Alpha9.5 customer presentation repair, hardened by Alpha9.6 and Alpha9.7.
 
 Keep current-day dashboard totals on the stable flat KEMS entities and restore the
 HA-side Full KEMS Agile panel flow publisher.  This module is reporting-only: it
@@ -14,7 +14,7 @@ import math
 from typing import Any
 
 from . import agile_smart_export_runtime_base as agile_runtime
-from .agile_panel_presentation_runtime import install_alpha736_panel_flow_patch
+from .agile_panel_presentation_runtime import _publish_panel_flow_state
 
 _SIMULATED_SOC_ENTITY = "sensor.kems_simulated_battery_state_of_charge"
 
@@ -143,7 +143,7 @@ def _state_with_panel_soc(manager: Any, state: dict[str, Any]) -> dict[str, Any]
 
 
 def install_alpha95_presentation() -> None:
-    """Install the Alpha9.5 presentation repair exactly once across HA retries."""
+    """Install the presentation repair exactly once without rewiring legacy globals."""
     from . import dashboard
     from . import update_orchestrator_convergent as convergent
 
@@ -157,27 +157,24 @@ def install_alpha95_presentation() -> None:
         dashboard._combined_master_dashboard_bytes = dashboard_bytes_with_alpha95
         convergent._managed_dashboard_bytes = dashboard_bytes_with_alpha95
 
-    # A failed Home Assistant setup is retried in the same Python process. Once
-    # Alpha9.5 already owns the publisher, return before calling the older panel
-    # installer again; reinstalling it would rewrite its global original-publish
-    # pointer back to this wrapper and create an infinite recursion loop.
     publish = agile_runtime.EfficientAgileSmartExportManager._publish
     if getattr(publish, "_kems_alpha95_panel_soc", False):
         return
 
-    # Restore the HA-side compact flow publisher expected by the already-shipped
-    # alpha9-panel.0 firmware. No panel firmware change is required.
-    install_alpha736_panel_flow_patch()
-
-    publish = agile_runtime.EfficientAgileSmartExportManager._publish
+    # The compatibility chain already installed the historical panel wrapper once.
+    # Reinstalling it here would overwrite that module's global original-publisher
+    # pointer with a later chain that already contains the first wrapper, creating
+    # an immediate recursion loop. Wrap only the final publisher and project the
+    # panel state directly after the existing chain completes.
     original_publish = publish
 
     def publish_with_alpha95_panel_soc(self: Any, state: dict[str, Any]) -> None:
-        original_publish(self, _state_with_panel_soc(self, state))
+        enriched = _state_with_panel_soc(self, state)
+        original_publish(self, enriched)
+        _publish_panel_flow_state(self, enriched)
 
     publish_with_alpha95_panel_soc._kems_alpha95_panel_soc = True
-    if getattr(original_publish, "_kems_alpha736_panel_flow", False):
-        publish_with_alpha95_panel_soc._kems_alpha736_panel_flow = True
+    publish_with_alpha95_panel_soc._kems_alpha736_panel_flow = True
     agile_runtime.EfficientAgileSmartExportManager._publish = (
         publish_with_alpha95_panel_soc
     )
