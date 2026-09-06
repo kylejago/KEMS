@@ -243,7 +243,9 @@ def _improve_alpha910_today_presentation(content: str) -> str:
     compare_view = content.find("\n  - title: Compare\n")
     if compare_view < 0:
         return content
-    next_view = content.find("\n  - title:", compare_view + len("\n  - title: Compare\n"))
+    next_view = content.find(
+        "\n  - title:", compare_view + len("\n  - title: Compare\n")
+    )
     if next_view < 0:
         next_view = len(content)
     compare = content[compare_view:next_view]
