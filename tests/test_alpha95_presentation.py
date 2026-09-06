@@ -130,8 +130,13 @@ def test_alpha96_install_is_retry_safe_before_legacy_panel_reinstall() -> None:
     guard = 'if getattr(publish, "_kems_alpha95_panel_soc", False):'
     assert guard in install
     assert install.index(guard) < install.index("install_alpha736_panel_flow_patch()")
-    assert "dashboard._combined_master_dashboard_bytes = dashboard_bytes_with_alpha95" in install
-    assert "convergent._managed_dashboard_bytes = dashboard_bytes_with_alpha95" in install
+    assert (
+        "dashboard._combined_master_dashboard_bytes = dashboard_bytes_with_alpha95"
+        in install
+    )
+    assert (
+        "convergent._managed_dashboard_bytes = dashboard_bytes_with_alpha95" in install
+    )
     assert "publish_with_alpha95_panel_soc._kems_alpha736_panel_flow = True" in install
 
 
