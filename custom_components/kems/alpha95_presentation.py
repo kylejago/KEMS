@@ -142,4 +142,6 @@ def install_alpha95_presentation() -> None:
         original_publish(self, _state_with_panel_soc(self, state))
 
     publish_with_alpha95_panel_soc._kems_alpha95_panel_soc = True
-    agile_runtime.EfficientAgileSmartExportManager._publish = publish_with_alpha95_panel_soc
+    agile_runtime.EfficientAgileSmartExportManager._publish = (
+        publish_with_alpha95_panel_soc
+    )
