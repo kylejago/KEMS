@@ -163,9 +163,7 @@ def _publish_panel_flow_state(manager: Any, state: dict[str, Any]) -> None:
     live_state = manager._hass.states.get(panel_runtime._LIVE_SENSOR)
     if live_state is not None:
         live_attributes = dict(live_state.attributes)
-        live_attributes["simulated_soc_percent"] = snapshot.get(
-            "simulated_soc_percent"
-        )
+        live_attributes["simulated_soc_percent"] = snapshot.get("simulated_soc_percent")
         live_attributes["panel_flow_state"] = flow
         live_attributes["panel_flow_source"] = panel_runtime._PANEL_FLOW_SENSOR
         manager._set(panel_runtime._LIVE_SENSOR, live_state.state, live_attributes)
