@@ -62,3 +62,15 @@ Alpha9.3 is a KEMS-only presentation release. It restores the Happy Hour control
 The System page also states the already-proven Alpha9.2 policy: every reward hour has its own 16 kWh cap with no carry or borrowing; useful battery charging is reserved first while unavoidable home demand is protected inside the cap; the EV receives only the remainder; and once the current reward-hour cap is exhausted KEMS immediately returns to normal tariff logic. Automatic Octopus detection remains primary and manual fallback does not grant Ohme charger-write authority.
 
 No Happy Hour runtime/allocator behaviour changes in Alpha9.3. FoxESS hardware writes remain blocked. Pi Web stays `0.9.0-alpha9-web.0`, Public Web stays `0.9.0-alpha9-public.0`, and Panel stays `0.9.0-alpha9-panel.0`.
+
+## Alpha9.4 simulation / commissioning separation
+
+- KEMS: `0.9.0-alpha9.4`
+- Pi Web remains: `0.9.0-alpha9-web.0`
+- Public Web remains: `0.9.0-alpha9-public.0`
+- Panel remains: `0.9.0-alpha9-panel.0`
+
+Alpha9.4 restores the intended separation between virtual simulation and physical FoxESS commissioning. Current-day and scenario replay now require fresh house-demand and tariff evidence, but stale or unavailable uncommissioned FoxESS SOC, battery-power, PV or grid-export telemetry no longer invalidates those virtual calculations. When live PV is unavailable or stale, proposal/forecast solar remains the simulation authority; stale optional physical values are not silently reused as observations.
+
+Physical FoxESS telemetry remains independently fail-closed for commissioning, hardware shadow and control. Alpha9.4 also distinguishes the writable command surface from readback evidence by entity domain: Work Mode binds through `select.*`, numeric commands bind through `number.*`, and matching `sensor.*` entities are retained as read-only observation evidence rather than treated as competing commands. **FoxESS writes remain hard-blocked.**
+

@@ -23,12 +23,24 @@ def _interval_hours(current: datetime, following: datetime) -> float:
     return min(seconds / 3600, MAX_INTERVAL_HOURS)
 
 
+def _fresh_snapshot_value(snapshot: Snapshot, field: str) -> float | None:
+    """Return one numeric observation only when that source is not stale."""
+    if field in snapshot.stale_fields:
+        return None
+    value = getattr(snapshot, field, None)
+    if value is None:
+        return None
+    return float(value)
+
+
 def _load_kw(snapshot: Snapshot) -> float | None:
-    """Return the best available house-load observation."""
-    if snapshot.house_load_kw is not None:
-        return max(snapshot.house_load_kw, 0.0)
-    if snapshot.grid_import_kw is not None:
-        return max(snapshot.grid_import_kw, 0.0)
+    """Return fresh house demand without depending on optional physical telemetry."""
+    house = _fresh_snapshot_value(snapshot, "house_load_kw")
+    if house is not None:
+        return max(house, 0.0)
+    grid_import = _fresh_snapshot_value(snapshot, "grid_import_kw")
+    if grid_import is not None:
+        return max(grid_import, 0.0)
     return None
 
 
@@ -65,7 +77,7 @@ class SimulationEngine:
         reserve_kwh = capacity * config.battery_reserve_percent / 100
         battery_kwh: float | None = None
         if today:
-            initial_soc = today[0].battery_soc
+            initial_soc = _fresh_snapshot_value(today[0], "battery_soc")
             if initial_soc is None:
                 battery_kwh = self._battery_energy_at_day_start(
                     records,
@@ -144,17 +156,19 @@ class SimulationEngine:
                 continue
             intervals += 1
 
-            # Do not integrate a frozen live reading across the next history
-            # interval. Requiring both ends to be usable deliberately leaves a
-            # small gap rather than inventing energy from a stale power value.
-            if current.stale_fields or following.stale_fields:
-                continue
+            # Simulation has its own evidence boundary. Optional physical
+            # FoxESS telemetry may be stale/offline before commissioning without
+            # invalidating fresh house-demand and tariff observations.
             if _load_kw(following) is None:
                 continue
 
             rate = current.current_import_rate
             load_kw = _load_kw(current)
-            if rate is None or load_kw is None:
+            if (
+                rate is None
+                or "current_import_rate" in current.tariff_stale_fields
+                or load_kw is None
+            ):
                 continue
             covered += 1
 
@@ -163,20 +177,23 @@ class SimulationEngine:
             # not pulled into the proposal simulation.
             export_rate = effective_export_rate
             solar_kw = self._simulated_solar_power(current, config)
+            observed_solar_kw = _fresh_snapshot_value(current, "solar_power_kw")
+            observed_grid_import_kw = _fresh_snapshot_value(current, "grid_import_kw")
+            observed_grid_export_kw = _fresh_snapshot_value(current, "grid_export_kw")
             actual_import_kw = (
-                max(current.grid_import_kw, 0.0)
-                if current.grid_import_kw is not None
-                else max(load_kw - max(current.solar_power_kw or 0.0, 0.0), 0.0)
+                max(observed_grid_import_kw, 0.0)
+                if observed_grid_import_kw is not None
+                else max(load_kw - max(observed_solar_kw or 0.0, 0.0), 0.0)
             )
-            actual_export_kw = max(current.grid_export_kw or 0.0, 0.0)
+            actual_export_kw = max(observed_grid_export_kw or 0.0, 0.0)
 
             actual_house_kwh = load_kw * hours
             actual_import_kwh = actual_import_kw * hours
             actual_export_kwh = actual_export_kw * hours
             actual_house += actual_house_kwh
             actual_ev += max(current.ev_power_kw or 0.0, 0.0) * hours
-            actual_solar += max(current.solar_power_kw or 0.0, 0.0) * hours
-            battery_power_kw = current.battery_power_kw or 0.0
+            actual_solar += max(observed_solar_kw or 0.0, 0.0) * hours
+            battery_power_kw = _fresh_snapshot_value(current, "battery_power_kw") or 0.0
             if config.battery_power_positive_is_discharge:
                 actual_battery_discharge += max(battery_power_kw, 0.0) * hours
                 actual_battery_charge += max(-battery_power_kw, 0.0) * hours
@@ -718,7 +735,9 @@ class SimulationEngine:
             site_import_limit_exceeded=bool(current_plan["site_import_exceeded"]),
             strategy=effective_strategy,
             proposal_solar_active=config.proposal_solar_enabled
-            and all(item.solar_power_kw is None for item in today),
+            and all(
+                _fresh_snapshot_value(item, "solar_power_kw") is None for item in today
+            ),
             battery_export_enabled=effective_battery_export_enabled,
             data_coverage=round(100 * coverage, 1),
         )
@@ -738,9 +757,10 @@ class SimulationEngine:
         capacity = max(config.battery_capacity_kwh, 0.1)
         reserve_kwh = capacity * config.battery_reserve_percent / 100
         if battery_kwh is None:
+            fresh_battery_soc = _fresh_snapshot_value(snapshot, "battery_soc")
             starting_soc = (
-                snapshot.battery_soc
-                if snapshot.battery_soc is not None
+                fresh_battery_soc
+                if fresh_battery_soc is not None
                 else config.battery_initial_percent
             )
             battery_kwh = capacity * min(max(starting_soc, 0.0), 100.0) / 100
@@ -791,7 +811,7 @@ class SimulationEngine:
             site_import_limit_exceeded=bool(current_plan["site_import_exceeded"]),
             strategy=self._effective_strategy(config),
             proposal_solar_active=config.proposal_solar_enabled
-            and snapshot.solar_power_kw is None,
+            and _fresh_snapshot_value(snapshot, "solar_power_kw") is None,
             battery_export_enabled=self._battery_export_enabled(config),
             saving_session_joined=bool(session["saving_session_joined"]),
             saving_session_active=bool(session["saving_session_active"]),
@@ -866,12 +886,13 @@ class SimulationEngine:
         ).total_seconds() > 12 * 3600:
             return initial
         if len(previous_day_records) < 2:
-            if latest_previous.battery_soc is None:
+            previous_soc = _fresh_snapshot_value(latest_previous, "battery_soc")
+            if previous_soc is None:
                 return initial
             observed = (
                 capacity
                 * min(
-                    max(latest_previous.battery_soc, 0.0),
+                    max(previous_soc, 0.0),
                     100.0,
                 )
                 / 100
@@ -931,9 +952,10 @@ class SimulationEngine:
         config: SimulationConfig,
     ) -> float:
         """Use live FoxESS PV when present, otherwise the proposal model."""
-        if snapshot.solar_power_kw is not None:
+        observed_solar_kw = _fresh_snapshot_value(snapshot, "solar_power_kw")
+        if observed_solar_kw is not None:
             return min(
-                max(snapshot.solar_power_kw, 0.0),
+                max(observed_solar_kw, 0.0),
                 max(config.inverter_limit_kw, 0.0),
             )
         if not config.proposal_solar_enabled:
