@@ -42,7 +42,7 @@
   },
   "maintenance": {
     "required": true,
-    "reason": "Alpha9 coordinated parity baseline; Alpha9.6 KEMS-only presentation recovery: make the Alpha9.5 panel publisher installation idempotent across Home Assistant setup retries, apply the current-day totals and whole-home energy repair to the actual authoritative managed-dashboard/update-verification byte path, and make the update-status card tolerate missing optional attributes; no optimiser, tariff, Happy Hour, FoxESS commissioning/control/write, Pi Web, Public Web or panel firmware behaviour changes; Pi Web remains 0.9.0-alpha9-web.0, Public Web remains 0.9.0-alpha9-public.0, Panel remains 0.9.0-alpha9-panel.0; canonical 15% optimisation target / 10% hard floor / 12% recovery remains unchanged; FoxESS hardware writes hard-blocked until physical commissioning is complete",
+    "reason": "Alpha9 coordinated parity baseline; Alpha9.7 KEMS-only presentation recovery: eliminate the first-start publisher recursion exposed after Alpha9.6 by never reinstalling the historical Alpha7.36 panel wrapper after the compatibility chain has advanced, project the compact panel state directly from the final publisher, and retain the Alpha9.6 retry-safe dashboard and defensive update-status repairs; no optimiser, tariff, Happy Hour, FoxESS commissioning/control/write, Pi Web, Public Web or panel firmware behaviour changes; Pi Web remains 0.9.0-alpha9-web.0, Public Web remains 0.9.0-alpha9-public.0, Panel remains 0.9.0-alpha9-panel.0; canonical 15% optimisation target / 10% hard floor / 12% recovery remains unchanged; FoxESS hardware writes hard-blocked until physical commissioning is complete",
     "expected_downtime_minutes": 5,
     "home_assistant_restart_required": true,
     "reboot_required": false,
