@@ -341,7 +341,7 @@ def test_alpha98_setup_recovers_sources_and_reprojects_panel_before_platforms() 
     setup = (KEMS / "__init__.py").read_text(encoding="utf-8")
 
     assert setup.count("async_recover_alpha98_startup_sources(hass, coordinator)") == 1
-    assert setup.count("publish_alpha98_panel_projection(") == 2  # import + call
+    assert setup.count("publish_alpha98_panel_projection(") == 1
     call = setup.index("publish_alpha98_panel_projection(\n")
     platforms = setup.index("await hass.config_entries.async_forward_entry_setups")
     assert call < platforms
