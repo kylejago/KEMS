@@ -1,4 +1,4 @@
-"""Alpha9.5 customer presentation repair, hardened by Alpha9.6 and Alpha9.7.
+"""Alpha9.5 customer presentation repair, hardened through Alpha9.8.
 
 Keep current-day dashboard totals on the stable flat KEMS entities and restore the
 HA-side Full KEMS Agile panel flow publisher.  This module is reporting-only: it
@@ -122,7 +122,11 @@ def _finite(value: Any) -> float | None:
     return number if math.isfinite(number) else None
 
 
-def _state_with_panel_soc(manager: Any, state: dict[str, Any]) -> dict[str, Any]:
+def _state_with_panel_soc(
+    manager: Any,
+    state: dict[str, Any],
+    fallback_soc: Any = None,
+) -> dict[str, Any]:
     """Fill only the reporting snapshot SOC when its simulation value is absent."""
     snapshot = state.get("current_routing_snapshot")
     if not isinstance(snapshot, dict):
@@ -130,8 +134,10 @@ def _state_with_panel_soc(manager: Any, state: dict[str, Any]) -> dict[str, Any]
     if _finite(snapshot.get("simulated_soc_percent")) is not None:
         return state
 
-    simulated = manager._hass.states.get(_SIMULATED_SOC_ENTITY)
-    soc = _finite(simulated.state if simulated is not None else None)
+    soc = _finite(fallback_soc)
+    if soc is None:
+        simulated = manager._hass.states.get(_SIMULATED_SOC_ENTITY)
+        soc = _finite(simulated.state if simulated is not None else None)
     if soc is None:
         return state
 
@@ -142,13 +148,22 @@ def _state_with_panel_soc(manager: Any, state: dict[str, Any]) -> dict[str, Any]
     return enriched
 
 
+def _panel_flow(snapshot: dict[str, Any]) -> str:
+    """Preserve valid virtual SOC even when instantaneous routing is unavailable."""
+    flow = panel_runtime._compact_flow(snapshot)
+    soc = _finite(snapshot.get("simulated_soc_percent"))
+    if soc is None or "SOC=-1" not in flow:
+        return flow
+    return flow.rsplit("SOC=", 1)[0] + f"SOC={soc:.1f}"
+
+
 def _publish_panel_flow_state(manager: Any, state: dict[str, Any]) -> None:
     """Project compact panel state without invoking or rewiring a publisher."""
     snapshot = state.get("current_routing_snapshot")
     if not isinstance(snapshot, dict):
         snapshot = {"available": False}
 
-    flow = panel_runtime._compact_flow(snapshot)
+    flow = _panel_flow(snapshot)
     attributes = {
         "version": "0.7.0-alpha7.36",
         "source": "current_routing_snapshot",
@@ -167,6 +182,15 @@ def _publish_panel_flow_state(manager: Any, state: dict[str, Any]) -> None:
         live_attributes["panel_flow_state"] = flow
         live_attributes["panel_flow_source"] = panel_runtime._PANEL_FLOW_SENSOR
         manager._set(panel_runtime._LIVE_SENSOR, live_state.state, live_attributes)
+
+
+def publish_alpha98_panel_projection(manager: Any, simulated_soc_percent: Any) -> None:
+    """Republish startup panel state with the coordinator's valid virtual SOC."""
+    state = manager.state
+    if not isinstance(state, dict) or not state:
+        return
+    enriched = _state_with_panel_soc(manager, state, simulated_soc_percent)
+    _publish_panel_flow_state(manager, enriched)
 
 
 def install_alpha95_presentation() -> None:
@@ -196,8 +220,8 @@ def install_alpha95_presentation() -> None:
     original_publish = publish
 
     def publish_with_alpha95_panel_soc(self: Any, state: dict[str, Any]) -> None:
+        original_publish(self, state)
         enriched = _state_with_panel_soc(self, state)
-        original_publish(self, enriched)
         _publish_panel_flow_state(self, enriched)
 
     publish_with_alpha95_panel_soc._kems_alpha95_panel_soc = True
