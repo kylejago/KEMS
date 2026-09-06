@@ -25,13 +25,9 @@ KEMS = ROOT / "custom_components" / "kems"
 
 def test_octopus_current_demand_survives_foxess_source_promotion() -> None:
     """The tariff mapping can recover the exact sibling demand sensor."""
-    rate = (
-        "sensor.octopus_energy_electricity_1234567890123_"
-        "20l1234567_current_rate"
-    )
+    rate = "sensor.octopus_energy_electricity_1234567890123_" "20l1234567_current_rate"
     demand = (
-        "sensor.octopus_energy_electricity_1234567890123_"
-        "20l1234567_current_demand"
+        "sensor.octopus_energy_electricity_1234567890123_" "20l1234567_current_demand"
     )
 
     resolved = resolve_octopus_current_demand_entity(
@@ -61,12 +57,14 @@ def test_fallback_retains_physical_staleness_and_marks_simulation_provenance() -
     assert "house_load_kw" in evidence.stale_fields
     assert "grid_import_kw" in evidence.stale_fields
     assert "battery_soc" in evidence.stale_fields
-    assert evidence.source_age_seconds[
-        simulation_fallback_age_key("house_load_kw")
-    ] == 15.0
-    assert evidence.source_age_seconds[
-        simulation_fallback_age_key("grid_import_kw")
-    ] == 15.0
+    assert (
+        evidence.source_age_seconds[simulation_fallback_age_key("house_load_kw")]
+        == 15.0
+    )
+    assert (
+        evidence.source_age_seconds[simulation_fallback_age_key("grid_import_kw")]
+        == 15.0
+    )
 
 
 def _fallback_records() -> list[Snapshot]:
@@ -181,8 +179,9 @@ def test_unmarked_stale_house_and_grid_still_fail_simulation_closed() -> None:
     assert result.data_coverage == 0.0
 
 
-def test_hardware_control_remains_fail_closed_while_fallback_drives_simulation(
-) -> None:
+def test_hardware_control_remains_fail_closed_while_fallback_drives_simulation() -> (
+    None
+):
     """Simulation health must not turn Octopus demand into hardware authority."""
     records = _fallback_records()
     now = records[-1].timestamp + timedelta(minutes=1)
