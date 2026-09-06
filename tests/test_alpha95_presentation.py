@@ -2,21 +2,53 @@
 
 from __future__ import annotations
 
+import ast
+import math
 from pathlib import Path
 from types import SimpleNamespace
-
-from custom_components.kems.alpha95_presentation import (
-    _state_with_panel_soc,
-    improve_alpha95_dashboard,
-)
+from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
 KEMS = ROOT / "custom_components" / "kems"
 DASHBOARD = ROOT / "dashboards" / "kems_master_dashboard.yaml"
+SOURCE_PATH = KEMS / "alpha95_presentation.py"
+
+
+def _pure_helpers() -> dict[str, Any]:
+    """Load only Alpha9.5's Home Assistant-independent helpers from source."""
+    tree = ast.parse(SOURCE_PATH.read_text(encoding="utf-8"))
+    assignments = {
+        "_SIMULATED_SOC_ENTITY",
+        "_LIVE_DAILY_OLD",
+        "_LIVE_DAILY_NEW",
+        "_KEMS_DAILY_OLD",
+        "_KEMS_DAILY_NEW",
+        "_KEMS_HOME_ENERGY_OLD",
+        "_KEMS_HOME_ENERGY_NEW",
+    }
+    functions = {"improve_alpha95_dashboard", "_finite", "_state_with_panel_soc"}
+    body: list[ast.stmt] = []
+    for node in tree.body:
+        if isinstance(node, ast.Assign):
+            names = {
+                target.id for target in node.targets if isinstance(target, ast.Name)
+            }
+            if names & assignments:
+                body.append(node)
+        elif isinstance(node, ast.FunctionDef) and node.name in functions:
+            body.append(node)
+
+    module = ast.fix_missing_locations(ast.Module(body=body, type_ignores=[]))
+    namespace: dict[str, Any] = {"Any": Any, "math": math}
+    exec(compile(module, str(SOURCE_PATH), "exec"), namespace)
+    return namespace
 
 
 def test_alpha95_current_day_cards_use_stable_flat_entities() -> None:
-    content = improve_alpha95_dashboard(DASHBOARD.read_text(encoding="utf-8"))
+    helpers = _pure_helpers()
+    content = helpers["improve_alpha95_dashboard"](
+        DASHBOARD.read_text(encoding="utf-8")
+    )
 
     assert "states('sensor.kems_whole_home_observed_cost_today')" in content
     assert "states('sensor.kems_whole_home_simulated_cost_today')" in content
@@ -35,6 +67,8 @@ def test_alpha95_current_day_cards_use_stable_flat_entities() -> None:
 
 
 def test_alpha95_panel_soc_falls_back_to_virtual_soc() -> None:
+    helper = _pure_helpers()["_state_with_panel_soc"]
+
     class States:
         @staticmethod
         def get(entity_id: str):
@@ -50,7 +84,7 @@ def test_alpha95_panel_soc_falls_back_to_virtual_soc() -> None:
         }
     }
 
-    enriched = _state_with_panel_soc(manager, original)
+    enriched = helper(manager, original)
 
     assert enriched is not original
     assert (
@@ -61,6 +95,8 @@ def test_alpha95_panel_soc_falls_back_to_virtual_soc() -> None:
 
 
 def test_alpha95_panel_soc_keeps_authoritative_routing_soc_when_present() -> None:
+    helper = _pure_helpers()["_state_with_panel_soc"]
+
     class States:
         @staticmethod
         def get(_entity_id: str):
@@ -69,12 +105,12 @@ def test_alpha95_panel_soc_keeps_authoritative_routing_soc_when_present() -> Non
     manager = SimpleNamespace(_hass=SimpleNamespace(states=States()))
     state = {"current_routing_snapshot": {"simulated_soc_percent": 42.5}}
 
-    assert _state_with_panel_soc(manager, state) is state
+    assert helper(manager, state) is state
 
 
 def test_alpha95_installs_before_dashboard_sync_and_restores_panel_flow() -> None:
     setup = (KEMS / "__init__.py").read_text(encoding="utf-8")
-    repair = (KEMS / "alpha95_presentation.py").read_text(encoding="utf-8")
+    repair = SOURCE_PATH.read_text(encoding="utf-8")
 
     assert "install_alpha95_presentation()" in setup
     assert setup.index("install_alpha95_presentation()") < setup.index(
@@ -85,7 +121,7 @@ def test_alpha95_installs_before_dashboard_sync_and_restores_panel_flow() -> Non
 
 
 def test_alpha95_presentation_repair_cannot_write_hardware() -> None:
-    source = (KEMS / "alpha95_presentation.py").read_text(encoding="utf-8")
+    source = SOURCE_PATH.read_text(encoding="utf-8")
 
     for forbidden in (
         ".services.async_call(",
