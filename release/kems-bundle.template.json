@@ -42,7 +42,7 @@
   },
   "maintenance": {
     "required": true,
-    "reason": "Alpha9 coordinated parity baseline; Alpha9.5 KEMS-only presentation repair: restore current-day dashboard totals and KEMS whole-home energy from stable flat reporting entities, reinstall the existing HA-side Full KEMS Agile panel flow publisher, and supply its simulated SOC from the current digital-twin SOC only when the routing snapshot lacks that reporting value; no optimiser, tariff, Happy Hour, FoxESS commissioning/control/write, Pi Web, Public Web or panel firmware behaviour changes; Pi Web remains 0.9.0-alpha9-web.0, Public Web remains 0.9.0-alpha9-public.0, Panel remains 0.9.0-alpha9-panel.0; canonical 15% optimisation target / 10% hard floor / 12% recovery remains unchanged; FoxESS hardware writes remain hard-blocked until physical commissioning is complete",
+    "reason": "Alpha9 coordinated parity baseline; Alpha9.5 KEMS-only presentation repair: restore current-day dashboard totals and KEMS whole-home energy from stable flat reporting entities, reinstall the existing HA-side Full KEMS Agile panel flow publisher, and supply its simulated SOC from the current digital-twin SOC only when the routing snapshot lacks that reporting value; no optimiser, tariff, Happy Hour, FoxESS commissioning/control/write, Pi Web, Public Web or panel firmware behaviour changes; Pi Web remains 0.9.0-alpha9-web.0, Public Web remains 0.9.0-alpha9-public.0, Panel remains 0.9.0-alpha9-panel.0; canonical 15% optimisation target / 10% hard floor / 12% recovery remains unchanged; FoxESS hardware writes hard-blocked until physical commissioning is complete",
     "expected_downtime_minutes": 5,
     "home_assistant_restart_required": true,
     "reboot_required": false,
