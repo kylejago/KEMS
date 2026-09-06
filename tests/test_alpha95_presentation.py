@@ -1,4 +1,4 @@
-"""Alpha9.5 live presentation regression contracts."""
+"""Alpha9.5 presentation contracts plus Alpha9.6 recovery hardening."""
 
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ SOURCE_PATH = KEMS / "alpha95_presentation.py"
 
 
 def _pure_helpers() -> dict[str, Any]:
-    """Load only Alpha9.5's Home Assistant-independent helpers from source."""
+    """Load only Home Assistant-independent presentation helpers from source."""
     tree = ast.parse(SOURCE_PATH.read_text(encoding="utf-8"))
     assignments = {
         "_SIMULATED_SOC_ENTITY",
@@ -26,7 +26,12 @@ def _pure_helpers() -> dict[str, Any]:
         "_KEMS_HOME_ENERGY_OLD",
         "_KEMS_HOME_ENERGY_NEW",
     }
-    functions = {"improve_alpha95_dashboard", "_finite", "_state_with_panel_soc"}
+    functions = {
+        "improve_alpha95_dashboard",
+        "_improve_dashboard_bytes",
+        "_finite",
+        "_state_with_panel_soc",
+    }
     body: list[ast.stmt] = []
     for node in tree.body:
         if isinstance(node, ast.Assign):
@@ -64,6 +69,16 @@ def test_alpha95_current_day_cards_use_stable_flat_entities() -> None:
         "{% set kems = p.get('kems', {}) or {} %}\n" "              | Cost | KEMS |"
     ) not in content
     assert "kems.get('home_energy_kwh')" not in content
+
+
+def test_alpha96_authoritative_dashboard_bytes_receive_repairs() -> None:
+    helper = _pure_helpers()["_improve_dashboard_bytes"]
+    content = helper(DASHBOARD.read_bytes()).decode("utf-8")
+
+    assert "states('sensor.kems_whole_home_energy_today')" in content
+    assert "u.attributes.running_kems_version" not in content
+    assert "u.attributes.get('running_kems_version')" in content
+    assert "u.attributes.get('last_error')" in content
 
 
 def test_alpha95_panel_soc_falls_back_to_virtual_soc() -> None:
@@ -106,6 +121,18 @@ def test_alpha95_panel_soc_keeps_authoritative_routing_soc_when_present() -> Non
     state = {"current_routing_snapshot": {"simulated_soc_percent": 42.5}}
 
     assert helper(manager, state) is state
+
+
+def test_alpha96_install_is_retry_safe_before_legacy_panel_reinstall() -> None:
+    repair = SOURCE_PATH.read_text(encoding="utf-8")
+    install = repair[repair.index("def install_alpha95_presentation()") :]
+
+    guard = 'if getattr(publish, "_kems_alpha95_panel_soc", False):'
+    assert guard in install
+    assert install.index(guard) < install.index("install_alpha736_panel_flow_patch()")
+    assert "dashboard._combined_master_dashboard_bytes = dashboard_bytes_with_alpha95" in install
+    assert "convergent._managed_dashboard_bytes = dashboard_bytes_with_alpha95" in install
+    assert "publish_with_alpha95_panel_soc._kems_alpha736_panel_flow = True" in install
 
 
 def test_alpha95_installs_before_dashboard_sync_and_restores_panel_flow() -> None:
