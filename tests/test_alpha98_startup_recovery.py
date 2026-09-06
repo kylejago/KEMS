@@ -143,9 +143,10 @@ def test_alpha98_runs_exactly_one_bounded_recovery_refresh() -> None:
 def test_alpha98_setup_has_one_recovery_call_and_no_retry_loop() -> None:
     setup = SETUP_PATH.read_text(encoding="utf-8")
     source = SOURCE_PATH.read_text(encoding="utf-8")
+    tree = ast.parse(source)
 
     assert setup.count("async_recover_alpha98_startup_sources(hass, coordinator)") == 1
-    assert "while " not in source
+    assert not any(isinstance(node, ast.While) for node in ast.walk(tree))
     assert "asyncio.sleep" not in source
     assert "call_later" not in source
 
