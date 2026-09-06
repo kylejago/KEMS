@@ -82,12 +82,18 @@ from .quality import assess_quality
 from .roi import ROIEngine
 from .scenario_comparison import SCENARIO_KEYS, ScenarioComparisonEngine
 from .simulation import SimulationEngine
+from .simulation_fallback import install_simulation_demand_fallback_policy
 from .system_profile import FOXHOLE_PROPOSAL_PROFILE, ProposalSystemProfile, SolarArray
 from .whole_home import WholeHomeEngine
 
 # Alpha7.34: make the configured overnight window the sole cheap-period
 # authority for both newly collected and previously retained snapshots.
 install_overnight_only_cheap_policy()
+
+# Alpha9.9: retain FoxESS physical source authority for commissioning while
+# allowing explicitly marked Octopus current-demand fallback evidence to keep the
+# virtual simulation alive. Physical stale flags remain fail-closed for control.
+install_simulation_demand_fallback_policy()
 
 # EV policy remains a shadow-only desired-command gate. Each coordinator sets
 # its own persisted policy on its ControlEngine instance during setup.
