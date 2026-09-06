@@ -1,4 +1,4 @@
-"""Alpha9.5 customer presentation repair.
+"""Alpha9.5 customer presentation repair, hardened by Alpha9.6.
 
 Keep current-day dashboard totals on the stable flat KEMS entities and restore the
 HA-side Full KEMS Agile panel flow publisher.  This module is reporting-only: it
@@ -81,12 +81,37 @@ _KEMS_HOME_ENERGY_NEW = """          | Energy | KEMS |
 
 
 def improve_alpha95_dashboard(content: str) -> str:
-    """Use stable flat current-day entities for headline customer cards."""
+    """Use stable flat current-day entities and defensive update-status templates."""
     return (
         content.replace(_LIVE_DAILY_OLD, _LIVE_DAILY_NEW)
         .replace(_KEMS_DAILY_OLD, _KEMS_DAILY_NEW)
         .replace(_KEMS_HOME_ENERGY_OLD, _KEMS_HOME_ENERGY_NEW)
+        .replace(
+            "{{ u.attributes.running_kems_version if u else '—' }}",
+            "{{ (u.attributes.get('running_kems_version') or '—') if u else '—' }}",
+        )
+        .replace(
+            "{{ u.attributes.bundle if u and u.attributes.bundle else '—' }}",
+            "{{ (u.attributes.get('bundle') or '—') if u else '—' }}",
+        )
+        .replace(
+            "{{ u.attributes.last_result if u and u.attributes.last_result else '—' }}",
+            "{{ (u.attributes.get('last_result') or '—') if u else '—' }}",
+        )
+        .replace(
+            "{% if u and u.attributes.last_error %}",
+            "{% if u and u.attributes.get('last_error') %}",
+        )
+        .replace(
+            "{{ u.attributes.last_error }}",
+            "{{ u.attributes.get('last_error') }}",
+        )
     )
+
+
+def _improve_dashboard_bytes(payload: bytes) -> bytes:
+    """Apply the presentation repair to the authoritative managed-dashboard bytes."""
+    return improve_alpha95_dashboard(payload.decode("utf-8")).encode("utf-8")
 
 
 def _finite(value: Any) -> float | None:
@@ -118,32 +143,41 @@ def _state_with_panel_soc(manager: Any, state: dict[str, Any]) -> dict[str, Any]
 
 
 def install_alpha95_presentation() -> None:
-    """Install the Alpha9.5 dashboard and panel reporting repair once."""
+    """Install the Alpha9.5 presentation repair exactly once across HA retries."""
     from . import dashboard
+    from . import update_orchestrator_convergent as convergent
 
-    readability = dashboard._dashboard_readability_pass
-    if not getattr(readability, "_kems_alpha95_flat_daily", False):
+    dashboard_bytes = dashboard._combined_master_dashboard_bytes
+    if not getattr(dashboard_bytes, "_kems_alpha95_flat_daily", False):
 
-        def readability_with_alpha95(content: str) -> str:
-            return improve_alpha95_dashboard(readability(content))
+        def dashboard_bytes_with_alpha95() -> bytes:
+            return _improve_dashboard_bytes(dashboard_bytes())
 
-        readability_with_alpha95._kems_alpha95_flat_daily = True
-        dashboard._dashboard_readability_pass = readability_with_alpha95
+        dashboard_bytes_with_alpha95._kems_alpha95_flat_daily = True
+        dashboard._combined_master_dashboard_bytes = dashboard_bytes_with_alpha95
+        convergent._managed_dashboard_bytes = dashboard_bytes_with_alpha95
+
+    # A failed Home Assistant setup is retried in the same Python process. Once
+    # Alpha9.5 already owns the publisher, return before calling the older panel
+    # installer again; reinstalling it would rewrite its global original-publish
+    # pointer back to this wrapper and create an infinite recursion loop.
+    publish = agile_runtime.EfficientAgileSmartExportManager._publish
+    if getattr(publish, "_kems_alpha95_panel_soc", False):
+        return
 
     # Restore the HA-side compact flow publisher expected by the already-shipped
     # alpha9-panel.0 firmware. No panel firmware change is required.
     install_alpha736_panel_flow_patch()
 
     publish = agile_runtime.EfficientAgileSmartExportManager._publish
-    if getattr(publish, "_kems_alpha95_panel_soc", False):
-        return
-
     original_publish = publish
 
     def publish_with_alpha95_panel_soc(self: Any, state: dict[str, Any]) -> None:
         original_publish(self, _state_with_panel_soc(self, state))
 
     publish_with_alpha95_panel_soc._kems_alpha95_panel_soc = True
+    if getattr(original_publish, "_kems_alpha736_panel_flow", False):
+        publish_with_alpha95_panel_soc._kems_alpha736_panel_flow = True
     agile_runtime.EfficientAgileSmartExportManager._publish = (
         publish_with_alpha95_panel_soc
     )
