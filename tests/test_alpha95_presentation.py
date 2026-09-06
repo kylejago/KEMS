@@ -1,4 +1,4 @@
-"""Alpha9.5 presentation contracts plus Alpha9.6/Alpha9.7 recovery hardening."""
+"""Alpha9.5 presentation contracts plus Alpha9.6-Alpha9.8 recovery hardening."""
 
 from __future__ import annotations
 
@@ -81,23 +81,35 @@ def _panel_runtime_fixture() -> SimpleNamespace:
     )
 
 
-def _alpha97_projection_helper():
-    """Load Alpha9.7's local panel projection against the frozen formatter."""
+def _alpha98_projection_helpers() -> dict[str, Any]:
+    """Load Alpha9.8's standalone projection helpers against the frozen formatter."""
     tree = ast.parse(SOURCE_PATH.read_text(encoding="utf-8"))
-    functions = [
-        node
-        for node in tree.body
-        if isinstance(node, ast.FunctionDef)
-        and node.name == "_publish_panel_flow_state"
-    ]
-    assert len(functions) == 1
-    module = ast.fix_missing_locations(ast.Module(body=functions, type_ignores=[]))
+    names = {
+        "_finite",
+        "_state_with_panel_soc",
+        "_panel_flow",
+        "_publish_panel_flow_state",
+        "publish_alpha98_panel_projection",
+    }
+    body: list[ast.stmt] = []
+    for node in tree.body:
+        if isinstance(node, ast.Assign):
+            assigned = {
+                target.id for target in node.targets if isinstance(target, ast.Name)
+            }
+            if "_SIMULATED_SOC_ENTITY" in assigned:
+                body.append(node)
+        elif isinstance(node, ast.FunctionDef) and node.name in names:
+            body.append(node)
+
+    module = ast.fix_missing_locations(ast.Module(body=body, type_ignores=[]))
     namespace: dict[str, Any] = {
         "Any": Any,
+        "math": math,
         "panel_runtime": _panel_runtime_fixture(),
     }
     exec(compile(module, str(SOURCE_PATH), "exec"), namespace)
-    return namespace["_publish_panel_flow_state"]
+    return namespace
 
 
 def test_alpha95_current_day_cards_use_stable_flat_entities() -> None:
@@ -160,6 +172,28 @@ def test_alpha95_panel_soc_falls_back_to_virtual_soc() -> None:
     assert original["current_routing_snapshot"]["simulated_soc_percent"] is None
 
 
+def test_alpha98_panel_soc_accepts_explicit_startup_virtual_soc() -> None:
+    helper = _pure_helpers()["_state_with_panel_soc"]
+
+    class States:
+        @staticmethod
+        def get(_entity_id: str):
+            raise AssertionError("HA fallback must not be queried when startup SOC exists")
+
+    manager = SimpleNamespace(_hass=SimpleNamespace(states=States()))
+    original = {
+        "current_routing_snapshot": {
+            "available": False,
+            "simulated_soc_percent": None,
+        }
+    }
+
+    enriched = helper(manager, original, 68.6)
+
+    assert enriched["current_routing_snapshot"]["simulated_soc_percent"] == 68.6
+    assert original["current_routing_snapshot"]["simulated_soc_percent"] is None
+
+
 def test_alpha95_panel_soc_keeps_authoritative_routing_soc_when_present() -> None:
     helper = _pure_helpers()["_state_with_panel_soc"]
 
@@ -175,7 +209,7 @@ def test_alpha95_panel_soc_keeps_authoritative_routing_soc_when_present() -> Non
 
 
 def test_alpha97_panel_projection_is_standalone_and_preserves_soc() -> None:
-    helper = _alpha97_projection_helper()
+    helper = _alpha98_projection_helpers()["_publish_panel_flow_state"]
     writes: list[tuple[str, object, dict[str, Any]]] = []
 
     class States:
@@ -223,6 +257,51 @@ def test_alpha97_panel_projection_is_standalone_and_preserves_soc() -> None:
     )
 
 
+def test_alpha98_unavailable_panel_flow_keeps_only_valid_virtual_soc() -> None:
+    helper = _alpha98_projection_helpers()["_panel_flow"]
+    flow = helper(
+        {
+            "available": False,
+            "simulated_soc_percent": 68.6,
+        }
+    )
+
+    assert flow == (
+        "H=-1,S=-1,GI=-1,GE=-1,SH=-1,SB=-1,SE=-1,"
+        "GB=-1,BH=-1,BE=-1,SOC=68.6"
+    )
+
+
+def test_alpha98_explicit_startup_projection_republishes_panel_soc() -> None:
+    helper = _alpha98_projection_helpers()["publish_alpha98_panel_projection"]
+    writes: list[tuple[str, object, dict[str, Any]]] = []
+
+    class States:
+        @staticmethod
+        def get(entity_id: str):
+            assert entity_id == "sensor.kems_agile_live_scenario"
+            return None
+
+    manager = SimpleNamespace(
+        state={
+            "current_routing_snapshot": {
+                "available": False,
+                "simulated_soc_percent": None,
+            }
+        },
+        _hass=SimpleNamespace(states=States()),
+        _set=lambda entity_id, state, attributes: writes.append(
+            (entity_id, state, attributes)
+        ),
+    )
+
+    helper(manager, 68.6)
+
+    assert len(writes) == 2
+    assert writes[0][1].endswith("SOC=68.6")
+    assert writes[1][1].endswith("SOC=68.6")
+
+
 def test_alpha97_install_never_reinstalls_legacy_panel_wrapper() -> None:
     repair = SOURCE_PATH.read_text(encoding="utf-8")
     panel = PANEL_SOURCE_PATH.read_text(encoding="utf-8")
@@ -233,7 +312,10 @@ def test_alpha97_install_never_reinstalls_legacy_panel_wrapper() -> None:
     assert "install_alpha736_panel_flow_patch()" in product
     assert "def _publish_panel_flow_state" in repair
     assert "_publish_panel_flow_state(self, enriched)" in install
-    assert install.index("original_publish(self, enriched)") < install.index(
+    assert install.index("original_publish(self, state)") < install.index(
+        "enriched = _state_with_panel_soc(self, state)"
+    )
+    assert install.index("enriched = _state_with_panel_soc(self, state)") < install.index(
         "_publish_panel_flow_state(self, enriched)"
     )
     assert "publish_with_alpha95_panel_soc._kems_alpha736_panel_flow = True" in install
@@ -253,6 +335,16 @@ def test_alpha96_install_remains_retry_safe() -> None:
     assert (
         "convergent._managed_dashboard_bytes = dashboard_bytes_with_alpha95" in install
     )
+
+
+def test_alpha98_setup_recovers_sources_and_reprojects_panel_before_platforms() -> None:
+    setup = (KEMS / "__init__.py").read_text(encoding="utf-8")
+
+    assert setup.count("async_recover_alpha98_startup_sources(hass, coordinator)") == 1
+    assert setup.count("publish_alpha98_panel_projection(") == 2  # import + call
+    call = setup.index("publish_alpha98_panel_projection(\n")
+    platforms = setup.index("await hass.config_entries.async_forward_entry_setups")
+    assert call < platforms
 
 
 def test_alpha95_installs_before_dashboard_sync_and_restores_panel_flow() -> None:
