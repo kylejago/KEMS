@@ -81,7 +81,9 @@ def startup_source_recovery_fields(
     return tuple(recovered)
 
 
-async def async_recover_alpha98_startup_sources(hass: Any, coordinator: Any) -> tuple[str, ...]:
+async def async_recover_alpha98_startup_sources(
+    hass: Any, coordinator: Any
+) -> tuple[str, ...]:
     """Run at most one extra coordinator refresh for sources that arrived mid-setup."""
     data = getattr(coordinator, "data", None)
     snapshot = getattr(data, "snapshot", None)
