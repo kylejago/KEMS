@@ -76,7 +76,9 @@ def test_forecast_path_avoids_9p_export_when_higher_value_path_is_feasible() -> 
     )
 
     assert plan.available is True
-    allocations = {item.rate_pence: item.planned_battery_export_kwh for item in plan.allocations}
+    allocations = {
+        item.rate_pence: item.planned_battery_export_kwh for item in plan.allocations
+    }
     assert allocations[18.0] >= 2.99
     assert allocations[9.8] == 0.0
     assert allocations[9.7] == 0.0
@@ -127,7 +129,9 @@ def test_forecast_solar_is_never_borrowed_before_it_arrives() -> None:
 
 def test_runtime_installs_after_total_ledger_and_keeps_writes_blocked() -> None:
     compat = (ROOT / "custom_components/kems/agile_alpha7_compat.py").read_text()
-    runtime = (ROOT / "custom_components/kems/agile_forecast_path_scheduler.py").read_text()
+    runtime = (
+        ROOT / "custom_components/kems/agile_forecast_path_scheduler.py"
+    ).read_text()
     pure = (
         ROOT / "custom_components/kems/kems_core/forecast_path_scheduler.py"
     ).read_text()
