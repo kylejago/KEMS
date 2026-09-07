@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
+import asyncio
 from pathlib import Path
 from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant, ServiceCall
+from homeassistant.core import HomeAssistant, ServiceCall, State
 from homeassistant.exceptions import HomeAssistantError
 
 from . import update_orchestrator as base
@@ -31,6 +32,10 @@ _UPDATE_BUTTON = (
     "          action: perform-action\n"
     "          perform_action: kems.check_for_updates\n"
 )
+_BACKUP_EVENT_ENTITY_ID = "event.backup_automatic_backup"
+_BACKUP_EVENT_TYPES = frozenset({"completed", "failed", "in_progress"})
+_BACKUP_COMPLETION_TIMEOUT_SECONDS = 3600.0
+_BACKUP_POLL_SECONDS = 1.0
 
 
 def _managed_dashboard_bytes() -> bytes:
@@ -80,6 +85,7 @@ class ConvergentKEMSUpdateOrchestrator(reliable.ReliableKEMSUpdateOrchestrator):
         self._dashboard_verification_detail: str | None = None
         self._dashboard_expected_sha256: str | None = None
         self._dashboard_installed_sha256: str | None = None
+        self._verified_backup_bypass = False
 
     def _remember_dashboard_verification(
         self,
@@ -88,6 +94,148 @@ class ConvergentKEMSUpdateOrchestrator(reliable.ReliableKEMSUpdateOrchestrator):
         self._dashboard_verification_detail = verification.detail
         self._dashboard_expected_sha256 = verification.expected_sha256
         self._dashboard_installed_sha256 = verification.installed_sha256
+
+    def _automatic_backup_state(self) -> State | None:
+        """Return the canonical automatic-backup event, tolerating a renamed entity."""
+        direct = self.hass.states.get(_BACKUP_EVENT_ENTITY_ID)
+        if direct is not None:
+            return direct
+        for state in self.hass.states.async_all("event"):
+            if not state.entity_id.startswith("event.backup_"):
+                continue
+            raw_event_types = state.attributes.get("event_types")
+            if not isinstance(raw_event_types, (list, tuple, set, frozenset)):
+                continue
+            event_types = {str(value) for value in raw_event_types}
+            if _BACKUP_EVENT_TYPES.issubset(event_types):
+                return state
+        return None
+
+    async def _async_require_completed_automatic_backup(self) -> None:
+        """Start a fresh automatic backup and prove that it actually completed."""
+        before = self._automatic_backup_state()
+        if before is None:
+            raise HomeAssistantError(
+                "Home Assistant automatic-backup event entity is unavailable; "
+                "KEMS will not install without completion evidence"
+            )
+        if str(before.attributes.get("event_type") or "").lower() == "in_progress":
+            raise HomeAssistantError(
+                "Home Assistant already has an automatic backup in progress; "
+                "KEMS will retry only after it finishes"
+            )
+        before_marker = before.state
+
+        if not self.hass.services.has_service("backup", "create_automatic"):
+            raise HomeAssistantError(
+                "backup.create_automatic is unavailable in Home Assistant"
+            )
+        try:
+            await self.hass.services.async_call(
+                "backup",
+                "create_automatic",
+                {},
+                blocking=True,
+            )
+        except Exception as error:
+            detail = str(error).strip() or repr(error)
+            raise HomeAssistantError(
+                "Home Assistant rejected the pre-update automatic backup before "
+                f"KEMS installation started: {detail}"
+            ) from error
+
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + _BACKUP_COMPLETION_TIMEOUT_SECONDS
+        saw_fresh_attempt = False
+        while loop.time() < deadline:
+            state = self._automatic_backup_state()
+            if state is not None:
+                if state.state != before_marker:
+                    saw_fresh_attempt = True
+                if saw_fresh_attempt:
+                    event_type = str(
+                        state.attributes.get("event_type") or ""
+                    ).lower()
+                    if event_type == "completed":
+                        return
+                    if event_type == "failed":
+                        reason = str(
+                            state.attributes.get("failed_reason") or ""
+                        ).strip()
+                        if not reason:
+                            reason = (
+                                "Home Assistant reported a failed automatic backup "
+                                "without a reason"
+                            )
+                        raise HomeAssistantError(reason)
+            await asyncio.sleep(_BACKUP_POLL_SECONDS)
+
+        raise HomeAssistantError(
+            "Timed out after 60 minutes waiting for Home Assistant to prove the "
+            "pre-update automatic backup completed"
+        )
+
+    async def _async_save(self) -> None:
+        """Never persist the transient post-proof backup bypass as user policy."""
+        if not self._verified_backup_bypass:
+            await super()._async_save()
+            return
+        configured = self.policy.backup_before_update
+        self.policy.backup_before_update = True
+        try:
+            await super()._async_save()
+        finally:
+            self.policy.backup_before_update = configured
+
+    async def async_apply_pending(self, *, force: bool) -> None:
+        """Prove backup completion before allowing the base installer to run."""
+        if self._lock.locked() and force:
+            await super().async_apply_pending(force=force)
+            return
+
+        pending = self.pending
+        if pending is None:
+            await self.async_check(force=True)
+            pending = self.pending
+        if pending is None:
+            return
+        if not force and not self.policy.automatic_updates:
+            return
+        if (
+            not force
+            and bool(pending.get("maintenance", {}).get("required", True))
+            and not self._in_maintenance_window()
+        ):
+            return
+
+        target = str(pending.get("target") or "")
+        state = self._find_kems_update_entity()
+        installed = state.attributes.get("installed_version") if state else None
+        install_required = bool(
+            state is not None and target and not base._version_matches(installed, target)
+        )
+        if not self.policy.backup_before_update or not install_required:
+            await super().async_apply_pending(force=force)
+            return
+
+        try:
+            await self._async_require_completed_automatic_backup()
+        except Exception as error:
+            await self._fail_pending(
+                "Pre-update backup failed before KEMS installation started: "
+                f"{error}"
+            )
+            return
+
+        configured = self.policy.backup_before_update
+        self.policy.backup_before_update = False
+        self._verified_backup_bypass = True
+        try:
+            await super().async_apply_pending(force=force)
+        finally:
+            self.policy.backup_before_update = configured
+            self._verified_backup_bypass = False
+            await self._async_save()
 
     async def async_verify_pending(self, *, save: bool = True) -> None:
         """Converge the dashboard only after the pending target core is active."""
