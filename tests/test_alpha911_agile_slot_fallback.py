@@ -33,11 +33,7 @@ def _helpers() -> dict[str, Any]:
 
     def rate_at(rates: list[Any], timestamp: datetime) -> Any | None:
         return next(
-            (
-                rate
-                for rate in rates
-                if rate.valid_from <= timestamp < rate.valid_to
-            ),
+            (rate for rate in rates if rate.valid_from <= timestamp < rate.valid_to),
             None,
         )
 
