@@ -153,9 +153,7 @@ class ConvergentKEMSUpdateOrchestrator(reliable.ReliableKEMSUpdateOrchestrator):
                 if state.state != before_marker:
                     saw_fresh_attempt = True
                 if saw_fresh_attempt:
-                    event_type = str(
-                        state.attributes.get("event_type") or ""
-                    ).lower()
+                    event_type = str(state.attributes.get("event_type") or "").lower()
                     if event_type == "completed":
                         return
                     if event_type == "failed":
@@ -212,7 +210,9 @@ class ConvergentKEMSUpdateOrchestrator(reliable.ReliableKEMSUpdateOrchestrator):
         state = self._find_kems_update_entity()
         installed = state.attributes.get("installed_version") if state else None
         install_required = bool(
-            state is not None and target and not base._version_matches(installed, target)
+            state is not None
+            and target
+            and not base._version_matches(installed, target)
         )
         if not self.policy.backup_before_update or not install_required:
             await super().async_apply_pending(force=force)
@@ -222,8 +222,7 @@ class ConvergentKEMSUpdateOrchestrator(reliable.ReliableKEMSUpdateOrchestrator):
             await self._async_require_completed_automatic_backup()
         except Exception as error:
             await self._fail_pending(
-                "Pre-update backup failed before KEMS installation started: "
-                f"{error}"
+                "Pre-update backup failed before KEMS installation started: " f"{error}"
             )
             return
 
