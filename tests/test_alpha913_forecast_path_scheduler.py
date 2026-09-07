@@ -7,7 +7,6 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
-
 from kems_core.forecast_path_scheduler import allocate_forecast_path_exports
 
 ROOT = Path(__file__).parents[1]
