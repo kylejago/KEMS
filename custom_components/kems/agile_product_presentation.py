@@ -1,8 +1,9 @@
 """Canonical product-presentation installers for reporting-only KEMS surfaces.
 
 This boundary owns panel flow projection, finance/comparison dashboard
-presentation, and the Agile slot replay presentation adapter. It does not alter planning,
-optimisation, tariffs, commissioning, or real hardware write permissions.
+presentation, and the Agile slot replay presentation adapter.
+It does not alter planning, optimisation, tariffs, commissioning, or real hardware
+write permissions.
 """
 
 from __future__ import annotations
