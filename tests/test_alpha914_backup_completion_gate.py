@@ -14,7 +14,10 @@ def test_pre_update_backup_waits_for_fresh_completed_event() -> None:
     """Starting a backup is not enough; a fresh completed event is required."""
     content = CONVERGENT.read_text(encoding="utf-8")
     assert '_BACKUP_EVENT_ENTITY_ID = "event.backup_automatic_backup"' in content
-    assert '_BACKUP_EVENT_TYPES = frozenset({"completed", "failed", "in_progress"})' in content
+    assert (
+        '_BACKUP_EVENT_TYPES = frozenset({"completed", "failed", "in_progress"})'
+        in content
+    )
     assert "before_marker = before.state" in content
     assert "saw_fresh_attempt = False" in content
     assert "state.state != before_marker" in content
