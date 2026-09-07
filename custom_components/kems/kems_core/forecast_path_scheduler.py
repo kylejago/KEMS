@@ -71,13 +71,9 @@ class ForecastPathPlan:
             "target_soc_percent": round(self.target_soc_percent, 3),
             "ending_soc_percent": round(self.ending_soc_percent, 3),
             "minimum_soc_percent": round(self.minimum_soc_percent, 3),
-            "planned_battery_export_kwh": round(
-                self.planned_battery_export_kwh, 3
-            ),
+            "planned_battery_export_kwh": round(self.planned_battery_export_kwh, 3),
             "planned_house_battery_kwh": round(self.planned_house_battery_kwh, 3),
-            "planned_total_discharge_kwh": round(
-                self.planned_total_discharge_kwh, 3
-            ),
+            "planned_total_discharge_kwh": round(self.planned_total_discharge_kwh, 3),
             "forecast_solar_input_kwh": round(self.forecast_solar_input_kwh, 3),
             "forecast_solar_stored_kwh": round(self.forecast_solar_stored_kwh, 3),
             "forecast_solar_spill_kwh": round(self.forecast_solar_spill_kwh, 3),
@@ -127,8 +123,7 @@ def _excluded(
     windows: tuple[tuple[datetime, datetime], ...],
 ) -> bool:
     return any(
-        _overlap_hours(start, end, left, right) > _EPSILON
-        for left, right in windows
+        _overlap_hours(start, end, left, right) > _EPSILON for left, right in windows
     )
 
 
@@ -354,7 +349,9 @@ def allocate_forecast_path_exports(
             initial_soc_percent=initial_soc,
             target_soc_percent=target_soc,
             ending_soc_percent=100.0 * float(baseline["ending_stored_kwh"]) / capacity,
-            minimum_soc_percent=100.0 * float(baseline["minimum_stored_kwh"]) / capacity,
+            minimum_soc_percent=100.0
+            * float(baseline["minimum_stored_kwh"])
+            / capacity,
             planned_battery_export_kwh=0.0,
             planned_house_battery_kwh=float(baseline["house_battery_kwh"]),
             planned_total_discharge_kwh=float(baseline["house_battery_kwh"]),
@@ -401,11 +398,7 @@ def allocate_forecast_path_exports(
         shift_needed = min(shift_needed, current_spare)
         if shift_needed > _EPSILON:
             donors = sorted(
-                (
-                    item
-                    for item in future
-                    if allocations[item["valid_from"]] > _EPSILON
-                ),
+                (item for item in future if allocations[item["valid_from"]] > _EPSILON),
                 key=lambda item: (item["rate_pence"], -item["valid_from"].timestamp()),
             )
             for donor in donors:
