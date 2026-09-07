@@ -1,4 +1,4 @@
-"""Alpha9.11 Agile slot replay fallback contracts."""
+"""Alpha9.11 slot fallback contracts retained through Alpha9.12 authority repair."""
 
 from __future__ import annotations
 
@@ -23,12 +23,23 @@ SOURCE = KEMS / "agile_slot_simulation_fallback.py"
 def _helpers() -> dict[str, Any]:
     """Load the HA-independent repair helpers with lightweight collaborators."""
     tree = ast.parse(SOURCE.read_text(encoding="utf-8"))
-    names = {"_simulation_load", "_fallback_aware_observed_slot_details"}
-    body = [
-        node
-        for node in tree.body
-        if isinstance(node, ast.FunctionDef) and node.name in names
-    ]
+    assignments = {"_PHYSICAL_ONLY_FIELDS"}
+    names = {
+        "_simulation_load",
+        "_simulation_snapshot_view",
+        "_simulation_records",
+        "_fallback_aware_observed_slot_details",
+    }
+    body: list[ast.stmt] = []
+    for node in tree.body:
+        if isinstance(node, ast.Assign):
+            targets = {
+                target.id for target in node.targets if isinstance(target, ast.Name)
+            }
+            if targets & assignments:
+                body.append(node)
+        elif isinstance(node, ast.FunctionDef) and node.name in names:
+            body.append(node)
     module = ast.fix_missing_locations(ast.Module(body=body, type_ignores=[]))
 
     def rate_at(rates: list[Any], timestamp: datetime) -> Any | None:
@@ -108,12 +119,14 @@ def test_agile_slot_load_accepts_explicit_simulation_fallback_only() -> None:
 
 def test_agile_slot_details_ignore_unrelated_physical_staleness() -> None:
     install_simulation_demand_fallback_policy()
-    helper = _helpers()["_fallback_aware_observed_slot_details"]
+    helpers = _helpers()
+    helper = helpers["_fallback_aware_observed_slot_details"]
+    view = helpers["_simulation_snapshot_view"]
     start = datetime(2026, 9, 7, 10, 0, tzinfo=UTC)
     records = [
-        _fallback_snapshot(start, 0.8),
-        _fallback_snapshot(start + timedelta(minutes=15), 1.0),
-        _fallback_snapshot(start + timedelta(minutes=30), 1.2),
+        view(_fallback_snapshot(start, 0.8)),
+        view(_fallback_snapshot(start + timedelta(minutes=15), 1.0)),
+        view(_fallback_snapshot(start + timedelta(minutes=30), 1.2)),
     ]
     rates = [
         SimpleNamespace(
@@ -140,13 +153,11 @@ def test_agile_slot_details_ignore_unrelated_physical_staleness() -> None:
     assert slot["solar_to_home_kwh"] == 0.25
 
 
-def test_alpha911_is_reporting_only_and_installed_from_product_presentation() -> None:
+def test_alpha911_remains_reporting_only_and_installed_from_product_presentation() -> None:
     source = SOURCE.read_text(encoding="utf-8")
     product = (KEMS / "agile_product_presentation.py").read_text(encoding="utf-8")
 
     assert "simulation_module._fresh_snapshot_value" in source
-    assert "current.stale_fields" not in source
-    assert "following.stale_fields" not in source
     assert "install_agile_slot_simulation_fallback()" in product
 
     for forbidden in (
