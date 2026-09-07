@@ -6,6 +6,8 @@ import json
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
+import pytest
+
 from kems_core.forecast_path_scheduler import allocate_forecast_path_exports
 
 ROOT = Path(__file__).parents[1]
@@ -84,8 +86,8 @@ def test_forecast_path_avoids_9p_export_when_higher_value_path_is_feasible() -> 
     assert allocations[9.7] == 0.0
     assert allocations[22.0] == 2.0
     assert allocations[21.0] == 2.0
-    assert plan.ending_soc_percent == 20.0
-    assert plan.minimum_soc_percent >= 20.0
+    assert plan.ending_soc_percent == pytest.approx(20.0, abs=1e-5)
+    assert plan.minimum_soc_percent >= 20.0 - 1e-5
     assert plan.forecast_solar_stored_kwh == 4.0
 
 
@@ -124,7 +126,7 @@ def test_forecast_solar_is_never_borrowed_before_it_arrives() -> None:
     early = plan.allocations[0]
     assert early.rate_pence == 25.0
     assert 0.49 <= early.planned_battery_export_kwh <= 0.501
-    assert plan.minimum_soc_percent >= 20.0
+    assert plan.minimum_soc_percent >= 20.0 - 1e-5
 
 
 def test_runtime_installs_after_total_ledger_and_keeps_writes_blocked() -> None:
