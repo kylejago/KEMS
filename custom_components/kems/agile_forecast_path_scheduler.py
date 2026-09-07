@@ -56,12 +56,15 @@ def _dt(value: Any) -> datetime | None:
 def _forecast_ready(self) -> tuple[bool, float]:
     forecast = getattr(self, "_kems_alpha734_forecast", None)
     confidence = _number(getattr(forecast, "confidence_percent", None)) or 0.0
-    return bool(
-        forecast is not None
-        and getattr(forecast, "ready", False)
-        and confidence >= MIN_FORECAST_CONFIDENCE_PERCENT
-        and getattr(forecast, "hourly", ())
-    ), confidence
+    return (
+        bool(
+            forecast is not None
+            and getattr(forecast, "ready", False)
+            and confidence >= MIN_FORECAST_CONFIDENCE_PERCENT
+            and getattr(forecast, "hourly", ())
+        ),
+        confidence,
+    )
 
 
 def _apply_current_targets(
@@ -77,11 +80,7 @@ def _apply_current_targets(
     """Pace only the active path allocation while preserving live house-first use."""
     now_utc = now.astimezone(UTC)
     current = next(
-        (
-            item
-            for item in allocations
-            if item.valid_from <= now_utc < item.valid_to
-        ),
+        (item for item in allocations if item.valid_from <= now_utc < item.valid_to),
         None,
     )
     if current is None:
@@ -139,7 +138,11 @@ def _apply_forecast_path(
     if mode in {"cheap_charge", "happy_hour_charge", "power_down_session"}:
         return plan
     guard = plan.get("deadline_guard")
-    guard_mode = str(guard.get("mode") or "price_optimised") if isinstance(guard, dict) else "price_optimised"
+    guard_mode = (
+        str(guard.get("mode") or "price_optimised")
+        if isinstance(guard, dict)
+        else "price_optimised"
+    )
     if guard_mode in {"deadline_following", "maximum_discharge"}:
         return plan
 
