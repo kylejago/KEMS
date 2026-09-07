@@ -153,7 +153,9 @@ def test_agile_slot_details_ignore_unrelated_physical_staleness() -> None:
     assert slot["solar_to_home_kwh"] == 0.25
 
 
-def test_alpha911_remains_reporting_only_and_installed_from_product_presentation() -> None:
+def test_alpha911_remains_reporting_only_and_installed_from_product_presentation() -> (
+    None
+):
     source = SOURCE.read_text(encoding="utf-8")
     product = (KEMS / "agile_product_presentation.py").read_text(encoding="utf-8")
 
