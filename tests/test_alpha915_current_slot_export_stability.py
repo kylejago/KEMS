@@ -119,12 +119,17 @@ def test_solar_storage_does_not_trigger_low_value_current_battery_export() -> No
 
     assert plan.forecast_solar_stored_kwh > 0.0
     assert plan.allocations[0].planned_battery_export_kwh == 0.0
-    assert sum(
-        allocation.planned_battery_export_kwh for allocation in plan.allocations[1:]
-    ) >= 4.99
+    assert (
+        sum(
+            allocation.planned_battery_export_kwh for allocation in plan.allocations[1:]
+        )
+        >= 4.99
+    )
 
 
-def test_low_value_current_export_remains_allowed_when_better_capacity_is_full() -> None:
+def test_low_value_current_export_remains_allowed_when_better_capacity_is_full() -> (
+    None
+):
     """Price protection must not strand energy when the better future slot is full."""
     start = datetime(2026, 9, 8, 12, 0, tzinfo=UTC)
     plan = _allocate(now=start, current_rate=7.72, future_rates=(20.0,))
