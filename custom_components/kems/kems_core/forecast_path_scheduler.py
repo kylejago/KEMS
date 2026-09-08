@@ -386,7 +386,11 @@ def allocate_forecast_path_exports(
         allocations[candidate["valid_from"]] = low
 
     current = next((item for item in candidates if item["is_current"]), None)
-    if current is not None and safety > _EPSILON:
+    if (
+        current is not None
+        and safety > _EPSILON
+        and current["rate_pence"] + _EPSILON >= floor_rate
+    ):
         future = [item for item in candidates if item["valid_from"] > now_utc]
         future_capacity = sum(item["export_capacity_kwh"] for item in future)
         future_planned = sum(allocations[item["valid_from"]] for item in future)
@@ -397,8 +401,18 @@ def allocate_forecast_path_exports(
         )
         shift_needed = min(shift_needed, current_spare)
         if shift_needed > _EPSILON:
+            # Headroom is a capacity preference, not permission to undo the
+            # price ranking.  Moving a higher-value future allocation into a
+            # cheaper active slot caused live low-value partial exports as the
+            # rolling plan moved between coordinator scans.  Only equal/lower
+            # value donors may be shifted into the current slot.
             donors = sorted(
-                (item for item in future if allocations[item["valid_from"]] > _EPSILON),
+                (
+                    item
+                    for item in future
+                    if allocations[item["valid_from"]] > _EPSILON
+                    and item["rate_pence"] <= current["rate_pence"] + _EPSILON
+                ),
                 key=lambda item: (item["rate_pence"], -item["valid_from"].timestamp()),
             )
             for donor in donors:
