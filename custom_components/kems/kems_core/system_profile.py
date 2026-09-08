@@ -134,10 +134,9 @@ def _solar_elevation_degrees(
 
     latitude = radians(latitude_degrees)
     hour_angle = radians(hour_angle_degrees)
-    cosine_zenith = (
-        sin(latitude) * sin(declination)
-        + cos(latitude) * cos(declination) * cos(hour_angle)
-    )
+    cosine_zenith = sin(latitude) * sin(declination) + cos(latitude) * cos(
+        declination
+    ) * cos(hour_angle)
     cosine_zenith = min(max(cosine_zenith, -1.0), 1.0)
     return 90.0 - (180.0 / pi) * acos(cosine_zenith)
 
