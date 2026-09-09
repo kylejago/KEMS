@@ -163,9 +163,15 @@ def test_dashboard_and_web_contract_use_one_canonical_bill_state() -> None:
     presentation = (
         ROOT / "custom_components/kems/energy_bill_presentation.py"
     ).read_text()
+    hygiene = (ROOT / "custom_components/kems/recorder_hygiene.py").read_text()
     init_source = (ROOT / "custom_components/kems/__init__.py").read_text()
     assert "sensor.kems_energy_cost_comparison" in presentation
     assert "Total energy cost by period — Live Data vs KEMS" in presentation
     assert "Battery wear is deliberately excluded" in presentation
     assert "install_energy_bill_dashboard_patch()" in init_source
-    assert "async_setup_energy_bill_state(hass, entry, coordinator)" in init_source
+    assert "from .energy_bill_presentation import _payload as energy_bill_payload" in hygiene
+    assert "class KEMSEnergyCostComparisonSensor" in hygiene
+    assert 'super().__init__(coordinator, "energy_cost_comparison")' in hygiene
+    assert "_unrecorded_attributes = ENERGY_COST_UNRECORDED_ATTRIBUTES" in hygiene
+    assert "install_alpha916_recorder_hygiene()" in init_source
+    assert "async_setup_energy_bill_state(hass, entry, coordinator)" not in init_source
