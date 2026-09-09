@@ -245,7 +245,7 @@ def test_alpha916_setup_retires_legacy_manual_state_publishers() -> None:
     source = (KEMS / "__init__.py").read_text(encoding="utf-8")
     hygiene = HYGIENE.read_text(encoding="utf-8")
 
-    assert "install_alpha916_recorder_hygiene()" in source
+    assert "install_alpha917_recorder_hygiene()" in source
     assert "async_setup_energy_bill_state(" not in source
     assert "async_setup_agile_slots_state(" not in source
     assert "KEMSAgileSlotsSensor" in hygiene
