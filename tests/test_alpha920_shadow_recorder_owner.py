@@ -197,7 +197,9 @@ def test_alpha920_source_binds_only_shadow_status_to_live_only_boundary() -> Non
 
     assert "from . import shadow_validation as shadow_runtime" in hygiene
     assert "shadow_runtime.ShadowValidationRecorder._set" in hygiene
-    assert 'AGILE_SHADOW_STATUS_ENTITY_ID = "sensor.kems_agile_shadow_status"' in hygiene
+    assert (
+        'AGILE_SHADOW_STATUS_ENTITY_ID = "sensor.kems_agile_shadow_status"' in hygiene
+    )
     assert "if entity_id == AGILE_SHADOW_STATUS_ENTITY_ID:" in hygiene
     assert "shadow_set(self, entity_id, value, attributes)" in hygiene
 
