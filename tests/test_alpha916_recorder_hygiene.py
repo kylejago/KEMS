@@ -36,7 +36,10 @@ def _frozenset_constant(name: str) -> frozenset[str]:
     for node in _hygiene_tree().body:
         if not isinstance(node, ast.Assign):
             continue
-        if not any(isinstance(target, ast.Name) and target.id == name for target in node.targets):
+        if not any(
+            isinstance(target, ast.Name) and target.id == name
+            for target in node.targets
+        ):
             continue
         value = node.value
         if (
