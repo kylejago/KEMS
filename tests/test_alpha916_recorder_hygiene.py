@@ -2,21 +2,13 @@
 
 from __future__ import annotations
 
+import ast
 import json
 from pathlib import Path
 
-from custom_components.kems.recorder_hygiene import (
-    AGILE_SLOTS_UNRECORDED_ATTRIBUTES,
-    ENERGY_COST_UNRECORDED_ATTRIBUTES,
-    SCENARIO_RECORDER_SAFE_KEYS,
-    SCENARIO_UNRECORDED_ATTRIBUTES,
-    KEMSAgileSlotsSensor,
-    KEMSEnergyCostComparisonSensor,
-    RecorderSafeScenarioSensor,
-)
-
 ROOT = Path(__file__).resolve().parents[1]
 KEMS = ROOT / "custom_components" / "kems"
+HYGIENE = KEMS / "recorder_hygiene.py"
 RECORDER_MAX_ATTRIBUTE_BYTES = 16_384
 
 
@@ -32,6 +24,45 @@ def _recorded(
 ) -> dict[str, object]:
     """Return the attributes Recorder is allowed to retain."""
     return {key: value for key, value in attributes.items() if key not in unrecorded}
+
+
+def _hygiene_tree() -> ast.Module:
+    """Parse the Recorder hygiene module without importing Home Assistant."""
+    return ast.parse(HYGIENE.read_text(encoding="utf-8"), filename=str(HYGIENE))
+
+
+def _frozenset_constant(name: str) -> frozenset[str]:
+    """Read one literal frozenset constant from the Recorder hygiene module."""
+    for node in _hygiene_tree().body:
+        if not isinstance(node, ast.Assign):
+            continue
+        if not any(isinstance(target, ast.Name) and target.id == name for target in node.targets):
+            continue
+        value = node.value
+        if (
+            isinstance(value, ast.Call)
+            and isinstance(value.func, ast.Name)
+            and value.func.id == "frozenset"
+            and len(value.args) == 1
+        ):
+            return frozenset(ast.literal_eval(value.args[0]))
+    raise AssertionError(f"Missing literal frozenset constant {name}")
+
+
+def _class_assignment(class_name: str, attribute: str) -> ast.expr:
+    """Return one class-level assignment expression from the hygiene module."""
+    for node in _hygiene_tree().body:
+        if not isinstance(node, ast.ClassDef) or node.name != class_name:
+            continue
+        for item in node.body:
+            if not isinstance(item, ast.Assign):
+                continue
+            if any(
+                isinstance(target, ast.Name) and target.id == attribute
+                for target in item.targets
+            ):
+                return item.value
+    raise AssertionError(f"Missing {class_name}.{attribute}")
 
 
 def _large_slots() -> list[dict[str, object]]:
@@ -84,19 +115,40 @@ def _large_scenarios() -> list[dict[str, object]]:
 
 def test_alpha916_warned_entities_are_routed_through_recorder_safe_entities() -> None:
     """All five reported Recorder offenders must have an unrecorded boundary."""
+    scenario_keys = _frozenset_constant("SCENARIO_RECORDER_SAFE_KEYS")
+    scenario_unrecorded = _frozenset_constant("SCENARIO_UNRECORDED_ATTRIBUTES")
+    agile_unrecorded = _frozenset_constant("AGILE_SLOTS_UNRECORDED_ATTRIBUTES")
+    energy_unrecorded = _frozenset_constant("ENERGY_COST_UNRECORDED_ATTRIBUTES")
+
     assert {
         "scenario_comparison_today",
         "scenario_comparison_7_days",
         "scenario_comparison_30_days",
-    } <= SCENARIO_RECORDER_SAFE_KEYS
-    assert RecorderSafeScenarioSensor._unrecorded_attributes == (
-        SCENARIO_UNRECORDED_ATTRIBUTES
-    )
-    assert KEMSAgileSlotsSensor._unrecorded_attributes == (
-        AGILE_SLOTS_UNRECORDED_ATTRIBUTES
-    )
-    assert KEMSEnergyCostComparisonSensor._unrecorded_attributes == (
-        ENERGY_COST_UNRECORDED_ATTRIBUTES
+    } <= scenario_keys
+    assert {"periods", "timeline", "scenarios"} <= scenario_unrecorded
+    assert {
+        "today_slots",
+        "tomorrow_slots",
+        "today_agile",
+        "current_day_settlement_reconciliation",
+    } <= agile_unrecorded
+    assert energy_unrecorded == {"periods"}
+
+    for class_name, constant_name in (
+        ("RecorderSafeScenarioSensor", "SCENARIO_UNRECORDED_ATTRIBUTES"),
+        ("KEMSAgileSlotsSensor", "AGILE_SLOTS_UNRECORDED_ATTRIBUTES"),
+        ("KEMSEnergyCostComparisonSensor", "ENERGY_COST_UNRECORDED_ATTRIBUTES"),
+    ):
+        value = _class_assignment(class_name, "_unrecorded_attributes")
+        assert isinstance(value, ast.Name)
+        assert value.id == constant_name
+
+    agile_name = _class_assignment("KEMSAgileSlotsSensor", "_attr_name")
+    energy_name = _class_assignment("KEMSEnergyCostComparisonSensor", "_attr_name")
+    assert isinstance(agile_name, ast.Constant) and agile_name.value == "Agile slots"
+    assert (
+        isinstance(energy_name, ast.Constant)
+        and energy_name.value == "Energy cost comparison"
     )
 
 
@@ -121,8 +173,9 @@ def test_alpha916_agile_slots_keep_rich_live_data_without_recording_it() -> None
         "reporting_only": True,
         "hardware_writes": "blocked",
     }
+    unrecorded = _frozenset_constant("AGILE_SLOTS_UNRECORDED_ATTRIBUTES")
     assert _size(attributes) > RECORDER_MAX_ATTRIBUTE_BYTES
-    recorded = _recorded(attributes, AGILE_SLOTS_UNRECORDED_ATTRIBUTES)
+    recorded = _recorded(attributes, unrecorded)
     assert _size(recorded) < RECORDER_MAX_ATTRIBUTE_BYTES
     assert attributes["today_slots"] == slots
     assert attributes["tomorrow_slots"] == slots
@@ -149,8 +202,9 @@ def test_alpha916_energy_cost_periods_stay_live_without_recording_them() -> None
         "reporting_only": True,
         "hardware_writes": "blocked",
     }
+    unrecorded = _frozenset_constant("ENERGY_COST_UNRECORDED_ATTRIBUTES")
     assert _size(attributes) > RECORDER_MAX_ATTRIBUTE_BYTES
-    recorded = _recorded(attributes, ENERGY_COST_UNRECORDED_ATTRIBUTES)
+    recorded = _recorded(attributes, unrecorded)
     assert _size(recorded) < RECORDER_MAX_ATTRIBUTE_BYTES
     assert "periods" in attributes
 
@@ -167,8 +221,9 @@ def test_alpha916_scenario_detail_stays_live_without_recording_it() -> None:
         "cheapest_scenario": "kems_full",
         "scenarios": scenarios,
     }
+    unrecorded = _frozenset_constant("SCENARIO_UNRECORDED_ATTRIBUTES")
     assert _size(period_attributes) > RECORDER_MAX_ATTRIBUTE_BYTES
-    recorded_period = _recorded(period_attributes, SCENARIO_UNRECORDED_ATTRIBUTES)
+    recorded_period = _recorded(period_attributes, unrecorded)
     assert _size(recorded_period) < RECORDER_MAX_ATTRIBUTE_BYTES
     assert period_attributes["scenarios"] == scenarios
 
@@ -178,16 +233,14 @@ def test_alpha916_scenario_detail_stays_live_without_recording_it() -> None:
         "timeline": [{"timestamp": index, "detail": "x" * 400} for index in range(49)],
     }
     assert _size(comparison_attributes) > RECORDER_MAX_ATTRIBUTE_BYTES
-    recorded_comparison = _recorded(
-        comparison_attributes, SCENARIO_UNRECORDED_ATTRIBUTES
-    )
+    recorded_comparison = _recorded(comparison_attributes, unrecorded)
     assert _size(recorded_comparison) < RECORDER_MAX_ATTRIBUTE_BYTES
 
 
 def test_alpha916_setup_retires_legacy_manual_state_publishers() -> None:
     """The affected states must be owned by SensorEntity, not hass.states.async_set."""
     source = (KEMS / "__init__.py").read_text(encoding="utf-8")
-    hygiene = (KEMS / "recorder_hygiene.py").read_text(encoding="utf-8")
+    hygiene = HYGIENE.read_text(encoding="utf-8")
 
     assert "install_alpha916_recorder_hygiene()" in source
     assert "async_setup_energy_bill_state(" not in source
@@ -198,7 +251,7 @@ def test_alpha916_setup_retires_legacy_manual_state_publishers() -> None:
 
 def test_alpha916_is_presentation_only_and_cannot_write_hardware() -> None:
     """Recorder hygiene must not alter optimisation, commissioning, or writes."""
-    source = (KEMS / "recorder_hygiene.py").read_text(encoding="utf-8")
+    source = HYGIENE.read_text(encoding="utf-8")
     assert ".services.async_call(" not in source
     assert "providers.foxess" not in source
     assert "forecast_path_scheduler" not in source
