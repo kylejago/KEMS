@@ -4,9 +4,11 @@ Alpha9.16 kept the first reported rich dashboard/Pi-Web payloads available in
 Home Assistant while marking their deliberately large presentation attributes as
 unrecorded. Alpha9.17 extended that boundary to every live overflow exposed by
 Home Assistant 2026.9. Alpha9.19 binds the manual Agile publication boundary to
-the final EfficientAgileSmartExportManager used by KEMSCoordinator. The rich live
-attributes remain intact; Recorder stores the compact state and standard metadata
-only.
+the final EfficientAgileSmartExportManager used by KEMSCoordinator. Alpha9.20
+binds the remaining Agile shadow-status overflow to its actual owner,
+ShadowValidationRecorder, while preserving Recorder history for its compact
+sibling states. Rich live attributes remain intact; Recorder stores only the
+safe boundary selected for each publisher.
 """
 
 from __future__ import annotations
@@ -30,6 +32,7 @@ RECORDER_LIVE_ONLY_ATTRIBUTES = frozenset({MATCH_ALL})
 RECORDER_LIVE_ONLY_STATE_INFO = {
     "unrecorded_attributes": RECORDER_LIVE_ONLY_ATTRIBUTES,
 }
+AGILE_SHADOW_STATUS_ENTITY_ID = "sensor.kems_agile_shadow_status"
 
 SCENARIO_RECORDER_SAFE_KEYS = frozenset(
     {
@@ -140,8 +143,9 @@ def _async_set_live_only_attributes(
 
 
 def _install_manual_state_hygiene() -> None:
-    """Make manual Agile and updater runtime publishers Recorder-safe."""
+    """Make manual Agile, shadow-status and updater publishers Recorder-safe."""
     from . import agile_smart_export_runtime as agile_runtime
+    from . import shadow_validation as shadow_runtime
     from . import update_orchestrator as updater
 
     agile_set = agile_runtime.EfficientAgileSmartExportManager._set
@@ -162,6 +166,28 @@ def _install_manual_state_hygiene() -> None:
 
         recorder_safe_agile_set._kems_alpha919_recorder_hygiene = True
         agile_runtime.EfficientAgileSmartExportManager._set = recorder_safe_agile_set
+
+    shadow_set = shadow_runtime.ShadowValidationRecorder._set
+    if not getattr(shadow_set, "_kems_alpha920_recorder_hygiene", False):
+
+        def recorder_safe_shadow_set(
+            self,
+            entity_id: str,
+            value: Any,
+            attributes: dict[str, Any],
+        ) -> None:
+            if entity_id == AGILE_SHADOW_STATUS_ENTITY_ID:
+                _async_set_live_only_attributes(
+                    self._hass,
+                    entity_id,
+                    value,
+                    attributes,
+                )
+                return
+            shadow_set(self, entity_id, value, attributes)
+
+        recorder_safe_shadow_set._kems_alpha920_recorder_hygiene = True
+        shadow_runtime.ShadowValidationRecorder._set = recorder_safe_shadow_set
 
     write_legacy = updater.KEMSUpdateOrchestrator._write_legacy_states
     if not getattr(write_legacy, "_kems_alpha917_recorder_hygiene", False):
