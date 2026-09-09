@@ -1,9 +1,11 @@
-"""Recorder-safe Home Assistant presentation entities for KEMS.
+"""Recorder-safe Home Assistant presentation and runtime state for KEMS.
 
-Alpha9.16 keeps the rich live dashboard/Pi-Web payloads available in Home
-Assistant while marking the deliberately large presentation attributes as
-unrecorded.  Home Assistant 2026.9 limits recorded state attributes to 16 KiB;
-these payloads are current presentation data, not historical database evidence.
+Alpha9.16 kept the first reported rich dashboard/Pi-Web payloads available in
+Home Assistant while marking their deliberately large presentation attributes as
+unrecorded. Alpha9.17 extends that boundary to every live overflow exposed by
+Home Assistant 2026.9: manual Agile runtime states, update-runtime state, update
+status, and forecast-validation status. The rich live attributes remain intact;
+Recorder stores the compact state and standard metadata only.
 """
 
 from __future__ import annotations
@@ -13,6 +15,7 @@ from typing import Any
 
 from homeassistant.components.sensor import SensorEntity
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import MATCH_ALL
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
@@ -20,6 +23,12 @@ from .agile_slots_state import _attributes as agile_slot_attributes
 from .energy_bill_presentation import _payload as energy_bill_payload
 from .entity import KEMSEntity
 from .sensor import KEMSSensor
+
+RECORDER_ATTRIBUTE_LIMIT_BYTES = 16_384
+RECORDER_LIVE_ONLY_ATTRIBUTES = frozenset({MATCH_ALL})
+RECORDER_LIVE_ONLY_STATE_INFO = {
+    "unrecorded_attributes": RECORDER_LIVE_ONLY_ATTRIBUTES,
+}
 
 SCENARIO_RECORDER_SAFE_KEYS = frozenset(
     {
@@ -114,15 +123,161 @@ class KEMSEnergyCostComparisonSensor(KEMSEntity, SensorEntity):
         return self._payload()
 
 
-def install_alpha916_recorder_hygiene() -> None:
-    """Replace only oversized presentation entities with Recorder-safe variants."""
+def _async_set_live_only_attributes(
+    hass: HomeAssistant,
+    entity_id: str,
+    value: Any,
+    attributes: Mapping[str, Any],
+) -> None:
+    """Publish rich live attributes while excluding them from Recorder history."""
+    hass.states.async_set(
+        entity_id,
+        str(value),
+        attributes,
+        state_info=RECORDER_LIVE_ONLY_STATE_INFO,
+    )
+
+
+def _install_manual_state_hygiene() -> None:
+    """Make manual Agile and updater runtime publishers Recorder-safe."""
+    from . import agile_smart_export as agile
+    from . import update_orchestrator as updater
+
+    agile_set = agile.EfficientAgileSmartExportManager._set
+    if not getattr(agile_set, "_kems_alpha917_recorder_hygiene", False):
+
+        def recorder_safe_agile_set(
+            self,
+            entity_id: str,
+            value: Any,
+            attributes: dict[str, Any],
+        ) -> None:
+            _async_set_live_only_attributes(
+                self._hass,
+                entity_id,
+                value,
+                attributes,
+            )
+
+        recorder_safe_agile_set._kems_alpha917_recorder_hygiene = True
+        agile.EfficientAgileSmartExportManager._set = recorder_safe_agile_set
+
+    write_legacy = updater.KEMSUpdateOrchestrator._write_legacy_states
+    if not getattr(write_legacy, "_kems_alpha917_recorder_hygiene", False):
+
+        def recorder_safe_legacy_states(self) -> None:
+            snapshot = self.snapshot()
+            _async_set_live_only_attributes(
+                self.hass,
+                "sensor.kems_update_orchestrator_runtime",
+                snapshot["status"],
+                {
+                    "friendly_name": "KEMS update orchestrator runtime",
+                    **snapshot,
+                },
+            )
+            maintenance = snapshot.get("maintenance") or {"status": "none"}
+            _async_set_live_only_attributes(
+                self.hass,
+                "sensor.kems_maintenance_runtime",
+                maintenance.get("status", "none"),
+                {
+                    "friendly_name": "KEMS maintenance runtime",
+                    **maintenance,
+                },
+            )
+
+        recorder_safe_legacy_states._kems_alpha917_recorder_hygiene = True
+        updater.KEMSUpdateOrchestrator._write_legacy_states = (
+            recorder_safe_legacy_states
+        )
+
+
+def _install_updater_io_hygiene() -> None:
+    """Keep updater filesystem verification off Home Assistant's event loop."""
+    from . import update_orchestrator_convergent as convergent
+    from . import update_orchestrator_reliable as reliable
+
+    orchestrator_class = convergent.ConvergentKEMSUpdateOrchestrator
+    if getattr(orchestrator_class, "_kems_alpha917_io_hygiene", False):
+        return
+
+    raw_disk_version_reader = reliable._read_integration_version_from_disk
+    files_version_cache = {"value": reliable._RUNNING_INTEGRATION_VERSION}
+
+    def cached_files_version() -> str:
+        return files_version_cache["value"]
+
+    reliable._read_integration_version_from_disk = cached_files_version
+
+    async def refresh_files_version(self) -> None:
+        files_version_cache["value"] = await self.hass.async_add_executor_job(
+            raw_disk_version_reader
+        )
+
+    original_start = orchestrator_class.async_start
+    original_verify = orchestrator_class.async_verify_pending
+    original_check = orchestrator_class.async_check
+    original_maybe_run_pending = orchestrator_class._maybe_run_pending
+
+    async def recorder_safe_start(self) -> None:
+        await refresh_files_version(self)
+        verification = await convergent._async_converge_dashboard(
+            self.hass,
+            strict=False,
+        )
+        if verification is not None:
+            self._remember_dashboard_verification(verification)
+        await original_start(self)
+
+    async def recorder_safe_verify(self, *, save: bool = True) -> None:
+        await refresh_files_version(self)
+        await original_verify(self, save=save)
+
+    async def recorder_safe_check(self, *, force: bool = False) -> dict[str, Any]:
+        await refresh_files_version(self)
+        return await original_check(self, force=force)
+
+    async def recorder_safe_maybe_run_pending(self) -> None:
+        await original_maybe_run_pending(self)
+        await refresh_files_version(self)
+
+    def cached_dashboard_current(self) -> bool | None:
+        expected = self._dashboard_expected_sha256
+        installed = self._dashboard_installed_sha256
+        if expected is None or installed is None:
+            return None
+        return expected == installed
+
+    orchestrator_class.async_start = recorder_safe_start
+    orchestrator_class.async_verify_pending = recorder_safe_verify
+    orchestrator_class.async_check = recorder_safe_check
+    orchestrator_class._maybe_run_pending = recorder_safe_maybe_run_pending
+    orchestrator_class._dashboard_current = cached_dashboard_current
+    orchestrator_class._kems_alpha917_io_hygiene = True
+
+
+def install_alpha917_recorder_hygiene() -> None:
+    """Apply the integration-wide Alpha9.17 Recorder and event-loop boundary."""
     from . import sensor as sensor_platform
+    from . import update_orchestrator as updater
+
+    _install_manual_state_hygiene()
+    _install_updater_io_hygiene()
 
     setup = sensor_platform.async_setup_entry
-    if getattr(setup, "_kems_alpha916_recorder_hygiene", False):
+    if getattr(setup, "_kems_alpha917_recorder_hygiene", False):
         return
 
     original_setup = setup
+
+    class RecorderSafeForecastValidationSensor(
+        sensor_platform.KEMSForecastValidationSensor
+    ):
+        _unrecorded_attributes = RECORDER_LIVE_ONLY_ATTRIBUTES
+
+    class RecorderSafeUpdateStatusSensor(updater.KEMSUpdateStatusSensor):
+        _unrecorded_attributes = RECORDER_LIVE_ONLY_ATTRIBUTES
 
     async def setup_with_recorder_hygiene(
         hass: HomeAssistant,
@@ -148,6 +303,23 @@ def install_alpha916_recorder_hygiene() -> None:
                             entity.entity_description,
                         )
                     )
+                elif (
+                    isinstance(entity, sensor_platform.KEMSForecastValidationSensor)
+                    and entity.entity_description.key == "forecast_validation_status"
+                ):
+                    repaired.append(
+                        RecorderSafeForecastValidationSensor(
+                            entity.coordinator,
+                            entity.entity_description,
+                        )
+                    )
+                elif isinstance(entity, updater.KEMSUpdateStatusSensor):
+                    repaired.append(
+                        RecorderSafeUpdateStatusSensor(
+                            entity.coordinator,
+                            entity.orchestrator,
+                        )
+                    )
                 else:
                     repaired.append(entity)
 
@@ -165,5 +337,10 @@ def install_alpha916_recorder_hygiene() -> None:
 
         await original_setup(hass, entry, add_entities)
 
-    setup_with_recorder_hygiene._kems_alpha916_recorder_hygiene = True
+    setup_with_recorder_hygiene._kems_alpha917_recorder_hygiene = True
     sensor_platform.async_setup_entry = setup_with_recorder_hygiene
+
+
+def install_alpha916_recorder_hygiene() -> None:
+    """Compatibility alias retained for older import sites and tests."""
+    install_alpha917_recorder_hygiene()
