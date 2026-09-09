@@ -9,7 +9,6 @@ from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 
 from .agile_simulation_presentation import install_agile_simulation_presentation
-from .agile_slots_state import async_setup_agile_slots_state
 from .alpha95_presentation import (
     install_alpha95_presentation,
     publish_alpha98_panel_projection,
@@ -39,10 +38,7 @@ from .const import (
 from .coordinator import KEMSCoordinator
 from .dashboard import async_sync_managed_dashboard
 from .dashboard_pipeline import install_dashboard_pipeline
-from .energy_bill_presentation import (
-    async_setup_energy_bill_state,
-    install_energy_bill_dashboard_patch,
-)
+from .energy_bill_presentation import install_energy_bill_dashboard_patch
 from .entity_discovery import (
     SourceValidationResult,
     async_discover_entities,
@@ -55,6 +51,7 @@ from .providers.gas import GasProvider
 from .providers.octoplus import OctoplusProvider
 from .providers.octopus import OctopusProvider
 from .providers.ohme import OhmeProvider
+from .recorder_hygiene import install_alpha916_recorder_hygiene
 from .settings import KEMSSettings
 from .source_authority import async_reconcile_source_mappings
 from .update_orchestrator import async_unload_update_orchestrator
@@ -182,8 +179,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     )
 
     entry.runtime_data = coordinator
-    async_setup_energy_bill_state(hass, entry, coordinator)
-    async_setup_agile_slots_state(hass, entry, coordinator)
+    install_alpha916_recorder_hygiene()
     update_orchestrator = await async_setup_update_orchestrator(hass, entry)
     if (
         update_orchestrator.policy.automatic_updates
