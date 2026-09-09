@@ -24,9 +24,7 @@ def _future_annotations() -> ast.ImportFrom:
 def _load_real_agile_manager_class() -> type:
     """Execute the real manager class definition without importing Home Assistant."""
     tree = ast.parse(AGILE.read_text(encoding="utf-8"), filename=str(AGILE))
-    class_names = {
-        node.name for node in tree.body if isinstance(node, ast.ClassDef)
-    }
+    class_names = {node.name for node in tree.body if isinstance(node, ast.ClassDef)}
     assert "AgileSmartExportManager" in class_names
     assert "EfficientAgileSmartExportManager" not in class_names
     manager = next(
@@ -97,7 +95,9 @@ def _load_manual_hygiene_installer(
     return namespace["_install_manual_state_hygiene"]
 
 
-def test_alpha918_installer_patches_real_agile_manager_and_publishes_state_info() -> None:
+def test_alpha918_installer_patches_real_agile_manager_and_publishes_state_info() -> (
+    None
+):
     """The startup installer must patch the class HA actually imports and uses."""
     manager_class = _load_real_agile_manager_class()
     original_set = manager_class._set
@@ -107,7 +107,9 @@ def test_alpha918_installer_patches_real_agile_manager_and_publishes_state_info(
         def _write_legacy_states(self) -> None:
             pass
 
-    updater_module = types.SimpleNamespace(KEMSUpdateOrchestrator=FakeUpdateOrchestrator)
+    updater_module = types.SimpleNamespace(
+        KEMSUpdateOrchestrator=FakeUpdateOrchestrator
+    )
     published: list[tuple[object, str, object, dict[str, object]]] = []
 
     def publisher(
