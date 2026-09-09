@@ -27,7 +27,9 @@ def _size(value: object) -> int:
     )
 
 
-def _recorded(attributes: dict[str, object], unrecorded: frozenset[str]) -> dict[str, object]:
+def _recorded(
+    attributes: dict[str, object], unrecorded: frozenset[str]
+) -> dict[str, object]:
     """Return the attributes Recorder is allowed to retain."""
     return {
         key: value for key, value in attributes.items() if key not in unrecorded
@@ -63,7 +65,7 @@ def _large_scenarios() -> list[dict[str, object]]:
         {
             "key": f"scenario_{index}",
             "label": f"Scenario {index}",
-            "description": "what-if replay result " + "x" * 700,
+            "description": "what-if replay result " + "x" * 2_500,
             "ready": True,
             "samples": 1440,
             "data_coverage": 1.0,
