@@ -50,6 +50,7 @@ class RecorderSafeScenarioSensor(KEMSSensor):
 class KEMSAgileSlotsSensor(KEMSEntity, SensorEntity):
     """Customer-facing Agile slot table with Recorder-safe large attributes."""
 
+    _attr_name = "Agile slots"
     _attr_icon = "mdi:table-clock"
     _unrecorded_attributes = AGILE_SLOTS_UNRECORDED_ATTRIBUTES
 
@@ -82,6 +83,7 @@ class KEMSAgileSlotsSensor(KEMSEntity, SensorEntity):
 class KEMSEnergyCostComparisonSensor(KEMSEntity, SensorEntity):
     """Canonical Live Data vs KEMS bill comparison with live-only period detail."""
 
+    _attr_name = "Energy cost comparison"
     _attr_icon = "mdi:home-currency-gbp"
     _attr_native_unit_of_measurement = "p"
     _unrecorded_attributes = ENERGY_COST_UNRECORDED_ATTRIBUTES
