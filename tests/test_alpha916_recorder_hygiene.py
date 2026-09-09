@@ -84,11 +84,11 @@ def _large_scenarios() -> list[dict[str, object]]:
 
 def test_alpha916_warned_entities_are_routed_through_recorder_safe_entities() -> None:
     """All five reported Recorder offenders must have an unrecorded boundary."""
-    assert SCENARIO_RECORDER_SAFE_KEYS >= {
+    assert {
         "scenario_comparison_today",
         "scenario_comparison_7_days",
         "scenario_comparison_30_days",
-    }
+    } <= SCENARIO_RECORDER_SAFE_KEYS
     assert RecorderSafeScenarioSensor._unrecorded_attributes == (
         SCENARIO_UNRECORDED_ATTRIBUTES
     )
