@@ -104,7 +104,9 @@ def test_agile_slots_has_one_stable_state_backed_by_retained_runtime_data() -> N
     assert 'getattr(coordinator, "agile_smart_export_state", None)' in slots
     assert 'state.get("today_slots")' in slots
     assert 'state.get("tomorrow_slots")' in slots
-    assert "from .agile_slots_state import _attributes as agile_slot_attributes" in hygiene
+    assert (
+        "from .agile_slots_state import _attributes as agile_slot_attributes" in hygiene
+    )
     assert "class KEMSAgileSlotsSensor" in hygiene
     assert 'super().__init__(coordinator, "agile_slots")' in hygiene
     assert "_unrecorded_attributes = AGILE_SLOTS_UNRECORDED_ATTRIBUTES" in hygiene
