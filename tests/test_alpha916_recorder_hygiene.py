@@ -31,9 +31,7 @@ def _recorded(
     attributes: dict[str, object], unrecorded: frozenset[str]
 ) -> dict[str, object]:
     """Return the attributes Recorder is allowed to retain."""
-    return {
-        key: value for key, value in attributes.items() if key not in unrecorded
-    }
+    return {key: value for key, value in attributes.items() if key not in unrecorded}
 
 
 def _large_slots() -> list[dict[str, object]]:
