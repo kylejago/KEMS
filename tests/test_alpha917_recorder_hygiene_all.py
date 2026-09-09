@@ -11,14 +11,38 @@ HYGIENE = KEMS / "recorder_hygiene.py"
 RECORDER_MAX_ATTRIBUTE_BYTES = 16_384
 
 LIVE_OVERFLOW_ENTITIES = {
-    "sensor.kems_agile_smart_export_plan": KEMS / "agile_smart_export.py",
-    "sensor.kems_agile_rolling_export_plan": KEMS / "agile_rolling_replan_runtime.py",
-    "sensor.kems_agile_decision_audit": KEMS / "agile_validation_evidence_runtime.py",
-    "sensor.kems_agile_slot_decisions_today": KEMS / "agile_smart_export.py",
-    "sensor.kems_agile_shadow_status": KEMS / "agile_shadow_command_runtime.py",
-    "sensor.kems_update_orchestrator_runtime": KEMS / "update_orchestrator.py",
-    "sensor.kems_update_status": KEMS / "update_orchestrator.py",
-    "sensor.kems_forecast_validation_status": KEMS / "sensor.py",
+    "sensor.kems_agile_smart_export_plan": (
+        KEMS / "agile_smart_export.py",
+        '"sensor.kems_agile_smart_export_plan"',
+    ),
+    "sensor.kems_agile_rolling_export_plan": (
+        KEMS / "agile_rolling_replan_runtime.py",
+        '"sensor.kems_agile_rolling_export_plan"',
+    ),
+    "sensor.kems_agile_decision_audit": (
+        KEMS / "agile_validation_evidence_runtime.py",
+        '"sensor.kems_agile_decision_audit"',
+    ),
+    "sensor.kems_agile_slot_decisions_today": (
+        KEMS / "agile_smart_export.py",
+        '"sensor.kems_agile_slot_decisions_today"',
+    ),
+    "sensor.kems_agile_shadow_status": (
+        KEMS / "agile_shadow_command_runtime.py",
+        '"sensor.kems_agile_shadow_status"',
+    ),
+    "sensor.kems_update_orchestrator_runtime": (
+        KEMS / "update_orchestrator.py",
+        '"sensor.kems_update_orchestrator_runtime"',
+    ),
+    "sensor.kems_update_status": (
+        KEMS / "update_orchestrator.py",
+        'super().__init__(coordinator, "update_status")',
+    ),
+    "sensor.kems_forecast_validation_status": (
+        KEMS / "sensor.py",
+        'key="forecast_validation_status"',
+    ),
 }
 
 
@@ -31,8 +55,8 @@ def _size(value: object) -> int:
 def test_alpha917_covers_every_live_recorder_overflow_entity() -> None:
     """All eight entities proven oversized by the live HA log stay in scope."""
     assert len(LIVE_OVERFLOW_ENTITIES) == 8
-    for entity_id, source_path in LIVE_OVERFLOW_ENTITIES.items():
-        assert entity_id in source_path.read_text(encoding="utf-8")
+    for entity_id, (source_path, source_needle) in LIVE_OVERFLOW_ENTITIES.items():
+        assert source_needle in source_path.read_text(encoding="utf-8"), entity_id
 
 
 def test_alpha917_manual_agile_publishers_carry_recorder_state_info() -> None:
