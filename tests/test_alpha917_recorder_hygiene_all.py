@@ -64,7 +64,10 @@ def test_alpha917_manual_agile_publishers_carry_recorder_state_info() -> None:
     hygiene = HYGIENE.read_text(encoding="utf-8")
     assert "RECORDER_LIVE_ONLY_ATTRIBUTES = frozenset({MATCH_ALL})" in hygiene
     assert "state_info=RECORDER_LIVE_ONLY_STATE_INFO" in hygiene
-    assert "agile.EfficientAgileSmartExportManager._set = recorder_safe_agile_set" in hygiene
+    assert (
+        "agile.EfficientAgileSmartExportManager._set = recorder_safe_agile_set"
+        in hygiene
+    )
 
     for source_name in (
         "agile_smart_export.py",
@@ -118,7 +121,9 @@ def test_alpha917_installs_before_first_coordinator_publication() -> None:
     """Startup publications must be Recorder-safe, not only later refreshes."""
     source = (KEMS / "__init__.py").read_text(encoding="utf-8")
     install_at = source.index("install_alpha917_recorder_hygiene()")
-    first_refresh_at = source.index("await coordinator.async_config_entry_first_refresh()")
+    first_refresh_at = source.index(
+        "await coordinator.async_config_entry_first_refresh()"
+    )
     assert install_at < first_refresh_at
 
 
