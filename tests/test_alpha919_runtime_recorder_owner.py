@@ -13,12 +13,11 @@ KEMS = ROOT / "custom_components" / "kems"
 HYGIENE = KEMS / "recorder_hygiene.py"
 COORDINATOR = KEMS / "coordinator.py"
 
-MANUAL_AGILE_OVERFLOW_ENTITIES = (
+MANUAL_AGILE_RUNTIME_OVERFLOW_ENTITIES = (
     "sensor.kems_agile_smart_export_plan",
     "sensor.kems_agile_rolling_export_plan",
     "sensor.kems_agile_decision_audit",
     "sensor.kems_agile_slot_decisions_today",
-    "sensor.kems_agile_shadow_status",
 )
 
 
@@ -32,6 +31,7 @@ def _future_annotations() -> ast.ImportFrom:
 
 def _load_manual_hygiene_installer(
     runtime_module: object,
+    shadow_module: object,
     updater_module: object,
     publisher: object,
 ):
@@ -61,6 +61,14 @@ def _load_manual_hygiene_installer(
                     )
                 )
                 continue
+            if alias.name == "shadow_validation" and alias.asname == "shadow_runtime":
+                rewritten.append(
+                    ast.Assign(
+                        targets=[ast.Name(id="shadow_runtime", ctx=ast.Store())],
+                        value=ast.Name(id="_shadow_module", ctx=ast.Load()),
+                    )
+                )
+                continue
             if alias.name == "update_orchestrator" and alias.asname == "updater":
                 rewritten.append(
                     ast.Assign(
@@ -79,8 +87,10 @@ def _load_manual_hygiene_installer(
     ast.fix_missing_locations(module)
     namespace = {
         "_runtime_module": runtime_module,
+        "_shadow_module": shadow_module,
         "_updater_module": updater_module,
         "_async_set_live_only_attributes": publisher,
+        "AGILE_SHADOW_STATUS_ENTITY_ID": "sensor.kems_agile_shadow_status",
     }
     exec(compile(module, str(HYGIENE), "exec"), namespace)
     return namespace["_install_manual_state_hygiene"]
@@ -99,8 +109,8 @@ def test_alpha919_patches_same_final_runtime_owner_used_by_coordinator() -> None
     assert "agile.AgileSmartExportManager._set" not in hygiene
 
 
-def test_alpha919_runtime_owner_publishes_all_five_live_only_states() -> None:
-    """Execute the real installer body against the final-runtime owner contract."""
+def test_alpha919_runtime_owner_publishes_four_live_only_runtime_states() -> None:
+    """Keep Alpha9.19 proof scoped to states owned by the final Agile manager."""
 
     class RuntimeManager:
         def _set(self, entity_id: str, value: object, attributes: dict) -> None:
@@ -109,6 +119,14 @@ def test_alpha919_runtime_owner_publishes_all_five_live_only_states() -> None:
     original_set = RuntimeManager._set
     runtime_module = types.SimpleNamespace(
         EfficientAgileSmartExportManager=RuntimeManager
+    )
+
+    class FakeShadowValidationRecorder:
+        def _set(self, entity_id: str, value: object, attributes: dict) -> None:
+            pass
+
+    shadow_module = types.SimpleNamespace(
+        ShadowValidationRecorder=FakeShadowValidationRecorder
     )
 
     class FakeUpdateOrchestrator:
@@ -130,6 +148,7 @@ def test_alpha919_runtime_owner_publishes_all_five_live_only_states() -> None:
 
     installer = _load_manual_hygiene_installer(
         runtime_module,
+        shadow_module,
         updater_module,
         publisher,
     )
@@ -143,10 +162,12 @@ def test_alpha919_runtime_owner_publishes_all_five_live_only_states() -> None:
     hass = object()
     manager._hass = hass
     attributes = {"rich_live_payload": "x" * 20_000}
-    for entity_id in MANUAL_AGILE_OVERFLOW_ENTITIES:
+    for entity_id in MANUAL_AGILE_RUNTIME_OVERFLOW_ENTITIES:
         patched_set(manager, entity_id, "live", attributes)
 
-    assert [item[1] for item in published] == list(MANUAL_AGILE_OVERFLOW_ENTITIES)
+    assert [item[1] for item in published] == list(
+        MANUAL_AGILE_RUNTIME_OVERFLOW_ENTITIES
+    )
     assert all(item[0] is hass for item in published)
     assert all(item[3] is attributes for item in published)
 
@@ -161,14 +182,14 @@ def test_alpha919_recorder_boundary_keeps_match_all_state_info() -> None:
 
 
 def test_alpha919_release_scope_is_recorder_only() -> None:
-    """Keep this hotfix outside optimiser, tariff and FoxESS control authority."""
+    """Keep successor releases outside optimiser, tariff and FoxESS authority."""
     manifest = json.loads((KEMS / "manifest.json").read_text(encoding="utf-8"))
     bundle = json.loads(
         (ROOT / "release" / "kems-bundle.template.json").read_text(encoding="utf-8")
     )
     hygiene = HYGIENE.read_text(encoding="utf-8")
 
-    assert manifest["version"] == "0.9.0-alpha9.19"
+    assert manifest["version"] == "0.9.0-alpha9.20"
     assert "runtime" in bundle["maintenance"]["reason"].lower()
     assert "recorder" in bundle["maintenance"]["reason"].lower()
     assert "forecast_path_scheduler" not in hygiene
