@@ -37,7 +37,7 @@ def _size(value: object) -> int:
 
 def test_alpha917_covers_every_live_recorder_overflow_entity() -> None:
     """All eight entities proven oversized by the live HA log stay in scope."""
-    assert LIVE_OVERFLOW_ENTITIES == {
+    assert {
         "sensor.kems_agile_smart_export_plan",
         "sensor.kems_agile_rolling_export_plan",
         "sensor.kems_agile_decision_audit",
@@ -46,7 +46,7 @@ def test_alpha917_covers_every_live_recorder_overflow_entity() -> None:
         "sensor.kems_update_orchestrator_runtime",
         "sensor.kems_update_status",
         "sensor.kems_forecast_validation_status",
-    }
+    } == LIVE_OVERFLOW_ENTITIES
     assert len(MANUAL_AGILE_OVERFLOW_ENTITIES) == 5
     assert len(ENTITY_OVERFLOW_ENTITIES) == 3
 
