@@ -169,7 +169,10 @@ def test_dashboard_and_web_contract_use_one_canonical_bill_state() -> None:
     assert "Total energy cost by period — Live Data vs KEMS" in presentation
     assert "Battery wear is deliberately excluded" in presentation
     assert "install_energy_bill_dashboard_patch()" in init_source
-    assert "from .energy_bill_presentation import _payload as energy_bill_payload" in hygiene
+    assert (
+        "from .energy_bill_presentation import _payload as energy_bill_payload"
+        in hygiene
+    )
     assert "class KEMSEnergyCostComparisonSensor" in hygiene
     assert 'super().__init__(coordinator, "energy_cost_comparison")' in hygiene
     assert "_unrecorded_attributes = ENERGY_COST_UNRECORDED_ATTRIBUTES" in hygiene
