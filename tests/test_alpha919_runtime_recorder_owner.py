@@ -107,7 +107,9 @@ def test_alpha919_runtime_owner_publishes_all_five_live_only_states() -> None:
             raise AssertionError("unpatched runtime publication")
 
     original_set = RuntimeManager._set
-    runtime_module = types.SimpleNamespace(EfficientAgileSmartExportManager=RuntimeManager)
+    runtime_module = types.SimpleNamespace(
+        EfficientAgileSmartExportManager=RuntimeManager
+    )
 
     class FakeUpdateOrchestrator:
         def _write_legacy_states(self) -> None:
