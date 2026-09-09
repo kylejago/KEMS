@@ -12,6 +12,7 @@ SOURCE = ROOT / "dashboards" / "kems_master_dashboard.yaml"
 PACKAGED = ROOT / "custom_components" / "kems" / "kems_master_dashboard.yaml"
 PIPELINE = ROOT / "custom_components" / "kems" / "dashboard_pipeline.py"
 SLOTS = ROOT / "custom_components" / "kems" / "agile_slots_state.py"
+HYGIENE = ROOT / "custom_components" / "kems" / "recorder_hygiene.py"
 INIT = ROOT / "custom_components" / "kems" / "__init__.py"
 MANIFEST = ROOT / "custom_components" / "kems" / "manifest.json"
 BUNDLE = ROOT / "release" / "kems-bundle.template.json"
@@ -95,6 +96,7 @@ def test_optional_uncommissioned_live_hardware_is_rendered_defensively() -> None
 def test_agile_slots_has_one_stable_state_backed_by_retained_runtime_data() -> None:
     content = _content()
     slots = SLOTS.read_text(encoding="utf-8")
+    hygiene = HYGIENE.read_text(encoding="utf-8")
     init = INIT.read_text(encoding="utf-8")
 
     assert "sensor.kems_agile_slots" in content
@@ -102,8 +104,12 @@ def test_agile_slots_has_one_stable_state_backed_by_retained_runtime_data() -> N
     assert 'getattr(coordinator, "agile_smart_export_state", None)' in slots
     assert 'state.get("today_slots")' in slots
     assert 'state.get("tomorrow_slots")' in slots
-    assert "coordinator.async_add_listener(publish)" in slots
-    assert "async_setup_agile_slots_state(hass, entry, coordinator)" in init
+    assert "from .agile_slots_state import _attributes as agile_slot_attributes" in hygiene
+    assert "class KEMSAgileSlotsSensor" in hygiene
+    assert 'super().__init__(coordinator, "agile_slots")' in hygiene
+    assert "_unrecorded_attributes = AGILE_SLOTS_UNRECORDED_ATTRIBUTES" in hygiene
+    assert "install_alpha916_recorder_hygiene()" in init
+    assert "async_setup_agile_slots_state(hass, entry, coordinator)" not in init
 
 
 def test_sync_and_verification_use_exact_same_fresh_packaged_bytes() -> None:
