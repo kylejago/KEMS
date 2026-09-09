@@ -2,10 +2,11 @@
 
 Alpha9.16 kept the first reported rich dashboard/Pi-Web payloads available in
 Home Assistant while marking their deliberately large presentation attributes as
-unrecorded. Alpha9.17 extends that boundary to every live overflow exposed by
-Home Assistant 2026.9: manual Agile runtime states, update-runtime state, update
-status, and forecast-validation status. The rich live attributes remain intact;
-Recorder stores the compact state and standard metadata only.
+unrecorded. Alpha9.17 extended that boundary to every live overflow exposed by
+Home Assistant 2026.9. Alpha9.19 binds the manual Agile publication boundary to
+the final EfficientAgileSmartExportManager used by KEMSCoordinator. The rich live
+attributes remain intact; Recorder stores the compact state and standard metadata
+only.
 """
 
 from __future__ import annotations
@@ -140,11 +141,11 @@ def _async_set_live_only_attributes(
 
 def _install_manual_state_hygiene() -> None:
     """Make manual Agile and updater runtime publishers Recorder-safe."""
-    from . import agile_smart_export as agile
+    from . import agile_smart_export_runtime as agile_runtime
     from . import update_orchestrator as updater
 
-    agile_set = agile.AgileSmartExportManager._set
-    if not getattr(agile_set, "_kems_alpha917_recorder_hygiene", False):
+    agile_set = agile_runtime.EfficientAgileSmartExportManager._set
+    if not getattr(agile_set, "_kems_alpha919_recorder_hygiene", False):
 
         def recorder_safe_agile_set(
             self,
@@ -159,8 +160,8 @@ def _install_manual_state_hygiene() -> None:
                 attributes,
             )
 
-        recorder_safe_agile_set._kems_alpha917_recorder_hygiene = True
-        agile.AgileSmartExportManager._set = recorder_safe_agile_set
+        recorder_safe_agile_set._kems_alpha919_recorder_hygiene = True
+        agile_runtime.EfficientAgileSmartExportManager._set = recorder_safe_agile_set
 
     write_legacy = updater.KEMSUpdateOrchestrator._write_legacy_states
     if not getattr(write_legacy, "_kems_alpha917_recorder_hygiene", False):
