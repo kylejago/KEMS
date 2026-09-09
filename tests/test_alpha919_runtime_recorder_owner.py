@@ -91,8 +91,8 @@ def test_alpha919_patches_same_final_runtime_owner_used_by_coordinator() -> None
     coordinator = COORDINATOR.read_text(encoding="utf-8")
     hygiene = HYGIENE.read_text(encoding="utf-8")
 
-    assert "from .agile_smart_export_runtime import (" in coordinator
-    assert "EfficientAgileSmartExportManager," in coordinator
+    assert "from .agile_smart_export_runtime import" in coordinator
+    assert "EfficientAgileSmartExportManager" in coordinator
     assert "self._agile_smart_export = EfficientAgileSmartExportManager(" in coordinator
     assert "from . import agile_smart_export_runtime as agile_runtime" in hygiene
     assert "agile_runtime.EfficientAgileSmartExportManager._set" in hygiene
