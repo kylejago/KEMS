@@ -51,7 +51,7 @@ from .providers.gas import GasProvider
 from .providers.octoplus import OctoplusProvider
 from .providers.octopus import OctopusProvider
 from .providers.ohme import OhmeProvider
-from .recorder_hygiene import install_alpha916_recorder_hygiene
+from .recorder_hygiene import install_alpha917_recorder_hygiene
 from .settings import KEMSSettings
 from .source_authority import async_reconcile_source_mappings
 from .update_orchestrator import async_unload_update_orchestrator
@@ -87,6 +87,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     install_energy_bill_dashboard_patch()
     install_dashboard_pipeline()
     install_alpha95_presentation()
+    # Alpha9.17 must install before the first coordinator refresh so even startup
+    # publications carry Recorder state-info and updater verification never performs
+    # filesystem reads on Home Assistant's event loop.
+    install_alpha917_recorder_hygiene()
     try:
         await async_sync_managed_dashboard(hass)
     except (OSError, ValueError):
@@ -179,7 +183,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     )
 
     entry.runtime_data = coordinator
-    install_alpha916_recorder_hygiene()
     update_orchestrator = await async_setup_update_orchestrator(hass, entry)
     if (
         update_orchestrator.policy.automatic_updates
