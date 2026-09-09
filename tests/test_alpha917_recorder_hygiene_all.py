@@ -10,40 +10,23 @@ KEMS = ROOT / "custom_components" / "kems"
 HYGIENE = KEMS / "recorder_hygiene.py"
 RECORDER_MAX_ATTRIBUTE_BYTES = 16_384
 
-LIVE_OVERFLOW_ENTITIES = {
-    "sensor.kems_agile_smart_export_plan": (
-        KEMS / "agile_smart_export.py",
-        '"sensor.kems_agile_smart_export_plan"',
-    ),
-    "sensor.kems_agile_rolling_export_plan": (
-        KEMS / "agile_rolling_replan_runtime.py",
-        '"sensor.kems_agile_rolling_export_plan"',
-    ),
-    "sensor.kems_agile_decision_audit": (
-        KEMS / "agile_validation_evidence_runtime.py",
-        '"sensor.kems_agile_decision_audit"',
-    ),
-    "sensor.kems_agile_slot_decisions_today": (
-        KEMS / "agile_smart_export.py",
-        '"sensor.kems_agile_slot_decisions_today"',
-    ),
-    "sensor.kems_agile_shadow_status": (
-        KEMS / "agile_shadow_command_runtime.py",
-        '"sensor.kems_agile_shadow_status"',
-    ),
-    "sensor.kems_update_orchestrator_runtime": (
-        KEMS / "update_orchestrator.py",
-        '"sensor.kems_update_orchestrator_runtime"',
-    ),
-    "sensor.kems_update_status": (
-        KEMS / "update_orchestrator.py",
-        'super().__init__(coordinator, "update_status")',
-    ),
-    "sensor.kems_forecast_validation_status": (
-        KEMS / "sensor.py",
-        'key="forecast_validation_status"',
-    ),
-}
+MANUAL_AGILE_OVERFLOW_ENTITIES = frozenset(
+    {
+        "sensor.kems_agile_smart_export_plan",
+        "sensor.kems_agile_rolling_export_plan",
+        "sensor.kems_agile_decision_audit",
+        "sensor.kems_agile_slot_decisions_today",
+        "sensor.kems_agile_shadow_status",
+    }
+)
+ENTITY_OVERFLOW_ENTITIES = frozenset(
+    {
+        "sensor.kems_update_orchestrator_runtime",
+        "sensor.kems_update_status",
+        "sensor.kems_forecast_validation_status",
+    }
+)
+LIVE_OVERFLOW_ENTITIES = MANUAL_AGILE_OVERFLOW_ENTITIES | ENTITY_OVERFLOW_ENTITIES
 
 
 def _size(value: object) -> int:
@@ -54,9 +37,18 @@ def _size(value: object) -> int:
 
 def test_alpha917_covers_every_live_recorder_overflow_entity() -> None:
     """All eight entities proven oversized by the live HA log stay in scope."""
-    assert len(LIVE_OVERFLOW_ENTITIES) == 8
-    for entity_id, (source_path, source_needle) in LIVE_OVERFLOW_ENTITIES.items():
-        assert source_needle in source_path.read_text(encoding="utf-8"), entity_id
+    assert LIVE_OVERFLOW_ENTITIES == {
+        "sensor.kems_agile_smart_export_plan",
+        "sensor.kems_agile_rolling_export_plan",
+        "sensor.kems_agile_decision_audit",
+        "sensor.kems_agile_slot_decisions_today",
+        "sensor.kems_agile_shadow_status",
+        "sensor.kems_update_orchestrator_runtime",
+        "sensor.kems_update_status",
+        "sensor.kems_forecast_validation_status",
+    }
+    assert len(MANUAL_AGILE_OVERFLOW_ENTITIES) == 5
+    assert len(ENTITY_OVERFLOW_ENTITIES) == 3
 
 
 def test_alpha917_manual_agile_publishers_carry_recorder_state_info() -> None:
@@ -81,7 +73,13 @@ def test_alpha917_manual_agile_publishers_carry_recorder_state_info() -> None:
 def test_alpha917_updater_and_forecast_entities_use_live_only_boundaries() -> None:
     """The remaining three overflow paths are covered without deleting live detail."""
     hygiene = HYGIENE.read_text(encoding="utf-8")
+    updater = (KEMS / "update_orchestrator.py").read_text(encoding="utf-8")
+    sensors = (KEMS / "sensor.py").read_text(encoding="utf-8")
+
     assert "sensor.kems_update_orchestrator_runtime" in hygiene
+    assert "sensor.kems_update_orchestrator_runtime" in updater
+    assert 'super().__init__(coordinator, "update_status")' in updater
+    assert 'key="forecast_validation_status"' in sensors
     assert "class RecorderSafeUpdateStatusSensor" in hygiene
     assert "class RecorderSafeForecastValidationSensor" in hygiene
     assert "_unrecorded_attributes = RECORDER_LIVE_ONLY_ATTRIBUTES" in hygiene
@@ -120,11 +118,14 @@ def test_alpha917_match_all_keeps_large_live_payload_but_recorder_compact() -> N
 def test_alpha917_installs_before_first_coordinator_publication() -> None:
     """Startup publications must be Recorder-safe, not only later refreshes."""
     source = (KEMS / "__init__.py").read_text(encoding="utf-8")
-    install_at = source.index("install_alpha917_recorder_hygiene()")
+    hygiene = HYGIENE.read_text(encoding="utf-8")
+    install_at = source.index("install_alpha916_recorder_hygiene()")
     first_refresh_at = source.index(
         "await coordinator.async_config_entry_first_refresh()"
     )
     assert install_at < first_refresh_at
+    assert "def install_alpha916_recorder_hygiene()" in hygiene
+    assert "install_alpha917_recorder_hygiene()" in hygiene
 
 
 def test_alpha917_updater_file_reads_are_executor_cached() -> None:
