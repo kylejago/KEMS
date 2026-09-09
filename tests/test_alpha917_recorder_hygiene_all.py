@@ -56,10 +56,7 @@ def test_alpha917_manual_agile_publishers_carry_recorder_state_info() -> None:
     hygiene = HYGIENE.read_text(encoding="utf-8")
     assert "RECORDER_LIVE_ONLY_ATTRIBUTES = frozenset({MATCH_ALL})" in hygiene
     assert "state_info=RECORDER_LIVE_ONLY_STATE_INFO" in hygiene
-    assert (
-        "agile.EfficientAgileSmartExportManager._set = recorder_safe_agile_set"
-        in hygiene
-    )
+    assert "def _install_manual_state_hygiene()" in hygiene
 
     for source_name in (
         "agile_smart_export.py",

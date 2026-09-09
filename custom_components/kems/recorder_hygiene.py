@@ -143,7 +143,7 @@ def _install_manual_state_hygiene() -> None:
     from . import agile_smart_export as agile
     from . import update_orchestrator as updater
 
-    agile_set = agile.EfficientAgileSmartExportManager._set
+    agile_set = agile.AgileSmartExportManager._set
     if not getattr(agile_set, "_kems_alpha917_recorder_hygiene", False):
 
         def recorder_safe_agile_set(
@@ -160,7 +160,7 @@ def _install_manual_state_hygiene() -> None:
             )
 
         recorder_safe_agile_set._kems_alpha917_recorder_hygiene = True
-        agile.EfficientAgileSmartExportManager._set = recorder_safe_agile_set
+        agile.AgileSmartExportManager._set = recorder_safe_agile_set
 
     write_legacy = updater.KEMSUpdateOrchestrator._write_legacy_states
     if not getattr(write_legacy, "_kems_alpha917_recorder_hygiene", False):
