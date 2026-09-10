@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import ast
 import importlib.util
+import json
 import math
 import sys
 from copy import deepcopy
@@ -17,6 +18,7 @@ ROOT = Path(__file__).parents[1]
 KEMS = ROOT / "custom_components" / "kems"
 PARITY = KEMS / "agile_flow_total_discharge_parity.py"
 POLICY_PARITY = KEMS / "agile_flow_policy_parity.py"
+RESTART_OWNER = KEMS / "agile_restart_soc_anchor.py"
 SLOT_FLOW = KEMS / "kems_core" / "slot_flow.py"
 
 
@@ -59,6 +61,7 @@ def _reconcilers():
     ]
     policy_namespace: dict[str, Any] = {
         "Any": Any,
+        "math": math,
         "_reconcile_future_total_discharge_flow": namespace[
             "_reconcile_future_total_discharge_flow"
         ],
@@ -183,6 +186,14 @@ def test_live_alpha923_overwrite_is_reproduced_then_blocked() -> None:
     assert second["house_import_floor_soc_percent"] == pytest.approx(10.0)
     assert second["hard_safety_recovery_soc_percent"] == pytest.approx(12.0)
     assert second["planning_target_limits_export_only"] is True
+    assert second["flow_policy_export_cap_applied"] is True
+    assert second["flow_policy_export_cap_kwh"] == pytest.approx(0.204)
+    assert second["flow_policy_rolling_export_kwh"] == pytest.approx(0.396)
+    assert second["flow_policy_suppressed_export_kwh"] == pytest.approx(0.192)
+    assert second["flow_policy_planner_fields_unchanged"] is True
+    assert protected["flow_total_discharge_parity"]["policy_export_cap_rows"] == 1
+    assert protected["flow_total_discharge_parity"]["policy_export_cap_preserved"] is True
+    assert protected["flow_total_discharge_parity"]["planner_fields_unchanged"] is True
     assert [
         (
             row["planned_total_battery_discharge_kwh"],
@@ -201,3 +212,32 @@ def test_legacy_rows_without_export_only_policy_keep_alpha867_parity() -> None:
     assert policy_reconcile(state) == 1
     assert state["today_slots"][1]["flow_battery_export_kwh"] == pytest.approx(0.396)
     assert state["today_slots"][1]["flow_battery_kwh"] == pytest.approx(1.102)
+
+
+def test_alpha924_runtime_uses_policy_safe_final_publication_owner() -> None:
+    """The final restart-safe owner must invoke the new guard, not legacy parity."""
+    source = RESTART_OWNER.read_text(encoding="utf-8")
+    assert "from .agile_flow_policy_parity import" in source
+    assert "_reconcile_future_policy_safe_total_discharge_flow(state)" in source
+    assert "_reconcile_future_total_discharge_flow(state)" not in source
+
+
+def test_alpha924_release_scope_remains_reporting_only() -> None:
+    manifest = json.loads((KEMS / "manifest.json").read_text(encoding="utf-8"))
+    bundle = json.loads(
+        (ROOT / "release" / "kems-bundle.template.json").read_text(encoding="utf-8")
+    )
+    source = POLICY_PARITY.read_text(encoding="utf-8")
+
+    assert manifest["version"] == "0.9.0-alpha9.24"
+    reason = bundle["maintenance"]["reason"].lower()
+    assert "alpha9.24" in reason
+    assert "flow parity" in reason
+    assert "15%" in reason
+    assert "10%" in reason
+    assert "12%" in reason
+    assert "reporting-only" in source
+    assert "services.async_call" not in source
+    assert "async_call(" not in source
+    assert "commands_permitted = true" not in source.lower()
+    assert "safe_to_write_hardware = true" not in source.lower()
