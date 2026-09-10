@@ -1,8 +1,9 @@
-"""Regression proof for Alpha9.21 planning-target / house-floor separation."""
+"""Regression proof for Alpha9.21+ planning-target / house-floor separation."""
 
 from __future__ import annotations
 
 import importlib
+import json
 import sys
 import types
 from datetime import UTC, datetime, time
@@ -67,7 +68,7 @@ TariffSettings = tariff_module.TariffSettings
 
 
 def _install_production_projection(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Install Alpha9.21/22 over canonical flow helpers without leaking globals."""
+    """Install the current reserve policy over canonical helpers without leaks."""
     base_projection = flow._future_today_projection
     base_close = flow._close_home_precision_residual
     base_attach = flow._attach_flow_contract
@@ -100,6 +101,7 @@ def _project(
     soc_percent: float,
     planned_export_kwh: float = 0.0,
     hard_floor_latched: bool = False,
+    forecast_floor_percent: float = 15.0,
 ) -> dict[str, object]:
     """Run the real future-flow projection for one pre-cheap half hour."""
     start = datetime(2026, 9, 10, 21, 0, tzinfo=UTC)  # 22:00 BST
@@ -135,7 +137,7 @@ def _project(
     learned = LearnedState(typical_house_load_kw=1.2)
     forecast = SolarForecastState(hourly=())
     forecast_plan = ForecastPlanState(
-        minimum_precheap_soc_percent=15.0,
+        minimum_precheap_soc_percent=forecast_floor_percent,
         maximum_overnight_soc_percent=100.0,
     )
     tariff = TariffSettings(
@@ -192,6 +194,31 @@ def test_house_demand_crosses_15_before_any_deliberate_export(
     assert 10.0 < row["estimated_soc_percent"] < 15.0
 
 
+def test_configured_15_target_limits_export_even_if_incoming_forecast_floor_is_lower(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Reproduce Alpha9.22 live leak: display export must never inherit 10%."""
+    _install_production_projection(monkeypatch)
+
+    row = _project(
+        soc_percent=20.0,
+        planned_export_kwh=3.0,
+        forecast_floor_percent=10.0,
+    )
+
+    # The old Alpha9.21/22 wrapper lowered effective config reserve to 10% and
+    # allowed this row to consume the whole 3 kWh export request, ending near
+    # 13%. Alpha9.23 must reserve 15% for deliberate export while still letting
+    # the house consume its normal 0.6 kWh without expensive Grid import.
+    assert row["battery_to_home_kwh"] == pytest.approx(0.6)
+    assert 0.0 < row["battery_export_kwh"] < 3.0
+    assert row["grid_import_kwh"] == pytest.approx(0.0)
+    assert row["estimated_soc_percent"] == pytest.approx(15.0)
+    assert row["planning_target_soc_percent"] == 15.0
+    assert row["house_import_floor_soc_percent"] == 10.0
+    assert row["planning_target_limits_export_only"] is True
+
+
 def test_absolute_10_percent_floor_allows_grid_to_serve_house(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -218,3 +245,21 @@ def test_12_percent_recovery_latch_remains_authoritative(
     assert row["battery_export_kwh"] == pytest.approx(0.0)
     assert row["grid_import_kwh"] == pytest.approx(0.6)
     assert row["estimated_soc_percent"] == pytest.approx(11.0)
+
+
+def test_alpha923_release_scope_is_projection_only() -> None:
+    manifest = json.loads((INTEGRATION / "manifest.json").read_text(encoding="utf-8"))
+    bundle = json.loads(
+        (ROOT / "release" / "kems-bundle.template.json").read_text(encoding="utf-8")
+    )
+    source = (INTEGRATION / "agile_flow_reserve_policy.py").read_text(encoding="utf-8")
+
+    assert manifest["version"] == "0.9.0-alpha9.23"
+    reason = bundle["maintenance"]["reason"].lower()
+    assert "export-floor correction" in reason
+    assert "15% planning/export target" in reason
+    assert "10% absolute floor" in reason
+    assert "12% recovery latch" in reason
+    assert "providers.foxess" not in source
+    assert "commands_permitted = True" not in source
+    assert "safe_to_write_hardware = True" not in source
