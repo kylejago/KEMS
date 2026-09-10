@@ -15,63 +15,50 @@ ROOT = Path(__file__).parents[1]
 INTEGRATION = ROOT / "custom_components" / "kems"
 
 
-def _module(name: str) -> types.ModuleType:
-    """Return an existing module or install a minimal test stub."""
-    module = sys.modules.get(name)
-    if module is None:
-        module = types.ModuleType(name)
-        sys.modules[name] = module
-    return module
+def _load_projection_modules():
+    """Load the real projection with the suite's established tiny HA stubs."""
+    aiohttp = types.ModuleType("aiohttp")
+    aiohttp.ClientError = type("ClientError", (Exception,), {})
+    sys.modules.setdefault("aiohttp", aiohttp)
+
+    homeassistant = types.ModuleType("homeassistant")
+    homeassistant.__path__ = []
+    core = types.ModuleType("homeassistant.core")
+    core.HomeAssistant = object
+    helpers = types.ModuleType("homeassistant.helpers")
+    helpers.__path__ = []
+    aiohttp_client = types.ModuleType("homeassistant.helpers.aiohttp_client")
+    aiohttp_client.async_get_clientsession = lambda hass: None
+    storage = types.ModuleType("homeassistant.helpers.storage")
+
+    class Store:
+        """Enough generic-looking Store API for module import."""
+
+        def __class_getitem__(cls, item):
+            return cls
+
+    storage.Store = Store
+    sys.modules.setdefault("homeassistant", homeassistant)
+    sys.modules.setdefault("homeassistant.core", core)
+    sys.modules.setdefault("homeassistant.helpers", helpers)
+    sys.modules.setdefault("homeassistant.helpers.aiohttp_client", aiohttp_client)
+    sys.modules.setdefault("homeassistant.helpers.storage", storage)
+
+    custom_components = types.ModuleType("custom_components")
+    custom_components.__path__ = [str(ROOT / "custom_components")]
+    package = types.ModuleType("custom_components.kems")
+    package.__path__ = [str(INTEGRATION)]
+    sys.modules.setdefault("custom_components", custom_components)
+    sys.modules.setdefault("custom_components.kems", package)
+
+    flow = importlib.import_module("custom_components.kems.agile_flow_presentation")
+    policy = importlib.import_module("custom_components.kems.agile_flow_reserve_policy")
+    core_models = importlib.import_module("custom_components.kems.kems_core")
+    tariff_module = importlib.import_module("custom_components.kems.tariff")
+    return flow, policy, core_models, tariff_module
 
 
-def _bootstrap_ha_independent_package() -> None:
-    """Provide only the import surface needed by the real projection modules."""
-    aiohttp = _module("aiohttp")
-    if not hasattr(aiohttp, "ClientError"):
-        aiohttp.ClientError = type("ClientError", (Exception,), {})
-
-    homeassistant = _module("homeassistant")
-    homeassistant.__path__ = getattr(homeassistant, "__path__", [])
-
-    core = _module("homeassistant.core")
-    if not hasattr(core, "HomeAssistant"):
-        core.HomeAssistant = object
-
-    helpers = _module("homeassistant.helpers")
-    helpers.__path__ = getattr(helpers, "__path__", [])
-
-    aiohttp_client = _module("homeassistant.helpers.aiohttp_client")
-    if not hasattr(aiohttp_client, "async_get_clientsession"):
-        aiohttp_client.async_get_clientsession = lambda hass: None
-
-    storage = _module("homeassistant.helpers.storage")
-    if not hasattr(storage, "Store"):
-        class Store:
-            """Enough generic-looking Store API for module import."""
-
-            def __class_getitem__(cls, item):
-                return cls
-
-        storage.Store = Store
-
-    custom_components = _module("custom_components")
-    custom_components.__path__ = getattr(
-        custom_components,
-        "__path__",
-        [str(ROOT / "custom_components")],
-    )
-
-    package = _module("custom_components.kems")
-    package.__path__ = getattr(package, "__path__", [str(INTEGRATION)])
-
-
-_bootstrap_ha_independent_package()
-
-flow = importlib.import_module("custom_components.kems.agile_flow_presentation")
-policy = importlib.import_module("custom_components.kems.agile_flow_reserve_policy")
-core_models = importlib.import_module("custom_components.kems.kems_core")
-tariff_module = importlib.import_module("custom_components.kems.tariff")
-
+flow, policy, core_models, tariff_module = _load_projection_modules()
 ForecastPlanState = core_models.ForecastPlanState
 LearnedState = core_models.LearnedState
 SimulationConfig = core_models.SimulationConfig
