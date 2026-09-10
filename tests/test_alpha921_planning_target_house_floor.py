@@ -67,17 +67,22 @@ TariffSettings = tariff_module.TariffSettings
 
 
 def _install_production_projection(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Install Alpha9.21 over the canonical projection without leaking globals."""
+    """Install Alpha9.21/22 over canonical flow helpers without leaking globals."""
     base_projection = flow._future_today_projection
     base_close = flow._close_home_precision_residual
+    base_attach = flow._attach_flow_contract
     if getattr(base_projection, "_kems_flow_reserve_policy", False):
         base_projection = policy._original_future_today_projection
         base_close = policy._original_close_home_precision_residual
+    if getattr(base_attach, "_kems_flow_reserve_contract_bridge", False):
+        base_attach = policy._original_attach_flow_contract
 
     monkeypatch.setattr(flow, "_future_today_projection", base_projection)
     monkeypatch.setattr(flow, "_close_home_precision_residual", base_close)
+    monkeypatch.setattr(flow, "_attach_flow_contract", base_attach)
     monkeypatch.setattr(policy, "_original_future_today_projection", None)
     monkeypatch.setattr(policy, "_original_close_home_precision_residual", None)
+    monkeypatch.setattr(policy, "_original_attach_flow_contract", None)
     policy.install_flow_reserve_policy()
 
     assert (
@@ -85,6 +90,10 @@ def _install_production_projection(monkeypatch: pytest.MonkeyPatch) -> None:
         is policy._future_today_projection_with_separate_reserves
     )
     assert flow._close_home_precision_residual is policy._house_floor_close
+    assert (
+        flow._attach_flow_contract
+        is policy._attach_flow_contract_with_policy_metadata
+    )
 
 
 def _project(
