@@ -13,8 +13,10 @@ its house-service reserve. The projection still uses the forecast/pre-cheap
 planning target for deliberate export, but its battery-to-home precision helper
 and final SOC clamp use the 10% hard floor. The existing 10% stop / 12% recovery
 latch remains authoritative; when already latched, the projection does not
-invent further battery-to-home discharge. No optimiser allocation, tariff,
-FoxESS command or hardware-write authority changes here.
+invent further battery-to-home discharge. Alpha9.22 also keeps the policy
+metadata outside the strict ``build_slot_flow`` keyword contract and reattaches
+it to the published slot afterwards. No optimiser allocation, tariff, FoxESS
+command or hardware-write authority changes here.
 """
 
 from __future__ import annotations
@@ -41,8 +43,31 @@ _HOUSE_FLOOR_KWH: ContextVar[float | None] = ContextVar(
     "kems_agile_projection_house_floor_kwh",
     default=None,
 )
+_FLOW_CONTRACT_KEYS = frozenset(
+    {
+        "grid_import_kwh",
+        "solar_generation_kwh",
+        "solar_to_home_kwh",
+        "solar_to_battery_kwh",
+        "solar_export_kwh",
+        "grid_to_battery_kwh",
+        "battery_to_home_kwh",
+        "battery_export_kwh",
+        "estimated_soc_percent",
+        "basis",
+        "scope",
+    }
+)
+_POLICY_METADATA_KEYS = (
+    "planning_target_soc_percent",
+    "house_import_floor_soc_percent",
+    "hard_safety_recovery_soc_percent",
+    "planning_target_limits_export_only",
+    "hard_safety_floor_latched",
+)
 _original_future_today_projection = None
 _original_close_home_precision_residual = None
+_original_attach_flow_contract = None
 
 
 def _number(value: Any) -> float | None:
@@ -163,17 +188,56 @@ def _future_today_projection_with_separate_reserves(
     return projected
 
 
+def _attach_flow_contract_with_policy_metadata(
+    state: dict[str, Any],
+    *,
+    now,
+    future_today: dict[str, dict[str, Any]],
+) -> None:
+    """Keep policy metadata out of ``build_slot_flow`` and publish it afterwards."""
+    safe_future: dict[str, dict[str, Any]] = {}
+    for slot_key, values in future_today.items():
+        if not isinstance(values, dict):
+            continue
+        safe_future[slot_key] = {
+            key: value for key, value in values.items() if key in _FLOW_CONTRACT_KEYS
+        }
+
+    _original_attach_flow_contract(state, now=now, future_today=safe_future)
+
+    slots = state.get("today_slots")
+    if not isinstance(slots, list):
+        return
+    for slot in slots:
+        if not isinstance(slot, dict):
+            continue
+        values = future_today.get(str(slot.get("valid_from") or ""))
+        if not isinstance(values, dict):
+            continue
+        for key in _POLICY_METADATA_KEYS:
+            if key in values:
+                slot[key] = values[key]
+
+
 def install_flow_reserve_policy() -> None:
-    """Bind the separate 15/10/12 policy to the real future-flow projection."""
-    global _original_future_today_projection, _original_close_home_precision_residual
+    """Bind the separate 15/10/12 policy and strict flow-contract bridge."""
+    global _original_attach_flow_contract
+    global _original_close_home_precision_residual
+    global _original_future_today_projection
 
     projection = flow._future_today_projection
-    if getattr(projection, "_kems_flow_reserve_policy", False):
-        return
+    if not getattr(projection, "_kems_flow_reserve_policy", False):
+        _original_future_today_projection = projection
+        _original_close_home_precision_residual = flow._close_home_precision_residual
+        _house_floor_close._kems_flow_reserve_policy = True
+        _future_today_projection_with_separate_reserves._kems_flow_reserve_policy = True
+        flow._close_home_precision_residual = _house_floor_close
+        flow._future_today_projection = _future_today_projection_with_separate_reserves
 
-    _original_future_today_projection = projection
-    _original_close_home_precision_residual = flow._close_home_precision_residual
-    _house_floor_close._kems_flow_reserve_policy = True
-    _future_today_projection_with_separate_reserves._kems_flow_reserve_policy = True
-    flow._close_home_precision_residual = _house_floor_close
-    flow._future_today_projection = _future_today_projection_with_separate_reserves
+    attach = flow._attach_flow_contract
+    if not getattr(attach, "_kems_flow_reserve_contract_bridge", False):
+        _original_attach_flow_contract = attach
+        _attach_flow_contract_with_policy_metadata._kems_flow_reserve_contract_bridge = (
+            True
+        )
+        flow._attach_flow_contract = _attach_flow_contract_with_policy_metadata
