@@ -89,6 +89,7 @@ def _reconcilers():
     policy_namespace: dict[str, Any] = {
         "Any": Any,
         "math": math,
+        "_dt": _dt,
         "_reconcile_future_total_discharge_flow": namespace[
             "_reconcile_future_total_discharge_flow"
         ],
@@ -246,9 +247,11 @@ def test_legacy_rows_without_export_only_policy_keep_alpha867_parity() -> None:
 def test_alpha924_runtime_uses_policy_safe_final_publication_owner() -> None:
     """The final restart-safe owner must invoke the new guard, not legacy parity."""
     source = RESTART_OWNER.read_text(encoding="utf-8")
+    policy_source = POLICY_PARITY.read_text(encoding="utf-8")
     assert "from .agile_flow_policy_parity import" in source
     assert "_reconcile_future_policy_safe_total_discharge_flow(state)" in source
     assert "_reconcile_future_total_discharge_flow(state)" not in source
+    assert "_dt," in policy_source
 
 
 def test_alpha924_release_scope_remains_reporting_only() -> None:
