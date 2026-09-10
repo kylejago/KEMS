@@ -90,10 +90,7 @@ def _install_production_projection(monkeypatch: pytest.MonkeyPatch) -> None:
         is policy._future_today_projection_with_separate_reserves
     )
     assert flow._close_home_precision_residual is policy._house_floor_close
-    assert (
-        flow._attach_flow_contract
-        is policy._attach_flow_contract_with_policy_metadata
-    )
+    assert flow._attach_flow_contract is policy._attach_flow_contract_with_policy_metadata
 
 
 def _project(
