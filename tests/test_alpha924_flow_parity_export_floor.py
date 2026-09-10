@@ -45,11 +45,22 @@ def _dt(value: Any) -> datetime | None:
     return parsed.astimezone(UTC)
 
 
+def _number(value: Any) -> float | None:
+    """Match the runtime's finite-number coercion for the isolated parity test."""
+    if value is None:
+        return None
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return None
+    return number if math.isfinite(number) else None
+
+
 def _reconcilers():
     """Load the real parity functions without importing Home Assistant."""
     slot_flow = _slot_flow_module()
     tree = ast.parse(PARITY.read_text(encoding="utf-8"))
-    wanted = {"_number", "_reconcile_future_total_discharge_flow"}
+    wanted = {"_reconcile_future_total_discharge_flow"}
     functions = [
         node
         for node in tree.body
@@ -61,6 +72,7 @@ def _reconcilers():
         "datetime": datetime,
         "math": math,
         "_dt": _dt,
+        "_number": _number,
         "build_slot_flow": slot_flow.build_slot_flow,
         "_EPSILON": 1e-6,
         "_LEDGER_TOLERANCE_KWH": 0.01,
