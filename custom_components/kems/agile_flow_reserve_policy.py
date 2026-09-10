@@ -237,9 +237,6 @@ def install_flow_reserve_policy() -> None:
     attach = flow._attach_flow_contract
     if not getattr(attach, "_kems_flow_reserve_contract_bridge", False):
         _original_attach_flow_contract = attach
-        setattr(
-            _attach_flow_contract_with_policy_metadata,
-            "_kems_flow_reserve_contract_bridge",
-            True,
-        )
-        flow._attach_flow_contract = _attach_flow_contract_with_policy_metadata
+        bridge = _attach_flow_contract_with_policy_metadata
+        bridge._kems_flow_reserve_contract_bridge = True
+        flow._attach_flow_contract = bridge
