@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import importlib
 import sys
 import types
 from datetime import UTC, datetime, time
@@ -13,70 +14,70 @@ import pytest
 ROOT = Path(__file__).parents[1]
 INTEGRATION = ROOT / "custom_components" / "kems"
 
-# The repository's pytest harness deliberately avoids installing Home Assistant.
-# Load the real KEMS projection modules under their package name while supplying
-# only the tiny HA/aiohttp import surface they require, matching the established
-# Agile module-test pattern used elsewhere in this suite.
-aiohttp = sys.modules.get("aiohttp") or types.ModuleType("aiohttp")
-if not hasattr(aiohttp, "ClientError"):
-    aiohttp.ClientError = type("ClientError", (Exception,), {})
-sys.modules.setdefault("aiohttp", aiohttp)
 
-homeassistant = sys.modules.get("homeassistant") or types.ModuleType("homeassistant")
-if not hasattr(homeassistant, "__path__"):
-    homeassistant.__path__ = []
-core = sys.modules.get("homeassistant.core") or types.ModuleType("homeassistant.core")
-if not hasattr(core, "HomeAssistant"):
-    core.HomeAssistant = object
-helpers = sys.modules.get("homeassistant.helpers") or types.ModuleType("homeassistant.helpers")
-if not hasattr(helpers, "__path__"):
-    helpers.__path__ = []
-aiohttp_client = sys.modules.get("homeassistant.helpers.aiohttp_client") or types.ModuleType(
-    "homeassistant.helpers.aiohttp_client"
-)
-if not hasattr(aiohttp_client, "async_get_clientsession"):
-    aiohttp_client.async_get_clientsession = lambda hass: None
-storage = sys.modules.get("homeassistant.helpers.storage") or types.ModuleType(
-    "homeassistant.helpers.storage"
-)
-if not hasattr(storage, "Store"):
+def _module(name: str) -> types.ModuleType:
+    """Return an existing module or install a minimal test stub."""
+    module = sys.modules.get(name)
+    if module is None:
+        module = types.ModuleType(name)
+        sys.modules[name] = module
+    return module
 
-    class Store:
-        """Enough generic-looking Store API for module import."""
 
-        def __class_getitem__(cls, item):
-            return cls
+def _bootstrap_ha_independent_package() -> None:
+    """Provide only the import surface needed by the real projection modules."""
+    aiohttp = _module("aiohttp")
+    if not hasattr(aiohttp, "ClientError"):
+        aiohttp.ClientError = type("ClientError", (Exception,), {})
 
-    storage.Store = Store
+    homeassistant = _module("homeassistant")
+    homeassistant.__path__ = getattr(homeassistant, "__path__", [])
 
-sys.modules.setdefault("homeassistant", homeassistant)
-sys.modules.setdefault("homeassistant.core", core)
-sys.modules.setdefault("homeassistant.helpers", helpers)
-sys.modules.setdefault("homeassistant.helpers.aiohttp_client", aiohttp_client)
-sys.modules.setdefault("homeassistant.helpers.storage", storage)
+    core = _module("homeassistant.core")
+    if not hasattr(core, "HomeAssistant"):
+        core.HomeAssistant = object
 
-custom_components = sys.modules.get("custom_components") or types.ModuleType(
-    "custom_components"
-)
-if not hasattr(custom_components, "__path__"):
-    custom_components.__path__ = [str(ROOT / "custom_components")]
-package = sys.modules.get("custom_components.kems") or types.ModuleType(
-    "custom_components.kems"
-)
-if not hasattr(package, "__path__"):
-    package.__path__ = [str(INTEGRATION)]
-sys.modules.setdefault("custom_components", custom_components)
-sys.modules.setdefault("custom_components.kems", package)
+    helpers = _module("homeassistant.helpers")
+    helpers.__path__ = getattr(helpers, "__path__", [])
 
-from custom_components.kems import agile_flow_presentation as flow
-from custom_components.kems import agile_flow_reserve_policy as policy
-from custom_components.kems.kems_core import (
-    ForecastPlanState,
-    LearnedState,
-    SimulationConfig,
-    SolarForecastState,
-)
-from custom_components.kems.tariff import TariffSettings
+    aiohttp_client = _module("homeassistant.helpers.aiohttp_client")
+    if not hasattr(aiohttp_client, "async_get_clientsession"):
+        aiohttp_client.async_get_clientsession = lambda hass: None
+
+    storage = _module("homeassistant.helpers.storage")
+    if not hasattr(storage, "Store"):
+
+        class Store:
+            """Enough generic-looking Store API for module import."""
+
+            def __class_getitem__(cls, item):
+                return cls
+
+        storage.Store = Store
+
+    custom_components = _module("custom_components")
+    custom_components.__path__ = getattr(
+        custom_components,
+        "__path__",
+        [str(ROOT / "custom_components")],
+    )
+
+    package = _module("custom_components.kems")
+    package.__path__ = getattr(package, "__path__", [str(INTEGRATION)])
+
+
+_bootstrap_ha_independent_package()
+
+flow = importlib.import_module("custom_components.kems.agile_flow_presentation")
+policy = importlib.import_module("custom_components.kems.agile_flow_reserve_policy")
+core_models = importlib.import_module("custom_components.kems.kems_core")
+tariff_module = importlib.import_module("custom_components.kems.tariff")
+
+ForecastPlanState = core_models.ForecastPlanState
+LearnedState = core_models.LearnedState
+SimulationConfig = core_models.SimulationConfig
+SolarForecastState = core_models.SolarForecastState
+TariffSettings = tariff_module.TariffSettings
 
 
 def _install_production_projection(monkeypatch: pytest.MonkeyPatch) -> None:
