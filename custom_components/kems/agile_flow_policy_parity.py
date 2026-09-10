@@ -80,9 +80,7 @@ def _reconcile_future_policy_safe_total_discharge_flow(state: dict[str, Any]) ->
     export. Original planner fields are restored in ``finally`` so optimiser and
     dispatch evidence remain byte-for-byte owned by their existing producers.
     """
-    protected: list[
-        tuple[dict[str, Any], tuple[float, float], dict[str, float]]
-    ] = []
+    protected: list[tuple[dict[str, Any], tuple[float, float], dict[str, float]]] = []
     slots = state.get("today_slots")
     if isinstance(slots, list):
         for slot in slots:
@@ -116,9 +114,7 @@ def _reconcile_future_policy_safe_total_discharge_flow(state: dict[str, Any]) ->
         slot["flow_policy_export_cap_source"] = (
             "canonical future-flow 15% planning-target projection"
         )
-        slot["flow_policy_export_cap_kwh"] = round(
-            override["canonical_export_kwh"], 6
-        )
+        slot["flow_policy_export_cap_kwh"] = round(override["canonical_export_kwh"], 6)
         slot["flow_policy_rolling_export_kwh"] = round(
             override["rolling_export_kwh"], 6
         )
