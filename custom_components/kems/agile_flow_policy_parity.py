@@ -15,7 +15,10 @@ from __future__ import annotations
 import math
 from typing import Any
 
-from .agile_flow_total_discharge_parity import _reconcile_future_total_discharge_flow
+from .agile_flow_total_discharge_parity import (
+    _dt,
+    _reconcile_future_total_discharge_flow,
+)
 
 _EPSILON = 1e-6
 _FLOW_TOLERANCE_KWH = 0.0005
@@ -75,16 +78,23 @@ def _reconcile_future_policy_safe_total_discharge_flow(state: dict[str, Any]) ->
     """Run future parity without letting the legacy ledger undo an export cap.
 
     The established parity owner may still restore its planned house allocation.
-    For rows that explicitly prove the Alpha9 planning target limits deliberate
-    export only, its temporary ledger view is capped to the canonical projected
-    export. Original planner fields are restored in ``finally`` so optimiser and
-    dispatch evidence remain byte-for-byte owned by their existing producers.
+    For strict-future rows that explicitly prove the Alpha9 planning target limits
+    deliberate export only, its temporary ledger view is capped to the canonical
+    projected export. Original planner fields are restored in ``finally`` so
+    optimiser and dispatch evidence remain owned by their existing producers.
     """
     protected: list[tuple[dict[str, Any], tuple[float, float], dict[str, float]]] = []
+    routing = state.get("current_routing_snapshot")
+    future_boundary = (
+        _dt(routing.get("routing_valid_to")) if isinstance(routing, dict) else None
+    )
     slots = state.get("today_slots")
-    if isinstance(slots, list):
+    if future_boundary is not None and isinstance(slots, list):
         for slot in slots:
             if not isinstance(slot, dict):
+                continue
+            start = _dt(slot.get("valid_from"))
+            if start is None or start < future_boundary:
                 continue
             override = _policy_export_override(slot)
             if override is None:
