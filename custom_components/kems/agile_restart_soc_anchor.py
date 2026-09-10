@@ -23,10 +23,10 @@ from .agile_active_elapsed_soc_continuity import (
     ActiveElapsedSocContinuityAgileSmartExportManager,
     _reconcile_completed_from_persisted_decisions,
 )
-from .agile_flow_total_discharge_parity import (
-    _reconcile_completed_settled_soc,
-    _reconcile_future_total_discharge_flow,
+from .agile_flow_policy_parity import (
+    _reconcile_future_policy_safe_total_discharge_flow,
 )
+from .agile_flow_total_discharge_parity import _reconcile_completed_settled_soc
 from .agile_intelligent_dispatch_observability import (
     IntelligentDispatchObservabilityAgileSmartExportManager,
 )
@@ -202,7 +202,7 @@ class RestartSocAnchorAgileSmartExportManager(
     """Publish restart-safe display SOC without changing canonical routing state."""
 
     def _publish(self, state: dict[str, Any]) -> None:
-        _reconcile_future_total_discharge_flow(state)
+        _reconcile_future_policy_safe_total_discharge_flow(state)
         config = getattr(self, "_rolling_config", None)
         routing = state.get("current_routing_snapshot")
         routing = routing if isinstance(routing, dict) else {}
