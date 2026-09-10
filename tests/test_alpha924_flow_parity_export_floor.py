@@ -31,11 +31,25 @@ def _slot_flow_module():
     return module
 
 
+def _dt(value: Any) -> datetime | None:
+    """Match the runtime's aware-UTC timestamp normalisation for the AST test."""
+    if isinstance(value, datetime):
+        parsed = value
+    else:
+        try:
+            parsed = datetime.fromisoformat(str(value))
+        except (TypeError, ValueError):
+            return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=UTC)
+    return parsed.astimezone(UTC)
+
+
 def _reconcilers():
     """Load the real parity functions without importing Home Assistant."""
     slot_flow = _slot_flow_module()
     tree = ast.parse(PARITY.read_text(encoding="utf-8"))
-    wanted = {"_number", "_dt", "_reconcile_future_total_discharge_flow"}
+    wanted = {"_number", "_reconcile_future_total_discharge_flow"}
     functions = [
         node
         for node in tree.body
@@ -46,6 +60,7 @@ def _reconcilers():
         "UTC": UTC,
         "datetime": datetime,
         "math": math,
+        "_dt": _dt,
         "build_slot_flow": slot_flow.build_slot_flow,
         "_EPSILON": 1e-6,
         "_LEDGER_TOLERANCE_KWH": 0.01,
