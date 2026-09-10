@@ -32,7 +32,10 @@ def _install_production_projection(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(policy, "_original_close_home_precision_residual", None)
     policy.install_flow_reserve_policy()
 
-    assert flow._future_today_projection is policy._future_today_projection_with_separate_reserves
+    assert (
+        flow._future_today_projection
+        is policy._future_today_projection_with_separate_reserves
+    )
     assert flow._close_home_precision_residual is policy._house_floor_close
 
 
