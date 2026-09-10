@@ -8,15 +8,18 @@ its displayed SOC was rebased against live state, that could publish avoidable
 pre-cheap Grid IMPORT rows around 15% even though the real routing policy would
 continue serving the home from battery.
 
-This presentation-only layer runs the existing projection unchanged except for
-its house-service reserve. The projection still uses the forecast/pre-cheap
-planning target for deliberate export, but its battery-to-home precision helper
-and final SOC clamp use the 10% hard floor. The existing 10% stop / 12% recovery
+This presentation-only layer runs the existing projection with two explicit
+reserve authorities. The canonical projection still receives the 15% planning
+target for deliberate export, while its battery-to-home precision helper and
+final SOC clamp use the 10% hard floor. The existing 10% stop / 12% recovery
 latch remains authoritative; when already latched, the projection does not
 invent further battery-to-home discharge. Alpha9.22 also keeps the policy
 metadata outside the strict ``build_slot_flow`` keyword contract and reattaches
-it to the published slot afterwards. No optimiser allocation, tariff, FoxESS
-command or hardware-write authority changes here.
+it to the published slot afterwards. Alpha9.23 closes the remaining live-only
+projection gap by pinning the effective forecast/pre-cheap floor to the original
+planning target even while the effective config reserve is lowered for the final
+10% display clamp. No optimiser allocation, tariff, FoxESS command or hardware-
+write authority changes here.
 """
 
 from __future__ import annotations
@@ -143,11 +146,28 @@ def _future_today_projection_with_separate_reserves(
     tariff: TariffSettings,
 ) -> dict[str, dict[str, Any]]:
     """Run the canonical flow projection with separate export and house reserves."""
+    planning_target = max(
+        float(config.battery_reserve_percent),
+        _number(getattr(forecast_plan, "minimum_precheap_soc_percent", None)) or 0.0,
+        PLANNING_TARGET_SOC_PERCENT,
+    )
     reserve_percent, latched = _projection_reserve_percent(state)
     effective_config = replace(config, battery_reserve_percent=reserve_percent)
+    effective_forecast_plan = replace(
+        forecast_plan,
+        minimum_precheap_soc_percent=planning_target,
+    )
     capacity = max(float(config.battery_capacity_kwh), 0.1)
     house_floor_kwh = capacity * HARD_SAFETY_FLOOR_SOC_PERCENT / 100.0
 
+    # The original projection derives its deliberate-export floor from the
+    # maximum of config reserve and forecast minimum. Alpha9.21 lowered config
+    # reserve to 10% so the final SOC clamp could honestly show Home bridging
+    # below 15%; if the incoming forecast object carried a lower floor, that also
+    # lowered deliberate export to 10%. Pinning the effective forecast minimum to
+    # the original planning target preserves 15% for export without manufacturing
+    # energy in the final clamp.
+    #
     # A live safety latch owns discharge until recovery. Using full capacity as
     # the helper floor suppresses projected house discharge without weakening
     # the original export/pre-cheap target calculation. Otherwise the Home may
@@ -162,17 +182,12 @@ def _future_today_projection_with_separate_reserves(
             config=effective_config,
             learned=learned,
             forecast=forecast,
-            forecast_plan=forecast_plan,
+            forecast_plan=effective_forecast_plan,
             tariff=tariff,
         )
     finally:
         _HOUSE_FLOOR_KWH.reset(token)
 
-    planning_target = max(
-        float(config.battery_reserve_percent),
-        _number(getattr(forecast_plan, "minimum_precheap_soc_percent", None)) or 0.0,
-        PLANNING_TARGET_SOC_PERCENT,
-    )
     for row in projected.values():
         if not isinstance(row, dict):
             continue
