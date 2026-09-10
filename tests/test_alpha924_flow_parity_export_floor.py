@@ -207,7 +207,9 @@ def test_live_alpha923_overwrite_is_reproduced_then_blocked() -> None:
     assert second["flow_policy_suppressed_export_kwh"] == pytest.approx(0.192)
     assert second["flow_policy_planner_fields_unchanged"] is True
     assert protected["flow_total_discharge_parity"]["policy_export_cap_rows"] == 1
-    assert protected["flow_total_discharge_parity"]["policy_export_cap_preserved"] is True
+    assert (
+        protected["flow_total_discharge_parity"]["policy_export_cap_preserved"] is True
+    )
     assert protected["flow_total_discharge_parity"]["planner_fields_unchanged"] is True
     assert [
         (
