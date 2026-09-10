@@ -2,18 +2,18 @@
 
 The rolling optimiser already treats 15% as the point where deliberate battery
 export must stop, while the independent safety owner permits ordinary house
-service down to the absolute 10% floor.  The customer-facing future-flow
-projection historically reused the 15% planning reserve for both purposes.  As
+service down to the absolute 10% floor. The customer-facing future-flow
+projection historically reused the 15% planning reserve for both purposes. As
 its displayed SOC was rebased against live state, that could publish avoidable
 pre-cheap Grid IMPORT rows around 15% even though the real routing policy would
 continue serving the home from battery.
 
 This presentation-only layer runs the existing projection unchanged except for
-its house-service reserve.  The projection still uses the forecast/pre-cheap
+its house-service reserve. The projection still uses the forecast/pre-cheap
 planning target for deliberate export, but its battery-to-home precision helper
-and final SOC clamp use the 10% hard floor.  The existing 10% stop / 12% recovery
+and final SOC clamp use the 10% hard floor. The existing 10% stop / 12% recovery
 latch remains authoritative; when already latched, the projection does not
-invent further battery-to-home discharge.  No optimiser allocation, tariff,
+invent further battery-to-home discharge. No optimiser allocation, tariff,
 FoxESS command or hardware-write authority changes here.
 """
 
@@ -37,7 +37,6 @@ from .kems_core import (
 )
 from .tariff import TariffSettings
 
-_EPSILON = 1e-6
 _HOUSE_FLOOR_KWH: ContextVar[float | None] = ContextVar(
     "kems_agile_projection_house_floor_kwh",
     default=None,
@@ -78,7 +77,7 @@ def _projection_reserve_percent(state: dict[str, Any]) -> tuple[float, bool]:
         return HARD_SAFETY_FLOOR_SOC_PERCENT, False
 
     # Do not manufacture stored energy when the persisted latch was entered
-    # slightly below 10%.  While latched the house helper is separately blocked.
+    # slightly below 10%. While latched the house helper is separately blocked.
     current_soc = _current_soc_percent(state)
     if current_soc is None:
         return HARD_SAFETY_FLOOR_SOC_PERCENT, True
@@ -124,9 +123,9 @@ def _future_today_projection_with_separate_reserves(
     capacity = max(float(config.battery_capacity_kwh), 0.1)
     house_floor_kwh = capacity * HARD_SAFETY_FLOOR_SOC_PERCENT / 100.0
 
-    # A live safety latch owns discharge until recovery.  Using full capacity as
+    # A live safety latch owns discharge until recovery. Using full capacity as
     # the helper floor suppresses projected house discharge without weakening
-    # the original export/pre-cheap target calculation.  Otherwise the Home may
+    # the original export/pre-cheap target calculation. Otherwise the Home may
     # bridge from 15% down toward the independent 10% hard floor.
     helper_floor_kwh = capacity if latched else house_floor_kwh
     token = _HOUSE_FLOOR_KWH.set(helper_floor_kwh)
