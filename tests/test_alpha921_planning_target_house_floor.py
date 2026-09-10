@@ -46,7 +46,6 @@ def _bootstrap_ha_independent_package() -> None:
 
     storage = _module("homeassistant.helpers.storage")
     if not hasattr(storage, "Store"):
-
         class Store:
             """Enough generic-looking Store API for module import."""
 
