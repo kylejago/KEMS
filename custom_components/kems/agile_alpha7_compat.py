@@ -82,6 +82,7 @@ POST_BASE_PATCHES: Final[tuple[PatchSpec, ...]] = (
     ("agile_precheap_home_bridge", "install_precheap_home_bridge"),
     ("agile_current_slot_truth", "install_current_slot_truth"),
     ("agile_deadline_dominance", "install_deadline_dominance"),
+    ("agile_flow_reserve_policy", "install_flow_reserve_policy"),
 )
 
 

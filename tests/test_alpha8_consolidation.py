@@ -40,7 +40,7 @@ def test_current_release_family_is_coordinated() -> None:
     panel_manager = (KEMS / "panel.py").read_text(encoding="utf-8")
     panel_yaml = (KEMS / "kems16x16.yaml").read_text(encoding="utf-8")
 
-    assert manifest["version"] == "0.9.0-alpha9.20"
+    assert manifest["version"] == "0.9.0-alpha9.21"
     assert bundle["components"]["panel"]["version"] == "0.9.0-alpha9-panel.0"
     pi_versions = {
         str(bundle["components"][key]["version"])
@@ -104,10 +104,15 @@ def test_alpha8_compatibility_registry_is_complete_and_resolvable() -> None:
         "agile_deadline_dominance",
         "install_deadline_dominance",
     )
+    flow_reserve_policy = (
+        "agile_flow_reserve_policy",
+        "install_flow_reserve_policy",
+    )
     assert specs.index(runtime_reconciliation) < specs.index(solar_net_demand)
     assert specs.index(solar_net_demand) < specs.index(total_discharge_ledger)
     assert specs.index(total_discharge_ledger) < specs.index(deadline_dominance)
-    assert specs[-1] == deadline_dominance
+    assert specs.index(deadline_dominance) < specs.index(flow_reserve_policy)
+    assert specs[-1] == flow_reserve_policy
 
     for module_name, installer_name in specs:
         path = KEMS / f"{module_name}.py"
