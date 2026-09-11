@@ -12,8 +12,12 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from .const import (
     CONF_EXPORT_TARIFF_STATUS,
     CONF_OPERATING_MODE,
+    CONF_PANEL_LAYOUT,
     CONF_SYSTEM_TYPE,
     CONF_VIRTUAL_SCENARIO,
+    PANEL_LAYOUT_LABELS,
+    PANEL_LAYOUTS,
+    PANEL_LAYOUT_V1,
 )
 from .entity import KEMSEntity
 from .happy_hour import CONF_HAPPY_HOUR_DURATION_HOURS, happy_hour_duration_hours
@@ -55,6 +59,7 @@ async def async_setup_entry(
         KEMSOperatingModeSelect(coordinator),
         KEMSEVChargingPolicySelect(coordinator),
         KEMSWeekendHappyHourDurationSelect(coordinator),
+        KEMSPanelLayoutSelect(coordinator),
         KEMSVirtualScenarioSelect(coordinator),
     ]
     entities.extend(build_update_select_entities(hass, coordinator, entry))
@@ -228,6 +233,44 @@ class KEMSWeekendHappyHourDurationSelect(KEMSEntity, SelectEntity):
             self.coordinator.entry,
             CONF_HAPPY_HOUR_DURATION_HOURS,
             duration,
+        )
+
+
+class KEMSPanelLayoutSelect(KEMSEntity, SelectEntity):
+    """Choose the physical 16x16 KEMS faceplate geometry."""
+
+    _attr_name = "Panel layout"
+    _attr_icon = "mdi:view-dashboard-variant-outline"
+    _attr_options = [PANEL_LAYOUT_LABELS[key] for key in PANEL_LAYOUTS]
+
+    def __init__(self, coordinator) -> None:
+        super().__init__(coordinator, "panel_layout_select")
+
+    @property
+    def current_option(self) -> str:
+        selected = str(
+            self.coordinator.entry.options.get(CONF_PANEL_LAYOUT, PANEL_LAYOUT_V1)
+        )
+        return PANEL_LAYOUT_LABELS.get(
+            selected, PANEL_LAYOUT_LABELS[PANEL_LAYOUT_V1]
+        )
+
+    async def async_select_option(self, option: str) -> None:
+        selected = next(
+            (
+                key
+                for key, label in PANEL_LAYOUT_LABELS.items()
+                if label == option
+            ),
+            None,
+        )
+        if selected is None:
+            raise HomeAssistantError(f"Unsupported KEMS panel layout: {option}")
+        await async_set_runtime_option(
+            self.hass,
+            self.coordinator.entry,
+            CONF_PANEL_LAYOUT,
+            selected,
         )
 
 

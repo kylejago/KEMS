@@ -125,6 +125,15 @@ CONF_ROI_FORECAST_YEARS = "roi_forecast_years"
 CONF_SYSTEM_TYPE = "system_type"
 CONF_OPERATING_MODE = "operating_mode"
 CONF_VIRTUAL_SCENARIO = "virtual_scenario"
+CONF_PANEL_LAYOUT = "panel_layout"
+
+PANEL_LAYOUT_V1 = "v1"
+PANEL_LAYOUT_V2 = "v2"
+PANEL_LAYOUTS = (PANEL_LAYOUT_V1, PANEL_LAYOUT_V2)
+PANEL_LAYOUT_LABELS = {
+    PANEL_LAYOUT_V1: "V1 — Current",
+    PANEL_LAYOUT_V2: "V2 — Inverter centred",
+}
 CONF_CONTROL_ENABLED = "control_enabled"
 CONF_SYSTEM_COMMISSIONED = "system_commissioned"
 CONF_EMERGENCY_STOP = "emergency_stop"
@@ -188,6 +197,7 @@ DEFAULT_OPTIONS = {
     CONF_SYSTEM_TYPE: "full_kems_agile",
     CONF_OPERATING_MODE: "simulate",
     CONF_VIRTUAL_SCENARIO: "normal",
+    CONF_PANEL_LAYOUT: PANEL_LAYOUT_V1,
     CONF_CONTROL_ENABLED: False,
     CONF_SYSTEM_COMMISSIONED: False,
     CONF_EMERGENCY_STOP: False,

@@ -791,6 +791,8 @@ views:
                 name: Mode
               - entity: select.kems_export_tariff
                 name: Export tariff
+              - entity: select.kems_panel_layout
+                name: Panel layout
               - entity: select.kems_update_mode
                 name: Update mode
               - entity: switch.kems_automatic_updates

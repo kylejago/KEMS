@@ -84,6 +84,7 @@ from .const import (
     CONF_OFF_PEAK,
     CONF_OFFPEAK_END,
     CONF_OPERATING_MODE,
+    CONF_PANEL_LAYOUT,
     CONF_PROPOSAL_SOLAR_ENABLED,
     CONF_PROPOSAL_SOLAR_FACTOR,
     CONF_ROI_FORECAST_YEARS,
@@ -104,6 +105,8 @@ from .const import (
     DOMAIN,
     ENTITY_MAPPING_KEYS,
     NAME,
+    PANEL_LAYOUT_LABELS,
+    PANEL_LAYOUTS,
 )
 from .entity_discovery import (
     DiscoveryResult,
@@ -178,6 +181,10 @@ TARIFF_MODE_SELECTOR = _select(
 
 SYSTEM_TYPE_SELECTOR = _select(
     [(key, SYSTEM_TYPE_DEFINITIONS[key].label) for key in SYSTEM_TYPES]
+)
+
+PANEL_LAYOUT_SELECTOR = _select(
+    [(key, PANEL_LAYOUT_LABELS[key]) for key in PANEL_LAYOUTS]
 )
 
 USER_MODE_SELECTOR = _select(
@@ -304,6 +311,12 @@ MONITORING_SCHEMA = vol.Schema(
         vol.Required(CONF_SCAN_INTERVAL): _number(30, 3600, 1, "seconds"),
         vol.Required(CONF_HISTORY_DAYS): _number(1, 365, 1, "days"),
         vol.Required(CONF_GAS_KWH_PER_M3): _number(1, 20, "any", "kWh/m³"),
+    }
+)
+
+PANEL_SCHEMA = vol.Schema(
+    {
+        vol.Required(CONF_PANEL_LAYOUT): PANEL_LAYOUT_SELECTOR,
     }
 )
 
@@ -589,6 +602,7 @@ class KEMSOptionsFlow(OptionsFlowWithReload):
         "forecast": "Forecast and reserve planning",
         "financial": "System cost and ROI",
         "monitoring": "Monitoring and history",
+        "panel": "Panel display",
         "control": "KEMS type, mode and safety",
     }
 
@@ -680,6 +694,15 @@ class KEMSOptionsFlow(OptionsFlowWithReload):
         if user_input is not None:
             return self._save_options(user_input)
         return self._show_category("monitoring", MONITORING_SCHEMA)
+
+    async def async_step_panel(
+        self,
+        user_input: dict[str, Any] | None = None,
+    ):
+        """Choose the managed ESP32 panel faceplate layout."""
+        if user_input is not None:
+            return self._save_options(user_input)
+        return self._show_category("panel", PANEL_SCHEMA)
 
     async def async_step_control(self, user_input: dict[str, Any] | None = None):
         """Configure the KEMS type, simple mode and safety safeguards."""
