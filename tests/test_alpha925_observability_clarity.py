@@ -52,7 +52,8 @@ def test_final_publication_clarifies_export_target_and_absolute_floor_labels() -
     runtime = (KEMS / "agile_smart_export_runtime.py").read_text(encoding="utf-8")
 
     assert "deliberate-export target reached" in source
-    assert "absolute floor until cheap charge" in source
+    assert "absolute" in source
+    assert "floor until cheap charge; no deliberate export" in source
     assert "planning target limits deliberate export only" in source
     assert 'slot["actions"] = [action]' in source
     assert 'slot["rolling_action"] = action' in source
