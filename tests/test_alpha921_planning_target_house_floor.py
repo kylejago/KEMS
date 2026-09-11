@@ -254,7 +254,7 @@ def test_alpha923_release_scope_is_projection_only() -> None:
     )
     source = (INTEGRATION / "agile_flow_reserve_policy.py").read_text(encoding="utf-8")
 
-    assert manifest["version"] == "0.9.0-alpha9.26"
+    assert manifest["version"] == "0.9.0-alpha9.27"
     reason = bundle["maintenance"]["reason"].lower()
     assert "export-floor correction" in reason
     assert "15% planning/export target" in reason
