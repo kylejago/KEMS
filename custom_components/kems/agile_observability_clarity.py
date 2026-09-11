@@ -87,10 +87,14 @@ def _clarify_policy_action_labels(state: dict[str, Any]) -> dict[str, Any]:
             or (routing_soc is not None and routing_soc <= target_soc + _EPSILON)
             or "planning target reached" in routing_action.lower()
         )
-        if reached and house_kw > _EPSILON and export_kw <= _EPSILON:
-            if routing.get("routing_action") != action:
-                routing["routing_action"] = action
-                clarified_fields += 1
+        if (
+            reached
+            and house_kw > _EPSILON
+            and export_kw <= _EPSILON
+            and routing.get("routing_action") != action
+        ):
+            routing["routing_action"] = action
+            clarified_fields += 1
 
     for slot in state.get("today_slots", []) or []:
         if not isinstance(slot, dict):
