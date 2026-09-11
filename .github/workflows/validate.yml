@@ -27,7 +27,35 @@ jobs:
         with:
           python-version: "3.13"
       - name: Apply deterministic branch implementation
-        run: python scripts/tmp_alpha926_apply.py
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path("custom_components/kems/select.py")
+          text = path.read_text(encoding="utf-8")
+          old = (
+              "            CONF_OPERATING_MODE,\n"
+              "            internal_mode_from_user(option),\n"
+          )
+          new = (
+              "            CONF_OPERATING_MODE,  # alpha926-builder-guard\n"
+              "            internal_mode_from_user(option),\n"
+          )
+          if text.count(old) != 1:
+              raise SystemExit("Unable to isolate runtime CONF_OPERATING_MODE use")
+          path.write_text(text.replace(old, new, 1), encoding="utf-8")
+          PY
+          python scripts/tmp_alpha926_apply.py
+          python - <<'PY'
+          from pathlib import Path
+          path = Path("custom_components/kems/select.py")
+          text = path.read_text(encoding="utf-8")
+          text = text.replace(
+              "            CONF_OPERATING_MODE,  # alpha926-builder-guard\n",
+              "            CONF_OPERATING_MODE,\n",
+              1,
+          )
+          path.write_text(text, encoding="utf-8")
+          PY
       - name: Commit implementation
         run: |
           git config user.name "github-actions[bot]"
