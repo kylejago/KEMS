@@ -11,8 +11,7 @@ ROOT = Path(__file__).parents[1]
 KEMS = ROOT / "custom_components" / "kems"
 
 
-def test_standard_six_hour_window_reports_100_percent_unreachable_from_10_percent(
-) -> None:
+def test_standard_six_hour_window_reports_100_percent_unreachable_from_10_percent() -> None:
     evidence = project_cheap_window_charge_capability(
         starting_soc_percent=10.0,
         target_soc_percent=100.0,
@@ -46,8 +45,7 @@ def test_charge_capability_clamps_at_target_when_window_is_sufficient() -> None:
     assert evidence["charge_target_shortfall_percent"] == 0.0
 
 
-def test_final_publication_clarifies_export_target_and_absolute_floor_labels(
-) -> None:
+def test_final_publication_clarifies_export_target_and_absolute_floor_labels() -> None:
     source = (KEMS / "agile_observability_clarity.py").read_text(encoding="utf-8")
     runtime = (KEMS / "agile_smart_export_runtime.py").read_text(encoding="utf-8")
 
