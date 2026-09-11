@@ -34,7 +34,7 @@ def test_coordinated_release_keeps_web_panel_and_brand_contract() -> None:
         web_version.startswith("0.9.0-alpha9-web.")
         or int(web_version.rsplit(".", 1)[1]) >= 2
     )
-    assert bundle["components"]["panel"]["version"] == "0.9.0-alpha9-panel.1"
+    assert bundle["components"]["panel"]["version"] == "0.9.0-alpha9-panel.2"
 
     assert "docs/assets/kems-logo-master.svg" in branding
     assert "single source of truth" in branding

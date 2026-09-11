@@ -316,4 +316,4 @@ def test_alpha847_runtime_scope_and_release_metadata() -> None:
     assert str(bundle["components"]["property_web"]["version"]).startswith(
         ("0.8.0-alpha8-web.", "0.9.0-alpha9-web.")
     )
-    assert bundle["components"]["panel"]["version"] == "0.9.0-alpha9-panel.1"
+    assert bundle["components"]["panel"]["version"] == "0.9.0-alpha9-panel.2"

@@ -40,16 +40,16 @@ def test_current_release_family_is_coordinated() -> None:
     panel_manager = (KEMS / "panel.py").read_text(encoding="utf-8")
     panel_yaml = (KEMS / "kems16x16.yaml").read_text(encoding="utf-8")
 
-    assert manifest["version"] == "0.9.0-alpha9.27"
-    assert bundle["components"]["panel"]["version"] == "0.9.0-alpha9-panel.1"
+    assert manifest["version"] == "0.9.0-alpha9.28"
+    assert bundle["components"]["panel"]["version"] == "0.9.0-alpha9-panel.2"
     pi_versions = {
         str(bundle["components"][key]["version"])
         for key in ("property_web", "pi_agent")
     }
     assert pi_versions == {"0.9.0-alpha9-web.0"}
     assert bundle["components"]["public_web"]["version"] == ("0.9.0-alpha9-public.0")
-    assert 'PANEL_CONFIG_VERSION = "0.9.0-alpha9-panel.1"' in panel_manager
-    assert 'panel_config_version: "0.9.0-alpha9-panel.1"' in panel_yaml
+    assert 'PANEL_CONFIG_VERSION = "0.9.0-alpha9-panel.2"' in panel_manager
+    assert 'panel_config_version: "0.9.0-alpha9-panel.2"' in panel_yaml
     assert not (KEMS / "panel_ev_policy.py").exists()
 
 

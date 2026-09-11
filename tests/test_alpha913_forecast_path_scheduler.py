@@ -154,7 +154,7 @@ def test_alpha913_version_and_release_scope() -> None:
     )
     bundle = json.loads((ROOT / "release" / "kems-bundle.template.json").read_text())
 
-    assert manifest["version"] == "0.9.0-alpha9.27"
+    assert manifest["version"] == "0.9.0-alpha9.28"
     assert bundle["maintenance"]["home_assistant_restart_required"] is True
     assert bundle["maintenance"]["reboot_required"] is False
     assert "forecast-aware" in bundle["maintenance"]["reason"].lower()

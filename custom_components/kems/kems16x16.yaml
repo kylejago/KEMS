@@ -4,7 +4,7 @@ substitutions:
   device_name: kems16x16
   friendly_name: "KEMS16x16"
   led_pin: GPIO21
-  panel_config_version: "0.9.0-alpha9-panel.1"
+  panel_config_version: "0.9.0-alpha9-panel.2"
   kems_status: sensor.kems_status
   live_battery_soc: sensor.kems_battery_state_of_charge
   live_battery_power: sensor.kems_battery_power
@@ -355,6 +355,63 @@ display:
           dir
         );
       };
+      // V2 uses five-row connectors. Start the next packet when the
+      // prior head reaches the fourth position so the longer path stays fluid.
+      auto flow_vertical_v2_dual = [&](int c1, int r1, int c2, int r2,
+                                       Color head_left, Color head_right,
+                                       Color trail_left, Color trail_right,
+                                       int dir) {
+        rect(c1, r1, c2, r2, OFF);
+        const int height = r2 - r1 + 1;
+        const int launch_spacing = 3;
+        const int phase = (now / 450) % launch_spacing;
+        auto physical_index = [&](int travel_index) -> int {
+          return (dir > 0)
+            ? travel_index
+            : (height - 1 - travel_index);
+        };
+        auto draw_packet = [&](int head) {
+          if (head >= 0 && head < height) {
+            int index = physical_index(head);
+            vertical_pair(
+              r1 + index, c1, c2,
+              head_left, head_right,
+              1.00f
+            );
+          }
+          int age1 = head - 1;
+          if (age1 >= 0 && age1 < height) {
+            int index = physical_index(age1);
+            vertical_pair(
+              r1 + index, c1, c2,
+              trail_left, trail_right,
+              0.66f
+            );
+          }
+          int age2 = head - 2;
+          if (age2 >= 0 && age2 < height) {
+            int index = physical_index(age2);
+            vertical_pair(
+              r1 + index, c1, c2,
+              trail_left, trail_right,
+              0.33f
+            );
+          }
+        };
+        for (int head = phase; head < height + 2; head += launch_spacing) {
+          draw_packet(head);
+        }
+      };
+      auto flow_vertical_v2 = [&](int c1, int r1, int c2, int r2,
+                                  Color left_color, Color right_color,
+                                  int dir) {
+        flow_vertical_v2_dual(
+          c1, r1, c2, r2,
+          left_color, right_color,
+          left_color, right_color,
+          dir
+        );
+      };
       auto bool_colour = [&](bool value) -> Color {
         return value ? GREEN : RED;
       };
@@ -663,16 +720,16 @@ display:
           rect(2, 1, 5, 2, pulse(RED));
         }
         if (grid_importing) {
-          flow_vertical(4, 3, 5, 7, BLUE, BLUE, +1);
+          flow_vertical_v2(4, 3, 5, 7, BLUE, BLUE, +1);
         } else if (grid_exporting) {
           if (export_from_solar && export_from_battery) {
-            flow_vertical(4, 3, 5, 7, YELLOW, GREEN, -1);
+            flow_vertical_v2(4, 3, 5, 7, YELLOW, GREEN, -1);
           } else if (export_from_solar) {
-            flow_vertical(4, 3, 5, 7, YELLOW, YELLOW, -1);
+            flow_vertical_v2(4, 3, 5, 7, YELLOW, YELLOW, -1);
           } else if (export_from_battery) {
-            flow_vertical(4, 3, 5, 7, GREEN, GREEN, -1);
+            flow_vertical_v2(4, 3, 5, 7, GREEN, GREEN, -1);
           } else {
-            flow_vertical(4, 3, 5, 7, WHITE, WHITE, -1);
+            flow_vertical_v2(4, 3, 5, 7, WHITE, WHITE, -1);
           }
         }
 
@@ -682,7 +739,7 @@ display:
           source_solar_active ? pulse(YELLOW) : scale_color(YELLOW, 0.20f)
         );
         if (source_solar_active) {
-          flow_vertical(8, 3, 9, 7, YELLOW, YELLOW, +1);
+          flow_vertical_v2(8, 3, 9, 7, YELLOW, YELLOW, +1);
         }
 
         // BATTERY uses the same ten 10%-per-cell model as V1, rotated
@@ -717,16 +774,16 @@ display:
         }
         if (battery_charging) {
           if (battery_charge_from_solar && battery_charge_from_grid) {
-            flow_vertical(12, 3, 13, 7, YELLOW, BLUE, -1);
+            flow_vertical_v2(12, 3, 13, 7, YELLOW, BLUE, -1);
           } else if (battery_charge_from_grid) {
-            flow_vertical(12, 3, 13, 7, BLUE, BLUE, -1);
+            flow_vertical_v2(12, 3, 13, 7, BLUE, BLUE, -1);
           } else if (battery_charge_from_solar) {
-            flow_vertical(12, 3, 13, 7, YELLOW, YELLOW, -1);
+            flow_vertical_v2(12, 3, 13, 7, YELLOW, YELLOW, -1);
           } else {
-            flow_vertical(12, 3, 13, 7, WHITE, WHITE, -1);
+            flow_vertical_v2(12, 3, 13, 7, WHITE, WHITE, -1);
           }
         } else if (battery_to_bus_active) {
-          flow_vertical(12, 3, 13, 7, GREEN, GREEN, +1);
+          flow_vertical_v2(12, 3, 13, 7, GREEN, GREEN, +1);
         }
 
         // HOME is a new V2 destination. Source colours continue through the
@@ -742,24 +799,24 @@ display:
         );
         if (home_active) {
           if (home_from_grid && home_from_solar && home_from_battery) {
-            flow_vertical_dual(
+            flow_vertical_v2_dual(
               5, 10, 6, 14,
               BLUE, GREEN,
               YELLOW, YELLOW,
               +1
             );
           } else if (home_from_grid && home_from_solar) {
-            flow_vertical(5, 10, 6, 14, BLUE, YELLOW, +1);
+            flow_vertical_v2(5, 10, 6, 14, BLUE, YELLOW, +1);
           } else if (home_from_solar && home_from_battery) {
-            flow_vertical(5, 10, 6, 14, YELLOW, GREEN, +1);
+            flow_vertical_v2(5, 10, 6, 14, YELLOW, GREEN, +1);
           } else if (home_from_grid && home_from_battery) {
-            flow_vertical(5, 10, 6, 14, BLUE, GREEN, +1);
+            flow_vertical_v2(5, 10, 6, 14, BLUE, GREEN, +1);
           } else if (home_from_grid) {
-            flow_vertical(5, 10, 6, 14, BLUE, BLUE, +1);
+            flow_vertical_v2(5, 10, 6, 14, BLUE, BLUE, +1);
           } else if (home_from_solar) {
-            flow_vertical(5, 10, 6, 14, YELLOW, YELLOW, +1);
+            flow_vertical_v2(5, 10, 6, 14, YELLOW, YELLOW, +1);
           } else if (home_from_battery) {
-            flow_vertical(5, 10, 6, 14, GREEN, GREEN, +1);
+            flow_vertical_v2(5, 10, 6, 14, GREEN, GREEN, +1);
           }
         }
 
@@ -769,26 +826,26 @@ display:
         } else if (ev_charging_for_display) {
           rect(10, 15, 13, 16, pulse(MAGENTA));
           if (ev_from_grid && ev_from_solar && ev_from_battery) {
-            flow_vertical_dual(
+            flow_vertical_v2_dual(
               11, 10, 12, 14,
               BLUE, GREEN,
               YELLOW, YELLOW,
               +1
             );
           } else if (ev_from_grid && ev_from_solar) {
-            flow_vertical(11, 10, 12, 14, BLUE, YELLOW, +1);
+            flow_vertical_v2(11, 10, 12, 14, BLUE, YELLOW, +1);
           } else if (ev_from_solar && ev_from_battery) {
-            flow_vertical(11, 10, 12, 14, YELLOW, GREEN, +1);
+            flow_vertical_v2(11, 10, 12, 14, YELLOW, GREEN, +1);
           } else if (ev_from_grid && ev_from_battery) {
-            flow_vertical(11, 10, 12, 14, BLUE, GREEN, +1);
+            flow_vertical_v2(11, 10, 12, 14, BLUE, GREEN, +1);
           } else if (ev_from_grid) {
-            flow_vertical(11, 10, 12, 14, BLUE, BLUE, +1);
+            flow_vertical_v2(11, 10, 12, 14, BLUE, BLUE, +1);
           } else if (ev_from_solar) {
-            flow_vertical(11, 10, 12, 14, YELLOW, YELLOW, +1);
+            flow_vertical_v2(11, 10, 12, 14, YELLOW, YELLOW, +1);
           } else if (ev_from_battery) {
-            flow_vertical(11, 10, 12, 14, GREEN, GREEN, +1);
+            flow_vertical_v2(11, 10, 12, 14, GREEN, GREEN, +1);
           } else {
-            flow_vertical(11, 10, 12, 14, MAGENTA, MAGENTA, +1);
+            flow_vertical_v2(11, 10, 12, 14, MAGENTA, MAGENTA, +1);
           }
         } else if (ev_connected) {
           rect(10, 15, 13, 16, MAGENTA);

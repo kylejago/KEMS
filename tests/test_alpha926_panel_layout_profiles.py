@@ -59,11 +59,11 @@ def test_alpha926_v2_matches_inverter_centred_16x16_faceplate() -> None:
 
     assert "// V2: inverter-centred faceplate." in panel
     assert "rect(4, 8, 13, 9, RAINBOW);" in panel
-    assert "flow_vertical(4, 3, 5, 7" in panel  # Grid <-> inverter
-    assert "flow_vertical(8, 3, 9, 7" in panel  # Solar -> inverter
-    assert "flow_vertical(12, 3, 13, 7" in panel  # Battery <-> inverter
-    assert "flow_vertical(5, 10, 6, 14" in panel  # Inverter -> home
-    assert "flow_vertical(11, 10, 12, 14" in panel  # Inverter -> EV
+    assert "flow_vertical_v2(4, 3, 5, 7" in panel  # Grid <-> inverter
+    assert "flow_vertical_v2(8, 3, 9, 7" in panel  # Solar -> inverter
+    assert "flow_vertical_v2(12, 3, 13, 7" in panel  # Battery <-> inverter
+    assert "flow_vertical_v2(5, 10, 6, 14" in panel  # Inverter -> home
+    assert "flow_vertical_v2(11, 10, 12, 14" in panel  # Inverter -> EV
 
     # Exact 90-degree counter-clockwise rotation of the V1 ten-cell map.
     assert (
@@ -83,10 +83,10 @@ def test_alpha926_versions_and_bundle_are_coordinated() -> None:
     panel = PANEL.read_text(encoding="utf-8")
     panel_health = PANEL_HEALTH.read_text(encoding="utf-8")
 
-    assert manifest["version"] == "0.9.0-alpha9.27"
-    assert bundle["components"]["panel"]["version"] == "0.9.0-alpha9-panel.1"
-    assert 'panel_config_version: "0.9.0-alpha9-panel.1"' in panel
-    assert 'PANEL_CONFIG_VERSION = "0.9.0-alpha9-panel.1"' in panel_health
+    assert manifest["version"] == "0.9.0-alpha9.28"
+    assert bundle["components"]["panel"]["version"] == "0.9.0-alpha9-panel.2"
+    assert 'panel_config_version: "0.9.0-alpha9-panel.2"' in panel
+    assert 'PANEL_CONFIG_VERSION = "0.9.0-alpha9-panel.2"' in panel_health
 
 
 def test_alpha926_dashboard_source_and_packaged_copy_remain_identical() -> None:
