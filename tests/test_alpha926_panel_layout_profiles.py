@@ -59,14 +59,17 @@ def test_alpha926_v2_matches_inverter_centred_16x16_faceplate() -> None:
 
     assert "// V2: inverter-centred faceplate." in panel
     assert "rect(4, 8, 13, 9, RAINBOW);" in panel
-    assert "flow_vertical(4, 3, 5, 7" in panel   # Grid <-> inverter
-    assert "flow_vertical(8, 3, 9, 7" in panel   # Solar -> inverter
+    assert "flow_vertical(4, 3, 5, 7" in panel  # Grid <-> inverter
+    assert "flow_vertical(8, 3, 9, 7" in panel  # Solar -> inverter
     assert "flow_vertical(12, 3, 13, 7" in panel  # Battery <-> inverter
     assert "flow_vertical(5, 10, 6, 14" in panel  # Inverter -> home
     assert "flow_vertical(11, 10, 12, 14" in panel  # Inverter -> EV
 
     # Exact 90-degree counter-clockwise rotation of the V1 ten-cell map.
-    assert "const int battery_v2_cols[10] = {16, 16, 15, 15, 14, 14, 13, 13, 12, 12};" in panel
+    assert (
+        "const int battery_v2_cols[10] = {16, 16, 15, 15, 14, 14, 13, 13, 12, 12};"
+        in panel
+    )
     assert "const int battery_v2_rows[10] = {2, 1, 2, 1, 2, 1, 2, 1, 2, 1};" in panel
 
     # The inverter keeps the established slow 40-second colour fade.
