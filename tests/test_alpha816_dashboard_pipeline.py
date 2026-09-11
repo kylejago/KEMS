@@ -42,7 +42,7 @@ def test_alpha816_safety_and_external_release_contract_survives_successors() -> 
         str(manifest["version"]).startswith("0.9.0-alpha9")
         or int(manifest["version"].rsplit(".", 1)[-1]) >= 19
     )
-    assert bundle["components"]["panel"]["version"] == "0.9.0-alpha9-panel.0"
+    assert bundle["components"]["panel"]["version"] == "0.9.0-alpha9-panel.1"
     assert str(bundle["components"]["property_web"]["version"]).startswith(
         ("0.8.0-alpha8-web.", "0.9.0-alpha9-web.")
     )

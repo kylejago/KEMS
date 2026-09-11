@@ -69,7 +69,7 @@ def test_alpha925_scope_is_observability_only_and_hardware_blocked() -> None:
         encoding="utf-8"
     )
 
-    assert manifest["version"] == "0.9.0-alpha9.25"
+    assert manifest["version"] == "0.9.0-alpha9.26"
     reason = str(bundle["maintenance"]["reason"]).lower()
     assert "alpha9.25" in reason
     assert "observability" in reason

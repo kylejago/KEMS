@@ -32,8 +32,8 @@ def test_alpha926_exposes_v1_v2_panel_layout_setting_with_v1_default() -> None:
     assert "PANEL_SCHEMA" in config
     assert "CONF_PANEL_LAYOUT" in config
     assert "KEMSPanelLayoutSelect" in select
-    assert '"V1 — Current"' in select
-    assert '"V2 — Inverter centred"' in select
+    assert '"V1 — Current"' in const
+    assert '"V2 — Inverter centred"' in const
     assert "select.kems_panel_layout" in dashboard
 
 

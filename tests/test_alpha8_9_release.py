@@ -21,7 +21,7 @@ def test_alpha8_9_truth_contract_survives_later_alpha8_releases() -> None:
         str(manifest["version"]).startswith("0.9.0-alpha9")
         or int(str(manifest["version"]).rsplit(".", 1)[1]) >= 9
     )
-    assert bundle["components"]["panel"]["version"] == "0.9.0-alpha9-panel.0"
+    assert bundle["components"]["panel"]["version"] == "0.9.0-alpha9-panel.1"
     web_versions = {
         bundle["components"]["property_web"]["version"],
         bundle["components"]["pi_agent"]["version"],
