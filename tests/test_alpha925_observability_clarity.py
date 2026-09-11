@@ -45,19 +45,23 @@ def test_charge_capability_clamps_at_target_when_window_is_sufficient() -> None:
     assert evidence["charge_target_shortfall_percent"] == 0.0
 
 
-def test_target_reached_wording_names_15_percent_export_target_and_10_percent_floor() -> None:
-    source = (KEMS / "agile_solar_net_demand.py").read_text(encoding="utf-8")
+def test_final_publication_clarifies_export_target_and_absolute_floor_labels() -> None:
+    source = (KEMS / "agile_observability_clarity.py").read_text(encoding="utf-8")
+    runtime = (KEMS / "agile_smart_export_runtime.py").read_text(encoding="utf-8")
 
-    assert "10% planning target reached" not in source
     assert "deliberate-export target reached" in source
-    assert "10% absolute floor" in source
-    assert "house-only battery bridge" in source
+    assert "absolute floor until cheap charge" in source
+    assert "planning target limits deliberate export only" in source
+    assert 'slot["actions"] = [action]' in source
+    assert 'slot["rolling_action"] = action' in source
+    assert 'routing["routing_action"] = action' in source
+    assert "install_observability_clarity()" in runtime
 
 
 def test_alpha925_scope_is_observability_only_and_hardware_blocked() -> None:
     manifest = json.loads((KEMS / "manifest.json").read_text(encoding="utf-8"))
     bundle = json.loads((ROOT / "release" / "kems-bundle.template.json").read_text())
-    solar = (KEMS / "agile_solar_net_demand.py").read_text(encoding="utf-8")
+    clarity = (KEMS / "agile_observability_clarity.py").read_text(encoding="utf-8")
     handoff = (KEMS / "kems_core" / "tomorrow_soc_handoff.py").read_text(
         encoding="utf-8"
     )
@@ -68,8 +72,9 @@ def test_alpha925_scope_is_observability_only_and_hardware_blocked() -> None:
     assert "observability" in reason
     assert "15%" in reason and "10%" in reason and "12%" in reason
     assert "7.0 kw" in reason
+    assert '"hardware_writes": "blocked"' in clarity
     assert '"hardware_writes": "blocked"' in handoff
-    assert ".services.async_call(" not in solar
+    assert ".services.async_call(" not in clarity
     assert ".services.async_call(" not in handoff
-    assert "safe_to_write_hardware = True" not in solar
+    assert "safe_to_write_hardware = True" not in clarity
     assert "safe_to_write_hardware = True" not in handoff
