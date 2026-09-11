@@ -31,6 +31,66 @@ def _finite_float(value: Any) -> float | None:
     return number
 
 
+def project_cheap_window_charge_capability(
+    *,
+    starting_soc_percent: float,
+    target_soc_percent: float,
+    battery_capacity_kwh: float,
+    max_charge_kw: float,
+    charge_efficiency: float,
+    charge_hours: float,
+) -> dict[str, Any]:
+    """Report the SOC physically achievable within the remaining cheap charge time.
+
+    This is observability only. It does not change the charge target, scheduling,
+    tariff ownership, or hardware-write authority.
+    """
+    start_soc = min(max(float(starting_soc_percent), 0.0), 100.0)
+    target_soc = min(max(float(target_soc_percent), 0.0), 100.0)
+    capacity = max(float(battery_capacity_kwh), 0.1)
+    charge_kw = max(float(max_charge_kw), 0.0)
+    efficiency = min(max(float(charge_efficiency), 0.01), 1.0)
+    hours = max(float(charge_hours), 0.0)
+
+    max_input_kwh = charge_kw * hours
+    max_stored_kwh = max_input_kwh * efficiency
+    unconstrained_soc = start_soc + max_stored_kwh / capacity * 100.0
+    maximum_achievable = min(max(unconstrained_soc, start_soc), 100.0)
+    reachable = maximum_achievable + 1e-6 >= target_soc
+    shortfall = max(target_soc - maximum_achievable, 0.0)
+
+    return {
+        "starting_soc_percent": round(start_soc, 3),
+        "charge_target_soc_percent": round(target_soc, 3),
+        "charge_hours_available": round(hours, 4),
+        "maximum_charge_input_kwh": round(max_input_kwh, 3),
+        "maximum_stored_charge_kwh": round(max_stored_kwh, 3),
+        "maximum_achievable_soc_percent": round(maximum_achievable, 3),
+        "charge_target_physically_reachable": reachable,
+        "charge_target_shortfall_percent": round(shortfall, 3),
+        "charge_target_status": (
+            "target physically reachable within cheap window"
+            if reachable
+            else "target physically unreachable within cheap window"
+        ),
+        "charge_efficiency": round(efficiency, 4),
+        "max_charge_kw": round(charge_kw, 3),
+        "basis": "SOC + configured charge power × remaining cheap time × efficiency",
+        "reporting_only": True,
+        "hardware_writes": "blocked",
+    }
+
+
+def _cheap_window_hours(start: time, end: time) -> float:
+    """Return configured cheap-window duration in hours, including midnight wrap."""
+    anchor = datetime(2000, 1, 1)
+    start_dt = datetime.combine(anchor.date(), start)
+    end_dt = datetime.combine(anchor.date(), end)
+    if end_dt <= start_dt:
+        end_dt += timedelta(days=1)
+    return max((end_dt - start_dt).total_seconds() / 3600.0, 0.0)
+
+
 def reconcile_precheap_projection(
     *,
     projected_precheap_soc_percent: float | None,
@@ -169,6 +229,7 @@ def project_tomorrow_midnight_soc(
             else current_soc
         )
         charge_from = cheap_start
+        capability_hours = _cheap_window_hours(offpeak_start, offpeak_end)
         basis = (
             "forecast projected SOC at cheap start"
             if projected_precheap is not None
@@ -177,10 +238,20 @@ def project_tomorrow_midnight_soc(
     elif local_now < midnight:
         start_soc = current_soc
         charge_from = local_now
+        cheap_end = datetime.combine(
+            local_now.date() + (timedelta(days=1) if offpeak_end <= offpeak_start else timedelta()),
+            offpeak_end,
+            tzinfo=LONDON,
+        )
+        capability_hours = max(
+            (cheap_end - local_now).total_seconds() / 3600.0,
+            0.0,
+        )
         basis = "current SOC inside active cheap window"
     else:
         start_soc = current_soc
         charge_from = midnight
+        capability_hours = _cheap_window_hours(offpeak_start, offpeak_end)
         basis = "current SOC at/after midnight"
 
     hours = max((midnight - charge_from).total_seconds() / 3600.0, 0.0)
@@ -192,6 +263,14 @@ def project_tomorrow_midnight_soc(
     input_kwh = min(max_input_kwh, stored_needed_kwh / efficiency)
     stored_kwh = input_kwh * efficiency
     midnight_soc = min(start_soc + stored_kwh / capacity * 100.0, 100.0)
+    capability = project_cheap_window_charge_capability(
+        starting_soc_percent=start_soc,
+        target_soc_percent=100.0,
+        battery_capacity_kwh=capacity,
+        max_charge_kw=charge_kw,
+        charge_efficiency=efficiency,
+        charge_hours=capability_hours,
+    )
 
     return round(midnight_soc, 3), {
         "active": True,
@@ -208,5 +287,6 @@ def project_tomorrow_midnight_soc(
         "midnight_soc_percent": round(midnight_soc, 3),
         "charge_efficiency": round(efficiency, 4),
         "max_charge_kw": round(charge_kw, 3),
+        "cheap_window_charge_capability": capability,
         "hardware_writes": "blocked",
     }
