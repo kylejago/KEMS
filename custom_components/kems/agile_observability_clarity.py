@@ -102,9 +102,9 @@ def _clarify_policy_action_labels(state: dict[str, Any]) -> dict[str, Any]:
         flow_soc = _number(slot.get("flow_estimated_soc_percent"))
         flow_home = max(_number(slot.get("flow_battery_to_home_kwh")) or 0.0, 0.0)
         flow_export = max(_number(slot.get("flow_battery_export_kwh")) or 0.0, 0.0)
-        stale_action = "10% reserve floor" in str(
-            slot.get("rolling_action") or ""
-        ).lower()
+        stale_action = (
+            "10% reserve floor" in str(slot.get("rolling_action") or "").lower()
+        )
         stale_actions = any(
             "10% reserve floor" in str(value).lower()
             for value in (slot.get("actions") or [])

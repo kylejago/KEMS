@@ -11,7 +11,9 @@ ROOT = Path(__file__).parents[1]
 KEMS = ROOT / "custom_components" / "kems"
 
 
-def test_standard_six_hour_window_reports_100_percent_unreachable_from_10_percent() -> None:
+def test_standard_six_hour_window_reports_100_percent_unreachable_from_10_percent() -> (
+    None
+):
     evidence = project_cheap_window_charge_capability(
         starting_soc_percent=10.0,
         target_soc_percent=100.0,
