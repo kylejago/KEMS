@@ -1,0 +1,42 @@
+name: Alpha9.27 successor assertion migration
+
+on:
+  push:
+    branches:
+      - fix/alpha9.27-policy-label-publication
+
+permissions:
+  contents: write
+
+jobs:
+  migrate:
+    if: github.event.head_commit.message != 'Alpha9.27: migrate successor release assertions'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/alpha9.27-policy-label-publication
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Migrate exact current-release assertions
+        run: python scripts/alpha927_migrate_successor_assertions.py
+      - name: Commit migration
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add tests/test_alpha8_consolidation.py \
+                  tests/test_alpha913_forecast_path_scheduler.py \
+                  tests/test_alpha919_runtime_recorder_owner.py \
+                  tests/test_alpha920_shadow_recorder_owner.py \
+                  tests/test_alpha921_planning_target_house_floor.py \
+                  tests/test_alpha922_flow_contract_startup.py \
+                  tests/test_alpha924_flow_parity_export_floor.py \
+                  tests/test_alpha925_observability_clarity.py \
+                  tests/test_alpha926_panel_layout_profiles.py \
+                  tests/test_alpha9_baseline.py
+          git diff --cached --check
+          git commit -m 'Alpha9.27: migrate successor release assertions'
+          git push origin HEAD:fix/alpha9.27-policy-label-publication
