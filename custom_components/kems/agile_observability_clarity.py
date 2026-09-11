@@ -91,10 +91,7 @@ def _clarify_policy_action_labels(state: dict[str, Any]) -> dict[str, Any]:
     rolling_action = str(rolling.get("dispatch_action") or "").lower()
     planning_target_reached = (
         bool(rolling.get("planning_target_reached"))
-        or (
-            rolling_soc is not None
-            and rolling_soc <= target_soc + _EPSILON
-        )
+        or (rolling_soc is not None and rolling_soc <= target_soc + _EPSILON)
         or "planning target reached" in rolling_action
         or "reserve floor" in rolling_action
     )
