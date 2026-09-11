@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   migrate:
-    if: github.event.head_commit.message != 'Alpha9.27: migrate successor release assertions'
+    if: "${{ github.event.head_commit.message != 'Alpha9.27: migrate successor release assertions' }}"
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
