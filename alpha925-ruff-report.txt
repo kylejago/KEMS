@@ -1,14 +1,1 @@
-SIM102 Use a single `if` statement instead of nested `if` statements
-  --> custom_components/kems/agile_observability_clarity.py:90:9
-   |
-88 |               or "planning target reached" in routing_action.lower()
-89 |           )
-90 | /         if reached and house_kw > _EPSILON and export_kw <= _EPSILON:
-91 | |             if routing.get("routing_action") != action:
-   | |_______________________________________________________^
-92 |                   routing["routing_action"] = action
-93 |                   clarified_fields += 1
-   |
-help: Combine `if` statements using `and`
-
-Found 1 error.
+All checks passed!
