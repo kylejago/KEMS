@@ -99,6 +99,9 @@ from .agile_intelligent_dispatch_observability import (  # noqa: E402,F401
 from .agile_intelligent_dispatch_replan import (  # noqa: E402
     install_intelligent_dispatch_replan,
 )
+from .agile_observability_clarity import (  # noqa: E402
+    install_observability_clarity,
+)
 from .agile_restart_soc_anchor import (  # noqa: E402
     RestartSocAnchorAgileSmartExportManager,
 )
@@ -110,6 +113,7 @@ from .agile_smart_export_runtime_base import *  # noqa: E402,F403
 
 install_intelligent_dispatch_replan()
 install_agile_safety_floor()
+install_observability_clarity()
 
 EfficientAgileSmartExportManager = build_safety_floor_manager(
     RestartSocAnchorAgileSmartExportManager
