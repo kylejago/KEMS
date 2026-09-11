@@ -1,0 +1,429 @@
+name: Temporary Alpha9.26 panel profile builder
+
+on:
+  push:
+    branches:
+      - feature/alpha9.26-panel-layout-profiles
+    paths:
+      - .github/workflows/tmp-alpha926-build.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/alpha9.26-panel-layout-profiles
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Apply implementation
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import json
+
+          def replace_once(path: str, old: str, new: str) -> None:
+              p = Path(path)
+              text = p.read_text(encoding="utf-8")
+              if text.count(old) != 1:
+                  raise SystemExit(f"Expected exactly one marker in {path}: {old!r}; got {text.count(old)}")
+              p.write_text(text.replace(old, new, 1), encoding="utf-8")
+
+          # Core option contract: V1 is deliberately the compatibility default.
+          replace_once(
+              "custom_components/kems/const.py",
+              'CONF_VIRTUAL_SCENARIO = "virtual_scenario"\n',
+              'CONF_VIRTUAL_SCENARIO = "virtual_scenario"\n'
+              'CONF_PANEL_LAYOUT = "panel_layout"\n\n'
+              'PANEL_LAYOUT_V1 = "v1"\n'
+              'PANEL_LAYOUT_V2 = "v2"\n'
+              'PANEL_LAYOUTS = (PANEL_LAYOUT_V1, PANEL_LAYOUT_V2)\n'
+              'PANEL_LAYOUT_LABELS = {\n'
+              '    PANEL_LAYOUT_V1: "V1 — Current",\n'
+              '    PANEL_LAYOUT_V2: "V2 — Inverter centred",\n'
+              '}\n',
+          )
+          replace_once(
+              "custom_components/kems/const.py",
+              '    CONF_VIRTUAL_SCENARIO: "normal",\n',
+              '    CONF_VIRTUAL_SCENARIO: "normal",\n'
+              '    CONF_PANEL_LAYOUT: PANEL_LAYOUT_V1,\n',
+          )
+
+          # Friendly HA Options/Settings page.
+          replace_once(
+              "custom_components/kems/config_flow.py",
+              '    CONF_OPERATING_MODE,\n',
+              '    CONF_OPERATING_MODE,\n    CONF_PANEL_LAYOUT,\n',
+          )
+          replace_once(
+              "custom_components/kems/config_flow.py",
+              '    NAME,\n)',
+              '    NAME,\n    PANEL_LAYOUT_LABELS,\n    PANEL_LAYOUTS,\n)',
+          )
+          replace_once(
+              "custom_components/kems/config_flow.py",
+              'USER_MODE_SELECTOR = _select(\n',
+              'PANEL_LAYOUT_SELECTOR = _select(\n'
+              '    [(key, PANEL_LAYOUT_LABELS[key]) for key in PANEL_LAYOUTS]\n'
+              ')\n\n'
+              'USER_MODE_SELECTOR = _select(\n',
+          )
+          replace_once(
+              "custom_components/kems/config_flow.py",
+              'CONTROL_SCHEMA = vol.Schema(\n',
+              'PANEL_SCHEMA = vol.Schema(\n'
+              '    {\n'
+              '        vol.Required(CONF_PANEL_LAYOUT): PANEL_LAYOUT_SELECTOR,\n'
+              '    }\n'
+              ')\n\n'
+              'CONTROL_SCHEMA = vol.Schema(\n',
+          )
+          replace_once(
+              "custom_components/kems/config_flow.py",
+              '        "monitoring": "Monitoring and history",\n        "control": "KEMS type, mode and safety",\n',
+              '        "monitoring": "Monitoring and history",\n'
+              '        "panel": "Panel display",\n'
+              '        "control": "KEMS type, mode and safety",\n',
+          )
+          replace_once(
+              "custom_components/kems/config_flow.py",
+              '    async def async_step_control(self, user_input: dict[str, Any] | None = None):\n',
+              '    async def async_step_panel(\n'
+              '        self,\n'
+              '        user_input: dict[str, Any] | None = None,\n'
+              '    ):\n'
+              '        """Choose the managed ESP32 panel faceplate layout."""\n'
+              '        if user_input is not None:\n'
+              '            return self._save_options(user_input)\n'
+              '        return self._show_category("panel", PANEL_SCHEMA)\n\n'
+              '    async def async_step_control(self, user_input: dict[str, Any] | None = None):\n',
+          )
+
+          # Live selector used by the dashboard and ESPHome renderer.
+          replace_once(
+              "custom_components/kems/select.py",
+              '    CONF_OPERATING_MODE,\n',
+              '    CONF_OPERATING_MODE,\n    CONF_PANEL_LAYOUT,\n',
+          )
+          replace_once(
+              "custom_components/kems/select.py",
+              '    CONF_VIRTUAL_SCENARIO,\n)',
+              '    CONF_VIRTUAL_SCENARIO,\n    PANEL_LAYOUT_LABELS,\n    PANEL_LAYOUTS,\n    PANEL_LAYOUT_V1,\n)',
+          )
+          replace_once(
+              "custom_components/kems/select.py",
+              '        KEMSWeekendHappyHourDurationSelect(coordinator),\n        KEMSVirtualScenarioSelect(coordinator),\n',
+              '        KEMSWeekendHappyHourDurationSelect(coordinator),\n'
+              '        KEMSPanelLayoutSelect(coordinator),\n'
+              '        KEMSVirtualScenarioSelect(coordinator),\n',
+          )
+          replace_once(
+              "custom_components/kems/select.py",
+              '\n\nclass KEMSVirtualScenarioSelect(KEMSEntity, SelectEntity):\n',
+              '\n\nclass KEMSPanelLayoutSelect(KEMSEntity, SelectEntity):\n'
+              '    """Choose the physical 16x16 KEMS faceplate geometry."""\n\n'
+              '    _attr_name = "Panel layout"\n'
+              '    _attr_icon = "mdi:view-dashboard-variant-outline"\n'
+              '    _attr_options = [PANEL_LAYOUT_LABELS[key] for key in PANEL_LAYOUTS]\n\n'
+              '    def __init__(self, coordinator) -> None:\n'
+              '        super().__init__(coordinator, "panel_layout_select")\n\n'
+              '    @property\n'
+              '    def current_option(self) -> str:\n'
+              '        selected = str(\n'
+              '            self.coordinator.entry.options.get(CONF_PANEL_LAYOUT, PANEL_LAYOUT_V1)\n'
+              '        )\n'
+              '        return PANEL_LAYOUT_LABELS.get(\n'
+              '            selected, PANEL_LAYOUT_LABELS[PANEL_LAYOUT_V1]\n'
+              '        )\n\n'
+              '    async def async_select_option(self, option: str) -> None:\n'
+              '        selected = next(\n'
+              '            (\n'
+              '                key\n'
+              '                for key, label in PANEL_LAYOUT_LABELS.items()\n'
+              '                if label == option\n'
+              '            ),\n'
+              '            None,\n'
+              '        )\n'
+              '        if selected is None:\n'
+              '            raise HomeAssistantError(f"Unsupported KEMS panel layout: {option}")\n'
+              '        await async_set_runtime_option(\n'
+              '            self.hass,\n'
+              '            self.coordinator.entry,\n'
+              '            CONF_PANEL_LAYOUT,\n'
+              '            selected,\n'
+              '        )\n'
+              '\n\nclass KEMSVirtualScenarioSelect(KEMSEntity, SelectEntity):\n',
+          )
+
+          # Dashboard System/Settings card exposes the live selector.
+          replace_once(
+              "dashboards/kems_master_dashboard.yaml",
+              '              - entity: select.kems_export_tariff\n                name: Export tariff\n',
+              '              - entity: select.kems_export_tariff\n'
+              '                name: Export tariff\n'
+              '              - entity: select.kems_panel_layout\n'
+              '                name: Panel layout\n',
+          )
+          Path("custom_components/kems/kems_master_dashboard.yaml").write_bytes(
+              Path("dashboards/kems_master_dashboard.yaml").read_bytes()
+          )
+
+          # Managed panel subscribes to the selected KEMS geometry.
+          replace_once(
+              "custom_components/kems/kems16x16.yaml",
+              '  panel_config_version: "0.9.0-alpha9-panel.0"\n',
+              '  panel_config_version: "0.9.0-alpha9-panel.1"\n',
+          )
+          replace_once(
+              "custom_components/kems/kems16x16.yaml",
+              '  scenario_agile_flow: sensor.kems_panel_full_kems_agile_flow_now\n',
+              '  scenario_agile_flow: sensor.kems_panel_full_kems_agile_flow_now\n'
+              '  panel_layout: select.kems_panel_layout\n',
+          )
+          replace_once(
+              "custom_components/kems/kems16x16.yaml",
+              "  - id: panel_boot_ha_ready_ms\n    type: uint32_t\n    restore_value: no\n    initial_value: '0'\n",
+              "  - id: panel_boot_ha_ready_ms\n    type: uint32_t\n    restore_value: no\n    initial_value: '0'\n"
+              "  - id: panel_layout_v2\n    type: bool\n    restore_value: yes\n    initial_value: 'false'\n",
+          )
+          replace_once(
+              "custom_components/kems/kems16x16.yaml",
+              '  - platform: homeassistant\n    id: ha_kems_status\n    entity_id: ${kems_status}\n',
+              '  - platform: homeassistant\n'
+              '    id: ha_panel_layout\n'
+              '    entity_id: ${panel_layout}\n'
+              '    on_value:\n'
+              '      then:\n'
+              '        - lambda: |-\n'
+              '            id(panel_layout_v2) = x == "V2 — Inverter centred";\n'
+              '  - platform: homeassistant\n'
+              '    id: ha_kems_status\n'
+              '    entity_id: ${kems_status}\n',
+          )
+          replace_once(
+              "custom_components/kems/kems16x16.yaml",
+              '      // KEMS boot / OTA completion sequence.\n',
+              '      std::string panel_layout = "V1 — Current";\n'
+              '      if (id(ha_panel_layout).has_state() &&\n'
+              '          !id(ha_panel_layout).state.empty()) {\n'
+              '        panel_layout = id(ha_panel_layout).state;\n'
+              '      } else if (id(panel_layout_v2)) {\n'
+              '        panel_layout = "V2 — Inverter centred";\n'
+              '      }\n'
+              '      const bool layout_v2 = panel_layout == "V2 — Inverter centred";\n\n'
+              '      // KEMS boot / OTA completion sequence.\n',
+          )
+
+          v2_block = r'''      if (layout_v2) {
+        // V2: inverter-centred faceplate.
+        it.fill(OFF);
+        rect(4, 8, 13, 9, RAINBOW); // INVERTER slow colour fade
+
+        // GRID at top-left. Import travels down into the inverter; export
+        // travels back up from the inverter using the originating source colour.
+        if (grid_available_for_display) {
+          rect(
+            2, 1, 5, 2,
+            (grid_importing || grid_exporting) ? pulse(BLUE) : scale_color(BLUE, 0.25f)
+          );
+        } else {
+          rect(2, 1, 5, 2, pulse(RED));
+        }
+        if (grid_importing) {
+          flow_vertical(4, 3, 5, 7, BLUE, BLUE, +1);
+        } else if (grid_exporting) {
+          if (export_from_solar && export_from_battery) {
+            flow_vertical(4, 3, 5, 7, YELLOW, GREEN, -1);
+          } else if (export_from_solar) {
+            flow_vertical(4, 3, 5, 7, YELLOW, YELLOW, -1);
+          } else if (export_from_battery) {
+            flow_vertical(4, 3, 5, 7, GREEN, GREEN, -1);
+          } else {
+            flow_vertical(4, 3, 5, 7, WHITE, WHITE, -1);
+          }
+        }
+
+        // SOLAR always feeds down into the inverter.
+        rect(
+          7, 1, 10, 2,
+          source_solar_active ? pulse(YELLOW) : scale_color(YELLOW, 0.20f)
+        );
+        if (source_solar_active) {
+          flow_vertical(8, 3, 9, 7, YELLOW, YELLOW, +1);
+        }
+
+        // BATTERY uses the same ten 10%-per-cell model as V1, rotated
+        // exactly 90 degrees counter-clockwise: right-to-left fill.
+        if (!isnan(battery_soc)) {
+          float soc = battery_soc;
+          if (soc < 0.0f) soc = 0.0f;
+          if (soc > 100.0f) soc = 100.0f;
+          const int battery_v2_cols[10] = {16, 16, 15, 15, 14, 14, 13, 13, 12, 12};
+          const int battery_v2_rows[10] = {2, 1, 2, 1, 2, 1, 2, 1, 2, 1};
+          if (soc >= 100.0f) {
+            for (int i = 0; i < 10; i++) {
+              px(battery_v2_cols[i], battery_v2_rows[i], GREEN);
+            }
+          } else if (soc < 10.0f) {
+            px(battery_v2_cols[0], battery_v2_rows[0], pulse(RED));
+          } else {
+            const int full_cells = (int) floorf(soc / 10.0f);
+            for (int i = 0; i < full_cells; i++) {
+              const Color filled =
+                (soc < 20.0f && i == 0) ? ORANGE : GREEN;
+              px(battery_v2_cols[i], battery_v2_rows[i], filled);
+            }
+            if (full_cells < 10) {
+              px(
+                battery_v2_cols[full_cells],
+                battery_v2_rows[full_cells],
+                pulse(GREEN)
+              );
+            }
+          }
+        }
+        if (battery_charging) {
+          if (battery_charge_from_solar && battery_charge_from_grid) {
+            flow_vertical(12, 3, 13, 7, YELLOW, BLUE, -1);
+          } else if (battery_charge_from_grid) {
+            flow_vertical(12, 3, 13, 7, BLUE, BLUE, -1);
+          } else if (battery_charge_from_solar) {
+            flow_vertical(12, 3, 13, 7, YELLOW, YELLOW, -1);
+          } else {
+            flow_vertical(12, 3, 13, 7, WHITE, WHITE, -1);
+          }
+        } else if (battery_to_bus_active) {
+          flow_vertical(12, 3, 13, 7, GREEN, GREEN, +1);
+        }
+
+        // HOME is a new V2 destination. Source colours continue through the
+        // inverter so mixed supply remains visible without changing KEMS logic.
+        const bool home_from_grid = grid_importing;
+        const bool home_from_solar = solar_to_home_active;
+        const bool home_from_battery = battery_discharging;
+        const bool home_active =
+          home_from_grid || home_from_solar || home_from_battery;
+        rect(
+          5, 15, 6, 16,
+          home_active ? pulse(WHITE) : scale_color(WHITE, 0.18f)
+        );
+        if (home_active) {
+          if (home_from_grid && home_from_solar && home_from_battery) {
+            flow_vertical_dual(
+              5, 10, 6, 14,
+              BLUE, GREEN,
+              YELLOW, YELLOW,
+              +1
+            );
+          } else if (home_from_grid && home_from_solar) {
+            flow_vertical(5, 10, 6, 14, BLUE, YELLOW, +1);
+          } else if (home_from_solar && home_from_battery) {
+            flow_vertical(5, 10, 6, 14, YELLOW, GREEN, +1);
+          } else if (home_from_grid && home_from_battery) {
+            flow_vertical(5, 10, 6, 14, BLUE, GREEN, +1);
+          } else if (home_from_grid) {
+            flow_vertical(5, 10, 6, 14, BLUE, BLUE, +1);
+          } else if (home_from_solar) {
+            flow_vertical(5, 10, 6, 14, YELLOW, YELLOW, +1);
+          } else if (home_from_battery) {
+            flow_vertical(5, 10, 6, 14, GREEN, GREEN, +1);
+          }
+        }
+
+        // EV remains magenta/red, now fed from the inverter on columns 11-12.
+        if (ev_blocked_by_kems) {
+          rect(10, 15, 13, 16, RED);
+        } else if (ev_charging_for_display) {
+          rect(10, 15, 13, 16, pulse(MAGENTA));
+          if (ev_from_grid && ev_from_solar && ev_from_battery) {
+            flow_vertical_dual(
+              11, 10, 12, 14,
+              BLUE, GREEN,
+              YELLOW, YELLOW,
+              +1
+            );
+          } else if (ev_from_grid && ev_from_solar) {
+            flow_vertical(11, 10, 12, 14, BLUE, YELLOW, +1);
+          } else if (ev_from_solar && ev_from_battery) {
+            flow_vertical(11, 10, 12, 14, YELLOW, GREEN, +1);
+          } else if (ev_from_grid && ev_from_battery) {
+            flow_vertical(11, 10, 12, 14, BLUE, GREEN, +1);
+          } else if (ev_from_grid) {
+            flow_vertical(11, 10, 12, 14, BLUE, BLUE, +1);
+          } else if (ev_from_solar) {
+            flow_vertical(11, 10, 12, 14, YELLOW, YELLOW, +1);
+          } else if (ev_from_battery) {
+            flow_vertical(11, 10, 12, 14, GREEN, GREEN, +1);
+          } else {
+            flow_vertical(11, 10, 12, 14, MAGENTA, MAGENTA, +1);
+          }
+        } else if (ev_connected) {
+          rect(10, 15, 13, 16, MAGENTA);
+        }
+        return;
+      }
+
+'''
+          replace_once(
+              "custom_components/kems/kems16x16.yaml",
+              '      it.fill(OFF);\n      rect(2, 2, 5, 3, RAINBOW);     // GRID\n',
+              v2_block + '      it.fill(OFF);\n      rect(2, 2, 5, 3, RAINBOW);     // GRID\n',
+          )
+
+          # Coordinated component/version metadata.
+          replace_once(
+              "custom_components/kems/panel.py",
+              'PANEL_CONFIG_VERSION = "0.9.0-alpha9-panel.0"',
+              'PANEL_CONFIG_VERSION = "0.9.0-alpha9-panel.1"',
+          )
+          manifest_path = Path("custom_components/kems/manifest.json")
+          manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+          manifest["version"] = "0.9.0-alpha9.26"
+          manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+
+          bundle_path = Path("release/kems-bundle.template.json")
+          bundle = json.loads(bundle_path.read_text(encoding="utf-8"))
+          bundle["components"]["panel"]["version"] = "0.9.0-alpha9-panel.1"
+          bundle["maintenance"]["reason"] = (
+              "Alpha9 coordinated parity baseline; Alpha9.26 adds selectable managed-panel "
+              "profiles without changing energy policy. V1 remains the default/current 16x16 "
+              "layout for backwards compatibility. V2 adds the inverter-centred faceplate with "
+              "Grid, Solar and the 90-degree counter-clockwise rotated ten-cell Battery flowing "
+              "into the central Inverter, then Home and EV flowing out; the Inverter retains the "
+              "existing slow colour fade. The selected profile is available in KEMS Settings and "
+              "as a live Home Assistant select consumed by the managed ESP32 firmware. Retain "
+              "Alpha9.25 reserve observability and reporting-only cheap-window charge capability: "
+              "100% remains a charging target, not a hard deadline, and KEMS charges as much as "
+              "possible during confirmed cheap time. Retain the 15% deliberate-export target, "
+              "independent 10% absolute house/import floor and restart-safe 12% recovery latch. "
+              "No optimiser allocation, tariff, Happy Hour, Power Down, SOC arithmetic or FoxESS "
+              "command/write authority changes; Pi Web remains 0.9.0-alpha9-web.0, Public Web "
+              "remains 0.9.0-alpha9-public.0, Panel advances to 0.9.0-alpha9-panel.1; configured "
+              "KH7 limits remain 7.0 kW; real FoxESS hardware writes hard-blocked until physical "
+              "commissioning is complete."
+          )
+          bundle_path.write_text(json.dumps(bundle, indent=2) + "\n", encoding="utf-8")
+
+          # Successor version assertions that are intentionally current-version contracts.
+          managed_panel_test = Path("tests/test_managed_panel.py")
+          test_text = managed_panel_test.read_text(encoding="utf-8")
+          test_text = test_text.replace("0.9.0-alpha9-panel.0", "0.9.0-alpha9-panel.1")
+          managed_panel_test.write_text(test_text, encoding="utf-8")
+          PY
+
+      - name: Commit implementation
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add custom_components/kems dashboards/kems_master_dashboard.yaml release/kems-bundle.template.json tests/test_managed_panel.py
+          git diff --cached --check
+          git commit -m "Alpha9.26: add selectable V1/V2 panel profiles"
+          git push origin HEAD:feature/alpha9.26-panel-layout-profiles
