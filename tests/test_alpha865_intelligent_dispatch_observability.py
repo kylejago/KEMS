@@ -203,6 +203,6 @@ def test_alpha865_is_observability_only_successor() -> None:
     assert str(bundle["components"]["property_web"]["version"]).startswith(
         ("0.8.0-alpha8-web.", "0.9.0-alpha9-web.")
     )
-    assert bundle["components"]["panel"]["version"] == "0.9.0-alpha9-panel.0"
+    assert bundle["components"]["panel"]["version"] == "0.9.0-alpha9-panel.1"
     assert "Alpha8.64 keeps the frozen Alpha7 boundary intact" in alpha864
     assert "hardware writes" in alpha864

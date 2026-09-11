@@ -34,7 +34,7 @@ def test_alpha746_contract_is_coordinated_in_alpha8() -> None:
         web_version.startswith("0.9.0-alpha9-web.")
         or int(web_version.rsplit(".", 1)[1]) >= 2
     )
-    assert bundle["components"]["panel"]["version"] == "0.9.0-alpha9-panel.0"
+    assert bundle["components"]["panel"]["version"] == "0.9.0-alpha9-panel.1"
 
 
 def test_alpha746_module_parses_and_installs_after_alpha745() -> None:

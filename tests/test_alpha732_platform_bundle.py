@@ -24,7 +24,7 @@ def test_alpha732_platform_contract_is_retained_in_alpha8() -> None:
         or int(property_web.rsplit(".", 1)[1]) >= 2
     )
     assert template["components"]["public_web"]["required"] is False
-    assert template["components"]["panel"]["version"] == "0.9.0-alpha9-panel.0"
+    assert template["components"]["panel"]["version"] == "0.9.0-alpha9-panel.1"
 
 
 def test_alpha732_is_behaviour_freeze_not_another_agile_patch() -> None:

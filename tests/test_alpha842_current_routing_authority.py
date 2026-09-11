@@ -174,7 +174,7 @@ def test_alpha842_release_scope_and_architecture() -> None:
     )
     assert bundle["maintenance"]["home_assistant_restart_required"] is True
     assert bundle["maintenance"]["reboot_required"] is False
-    assert bundle["components"]["panel"]["version"] == "0.9.0-alpha9-panel.0"
+    assert bundle["components"]["panel"]["version"] == "0.9.0-alpha9-panel.1"
     assert str(bundle["components"]["property_web"]["version"]).startswith(
         ("0.8.0-alpha8-web.", "0.9.0-alpha9-web.")
     )

@@ -4,7 +4,7 @@ substitutions:
   device_name: kems16x16
   friendly_name: "KEMS16x16"
   led_pin: GPIO21
-  panel_config_version: "0.9.0-alpha9-panel.0"
+  panel_config_version: "0.9.0-alpha9-panel.1"
   kems_status: sensor.kems_status
   live_battery_soc: sensor.kems_battery_state_of_charge
   live_battery_power: sensor.kems_battery_power
@@ -23,6 +23,7 @@ substitutions:
   scenario_solar_battery_flow: sensor.kems_compare_solar_and_battery_flow_now
   scenario_full_kems_forecast_flow: sensor.kems_compare_full_kems_forecast_flow_now
   scenario_agile_flow: sensor.kems_panel_full_kems_agile_flow_now
+  panel_layout: select.kems_panel_layout
 esphome:
   name: ${device_name}
   friendly_name: ${friendly_name}
@@ -64,6 +65,10 @@ globals:
     type: uint32_t
     restore_value: no
     initial_value: '0'
+  - id: panel_layout_v2
+    type: bool
+    restore_value: yes
+    initial_value: 'false'
 
 select:
   - platform: template
@@ -86,6 +91,13 @@ text_sensor:
     update_interval: 60s
     lambda: |-
       return {"${panel_config_version}"};
+  - platform: homeassistant
+    id: ha_panel_layout
+    entity_id: ${panel_layout}
+    on_value:
+      then:
+        - lambda: |-
+            id(panel_layout_v2) = x == "V2 — Inverter centred";
   - platform: homeassistant
     id: ha_kems_status
     entity_id: ${kems_status}
@@ -346,6 +358,15 @@ display:
       auto bool_colour = [&](bool value) -> Color {
         return value ? GREEN : RED;
       };
+
+      std::string panel_layout = "V1 — Current";
+      if (id(ha_panel_layout).has_state() &&
+          !id(ha_panel_layout).state.empty()) {
+        panel_layout = id(ha_panel_layout).state;
+      } else if (id(panel_layout_v2)) {
+        panel_layout = "V2 — Inverter centred";
+      }
+      const bool layout_v2 = panel_layout == "V2 — Inverter centred";
 
       // KEMS boot / OTA completion sequence.
       const uint32_t boot_elapsed = now - id(panel_boot_started_ms);
@@ -626,6 +647,155 @@ display:
         ev_charging_for_display && source_solar_active;
       const bool ev_from_battery =
         ev_charging_for_display && source_battery_active;
+      if (layout_v2) {
+        // V2: inverter-centred faceplate.
+        it.fill(OFF);
+        rect(4, 8, 13, 9, RAINBOW); // INVERTER slow colour fade
+
+        // GRID at top-left. Import travels down into the inverter; export
+        // travels back up from the inverter using the originating source colour.
+        if (grid_available_for_display) {
+          rect(
+            2, 1, 5, 2,
+            (grid_importing || grid_exporting) ? pulse(BLUE) : scale_color(BLUE, 0.25f)
+          );
+        } else {
+          rect(2, 1, 5, 2, pulse(RED));
+        }
+        if (grid_importing) {
+          flow_vertical(4, 3, 5, 7, BLUE, BLUE, +1);
+        } else if (grid_exporting) {
+          if (export_from_solar && export_from_battery) {
+            flow_vertical(4, 3, 5, 7, YELLOW, GREEN, -1);
+          } else if (export_from_solar) {
+            flow_vertical(4, 3, 5, 7, YELLOW, YELLOW, -1);
+          } else if (export_from_battery) {
+            flow_vertical(4, 3, 5, 7, GREEN, GREEN, -1);
+          } else {
+            flow_vertical(4, 3, 5, 7, WHITE, WHITE, -1);
+          }
+        }
+
+        // SOLAR always feeds down into the inverter.
+        rect(
+          7, 1, 10, 2,
+          source_solar_active ? pulse(YELLOW) : scale_color(YELLOW, 0.20f)
+        );
+        if (source_solar_active) {
+          flow_vertical(8, 3, 9, 7, YELLOW, YELLOW, +1);
+        }
+
+        // BATTERY uses the same ten 10%-per-cell model as V1, rotated
+        // exactly 90 degrees counter-clockwise: right-to-left fill.
+        if (!isnan(battery_soc)) {
+          float soc = battery_soc;
+          if (soc < 0.0f) soc = 0.0f;
+          if (soc > 100.0f) soc = 100.0f;
+          const int battery_v2_cols[10] = {16, 16, 15, 15, 14, 14, 13, 13, 12, 12};
+          const int battery_v2_rows[10] = {2, 1, 2, 1, 2, 1, 2, 1, 2, 1};
+          if (soc >= 100.0f) {
+            for (int i = 0; i < 10; i++) {
+              px(battery_v2_cols[i], battery_v2_rows[i], GREEN);
+            }
+          } else if (soc < 10.0f) {
+            px(battery_v2_cols[0], battery_v2_rows[0], pulse(RED));
+          } else {
+            const int full_cells = (int) floorf(soc / 10.0f);
+            for (int i = 0; i < full_cells; i++) {
+              const Color filled =
+                (soc < 20.0f && i == 0) ? ORANGE : GREEN;
+              px(battery_v2_cols[i], battery_v2_rows[i], filled);
+            }
+            if (full_cells < 10) {
+              px(
+                battery_v2_cols[full_cells],
+                battery_v2_rows[full_cells],
+                pulse(GREEN)
+              );
+            }
+          }
+        }
+        if (battery_charging) {
+          if (battery_charge_from_solar && battery_charge_from_grid) {
+            flow_vertical(12, 3, 13, 7, YELLOW, BLUE, -1);
+          } else if (battery_charge_from_grid) {
+            flow_vertical(12, 3, 13, 7, BLUE, BLUE, -1);
+          } else if (battery_charge_from_solar) {
+            flow_vertical(12, 3, 13, 7, YELLOW, YELLOW, -1);
+          } else {
+            flow_vertical(12, 3, 13, 7, WHITE, WHITE, -1);
+          }
+        } else if (battery_to_bus_active) {
+          flow_vertical(12, 3, 13, 7, GREEN, GREEN, +1);
+        }
+
+        // HOME is a new V2 destination. Source colours continue through the
+        // inverter so mixed supply remains visible without changing KEMS logic.
+        const bool home_from_grid = grid_importing;
+        const bool home_from_solar = solar_to_home_active;
+        const bool home_from_battery = battery_discharging;
+        const bool home_active =
+          home_from_grid || home_from_solar || home_from_battery;
+        rect(
+          5, 15, 6, 16,
+          home_active ? pulse(WHITE) : scale_color(WHITE, 0.18f)
+        );
+        if (home_active) {
+          if (home_from_grid && home_from_solar && home_from_battery) {
+            flow_vertical_dual(
+              5, 10, 6, 14,
+              BLUE, GREEN,
+              YELLOW, YELLOW,
+              +1
+            );
+          } else if (home_from_grid && home_from_solar) {
+            flow_vertical(5, 10, 6, 14, BLUE, YELLOW, +1);
+          } else if (home_from_solar && home_from_battery) {
+            flow_vertical(5, 10, 6, 14, YELLOW, GREEN, +1);
+          } else if (home_from_grid && home_from_battery) {
+            flow_vertical(5, 10, 6, 14, BLUE, GREEN, +1);
+          } else if (home_from_grid) {
+            flow_vertical(5, 10, 6, 14, BLUE, BLUE, +1);
+          } else if (home_from_solar) {
+            flow_vertical(5, 10, 6, 14, YELLOW, YELLOW, +1);
+          } else if (home_from_battery) {
+            flow_vertical(5, 10, 6, 14, GREEN, GREEN, +1);
+          }
+        }
+
+        // EV remains magenta/red, now fed from the inverter on columns 11-12.
+        if (ev_blocked_by_kems) {
+          rect(10, 15, 13, 16, RED);
+        } else if (ev_charging_for_display) {
+          rect(10, 15, 13, 16, pulse(MAGENTA));
+          if (ev_from_grid && ev_from_solar && ev_from_battery) {
+            flow_vertical_dual(
+              11, 10, 12, 14,
+              BLUE, GREEN,
+              YELLOW, YELLOW,
+              +1
+            );
+          } else if (ev_from_grid && ev_from_solar) {
+            flow_vertical(11, 10, 12, 14, BLUE, YELLOW, +1);
+          } else if (ev_from_solar && ev_from_battery) {
+            flow_vertical(11, 10, 12, 14, YELLOW, GREEN, +1);
+          } else if (ev_from_grid && ev_from_battery) {
+            flow_vertical(11, 10, 12, 14, BLUE, GREEN, +1);
+          } else if (ev_from_grid) {
+            flow_vertical(11, 10, 12, 14, BLUE, BLUE, +1);
+          } else if (ev_from_solar) {
+            flow_vertical(11, 10, 12, 14, YELLOW, YELLOW, +1);
+          } else if (ev_from_battery) {
+            flow_vertical(11, 10, 12, 14, GREEN, GREEN, +1);
+          } else {
+            flow_vertical(11, 10, 12, 14, MAGENTA, MAGENTA, +1);
+          }
+        } else if (ev_connected) {
+          rect(10, 15, 13, 16, MAGENTA);
+        }
+        return;
+      }
+
       it.fill(OFF);
       rect(2, 2, 5, 3, RAINBOW);     // GRID
       rect(12, 2, 15, 3, RAINBOW);   // COST
