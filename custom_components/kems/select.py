@@ -16,8 +16,8 @@ from .const import (
     CONF_SYSTEM_TYPE,
     CONF_VIRTUAL_SCENARIO,
     PANEL_LAYOUT_LABELS,
-    PANEL_LAYOUTS,
     PANEL_LAYOUT_V1,
+    PANEL_LAYOUTS,
 )
 from .entity import KEMSEntity
 from .happy_hour import CONF_HAPPY_HOUR_DURATION_HOURS, happy_hour_duration_hours
