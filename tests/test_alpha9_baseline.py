@@ -16,7 +16,7 @@ def test_alpha9_four_track_versions_are_explicit() -> None:
     )
 
     assert manifest["version"] == "0.9.0-alpha9.28"
-    assert bundle["components"]["panel"]["version"] == "0.9.0-alpha9-panel.1"
+    assert bundle["components"]["panel"]["version"] == "0.9.0-alpha9-panel.2"
     assert bundle["components"]["property_web"]["version"] == "0.9.0-alpha9-web.0"
     assert bundle["components"]["pi_agent"]["version"] == "0.9.0-alpha9-web.0"
     assert bundle["components"]["public_web"]["version"] == ("0.9.0-alpha9-public.0")

@@ -40,7 +40,7 @@ def test_alpha927_is_reporting_only_and_keeps_panel_profile_release() -> None:
     assert "15%" in reason
     assert "10% absolute floor" in reason
     assert "12%" in reason
-    assert "0.9.0-alpha9-panel.1" in reason
+    assert "0.9.0-alpha9-panel.2" in reason
     assert "0.9.0-alpha9-web.0" in reason
     assert "0.9.0-alpha9-public.0" in reason
     assert "hardware writes hard-blocked" in reason

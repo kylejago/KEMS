@@ -286,7 +286,7 @@ def test_alpha868_is_reporting_only_and_keeps_runtime_owner_and_coordination() -
     assert str(bundle["components"]["public_web"]["version"]).startswith(
         ("0.8.0-alpha8-web.", "0.9.0-alpha9-public.")
     )
-    assert bundle["components"]["panel"]["version"] == "0.9.0-alpha9-panel.1"
+    assert bundle["components"]["panel"]["version"] == "0.9.0-alpha9-panel.2"
     assert bundle["maintenance"]["affected_components"] in (
         ["kems_core", "dashboard"],
         ["kems_core", "dashboard", "panel", "property_web", "pi_agent", "public_web"],
