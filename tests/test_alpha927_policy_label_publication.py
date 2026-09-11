@@ -21,10 +21,10 @@ def test_alpha927_final_publication_owns_house_bridge_label() -> None:
     assert "10% planning target reached" not in source
     assert "10% reserve floor — no battery discharge/export" not in source
 
-    publish = source.split("def _publish(self, state", 1)[1]
-    assert publish.count("_clarify_labels(state)") >= 2
-    assert publish.index("original(self, state)") < publish.rindex(
-        "_clarify_labels(state)"
+    publish = source.split("def publish_with_observability_clarity", 1)[1]
+    assert publish.count("_clarify_policy_action_labels(state)") >= 2
+    assert publish.index("_original_publish(self, state)") < publish.rindex(
+        "_clarify_policy_action_labels(state)"
     )
 
 
