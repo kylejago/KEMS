@@ -6,10 +6,10 @@ policy now separates them: 15% limits deliberate export, ordinary Home service
 may continue toward the independent 10% absolute floor, and a latched 10% stop
 recovers at 12%.
 
-This module only clarifies already-published human-readable labels immediately
-before Home Assistant entity publication. It never changes optimiser fields,
-energy allocations, SOC arithmetic, tariffs, command targets, or hardware-write
-authority.
+This module only clarifies human-readable labels around the existing entity
+publication boundary, using canonical flow truth. It never changes optimiser
+fields, energy allocations, SOC arithmetic, tariffs, command targets, or
+hardware-write authority.
 """
 
 from __future__ import annotations
@@ -72,9 +72,49 @@ def _clarify_policy_action_labels(state: dict[str, Any]) -> dict[str, Any]:
         _number(rolling.get("hard_safety_recovery_soc_percent"))
         or HARD_SAFETY_RECOVERY_SOC_PERCENT
     )
-    hard_latched = bool(rolling.get("hard_safety_floor_active"))
+    hard_latched = bool(
+        rolling.get("hard_safety_floor_active")
+        or rolling.get("hard_safety_floor_latched")
+    )
     action = _house_bridge_action(target_soc, floor_soc)
     clarified_fields = 0
+
+    rolling_soc = _number(rolling.get("simulated_soc_percent"))
+    rolling_house_kw = max(
+        _number(rolling.get("current_house_battery_kw")) or 0.0,
+        0.0,
+    )
+    rolling_export_kw = max(
+        _number(rolling.get("current_battery_export_target_kw")) or 0.0,
+        0.0,
+    )
+    rolling_action = str(rolling.get("dispatch_action") or "").lower()
+    planning_target_reached = (
+        bool(rolling.get("planning_target_reached"))
+        or (
+            rolling_soc is not None
+            and rolling_soc <= target_soc + _EPSILON
+        )
+        or "planning target reached" in rolling_action
+        or "reserve floor" in rolling_action
+    )
+    house_bridge_active = (
+        not hard_latched
+        and planning_target_reached
+        and rolling_house_kw > _EPSILON
+        and rolling_export_kw <= _EPSILON
+    )
+
+    if house_bridge_active:
+        if rolling.get("dispatch_action") != action:
+            rolling["dispatch_action"] = action
+            clarified_fields += 1
+        if state.get("current_action") != action:
+            state["current_action"] = action
+            clarified_fields += 1
+        if state.get("today_action") != action:
+            state["today_action"] = action
+            clarified_fields += 1
 
     routing = state.get("current_routing_snapshot")
     if isinstance(routing, dict) and not hard_latched:
@@ -86,6 +126,7 @@ def _clarify_policy_action_labels(state: dict[str, Any]) -> dict[str, Any]:
             bool(rolling.get("planning_target_reached"))
             or (routing_soc is not None and routing_soc <= target_soc + _EPSILON)
             or "planning target reached" in routing_action.lower()
+            or "reserve floor" in routing_action.lower()
         )
         if (
             reached
@@ -126,6 +167,7 @@ def _clarify_policy_action_labels(state: dict[str, Any]) -> dict[str, Any]:
                 slot["actions"] = [action]
                 clarified_fields += 1
 
+    state["rolling_export_plan"] = rolling
     evidence = {
         "active": True,
         "clarified_fields": clarified_fields,
@@ -144,7 +186,7 @@ def _clarify_policy_action_labels(state: dict[str, Any]) -> dict[str, Any]:
 
 
 def install_observability_clarity() -> None:
-    """Clarify final labels immediately before existing entity publication."""
+    """Clarify labels before and after the existing publication boundary."""
     global _original_publish
     publish = IntelligentDispatchObservabilityAgileSmartExportManager._publish
     if getattr(publish, "_kems_observability_clarity", False):
@@ -154,6 +196,7 @@ def install_observability_clarity() -> None:
     def publish_with_observability_clarity(self, state: dict[str, Any]) -> None:
         _clarify_policy_action_labels(state)
         _original_publish(self, state)
+        _clarify_policy_action_labels(state)
 
     publish_with_observability_clarity._kems_observability_clarity = True
     IntelligentDispatchObservabilityAgileSmartExportManager._publish = (
