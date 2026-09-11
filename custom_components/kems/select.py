@@ -251,17 +251,11 @@ class KEMSPanelLayoutSelect(KEMSEntity, SelectEntity):
         selected = str(
             self.coordinator.entry.options.get(CONF_PANEL_LAYOUT, PANEL_LAYOUT_V1)
         )
-        return PANEL_LAYOUT_LABELS.get(
-            selected, PANEL_LAYOUT_LABELS[PANEL_LAYOUT_V1]
-        )
+        return PANEL_LAYOUT_LABELS.get(selected, PANEL_LAYOUT_LABELS[PANEL_LAYOUT_V1])
 
     async def async_select_option(self, option: str) -> None:
         selected = next(
-            (
-                key
-                for key, label in PANEL_LAYOUT_LABELS.items()
-                if label == option
-            ),
+            (key for key, label in PANEL_LAYOUT_LABELS.items() if label == option),
             None,
         )
         if selected is None:
