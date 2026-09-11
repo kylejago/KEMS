@@ -238,8 +238,11 @@ def project_tomorrow_midnight_soc(
     elif local_now < midnight:
         start_soc = current_soc
         charge_from = local_now
+        cheap_end_date = local_now.date() + (
+            timedelta(days=1) if offpeak_end <= offpeak_start else timedelta()
+        )
         cheap_end = datetime.combine(
-            local_now.date() + (timedelta(days=1) if offpeak_end <= offpeak_start else timedelta()),
+            cheap_end_date,
             offpeak_end,
             tzinfo=LONDON,
         )
