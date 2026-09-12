@@ -207,7 +207,7 @@ def test_foxess_provider_accepts_static_zero_from_live_same_device(monkeypatch) 
     assert state.raw_grid_import_kw == 0.0
     assert state.source_age_seconds["grid_import_kw"] == 600.0
     assert state.stale_fields == ()
-    assert state.source_data_age_seconds == 600.0
+    assert state.source_data_age_seconds == 30.0
 
 
 def test_foxess_provider_accepts_static_nonzero_from_live_same_device(
@@ -245,6 +245,7 @@ def test_foxess_provider_accepts_static_nonzero_from_live_same_device(
 
     assert state.solar_power_kw == 2.5
     assert state.stale_fields == ()
+    assert state.source_data_age_seconds == 20.0
 
 
 def test_foxess_provider_does_not_cross_device_rescue_stale_source(monkeypatch) -> None:
@@ -281,6 +282,7 @@ def test_foxess_provider_does_not_cross_device_rescue_stale_source(monkeypatch) 
     assert state.house_load_kw == 1.25
     assert state.grid_import_kw is None
     assert state.stale_fields == ("grid_import_kw",)
+    assert state.source_data_age_seconds == 600.0
 
 
 def test_foxess_provider_fails_closed_when_same_device_cohort_is_stale(
@@ -312,6 +314,7 @@ def test_foxess_provider_fails_closed_when_same_device_cohort_is_stale(
     assert state.house_load_kw is None
     assert state.grid_import_kw is None
     assert state.stale_fields == ("grid_import_kw", "house_load_kw")
+    assert state.source_data_age_seconds == 600.0
 
 
 def _load_octopus_provider(monkeypatch):
