@@ -4,7 +4,7 @@ substitutions:
   device_name: kems16x16
   friendly_name: "KEMS16x16"
   led_pin: GPIO21
-  panel_config_version: "0.9.0-alpha9-panel.2"
+  panel_config_version: "0.9.0-alpha9-panel.3"
   kems_status: sensor.kems_status
   live_battery_soc: sensor.kems_battery_state_of_charge
   live_battery_power: sensor.kems_battery_power
@@ -355,15 +355,15 @@ display:
           dir
         );
       };
-      // V2 uses five-row connectors. Start the next packet when the
-      // prior head reaches the fourth position so the longer path stays fluid.
+      // V2 uses five-row connectors. Four-position launch spacing leaves
+      // one dark row between packets so opposing flows are easier to read.
       auto flow_vertical_v2_dual = [&](int c1, int r1, int c2, int r2,
                                        Color head_left, Color head_right,
                                        Color trail_left, Color trail_right,
                                        int dir) {
         rect(c1, r1, c2, r2, OFF);
         const int height = r2 - r1 + 1;
-        const int launch_spacing = 3;
+        const int launch_spacing = 4;
         const int phase = (now / 450) % launch_spacing;
         auto physical_index = [&](int travel_index) -> int {
           return (dir > 0)

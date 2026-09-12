@@ -16,7 +16,7 @@ def test_alpha8_8_retention_contract_survives_later_alpha8_releases() -> None:
     bundle = json.loads(BUNDLE.read_text(encoding="utf-8"))
 
     assert str(manifest["version"]).startswith(("0.8.0-alpha8.", "0.9.0-alpha9."))
-    assert bundle["components"]["panel"]["version"] == "0.9.0-alpha9-panel.2"
+    assert bundle["components"]["panel"]["version"] == "0.9.0-alpha9-panel.3"
     web_versions = {
         bundle["components"]["property_web"]["version"],
         bundle["components"]["pi_agent"]["version"],

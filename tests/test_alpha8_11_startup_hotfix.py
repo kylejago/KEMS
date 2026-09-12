@@ -30,7 +30,7 @@ def test_alpha8_11_release_identity_keeps_web_and_panel_coordinated() -> None:
         str(manifest["version"]).startswith("0.9.0-alpha9")
         or int(str(manifest["version"]).rsplit(".", 1)[1]) >= 11
     )
-    assert bundle["components"]["panel"]["version"] == "0.9.0-alpha9-panel.2"
+    assert bundle["components"]["panel"]["version"] == "0.9.0-alpha9-panel.3"
     web_versions = {
         str(bundle["components"][key]["version"])
         for key in ("property_web", "pi_agent", "public_web")

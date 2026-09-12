@@ -196,7 +196,7 @@ def test_alpha875_scope_priority_and_hardware_isolation() -> None:
     assert str(bundle["components"]["public_web"]["version"]).startswith(
         ("0.8.0-alpha8-web.", "0.9.0-alpha9-public.")
     )
-    assert bundle["components"]["panel"]["version"] == "0.9.0-alpha9-panel.2"
+    assert bundle["components"]["panel"]["version"] == "0.9.0-alpha9-panel.3"
     if release_number == 75:
         assert "planning target" in bundle["maintenance"]["reason"].lower()
         assert "avoidable day-rate" in bundle["maintenance"]["reason"].lower()
