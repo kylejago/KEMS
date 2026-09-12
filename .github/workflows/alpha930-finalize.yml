@@ -1,0 +1,30 @@
+name: Alpha9.30 finalization
+
+on:
+  push:
+    branches:
+      - feature/alpha9.30-live-foxess-solar-commissioning
+    paths:
+      - tools/alpha930_finalize.py
+      - .github/workflows/alpha930-finalize.yml
+
+permissions:
+  contents: write
+
+jobs:
+  finalize:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Apply guarded finalization
+        run: python tools/alpha930_finalize.py
+      - name: Commit finalization
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add custom_components/kems/entity_discovery.py tests/
+          git diff --cached --check
+          git commit -m "Alpha9.30: align fallback and successor contracts"
+          git push origin HEAD:feature/alpha9.30-live-foxess-solar-commissioning
