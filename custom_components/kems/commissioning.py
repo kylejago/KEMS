@@ -81,9 +81,7 @@ def _entity_unit(hass: HomeAssistant, entity_id: str | None) -> str | None:
     return str(value) if value is not None else None
 
 
-def _entity_numeric_state(
-    hass: HomeAssistant, entity_id: str | None
-) -> float | None:
+def _entity_numeric_state(hass: HomeAssistant, entity_id: str | None) -> float | None:
     """Return one finite numeric source state when available."""
     if not entity_id:
         return None
@@ -389,9 +387,7 @@ def build_commissioning_snapshot(hass: HomeAssistant, coordinator) -> dict[str, 
     physical_source_authority = _physical_source_authority(hass, mappings)
     physical_source_duplicates = duplicate_physical_sources(mappings)
     battery_installation_pending = _battery_installation_pending(hass, mappings)
-    solar_only_commissioning = bool(
-        foxess_registered and battery_installation_pending
-    )
+    solar_only_commissioning = bool(foxess_registered and battery_installation_pending)
 
     checks: list[dict[str, Any]] = []
     checks.append(

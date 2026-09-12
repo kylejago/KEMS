@@ -76,7 +76,9 @@ def _record(timestamp: datetime) -> SimpleNamespace:
     )
 
 
-def test_real_kh_entity_ids_win_over_preinstall_fallback_and_aggregate_variants() -> None:
+def test_real_kh_entity_ids_win_over_preinstall_fallback_and_aggregate_variants() -> (
+    None
+):
     """Live KH power entities should be discovered without aggregate ambiguity."""
     constants, discovery = _load_discovery()
     candidate = discovery.Candidate
