@@ -1,0 +1,33 @@
+name: Alpha9.30 format
+
+on:
+  push:
+    branches:
+      - feature/alpha9.30-live-foxess-solar-commissioning
+    paths:
+      - .github/workflows/alpha930-format.yml
+
+permissions:
+  contents: write
+
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - run: python -m pip install black==26.5.1
+      - name: Apply Black canonical formatting
+        run: python -m black custom_components/kems/commissioning.py tests/test_alpha930_live_foxess_solar_commissioning.py
+      - name: Commit formatting
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add custom_components/kems/commissioning.py tests/test_alpha930_live_foxess_solar_commissioning.py
+          git diff --cached --check
+          git commit -m "style: format Alpha9.30 commissioning changes"
+          git push origin HEAD:feature/alpha9.30-live-foxess-solar-commissioning
