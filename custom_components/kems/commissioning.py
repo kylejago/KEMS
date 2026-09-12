@@ -81,6 +81,55 @@ def _entity_unit(hass: HomeAssistant, entity_id: str | None) -> str | None:
     return str(value) if value is not None else None
 
 
+def _entity_numeric_state(hass: HomeAssistant, entity_id: str | None) -> float | None:
+    """Return one finite numeric source state when available."""
+    if not entity_id:
+        return None
+    state = hass.states.get(entity_id)
+    if state is None or state.state in {"unknown", "unavailable"}:
+        return None
+    try:
+        return float(state.state)
+    except (TypeError, ValueError):
+        return None
+
+
+def _battery_installation_pending(
+    hass: HomeAssistant, mappings: Mapping[str, str]
+) -> bool:
+    """Identify the commissioned-inverter stage before the HV battery is fitted.
+
+    A missing SOC by itself could be a fault, so KEMS only identifies the battery
+    as not yet detected when FoxESS also reports essentially zero battery power and
+    current plus a near-zero/sentinel battery voltage. This state is informational
+    and can never relax control/write safety.
+    """
+    soc = mappings.get(CONF_BATTERY_SOC)
+    power = mappings.get(CONF_BATTERY_POWER)
+    voltage = mappings.get(CONF_BATTERY_VOLTAGE)
+    current = mappings.get(CONF_BATTERY_CURRENT)
+    entities = (soc, power, voltage, current)
+    if any(
+        not entity_id or _entity_platform(hass, entity_id) != FOXESS_PLATFORM
+        for entity_id in entities
+    ):
+        return False
+    if _entity_available(hass, soc):
+        return False
+
+    power_value = _entity_numeric_state(hass, power)
+    voltage_value = _entity_numeric_state(hass, voltage)
+    current_value = _entity_numeric_state(hass, current)
+    return (
+        power_value is not None
+        and abs(power_value) <= 0.05
+        and current_value is not None
+        and abs(current_value) <= 0.1
+        and voltage_value is not None
+        and abs(voltage_value) <= 10.0
+    )
+
+
 def _source_check(
     hass: HomeAssistant,
     mappings: Mapping[str, str],
@@ -159,15 +208,19 @@ def _battery_power_source_check(
 def _foxess_unit_evidence(
     hass: HomeAssistant,
     mappings: Mapping[str, str],
+    *,
+    battery_required: bool = True,
 ):
     """Return the raw-unit contract and deterministic source signature."""
     common_sources = (
-        ("battery_soc", CONF_BATTERY_SOC),
         ("solar_power_kw", CONF_SOLAR_POWER),
         ("house_load_kw", CONF_HOUSE_LOAD),
         ("grid_import_kw", CONF_GRID_IMPORT),
         ("grid_export_kw", CONF_GRID_EXPORT),
     )
+    if battery_required:
+        common_sources = (("battery_soc", CONF_BATTERY_SOC), *common_sources)
+
     source_units: dict[str, str | None] = {}
     signature: list[tuple[str, str | None]] = []
 
@@ -178,29 +231,34 @@ def _foxess_unit_evidence(
         identity = f"{entity_id}|{unit}" if entity_id else None
         signature.append((role, identity))
 
-    direct = mappings.get(CONF_BATTERY_POWER)
-    direct_is_foxess = bool(
-        direct and _entity_platform(hass, direct) == FOXESS_PLATFORM
-    )
-    battery_power_derived = not direct_is_foxess
-    if battery_power_derived:
-        for role, key in (
-            ("battery_voltage", CONF_BATTERY_VOLTAGE),
-            ("battery_current", CONF_BATTERY_CURRENT),
-        ):
-            entity_id = mappings.get(key)
-            unit = _entity_unit(hass, entity_id)
-            source_units[role] = unit
-            identity = f"{entity_id}|{unit}" if entity_id else None
-            signature.append((role, identity))
-    else:
-        unit = _entity_unit(hass, direct)
-        source_units["battery_power_kw"] = unit
-        signature.append(("battery_power_kw", f"{direct}|{unit}" if direct else None))
+    battery_power_derived = False
+    if battery_required:
+        direct = mappings.get(CONF_BATTERY_POWER)
+        direct_is_foxess = bool(
+            direct and _entity_platform(hass, direct) == FOXESS_PLATFORM
+        )
+        battery_power_derived = not direct_is_foxess
+        if battery_power_derived:
+            for role, key in (
+                ("battery_voltage", CONF_BATTERY_VOLTAGE),
+                ("battery_current", CONF_BATTERY_CURRENT),
+            ):
+                entity_id = mappings.get(key)
+                unit = _entity_unit(hass, entity_id)
+                source_units[role] = unit
+                identity = f"{entity_id}|{unit}" if entity_id else None
+                signature.append((role, identity))
+        else:
+            unit = _entity_unit(hass, direct)
+            source_units["battery_power_kw"] = unit
+            signature.append(
+                ("battery_power_kw", f"{direct}|{unit}" if direct else None)
+            )
 
     evidence = assess_foxess_unit_contract(
         source_units,
         battery_power_derived=battery_power_derived,
+        battery_required=battery_required,
     )
     return evidence, tuple(sorted(signature)), battery_power_derived
 
@@ -328,6 +386,8 @@ def build_commissioning_snapshot(hass: HomeAssistant, coordinator) -> dict[str, 
     }
     physical_source_authority = _physical_source_authority(hass, mappings)
     physical_source_duplicates = duplicate_physical_sources(mappings)
+    battery_installation_pending = _battery_installation_pending(hass, mappings)
+    solar_only_commissioning = bool(foxess_registered and battery_installation_pending)
 
     checks: list[dict[str, Any]] = []
     checks.append(
@@ -337,7 +397,7 @@ def build_commissioning_snapshot(hass: HomeAssistant, coordinator) -> dict[str, 
             (
                 PASS
                 if data.quality.score >= 95.0 and not data.quality.stale_fields
-                else FAIL
+                else WAIT if solar_only_commissioning else FAIL
             ),
             (
                 f"{data.quality.score:.0f}% quality; "
@@ -385,10 +445,26 @@ def build_commissioning_snapshot(hass: HomeAssistant, coordinator) -> dict[str, 
         )
     )
 
-    checks.append(
-        _source_check(hass, mappings, CONF_BATTERY_SOC, "Battery SOC mapping")
-    )
-    battery_power_check = _battery_power_source_check(hass, mappings)
+    if battery_installation_pending:
+        checks.append(
+            _check(
+                CONF_BATTERY_SOC,
+                "Battery SOC mapping",
+                WAIT,
+                "Battery installation pending — SOC proof deferred",
+            )
+        )
+        battery_power_check = _check(
+            "battery_power_mapping",
+            "Battery power mapping",
+            WAIT,
+            "Battery installation pending — power/direction proof deferred",
+        )
+    else:
+        checks.append(
+            _source_check(hass, mappings, CONF_BATTERY_SOC, "Battery SOC mapping")
+        )
+        battery_power_check = _battery_power_source_check(hass, mappings)
     checks.append(battery_power_check)
     checks.append(
         _source_check(hass, mappings, CONF_SOLAR_POWER, "Solar power mapping")
@@ -404,11 +480,9 @@ def build_commissioning_snapshot(hass: HomeAssistant, coordinator) -> dict[str, 
     checks.append(source_uniqueness_check)
 
     mapping_checks = {item["key"]: item for item in checks}
-    foxess_physical_mappings_ready = all(
+    site_physical_mappings_ready = all(
         mapping_checks[key]["status"] == PASS
         for key in (
-            CONF_BATTERY_SOC,
-            "battery_power_mapping",
             CONF_SOLAR_POWER,
             CONF_GRID_IMPORT,
             CONF_GRID_EXPORT,
@@ -416,13 +490,23 @@ def build_commissioning_snapshot(hass: HomeAssistant, coordinator) -> dict[str, 
             "physical_source_uniqueness",
         )
     )
+    foxess_physical_mappings_ready = site_physical_mappings_ready and all(
+        mapping_checks[key]["status"] == PASS
+        for key in (CONF_BATTERY_SOC, "battery_power_mapping")
+    )
+    commissioning_physical_mappings_ready = (
+        site_physical_mappings_ready
+        if solar_only_commissioning
+        else foxess_physical_mappings_ready
+    )
 
     unit_evidence, source_signature, battery_power_derived = _foxess_unit_evidence(
         hass,
         mappings,
+        battery_required=not solar_only_commissioning,
     )
     unit_evidence_payload = unit_evidence.to_dict()
-    if not foxess_physical_mappings_ready:
+    if not commissioning_physical_mappings_ready:
         unit_check = _check(
             "foxess_unit_contract",
             "FoxESS raw unit contract",
@@ -451,18 +535,23 @@ def build_commissioning_snapshot(hass: HomeAssistant, coordinator) -> dict[str, 
         )
     checks.append(unit_check)
 
+    commissioning_evidence_sources_ready = (
+        commissioning_physical_mappings_ready and unit_evidence.ready
+    )
     foxess_evidence_sources_ready = (
-        foxess_physical_mappings_ready and unit_evidence.ready
+        foxess_physical_mappings_ready
+        and unit_evidence.ready
+        and not solar_only_commissioning
     )
     records, session_metadata = collect_foxess_session_records(
         coordinator,
         source_signature=source_signature,
         snapshot=data.snapshot,
-        ready=foxess_evidence_sources_ready,
+        ready=commissioning_evidence_sources_ready,
     )
 
     telemetry_evidence_payload: dict[str, Any] | None = None
-    if not foxess_evidence_sources_ready:
+    if not commissioning_evidence_sources_ready:
         telemetry_check = _check(
             "foxess_telemetry_stability",
             "FoxESS telemetry stability",
@@ -473,6 +562,7 @@ def build_commissioning_snapshot(hass: HomeAssistant, coordinator) -> dict[str, 
         telemetry_evidence = assess_foxess_telemetry_stability(
             records,
             expected_interval_seconds=coordinator.settings.scan_interval_seconds,
+            battery_required=not solar_only_commissioning,
         )
         telemetry_evidence_payload = telemetry_evidence.to_dict()
         if telemetry_evidence.ready:
@@ -522,7 +612,14 @@ def build_commissioning_snapshot(hass: HomeAssistant, coordinator) -> dict[str, 
     configured_positive_is_discharge = bool(
         coordinator.settings.simulation.battery_power_positive_is_discharge
     )
-    if not foxess_evidence_sources_ready:
+    if solar_only_commissioning:
+        battery_direction = _check(
+            "battery_power_direction",
+            "Battery power direction",
+            WAIT,
+            "Battery installation pending — battery sign proof deferred",
+        )
+    elif not foxess_evidence_sources_ready:
         battery_direction = _check(
             "battery_power_direction",
             "Battery power direction",
@@ -617,14 +714,14 @@ def build_commissioning_snapshot(hass: HomeAssistant, coordinator) -> dict[str, 
     checks.append(grid_direction_check)
 
     power_balance_evidence_payload: dict[str, Any] | None = None
-    if not foxess_evidence_sources_ready:
+    if not commissioning_evidence_sources_ready:
         power_balance_check = _check(
             "foxess_power_balance",
             "FoxESS whole-site power balance",
             WAIT,
             "Waiting for valid fresh-session FoxESS telemetry sources",
         )
-    elif battery_direction["status"] != PASS:
+    elif not solar_only_commissioning and battery_direction["status"] != PASS:
         power_balance_check = _check(
             "foxess_power_balance",
             "FoxESS whole-site power balance",
@@ -635,6 +732,7 @@ def build_commissioning_snapshot(hass: HomeAssistant, coordinator) -> dict[str, 
         power_balance_evidence = assess_foxess_power_balance(
             records,
             positive_is_discharge=configured_positive_is_discharge,
+            battery_required=not solar_only_commissioning,
         )
         power_balance_evidence_payload = power_balance_evidence.to_dict()
         if power_balance_evidence.ready:
@@ -740,7 +838,7 @@ def build_commissioning_snapshot(hass: HomeAssistant, coordinator) -> dict[str, 
         _check(
             "shadow_planner",
             "Shadow planner",
-            PASS if shadow_safe else FAIL,
+            PASS if shadow_safe else WAIT if solar_only_commissioning else FAIL,
             (
                 f"preflight={data.control.preflight_passed}/"
                 f"{data.control.preflight_total}; "
@@ -833,8 +931,24 @@ def build_commissioning_snapshot(hass: HomeAssistant, coordinator) -> dict[str, 
             "foxess_power_balance",
         }
     }
-    foxess_telemetry_proof_ready = bool(telemetry_proof_checks) and all(
-        status == PASS for status in telemetry_proof_checks.values()
+    foxess_telemetry_proof_ready = (
+        not solar_only_commissioning
+        and bool(telemetry_proof_checks)
+        and all(status == PASS for status in telemetry_proof_checks.values())
+    )
+    site_telemetry_proof_checks = {
+        item["key"]: item["status"]
+        for item in checks
+        if item["key"]
+        in {
+            "foxess_unit_contract",
+            "foxess_telemetry_stability",
+            "grid_direction",
+            "foxess_power_balance",
+        }
+    }
+    foxess_site_telemetry_proof_ready = bool(site_telemetry_proof_checks) and all(
+        status == PASS for status in site_telemetry_proof_checks.values()
     )
 
     return {
@@ -856,13 +970,18 @@ def build_commissioning_snapshot(hass: HomeAssistant, coordinator) -> dict[str, 
             entity_id: list(keys)
             for entity_id, keys in physical_source_duplicates.items()
         },
+        "battery_installation_pending": battery_installation_pending,
+        "solar_only_commissioning": solar_only_commissioning,
+        "foxess_site_mapping_gate_passed": site_physical_mappings_ready,
         "foxess_telemetry_mapping_gate_passed": foxess_physical_mappings_ready,
+        "foxess_site_evidence_sources_ready": commissioning_evidence_sources_ready,
         "foxess_evidence_sources_ready": foxess_evidence_sources_ready,
         "foxess_unit_contract": unit_evidence_payload,
         "foxess_battery_power_derived": battery_power_derived,
         "foxess_commissioning_session": session_metadata,
         "foxess_telemetry_stability": telemetry_evidence_payload,
         "foxess_power_balance": power_balance_evidence_payload,
+        "foxess_site_telemetry_proof_ready": foxess_site_telemetry_proof_ready,
         "foxess_telemetry_proof_ready": foxess_telemetry_proof_ready,
         "configured_battery_power_positive_is_discharge": (
             configured_positive_is_discharge

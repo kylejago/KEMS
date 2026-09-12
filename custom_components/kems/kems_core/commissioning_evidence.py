@@ -12,13 +12,17 @@ from dataclasses import dataclass
 from math import isfinite
 from typing import Any
 
-FOXESS_REQUIRED_TELEMETRY_FIELDS: tuple[str, ...] = (
-    "battery_soc",
-    "battery_power_kw",
+FOXESS_SITE_TELEMETRY_FIELDS: tuple[str, ...] = (
     "solar_power_kw",
     "house_load_kw",
     "grid_import_kw",
     "grid_export_kw",
+)
+
+FOXESS_REQUIRED_TELEMETRY_FIELDS: tuple[str, ...] = (
+    "battery_soc",
+    "battery_power_kw",
+    *FOXESS_SITE_TELEMETRY_FIELDS,
 )
 
 FOXESS_POWER_UNIT_FIELDS: tuple[str, ...] = (
@@ -166,6 +170,7 @@ def assess_foxess_unit_contract(
     source_units: Mapping[str, Any],
     *,
     battery_power_derived: bool = False,
+    battery_required: bool = True,
 ) -> UnitContractEvidence:
     """Verify raw source units before KEMS treats FoxESS telemetry as evidence.
 
@@ -174,21 +179,22 @@ def assess_foxess_unit_contract(
     use volts and amps because KEMS multiplies those values directly.
     """
     expected: dict[str, set[str]] = {
-        "battery_soc": {"%"},
         "solar_power_kw": {"w", "kw"},
         "house_load_kw": {"w", "kw"},
         "grid_import_kw": {"w", "kw"},
         "grid_export_kw": {"w", "kw"},
     }
-    if battery_power_derived:
-        expected.update(
-            {
-                "battery_voltage": {"v"},
-                "battery_current": {"a"},
-            }
-        )
-    else:
-        expected["battery_power_kw"] = {"w", "kw"}
+    if battery_required:
+        expected["battery_soc"] = {"%"}
+        if battery_power_derived:
+            expected.update(
+                {
+                    "battery_voltage": {"v"},
+                    "battery_current": {"a"},
+                }
+            )
+        else:
+            expected["battery_power_kw"] = {"w", "kw"}
 
     observed = {field: _normalised_unit(source_units.get(field)) for field in expected}
     missing = tuple(sorted(field for field, unit in observed.items() if unit is None))
@@ -226,6 +232,7 @@ def assess_foxess_telemetry_stability(
     records: tuple[Any, ...] | list[Any],
     *,
     expected_interval_seconds: float,
+    battery_required: bool = True,
     minimum_samples: int = 12,
     minimum_completeness_percent: float = 95.0,
     recent_sample_limit: int = 60,
@@ -240,6 +247,11 @@ def assess_foxess_telemetry_stability(
     expected_interval = max(float(expected_interval_seconds), 1.0)
     allowed_gap = round(expected_interval * 3.0, 3)
     recent = list(records)[-max(int(recent_sample_limit), minimum_samples, 1) :]
+    required_fields = set(
+        FOXESS_REQUIRED_TELEMETRY_FIELDS
+        if battery_required
+        else FOXESS_SITE_TELEMETRY_FIELDS
+    )
 
     complete_samples = 0
     missing: set[str] = set()
@@ -252,13 +264,9 @@ def assess_foxess_telemetry_stability(
             timestamps.append(timestamp)
 
         sample_missing = {
-            field
-            for field in FOXESS_REQUIRED_TELEMETRY_FIELDS
-            if getattr(record, field, None) is None
+            field for field in required_fields if getattr(record, field, None) is None
         }
-        sample_stale = set(getattr(record, "stale_fields", ()) or ()) & set(
-            FOXESS_REQUIRED_TELEMETRY_FIELDS
-        )
+        sample_stale = set(getattr(record, "stale_fields", ()) or ()) & required_fields
         missing.update(sample_missing)
         stale.update(sample_stale)
         if not sample_missing and not sample_stale:
@@ -328,6 +336,7 @@ def assess_foxess_power_balance(
     records: tuple[Any, ...] | list[Any],
     *,
     positive_is_discharge: bool,
+    battery_required: bool = True,
     minimum_samples: int = 12,
     minimum_balance_percent: float = 90.0,
     recent_sample_limit: int = 60,
@@ -346,14 +355,18 @@ def assess_foxess_power_balance(
     residuals: list[float] = []
     balanced = 0
     invalid = 0
-    required = set(FOXESS_REQUIRED_TELEMETRY_FIELDS)
+    required = set(
+        FOXESS_REQUIRED_TELEMETRY_FIELDS
+        if battery_required
+        else FOXESS_SITE_TELEMETRY_FIELDS
+    )
 
     for record in recent:
         if required & set(getattr(record, "stale_fields", ()) or ()):
             continue
         values: dict[str, float] = {}
         unusable = False
-        for field in FOXESS_REQUIRED_TELEMETRY_FIELDS:
+        for field in required:
             value = getattr(record, field, None)
             if value is None:
                 unusable = True
@@ -370,7 +383,7 @@ def assess_foxess_power_balance(
         if unusable:
             continue
 
-        if not 0.0 <= values["battery_soc"] <= 100.0:
+        if battery_required and not 0.0 <= values["battery_soc"] <= 100.0:
             invalid += 1
             continue
         if any(
@@ -389,10 +402,14 @@ def assess_foxess_power_balance(
         house = max(values["house_load_kw"], 0.0)
         grid_import = max(values["grid_import_kw"], 0.0)
         grid_export = max(values["grid_export_kw"], 0.0)
-        charge, discharge = _battery_routing(
-            values["battery_power_kw"],
-            positive_is_discharge=positive_is_discharge,
-        )
+        if battery_required:
+            charge, discharge = _battery_routing(
+                values["battery_power_kw"],
+                positive_is_discharge=positive_is_discharge,
+            )
+        else:
+            charge = 0.0
+            discharge = 0.0
         sources = solar + grid_import + discharge
         sinks = house + grid_export + charge
         residual = sources - sinks
