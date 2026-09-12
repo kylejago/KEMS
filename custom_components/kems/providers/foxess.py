@@ -107,10 +107,7 @@ class FoxESSProvider(HomeAssistantStateReader):
                 ):
                     continue
                 sibling_age = self._report_age_seconds(sibling_id, reference)
-                if (
-                    sibling_age is not None
-                    and sibling_age <= self._stale_data_seconds
-                ):
+                if sibling_age is not None and sibling_age <= self._stale_data_seconds:
                     sibling_ages.append(sibling_age)
             return min(sibling_ages) if sibling_ages else None
 
