@@ -261,7 +261,7 @@ def test_alpha924_release_scope_remains_reporting_only() -> None:
     )
     source = POLICY_PARITY.read_text(encoding="utf-8")
 
-    assert manifest["version"] == "0.9.0-alpha9.30"
+    assert manifest["version"] == "0.9.0-alpha9.31"
     reason = bundle["maintenance"]["reason"].lower()
     assert "alpha9.24" in reason
     assert "flow parity" in reason
