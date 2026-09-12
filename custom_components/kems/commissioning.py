@@ -617,7 +617,7 @@ def build_commissioning_snapshot(hass: HomeAssistant, coordinator) -> dict[str, 
             "battery_power_direction",
             "Battery power direction",
             WAIT,
-            "Battery installation pending — sign proof deferred until the pack is fitted",
+            "Battery installation pending — battery sign proof deferred",
         )
     elif not foxess_evidence_sources_ready:
         battery_direction = _check(
