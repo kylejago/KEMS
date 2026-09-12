@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers import entity_registry as er
 from homeassistant.util import dt as dt_util
 
 from ..kems_core import calculate_battery_power_kw, normalise_grid_power
@@ -50,6 +51,23 @@ class FoxESSProvider(HomeAssistantStateReader):
         reference = now or dt_util.now()
         ages: dict[str, float] = {}
         stale: set[str] = set()
+        registry = er.async_get(self._hass)
+        cohort_entity_ids = tuple(
+            dict.fromkeys(
+                entity_id
+                for entity_id in (
+                    self._entities.house_load_kw,
+                    self._entities.battery_soc,
+                    self._entities.battery_power_kw,
+                    self._entities.battery_voltage,
+                    self._entities.battery_current,
+                    self._entities.solar_power_kw,
+                    self._entities.grid_import_kw,
+                    self._entities.grid_export_kw,
+                )
+                if entity_id
+            )
+        )
 
         def age_for(logical_name: str, entity_id: str | None) -> float | None:
             age = self._report_age_seconds(entity_id, reference)
@@ -57,17 +75,64 @@ class FoxESSProvider(HomeAssistantStateReader):
                 ages[logical_name] = round(age, 1)
             return age
 
-        def fresh_power(logical_name: str, entity_id: str | None) -> float | None:
+        def same_device_cohort_age(entity_id: str | None) -> float | None:
+            """Return a fresh sibling age proving this FoxESS device is still live.
+
+            FoxESS Modbus only writes a Home Assistant sensor state when its value
+            changes. Therefore an unchanged sensor can have an old ``last_reported``
+            timestamp even while the inverter is being polled successfully. A stale
+            looking value is accepted only when another numeric entity from the same
+            ``foxess_modbus`` device has reported within the normal freshness window.
+            """
+            if not entity_id:
+                return None
+            target = registry.async_get(entity_id)
+            if (
+                target is None
+                or target.platform != "foxess_modbus"
+                or target.device_id is None
+            ):
+                return None
+
+            sibling_ages: list[float] = []
+            for sibling_id in cohort_entity_ids:
+                if sibling_id == entity_id:
+                    continue
+                sibling = registry.async_get(sibling_id)
+                if (
+                    sibling is None
+                    or sibling.platform != "foxess_modbus"
+                    or sibling.device_id != target.device_id
+                    or self._float(sibling_id) is None
+                ):
+                    continue
+                sibling_age = self._report_age_seconds(sibling_id, reference)
+                if (
+                    sibling_age is not None
+                    and sibling_age <= self._stale_data_seconds
+                ):
+                    sibling_ages.append(sibling_age)
+            return min(sibling_ages) if sibling_ages else None
+
+        def source_is_usable(
+            logical_name: str,
+            entity_id: str | None,
+        ) -> bool:
             age = age_for(logical_name, entity_id)
-            if age is not None and age > self._stale_data_seconds:
-                stale.add(logical_name)
+            if age is None or age <= self._stale_data_seconds:
+                return True
+            if same_device_cohort_age(entity_id) is not None:
+                return True
+            stale.add(logical_name)
+            return False
+
+        def fresh_power(logical_name: str, entity_id: str | None) -> float | None:
+            if not source_is_usable(logical_name, entity_id):
                 return None
             return self._power_kw(entity_id)
 
         def fresh_float(logical_name: str, entity_id: str | None) -> float | None:
-            age = age_for(logical_name, entity_id)
-            if age is not None and age > self._stale_data_seconds:
-                stale.add(logical_name)
+            if not source_is_usable(logical_name, entity_id):
                 return None
             return self._float(entity_id)
 
@@ -93,9 +158,16 @@ class FoxESSProvider(HomeAssistantStateReader):
             component_ages = [
                 age for age in (voltage_age, current_age) if age is not None
             ]
-            if component_ages and all(
-                age <= self._stale_data_seconds for age in component_ages
-            ):
+            components_usable = all(
+                age <= self._stale_data_seconds
+                or same_device_cohort_age(entity_id) is not None
+                for age, entity_id in (
+                    (voltage_age, self._entities.battery_voltage),
+                    (current_age, self._entities.battery_current),
+                )
+                if age is not None
+            )
+            if component_ages and components_usable:
                 derived = calculate_battery_power_kw(
                     self._float(self._entities.battery_voltage),
                     self._float(self._entities.battery_current),
