@@ -19,6 +19,8 @@ def _load_foxess_provider(monkeypatch):
     homeassistant = ModuleType("homeassistant")
     core = ModuleType("homeassistant.core")
     const = ModuleType("homeassistant.const")
+    helpers = ModuleType("homeassistant.helpers")
+    entity_registry = ModuleType("homeassistant.helpers.entity_registry")
     util = ModuleType("homeassistant.util")
     dt = ModuleType("homeassistant.util.dt")
 
@@ -35,6 +37,13 @@ def _load_foxess_provider(monkeypatch):
             self.last_updated = last_reported
             self.last_reported = last_reported
 
+    empty_registry = SimpleNamespace(async_get=lambda entity_id: None)
+    entity_registry.async_get = lambda hass: getattr(
+        hass,
+        "entity_registry",
+        empty_registry,
+    )
+    helpers.entity_registry = entity_registry
     core.HomeAssistant = object
     core.State = State
     const.ATTR_UNIT_OF_MEASUREMENT = "unit_of_measurement"
@@ -48,6 +57,8 @@ def _load_foxess_provider(monkeypatch):
         "homeassistant": homeassistant,
         "homeassistant.core": core,
         "homeassistant.const": const,
+        "homeassistant.helpers": helpers,
+        "homeassistant.helpers.entity_registry": entity_registry,
         "homeassistant.util": util,
         "homeassistant.util.dt": dt,
     }.items():
@@ -86,21 +97,41 @@ def _load_foxess_provider(monkeypatch):
     return loaded["providers.foxess"], State
 
 
+def _foxess_entities(**overrides):
+    """Return a complete FoxESS mapping with optional source overrides."""
+    values = {
+        "house_load_kw": None,
+        "battery_soc": None,
+        "battery_power_kw": None,
+        "battery_voltage": None,
+        "battery_current": None,
+        "solar_power_kw": None,
+        "grid_import_kw": None,
+        "grid_export_kw": None,
+    }
+    values.update(overrides)
+    return SimpleNamespace(**values)
+
+
+def _foxess_registry(entries):
+    """Return a minimal entity registry backed by the supplied entries."""
+    return SimpleNamespace(async_get=entries.get)
+
+
+def _foxess_entry(device_id: str, platform: str = "foxess_modbus"):
+    """Return a minimal registry entry."""
+    return SimpleNamespace(platform=platform, device_id=device_id)
+
+
 def test_foxess_provider_rejects_a_stale_live_meter(monkeypatch) -> None:
     """A still-valid numeric state is unusable after its report timeout."""
     foxess, State = _load_foxess_provider(monkeypatch)
     stale_time = NOW - timedelta(minutes=10)
     meter = State("3222", last_reported=stale_time)
     hass = SimpleNamespace(states=SimpleNamespace(get=lambda entity_id: meter))
-    entities = SimpleNamespace(
+    entities = _foxess_entities(
         house_load_kw="sensor.live_meter",
-        battery_soc=None,
-        battery_power_kw=None,
-        battery_voltage=None,
-        battery_current=None,
-        solar_power_kw=None,
         grid_import_kw="sensor.live_meter",
-        grid_export_kw=None,
     )
 
     state = foxess.FoxESSProvider(
@@ -119,19 +150,13 @@ def test_foxess_provider_rejects_a_stale_live_meter(monkeypatch) -> None:
 
 
 def test_foxess_provider_accepts_recent_same_value_report(monkeypatch) -> None:
-    """last_reported prevents an unchanged numeric value being falsely stale."""
+    """A directly recent numeric value remains fresh without cohort evidence."""
     foxess, State = _load_foxess_provider(monkeypatch)
     meter = State("3222", last_reported=NOW - timedelta(seconds=45))
     hass = SimpleNamespace(states=SimpleNamespace(get=lambda entity_id: meter))
-    entities = SimpleNamespace(
+    entities = _foxess_entities(
         house_load_kw="sensor.live_meter",
-        battery_soc=None,
-        battery_power_kw=None,
-        battery_voltage=None,
-        battery_current=None,
-        solar_power_kw=None,
         grid_import_kw="sensor.live_meter",
-        grid_export_kw=None,
     )
 
     state = foxess.FoxESSProvider(
@@ -144,6 +169,149 @@ def test_foxess_provider_accepts_recent_same_value_report(monkeypatch) -> None:
     assert state.grid_import_kw == 3.222
     assert state.stale_fields == ()
     assert state.source_data_age_seconds == 45.0
+
+
+def test_foxess_provider_accepts_static_zero_from_live_same_device(monkeypatch) -> None:
+    """A static zero remains usable while a same-device FoxESS sibling is live."""
+    foxess, State = _load_foxess_provider(monkeypatch)
+    states = {
+        "sensor.grid_import": State(
+            "0",
+            unit="kW",
+            last_reported=NOW - timedelta(minutes=10),
+        ),
+        "sensor.house_load": State(
+            "1.25",
+            unit="kW",
+            last_reported=NOW - timedelta(seconds=30),
+        ),
+    }
+    hass = SimpleNamespace(
+        states=SimpleNamespace(get=states.get),
+        entity_registry=_foxess_registry(
+            {
+                "sensor.grid_import": _foxess_entry("kh7"),
+                "sensor.house_load": _foxess_entry("kh7"),
+            }
+        ),
+    )
+    entities = _foxess_entities(
+        house_load_kw="sensor.house_load",
+        grid_import_kw="sensor.grid_import",
+    )
+
+    state = foxess.FoxESSProvider(hass, entities, stale_data_seconds=180).get_state(NOW)
+
+    assert state.house_load_kw == 1.25
+    assert state.grid_import_kw == 0.0
+    assert state.raw_grid_import_kw == 0.0
+    assert state.source_age_seconds["grid_import_kw"] == 600.0
+    assert state.stale_fields == ()
+    assert state.source_data_age_seconds == 600.0
+
+
+def test_foxess_provider_accepts_static_nonzero_from_live_same_device(
+    monkeypatch,
+) -> None:
+    """Cohort freshness is independent of the stale-looking sensor's value."""
+    foxess, State = _load_foxess_provider(monkeypatch)
+    states = {
+        "sensor.solar": State(
+            "2.5",
+            unit="kW",
+            last_reported=NOW - timedelta(minutes=10),
+        ),
+        "sensor.house_load": State(
+            "0.8",
+            unit="kW",
+            last_reported=NOW - timedelta(seconds=20),
+        ),
+    }
+    hass = SimpleNamespace(
+        states=SimpleNamespace(get=states.get),
+        entity_registry=_foxess_registry(
+            {
+                "sensor.solar": _foxess_entry("kh7"),
+                "sensor.house_load": _foxess_entry("kh7"),
+            }
+        ),
+    )
+    entities = _foxess_entities(
+        house_load_kw="sensor.house_load",
+        solar_power_kw="sensor.solar",
+    )
+
+    state = foxess.FoxESSProvider(hass, entities, stale_data_seconds=180).get_state(NOW)
+
+    assert state.solar_power_kw == 2.5
+    assert state.stale_fields == ()
+
+
+def test_foxess_provider_does_not_cross_device_rescue_stale_source(monkeypatch) -> None:
+    """Fresh telemetry from another FoxESS device cannot rescue a stale KH7 field."""
+    foxess, State = _load_foxess_provider(monkeypatch)
+    states = {
+        "sensor.grid_import": State(
+            "0",
+            unit="kW",
+            last_reported=NOW - timedelta(minutes=10),
+        ),
+        "sensor.house_load": State(
+            "1.25",
+            unit="kW",
+            last_reported=NOW - timedelta(seconds=30),
+        ),
+    }
+    hass = SimpleNamespace(
+        states=SimpleNamespace(get=states.get),
+        entity_registry=_foxess_registry(
+            {
+                "sensor.grid_import": _foxess_entry("kh7"),
+                "sensor.house_load": _foxess_entry("other-inverter"),
+            }
+        ),
+    )
+    entities = _foxess_entities(
+        house_load_kw="sensor.house_load",
+        grid_import_kw="sensor.grid_import",
+    )
+
+    state = foxess.FoxESSProvider(hass, entities, stale_data_seconds=180).get_state(NOW)
+
+    assert state.house_load_kw == 1.25
+    assert state.grid_import_kw is None
+    assert state.stale_fields == ("grid_import_kw",)
+
+
+def test_foxess_provider_fails_closed_when_same_device_cohort_is_stale(
+    monkeypatch,
+) -> None:
+    """A fully stale same-device cohort remains rejected."""
+    foxess, State = _load_foxess_provider(monkeypatch)
+    stale_time = NOW - timedelta(minutes=10)
+    states = {
+        "sensor.grid_import": State("0", unit="kW", last_reported=stale_time),
+        "sensor.house_load": State("1.25", unit="kW", last_reported=stale_time),
+    }
+    hass = SimpleNamespace(
+        states=SimpleNamespace(get=states.get),
+        entity_registry=_foxess_registry(
+            {
+                "sensor.grid_import": _foxess_entry("kh7"),
+                "sensor.house_load": _foxess_entry("kh7"),
+            }
+        ),
+    )
+    entities = _foxess_entities(
+        house_load_kw="sensor.house_load",
+        grid_import_kw="sensor.grid_import",
+    )
+
+    state = foxess.FoxESSProvider(hass, entities, stale_data_seconds=180).get_state(NOW)
+
+    assert state.house_load_kw is None
+    assert state.grid_import_kw is None
+    assert state.stale_fields == ("grid_import_kw", "house_load_kw")
 
 
 def _load_octopus_provider(monkeypatch):
