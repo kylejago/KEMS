@@ -34,7 +34,7 @@ def test_alpha927_is_reporting_only_and_keeps_panel_profile_release() -> None:
     maintenance = bundle["maintenance"]
     reason = maintenance["reason"]
 
-    assert manifest["version"] == "0.9.0-alpha9.30"
+    assert manifest["version"] == "0.9.0-alpha9.31"
     assert "reporting-only" in reason.lower()
     assert "policy" in reason.lower()
     assert "15%" in reason
@@ -43,4 +43,4 @@ def test_alpha927_is_reporting_only_and_keeps_panel_profile_release() -> None:
     assert "0.9.0-alpha9-panel.3" in reason
     assert "0.9.0-alpha9-web.0" in reason
     assert "0.9.0-alpha9-public.0" in reason
-    assert "hardware writes hard-blocked" in reason
+    assert "hardware writes remain hard-blocked" in reason
