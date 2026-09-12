@@ -257,6 +257,6 @@ def test_alpha872_contract_survives_successor_releases() -> None:
     assert str(bundle["components"]["public_web"]["version"]).startswith(
         ("0.8.0-alpha8-web.", "0.9.0-alpha9-public.")
     )
-    assert bundle["components"]["panel"]["version"] == "0.9.0-alpha9-panel.2"
+    assert bundle["components"]["panel"]["version"] == "0.9.0-alpha9-panel.3"
     assert "hardware_writes" in anchor
     assert "services.async_call" not in anchor

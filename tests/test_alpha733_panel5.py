@@ -19,10 +19,10 @@ def test_alpha733_versions_and_bundle_remain_aligned_in_alpha8() -> None:
     dashboard = (KEMS / "dashboard.py").read_text(encoding="utf-8")
 
     assert str(manifest["version"]).startswith(("0.8.0-alpha8.", "0.9.0-alpha9."))
-    assert bundle["components"]["panel"]["version"] == "0.9.0-alpha9-panel.2"
+    assert bundle["components"]["panel"]["version"] == "0.9.0-alpha9-panel.3"
     # Panel.1 is now the packaged source of truth; no runtime version transform remains.
-    assert 'PANEL_CONFIG_VERSION = "0.9.0-alpha9-panel.2"' in panel
-    assert 'panel_config_version: "0.9.0-alpha9-panel.2"' in yaml
+    assert 'PANEL_CONFIG_VERSION = "0.9.0-alpha9-panel.3"' in panel
+    assert 'panel_config_version: "0.9.0-alpha9-panel.3"' in yaml
     assert not (KEMS / "panel_ev_policy.py").exists()
     assert "PANEL6_VERSION_LINE" not in dashboard
     assert "PANEL7_VERSION_LINE" not in dashboard

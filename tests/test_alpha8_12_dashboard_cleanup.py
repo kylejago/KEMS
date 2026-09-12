@@ -61,7 +61,7 @@ def test_alpha8_12_release_contract_survives_later_coordinated_alpha8() -> None:
     assert (
         str(version).startswith("0.9.0-alpha9") or int(version.rsplit(".", 1)[1]) >= 12
     )
-    assert bundle["components"]["panel"]["version"] == "0.9.0-alpha9-panel.2"
+    assert bundle["components"]["panel"]["version"] == "0.9.0-alpha9-panel.3"
 
     web_versions = {
         str(bundle["components"][key]["version"])

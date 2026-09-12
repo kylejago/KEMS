@@ -172,7 +172,7 @@ def test_alpha874_version_and_release_scope() -> None:
     assert version.startswith(("0.8.0-alpha8.", "0.9.0-alpha9."))
     release_number = int(version.rsplit(".", 1)[1])
     assert str(version).startswith("0.9.0-alpha9") or release_number >= 74
-    assert bundle["components"]["panel"]["version"] == "0.9.0-alpha9-panel.2"
+    assert bundle["components"]["panel"]["version"] == "0.9.0-alpha9-panel.3"
     assert str(bundle["components"]["property_web"]["version"]).startswith(
         ("0.8.0-alpha8-web.", "0.9.0-alpha9-web.")
     )

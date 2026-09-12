@@ -99,7 +99,7 @@ def test_alpha877_release_contract_is_successor_safe() -> None:
     assert str(bundle["components"]["public_web"]["version"]).startswith(
         ("0.8.0-alpha8-web.", "0.9.0-alpha9-public.")
     )
-    assert bundle["components"]["panel"]["version"] == "0.9.0-alpha9-panel.2"
+    assert bundle["components"]["panel"]["version"] == "0.9.0-alpha9-panel.3"
     reason = bundle["maintenance"]["reason"].lower()
     assert "15%" in reason and "10%" in reason and "12%" in reason
     assert "hardware writes" in reason and "blocked" in reason
