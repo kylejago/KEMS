@@ -50,6 +50,7 @@ class FoxESSProvider(HomeAssistantStateReader):
         """Return the current FoxESS observation, rejecting stale live data."""
         reference = now or dt_util.now()
         ages: dict[str, float] = {}
+        effective_ages: dict[str, float] = {}
         stale: set[str] = set()
         registry = er.async_get(self._hass)
         cohort_entity_ids = tuple(
@@ -111,15 +112,26 @@ class FoxESSProvider(HomeAssistantStateReader):
                     sibling_ages.append(sibling_age)
             return min(sibling_ages) if sibling_ages else None
 
+        def effective_age(
+            entity_id: str | None,
+            raw_age: float | None,
+        ) -> float | None:
+            if raw_age is None or raw_age <= self._stale_data_seconds:
+                return raw_age
+            return same_device_cohort_age(entity_id)
+
         def source_is_usable(
             logical_name: str,
             entity_id: str | None,
         ) -> bool:
             age = age_for(logical_name, entity_id)
-            if age is None or age <= self._stale_data_seconds:
+            if age is None:
                 return True
-            if same_device_cohort_age(entity_id) is not None:
+            usable_age = effective_age(entity_id, age)
+            if usable_age is not None:
+                effective_ages[logical_name] = round(usable_age, 1)
                 return True
+            effective_ages[logical_name] = round(age, 1)
             stale.add(logical_name)
             return False
 
@@ -155,16 +167,18 @@ class FoxESSProvider(HomeAssistantStateReader):
             component_ages = [
                 age for age in (voltage_age, current_age) if age is not None
             ]
-            components_usable = all(
-                age <= self._stale_data_seconds
-                or same_device_cohort_age(entity_id) is not None
+            component_effective_ages = [
+                effective_age(entity_id, age)
                 for age, entity_id in (
                     (voltage_age, self._entities.battery_voltage),
                     (current_age, self._entities.battery_current),
                 )
                 if age is not None
+            ]
+            components_usable = component_ages and all(
+                age is not None for age in component_effective_ages
             )
-            if component_ages and components_usable:
+            if components_usable:
                 derived = calculate_battery_power_kw(
                     self._float(self._entities.battery_voltage),
                     self._float(self._entities.battery_current),
@@ -172,13 +186,22 @@ class FoxESSProvider(HomeAssistantStateReader):
                 if derived is not None:
                     battery_power = derived
                     ages["battery_power_kw"] = round(max(component_ages), 1)
+                    effective_ages["battery_power_kw"] = round(
+                        max(
+                            age
+                            for age in component_effective_ages
+                            if age is not None
+                        ),
+                        1,
+                    )
                     stale.discard("battery_power_kw")
             elif component_ages and battery_power is None:
                 ages["battery_power_kw"] = round(max(component_ages), 1)
+                effective_ages["battery_power_kw"] = round(max(component_ages), 1)
                 stale.add("battery_power_kw")
 
         grid = normalise_grid_power(raw_grid_import, raw_grid_export)
-        max_age = max(ages.values()) if ages else None
+        max_age = max(effective_ages.values()) if effective_ages else None
         return FoxESSState(
             house_load_kw=house_load,
             battery_soc=battery_soc,
