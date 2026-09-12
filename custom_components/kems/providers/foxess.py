@@ -187,11 +187,7 @@ class FoxESSProvider(HomeAssistantStateReader):
                     battery_power = derived
                     ages["battery_power_kw"] = round(max(component_ages), 1)
                     effective_ages["battery_power_kw"] = round(
-                        max(
-                            age
-                            for age in component_effective_ages
-                            if age is not None
-                        ),
+                        max(age for age in component_effective_ages if age is not None),
                         1,
                     )
                     stale.discard("battery_power_kw")
