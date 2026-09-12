@@ -1,0 +1,34 @@
+name: Alpha9.30 guarded migration
+
+on:
+  push:
+    branches:
+      - feature/alpha9.30-live-foxess-solar-commissioning
+    paths:
+      - tools/alpha930_apply.py
+      - .github/workflows/alpha930-apply.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Apply guarded migration
+        run: python tools/alpha930_apply.py
+      - name: Commit production changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add custom_components/kems/entity_discovery.py
+          git add custom_components/kems/kems_core/commissioning_evidence.py
+          git add custom_components/kems/commissioning.py
+          git add custom_components/kems/manifest.json
+          git add release/kems-bundle.template.json
+          git diff --cached --check
+          git commit -m "Alpha9.30: commission live FoxESS solar telemetry"
+          git push origin HEAD:feature/alpha9.30-live-foxess-solar-commissioning
