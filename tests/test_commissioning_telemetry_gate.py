@@ -14,13 +14,15 @@ def test_commissioning_requires_stable_foxess_telemetry_for_shadow_readiness() -
         "assess_foxess_telemetry_stability",
         '"foxess_telemetry_stability"',
         '"foxess_telemetry_mapping_gate_passed"',
+        '"foxess_site_mapping_gate_passed"',
+        "commissioning_physical_mappings_ready",
         "coordinator.settings.scan_interval_seconds",
         '"battery_power_mapping"',
         '"FoxESS telemetry stability"',
     ):
         assert token in content
 
-    assert content.index("foxess_physical_mappings_ready = all(") < content.index(
+    assert content.index("commissioning_physical_mappings_ready = (") < content.index(
         "assess_foxess_telemetry_stability("
     )
     assert content.index("checks.append(telemetry_check)") < content.index(
