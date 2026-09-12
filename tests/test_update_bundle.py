@@ -46,7 +46,7 @@ def test_release_bundle_renders_exact_coordinated_alpha9_targets() -> None:
     assert "0.9.0-alpha9-web.0" in reason
     assert "0.9.0-alpha9-public.0" in reason
     assert "0.9.0-alpha9-panel.3" in reason
-    assert "hardware writes hard-blocked" in reason
+    assert "hardware writes remain hard-blocked" in reason
 
 
 def test_bundle_contract_rejects_mismatched_appliance_versions() -> None:
