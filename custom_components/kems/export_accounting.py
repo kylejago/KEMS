@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import replace
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from typing import Any
 from zoneinfo import ZoneInfo
 
@@ -29,7 +29,9 @@ def _number(value: Any) -> float | None:
     return number
 
 
-def _agile_slots(state: dict[str, Any]) -> tuple[tuple[datetime, datetime, float], ...]:
+def _agile_slots(
+    state: dict[str, Any],
+) -> tuple[tuple[datetime, datetime, float], ...]:
     """Return published current-day Agile slots from manager state."""
     raw = state.get("today_slots")
     if not isinstance(raw, list):
@@ -112,7 +114,11 @@ def actual_export_income_pence(
     if len(day_records) < 2:
         return 0.0
 
-    slots = _agile_slots(agile_state) if tariff_type == EXPORT_TARIFF_TYPE_AGILE else ()
+    slots = (
+        _agile_slots(agile_state)
+        if tariff_type == EXPORT_TARIFF_TYPE_AGILE
+        else ()
+    )
     total = 0.0
     for current, following in zip(day_records, day_records[1:], strict=False):
         hours = min(
@@ -185,16 +191,30 @@ def _scrub_day(values: dict[str, float]) -> float:
 
 
 async def async_repair_no_paid_export_income(recorder: Any) -> bool:
-    """Remove impossible paid-export income from the retained live ledger.
+    """Remove false income from the latest two retained live days only.
 
-    This intentionally leaves measured grid-export kWh and every simulated/
-    what-if value untouched. The migration is idempotent and only runs while
-    the user has explicitly selected ``No paid export``.
+    This intentionally leaves measured grid-export kWh, older historical days,
+    and every simulated/what-if value untouched. It is idempotent and is only
+    called while the user has explicitly selected ``No paid export``.
     """
     daily = getattr(recorder, "_daily_records", None)
     tracking = getattr(recorder, "_tracking_values", None)
+    tracking_date = getattr(recorder, "_tracking_date", None)
     if not isinstance(daily, dict) or not isinstance(tracking, dict):
         return False
+
+    reference = tracking_date if isinstance(tracking_date, date) else None
+    if reference is None:
+        parsed_days: list[date] = []
+        for day_text in daily:
+            try:
+                parsed_days.append(date.fromisoformat(str(day_text)))
+            except ValueError:
+                continue
+        reference = max(parsed_days) if parsed_days else None
+    if reference is None:
+        return False
+    targets = {reference, reference - timedelta(days=1)}
 
     changed = False
     removed_commissioned = 0.0
@@ -204,27 +224,25 @@ async def async_repair_no_paid_export_income(recorder: Any) -> bool:
     for day_text, values in daily.items():
         if not isinstance(values, dict):
             continue
+        try:
+            day = date.fromisoformat(str(day_text))
+        except ValueError:
+            continue
+        if day not in targets:
+            continue
         removed = _scrub_day(values)
         if not removed:
             continue
         changed = True
-        if isinstance(commissioning, date):
-            try:
-                if date.fromisoformat(str(day_text)) >= commissioning:
-                    removed_commissioned += removed
-            except ValueError:
-                pass
-
-    tracking_date = getattr(recorder, "_tracking_date", None)
-    removed = _scrub_day(tracking)
-    if removed:
-        changed = True
-        if (
-            isinstance(commissioning, date)
-            and isinstance(tracking_date, date)
-            and tracking_date >= commissioning
-        ):
+        if isinstance(commissioning, date) and day >= commissioning:
             removed_commissioned += removed
+
+    if isinstance(tracking_date, date) and tracking_date in targets:
+        removed = _scrub_day(tracking)
+        if removed:
+            changed = True
+            if isinstance(commissioning, date) and tracking_date >= commissioning:
+                removed_commissioned += removed
 
     if not changed:
         return False
