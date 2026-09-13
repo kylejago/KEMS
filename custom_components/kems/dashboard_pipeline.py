@@ -368,10 +368,19 @@ def _finalise_dashboard_bytes(payload: bytes) -> bytes:
 
 
 def _fresh_dashboard_bytes() -> bytes:
-    """Return the authoritative customer dashboard after deterministic finalisation."""
+    """Return the authoritative customer dashboard with the live ROI view."""
     from . import dashboard
 
-    return _finalise_dashboard_bytes(dashboard.PACKAGED_DASHBOARD_PATH.read_bytes())
+    master = dashboard.PACKAGED_DASHBOARD_PATH.read_text(encoding="utf-8").rstrip()
+    roi_path = dashboard.PACKAGED_DASHBOARD_PATH.with_name(
+        "kems_roi_lifetime_dashboard.yaml"
+    )
+    roi = roi_path.read_text(encoding="utf-8")
+    marker = "\nviews:\n"
+    if marker not in roi:
+        raise ValueError("Packaged KEMS ROI dashboard has no views section")
+    roi_views = roi.split(marker, 1)[1].lstrip("\n")
+    return _finalise_dashboard_bytes(f"{master}\n\n{roi_views}".encode("utf-8"))
 
 
 def install_dashboard_pipeline() -> None:
@@ -379,8 +388,8 @@ def install_dashboard_pipeline() -> None:
     from . import dashboard
     from . import update_orchestrator_convergent as convergent
 
-    # The packaged Alpha8 dashboard stays the source of truth. The deterministic
-    # finaliser exposes canonical flow presentation on the native full-width Agile
-    # Plan view; normal sync and exact updater verification consume identical bytes.
+    # The packaged customer dashboard remains the base source of truth. The
+    # deterministic finaliser adds the native Agile Plan and live ROI views; normal
+    # sync and exact updater verification consume identical final bytes.
     dashboard._combined_master_dashboard_bytes = _fresh_dashboard_bytes
     convergent._managed_dashboard_bytes = _fresh_dashboard_bytes
