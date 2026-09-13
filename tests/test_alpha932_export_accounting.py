@@ -2,9 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
 from datetime import UTC, date, datetime, timedelta
-
-import pytest
 
 from custom_components.kems.export_accounting import (
     actual_export_income_pence,
@@ -214,11 +213,10 @@ class _FakeRecorder:
         self.saved = True
 
 
-@pytest.mark.asyncio
-async def test_no_paid_export_repair_zeroes_latest_two_days_only() -> None:
+def test_no_paid_export_repair_zeroes_latest_two_days_only() -> None:
     recorder = _FakeRecorder()
 
-    changed = await async_repair_no_paid_export_income(recorder)
+    changed = asyncio.run(async_repair_no_paid_export_income(recorder))
 
     assert changed is True
     assert recorder._daily_records["2026-09-11"]["export_income_pence"] == 12.0
@@ -233,5 +231,5 @@ async def test_no_paid_export_repair_zeroes_latest_two_days_only() -> None:
 
     # Migration is idempotent on subsequent startup/reload.
     recorder.saved = False
-    assert await async_repair_no_paid_export_income(recorder) is False
+    assert asyncio.run(async_repair_no_paid_export_income(recorder)) is False
     assert recorder.saved is False
