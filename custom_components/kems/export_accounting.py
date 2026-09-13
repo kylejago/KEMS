@@ -77,8 +77,7 @@ def current_export_rate_pence(
     if tariff_type == EXPORT_TARIFF_TYPE_FIXED:
         return max(float(fixed_rate_pence), 0.0)
     if tariff_type == EXPORT_TARIFF_TYPE_AGILE:
-        rate = _number(agile_state.get("current_rate_pence"))
-        return max(rate, 0.0) if rate is not None else None
+        return _number(agile_state.get("current_rate_pence"))
     return None
 
 
@@ -96,6 +95,7 @@ def actual_export_income_pence(
     price. Agile Outgoing uses the published half-hour price covering every
     measured export interval and fails closed when a positive-export interval
     cannot be priced instead of silently falling back to the legacy 12p value.
+    Signed Agile prices are preserved, including zero/negative export slots.
     """
     if tariff_type == EXPORT_TARIFF_TYPE_NONE:
         return 0.0
@@ -132,7 +132,6 @@ def actual_export_income_pence(
             rate = _agile_rate_at(slots, current.timestamp)
             if rate is None:
                 return None
-            rate = max(rate, 0.0)
         else:
             return None
         total += exported_kwh * rate
@@ -146,7 +145,7 @@ def revalue_actual_export_income(
     """Return live actual financial fields reconciled to authoritative income."""
     if export_income_pence is None:
         return simulation
-    income = round(max(float(export_income_pence), 0.0), 2)
+    income = round(float(export_income_pence), 2)
     import_cost = simulation.actual_import_cost_pence
     actual_cost = (
         round(float(import_cost) - income, 2)
