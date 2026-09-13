@@ -14,7 +14,7 @@ import yaml
 ROOT = Path(__file__).parents[1]
 ROI_ACCOUNTING = ROOT / "custom_components" / "kems" / "roi_accounting.py"
 ROI_DASHBOARD = ROOT / "custom_components" / "kems" / "kems_roi_lifetime_dashboard.yaml"
-PIPELINE = ROOT / "custom_components" / "kems" / "dashboard_pipeline.py"
+ROI_EXTENSION = ROOT / "custom_components" / "kems" / "roi_dashboard.py"
 COORDINATOR = ROOT / "custom_components" / "kems" / "coordinator.py"
 
 
@@ -160,12 +160,12 @@ def test_roi_view_is_builtin_and_actual_value_focused() -> None:
     assert "Simulated battery/export gains are kept out of actual payback" in content
 
 
-def test_final_managed_pipeline_appends_roi_view() -> None:
-    """The authoritative runtime dashboard must append the packaged ROI tab."""
-    pipeline = PIPELINE.read_text(encoding="utf-8")
-    assert '"kems_roi_lifetime_dashboard.yaml"' in pipeline
-    assert 'marker = "\\nviews:\\n"' in pipeline
-    assert 'f"{master}\\n\\n{roi_views}"' in pipeline
+def test_roi_extension_wraps_final_managed_pipeline() -> None:
+    """The runtime extension must append ROI without replacing the base pipeline."""
+    extension = ROI_EXTENSION.read_text(encoding="utf-8")
+    assert "base_fresh_dashboard_bytes = dashboard_pipeline._fresh_dashboard_bytes" in extension
+    assert '"kems_roi_lifetime_dashboard.yaml"' in extension
+    assert "dashboard_pipeline._fresh_dashboard_bytes = _fresh_dashboard_bytes_with_roi" in extension
 
 
 def test_unpaid_export_cleanup_precedes_financial_roi_reconciliation() -> None:
