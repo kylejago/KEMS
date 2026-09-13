@@ -91,6 +91,7 @@ CONF_INTELLIGENT_SLOTS_ENABLED = "intelligent_slots_enabled"
 
 CONF_SCAN_INTERVAL = "scan_interval_seconds"
 CONF_HISTORY_DAYS = "history_days"
+CONF_BATTERY_INSTALLED = "battery_installed"
 CONF_BATTERY_CAPACITY = "battery_capacity_kwh"
 CONF_BATTERY_RESERVE = "battery_reserve_percent"
 CONF_BATTERY_INITIAL = "battery_initial_percent"
@@ -163,6 +164,9 @@ DEFAULT_OPTIONS = {
     CONF_HAPPY_HOUR_OHME_CONTROL_ENABLED: False,
     CONF_SCAN_INTERVAL: DEFAULT_SCAN_INTERVAL_SECONDS,
     CONF_HISTORY_DAYS: DEFAULT_HISTORY_DAYS,
+    # Physical battery installation is explicit and fail-closed. Telemetry can
+    # validate or contradict this setting, but can never switch it on itself.
+    CONF_BATTERY_INSTALLED: False,
     CONF_BATTERY_CAPACITY: 56.42,
     # Alpha8.76: this is the optimiser/planning target. The independent hard
     # battery safety floor remains fixed at 10% with release at 12%.
