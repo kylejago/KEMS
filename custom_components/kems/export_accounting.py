@@ -104,21 +104,13 @@ def actual_export_income_pence(
 
     today = now.astimezone(LONDON).date()
     day_records = sorted(
-        (
-            item
-            for item in records
-            if item.timestamp.astimezone(LONDON).date() == today
-        ),
+        (item for item in records if item.timestamp.astimezone(LONDON).date() == today),
         key=lambda item: item.timestamp,
     )
     if len(day_records) < 2:
         return 0.0
 
-    slots = (
-        _agile_slots(agile_state)
-        if tariff_type == EXPORT_TARIFF_TYPE_AGILE
-        else ()
-    )
+    slots = _agile_slots(agile_state) if tariff_type == EXPORT_TARIFF_TYPE_AGILE else ()
     total = 0.0
     for current, following in zip(day_records, day_records[1:], strict=False):
         hours = min(
