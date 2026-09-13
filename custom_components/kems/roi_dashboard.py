@@ -17,7 +17,9 @@ def install_roi_dashboard_extension() -> None:
 
     from . import dashboard, dashboard_pipeline
 
-    base_fresh_dashboard_bytes: DashboardBytesFn = dashboard_pipeline._fresh_dashboard_bytes
+    base_fresh_dashboard_bytes: DashboardBytesFn = (
+        dashboard_pipeline._fresh_dashboard_bytes
+    )
 
     def _fresh_dashboard_bytes_with_roi() -> bytes:
         """Return the normal managed dashboard followed by the live ROI view."""
