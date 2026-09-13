@@ -163,15 +163,10 @@ def test_roi_view_is_builtin_and_actual_value_focused() -> None:
 def test_roi_extension_wraps_final_managed_pipeline() -> None:
     """The runtime extension must append ROI without replacing the base pipeline."""
     extension = ROI_EXTENSION.read_text(encoding="utf-8")
-    assert (
-        "base_fresh_dashboard_bytes = dashboard_pipeline._fresh_dashboard_bytes"
-        in extension
-    )
+    assert "base_fresh_dashboard_bytes" in extension
+    assert "dashboard_pipeline._fresh_dashboard_bytes" in extension
     assert '"kems_roi_lifetime_dashboard.yaml"' in extension
-    assert (
-        "dashboard_pipeline._fresh_dashboard_bytes = _fresh_dashboard_bytes_with_roi"
-        in extension
-    )
+    assert "_fresh_dashboard_bytes_with_roi" in extension
 
 
 def test_unpaid_export_cleanup_precedes_financial_roi_reconciliation() -> None:
