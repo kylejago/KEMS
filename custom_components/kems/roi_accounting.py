@@ -85,7 +85,9 @@ async def async_reconcile_financial_commissioning(
         daily,
         commissioning_date=commissioning_date,
         tracking_date=(tracking_date if isinstance(tracking_date, date) else None),
-        tracking_values=(tracking_values if isinstance(tracking_values, dict) else None),
+        tracking_values=(
+            tracking_values if isinstance(tracking_values, dict) else None
+        ),
     )
 
     previous = (
