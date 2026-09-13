@@ -139,9 +139,7 @@ def assess_battery_values(
     if voltage is None:
         issues.append("battery voltage is unavailable/non-numeric")
     elif voltage <= NO_BATTERY_VOLTAGE_MAX:
-        issues.append(
-            f"battery voltage {voltage:g} V is a no-battery/sentinel value"
-        )
+        issues.append(f"battery voltage {voltage:g} V is a no-battery/sentinel value")
 
     if issues:
         return BatteryTelemetryAssessment(
