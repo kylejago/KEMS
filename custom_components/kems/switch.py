@@ -4,10 +4,17 @@ from __future__ import annotations
 
 from homeassistant.components.switch import SwitchEntity
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
+from .battery_installation import (
+    battery_installed_from_options,
+    battery_telemetry_snapshot,
+    install_battery_installation_contract,
+)
 from .const import (
+    CONF_BATTERY_INSTALLED,
     CONF_CONTROL_ENABLED,
     CONF_EMERGENCY_STOP,
     CONF_HAPPY_HOUR_OHME_CONTROL_ENABLED,
@@ -16,6 +23,10 @@ from .entity import KEMSEntity
 from .happy_hour import CONF_HAPPY_HOUR_ENABLED
 from .runtime_options import async_set_runtime_option
 from .update_orchestrator import build_update_switch_entities
+
+# Apply the Alpha9.34 commissioning contract before any switch state is exposed.
+# The patch is idempotent and does not grant control/write authority.
+install_battery_installation_contract()
 
 
 async def async_setup_entry(
@@ -26,6 +37,7 @@ async def async_setup_entry(
     """Set up control-lab and event-planning switches."""
     coordinator = entry.runtime_data
     entities = [
+        KEMSBatteryInstalledSwitch(coordinator),
         KEMSEmergencyStopSwitch(coordinator),
         KEMSMasterControlEnableSwitch(coordinator),
         KEMSWeekendHappyHourPlanningSwitch(coordinator),
@@ -33,6 +45,61 @@ async def async_setup_entry(
     ]
     entities.extend(build_update_switch_entities(hass, coordinator, entry))
     async_add_entities(entities)
+
+
+class KEMSBatteryInstalledSwitch(KEMSEntity, SwitchEntity):
+    """Declare whether the physical battery has actually been installed."""
+
+    _attr_name = "Battery installed"
+    _attr_icon = "mdi:battery-check-outline"
+    _attr_entity_category = EntityCategory.CONFIG
+
+    def __init__(self, coordinator) -> None:
+        super().__init__(coordinator, "battery_installed")
+
+    @property
+    def is_on(self) -> bool:
+        """Return the authoritative physical installation setting."""
+        return battery_installed_from_options(self.coordinator.entry.options)
+
+    @property
+    def extra_state_attributes(self):
+        """Expose installation-vs-telemetry evidence beside the setting."""
+        assessment = battery_telemetry_snapshot(
+            self.hass,
+            self.coordinator.entities.as_dict(),
+            installed=self.is_on,
+        )
+        return {
+            "installation_status": "Installed" if self.is_on else "Not installed",
+            "telemetry_status": assessment.state,
+            "telemetry_detail": assessment.detail,
+            "no_battery_sentinel_detected": assessment.no_battery_sentinel_detected,
+            "setting_telemetry_mismatch": assessment.setting_telemetry_mismatch,
+            "setting_is_authoritative": True,
+            "control_authority": (
+                "None — declaring the battery installed never commissions the system "
+                "or permits inverter writes"
+            ),
+        }
+
+    async def async_turn_on(self, **kwargs) -> None:
+        """Declare that the battery is physically fitted, then reload KEMS."""
+        await async_set_runtime_option(
+            self.hass,
+            self.coordinator.entry,
+            CONF_BATTERY_INSTALLED,
+            True,
+        )
+
+    async def async_turn_off(self, **kwargs) -> None:
+        """Declare that the battery is not physically fitted, then reload KEMS."""
+        await async_set_runtime_option(
+            self.hass,
+            self.coordinator.entry,
+            CONF_BATTERY_INSTALLED,
+            False,
+        )
 
 
 class KEMSEmergencyStopSwitch(KEMSEntity, SwitchEntity):
