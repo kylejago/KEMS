@@ -55,6 +55,7 @@ from .product_types import (
     export_tariff_type_from_options,
 )
 from .providers.entity_map import KEMSEntities
+from .roi_accounting import async_reconcile_financial_commissioning
 from .settings import KEMSSettings
 from .shadow_validation import ShadowValidationRecorder
 
@@ -156,6 +157,10 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
             == EXPORT_TARIFF_TYPE_NONE
         ):
             await async_repair_no_paid_export_income(self._lifetime)
+        await async_reconcile_financial_commissioning(
+            self._lifetime,
+            self.settings.roi.commissioning_date,
+        )
         await self._power_down.async_load()
         await self._agile_smart_export.async_load()
         await self._shadow_validation.async_load()
