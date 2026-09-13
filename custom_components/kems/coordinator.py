@@ -20,6 +20,12 @@ from .agile_smart_export_runtime import EfficientAgileSmartExportManager
 from .collector import Collector
 from .const import NAME
 from .entity_discovery import SourceValidationResult
+from .export_accounting import (
+    actual_export_income_pence,
+    async_repair_no_paid_export_income,
+    current_export_rate_pence,
+    revalue_actual_export_income,
+)
 from .forecast_validation import ForecastValidationRecorder
 from .forecasting import SolarForecastCoordinator
 from .happy_hour_budget import apply_happy_hour_control
@@ -43,6 +49,11 @@ from .kems_core import (
 )
 from .lifetime import LifetimeLedgerRecorder
 from .power_down import PowerDownHistoryRecorder
+from .product_types import (
+    EXPORT_TARIFF_TYPE_AGILE,
+    EXPORT_TARIFF_TYPE_NONE,
+    export_tariff_type_from_options,
+)
 from .providers.entity_map import KEMSEntities
 from .settings import KEMSSettings
 from .shadow_validation import ShadowValidationRecorder
@@ -140,6 +151,11 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
         await self._history.async_load()
         await self._forecast_validation.async_load()
         await self._lifetime.async_load()
+        if (
+            export_tariff_type_from_options(self.entry.options)
+            == EXPORT_TARIFF_TYPE_NONE
+        ):
+            await async_repair_no_paid_export_income(self._lifetime)
         await self._power_down.async_load()
         await self._agile_smart_export.async_load()
         await self._shadow_validation.async_load()
@@ -228,6 +244,36 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                 forecast_plan=forecast_plan,
                 tariff=self.settings.tariff,
             )
+
+            # Actual/live export money follows the user's selected tariff, not
+            # the fixed 12p comparison benchmark used by legacy proposal replay.
+            # Agile is valued interval-by-interval against published Region L
+            # half-hour rates; no-paid-export is always zero and fixed retains
+            # the configured fixed export rate.
+            tariff_type = export_tariff_type_from_options(self.entry.options)
+            agile_state = self._agile_smart_export.state
+            actual_export_income = actual_export_income_pence(
+                records,
+                now,
+                tariff_type=tariff_type,
+                fixed_rate_pence=self.settings.simulation.export_rate_pence,
+                agile_state=agile_state,
+            )
+            base_simulation = revalue_actual_export_income(
+                base_simulation,
+                actual_export_income,
+            )
+            selected_export_rate = current_export_rate_pence(
+                tariff_type=tariff_type,
+                fixed_rate_pence=self.settings.simulation.export_rate_pence,
+                agile_state=agile_state,
+            )
+            if selected_export_rate is not None:
+                snapshot.current_export_rate = selected_export_rate
+            elif tariff_type == EXPORT_TARIFF_TYPE_AGILE:
+                # Fail closed if Agile publication is temporarily unavailable;
+                # never present the legacy fixed benchmark as a live Agile rate.
+                snapshot.current_export_rate = None
 
             # Settle retained completed outcomes before the rolling target,
             # ControlState and shadow candidate are built. This prevents those
