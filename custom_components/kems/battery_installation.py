@@ -13,9 +13,10 @@ installed. None of this module grants inverter-write authority.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import asdict, dataclass
 from math import isfinite
-from typing import Any, Mapping
+from typing import Any
 
 from .const import (
     CONF_BATTERY_CURRENT,
@@ -112,7 +113,10 @@ def assess_battery_values(
             "advisory only."
         )
         if mismatch:
-            detail += " Telemetry looks battery-present; review the Battery installed setting."
+            detail += (
+                " Telemetry looks battery-present; review the Battery installed "
+                "setting."
+            )
         elif sentinel:
             detail += " FoxESS is reporting the expected no-battery sentinel pattern."
         return BatteryTelemetryAssessment(
