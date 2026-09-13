@@ -20,7 +20,9 @@ COORDINATOR = ROOT / "custom_components" / "kems" / "coordinator.py"
 
 def _load_roi_accounting():
     """Load the pure ROI accounting helper without importing Home Assistant."""
-    spec = importlib.util.spec_from_file_location("kems_roi_accounting_test", ROI_ACCOUNTING)
+    spec = importlib.util.spec_from_file_location(
+        "kems_roi_accounting_test", ROI_ACCOUNTING
+    )
     assert spec is not None
     assert spec.loader is not None
     module = importlib.util.module_from_spec(spec)
@@ -135,7 +137,9 @@ def test_clearing_financial_start_returns_actual_roi_to_preinstall_state() -> No
             actual_system_value_pence=100.0,
         ),
     )
-    changed = asyncio.run(module.async_reconcile_financial_commissioning(recorder, None))
+    changed = asyncio.run(
+        module.async_reconcile_financial_commissioning(recorder, None)
+    )
     assert changed is True
     assert recorder._ledger.commissioning_date is None
     assert recorder._ledger.actual_avoided_import_value_pence == 0.0
