@@ -10,7 +10,9 @@ MODULE_PATH = ROOT / "custom_components" / "kems" / "alpha937_dashboard_contract
 
 
 def _module():
-    spec = importlib.util.spec_from_file_location("alpha937_dashboard_contract", MODULE_PATH)
+    spec = importlib.util.spec_from_file_location(
+        "alpha937_dashboard_contract", MODULE_PATH
+    )
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
