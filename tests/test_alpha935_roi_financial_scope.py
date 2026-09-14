@@ -1,4 +1,4 @@
-"""Alpha9.35 commissioning-scoped ROI regression tests."""
+"""Financial-commissioning ROI scope regression tests."""
 
 from __future__ import annotations
 
@@ -20,7 +20,7 @@ ROI_ACCOUNTING = ROOT / "custom_components" / "kems" / "roi_accounting.py"
 
 
 def test_financial_period_starts_at_commissioning() -> None:
-    """Every ROI evidence total must begin on the chosen financial start date."""
+    """Every actual ROI evidence total must begin on the chosen financial start."""
     period = financial_period_from_records(
         {
             "2026-09-11": {
@@ -76,7 +76,7 @@ def test_financial_period_starts_at_commissioning() -> None:
 
 
 def test_financial_period_is_empty_without_selected_start() -> None:
-    """ROI evidence must not silently fall back to all-time history."""
+    """Actual ROI evidence must not silently fall back to all-time history."""
     period = financial_period_from_records(
         {"2026-09-14": {"grid_import_kwh": 42.0}},
         tracking_date=None,
@@ -89,16 +89,18 @@ def test_financial_period_is_empty_without_selected_start() -> None:
     assert period.house_consumption_kwh == 0.0
 
 
-def test_projection_ledger_uses_commissioned_window() -> None:
-    """Post-live projection must not annualise older pre-commission simulation."""
+def test_projection_ledger_retains_learning_window_and_scopes_actual_value() -> None:
+    """Projection keeps retained learning while actual payback starts at commission."""
     original = LifetimeLedger(
         first_observation=datetime(2026, 8, 1, 0, 0),
         observed_days=45,
+        system_operating_days=45,
         simulated_system_value_pence=50000.0,
         simulated_export_income_pence=10000.0,
         simulated_solar_generation_kwh=900.0,
         simulated_grid_export_kwh=600.0,
-        actual_system_value_pence=634.0,
+        actual_avoided_import_value_pence=9999.0,
+        actual_system_value_pence=9999.0,
     )
     period = PeriodTotals(
         start_date=date(2026, 9, 12),
@@ -108,6 +110,7 @@ def test_projection_ledger_uses_commissioned_window() -> None:
         simulated_export_income_pence=200.0,
         simulated_solar_generation_kwh=53.0,
         simulated_grid_export_kwh=25.0,
+        actual_avoided_import_value_pence=600.0,
         actual_system_value_pence=634.0,
     )
     now = datetime(2026, 9, 14, 18, 0)
@@ -120,17 +123,20 @@ def test_projection_ledger_uses_commissioned_window() -> None:
     )
 
     assert scoped is not original
-    assert scoped.first_observation == datetime(2026, 9, 12, 0, 0)
-    assert scoped.observed_days == 3
-    assert scoped.simulated_system_value_pence == 1500.0
-    assert scoped.simulated_export_income_pence == 200.0
-    assert scoped.simulated_solar_generation_kwh == 53.0
-    assert scoped.simulated_grid_export_kwh == 25.0
-    assert original.simulated_system_value_pence == 50000.0
+    assert scoped.first_observation == datetime(2026, 8, 1, 0, 0)
+    assert scoped.observed_days == 45
+    assert scoped.system_operating_days == 3
+    assert scoped.simulated_system_value_pence == 50000.0
+    assert scoped.simulated_export_income_pence == 10000.0
+    assert scoped.simulated_solar_generation_kwh == 900.0
+    assert scoped.simulated_grid_export_kwh == 600.0
+    assert scoped.actual_avoided_import_value_pence == 600.0
+    assert scoped.actual_system_value_pence == 634.0
+    assert original.actual_system_value_pence == 9999.0
 
 
-def test_roi_dashboard_uses_financial_scope_for_evidence() -> None:
-    """The ROI tab must not display all-time energy or export-income entities."""
+def test_roi_dashboard_separates_actual_scope_from_full_kems_projection() -> None:
+    """ROI makes the actual-vs-projection evidence boundary explicit."""
     content = ROI_DASHBOARD.read_text(encoding="utf-8")
     parsed = yaml.safe_load(content)
     assert [view["path"] for view in parsed["views"]] == ["roi"]
@@ -138,14 +144,16 @@ def test_roi_dashboard_uses_financial_scope_for_evidence() -> None:
     assert "sensor.kems_financial_solar_generation" in content
     assert "sensor.kems_financial_grid_import" in content
     assert "sensor.kems_financial_grid_export" in content
-    assert "sensor.kems_financial_house_consumption" in content
+    assert "sensor.kems_house_electricity_since_commissioning" in content
     assert "sensor.kems_financial_export_income" in content
     assert "sensor.kems_lifetime_grid_import" not in content
     assert "sensor.kems_lifetime_grid_export" not in content
     assert "sensor.kems_lifetime_solar_generation" not in content
     assert "sensor.kems_lifetime_house_consumption" not in content
     assert "sensor.kems_lifetime_export_income" not in content
-    assert "Current projection — since commissioning" in content
+    assert "Full KEMS projection — retained evidence" in content
+    assert "including battery and paid export" in content
+    assert "Projection evidence never enters actual payback" in content
 
 
 def test_financial_scope_extension_is_installed() -> None:
