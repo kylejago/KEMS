@@ -15,11 +15,13 @@ from custom_components.kems.roi_financial_scope import (
 
 ROOT = Path(__file__).parents[1]
 ROI_SCOPE = ROOT / "custom_components" / "kems" / "roi_financial_scope.py"
-ROI_DASHBOARD = ROOT / "custom_components" / "kems" / "kems_roi_lifetime_dashboard.yaml"
+ROI_DASHBOARD = (
+    ROOT / "custom_components" / "kems" / "kems_roi_lifetime_dashboard.yaml"
+)
 ROI_ACCOUNTING = ROOT / "custom_components" / "kems" / "roi_accounting.py"
 
 
-def test_financial_period_excludes_precommission_energy_and_includes_today() -> None:
+def test_financial_period_starts_at_commissioning() -> None:
     """Every ROI evidence total must begin on the chosen financial start date."""
     period = financial_period_from_records(
         {
@@ -89,7 +91,7 @@ def test_financial_period_is_empty_without_selected_start() -> None:
     assert period.house_consumption_kwh == 0.0
 
 
-def test_projection_ledger_uses_only_commissioned_simulation_window() -> None:
+def test_projection_ledger_uses_commissioned_window() -> None:
     """Post-live projection must not annualise older pre-commission simulation."""
     original = LifetimeLedger(
         first_observation=datetime(2026, 8, 1, 0, 0),
@@ -129,7 +131,7 @@ def test_projection_ledger_uses_only_commissioned_simulation_window() -> None:
     assert original.simulated_system_value_pence == 50000.0
 
 
-def test_roi_dashboard_uses_only_financial_scope_for_visible_evidence() -> None:
+def test_roi_dashboard_uses_financial_scope_for_evidence() -> None:
     """The ROI tab must not display all-time energy or export-income entities."""
     content = ROI_DASHBOARD.read_text(encoding="utf-8")
     parsed = yaml.safe_load(content)
@@ -148,7 +150,7 @@ def test_roi_dashboard_uses_only_financial_scope_for_visible_evidence() -> None:
     assert "Current projection — since commissioning" in content
 
 
-def test_financial_scope_extension_is_installed_with_roi_accounting() -> None:
+def test_financial_scope_extension_is_installed() -> None:
     """The runtime extension must be activated before coordinator setup runs."""
     accounting = ROI_ACCOUNTING.read_text(encoding="utf-8")
     scope = ROI_SCOPE.read_text(encoding="utf-8")
