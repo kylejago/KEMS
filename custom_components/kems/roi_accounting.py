@@ -7,8 +7,10 @@ from typing import Any
 
 if __package__:
     from .roi_dashboard import install_roi_dashboard_extension
+    from .roi_financial_scope import install_financial_roi_scope
 
     install_roi_dashboard_extension()
+    install_financial_roi_scope()
 
 _COMMISSIONED_VALUE_KEYS = (
     "actual_avoided_import_value_pence",
