@@ -60,12 +60,12 @@ views:
       - entity: sensor.kems_financial_grid_import
       - entity: sensor.kems_financial_grid_export
       - entity: sensor.kems_financial_export_income
-""".encode("utf-8")
+""".encode()
 
 
 def test_alpha937_removes_every_observed_stale_dashboard_entity_reference() -> None:
     module = _module()
-    repaired = module.repair_dashboard_contract(_legacy_payload()).decode("utf-8")
+    repaired = module.repair_dashboard_contract(_legacy_payload()).decode()
 
     for stale in (
         "sensor.kems_solar_generation_today",
@@ -95,7 +95,7 @@ def test_alpha937_removes_every_observed_stale_dashboard_entity_reference() -> N
 
 def test_compare_kems_uses_same_canonical_today_entities_as_kems_page() -> None:
     module = _module()
-    repaired = module.repair_dashboard_contract(_legacy_payload()).decode("utf-8")
+    repaired = module.repair_dashboard_contract(_legacy_payload()).decode()
     compare = repaired.split("\n  - title: Compare\n", 1)[1].split(
         "\n  - title: History\n", 1
     )[0]
