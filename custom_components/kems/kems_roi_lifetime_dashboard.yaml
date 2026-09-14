@@ -10,9 +10,11 @@ views:
           # Live ROI
 
           {% if is_state('binary_sensor.kems_system_installed', 'on') %}
-          **Actual ROI tracking is active.** Every operational figure on this page is scoped from the selected **Financial commissioning date** onward.
+          **Actual ROI tracking is active.** Actual value, payback and physical evidence on this page are scoped from the selected **Financial commissioning date** onward.
 
           Solar used by the home counts as avoided grid-import value. Export counts only when a paid export tariff is active. Simulated battery/export gains are kept out of actual payback.
+
+          The **full KEMS projection** uses the longer retained property-learning window to estimate the complete configured KEMS proposal, including battery and paid export. Projection evidence never enters actual payback.
           {% else %}
           **Actual ROI tracking has not started yet.**
 
@@ -89,7 +91,7 @@ views:
             name: System paid back
 
       - type: entities
-        title: Current projection — since commissioning
+        title: Full KEMS projection — retained evidence
         show_header_toggle: false
         entities:
           - entity: sensor.kems_predicted_annual_saving
@@ -113,7 +115,7 @@ views:
             name: Grid imported
           - entity: sensor.kems_financial_grid_export
             name: Grid exported
-          - entity: sensor.kems_financial_house_consumption
+          - entity: sensor.kems_house_electricity_since_commissioning
             name: House electricity
 
       - type: history-graph
