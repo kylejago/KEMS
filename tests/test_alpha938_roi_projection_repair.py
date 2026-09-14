@@ -86,7 +86,9 @@ def test_alpha938_release_identity_and_roi_only_scope() -> None:
 
     assert manifest["version"] == "0.9.0-alpha9.38"
     assert reason.startswith("Alpha9.38 repairs Live ROI")
-    assert "complete configured future system including battery and paid export" in reason
+    assert (
+        "complete configured future system including battery and paid export" in reason
+    )
     assert "simulated battery/export gains never enter actual payback" in reason
     assert "no optimiser allocation" in reason
     assert "FoxESS command/write authority changes" in reason
