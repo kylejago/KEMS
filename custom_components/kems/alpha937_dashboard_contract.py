@@ -6,6 +6,8 @@ canonical live simulation entities, while stale dashboard entity references are
 mapped to their registered Home Assistant entities.
 """
 
+# ruff: noqa: E501
+
 from __future__ import annotations
 
 from collections.abc import Callable
@@ -151,7 +153,7 @@ def _repair_live_energy_today(content: str) -> str:
 
 def repair_dashboard_contract(payload: bytes) -> bytes:
     """Return customer dashboard bytes with one coherent registered-entity contract."""
-    content = payload.decode("utf-8")
+    content = payload.decode()
 
     for old, new in _ROI_ENTITY_RENAMES.items():
         content = content.replace(old, new)
@@ -166,7 +168,7 @@ def repair_dashboard_contract(payload: bytes) -> bytes:
 
     content = _repair_live_energy_today(content)
     content = _repair_compare_view(content)
-    return content.encode("utf-8")
+    return content.encode()
 
 
 def install_alpha937_dashboard_contract() -> None:
