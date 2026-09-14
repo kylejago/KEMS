@@ -10,7 +10,7 @@ views:
           # Live ROI
 
           {% if is_state('binary_sensor.kems_system_installed', 'on') %}
-          **Actual ROI tracking is active.** Only value created by the physical system is counted here.
+          **Actual ROI tracking is active.** Every operational figure on this page is scoped from the selected **Financial commissioning date** onward.
 
           Solar used by the home counts as avoided grid-import value. Export counts only when a paid export tariff is active. Simulated battery/export gains are kept out of actual payback.
           {% else %}
@@ -57,12 +57,12 @@ views:
             color: var(--success-color)
 
       - type: entities
-        title: Actual value created
+        title: Actual value created since commissioning
         show_header_toggle: false
         entities:
           - entity: sensor.kems_lifetime_avoided_import_value
             name: Avoided grid-import value
-          - entity: sensor.kems_lifetime_export_income
+          - entity: sensor.kems_financial_export_income
             name: Paid export income
           - entity: sensor.kems_lifetime_system_value
             name: Gross system value
@@ -75,6 +75,8 @@ views:
         title: Actual payback
         show_header_toggle: false
         entities:
+          - entity: sensor.kems_financial_commissioning_date
+            name: Financial start date
           - entity: sensor.kems_system_operating_days
             name: Financial operating days
           - entity: sensor.kems_actual_roi
@@ -87,7 +89,7 @@ views:
             name: System paid back
 
       - type: entities
-        title: Current projection
+        title: Current projection — since commissioning
         show_header_toggle: false
         entities:
           - entity: sensor.kems_predicted_annual_saving
@@ -102,25 +104,25 @@ views:
             name: Projection confidence
 
       - type: entities
-        title: Physical lifetime evidence
+        title: Physical evidence since commissioning
         show_header_toggle: false
         entities:
-          - entity: sensor.kems_lifetime_solar_generation
+          - entity: sensor.kems_financial_solar_generation
             name: Solar generated
-          - entity: sensor.kems_lifetime_grid_import
+          - entity: sensor.kems_financial_grid_import
             name: Grid imported
-          - entity: sensor.kems_lifetime_grid_export
+          - entity: sensor.kems_financial_grid_export
             name: Grid exported
-          - entity: sensor.kems_lifetime_house_electricity
+          - entity: sensor.kems_financial_house_consumption
             name: House electricity
 
       - type: history-graph
-        title: Value recovered
+        title: Value recovered since commissioning
         hours_to_show: 720
         entities:
           - entity: sensor.kems_lifetime_system_value
             name: Actual system value
           - entity: sensor.kems_lifetime_avoided_import_value
             name: Avoided import
-          - entity: sensor.kems_lifetime_export_income
+          - entity: sensor.kems_financial_export_income
             name: Paid export income
