@@ -59,20 +59,17 @@ def test_alpha926_v2_matches_inverter_centred_16x16_faceplate() -> None:
 
     assert "// V2: inverter-centred faceplate." in panel
     assert "rect(4, 8, 13, 9, RAINBOW);" in panel
-    assert "flow_vertical_v2(4, 3, 5, 7" in panel  # Grid <-> inverter
-    assert "flow_vertical_v2(8, 3, 9, 7" in panel  # Solar -> inverter
-    assert "flow_vertical_v2(12, 3, 13, 7" in panel  # Battery <-> inverter
-    assert "flow_vertical_v2(5, 10, 6, 14" in panel  # Inverter -> home
-    assert "flow_vertical_v2(11, 10, 12, 14" in panel  # Inverter -> EV
+    assert "flow_vertical_v2(4, 3, 5, 7" in panel
+    assert "flow_vertical_v2(8, 3, 9, 7" in panel
+    assert "flow_vertical_v2(12, 3, 13, 7" in panel
+    assert "flow_vertical_v2(5, 10, 6, 14" in panel
+    assert "flow_vertical_v2(11, 10, 12, 14" in panel
 
-    # Exact 90-degree counter-clockwise rotation of the V1 ten-cell map.
     assert (
         "const int battery_v2_cols[10] = {16, 16, 15, 15, 14, 14, 13, 13, 12, 12};"
         in panel
     )
     assert "const int battery_v2_rows[10] = {2, 1, 2, 1, 2, 1, 2, 1, 2, 1};" in panel
-
-    # The inverter keeps the established slow 40-second colour fade.
     assert "float rainbow_hue = fmodf((float) now / 40000.0f, 1.0f);" in panel
 
 
@@ -83,7 +80,7 @@ def test_alpha926_versions_and_bundle_are_coordinated() -> None:
     panel = PANEL.read_text(encoding="utf-8")
     panel_health = PANEL_HEALTH.read_text(encoding="utf-8")
 
-    assert manifest["version"] == "0.9.0-alpha9.35"
+    assert manifest["version"] == "0.9.0-alpha9.36"
     assert bundle["components"]["panel"]["version"] == "0.9.0-alpha9-panel.3"
     assert 'panel_config_version: "0.9.0-alpha9-panel.3"' in panel
     assert 'PANEL_CONFIG_VERSION = "0.9.0-alpha9-panel.3"' in panel_health
