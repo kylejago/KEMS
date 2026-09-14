@@ -19,7 +19,9 @@ ROOT = Path(__file__).parents[1]
 ROI_DASHBOARD = ROOT / "custom_components" / "kems" / "kems_roi_lifetime_dashboard.yaml"
 
 
-def test_alpha938_projection_uses_retained_learning_but_actual_starts_at_commission() -> None:
+def test_alpha938_projection_uses_retained_learning_but_actual_starts_at_commission() -> (
+    None
+):
     """Forty-five days of learning can project while only three live days pay back."""
     ledger = LifetimeLedger(
         first_observation=datetime(2026, 8, 1, 23, 10),
@@ -86,7 +88,10 @@ def test_alpha938_release_identity_and_roi_only_scope() -> None:
 
     assert manifest["version"] == "0.9.0-alpha9.38"
     assert reason.startswith("Alpha9.38 repairs Live ROI")
-    assert "KEMS remains the complete configured future system including battery and paid export" in reason
+    assert (
+        "KEMS remains the complete configured future system including battery and paid export"
+        in reason
+    )
     assert "simulated battery/export gains never enter actual payback" in reason
     assert "no optimiser allocation" in reason
     assert "FoxESS command/write authority changes" in reason
