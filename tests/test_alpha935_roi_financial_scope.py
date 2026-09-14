@@ -15,9 +15,7 @@ from custom_components.kems.roi_financial_scope import (
 
 ROOT = Path(__file__).parents[1]
 ROI_SCOPE = ROOT / "custom_components" / "kems" / "roi_financial_scope.py"
-ROI_DASHBOARD = (
-    ROOT / "custom_components" / "kems" / "kems_roi_lifetime_dashboard.yaml"
-)
+ROI_DASHBOARD = ROOT / "custom_components" / "kems" / "kems_roi_lifetime_dashboard.yaml"
 ROI_ACCOUNTING = ROOT / "custom_components" / "kems" / "roi_accounting.py"
 
 
