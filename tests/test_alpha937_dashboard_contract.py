@@ -18,7 +18,7 @@ def _module():
 
 
 def _legacy_payload() -> bytes:
-    return b"""title: KEMS
+    return """title: KEMS
 views:
   - title: Live Data
     path: live-data
@@ -28,7 +28,7 @@ views:
         entities:
           - entity: sensor.kems_solar_generation_today
       - type: markdown
-        title: Power history â        title: Power history \xe2        title: Power history \xe2\x80        title: Power history \xe2\x80\x94 today
+        title: Power history — today
         content: keep
 
   - title: Compare
@@ -39,11 +39,11 @@ views:
             content: |
               legacy sensor.kems_compare_full_kems_cost_today
       - type: markdown
-        title: Today â        title: Today \xe2        title: Today \xe2\x80        title: Today \xe2\x80\x94 side by side
+        title: Today — side by side
         content: |
           legacy sensor.kems_compare_full_kems_cost_today
       - type: history-graph
-        title: Electricity cost â        title: Electricity cost \xe2        title: Electricity cost \xe2\x80        title: Electricity cost \xe2\x80\x94 Live vs KEMS
+        title: Electricity cost — Live vs KEMS
         entities: []
 
   - title: History
@@ -58,7 +58,7 @@ views:
       - entity: sensor.kems_financial_grid_import
       - entity: sensor.kems_financial_grid_export
       - entity: sensor.kems_financial_export_income
-"""
+""".encode("utf-8")
 
 
 def test_alpha937_removes_every_observed_stale_dashboard_entity_reference() -> None:
