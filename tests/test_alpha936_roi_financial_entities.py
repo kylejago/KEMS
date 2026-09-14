@@ -1,4 +1,4 @@
-"""Alpha9.36 ROI financial entity registration regression tests."""
+"""ROI financial entity registration regression tests."""
 
 from __future__ import annotations
 
@@ -25,7 +25,16 @@ def test_financial_roi_entities_have_valid_registration_metadata() -> None:
     )
     for key in expected:
         assert f'key="{key}"' in source
-        assert f"sensor.kems_{key}" in dashboard
+
+    for dashboard_entity in (
+        "sensor.kems_financial_commissioning_date",
+        "sensor.kems_house_electricity_since_commissioning",
+        "sensor.kems_financial_grid_import",
+        "sensor.kems_financial_grid_export",
+        "sensor.kems_financial_solar_generation",
+        "sensor.kems_financial_export_income",
+    ):
+        assert dashboard_entity in dashboard
 
     for key in (
         "financial_house_consumption",

@@ -1,9 +1,9 @@
-"""Financial-commissioning scope for ROI evidence and projections."""
+"""Financial commissioning evidence plus retained-learning ROI projection."""
 
 from __future__ import annotations
 
 from contextvars import ContextVar
-from datetime import date, datetime, time
+from datetime import date, datetime
 from functools import wraps
 from typing import Any
 
@@ -15,19 +15,7 @@ _CURRENT_FINANCIAL_PERIOD: ContextVar[PeriodTotals | None] = ContextVar(
 )
 _INSTALLED = False
 
-_FINANCIAL_PROJECTION_KEYS = (
-    "simulated_grid_import_kwh",
-    "simulated_grid_export_kwh",
-    "simulated_solar_generation_kwh",
-    "simulated_battery_charge_kwh",
-    "simulated_battery_to_home_kwh",
-    "simulated_battery_export_kwh",
-    "simulated_avoided_day_rate_import_kwh",
-    "simulated_import_cost_pence",
-    "simulated_export_income_pence",
-    "simulated_net_cost_pence",
-    "simulated_avoided_import_value_pence",
-    "simulated_system_value_pence",
+_FINANCIAL_ACTUAL_KEYS = (
     "actual_avoided_import_value_pence",
     "actual_system_value_pence",
 )
@@ -64,7 +52,16 @@ def roi_scoped_ledger(
     commissioning_date: date | None,
     now: datetime,
 ) -> LifetimeLedger:
-    """Return an ROI-only ledger whose projection evidence starts at commissioning."""
+    """Scope actual payback while retaining the longer learning projection window.
+
+    The retained pre-commission observation window is valuable evidence for the
+    full KEMS proposal projection, especially during the first days after the
+    physical system goes live.  Actual payback is different: it must start at the
+    explicitly selected financial commissioning date.  Keep those two contracts
+    separate by replacing only the actual-value counters and operating-day count
+    from the financial period while leaving first_observation and all simulated
+    proposal evidence untouched.
+    """
     if (
         commissioning_date is None
         or now.date() < commissioning_date
@@ -75,14 +72,9 @@ def roi_scoped_ledger(
         return ledger
 
     scoped = LifetimeLedger.from_dict(ledger.to_dict())
-    scoped.first_observation = datetime.combine(
-        commissioning_date,
-        time.min,
-        tzinfo=now.tzinfo,
-    )
-    scoped.observed_days = period.days_included
-    for key in _FINANCIAL_PROJECTION_KEYS:
+    for key in _FINANCIAL_ACTUAL_KEYS:
         setattr(scoped, key, float(getattr(period, key, 0.0)))
+    scoped.system_operating_days = period.days_included
     return scoped
 
 
@@ -101,7 +93,7 @@ def _financial_gbp(data: Any, key: str) -> float | None:
 
 
 def install_financial_roi_scope() -> None:
-    """Install the isolated Alpha9.35 financial-scope extensions once."""
+    """Install the isolated financial-scope extensions once."""
     global _INSTALLED
     if _INSTALLED:
         return
