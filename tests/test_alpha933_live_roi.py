@@ -154,7 +154,7 @@ def test_roi_view_is_builtin_and_actual_value_focused() -> None:
     assert "sensor.kems_actual_system_value_today" in content
     assert "sensor.kems_actual_system_value_total" in content
     assert "sensor.kems_lifetime_avoided_import_value" in content
-    assert "sensor.kems_lifetime_export_income" in content
+    assert "sensor.kems_financial_export_income" in content
     assert "sensor.kems_actual_roi" in content
     assert "Solar used by the home counts as avoided grid-import value" in content
     assert "Simulated battery/export gains are kept out of actual payback" in content
