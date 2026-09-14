@@ -18,7 +18,7 @@ _installed = False
 
 _ROI_ENTITY_RENAMES = {
     "sensor.kems_financial_house_consumption": (
-        "sensor.kems_house_consumption_since_commissioning"
+        "sensor.kems_house_electricity_since_commissioning"
     ),
     "sensor.kems_financial_solar_generation": (
         "sensor.kems_solar_generation_since_commissioning"

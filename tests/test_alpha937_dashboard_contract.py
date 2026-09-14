@@ -83,7 +83,7 @@ def test_alpha937_removes_every_observed_stale_dashboard_entity_reference() -> N
     for registered in (
         "sensor.kems_lifetime_gas_consumption",
         "sensor.kems_lifetime_net_energy_cost",
-        "sensor.kems_house_consumption_since_commissioning",
+        "sensor.kems_house_electricity_since_commissioning",
         "sensor.kems_solar_generation_since_commissioning",
         "sensor.kems_grid_import_since_commissioning",
         "sensor.kems_grid_export_since_commissioning",
@@ -92,6 +92,23 @@ def test_alpha937_removes_every_observed_stale_dashboard_entity_reference() -> N
         assert registered in repaired
 
     assert "actual_solar_generation_kwh" in repaired
+
+
+def test_roi_uses_all_registered_since_commissioning_entities() -> None:
+    module = _module()
+    repaired = module.repair_dashboard_contract(_legacy_payload()).decode()
+    roi = repaired.split("\n  - title: ROI\n", 1)[1]
+
+    for entity_id in (
+        "sensor.kems_house_electricity_since_commissioning",
+        "sensor.kems_solar_generation_since_commissioning",
+        "sensor.kems_grid_import_since_commissioning",
+        "sensor.kems_grid_export_since_commissioning",
+        "sensor.kems_paid_export_income_since_commissioning",
+    ):
+        assert entity_id in roi
+
+    assert "sensor.kems_house_consumption_since_commissioning" not in roi
 
 
 def test_compare_kems_uses_same_canonical_today_entities_as_kems_page() -> None:
@@ -127,8 +144,8 @@ def test_alpha937_release_identity_and_scope() -> None:
     bundle = json.loads((ROOT / "release" / "kems-bundle.template.json").read_text())
     reason = str(bundle["maintenance"]["reason"])
 
-    assert manifest["version"] == "0.9.0-alpha9.37"
-    assert reason.startswith("Alpha9.37")
+    assert manifest["version"] == "0.9.0-alpha9.38"
+    assert reason.startswith("Alpha9.38")
     assert "canonical current-day KEMS cost" in reason
     assert "presentation/reporting only" in reason
     assert "FoxESS command/write authority changes" in reason
