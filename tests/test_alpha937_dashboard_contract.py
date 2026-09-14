@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 from pathlib import Path
 
 ROOT = Path(__file__).parents[1]
@@ -117,3 +118,17 @@ def test_dashboard_contract_repair_is_idempotent_and_reporting_only() -> None:
     assert "presentation-only" in source
     assert "control eligibility" not in source
     assert "FoxESS" not in source
+
+
+def test_alpha937_release_identity_and_scope() -> None:
+    manifest = json.loads(
+        (ROOT / "custom_components" / "kems" / "manifest.json").read_text()
+    )
+    bundle = json.loads((ROOT / "release" / "kems-bundle.template.json").read_text())
+    reason = str(bundle["maintenance"]["reason"])
+
+    assert manifest["version"] == "0.9.0-alpha9.37"
+    assert reason.startswith("Alpha9.37")
+    assert "canonical current-day KEMS cost" in reason
+    assert "presentation/reporting only" in reason
+    assert "FoxESS command/write authority changes" in reason
