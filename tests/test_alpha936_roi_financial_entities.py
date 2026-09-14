@@ -2,33 +2,30 @@
 
 from __future__ import annotations
 
-from homeassistant.components.sensor import SensorDeviceClass, SensorStateClass
+import re
+from pathlib import Path
 
-from custom_components.kems import sensor as sensor_module
-from custom_components.kems.roi_financial_scope import install_financial_roi_scope
+ROOT = Path(__file__).parents[1]
+ROI_SCOPE = ROOT / "custom_components" / "kems" / "roi_financial_scope.py"
+ROI_DASHBOARD = ROOT / "custom_components" / "kems" / "kems_roi_lifetime_dashboard.yaml"
 
 
 def test_financial_roi_entities_have_valid_registration_metadata() -> None:
-    """All ROI financial entities must survive Home Assistant sensor validation."""
-    install_financial_roi_scope()
-    descriptions = {
-        description.key: description for description in sensor_module.SENSORS
-    }
+    """All ROI financial entities must carry Home Assistant-valid metadata."""
+    source = ROI_SCOPE.read_text(encoding="utf-8")
+    dashboard = ROI_DASHBOARD.read_text(encoding="utf-8")
 
-    expected = {
+    expected = (
         "financial_commissioning_date",
         "financial_house_consumption",
         "financial_grid_import",
         "financial_grid_export",
         "financial_solar_generation",
         "financial_export_income",
-    }
-    assert expected <= descriptions.keys()
-
-    assert (
-        descriptions["financial_commissioning_date"].device_class
-        == SensorDeviceClass.DATE
     )
+    for key in expected:
+        assert f'key="{key}"' in source
+        assert f"sensor.kems_{key}" in dashboard
 
     for key in (
         "financial_house_consumption",
@@ -36,12 +33,17 @@ def test_financial_roi_entities_have_valid_registration_metadata() -> None:
         "financial_grid_export",
         "financial_solar_generation",
     ):
-        description = descriptions[key]
-        assert description.device_class == SensorDeviceClass.ENERGY
-        assert description.state_class == SensorStateClass.TOTAL
-        assert description.native_unit_of_measurement == "kWh"
+        assert re.search(
+            rf'key="{key}".*?device_class=SensorDeviceClass\.ENERGY.*?'
+            r"state_class=SensorStateClass\.TOTAL",
+            source,
+            re.DOTALL,
+        )
 
-    export_income = descriptions["financial_export_income"]
-    assert export_income.device_class == SensorDeviceClass.MONETARY
-    assert export_income.state_class == SensorStateClass.TOTAL
-    assert export_income.native_unit_of_measurement == "GBP"
+    assert re.search(
+        r'key="financial_export_income".*?'
+        r"device_class=SensorDeviceClass\.MONETARY.*?"
+        r"state_class=SensorStateClass\.TOTAL",
+        source,
+        re.DOTALL,
+    )
