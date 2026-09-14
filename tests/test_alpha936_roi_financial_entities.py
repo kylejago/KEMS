@@ -11,7 +11,9 @@ from custom_components.kems.roi_financial_scope import install_financial_roi_sco
 def test_financial_roi_entities_have_valid_registration_metadata() -> None:
     """All ROI financial entities must survive Home Assistant sensor validation."""
     install_financial_roi_scope()
-    descriptions = {description.key: description for description in sensor_module.SENSORS}
+    descriptions = {
+        description.key: description for description in sensor_module.SENSORS
+    }
 
     expected = {
         "financial_commissioning_date",
