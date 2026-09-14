@@ -14,6 +14,7 @@ from .alpha95_presentation import (
     publish_alpha98_panel_projection,
 )
 from .alpha98_startup_recovery import async_recover_alpha98_startup_sources
+from .alpha937_dashboard_contract import install_alpha937_dashboard_contract
 from .collector import Collector
 from .const import (
     CONF_BATTERY_RESERVE,
@@ -87,6 +88,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     install_energy_bill_dashboard_patch()
     install_dashboard_pipeline()
     install_alpha95_presentation()
+    install_alpha937_dashboard_contract()
     # Alpha9.17 extends the Alpha9.16 compatibility installer before the first
     # coordinator refresh so even startup publications carry Recorder state-info
     # and updater verification never performs filesystem reads on HA's event loop.
