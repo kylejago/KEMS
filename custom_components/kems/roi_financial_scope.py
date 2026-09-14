@@ -113,9 +113,7 @@ def install_financial_roi_scope() -> None:
     from . import sensor as sensor_module
     from .kems_core.roi import ROIEngine
 
-    original_period_summaries = (
-        lifetime_module.LifetimeLedgerRecorder.period_summaries
-    )
+    original_period_summaries = lifetime_module.LifetimeLedgerRecorder.period_summaries
 
     @wraps(original_period_summaries)
     def period_summaries(self: Any, now: datetime) -> dict[str, PeriodTotals]:
