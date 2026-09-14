@@ -94,6 +94,12 @@ def _financial_metric(data: Any, key: str) -> float | None:
     return float(getattr(period, key, 0.0))
 
 
+def _financial_gbp(data: Any, key: str) -> float | None:
+    """Return one financial-period pence value converted to GBP."""
+    value = _financial_metric(data, key)
+    return None if value is None else round(value / 100, 2)
+
+
 def install_financial_roi_scope() -> None:
     """Install the isolated Alpha9.35 financial-scope extensions once."""
     global _INSTALLED
@@ -107,7 +113,9 @@ def install_financial_roi_scope() -> None:
     from . import sensor as sensor_module
     from .kems_core.roi import ROIEngine
 
-    original_period_summaries = lifetime_module.LifetimeLedgerRecorder.period_summaries
+    original_period_summaries = (
+        lifetime_module.LifetimeLedgerRecorder.period_summaries
+    )
 
     @wraps(original_period_summaries)
     def period_summaries(self: Any, now: datetime) -> dict[str, PeriodTotals]:
@@ -161,7 +169,6 @@ def install_financial_roi_scope() -> None:
             icon="mdi:home-lightning-bolt",
             device_class=SensorDeviceClass.ENERGY,
             native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
-            state_class=SensorStateClass.TOTAL_INCREASING,
             suggested_display_precision=2,
             value_fn=lambda data: _financial_metric(data, "house_consumption_kwh"),
         ),
@@ -171,7 +178,6 @@ def install_financial_roi_scope() -> None:
             icon="mdi:transmission-tower-import",
             device_class=SensorDeviceClass.ENERGY,
             native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
-            state_class=SensorStateClass.TOTAL_INCREASING,
             suggested_display_precision=2,
             value_fn=lambda data: _financial_metric(data, "grid_import_kwh"),
         ),
@@ -181,7 +187,6 @@ def install_financial_roi_scope() -> None:
             icon="mdi:transmission-tower-export",
             device_class=SensorDeviceClass.ENERGY,
             native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
-            state_class=SensorStateClass.TOTAL_INCREASING,
             suggested_display_precision=2,
             value_fn=lambda data: _financial_metric(data, "grid_export_kwh"),
         ),
@@ -191,7 +196,6 @@ def install_financial_roi_scope() -> None:
             icon="mdi:solar-power",
             device_class=SensorDeviceClass.ENERGY,
             native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
-            state_class=SensorStateClass.TOTAL_INCREASING,
             suggested_display_precision=2,
             value_fn=lambda data: _financial_metric(data, "solar_generation_kwh"),
         ),
@@ -203,16 +207,16 @@ def install_financial_roi_scope() -> None:
             native_unit_of_measurement="GBP",
             state_class=SensorStateClass.TOTAL,
             suggested_display_precision=2,
-            value_fn=lambda data: (
-                None
-                if _financial_metric(data, "export_income_pence") is None
-                else round(_financial_metric(data, "export_income_pence") / 100, 2)
-            ),
+            value_fn=lambda data: _financial_gbp(data, "export_income_pence"),
         ),
     )
     sensor_module.SENSORS = (
         *sensor_module.SENSORS,
-        *(description for description in descriptions if description.key not in existing_keys),
+        *(
+            description
+            for description in descriptions
+            if description.key not in existing_keys
+        ),
     )
 
     _INSTALLED = True
