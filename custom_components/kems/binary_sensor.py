@@ -28,7 +28,7 @@ from .const import (
 )
 from .entity import KEMSEntity
 from .kems_core import KEMSData
-from .kems_core.observability import full_kems_battery_export_enabled
+from .kems_core.observability import full_kems_battery_export_present
 
 IsOnFn = Callable[[KEMSData], bool | None]
 GAS_SOURCE_KEYS = (
@@ -125,9 +125,9 @@ BINARY_SENSORS: tuple[KEMSBinarySensorEntityDescription, ...] = (
     ),
     KEMSBinarySensorEntityDescription(
         key="battery_export_simulated",
-        name="Full KEMS battery export enabled in simulation",
+        name="Full KEMS battery export present in simulation",
         icon="mdi:battery-arrow-down-outline",
-        is_on_fn=lambda data: full_kems_battery_export_enabled(data.scenarios),
+        is_on_fn=lambda data: full_kems_battery_export_present(data.simulation),
     ),
     KEMSBinarySensorEntityDescription(
         key="battery_export_paused_for_home_reserve",
@@ -384,21 +384,17 @@ class KEMSBinarySensor(KEMSEntity, BinarySensorEntity):
     def extra_state_attributes(self) -> dict[str, object] | None:
         """Explain scoped binary-sensor semantics without changing source truth."""
         if self.entity_description.key == "battery_export_simulated":
-            data = self.coordinator.data
-            simulation = data.simulation
-            full_kems = data.scenarios.scenario("kems_full")
+            simulation = self.coordinator.data.simulation
             return {
-                "authority": "Full KEMS customer digital twin",
-                "full_kems_ready": bool(full_kems and full_kems.ready),
-                "full_kems_battery_export_today_kwh": (
-                    full_kems.battery_export_kwh
-                    if full_kems and full_kems.ready
-                    else None
+                "authority": "Full KEMS customer simulation",
+                "simulated_battery_export_today_kwh": (
+                    simulation.simulated_battery_export_kwh
                 ),
-                "full_kems_current_battery_export_kw": (
-                    full_kems.current_battery_export_kw
-                    if full_kems and full_kems.ready
-                    else None
+                "current_simulated_battery_export_kw": (
+                    simulation.current_simulated_battery_export_power_kw
+                ),
+                "target_battery_export_power_kw": (
+                    simulation.target_battery_export_power_kw
                 ),
                 "live_export_tariff_active": simulation.export_tariff_active,
                 "live_no_export_mode_active": simulation.no_export_mode_active,
@@ -406,8 +402,9 @@ class KEMSBinarySensor(KEMSEntity, BinarySensorEntity):
                     simulation.battery_export_enabled
                 ),
                 "scope_note": (
-                    "State describes the Full KEMS customer digital twin; live/control "
-                    "export permission remains separate and fail-safe."
+                    "State reports battery export represented in the authoritative "
+                    "Full KEMS customer simulation; live/control export permission "
+                    "remains separate and fail-safe."
                 ),
             }
 
