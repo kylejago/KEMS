@@ -6,7 +6,7 @@ import importlib.util
 import sys
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from types import ModuleType
+from types import ModuleType, SimpleNamespace
 
 ROOT = Path(__file__).parents[1]
 INTEGRATION = ROOT / "custom_components" / "kems"
@@ -170,6 +170,74 @@ def test_live_automatic_event_remains_authoritative() -> None:
     assert result["automatic_evidence"] == "live"
 
 
+def test_confirmed_kems_booking_bridges_coded_19_1_event_into_dispatch() -> None:
+    """A confirmed booking outranks manual fallback without trusting coded feed."""
+    hass = object()
+    booked_start = NOW + timedelta(days=1, hours=1)
+    booked_end = booked_start + timedelta(hours=1)
+    module_name = f"{MODULE.__package__}.happy_hour_auto_join"
+    auto_join = ModuleType(module_name)
+    auto_join._CONTROLLERS = {
+        (id(hass), "entry-1"): SimpleNamespace(
+            state={
+                "status": "booked",
+                "booked_event_code": "WEEKEND-HH-19-1",
+                "booked_start": booked_start.isoformat(),
+                "booked_end": booked_end.isoformat(),
+                "source_entity": (
+                    "event.octopus_energy_a_123_octoplus_power_up_events"
+                ),
+            }
+        )
+    }
+    sys.modules[module_name] = auto_join
+    try:
+        booking = MODULE._auto_join_booking_event(hass, NOW)
+    finally:
+        sys.modules.pop(module_name, None)
+
+    assert booking is not None
+    assert booking["automatic_status"] == "detected_kems_booking"
+    assert booking["event_code"] == "WEEKEND-HH-19-1"
+    assert booking["booking_authoritative"] is True
+    assert booking["source_kind"] == "kems_auto_join_booking"
+
+    # BottlecapDave 19.1 joined Power Up events retain a code. The generic KEMS
+    # classifier deliberately rejects those, so the live resolver reaches its
+    # manual/no-confident fallback. The exact service-confirmed KEMS booking is
+    # stronger evidence and must become the dispatch event instead.
+    manual_start = booked_start + timedelta(days=6)
+    live = _manual(
+        manual_start,
+        manual_start + timedelta(hours=1),
+        "no_confident_weekend_happy_hour",
+    )
+    retained = MODULE._serialise_event(booking, NOW)
+    result = retained_happy_hour_result(live, retained, now=NOW)
+
+    assert result["source"] == "octopus_energy"
+    assert result["automatic_status"] == "retained_upcoming"
+    assert result["automatic_evidence"] == "kems_booking"
+    assert result["retained_source_kind"] == "kems_auto_join_booking"
+    assert result["event_code"] == "WEEKEND-HH-19-1"
+    assert result["start"] == booked_start
+    assert result["end"] == booked_end
+
+
+def test_ambiguous_live_evidence_still_beats_confirmed_booking_bridge() -> None:
+    start = NOW + timedelta(hours=2)
+    end = start + timedelta(hours=1)
+    retained = _retained(start, end)
+    retained["booking_authoritative"] = True
+    retained["event_code"] = "BOOKED"
+    live = _manual(start, end, "ambiguous_upcoming_power_up_events")
+
+    result = retained_happy_hour_result(live, retained, now=NOW)
+
+    assert result["source"] == "manual"
+    assert result["automatic_status"] == "ambiguous_upcoming_power_up_events"
+
+
 def test_runtime_registry_installs_retention_after_automatic_discovery() -> None:
     compat = (INTEGRATION / "agile_alpha7_compat.py").read_text(encoding="utf-8")
     automatic = '("happy_hour_auto", "install_automatic_happy_hour")'
@@ -184,3 +252,5 @@ def test_dashboard_retention_copy_is_present() -> None:
     assert "**Evidence:**" in source
     assert "retained_octopus_evidence" in source
     assert "retained_completed" in source
+    assert "kems_auto_join_booking" in source
+    assert "booking_authoritative" in source
