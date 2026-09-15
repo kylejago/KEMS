@@ -60,7 +60,7 @@ def _classify_import_breakdown(
 ) -> None:
     """Attach cheap/day import energy and cost to one authoritative Agile day."""
     total_kwh = max(_number(summary.get("grid_import_kwh")) or 0.0, 0.0)
-    total_cost = max(_number(summary.get("import_cost_pence")) or 0.0, 0.0)
+    total_cost = _number(summary.get("import_cost_pence")) or 0.0
     cheap_kwh = 0.0
     cheap_cost = 0.0
 
@@ -91,8 +91,7 @@ def _classify_import_breakdown(
 
     cheap_kwh = min(max(cheap_kwh, 0.0), total_kwh)
     day_kwh = max(total_kwh - cheap_kwh, 0.0)
-    cheap_cost = min(max(cheap_cost, 0.0), total_cost)
-    day_cost = max(total_cost - cheap_cost, 0.0)
+    day_cost = total_cost - cheap_cost
 
     summary.update(
         {
@@ -193,12 +192,9 @@ def _reconcile_import_totals(today: dict[str, Any]) -> bool:
         total_kwh,
     )
     day_kwh = max(total_kwh - cheap_kwh, 0.0)
-    total_cost = max(_number(today.get("import_cost_pence")) or 0.0, 0.0)
-    cheap_cost = min(
-        max(_number(today.get("cheap_import_cost_pence")) or 0.0, 0.0),
-        total_cost,
-    )
-    day_cost = max(total_cost - cheap_cost, 0.0)
+    total_cost = _number(today.get("import_cost_pence")) or 0.0
+    cheap_cost = _number(today.get("cheap_import_cost_pence")) or 0.0
+    day_cost = total_cost - cheap_cost
     today.update(
         {
             "cheap_grid_import_kwh": round(cheap_kwh, 3),
