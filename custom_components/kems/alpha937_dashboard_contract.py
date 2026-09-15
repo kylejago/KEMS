@@ -275,7 +275,9 @@ def _repair_live_kems_view_parity(content: str) -> str:
 
     # Re-find KEMS after the Live replacement because the byte offset changed.
     kems_start = content.find(kems_marker, live_start + len(live_marker))
-    compare_start = content.find("\n  - title: Compare\n", kems_start + len(kems_marker))
+    compare_start = content.find(
+        "\n  - title: Compare\n", kems_start + len(kems_marker)
+    )
     if kems_start < 0 or compare_start < 0:
         return content
     kems = content[kems_start:compare_start]
