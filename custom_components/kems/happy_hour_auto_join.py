@@ -346,9 +346,7 @@ def discover_available_happy_hours(
         "public_source_count": len(public_sources),
         "weekend_happy_hours_available": count,
         "weekend_happy_hours_raw_coordinator": coordinator_raw_count,
-        "weekend_happy_hours_event_day_limit": (
-            HAPPY_HOUR_MAX_REWARDS_PER_EVENT_DAY
-        ),
+        "weekend_happy_hours_event_day_limit": (HAPPY_HOUR_MAX_REWARDS_PER_EVENT_DAY),
         "weekend_happy_hours_redeemable_event_day": (
             _event_day_redeemable_reward_hours(count)
         ),
