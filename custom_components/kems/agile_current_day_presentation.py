@@ -1,4 +1,4 @@
-"""Expose policy-aware current-day KEMS accounting through headline sensors."""
+"""Expose the full KEMS customer digital twin through headline sensors."""
 
 from __future__ import annotations
 
@@ -23,7 +23,7 @@ def _today_agile(state: dict[str, Any]) -> dict[str, Any] | None:
     """Return the ready current-day Full KEMS period when authoritative.
 
     Settlement reconciliation strengthens the provenance of completed intervals,
-    but it is not a prerequisite for presenting a ready digital twin.  In
+    but it is not a prerequisite for presenting a ready digital twin. In
     particular, immediately after midnight there may be no settled half-hour yet;
     falling back to the generic proposal replay in that window would mix its SOC
     and daily accumulators with the independently authoritative Full KEMS current
@@ -48,14 +48,14 @@ def _today_agile(state: dict[str, Any]) -> dict[str, Any] | None:
 
     # Keep the settled path explicit for the historical Alpha8.40 contract, while
     # making the same ready Full KEMS period authoritative before the first
-    # settlement as well.  The distinction is provenance, not presentation source.
+    # settlement as well. The distinction is provenance, not presentation source.
     if settlement_reconciled:
         return agile
     return agile
 
 
 def _current_routing(state: dict[str, Any]) -> dict[str, Any] | None:
-    """Return the final current Agile routing snapshot when authoritative."""
+    """Return the final current Full KEMS routing snapshot when authoritative."""
     routing = state.get("current_routing_snapshot")
     if not isinstance(routing, dict) or not routing.get("available"):
         return None
@@ -63,7 +63,7 @@ def _current_routing(state: dict[str, Any]) -> dict[str, Any] | None:
 
 
 def _current_routing_replacements(state: dict[str, Any]) -> dict[str, float]:
-    """Project canonical Agile current routing onto SimulationState power fields."""
+    """Project canonical Full KEMS current routing onto simulation power fields."""
     routing = _current_routing(state)
     if routing is None:
         return {}
@@ -129,34 +129,22 @@ def reconciled_current_day_simulation(
     simulation: SimulationState,
     state: dict[str, Any],
 ) -> SimulationState:
-    """Return one policy-aware headline SimulationState.
+    """Return one Full-KEMS-authoritative customer SimulationState.
 
-    The configured proposal replay is the cumulative/accounting authority while
-    no-paid-export mode is active.  The Agile Smart Export ledger is a paid-export
-    model and must not overwrite that policy with hypothetical export income,
-    battery export, SOC or import totals.  Current power fields remain independently
-    projected from the final KEMS routing snapshot.
+    The KEMS customer view is deliberately a counterfactual full-system digital
+    twin: it answers what KEMS would do with all modeled capabilities available,
+    independently of today's live commissioning state or live export permission.
+    Live/control safety and tariff permissions remain separate authorities and are
+    not changed here.
 
-    When paid export is active, the Alpha9.39 contract remains unchanged: a ready
-    current-day Full KEMS period supplies headline SOC, cumulative energy and costs
-    even before today's first settlement, while the final routing snapshot supplies
-    instantaneous power.
+    Whenever the current-day Full KEMS period is ready, headline SOC, cumulative
+    energy and cost fields come from that same digital twin, even before today's
+    first settlement. Current power fields are independently projected from the
+    final Full KEMS routing snapshot whenever available. The configured proposal
+    replay remains only a fallback when the Full KEMS period is unavailable.
     """
-    routing_replacements = _current_routing_replacements(state)
-
-    # Alpha9.41 policy boundary: the Agile Smart Export period deliberately models
-    # a paid-export strategy.  In no-paid-export mode the already policy-aware
-    # SimulationEngine replay remains authoritative for cumulative values.  Do not
-    # zero individual Agile fields after the fact; that would leave impossible SOC,
-    # charge/import and financial totals from the paid-export trajectory.
-    if bool(getattr(simulation, "no_export_mode_active", False)):
-        return (
-            replace(simulation, **routing_replacements)
-            if routing_replacements
-            else simulation
-        )
-
     agile = _today_agile(state)
+    routing_replacements = _current_routing_replacements(state)
     if agile is None:
         return (
             replace(simulation, **routing_replacements)
