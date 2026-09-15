@@ -16,6 +16,7 @@ from .alpha95_presentation import (
 from .alpha98_startup_recovery import async_recover_alpha98_startup_sources
 from .alpha937_dashboard_contract import install_alpha937_dashboard_contract
 from .alpha946_solar_actual import install_alpha946_solar_actual
+from .alpha947_reporting_consistency import install_alpha947_reporting_consistency
 from .collector import Collector
 from .const import (
     CONF_BATTERY_RESERVE,
@@ -95,6 +96,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     install_alpha946_solar_actual()
     install_alpha95_presentation()
     install_alpha937_dashboard_contract()
+    # Alpha9.47 reconciles all customer-facing Full KEMS breakdowns onto the
+    # authoritative current-day ledger and tidies reporting-only diagnostics.
+    install_alpha947_reporting_consistency()
     # Alpha9.40 installs recommendation/booking before dashboard composition and
     # before the first coordinator refresh. The external join path remains
     # fail-closed unless Control + commissioning + explicit auto-join all pass.
