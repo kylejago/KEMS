@@ -144,7 +144,7 @@ def test_alpha937_release_identity_and_scope() -> None:
     bundle = json.loads((ROOT / "release" / "kems-bundle.template.json").read_text())
     reason = str(bundle["maintenance"]["reason"])
 
-    assert manifest["version"] == "0.9.0-alpha9.47"
+    assert manifest["version"] == "0.9.0-alpha9.48"
     assert reason.startswith("Alpha9.46")
     assert "canonical current-day KEMS cost" in reason
     assert "presentation/reporting only" in reason
