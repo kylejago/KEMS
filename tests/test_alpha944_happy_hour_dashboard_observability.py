@@ -16,8 +16,12 @@ def _dashboard() -> str:
 
 def test_alpha944_kems_surfaces_happy_hour_without_live_data_pollution() -> None:
     content = _dashboard()
-    live = content.split("\n  - title: Live Data\n", 1)[1].split("\n  - title: KEMS\n", 1)[0]
-    kems = content.split("\n  - title: KEMS\n", 1)[1].split("\n  - title: Compare\n", 1)[0]
+    live = content.split("\n  - title: Live Data\n", 1)[1].split(
+        "\n  - title: KEMS\n", 1
+    )[0]
+    kems = content.split("\n  - title: KEMS\n", 1)[1].split(
+        "\n  - title: Compare\n", 1
+    )[0]
     assert "title: Weekend Happy Hour" in kems
     assert "switch.kems_weekend_happy_hour_auto_join" in kems
     for item in (
@@ -59,7 +63,9 @@ def test_alpha944_dashboard_is_packaged_identically() -> None:
 
 
 def test_alpha944_release_identity_and_scope() -> None:
-    manifest = json.loads((ROOT / "custom_components" / "kems" / "manifest.json").read_text())
+    manifest = json.loads(
+        (ROOT / "custom_components" / "kems" / "manifest.json").read_text()
+    )
     bundle = json.loads((ROOT / "release" / "kems-bundle.template.json").read_text())
     reason = str(bundle["maintenance"]["reason"])
     assert manifest["version"] == "0.9.0-alpha9.44"
