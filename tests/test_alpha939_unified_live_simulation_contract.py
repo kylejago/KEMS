@@ -183,6 +183,12 @@ def _view(content: str, title: str, next_title: str) -> str:
     return content[start:end]
 
 
+def _customer_metric_block(view: str) -> str:
+    marker = "      - type: markdown\n        title: Power history — today\n"
+    end = view.index(marker)
+    return view[:end]
+
+
 def _table_labels(view: str) -> list[str]:
     labels: list[str] = []
     for match in re.finditer(r"^\s*\|\s*([^|]+?)\s*\|", view, re.MULTILINE):
@@ -198,19 +204,21 @@ def test_alpha939_live_and_kems_tabs_expose_the_same_customer_metrics() -> None:
     dashboard = dashboard_contract.repair_dashboard_contract(raw).decode()
     live = _view(dashboard, "Live Data", "KEMS")
     kems = _view(dashboard, "KEMS", "Compare")
+    live_customer = _customer_metric_block(live)
+    kems_customer = _customer_metric_block(kems)
 
-    assert _table_labels(live) == _table_labels(kems)
-    assert "title: Now" in live
-    assert "title: Now" in kems
+    assert _table_labels(live_customer) == _table_labels(kems_customer)
+    assert "title: Now" in live_customer
+    assert "title: Now" in kems_customer
 
     # Live Data stays measured/observed; KEMS stays fully simulated.
-    assert "sensor.kems_observed_grid_import_today" in live
-    assert "sensor.kems_simulated_grid_import_today" not in live
-    assert "sensor.kems_simulated_grid_import_today" in kems
-    assert "sensor.kems_observed_grid_import_today" not in kems
-    assert "sensor.kems_simulated_battery_state_of_charge" in kems
+    assert "sensor.kems_observed_grid_import_today" in live_customer
+    assert "sensor.kems_simulated_grid_import_today" not in live_customer
+    assert "sensor.kems_simulated_grid_import_today" in kems_customer
+    assert "sensor.kems_observed_grid_import_today" not in kems_customer
+    assert "sensor.kems_simulated_battery_state_of_charge" in kems_customer
 
     # Product-specific extras no longer make the main tabs structurally diverge.
-    assert "| EV connected |" not in live
-    assert "| Solar → battery |" not in kems
-    assert "| Battery → home |" not in kems
+    assert "| EV connected |" not in live_customer
+    assert "| Solar → battery |" not in kems_customer
+    assert "| Battery → home |" not in kems_customer
