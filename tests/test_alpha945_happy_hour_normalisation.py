@@ -130,7 +130,9 @@ def test_alpha945_release_identity_and_scope() -> None:
 
     root = Path(__file__).parents[1]
     manifest = json.loads(
-        (root / "custom_components" / "kems" / "manifest.json").read_text(encoding="utf-8")
+        (root / "custom_components" / "kems" / "manifest.json").read_text(
+            encoding="utf-8"
+        )
     )
     bundle = json.loads(
         (root / "release" / "kems-bundle.template.json").read_text(encoding="utf-8")
