@@ -1,9 +1,10 @@
-"""Final customer-dashboard data-contract repair for Alpha9.37.
+"""Final customer-dashboard data contract, hardened for Live/KEMS parity.
 
 This layer is presentation-only.  It runs after the established Alpha9.5 dashboard
 presentation so every customer-facing current-day KEMS figure comes from the same
-canonical live simulation entities, while stale dashboard entity references are
-mapped to their registered Home Assistant entities.
+canonical live simulation entities, stale dashboard entity references are mapped
+to registered Home Assistant entities, and the Live Data/KEMS pages expose the
+same customer metric contract from their respective actual/simulated authorities.
 """
 
 # ruff: noqa: E501
@@ -42,6 +43,109 @@ _LIVE_ENERGY_TODAY = """      - type: markdown
           | Solar generation | {{ (solar ~ ' kWh') if solar is not none else '—' }} |
           | Gas usage | {{ states('sensor.kems_gas_usage_today') }} kWh |
           | Export income | {{ states('sensor.kems_observed_export_income_today') }} p |
+"""
+
+_LIVE_PARITY_BLOCK = """      - type: grid
+        columns: 2
+        square: false
+        cards:
+          - type: markdown
+            title: Now
+            content: |
+              {% set bad = ['unknown', 'unavailable', 'none', ''] %}
+              {% set ge = states('sensor.kems_grid_export') %}
+              {% set solar = states('sensor.kems_solar_power') %}
+              {% set batt = states('sensor.kems_battery_power') %}
+              {% set soc = states('sensor.kems_battery_state_of_charge') %}
+              | Reading | Live Data |
+              |---|---:|
+              | House load | **{{ states('sensor.kems_house_load') }} kW** |
+              | Grid import | {{ states('sensor.kems_grid_import') }} kW |
+              | Grid export | {{ '—' if ge | lower in bad else ge ~ ' kW' }} |
+              | Solar | {{ '—' if solar | lower in bad else solar ~ ' kW' }} |
+              | Battery power | {{ '—' if batt | lower in bad else batt ~ ' kW' }} |
+              | Battery SOC | {{ '—' if soc | lower in bad else soc ~ '%' }} |
+
+          - type: markdown
+            title: Daily costs
+            content: |
+              {% set net = states('sensor.kems_observed_cost_today') | float(0) %}
+              {% set gas = states('sensor.kems_gas_cost_today') | float(0) %}
+              {% set total = states('sensor.kems_whole_home_observed_cost_today') | float(net + gas) %}
+              {% set export = states('sensor.kems_observed_export_income_today') | float(0) %}
+              {% set standing = [total - gas - net, 0] | max %}
+              | Cost | Live Data |
+              |---|---:|
+              | Electricity net before standing | £{{ '%.2f' | format(net / 100) }} |
+              | Standing charge | £{{ '%.2f' | format(standing / 100) }} |
+              | Export income | −£{{ '%.2f' | format(export / 100) }} |
+              | **Electricity total** | **£{{ '%.2f' | format((total - gas) / 100) }}** |
+              | Gas | £{{ '%.2f' | format(gas / 100) }} |
+              | **TOTAL ENERGY COST** | **£{{ '%.2f' | format(total / 100) }}** |
+
+      - type: markdown
+        title: Energy today
+        content: |
+          {% set solar = state_attr('sensor.kems_simulated_kems_cost_today', 'actual_solar_generation_kwh') %}
+          | Energy | Live Data |
+          |---|---:|
+          | Whole-home energy | {{ states('sensor.kems_whole_home_energy_today') }} kWh |
+          | Grid import | {{ states('sensor.kems_observed_grid_import_today') }} kWh |
+          | Grid export | {{ states('sensor.kems_observed_grid_export_today') }} kWh |
+          | Solar generation | {{ (solar ~ ' kWh') if solar is not none else '—' }} |
+          | Gas usage | {{ states('sensor.kems_gas_usage_today') }} kWh |
+          | Export income | {{ states('sensor.kems_observed_export_income_today') }} p |
+"""
+
+_KEMS_PARITY_BLOCK = """      - type: grid
+        columns: 2
+        square: false
+        cards:
+          - type: markdown
+            title: Now
+            content: |
+              {% set bad = ['unknown', 'unavailable', 'none', ''] %}
+              {% set ge = states('sensor.kems_simulated_grid_export_power') %}
+              {% set solar = states('sensor.kems_simulated_solar_power') %}
+              {% set batt = states('sensor.kems_simulated_battery_power') %}
+              {% set soc = states('sensor.kems_simulated_battery_state_of_charge') %}
+              | Reading | KEMS |
+              |---|---:|
+              | House load | **{{ states('sensor.kems_simulated_house_load_power') }} kW** |
+              | Grid import | {{ states('sensor.kems_simulated_grid_import_power') }} kW |
+              | Grid export | {{ '—' if ge | lower in bad else ge ~ ' kW' }} |
+              | Solar | {{ '—' if solar | lower in bad else solar ~ ' kW' }} |
+              | Battery power | {{ '—' if batt | lower in bad else batt ~ ' kW' }} |
+              | Battery SOC | {{ '—' if soc | lower in bad else soc ~ '%' }} |
+
+          - type: markdown
+            title: Daily costs
+            content: |
+              {% set net = states('sensor.kems_simulated_kems_cost_today') | float(0) %}
+              {% set gas = states('sensor.kems_gas_cost_today') | float(0) %}
+              {% set total = states('sensor.kems_whole_home_simulated_cost_today') | float(net + gas) %}
+              {% set export = states('sensor.kems_simulated_export_income_today') | float(0) %}
+              {% set standing = [total - gas - net, 0] | max %}
+              | Cost | KEMS |
+              |---|---:|
+              | Electricity net before standing | £{{ '%.2f' | format(net / 100) }} |
+              | Standing charge | £{{ '%.2f' | format(standing / 100) }} |
+              | Export income | −£{{ '%.2f' | format(export / 100) }} |
+              | **Electricity total** | **£{{ '%.2f' | format((total - gas) / 100) }}** |
+              | Gas | £{{ '%.2f' | format(gas / 100) }} |
+              | **TOTAL ENERGY COST** | **£{{ '%.2f' | format(total / 100) }}** |
+
+      - type: markdown
+        title: Energy today
+        content: |
+          | Energy | KEMS |
+          |---|---:|
+          | Whole-home energy | {{ states('sensor.kems_whole_home_energy_today') }} kWh |
+          | Grid import | {{ states('sensor.kems_simulated_grid_import_today') }} kWh |
+          | Grid export | {{ states('sensor.kems_simulated_grid_export_today') }} kWh |
+          | Solar generation | {{ states('sensor.kems_simulated_solar_generation_today') }} kWh |
+          | Gas usage | {{ states('sensor.kems_gas_usage_today') }} kWh |
+          | Export income | {{ states('sensor.kems_simulated_export_income_today') }} p |
 """
 
 _COMPARE_KEMS = """          - type: markdown
@@ -151,8 +255,41 @@ def _repair_live_energy_today(content: str) -> str:
     return content[:start] + live + content[end:]
 
 
+def _repair_live_kems_view_parity(content: str) -> str:
+    """Give Live Data and KEMS the same metrics from separate authorities."""
+    live_marker = "\n  - title: Live Data\n"
+    kems_marker = "\n  - title: KEMS\n"
+    live_start = content.find(live_marker)
+    kems_start = content.find(kems_marker, live_start + len(live_marker))
+    if live_start < 0 or kems_start < 0:
+        return content
+
+    live = content[live_start:kems_start]
+    live = _replace_between(
+        live,
+        "      - type: grid\n        columns: 2\n        square: false\n        cards:\n          - type: markdown\n            title: Live now\n",
+        "      - type: markdown\n        title: Power history — today\n",
+        _LIVE_PARITY_BLOCK,
+    )
+    content = content[:live_start] + live + content[kems_start:]
+
+    # Re-find KEMS after the Live replacement because the byte offset changed.
+    kems_start = content.find(kems_marker, live_start + len(live_marker))
+    compare_start = content.find("\n  - title: Compare\n", kems_start + len(kems_marker))
+    if kems_start < 0 or compare_start < 0:
+        return content
+    kems = content[kems_start:compare_start]
+    kems = _replace_between(
+        kems,
+        "      - type: grid\n        columns: 2\n        square: false\n        cards:\n          - type: markdown\n            title: KEMS now\n",
+        "      - type: markdown\n        title: Power history — today\n",
+        _KEMS_PARITY_BLOCK,
+    )
+    return content[:kems_start] + kems + content[compare_start:]
+
+
 def repair_dashboard_contract(payload: bytes) -> bytes:
-    """Return customer dashboard bytes with one coherent registered-entity contract."""
+    """Return dashboard bytes with coherent registered-entity/source contracts."""
     content = payload.decode()
 
     for old, new in _ROI_ENTITY_RENAMES.items():
@@ -167,12 +304,13 @@ def repair_dashboard_contract(payload: bytes) -> bytes:
     )
 
     content = _repair_live_energy_today(content)
+    content = _repair_live_kems_view_parity(content)
     content = _repair_compare_view(content)
     return content.encode()
 
 
 def install_alpha937_dashboard_contract() -> None:
-    """Make Alpha9.37's final reporting contract authoritative for dashboard sync."""
+    """Make the final customer reporting contract authoritative for dashboard sync."""
     global _installed
     if _installed:
         return
