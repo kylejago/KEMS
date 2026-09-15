@@ -5,8 +5,8 @@ from __future__ import annotations
 import importlib.util
 import sys
 from dataclasses import dataclass
-from types import ModuleType
 from pathlib import Path
+from types import ModuleType
 
 ROOT = Path(__file__).parents[1]
 KEMS_ROOT = ROOT / "custom_components" / "kems"
