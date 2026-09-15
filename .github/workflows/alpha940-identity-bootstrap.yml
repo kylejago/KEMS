@@ -1,0 +1,84 @@
+name: Alpha9.40 identity bootstrap
+
+on:
+  push:
+    branches:
+      - feature/alpha9.40-happy-hour-auto-join
+
+permissions:
+  contents: write
+
+jobs:
+  bump-identity:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/alpha9.40-happy-hour-auto-join
+          fetch-depth: 0
+
+      - name: Advance release identity only
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import json
+
+          old = "0.9.0-alpha9.39"
+          new = "0.9.0-alpha9.40"
+          paths = [
+              Path("custom_components/kems/manifest.json"),
+              Path("tests/test_alpha8_consolidation.py"),
+              Path("tests/test_alpha913_forecast_path_scheduler.py"),
+              Path("tests/test_alpha919_runtime_recorder_owner.py"),
+              Path("tests/test_alpha920_shadow_recorder_owner.py"),
+              Path("tests/test_alpha921_planning_target_house_floor.py"),
+              Path("tests/test_alpha922_flow_contract_startup.py"),
+              Path("tests/test_alpha924_flow_parity_export_floor.py"),
+              Path("tests/test_alpha925_observability_clarity.py"),
+              Path("tests/test_alpha926_panel_layout_profiles.py"),
+              Path("tests/test_alpha927_policy_label_publication.py"),
+              Path("tests/test_alpha928_panel_v2_staggered_flow.py"),
+              Path("tests/test_alpha929_panel_v2_extra_gap.py"),
+              Path("tests/test_alpha930_live_foxess_solar_commissioning.py"),
+              Path("tests/test_alpha937_dashboard_contract.py"),
+              Path("tests/test_alpha9_baseline.py"),
+          ]
+          for path in paths:
+              text = path.read_text(encoding="utf-8")
+              if old not in text:
+                  raise SystemExit(f"expected {old} in {path}")
+              path.write_text(text.replace(old, new), encoding="utf-8")
+
+          guard = Path("tests/test_alpha937_dashboard_contract.py")
+          text = guard.read_text(encoding="utf-8")
+          expected = 'assert reason.startswith("Alpha9.39")'
+          replacement = 'assert reason.startswith("Alpha9.40")'
+          if expected not in text:
+              raise SystemExit("Alpha9.39 maintenance-prefix guard not found")
+          guard.write_text(text.replace(expected, replacement), encoding="utf-8")
+
+          bundle_path = Path("release/kems-bundle.template.json")
+          bundle = json.loads(bundle_path.read_text(encoding="utf-8"))
+          previous = str(bundle["maintenance"]["reason"])
+          prefix = (
+              "Alpha9.40 adds safe, opt-in Weekend Happy Hour planning and auto-join. "
+              "KEMS evaluates eligible Octopus Weekend Happy Hour choices against the complete energy plan once day-ahead tariff coverage is sufficient, including the value of free import, later avoided import, solar/headroom effects and paid-export opportunity cost. "
+              "No paid export never creates headroom through deliberate battery export. Automatic joining is disabled by default and can call the supported Octopus join service only in Control mode when the explicit auto-join switch, master control, commissioning, battery-installed and emergency-stop gates all permit it; Simulate mode remains read-only and reports what KEMS would choose. "
+              "A successful KEMS booking is persisted and becomes authoritative Happy Hour dispatch evidence even when Octopus Energy 19.1 exposes the joined Power Up event with a code that the older generic classifier correctly rejects; ambiguous live Power Up evidence still wins fail-safe. "
+              "Alpha9.40 does not grant any new FoxESS hardware-write authority, weaken commissioning/control safety gates, or alter the Alpha9.39 unified Live Data/KEMS simulation-authority contract. "
+          )
+          if not previous.startswith("Alpha9.39"):
+              raise SystemExit("unexpected maintenance reason head")
+          bundle["maintenance"]["reason"] = prefix + previous
+          bundle_path.write_text(json.dumps(bundle, indent=2) + "\n", encoding="utf-8")
+          PY
+
+          rm .github/workflows/alpha940-identity-bootstrap.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --cached --check
+          git commit -m "release: prepare Alpha9.40 identity"
+          git push origin HEAD:feature/alpha9.40-happy-hour-auto-join
