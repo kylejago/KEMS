@@ -39,6 +39,8 @@ HAPPY_HOUR_AUTO_JOIN_STORAGE_VERSION = 1
 HAPPY_HOUR_PRICE_COVERAGE_REQUIRED = 0.90
 HAPPY_HOUR_JOIN_RETRY_COOLDOWN = timedelta(minutes=30)
 HAPPY_HOUR_REWARD_CAP_KWH_PER_HOUR = 16.0
+HAPPY_HOUR_MAX_REWARDS_PER_EVENT_DAY = 2
+HAPPY_HOUR_COORDINATOR_SESSIONS_PER_REWARD = 2
 _LONDON = ZoneInfo("Europe/London")
 _POWER_UP_SUFFIX = "_octoplus_power_up_events"
 _WEEKEND_HAPPY_HOURS_SUFFIX = "_octoplus_weekend_happy_hours"
@@ -205,6 +207,33 @@ def _public_power_up_sources(hass: Any) -> list[Any]:
     ]
 
 
+def _normalise_coordinator_happy_hour_count(value: Any) -> int | None:
+    """Convert Octopus coordinator progress units into earned one-hour rewards.
+
+    Octopus Energy 19.1 exposes ``weekend_happy_hours`` on the coordinator in
+    Power Down-success units, while its public Weekend Happy Hours sensor divides
+    that value by two. Mirror the integration's public entity semantics so KEMS
+    never displays or plans against double the customer's banked reward balance.
+    """
+    raw = _number(value)
+    if raw is None:
+        return None
+    return max(int(raw / HAPPY_HOUR_COORDINATOR_SESSIONS_PER_REWARD), 0)
+
+
+def _event_day_redeemable_reward_hours(balance: int | None) -> int | None:
+    """Return the reward hours KEMS may consume on one Weekend Happy Hour day."""
+    if balance is None:
+        return None
+    return min(max(int(balance), 0), HAPPY_HOUR_MAX_REWARDS_PER_EVENT_DAY)
+
+
+def _reward_hours_for_candidate(candidate: HappyHourCandidate) -> int:
+    """Canonicalise one Octopus reward choice to one or two one-hour rewards."""
+    reward_hours = 2 if candidate.duration_hours >= 1.5 else 1
+    return min(reward_hours, HAPPY_HOUR_MAX_REWARDS_PER_EVENT_DAY)
+
+
 def _weekend_happy_hour_count(hass: Any) -> int | None:
     states = getattr(getattr(hass, "states", None), "async_all", None)
     if callable(states):
@@ -235,9 +264,11 @@ def _weekend_happy_hour_count(hass: Any) -> int | None:
             continue
         coordinator = account_data.get("POWER_UP_DOWN_COORDINATOR")
         data = getattr(coordinator, "data", None)
-        value = _number(getattr(data, "weekend_happy_hours", None))
+        value = _normalise_coordinator_happy_hour_count(
+            getattr(data, "weekend_happy_hours", None)
+        )
         if value is not None:
-            counts.append(max(int(value), 0))
+            counts.append(value)
     return counts[0] if len(counts) == 1 else None
 
 
@@ -262,6 +293,7 @@ def discover_available_happy_hours(
             source = "public_event_entity"
 
     coordinator_count: int | None = None
+    coordinator_raw_count: int | None = None
     if not raw:
         domain_data = getattr(hass, "data", {}).get("octopus_energy", {})
         coordinator_matches = []
@@ -278,8 +310,11 @@ def discover_available_happy_hours(
             _, data, values = coordinator_matches[0]
             raw = list(values)
             source = "octopus_coordinator"
-            value = _number(getattr(data, "weekend_happy_hours", None))
-            coordinator_count = int(value) if value is not None else None
+            raw_count = _number(getattr(data, "weekend_happy_hours", None))
+            coordinator_raw_count = (
+                max(int(raw_count), 0) if raw_count is not None else None
+            )
+            coordinator_count = _normalise_coordinator_happy_hour_count(raw_count)
 
     count = coordinator_count
     if count is None:
@@ -310,6 +345,18 @@ def discover_available_happy_hours(
         "source_entity": source_entity,
         "public_source_count": len(public_sources),
         "weekend_happy_hours_available": count,
+        "weekend_happy_hours_raw_coordinator": coordinator_raw_count,
+        "weekend_happy_hours_event_day_limit": (
+            HAPPY_HOUR_MAX_REWARDS_PER_EVENT_DAY
+        ),
+        "weekend_happy_hours_redeemable_event_day": (
+            _event_day_redeemable_reward_hours(count)
+        ),
+        "weekend_happy_hours_balance_basis": (
+            "octopus public reward count"
+            if coordinator_raw_count is None
+            else "octopus coordinator progress / 2"
+        ),
         "service_target_available": bool(source_entity),
     }
 
@@ -482,7 +529,7 @@ def score_candidate(
         event_export = 0.0
         pre_export_rate = 0.0
 
-    duration = candidate.duration_hours
+    duration = float(_reward_hours_for_candidate(candidate))
     cap = HAPPY_HOUR_REWARD_CAP_KWH_PER_HOUR * duration
     house_daily = max(expected_house_tomorrow_kwh or 0.0, 0.0)
     house_free = min(house_daily / 24.0 * duration, cap)
