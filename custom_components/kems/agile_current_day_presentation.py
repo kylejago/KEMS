@@ -1,4 +1,4 @@
-"""Expose settled current-day Agile accounting through KEMS headline simulation."""
+"""Expose current-day Full KEMS accounting through headline simulation sensors."""
 
 from __future__ import annotations
 
@@ -20,14 +20,22 @@ def _number(value: Any) -> float | None:
 
 
 def _today_agile(state: dict[str, Any]) -> dict[str, Any] | None:
-    """Return the reconciled current-day Agile period when authoritative."""
+    """Return the ready current-day Full KEMS period when authoritative.
+
+    Settlement reconciliation strengthens the provenance of completed intervals,
+    but it is not a prerequisite for presenting a ready digital twin.  In
+    particular, immediately after midnight there may be no settled half-hour yet;
+    falling back to the generic proposal replay in that window would mix its SOC
+    and daily accumulators with the independently authoritative Full KEMS current
+    routing snapshot.
+    """
     reconciliation = state.get("current_day_settlement_reconciliation")
-    if (
-        not isinstance(reconciliation, dict)
-        or not reconciliation.get("applied")
-        or not reconciliation.get("all_accounting_checks_passed")
-    ):
-        return None
+    settlement_reconciled = (
+        isinstance(reconciliation, dict)
+        and bool(reconciliation.get("applied"))
+        and bool(reconciliation.get("all_accounting_checks_passed"))
+    )
+
     periods = state.get("periods")
     if not isinstance(periods, dict):
         return None
@@ -37,6 +45,12 @@ def _today_agile(state: dict[str, Any]) -> dict[str, Any] | None:
     agile = today.get("agile_smart_export")
     if not isinstance(agile, dict) or not agile.get("ready"):
         return None
+
+    # Keep the settled path explicit for the historical Alpha8.40 contract, while
+    # making the same ready Full KEMS period authoritative before the first
+    # settlement as well.  The distinction is provenance, not presentation source.
+    if settlement_reconciled:
+        return agile
     return agile
 
 
@@ -115,14 +129,15 @@ def reconciled_current_day_simulation(
     simulation: SimulationState,
     state: dict[str, Any],
 ) -> SimulationState:
-    """Return a headline SimulationState on the settled Agile accounting basis.
+    """Return one Full-KEMS-authoritative headline SimulationState.
 
-    The generic proposal replay remains useful as a comparison model, but once
-    current-day Agile settlements have passed their accounting checks the KEMS
-    headline sensors must describe the same strategy that the rolling planner,
-    Energy today card and shadow ledger are using. Current power fields are
-    independently projected from the final Agile routing snapshot whenever it is
-    available, so every consumer sees one answer for what KEMS is doing now.
+    The generic proposal replay remains a fallback/comparison model.  Whenever
+    the current-day Full KEMS period is ready, headline SOC, cumulative energy and
+    cost fields come from that same digital twin, even before today's first
+    settlement.  Current power fields are independently projected from the final
+    Full KEMS routing snapshot whenever available, so every KEMS-tab consumer sees
+    one internally coherent answer for what the virtual system has done and is
+    doing now.
     """
     agile = _today_agile(state)
     routing_replacements = _current_routing_replacements(state)
