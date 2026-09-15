@@ -19,9 +19,9 @@ control eligibility, commissioning, tariff logic or hardware writes.
 
 from __future__ import annotations
 
+import math
 from dataclasses import replace
 from datetime import date, datetime
-import math
 from typing import Any
 
 from homeassistant.core import HomeAssistant, State
@@ -232,7 +232,10 @@ def _direct_for_day(
 ) -> float | None:
     """Return the highest retained direct daily total for one local day."""
     candidates: list[tuple[datetime, float]] = []
-    for record in [*records, *([current_snapshot] if current_snapshot is not None else [])]:
+    for record in [
+        *records,
+        *([current_snapshot] if current_snapshot is not None else []),
+    ]:
         if record.timestamp.date() != target_date:
             continue
         value = _sidecar_value(record)
@@ -378,7 +381,9 @@ def _install_simulation_authority() -> None:
                     "difference_kwh": (
                         round(difference, 3) if difference is not None else None
                     ),
-                    "difference_percent": round(percent, 1) if percent is not None else None,
+                    "difference_percent": (
+                        round(percent, 1) if percent is not None else None
+                    ),
                     "observed_solar_authority": "direct FoxESS daily counter",
                     "integrated_pv_retained_as_fallback": True,
                 }
