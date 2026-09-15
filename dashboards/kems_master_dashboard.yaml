@@ -262,6 +262,58 @@ views:
           | Export income | £{{ '%.2f' | format((states('sensor.kems_simulated_export_income_today') | float(0)) / 100) }} |
 
       - type: markdown
+        title: Weekend Happy Hour
+        content: |
+          {% set hh = 'switch.kems_weekend_happy_hour_auto_join' %}
+          {% set status = state_attr(hh, 'status') or 'waiting_for_first_planner_update' %}
+          {% set mode = states('select.kems_operating_mode') %}
+          {% set booked_start = state_attr(hh, 'booked_start') %}
+          {% set booked_end = state_attr(hh, 'booked_end') %}
+          {% set selected_start = booked_start or state_attr(hh, 'recommended_start') %}
+          {% set selected_end = booked_end or state_attr(hh, 'recommended_end') %}
+          {% set rec = state_attr(hh, 'recommendation') or {} %}
+          {% set benefit = state_attr(hh, 'estimated_net_benefit_pence') %}
+          {% if benefit is none %}{% set benefit = rec.get('net_benefit_pence') %}{% endif %}
+          {% set free_import = state_attr(hh, 'estimated_free_import_kwh') %}
+          {% if free_import is none and rec %}
+          {% set free_import = (rec.get('expected_house_free_import_kwh', 0) | float) + (rec.get('expected_battery_free_import_kwh', 0) | float) %}
+          {% endif %}
+          {% set pre_export = state_attr(hh, 'planned_pre_event_export_kwh') %}
+          {% if pre_export is none %}{% set pre_export = rec.get('planned_pre_event_export_kwh') %}{% endif %}
+          **Planner status:** **{{ status | replace('_', ' ') | title }}**
+          **Auto join:** {{ states(hh) }}
+          **Automatic event source:** {{ state_attr('sensor.kems_agile_happy_hour_plan', 'automatic_status') or 'waiting for Octopus data' }}
+          **Available choices:** {{ state_attr(hh, 'candidate_count') if state_attr(hh, 'candidate_count') is not none else '-' }}
+          **Selected window:** {{ selected_start or '-' }}{% if selected_end %} to {{ selected_end }}{% endif %}
+          **Agile price coverage:** import {{ (state_attr(hh, 'import_price_coverage_percent') ~ '%') if state_attr(hh, 'import_price_coverage_percent') is not none else '-' }} / export {{ (state_attr(hh, 'export_price_coverage_percent') ~ '%') if state_attr(hh, 'export_price_coverage_percent') is not none else '-' }}
+          **Expected free import:** {{ (free_import ~ ' kWh') if free_import is not none else '-' }}
+          **Expected battery free charge:** {{ (rec.get('expected_battery_free_import_kwh') ~ ' kWh') if rec.get('expected_battery_free_import_kwh') is not none else '-' }}
+          **Planned pre-event export:** {{ (pre_export ~ ' kWh') if pre_export is not none else '-' }}
+          **Estimated net benefit:** {{ ('GBP %.2f' | format((benefit | float) / 100)) if benefit is not none else '-' }}
+
+          {% if status == 'booked' and booked_start and booked_end %}
+          {% set bs = as_datetime(booked_start) %}
+          {% set be = as_datetime(booked_end) %}
+          {% if bs and be %}
+          **Event phase:** **{{ 'Booked - preparing' if now() < bs else 'Active' if now() < be else 'Completed' }}**
+          {% endif %}
+          {% endif %}
+
+          {% if mode | lower != 'control' %}
+          **Booking authority:** **Simulation/read-only - KEMS will not book.**
+          {% elif states(hh) != 'on' %}
+          **Booking authority:** Control mode is selected, but auto join is **off**.
+          {% else %}
+          **Booking authority:** Auto join is enabled; every independent commissioning and safety gate must still pass before KEMS calls Octopus.
+          {% endif %}
+
+          **Reward-hour import:** {{ state_attr('sensor.kems_agile_happy_hour_plan', 'current_reward_hour_import_kwh') or 0 }} / 16 kWh
+          **Reward-hour remaining:** {{ state_attr('sensor.kems_agile_happy_hour_plan', 'current_reward_hour_remaining_kwh') if state_attr('sensor.kems_agile_happy_hour_plan', 'current_reward_hour_remaining_kwh') is not none else '-' }} kWh
+          **Battery reservation remaining:** {{ state_attr('sensor.kems_agile_happy_hour_plan', 'battery_reserved_input_kwh_remaining') or 0 }} kWh
+          **EV allowance remaining:** {{ state_attr('sensor.kems_agile_happy_hour_plan', 'ev_allowance_kwh_remaining') or 0 }} kWh
+
+          _This is KEMS planning/booking evidence. Live Data remains measured property reality._
+      - type: markdown
         title: Power history — today
         content: |
           These graphs use the KEMS simulated equivalents of the Live Data page so both views can be compared on the same structure.
@@ -834,6 +886,8 @@ views:
             entities:
               - entity: switch.kems_weekend_happy_hour_planning
                 name: Manual fallback planning
+              - entity: switch.kems_weekend_happy_hour_auto_join
+                name: Auto join recommended Happy Hour
               - entity: datetime.kems_weekend_happy_hour_start
                 name: Manual event start
               - entity: select.kems_weekend_happy_hour_duration
@@ -842,8 +896,38 @@ views:
                 name: Allow Ohme control
 
           - type: markdown
-            title: Happy Hour policy
+            title: Happy Hour planner & policy
             content: |
+              {% set hh = 'switch.kems_weekend_happy_hour_auto_join' %}
+              {% set status = state_attr(hh, 'status') or 'waiting_for_first_planner_update' %}
+              {% set rec = state_attr(hh, 'recommendation') or {} %}
+              {% set benefit = state_attr(hh, 'estimated_net_benefit_pence') %}
+              {% if benefit is none %}{% set benefit = rec.get('net_benefit_pence') %}{% endif %}
+              **Planner:** **{{ status | replace('_', ' ') | title }}**
+              **Discovery source:** {{ state_attr(hh, 'source') or '-' }}
+              **Weekend Happy Hours available:** {{ state_attr(hh, 'weekend_happy_hours_available') if state_attr(hh, 'weekend_happy_hours_available') is not none else '-' }}
+              **Reason / gate:** {{ state_attr(hh, 'join_block_reason') or '-' }}
+              **Candidate slots:** {{ state_attr(hh, 'candidate_count') if state_attr(hh, 'candidate_count') is not none else '-' }}
+              **Recommended start:** {{ state_attr(hh, 'recommended_start') or state_attr(hh, 'booked_start') or '-' }}
+              **Recommended end:** {{ state_attr(hh, 'recommended_end') or state_attr(hh, 'booked_end') or '-' }}
+              **Import price coverage:** {{ (state_attr(hh, 'import_price_coverage_percent') ~ '%') if state_attr(hh, 'import_price_coverage_percent') is not none else '-' }}
+              **Export price coverage:** {{ (state_attr(hh, 'export_price_coverage_percent') ~ '%') if state_attr(hh, 'export_price_coverage_percent') is not none else '-' }}
+              **Battery free charge:** {{ (rec.get('expected_battery_free_import_kwh') ~ ' kWh') if rec.get('expected_battery_free_import_kwh') is not none else '-' }}
+              **Free house import:** {{ (rec.get('expected_house_free_import_kwh') ~ ' kWh') if rec.get('expected_house_free_import_kwh') is not none else '-' }}
+              **Solar opportunity:** {{ (rec.get('expected_solar_opportunity_kwh') ~ ' kWh') if rec.get('expected_solar_opportunity_kwh') is not none else '-' }}
+              **Planned pre-event export:** {{ (state_attr(hh, 'planned_pre_event_export_kwh') ~ ' kWh') if state_attr(hh, 'planned_pre_event_export_kwh') is not none else ((rec.get('planned_pre_event_export_kwh') ~ ' kWh') if rec.get('planned_pre_event_export_kwh') is not none else '-') }}
+              **Estimated net benefit:** {{ ('GBP %.2f' | format((benefit | float) / 100)) if benefit is not none else '-' }}
+              **External booking authority now:** {{ 'PERMITTED' if state_attr(hh, 'external_join_authority') else 'blocked' }}
+
+              {% set choices = state_attr(hh, 'evaluated_candidates') or [] %}
+              {% if choices %}
+              | Candidate | Net benefit | Free battery | Pre-event export |
+              |---|---:|---:|---:|
+              {% for c in choices %}
+              | {{ c.get('start', '-') }} | GBP {{ '%.2f' | format((c.get('net_benefit_pence', 0) | float) / 100) }} | {{ c.get('expected_battery_free_import_kwh', '-') }} kWh | {{ c.get('planned_pre_event_export_kwh', '-') }} kWh |
+              {% endfor %}
+              {% endif %}
+
               **Automatic Octopus detection remains primary.** Manual planning is the fallback when KEMS cannot confidently identify the booked event.
 
               **Reward cap:** **16 kWh per reward hour**, independently. Unused allowance never carries forward and KEMS never borrows from a later reward hour.
