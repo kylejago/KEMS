@@ -1,0 +1,104 @@
+name: Alpha9.47 version-pin fix
+
+on:
+  push:
+    branches:
+      - fix/alpha9.47-reporting-consistency
+
+permissions:
+  contents: write
+
+jobs:
+  update-release-contract-pins:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out Alpha9.47 branch
+        uses: actions/checkout@v4
+        with:
+          ref: fix/alpha9.47-reporting-consistency
+          fetch-depth: 0
+
+      - name: Advance legacy current-release assertions
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          paths = [
+              "tests/test_alpha8_consolidation.py",
+              "tests/test_alpha913_forecast_path_scheduler.py",
+              "tests/test_alpha919_runtime_recorder_owner.py",
+              "tests/test_alpha920_shadow_recorder_owner.py",
+              "tests/test_alpha921_planning_target_house_floor.py",
+              "tests/test_alpha922_flow_contract_startup.py",
+              "tests/test_alpha924_flow_parity_export_floor.py",
+              "tests/test_alpha925_observability_clarity.py",
+              "tests/test_alpha926_panel_layout_profiles.py",
+              "tests/test_alpha927_policy_label_publication.py",
+              "tests/test_alpha928_panel_v2_staggered_flow.py",
+              "tests/test_alpha929_panel_v2_extra_gap.py",
+              "tests/test_alpha930_live_foxess_solar_commissioning.py",
+              "tests/test_alpha937_dashboard_contract.py",
+              "tests/test_alpha944_happy_hour_dashboard_observability.py",
+              "tests/test_alpha945_happy_hour_normalisation.py",
+              "tests/test_alpha9_baseline.py",
+          ]
+          old = "0.9.0-alpha9.46"
+          new = "0.9.0-alpha9.47"
+          replacements = 0
+          for raw in paths:
+              path = Path(raw)
+              text = path.read_text(encoding="utf-8")
+              count = text.count(old)
+              if count:
+                  path.write_text(text.replace(old, new), encoding="utf-8")
+                  replacements += count
+                  print(f"{raw}: {count} replacement(s)")
+              else:
+                  print(f"{raw}: already current")
+          if replacements != 16:
+              raise SystemExit(f"Expected 16 remaining replacements, found {replacements}")
+          remaining = [raw for raw in paths if old in Path(raw).read_text(encoding="utf-8")]
+          if remaining:
+              raise SystemExit(f"Stale version pins remain: {remaining}")
+          PY
+
+      - name: Install development tools
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements-dev.txt
+
+      - name: Validate branch before committing
+        run: |
+          python scripts/sync_packaged_dashboard.py --check
+          python -m black --check --diff .
+          python -m ruff check .
+          python -m pytest
+          python -m compileall custom_components/kems
+
+      - name: Commit release-contract updates
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add tests/test_alpha8_consolidation.py \
+                  tests/test_alpha913_forecast_path_scheduler.py \
+                  tests/test_alpha919_runtime_recorder_owner.py \
+                  tests/test_alpha920_shadow_recorder_owner.py \
+                  tests/test_alpha921_planning_target_house_floor.py \
+                  tests/test_alpha922_flow_contract_startup.py \
+                  tests/test_alpha924_flow_parity_export_floor.py \
+                  tests/test_alpha925_observability_clarity.py \
+                  tests/test_alpha926_panel_layout_profiles.py \
+                  tests/test_alpha927_policy_label_publication.py \
+                  tests/test_alpha928_panel_v2_staggered_flow.py \
+                  tests/test_alpha929_panel_v2_extra_gap.py \
+                  tests/test_alpha930_live_foxess_solar_commissioning.py \
+                  tests/test_alpha937_dashboard_contract.py \
+                  tests/test_alpha944_happy_hour_dashboard_observability.py \
+                  tests/test_alpha945_happy_hour_normalisation.py \
+                  tests/test_alpha9_baseline.py
+          git diff --cached --check
+          git commit -m "Alpha9.47: advance legacy release-contract pins"
+          git push origin HEAD:fix/alpha9.47-reporting-consistency
