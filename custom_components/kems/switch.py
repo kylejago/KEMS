@@ -21,6 +21,10 @@ from .const import (
 )
 from .entity import KEMSEntity
 from .happy_hour import CONF_HAPPY_HOUR_ENABLED
+from .happy_hour_auto_join import (
+    CONF_HAPPY_HOUR_AUTO_JOIN_ENABLED,
+    happy_hour_auto_join_state,
+)
 from .runtime_options import async_set_runtime_option
 from .update_orchestrator import build_update_switch_entities
 
@@ -41,6 +45,7 @@ async def async_setup_entry(
         KEMSEmergencyStopSwitch(coordinator),
         KEMSMasterControlEnableSwitch(coordinator),
         KEMSWeekendHappyHourPlanningSwitch(coordinator),
+        KEMSWeekendHappyHourAutoJoinSwitch(coordinator),
         KEMSHappyHourOhmeControlSwitch(coordinator),
     ]
     entities.extend(build_update_switch_entities(hass, coordinator, entry))
@@ -200,6 +205,60 @@ class KEMSWeekendHappyHourPlanningSwitch(KEMSEntity, SwitchEntity):
             self.hass,
             self.coordinator.entry,
             CONF_HAPPY_HOUR_ENABLED,
+            False,
+        )
+
+
+class KEMSWeekendHappyHourAutoJoinSwitch(KEMSEntity, SwitchEntity):
+    """Explicit opt-in for KEMS to book the recommended Octopus Happy Hour."""
+
+    _attr_name = "Weekend Happy Hour auto join"
+    _attr_icon = "mdi:calendar-check-outline"
+    _attr_entity_category = EntityCategory.CONFIG
+
+    def __init__(self, coordinator) -> None:
+        super().__init__(coordinator, "weekend_happy_hour_auto_join")
+
+    @property
+    def is_on(self) -> bool:
+        """Return the explicit external-account booking permission."""
+        return bool(
+            self.coordinator.entry.options.get(
+                CONF_HAPPY_HOUR_AUTO_JOIN_ENABLED,
+                False,
+            )
+        )
+
+    @property
+    def extra_state_attributes(self):
+        """Expose the recommendation, economics and all booking safety gates."""
+        state = happy_hour_auto_join_state(self.coordinator)
+        return {
+            **state,
+            "setting_is_authoritative": True,
+            "default": "off",
+            "simulation_can_book": False,
+            "control_authority": (
+                "Octopus account booking only; battery/EV dispatch remains owned by "
+                "the existing KEMS control safety layers"
+            ),
+        }
+
+    async def async_turn_on(self, **kwargs) -> None:
+        """Allow booking only when the independent runtime gates also pass."""
+        await async_set_runtime_option(
+            self.hass,
+            self.coordinator.entry,
+            CONF_HAPPY_HOUR_AUTO_JOIN_ENABLED,
+            True,
+        )
+
+    async def async_turn_off(self, **kwargs) -> None:
+        """Revoke external Happy Hour booking permission immediately."""
+        await async_set_runtime_option(
+            self.hass,
+            self.coordinator.entry,
+            CONF_HAPPY_HOUR_AUTO_JOIN_ENABLED,
             False,
         )
 

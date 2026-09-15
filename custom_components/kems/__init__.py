@@ -45,6 +45,7 @@ from .entity_discovery import (
     async_discover_entities,
     async_validate_entity_mappings,
 )
+from .happy_hour_auto_join import install_happy_hour_auto_join
 from .kems_core import configure_ev_charge_policy
 from .providers.entity_map import KEMSEntities
 from .providers.foxess import FoxESSProvider
@@ -89,6 +90,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     install_dashboard_pipeline()
     install_alpha95_presentation()
     install_alpha937_dashboard_contract()
+    # Alpha9.40 installs recommendation/booking before dashboard composition and
+    # before the first coordinator refresh. The external join path remains
+    # fail-closed unless Control + commissioning + explicit auto-join all pass.
+    install_happy_hour_auto_join()
     # Alpha9.17 extends the Alpha9.16 compatibility installer before the first
     # coordinator refresh so even startup publications carry Recorder state-info
     # and updater verification never performs filesystem reads on HA's event loop.
