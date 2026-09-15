@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib.util
+import re
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -76,7 +77,21 @@ def _load_presentation():
     return module
 
 
+def _load_dashboard_contract():
+    name = "kems_alpha939_dashboard_contract_test"
+    spec = importlib.util.spec_from_file_location(
+        name,
+        KEMS_ROOT / "alpha937_dashboard_contract.py",
+    )
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
 presentation = _load_presentation()
+dashboard_contract = _load_dashboard_contract()
 
 
 def _midnight_agile_state() -> dict:
@@ -160,3 +175,42 @@ def test_alpha939_unavailable_full_kems_period_preserves_generic_fallback() -> N
     result = presentation.reconciled_current_day_simulation(legacy, state)
 
     assert result is legacy
+
+
+def _view(content: str, title: str, next_title: str) -> str:
+    start = content.index(f"\n  - title: {title}\n")
+    end = content.index(f"\n  - title: {next_title}\n", start)
+    return content[start:end]
+
+
+def _table_labels(view: str) -> list[str]:
+    labels: list[str] = []
+    for match in re.finditer(r"^\s*\|\s*([^|]+?)\s*\|", view, re.MULTILINE):
+        label = match.group(1).strip().replace("**", "")
+        if label and set(label) != {"-"}:
+            labels.append(label)
+    return labels
+
+
+def test_alpha939_live_and_kems_tabs_expose_the_same_customer_metrics() -> None:
+    """The two tabs differ only by actual versus simulated data authority."""
+    raw = (ROOT / "dashboards" / "kems_master_dashboard.yaml").read_bytes()
+    dashboard = dashboard_contract.repair_dashboard_contract(raw).decode()
+    live = _view(dashboard, "Live Data", "KEMS")
+    kems = _view(dashboard, "KEMS", "Compare")
+
+    assert _table_labels(live) == _table_labels(kems)
+    assert "title: Now" in live
+    assert "title: Now" in kems
+
+    # Live Data stays measured/observed; KEMS stays fully simulated.
+    assert "sensor.kems_observed_grid_import_today" in live
+    assert "sensor.kems_simulated_grid_import_today" not in live
+    assert "sensor.kems_simulated_grid_import_today" in kems
+    assert "sensor.kems_observed_grid_import_today" not in kems
+    assert "sensor.kems_simulated_battery_state_of_charge" in kems
+
+    # Product-specific extras no longer make the main tabs structurally diverge.
+    assert "| EV connected |" not in live
+    assert "| Solar → battery |" not in kems
+    assert "| Battery → home |" not in kems
