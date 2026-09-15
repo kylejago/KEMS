@@ -398,7 +398,9 @@ class KEMSBinarySensor(KEMSEntity, BinarySensorEntity):
                 "authority": "Full KEMS customer digital twin",
                 "full_kems_ready": bool(full_kems and full_kems.ready),
                 "full_kems_battery_export_today_kwh": (
-                    full_kems.battery_export_kwh if full_kems and full_kems.ready else None
+                    full_kems.battery_export_kwh
+                    if full_kems and full_kems.ready
+                    else None
                 ),
                 "full_kems_current_battery_export_kw": (
                     full_kems.current_battery_export_kw
