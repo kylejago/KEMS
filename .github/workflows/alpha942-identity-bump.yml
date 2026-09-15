@@ -1,0 +1,75 @@
+name: Alpha9.42 coordinated identity bump
+
+on:
+  push:
+    branches:
+      - fix/alpha9.42-full-kems-customer-authority
+
+permissions:
+  contents: write
+
+jobs:
+  bump:
+    if: ${{ !contains(github.event.head_commit.message, '[alpha942-bump]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/alpha9.42-full-kems-customer-authority
+          fetch-depth: 0
+
+      - name: Coordinate Alpha9.42 identity
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          old = "0.9.0-alpha9.41"
+          new = "0.9.0-alpha9.42"
+
+          manifest = Path("custom_components/kems/manifest.json")
+          manifest_text = manifest.read_text(encoding="utf-8")
+          if old not in manifest_text:
+              raise SystemExit("Alpha9.41 manifest identity not found")
+          manifest.write_text(manifest_text.replace(old, new), encoding="utf-8")
+
+          changed_tests = 0
+          for path in sorted(Path("tests").glob("test_*.py")):
+              text = path.read_text(encoding="utf-8")
+              if old not in text:
+                  continue
+              path.write_text(text.replace(old, new), encoding="utf-8")
+              changed_tests += 1
+          if changed_tests == 0:
+              raise SystemExit("No current release assertions were advanced")
+
+          bundle = Path("release/kems-bundle.template.json")
+          text = bundle.read_text(encoding="utf-8")
+          marker = '"reason": "'
+          intro = (
+              "Alpha9.42 restores the customer reporting contract clarified by live Alpha9.41 proof: "
+              "No KEMS remains the counterfactual no-system baseline, Live remains measured property reality, "
+              "and KEMS is the full-system KEMS digital twin with all modeled KEMS capabilities available "
+              "regardless of the current live export or commissioning permission. The ready Full KEMS current-day "
+              "period is authoritative for KEMS cumulative SOC, energy and financial totals and final Full KEMS "
+              "routing remains authoritative for instantaneous KEMS power. Live/control tariff permissions, "
+              "commissioning gates, Weekend Happy Hour safety, control eligibility and FoxESS hardware-write "
+              "authority remain unchanged; No paid export still constrains real/control behaviour and the KEMS "
+              "no-export scenario remains available as a separate comparison model. "
+          )
+          if marker not in text:
+              raise SystemExit("Bundle maintenance reason marker not found")
+          text = text.replace(marker, marker + intro, 1)
+          bundle.write_text(text, encoding="utf-8")
+          PY
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add custom_components/kems/manifest.json release/kems-bundle.template.json tests
+          git diff --cached --check
+          if git diff --cached --quiet; then
+            echo "No coordinated identity changes required"
+            exit 0
+          fi
+          git commit -m "[alpha942-bump] coordinate Alpha9.42 release identity"
+          git push origin HEAD:fix/alpha9.42-full-kems-customer-authority
