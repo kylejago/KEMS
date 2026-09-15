@@ -1,4 +1,10 @@
-"""Alpha9.41 no-paid-export simulation-authority regressions."""
+"""Current-day customer simulation-authority regressions.
+
+Alpha9.41 briefly made the live no-export configuration authoritative for the
+customer KEMS totals. Alpha9.42 deliberately supersedes that presentation rule:
+KEMS is the full-system counterfactual digital twin, while live/control policy
+remains separate.
+"""
 
 from __future__ import annotations
 
@@ -118,9 +124,8 @@ def _paid_export_agile_state() -> dict:
     }
 
 
-def test_alpha941_no_export_keeps_policy_simulation_for_cumulative_values() -> None:
-    """Paid-export Agile replay must not overwrite a no-export KEMS digital twin."""
-    no_export = _SimulationState(
+def _proposal_simulation(*, no_export_mode_active: bool) -> _SimulationState:
+    return _SimulationState(
         simulated_cost_pence=10.04,
         simulated_import_cost_pence=10.04,
         simulated_export_income_pence=0.0,
@@ -137,25 +142,20 @@ def test_alpha941_no_export_keeps_policy_simulation_for_cumulative_values() -> N
         simulated_battery_soc=80.5,
         actual_cost_pence=96.15,
         baseline_no_system_cost_pence=138.39,
-        no_export_mode_active=True,
+        no_export_mode_active=no_export_mode_active,
     )
 
-    result = presentation.reconciled_current_day_simulation(
-        no_export,
-        _paid_export_agile_state(),
-    )
 
-    # Cumulative/accounting authority remains the policy-aware no-export replay.
-    assert result.simulated_cost_pence == 10.04
-    assert result.simulated_import_cost_pence == 10.04
-    assert result.simulated_grid_import_kwh == 2.873
-    assert result.simulated_grid_export_kwh == 0.0
-    assert result.simulated_battery_charge_kwh == 3.353
-    assert result.simulated_battery_export_kwh == 0.0
-    assert result.simulated_export_income_pence == 0.0
-    assert result.simulated_battery_soc == 80.5
+def _assert_full_kems_authority(result: _SimulationState) -> None:
+    assert result.simulated_import_cost_pence == 145.75
+    assert result.simulated_grid_import_kwh == 41.723
+    assert result.simulated_grid_export_kwh == 10.103
+    assert result.simulated_battery_charge_kwh == 36.907
+    assert result.simulated_battery_export_kwh == 5.054
+    assert result.simulated_export_income_pence == 121.23
+    assert result.simulated_battery_soc == 67.3
 
-    # Instantaneous power still comes from the final canonical routing snapshot.
+    # Instantaneous power comes from the same final Full KEMS routing authority.
     assert result.current_simulated_house_load_kw == 0.434
     assert result.current_simulated_solar_power_kw == 1.487
     assert result.current_simulated_grid_import_kw == 0.0
@@ -164,25 +164,19 @@ def test_alpha941_no_export_keeps_policy_simulation_for_cumulative_values() -> N
     assert result.current_simulated_battery_power_kw == -1.053
 
 
-def test_alpha941_paid_export_still_uses_full_agile_cumulative_authority() -> None:
-    """The Alpha9.39 Full-KEMS authority remains intact when export is paid."""
-    paid_export = _SimulationState(
-        simulated_grid_import_kwh=2.873,
-        simulated_grid_export_kwh=0.0,
-        simulated_battery_export_kwh=0.0,
-        simulated_battery_soc=80.5,
-        actual_cost_pence=96.15,
-        baseline_no_system_cost_pence=138.39,
-        no_export_mode_active=False,
-    )
-
+def test_no_export_live_setting_does_not_downscope_customer_kems_simulation() -> None:
+    """KEMS remains full-system what-if even while live export is unpaid."""
     result = presentation.reconciled_current_day_simulation(
-        paid_export,
+        _proposal_simulation(no_export_mode_active=True),
         _paid_export_agile_state(),
     )
+    _assert_full_kems_authority(result)
 
-    assert result.simulated_grid_import_kwh == 41.723
-    assert result.simulated_grid_export_kwh == 10.103
-    assert result.simulated_battery_export_kwh == 5.054
-    assert result.simulated_export_income_pence == 121.23
-    assert result.simulated_battery_soc == 67.3
+
+def test_paid_export_live_setting_uses_same_full_kems_customer_authority() -> None:
+    """Customer KEMS authority is independent of the current live export setting."""
+    result = presentation.reconciled_current_day_simulation(
+        _proposal_simulation(no_export_mode_active=False),
+        _paid_export_agile_state(),
+    )
+    _assert_full_kems_authority(result)
