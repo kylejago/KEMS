@@ -146,6 +146,8 @@ def test_alpha941_no_export_keeps_policy_simulation_for_cumulative_values() -> N
     )
 
     # Cumulative/accounting authority remains the policy-aware no-export replay.
+    assert result.simulated_cost_pence == 10.04
+    assert result.simulated_import_cost_pence == 10.04
     assert result.simulated_grid_import_kwh == 2.873
     assert result.simulated_grid_export_kwh == 0.0
     assert result.simulated_battery_charge_kwh == 3.353
