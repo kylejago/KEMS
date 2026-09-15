@@ -57,11 +57,14 @@ def test_alpha947_import_breakdown_reconciles_to_authoritative_totals() -> None:
     module._classify_import_breakdown(summary, plan, records)
     assert summary["cheap_grid_import_kwh"] == 41.723
     assert summary["day_grid_import_kwh"] == 0.0
-    assert abs(
-        summary["cheap_import_cost_pence"]
-        + summary["day_import_cost_pence"]
-        - summary["import_cost_pence"]
-    ) <= 0.02
+    assert (
+        abs(
+            summary["cheap_import_cost_pence"]
+            + summary["day_import_cost_pence"]
+            - summary["import_cost_pence"]
+        )
+        <= 0.02
+    )
     assert module._reconcile_import_totals(summary) is True
 
 
@@ -97,10 +100,12 @@ def test_alpha947_installs_before_first_refresh_and_stays_reporting_only() -> No
     manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
 
     assert manifest["version"] == "0.9.0-alpha9.47"
-    assert entrypoint.index("install_alpha947_reporting_consistency()") < entrypoint.index(
-        "await coordinator.async_config_entry_first_refresh()"
+    assert entrypoint.index(
+        "install_alpha947_reporting_consistency()"
+    ) < entrypoint.index("await coordinator.async_config_entry_first_refresh()")
+    assert (
+        "self._finalise_best_day(self._tracking_date, self._tracking_values)" in source
     )
-    assert "self._finalise_best_day(self._tracking_date, self._tracking_values)" in source
     assert "Real inverter writes remain hard-blocked until" in source
     assert "No older replay days were recovered" in source
     assert "solar_destinations_within_generation" in source
