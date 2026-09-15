@@ -28,6 +28,7 @@ from .const import (
 )
 from .entity import KEMSEntity
 from .kems_core import KEMSData
+from .kems_core.observability import full_kems_battery_export_present
 
 IsOnFn = Callable[[KEMSData], bool | None]
 GAS_SOURCE_KEYS = (
@@ -124,9 +125,9 @@ BINARY_SENSORS: tuple[KEMSBinarySensorEntityDescription, ...] = (
     ),
     KEMSBinarySensorEntityDescription(
         key="battery_export_simulated",
-        name="Battery export enabled in simulation",
+        name="Full KEMS battery export present in simulation",
         icon="mdi:battery-arrow-down-outline",
-        is_on_fn=lambda data: data.simulation.battery_export_enabled,
+        is_on_fn=lambda data: full_kems_battery_export_present(data.simulation),
     ),
     KEMSBinarySensorEntityDescription(
         key="battery_export_paused_for_home_reserve",
@@ -381,7 +382,32 @@ class KEMSBinarySensor(KEMSEntity, BinarySensorEntity):
 
     @property
     def extra_state_attributes(self) -> dict[str, object] | None:
-        """Explain Power Down baseline semantics without changing source truth."""
+        """Explain scoped binary-sensor semantics without changing source truth."""
+        if self.entity_description.key == "battery_export_simulated":
+            simulation = self.coordinator.data.simulation
+            return {
+                "authority": "Full KEMS customer simulation",
+                "simulated_battery_export_today_kwh": (
+                    simulation.simulated_battery_export_kwh
+                ),
+                "current_simulated_battery_export_kw": (
+                    simulation.current_simulated_battery_export_power_kw
+                ),
+                "target_battery_export_power_kw": (
+                    simulation.target_battery_export_power_kw
+                ),
+                "live_export_tariff_active": simulation.export_tariff_active,
+                "live_no_export_mode_active": simulation.no_export_mode_active,
+                "base_simulation_battery_export_enabled": (
+                    simulation.battery_export_enabled
+                ),
+                "scope_note": (
+                    "State reports battery export represented in the authoritative "
+                    "Full KEMS customer simulation; live/control export permission "
+                    "remains separate and fail-safe."
+                ),
+            }
+
         if self.entity_description.key != "saving_session_baseline_incomplete":
             return None
 
