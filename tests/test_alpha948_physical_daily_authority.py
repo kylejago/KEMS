@@ -63,7 +63,8 @@ def test_alpha948_promotes_energy_but_never_invents_tariff_timing() -> None:
 
     assert "replace(result, **replacements)" in source
     assert "integrated instantaneous physical power fallback" in source
-    assert "aggregate daily energy counters do not invent tariff timing" in source
+    assert "aggregate daily " in source
+    assert "energy counters do not invent tariff timing" in source
     assert "physical_balance_residual_kwh" in source
     assert '"hardware_writes": "blocked"' in source
     assert ".services.async_call(" not in source

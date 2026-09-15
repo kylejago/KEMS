@@ -274,7 +274,7 @@ def _direct_for_day(
         *records,
         *([current_snapshot] if current_snapshot is not None else []),
     ]:
-        if record.timestamp.date() != target_date:
+        if dt_util.as_local(record.timestamp).date() != target_date:
             continue
         value = _sidecar_value(record, metric)
         if value is not None:
@@ -399,7 +399,9 @@ def _install_simulation_authority() -> None:
         for metric, spec in _METRICS.items():
             field = spec["simulation_field"]
             integrated = _number(getattr(result, field, None))
-            direct = _direct_for_day(records, now.date(), metric, current_snapshot)
+            direct = _direct_for_day(
+                records, dt_util.as_local(now).date(), metric, current_snapshot
+            )
             difference = (
                 direct - integrated
                 if direct is not None and integrated is not None
@@ -433,7 +435,7 @@ def _install_simulation_authority() -> None:
         if replacements:
             result = replace(result, **replacements)
 
-        if now.date() == dt_util.now().date():
+        if dt_util.as_local(now).date() == dt_util.as_local(dt_util.now()).date():
             solar = _number(result.actual_solar_generation_kwh)
             house = _number(result.actual_house_consumption_kwh)
             grid_import = _number(result.actual_grid_import_kwh)
