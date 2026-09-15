@@ -3,8 +3,9 @@
 BottlecapDave's live Power Up coordinator can stop exposing a joined event after
 completion. KEMS therefore retains the last confidently classified automatic
 Happy Hour in Home Assistant storage and may reuse that evidence when the live
-feed becomes empty. Ambiguous live Power Up data always wins fail-safe and a
-newer manual fallback is never hidden by older retained evidence.
+feed becomes empty. Ambiguous live Power Up data always wins fail-safe. A newer
+manual fallback is also preserved unless KEMS has stronger evidence that it
+successfully booked a specific Weekend Happy Hour through Octopus.
 """
 
 # ruff: noqa: E501  # Embedded Lovelace/Jinja lines are intentionally verbatim.
@@ -55,6 +56,9 @@ def _serialise_event(event: Mapping[str, Any], captured_at: datetime) -> dict[st
         "classification_basis",
         "confidence",
         "event_ids",
+        "event_code",
+        "booking_authoritative",
+        "booking_source",
         "duration_hours",
         "fair_use_cap_kwh",
     ):
@@ -84,6 +88,70 @@ def _same_window(left: Mapping[str, Any], right: Mapping[str, Any]) -> bool:
         and abs((left_start - right_start).total_seconds()) <= 90
         and abs((left_end - right_end).total_seconds()) <= 90
     )
+
+
+def _auto_join_booking_event(hass: Any, now: datetime) -> dict[str, Any] | None:
+    """Return one KEMS-confirmed booking as dispatch-safe Octopus evidence.
+
+    Octopus Energy 19.1 retains an event ``code`` on joined Power Up events.
+    Historical KEMS discovery deliberately rejects coded events because older
+    generic free-electricity events used the same feed. Alpha9.40 has stronger
+    evidence after the supported Weekend Happy Hour join service returns success:
+    the exact code and window that KEMS itself booked. Bridge that confirmed
+    booking into the existing retained-event authority rather than weakening the
+    generic coded-event classifier.
+    """
+    try:
+        from . import happy_hour_auto_join
+    except ImportError:
+        return None
+
+    controllers = getattr(happy_hour_auto_join, "_CONTROLLERS", {})
+    if not isinstance(controllers, Mapping):
+        return None
+    matches = [
+        controller
+        for key, controller in controllers.items()
+        if isinstance(key, tuple) and key and key[0] == id(hass)
+    ]
+    if len(matches) != 1:
+        return None
+
+    state = getattr(matches[0], "state", None)
+    if not isinstance(state, Mapping) or state.get("status") != "booked":
+        return None
+    code = str(state.get("booked_event_code") or "").strip()
+    start = _dt(state.get("booked_start"))
+    end = _dt(state.get("booked_end"))
+    if not code or start is None or end is None or end <= start:
+        return None
+    if end < now - _MAX_RETAINED_PLAN_AGE:
+        return None
+
+    duration = max((end - start).total_seconds() / 3600.0, 0.0)
+    reward_hours = 2 if duration >= 1.5 else 1
+    return {
+        "enabled": True,
+        "source": "octopus_energy",
+        "automatic_source_supported": True,
+        "automatic_status": "detected_kems_booking",
+        "source_kind": "kems_auto_join_booking",
+        "source_entity": state.get("source_entity"),
+        "source_account": state.get("source_account"),
+        "classification_basis": (
+            "KEMS-confirmed Weekend Happy Hour booking via the supported "
+            "Octopus join service"
+        ),
+        "confidence": "confirmed_booking",
+        "event_ids": [code],
+        "event_code": code,
+        "booking_authoritative": True,
+        "booking_source": "kems_auto_join",
+        "start": start,
+        "end": end,
+        "duration_hours": reward_hours,
+        "fair_use_cap_kwh": 16.0 * reward_hours,
+    }
 
 
 def retained_happy_hour_result(
@@ -122,7 +190,12 @@ def retained_happy_hour_result(
         and manual_end is not None
         and manual_end > now
     )
-    if manual_current_or_future and not _same_window(result, retained):
+    authoritative_booking = bool(retained.get("booking_authoritative"))
+    if (
+        manual_current_or_future
+        and not _same_window(result, retained)
+        and not authoritative_booking
+    ):
         result["retained_automatic_event_available"] = True
         result["retained_automatic_event_superseded_by_manual"] = True
         return result
@@ -143,7 +216,9 @@ def retained_happy_hour_result(
             "automatic_status": retained_status,
             "source_kind": "retained_octopus_evidence",
             "retained_source_kind": retained.get("source_kind"),
-            "automatic_evidence": "retained",
+            "automatic_evidence": (
+                "kems_booking" if authoritative_booking else "retained"
+            ),
             "evidence_retained": True,
             "retained_at": retained.get("captured_at"),
         }
@@ -215,10 +290,14 @@ class HappyHourEvidenceRecorder:
         self._hass.async_create_task(self._store.async_save({"last_event": stored}))
 
     def resolve(self, live: Mapping[str, Any], now: datetime) -> dict[str, Any]:
-        """Capture live evidence and otherwise safely apply retained evidence."""
+        """Capture live or confirmed-booking evidence, then safely resolve it."""
         self.ensure_loaded()
         if live.get("source") == "octopus_energy":
             self.capture(live, now)
+        else:
+            booked = _auto_join_booking_event(self._hass, now)
+            if booked is not None:
+                self.capture(booked, now)
         return retained_happy_hour_result(live, self._retained, now=now)
 
 
