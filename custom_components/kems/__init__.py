@@ -15,6 +15,7 @@ from .alpha95_presentation import (
 )
 from .alpha98_startup_recovery import async_recover_alpha98_startup_sources
 from .alpha937_dashboard_contract import install_alpha937_dashboard_contract
+from .alpha946_solar_actual import install_alpha946_solar_actual
 from .collector import Collector
 from .const import (
     CONF_BATTERY_RESERVE,
@@ -88,6 +89,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # dashboard compositor with one fresh packaged customer dashboard.
     install_energy_bill_dashboard_patch()
     install_dashboard_pipeline()
+    # Alpha9.46 must be active before history is loaded and before the first
+    # coordinator refresh so direct FoxESS daily-solar evidence is retained from
+    # the first post-update sample onward.
+    install_alpha946_solar_actual()
     install_alpha95_presentation()
     install_alpha937_dashboard_contract()
     # Alpha9.40 installs recommendation/booking before dashboard composition and
