@@ -1,4 +1,4 @@
-"""Expose current-day Full KEMS accounting through headline simulation sensors."""
+"""Expose policy-aware current-day KEMS accounting through headline sensors."""
 
 from __future__ import annotations
 
@@ -129,18 +129,34 @@ def reconciled_current_day_simulation(
     simulation: SimulationState,
     state: dict[str, Any],
 ) -> SimulationState:
-    """Return one Full-KEMS-authoritative headline SimulationState.
+    """Return one policy-aware headline SimulationState.
 
-    The generic proposal replay remains a fallback/comparison model.  Whenever
-    the current-day Full KEMS period is ready, headline SOC, cumulative energy and
-    cost fields come from that same digital twin, even before today's first
-    settlement.  Current power fields are independently projected from the final
-    Full KEMS routing snapshot whenever available, so every KEMS-tab consumer sees
-    one internally coherent answer for what the virtual system has done and is
-    doing now.
+    The configured proposal replay is the cumulative/accounting authority while
+    no-paid-export mode is active.  The Agile Smart Export ledger is a paid-export
+    model and must not overwrite that policy with hypothetical export income,
+    battery export, SOC or import totals.  Current power fields remain independently
+    projected from the final KEMS routing snapshot.
+
+    When paid export is active, the Alpha9.39 contract remains unchanged: a ready
+    current-day Full KEMS period supplies headline SOC, cumulative energy and costs
+    even before today's first settlement, while the final routing snapshot supplies
+    instantaneous power.
     """
-    agile = _today_agile(state)
     routing_replacements = _current_routing_replacements(state)
+
+    # Alpha9.41 policy boundary: the Agile Smart Export period deliberately models
+    # a paid-export strategy.  In no-paid-export mode the already policy-aware
+    # SimulationEngine replay remains authoritative for cumulative values.  Do not
+    # zero individual Agile fields after the fact; that would leave impossible SOC,
+    # charge/import and financial totals from the paid-export trajectory.
+    if bool(getattr(simulation, "no_export_mode_active", False)):
+        return (
+            replace(simulation, **routing_replacements)
+            if routing_replacements
+            else simulation
+        )
+
+    agile = _today_agile(state)
     if agile is None:
         return (
             replace(simulation, **routing_replacements)
