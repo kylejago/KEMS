@@ -283,6 +283,9 @@ views:
           **Planner status:** **{{ status | replace('_', ' ') | title }}**
           **Auto join:** {{ states(hh) }}
           **Automatic event source:** {{ state_attr('sensor.kems_agile_happy_hour_plan', 'automatic_status') or 'waiting for Octopus data' }}
+          **Happy Hours banked:** {{ state_attr(hh, 'weekend_happy_hours_available') if state_attr(hh, 'weekend_happy_hours_available') is not none else '-' }}
+          **Redeemable this event day:** {{ state_attr(hh, 'weekend_happy_hours_redeemable_event_day') if state_attr(hh, 'weekend_happy_hours_redeemable_event_day') is not none else '-' }} h
+          **Event-day limit:** {{ state_attr(hh, 'weekend_happy_hours_event_day_limit') or 2 }} h
           **Available choices:** {{ state_attr(hh, 'candidate_count') if state_attr(hh, 'candidate_count') is not none else '-' }}
           **Selected window:** {{ selected_start or '-' }}{% if selected_end %} to {{ selected_end }}{% endif %}
           **Agile price coverage:** import {{ (state_attr(hh, 'import_price_coverage_percent') ~ '%') if state_attr(hh, 'import_price_coverage_percent') is not none else '-' }} / export {{ (state_attr(hh, 'export_price_coverage_percent') ~ '%') if state_attr(hh, 'export_price_coverage_percent') is not none else '-' }}
@@ -905,7 +908,10 @@ views:
               {% if benefit is none %}{% set benefit = rec.get('net_benefit_pence') %}{% endif %}
               **Planner:** **{{ status | replace('_', ' ') | title }}**
               **Discovery source:** {{ state_attr(hh, 'source') or '-' }}
-              **Weekend Happy Hours available:** {{ state_attr(hh, 'weekend_happy_hours_available') if state_attr(hh, 'weekend_happy_hours_available') is not none else '-' }}
+              **Happy Hours banked:** {{ state_attr(hh, 'weekend_happy_hours_available') if state_attr(hh, 'weekend_happy_hours_available') is not none else '-' }}
+              **Redeemable this event day:** {{ state_attr(hh, 'weekend_happy_hours_redeemable_event_day') if state_attr(hh, 'weekend_happy_hours_redeemable_event_day') is not none else '-' }} h
+              **Event-day limit:** {{ state_attr(hh, 'weekend_happy_hours_event_day_limit') or 2 }} h
+              **Balance basis:** {{ state_attr(hh, 'weekend_happy_hours_balance_basis') or '-' }}
               **Reason / gate:** {{ state_attr(hh, 'join_block_reason') or '-' }}
               **Candidate slots:** {{ state_attr(hh, 'candidate_count') if state_attr(hh, 'candidate_count') is not none else '-' }}
               **Recommended start:** {{ state_attr(hh, 'recommended_start') or state_attr(hh, 'booked_start') or '-' }}

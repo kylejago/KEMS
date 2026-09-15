@@ -68,8 +68,8 @@ def test_alpha944_release_identity_and_scope() -> None:
     )
     bundle = json.loads((ROOT / "release" / "kems-bundle.template.json").read_text())
     reason = str(bundle["maintenance"]["reason"])
-    assert manifest["version"] == "0.9.0-alpha9.44"
-    assert reason.startswith("Alpha9.44")
+    assert manifest["version"] == "0.9.0-alpha9.45"
+    assert reason.startswith("Alpha9.45")
     assert "dashboard/observability only" in reason
     assert "Happy Hour scoring or joining logic" in reason
     assert "FoxESS hardware-write authority" in reason
