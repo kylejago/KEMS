@@ -28,6 +28,18 @@ def test_alpha946_prefers_same_device_daily_counter_and_keeps_power_fallback() -
     assert "require_day_end=True" in source
 
 
+def test_alpha946_retained_daily_solar_uses_home_assistant_local_day() -> None:
+    source = SOURCE.read_text(encoding="utf-8")
+
+    assert "dt_util.as_local(record.timestamp).date() != target_date" in source
+    assert "dt_util.as_local(item[0]).hour >= 23" in source
+    assert "records, dt_util.as_local(now).date(), current_snapshot" in source
+    assert (
+        "dt_util.as_local(now).date() == dt_util.as_local(dt_util.now()).date()"
+        in source
+    )
+
+
 def test_alpha946_installs_before_history_refresh_and_remains_reporting_only() -> None:
     source = SOURCE.read_text(encoding="utf-8")
     entrypoint = ENTRYPOINT.read_text(encoding="utf-8")
@@ -35,7 +47,7 @@ def test_alpha946_installs_before_history_refresh_and_remains_reporting_only() -
     bundle = json.loads(BUNDLE.read_text(encoding="utf-8"))
     reason = str(bundle["maintenance"]["reason"])
 
-    assert manifest["version"] == "0.9.0-alpha9.47"
+    assert manifest["version"] == "0.9.0-alpha9.48"
     assert "Alpha9.46" in reason
     assert "Solar Generation Today" in reason
     assert "telemetry gaps" in reason

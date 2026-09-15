@@ -17,6 +17,7 @@ from .alpha98_startup_recovery import async_recover_alpha98_startup_sources
 from .alpha937_dashboard_contract import install_alpha937_dashboard_contract
 from .alpha946_solar_actual import install_alpha946_solar_actual
 from .alpha947_reporting_consistency import install_alpha947_reporting_consistency
+from .alpha948_physical_daily_actual import install_alpha948_physical_daily_actual
 from .collector import Collector
 from .const import (
     CONF_BATTERY_RESERVE,
@@ -94,6 +95,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # coordinator refresh so direct FoxESS daily-solar evidence is retained from
     # the first post-update sample onward.
     install_alpha946_solar_actual()
+    # Alpha9.48 extends the same-device daily-energy authority to physical load,
+    # grid and battery counters before history is loaded or the first refresh runs.
+    install_alpha948_physical_daily_actual()
     install_alpha95_presentation()
     install_alpha937_dashboard_contract()
     # Alpha9.47 reconciles all customer-facing Full KEMS breakdowns onto the

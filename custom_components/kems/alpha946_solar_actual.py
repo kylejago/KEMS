@@ -236,7 +236,7 @@ def _direct_for_day(
         *records,
         *([current_snapshot] if current_snapshot is not None else []),
     ]:
-        if record.timestamp.date() != target_date:
+        if dt_util.as_local(record.timestamp).date() != target_date:
             continue
         value = _sidecar_value(record)
         if value is None:
@@ -245,7 +245,9 @@ def _direct_for_day(
     if not candidates:
         return None
     if require_day_end:
-        candidates = [item for item in candidates if item[0].hour >= 23]
+        candidates = [
+            item for item in candidates if dt_util.as_local(item[0]).hour >= 23
+        ]
         if not candidates:
             return None
     return max(value for _, value in candidates)
@@ -350,10 +352,12 @@ def _install_simulation_authority() -> None:
             _day_end_boundary=_day_end_boundary,
             _records_by_day=_records_by_day,
         )
-        direct = _direct_for_day(records, now.date(), current_snapshot)
+        direct = _direct_for_day(
+            records, dt_util.as_local(now).date(), current_snapshot
+        )
         integrated = _number(result.actual_solar_generation_kwh)
         if direct is None:
-            if now.date() == dt_util.now().date():
+            if dt_util.as_local(now).date() == dt_util.as_local(dt_util.now()).date():
                 _LAST_STATUS.update(
                     {
                         "integrated_today_kwh": (
@@ -365,7 +369,7 @@ def _install_simulation_authority() -> None:
                 )
             return result
 
-        if now.date() == dt_util.now().date():
+        if dt_util.as_local(now).date() == dt_util.as_local(dt_util.now()).date():
             difference = direct - integrated if integrated is not None else None
             percent = (
                 (difference / direct * 100.0)
