@@ -68,7 +68,7 @@ def test_alpha944_release_identity_and_scope() -> None:
     )
     bundle = json.loads((ROOT / "release" / "kems-bundle.template.json").read_text())
     reason = str(bundle["maintenance"]["reason"])
-    assert manifest["version"] == "0.9.0-alpha9.46"
+    assert manifest["version"] == "0.9.0-alpha9.47"
     assert reason.startswith("Alpha9.46")
     assert "dashboard/observability only" in reason
     assert "Happy Hour scoring or joining logic" in reason
