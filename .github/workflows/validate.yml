@@ -24,8 +24,9 @@ jobs:
           fetch-depth: 0
 
       - name: Advance Alpha9.39 release identity only
-        shell: python
+        shell: bash
         run: |
+          python - <<'PY'
           import json
           from pathlib import Path
 
@@ -71,6 +72,7 @@ jobs:
               json.dumps(bundle, indent=2, ensure_ascii=False) + "\n",
               encoding="utf-8",
           )
+          PY
 
       - name: Commit Alpha9.39 identity
         run: |
