@@ -1,0 +1,47 @@
+name: Alpha9.48 version pin sweep
+
+on:
+  push:
+    branches:
+      - fix/alpha9.48-foxess-daily-energy-authority
+
+permissions:
+  contents: write
+
+jobs:
+  sweep:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/alpha9.48-foxess-daily-energy-authority
+      - name: Advance legacy release-contract pins
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          old = '0.9.0-alpha9.47'
+          new = '0.9.0-alpha9.48'
+          changed = []
+          for path in sorted(Path('tests').glob('*.py')):
+              text = path.read_text(encoding='utf-8')
+              if old not in text:
+                  continue
+              path.write_text(text.replace(old, new), encoding='utf-8')
+              changed.append(str(path))
+          print(f'updated {len(changed)} test files')
+          for path in changed:
+              print(path)
+          PY
+      - name: Commit sweep
+        run: |
+          if git diff --quiet -- tests; then
+            echo 'No legacy version pins remain.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add tests
+          git commit -m 'Alpha9.48: advance legacy release-contract version pins'
+          git push origin HEAD:fix/alpha9.48-foxess-daily-energy-authority
