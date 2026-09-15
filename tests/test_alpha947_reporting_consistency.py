@@ -25,7 +25,14 @@ def _load_module():
 
 def test_alpha947_compare_currency_and_wording_are_customer_clear() -> None:
     module = _load_module()
-    payload = b"""**Today total energy cost**\n# {{ ('\xc2\xa3%.2f' | format((kems.get('total_energy_cost_pence') | float) / 100)) if kems.get('total_energy_cost_pence') is not none else '\xe2\x80\x94' }}\n_Configured KEMS digital twin._\n"""
+    payload = (
+        b"**Today total energy cost**\n"
+        b"# {{ ('\xc2\xa3%.2f' | format("
+        b"(kems.get('total_energy_cost_pence') | float) / 100)) "
+        b"if kems.get('total_energy_cost_pence') is not none else "
+        b"'\xe2\x80\x94' }}\n"
+        b"_Configured KEMS digital twin._\n"
+    )
 
     rendered = module._normalise_dashboard(payload).decode("utf-8")
 
