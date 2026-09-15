@@ -75,6 +75,32 @@ def test_alpha947_import_breakdown_reconciles_to_authoritative_totals() -> None:
     assert module._reconcile_import_totals(summary) is True
 
 
+def test_alpha947_import_cost_breakdown_preserves_negative_agile_costs() -> None:
+    module = _load_module()
+    start = datetime(2026, 9, 15, 0, 0, tzinfo=UTC)
+    summary = {"grid_import_kwh": 2.0, "import_cost_pence": -10.0}
+    plan = [
+        {
+            "valid_from": start.isoformat(),
+            "valid_to": (start + timedelta(minutes=30)).isoformat(),
+            "grid_import_kwh": 2.0,
+        }
+    ]
+    records = [
+        SimpleNamespace(
+            timestamp=start,
+            current_import_rate=-5.0,
+            cheap_period_confirmed=True,
+            tariff_stale_fields=(),
+        )
+    ]
+
+    module._classify_import_breakdown(summary, plan, records)
+    assert summary["cheap_import_cost_pence"] == -10.0
+    assert summary["day_import_cost_pence"] == 0.0
+    assert module._reconcile_import_totals(summary) is True
+
+
 def test_alpha947_solar_destinations_cannot_exceed_generation() -> None:
     module = _load_module()
     today = {
