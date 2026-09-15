@@ -71,7 +71,9 @@ def test_alpha948_promotes_energy_but_never_invents_tariff_timing() -> None:
     assert "safe_to_write_hardware = True" not in source
 
 
-def test_alpha948_installs_before_first_refresh_and_release_metadata_is_current() -> None:
+def test_alpha948_installs_before_first_refresh_and_release_metadata_is_current() -> (
+    None
+):
     source = SOURCE.read_text(encoding="utf-8")
     entrypoint = ENTRYPOINT.read_text(encoding="utf-8")
     manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
@@ -83,9 +85,9 @@ def test_alpha948_installs_before_first_refresh_and_release_metadata_is_current(
     assert "Load Energy Today" in reason
     assert "Grid Consumption Today" in reason
     assert "Feed-in Today" in reason
-    assert entrypoint.index("install_alpha948_physical_daily_actual()") < entrypoint.index(
-        "await coordinator.async_config_entry_first_refresh()"
-    )
+    assert entrypoint.index(
+        "install_alpha948_physical_daily_actual()"
+    ) < entrypoint.index("await coordinator.async_config_entry_first_refresh()")
     assert entrypoint.index("install_alpha946_solar_actual()") < entrypoint.index(
         "install_alpha948_physical_daily_actual()"
     )
