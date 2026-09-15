@@ -10,7 +10,77 @@ on:
       - "release/**"
   pull_request:
 
+permissions:
+  contents: write
+
 jobs:
+  alpha939-identity-bump:
+    if: github.event_name == 'push' && github.event.head_commit.message == 'chore: bootstrap Alpha9.39 identity bump'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/alpha9.39-unified-live-simulation-contract
+          fetch-depth: 0
+
+      - name: Advance Alpha9.39 release identity only
+        shell: python
+        run: |
+          import json
+          from pathlib import Path
+
+          old = "0.9.0-alpha9.38"
+          new = "0.9.0-alpha9.39"
+          guarded = [
+              "custom_components/kems/manifest.json",
+              "tests/test_alpha8_consolidation.py",
+              "tests/test_alpha913_forecast_path_scheduler.py",
+              "tests/test_alpha919_runtime_recorder_owner.py",
+              "tests/test_alpha920_shadow_recorder_owner.py",
+              "tests/test_alpha921_planning_target_house_floor.py",
+              "tests/test_alpha922_flow_contract_startup.py",
+              "tests/test_alpha924_flow_parity_export_floor.py",
+              "tests/test_alpha925_observability_clarity.py",
+              "tests/test_alpha926_panel_layout_profiles.py",
+              "tests/test_alpha927_policy_label_publication.py",
+              "tests/test_alpha928_panel_v2_staggered_flow.py",
+              "tests/test_alpha929_panel_v2_extra_gap.py",
+              "tests/test_alpha930_live_foxess_solar_commissioning.py",
+              "tests/test_alpha937_dashboard_contract.py",
+              "tests/test_alpha9_baseline.py",
+          ]
+          for name in guarded:
+              path = Path(name)
+              text = path.read_text(encoding="utf-8")
+              needle = f'"{old}"'
+              count = text.count(needle)
+              if count != 1:
+                  raise SystemExit(f"{name}: expected exactly one {needle}, found {count}")
+              path.write_text(text.replace(needle, f'"{new}"'), encoding="utf-8")
+
+          bundle_path = Path("release/kems-bundle.template.json")
+          bundle = json.loads(bundle_path.read_text(encoding="utf-8"))
+          previous = str(bundle["maintenance"]["reason"])
+          if not previous.startswith("Alpha9.38 "):
+              raise SystemExit("release history no longer starts with the proven Alpha9.38 reason")
+          prefix = (
+              "Alpha9.39 makes the customer Live Data and KEMS views share one metric contract while keeping their authorities strictly separate: Live Data remains measured/observed, and KEMS is now fully digital-twin simulated for the same current, daily-energy and cost fields. A ready current-day Full KEMS period is authoritative for SOC, cumulative energy and costs immediately after midnight even before the first settled half-hour, while final Full KEMS routing remains authoritative for instantaneous simulated power; the generic proposal replay is only a fallback when Full KEMS itself is not ready. This prevents mixed states such as stale 80.2% SOC and ~0.17 kWh cumulative import being displayed beside a canonical ~7.56 kW Full KEMS charge/import flow. Alpha9.39 is simulation presentation/accounting authority and dashboard parity only: no optimiser allocation, tariff policy, battery policy, commissioning authority, control eligibility or FoxESS hardware-write permission changes. "
+          )
+          bundle["maintenance"]["reason"] = prefix + previous
+          bundle_path.write_text(
+              json.dumps(bundle, indent=2, ensure_ascii=False) + "\n",
+              encoding="utf-8",
+          )
+
+      - name: Commit Alpha9.39 identity
+        run: |
+          git diff --check
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add custom_components/kems/manifest.json release/kems-bundle.template.json tests/
+          git commit -m "chore: bump KEMS to Alpha9.39"
+          git push origin HEAD:fix/alpha9.39-unified-live-simulation-contract
+
   validate:
     runs-on: ubuntu-latest
 
