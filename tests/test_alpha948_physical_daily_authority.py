@@ -54,7 +54,10 @@ def test_alpha948_uses_home_assistant_local_day_for_daily_counters() -> None:
 
     assert "dt_util.as_local(record.timestamp).date() != target_date" in source
     assert "records, dt_util.as_local(now).date(), metric, current_snapshot" in source
-    assert "dt_util.as_local(now).date() == dt_util.as_local(dt_util.now()).date()" in source
+    assert (
+        "dt_util.as_local(now).date() == dt_util.as_local(dt_util.now()).date()"
+        in source
+    )
 
 
 def test_alpha948_promotes_energy_but_never_invents_tariff_timing() -> None:
