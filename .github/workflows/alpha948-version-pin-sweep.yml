@@ -1,4 +1,4 @@
-name: Alpha9.48 version pin sweep
+name: Alpha9.48 final branch cleanup
 
 on:
   push:
@@ -9,39 +9,52 @@ permissions:
   contents: write
 
 jobs:
-  sweep:
+  finalise:
     if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           ref: fix/alpha9.48-foxess-daily-energy-authority
-      - name: Advance legacy release-contract pins
+      - name: Apply final Alpha9.48 correctness cleanup
         run: |
           python - <<'PY'
           from pathlib import Path
 
-          old = '0.9.0-alpha9.47'
-          new = '0.9.0-alpha9.48'
-          changed = []
-          for path in sorted(Path('tests').glob('*.py')):
-              text = path.read_text(encoding='utf-8')
-              if old not in text:
-                  continue
-              path.write_text(text.replace(old, new), encoding='utf-8')
-              changed.append(str(path))
-          print(f'updated {len(changed)} test files')
-          for path in changed:
-              print(path)
+          source_path = Path('custom_components/kems/alpha948_physical_daily_actual.py')
+          source = source_path.read_text(encoding='utf-8')
+          replacements = {
+              'if record.timestamp.date() != target_date:':
+                  'if dt_util.as_local(record.timestamp).date() != target_date:',
+              'direct = _direct_for_day(records, now.date(), metric, current_snapshot)':
+                  'direct = _direct_for_day(\n                records, dt_util.as_local(now).date(), metric, current_snapshot\n            )',
+              'if now.date() == dt_util.now().date():':
+                  'if dt_util.as_local(now).date() == dt_util.as_local(dt_util.now()).date():',
+          }
+          for old, new in replacements.items():
+              if old not in source:
+                  raise SystemExit(f'missing expected source text: {old}')
+              source = source.replace(old, new, 1)
+          source_path.write_text(source, encoding='utf-8')
+
+          test_path = Path('tests/test_alpha948_physical_daily_authority.py')
+          test = test_path.read_text(encoding='utf-8')
+          old_assert = 'assert "aggregate daily energy counters do not invent tariff timing" in source'
+          new_assert = (
+              'assert "aggregate daily " in source\n'
+              '    assert "energy counters do not invent tariff timing" in source'
+          )
+          if old_assert not in test:
+              raise SystemExit('missing expected tariff-timing assertion')
+          test_path.write_text(test.replace(old_assert, new_assert, 1), encoding='utf-8')
+
+          workflow = Path('.github/workflows/alpha948-version-pin-sweep.yml')
+          workflow.unlink()
           PY
-      - name: Commit sweep
+      - name: Commit final cleanup
         run: |
-          if git diff --quiet -- tests; then
-            echo 'No legacy version pins remain.'
-            exit 0
-          fi
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add tests
-          git commit -m 'Alpha9.48: advance legacy release-contract version pins'
+          git add -A
+          git commit -m 'Alpha9.48: finalise local-day authority and release contracts'
           git push origin HEAD:fix/alpha9.48-foxess-daily-energy-authority
