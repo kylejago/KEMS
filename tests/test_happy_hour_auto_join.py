@@ -1,6 +1,7 @@
 """Alpha9.40 Weekend Happy Hour recommendation/auto-join contracts."""
 
 from datetime import UTC, date, datetime, timedelta
+from zoneinfo import ZoneInfo
 
 import pytest
 
@@ -17,18 +18,35 @@ from custom_components.kems.product_types import (
     EXPORT_TARIFF_TYPE_NONE,
 )
 
+_LONDON = ZoneInfo("Europe/London")
+
 
 def _half_hour_rates(
     target_day: date,
     value,
 ) -> list[RateSlot]:
-    start = datetime(target_day.year, target_day.month, target_day.day, tzinfo=UTC)
+    local_start = datetime(
+        target_day.year,
+        target_day.month,
+        target_day.day,
+        tzinfo=_LONDON,
+    )
+    next_day = target_day + timedelta(days=1)
+    local_end = datetime(
+        next_day.year,
+        next_day.month,
+        next_day.day,
+        tzinfo=_LONDON,
+    )
+    cursor = local_start.astimezone(UTC)
+    end = local_end.astimezone(UTC)
     output = []
-    for index in range(48):
-        slot_start = start + timedelta(minutes=30 * index)
-        slot_end = slot_start + timedelta(minutes=30)
+    while cursor < end:
+        slot_start = cursor
+        slot_end = min(slot_start + timedelta(minutes=30), end)
         slot_value = value(slot_start) if callable(value) else value
         output.append(RateSlot(slot_start, slot_end, float(slot_value)))
+        cursor = slot_end
     return output
 
 
