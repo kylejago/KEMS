@@ -28,6 +28,7 @@ from .const import (
 )
 from .entity import KEMSEntity
 from .kems_core import KEMSData
+from .kems_core.observability import full_kems_battery_export_enabled
 
 IsOnFn = Callable[[KEMSData], bool | None]
 GAS_SOURCE_KEYS = (
@@ -46,14 +47,6 @@ class KEMSBinarySensorEntityDescription(BinarySensorEntityDescription):
     is_on_fn: IsOnFn
     source_key: str | None = None
     source_any_keys: tuple[str, ...] = ()
-
-
-def _full_kems_battery_export_enabled(data: KEMSData) -> bool | None:
-    """Return Full KEMS battery-export capability, separate from live policy."""
-    full_kems = data.scenarios.scenario("kems_full")
-    if full_kems is None or not full_kems.ready:
-        return None
-    return True
 
 
 BINARY_SENSORS: tuple[KEMSBinarySensorEntityDescription, ...] = (
@@ -134,7 +127,7 @@ BINARY_SENSORS: tuple[KEMSBinarySensorEntityDescription, ...] = (
         key="battery_export_simulated",
         name="Full KEMS battery export enabled in simulation",
         icon="mdi:battery-arrow-down-outline",
-        is_on_fn=_full_kems_battery_export_enabled,
+        is_on_fn=lambda data: full_kems_battery_export_enabled(data.scenarios),
     ),
     KEMSBinarySensorEntityDescription(
         key="battery_export_paused_for_home_reserve",
