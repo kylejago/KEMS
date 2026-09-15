@@ -122,3 +122,24 @@ def test_alpha945_dashboard_explains_banked_balance_and_daily_limit() -> None:
     assert "Event-day limit" in source
     assert "weekend_happy_hours_redeemable_event_day" in source
     assert source == packaged
+
+
+def test_alpha945_release_identity_and_scope() -> None:
+    import json
+    from pathlib import Path
+
+    root = Path(__file__).parents[1]
+    manifest = json.loads(
+        (root / "custom_components" / "kems" / "manifest.json").read_text(encoding="utf-8")
+    )
+    bundle = json.loads(
+        (root / "release" / "kems-bundle.template.json").read_text(encoding="utf-8")
+    )
+    reason = str(bundle["maintenance"]["reason"])
+    assert manifest["version"] == "0.9.0-alpha9.45"
+    assert reason.startswith("Alpha9.45")
+    assert "raw 6 reports 3 rewards rather than 6" in reason
+    assert "two-one-hour-reward event-day limit" in reason
+    assert "16 kWh-per-reward-hour cap" in reason
+    assert "does not broaden external Octopus booking authority" in reason
+    assert "FoxESS hardware-write authority" in reason
