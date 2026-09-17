@@ -138,11 +138,7 @@ def build_foxess_command_shadow(
         translation_reason = f"Unreviewed KEMS work mode: {control.desired_work_mode}"
 
     proposed_export_limit_w = round(
-        (
-            configured_export_limit_kw
-            if control.desired_grid_export_allowed
-            else 0.0
-        )
+        (configured_export_limit_kw if control.desired_grid_export_allowed else 0.0)
         * 1000
     )
     proposed_min_soc_on_grid = round(control.desired_min_soc_percent, 1)
