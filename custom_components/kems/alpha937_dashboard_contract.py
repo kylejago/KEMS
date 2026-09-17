@@ -12,10 +12,15 @@ same customer metric contract from their respective actual/simulated authorities
 from __future__ import annotations
 
 from collections.abc import Callable
+from pathlib import Path
 
 DashboardBytesFn = Callable[[], bytes]
 
 _installed = False
+
+POWER_DOWN_CARD_PATH = Path(__file__).with_name("power_down_dashboard_card.yaml")
+_KEMS_HAPPY_HOUR_MARKER = "      - type: markdown\n        title: Weekend Happy Hour\n"
+_KEMS_POWER_HISTORY_MARKER = "      - type: markdown\n        title: Power history — today\n"
 
 _ROI_ENTITY_RENAMES = {
     "sensor.kems_financial_house_consumption": (
@@ -281,12 +286,42 @@ def _repair_live_kems_view_parity(content: str) -> str:
     if kems_start < 0 or compare_start < 0:
         return content
     kems = content[kems_start:compare_start]
+    kems_end_marker = (
+        _KEMS_HAPPY_HOUR_MARKER
+        if _KEMS_HAPPY_HOUR_MARKER in kems
+        else _KEMS_POWER_HISTORY_MARKER
+    )
     kems = _replace_between(
         kems,
         "      - type: grid\n        columns: 2\n        square: false\n        cards:\n          - type: markdown\n            title: KEMS now\n",
-        "      - type: markdown\n        title: Power history — today\n",
+        kems_end_marker,
         _KEMS_PARITY_BLOCK,
     )
+    return content[:kems_start] + kems + content[compare_start:]
+
+
+def _repair_kems_event_cards(content: str) -> str:
+    """Keep Happy Hour and Power Down visible in the final managed KEMS view."""
+    kems_marker = "\n  - title: KEMS\n"
+    kems_start = content.find(kems_marker)
+    if kems_start < 0:
+        return content
+    compare_start = content.find("\n  - title: Compare\n", kems_start + len(kems_marker))
+    if compare_start < 0:
+        return content
+
+    kems = content[kems_start:compare_start]
+    if _KEMS_HAPPY_HOUR_MARKER not in kems:
+        return content
+    if "        title: Power Down\n" in kems:
+        return content
+
+    power_history = kems.find(_KEMS_POWER_HISTORY_MARKER)
+    if power_history < 0:
+        return content
+
+    card = POWER_DOWN_CARD_PATH.read_text(encoding="utf-8").rstrip()
+    kems = f"{kems[:power_history]}{card}\n{kems[power_history:]}"
     return content[:kems_start] + kems + content[compare_start:]
 
 
@@ -307,6 +342,7 @@ def repair_dashboard_contract(payload: bytes) -> bytes:
 
     content = _repair_live_energy_today(content)
     content = _repair_live_kems_view_parity(content)
+    content = _repair_kems_event_cards(content)
     content = _repair_compare_view(content)
     return content.encode()
 
