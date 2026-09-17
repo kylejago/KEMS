@@ -25,6 +25,8 @@ def _module(path: Path, name: str):
 
 
 def _runtime_dashboard() -> tuple[object, bytes]:
+    # Mirror the installed runtime order: finalise first, then apply the
+    # authoritative Alpha9.37+ customer reporting contract.
     pipeline = _module(PIPELINE, "alpha950_dashboard_pipeline")
     contract = _module(CONTRACT, "alpha950_dashboard_contract")
     base = pipeline._finalise_dashboard_bytes(MASTER.read_bytes())
