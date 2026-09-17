@@ -49,7 +49,10 @@ def assess_foxess_export_limit_readback(
     if not selected_device_id:
         return _check(
             WAIT,
-            "Waiting for one authoritative FoxESS telemetry device before proving the export limit",
+            (
+                "Waiting for one authoritative FoxESS telemetry device before "
+                "proving the export limit"
+            ),
         )
 
     binding_data = dict(binding or {})
@@ -73,7 +76,10 @@ def assess_foxess_export_limit_readback(
     except (TypeError, ValueError):
         return _check(
             WAIT,
-            f"FoxESS export-limit readback is unavailable or non-numeric: {readback_entity_id}",
+            (
+                "FoxESS export-limit readback is unavailable or non-numeric: "
+                f"{readback_entity_id}"
+            ),
         )
 
     if observed_w < 0:
