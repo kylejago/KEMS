@@ -163,8 +163,6 @@ def test_real_projection_attach_builder_chain_preserves_policy_metadata(
     assert projected["house_import_floor_soc_percent"] == 10.0
     assert projected["hard_safety_recovery_soc_percent"] == 12.0
 
-    # Alpha9.21 failed here because the metadata dictionary was expanded directly
-    # into the strict build_slot_flow signature. Alpha9.22 must complete normally.
     flow._attach_flow_contract(state, now=now, future_today=future)
 
     slot = state["today_slots"][0]
@@ -186,7 +184,7 @@ def test_alpha922_release_scope_is_startup_presentation_only() -> None:
     )
     source = (INTEGRATION / "agile_flow_reserve_policy.py").read_text(encoding="utf-8")
 
-    assert manifest["version"] == "0.9.0-alpha9.50"
+    assert manifest["version"] == "0.9.0-alpha9.51"
     reason = bundle["maintenance"]["reason"].lower()
     assert "startup hotfix" in reason
     assert "build_slot_flow" in reason
