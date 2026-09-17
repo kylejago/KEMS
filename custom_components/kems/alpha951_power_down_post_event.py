@@ -275,7 +275,10 @@ def _install_dashboard_patch() -> None:
     )
     replacement = (
         "              | Export income | −£{{ '%.2f' | format(export / 100) }} |\n"
-        "              | Power Down event credit | −£{{ '%.2f' | format((state_attr('binary_sensor.kems_last_power_down_result_available', 'power_down_credit_today_pence') | float(0)) / 100) }} |\n"
+        "              | Power Down event credit | −£{{ '%.2f' | "
+        "format((state_attr("
+        "'binary_sensor.kems_last_power_down_result_available', "
+        "'power_down_credit_today_pence') | float(0)) / 100) }} |\n"
         "              | **Electricity total**"
     )
 
@@ -334,7 +337,8 @@ def _install_diagnostics_patch() -> None:
             "supplier_settled": False,
             "authority_note": (
                 "Completed same-day KEMS event results are authoritative for the "
-                "published KEMS Power Down credit; Octopus supplier settlement may differ."
+                "published KEMS Power Down credit; Octopus supplier "
+                "settlement may differ."
             ),
         }
         return payload
