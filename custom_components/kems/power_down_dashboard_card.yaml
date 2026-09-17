@@ -1,0 +1,60 @@
+      - type: markdown
+        title: Power Down
+        content: |
+          {% set sim = 'sensor.kems_export_tariff_status' %}
+          {% set mode = states('select.kems_operating_mode') %}
+          {% set joined = state_attr(sim, 'saving_session_joined') | default(false, true) %}
+          {% set active = state_attr(sim, 'saving_session_active') | default(false, true) %}
+          {% set start_raw = state_attr(sim, 'saving_session_start') %}
+          {% set end_raw = state_attr(sim, 'saving_session_end') %}
+          {% set start = as_datetime(start_raw) if start_raw else none %}
+          {% set end = as_datetime(end_raw) if end_raw else none %}
+          {% set baseline = state_attr(sim, 'saving_session_baseline_net_kwh') %}
+          {% set baseline_source = state_attr(sim, 'saving_session_baseline_source') %}
+          {% set baseline_incomplete = state_attr(sim, 'saving_session_baseline_incomplete') %}
+          {% set reserve = state_attr(sim, 'saving_session_battery_reserve_kwh') %}
+          {% set export_target = state_attr(sim, 'saving_session_export_target_kw') %}
+          {% set est_export = state_attr(sim, 'estimated_saving_session_export_kwh') %}
+          {% set reduction = state_attr(sim, 'estimated_saving_session_rewardable_reduction_kwh') %}
+          {% set bonus = state_attr(sim, 'estimated_saving_session_bonus_pence') %}
+          {% set export_income = state_attr(sim, 'estimated_saving_session_export_income_pence') %}
+          {% set total_income = state_attr(sim, 'estimated_saving_session_total_income_pence') %}
+          {% set duration = state_attr(sim, 'saving_session_duration_minutes') %}
+          {% set points = state_attr(sim, 'saving_session_octopoints_per_kwh') %}
+          {% set bonus_rate = state_attr(sim, 'saving_session_bonus_rate_pence') %}
+          {% if active %}
+          {% set status = 'Active' %}
+          {% elif joined and start and now() < as_local(start) %}
+          {% set status = 'Joined - preparing' %}
+          {% elif joined %}
+          {% set status = 'Joined' %}
+          {% else %}
+          {% set status = 'No joined session' %}
+          {% endif %}
+          **Status:** **{{ status }}**
+          **Session:** {{ as_local(start).strftime('%a %d %b %H:%M') if start else '-' }}{% if end %} to {{ as_local(end).strftime('%H:%M') }}{% endif %}
+          **Duration:** {{ (duration ~ ' min') if duration is not none else '-' }}
+          **Reward:** {{ (points ~ ' Octopoints/kWh') if points is not none else '-' }} / {{ (bonus_rate ~ ' p/kWh') if bonus_rate is not none else '-' }}
+          **Net baseline:** {{ (baseline ~ ' kWh') if baseline is not none else '-' }}
+          **Baseline source:** {{ baseline_source or '-' }}
+          **Baseline completeness:** {{ 'Incomplete' if joined and baseline_incomplete else 'Complete' if joined and baseline is not none else '-' }}
+          **Battery reserve for event:** {{ (reserve ~ ' kWh') if reserve is not none else '-' }}
+          **Planned export target:** {{ (export_target ~ ' kW') if export_target is not none else '-' }}
+          **Estimated session export:** {{ (est_export ~ ' kWh') if est_export is not none else '-' }}
+          **Estimated rewardable reduction:** {{ (reduction ~ ' kWh') if reduction is not none else '-' }}
+          **Estimated Power Down bonus:** {{ ('GBP %.2f' | format((bonus | float) / 100)) if bonus is not none else '-' }}
+          **Estimated export income:** {{ ('GBP %.2f' | format((export_income | float) / 100)) if export_income is not none else '-' }}
+          **Estimated combined income:** {{ ('GBP %.2f' | format((total_income | float) / 100)) if total_income is not none else '-' }}
+          **Battery reserved:** {{ 'yes' if state_attr(sim, 'battery_reserved_for_saving_session') else 'no' }}
+          **Normal battery export held back:** {{ 'yes' if state_attr(sim, 'battery_export_reduced_for_saving_session') else 'no' }}
+
+          {% if mode | lower != 'control' %}
+          **Execution authority:** **Simulation/read-only - KEMS will not write hardware.**
+          {% elif states('binary_sensor.kems_control_commands_permitted') != 'on' %}
+          **Execution authority:** Control mode is selected, but hardware commands remain blocked by the existing commissioning and safety gates.
+          {% else %}
+          **Execution authority:** Control mode is selected; the existing commissioning, control and safety gates remain authoritative.
+          {% endif %}
+
+          _This is KEMS Power Down planning/reward evidence. Live Data remains measured property reality._
+          _This dashboard card is read-only evidence: it does not join sessions or write FoxESS hardware._

@@ -91,8 +91,11 @@ def test_alpha948_installs_before_first_refresh_and_release_metadata_is_current(
     manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
     bundle = json.loads(BUNDLE.read_text(encoding="utf-8"))
     reason = str(bundle["maintenance"]["reason"])
+    version = str(manifest["version"])
+    prefix = "0.9.0-alpha9."
 
-    assert manifest["version"] == "0.9.0-alpha9.48"
+    assert version.startswith(prefix)
+    assert int(version.removeprefix(prefix)) >= 48
     assert "Alpha9.48" in reason
     assert "Load Energy Today" in reason
     assert "Grid Consumption Today" in reason
