@@ -126,10 +126,11 @@ def test_counterfactual_export_cannot_leak_into_physical_control_state() -> None
     assert shadow["maximum_allowed_stage"] == "shadow"
 
     # The Full-KEMS rolling plan remains untouched and can still model export.
-    assert agile_state["rolling_export_plan"]["current_battery_export_target_kw"] == 5.538
     assert (
-        agile_state["rolling_export_plan"]["current_battery_discharge_target_kw"]
-        == 6.4
+        agile_state["rolling_export_plan"]["current_battery_export_target_kw"] == 5.538
+    )
+    assert (
+        agile_state["rolling_export_plan"]["current_battery_discharge_target_kw"] == 6.4
     )
 
 
