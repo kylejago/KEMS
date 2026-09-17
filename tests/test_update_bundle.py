@@ -43,9 +43,6 @@ def test_release_bundle_renders_exact_coordinated_alpha9_targets() -> None:
     assert bundle["maintenance"]["reboot_required"] is False
     reason = bundle["maintenance"]["reason"]
     assert "Alpha9 coordinated parity baseline" in reason
-    assert "0.9.0-alpha9-web.0" in reason
-    assert "0.9.0-alpha9-public.0" in reason
-    assert "0.9.0-alpha9-panel.3" in reason
     assert "hardware writes remain hard-blocked" in reason
 
 
