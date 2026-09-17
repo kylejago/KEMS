@@ -221,7 +221,7 @@ def align_agile_control_state(
     target, plan = rolling
 
     physical_target = dict(target)
-    if not control.desired_grid_export_allowed:
+    if not getattr(control, "desired_grid_export_allowed", True):
         # Full-KEMS may legitimately model profitable export even when the live
         # installation is configured No paid export. Preserve that rolling plan
         # unchanged, but project only house-support discharge into the physical
