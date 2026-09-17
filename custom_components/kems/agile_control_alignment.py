@@ -14,6 +14,9 @@ from typing import Any
 from .kems_core import ControlConfig, ControlState, SimulationState
 
 
+_EPSILON = 1e-6
+
+
 def _number(value: Any) -> float | None:
     """Return a finite float for one optional diagnostic value."""
     if value is None or isinstance(value, bool):
@@ -208,26 +211,43 @@ def align_agile_control_state(
     agile_state: dict[str, Any],
     config: ControlConfig,
 ) -> ControlState:
-    """Make the published ControlState exactly match the current rolling target.
+    """Project the current rolling target into the physical control envelope.
 
-    ControlEngine still supplies the independent safety/context envelope. This
-    final reconciliation changes only the battery command target and associated
-    explanatory/output fields, then recomputes the simple power-limit safety
-    envelope. Hardware permissions are explicitly forced closed.
+    The rolling optimiser remains the counterfactual Full-KEMS authority. This
+    reconciliation is narrower: it turns that target into a command candidate
+    that obeys the already-authoritative physical ControlState permissions.
+    In particular, a counterfactual export target must never become a physical
+    battery-export request while grid export is forbidden. Hardware permissions
+    remain explicitly forced closed.
     """
     rolling = _rolling_target(simulation, agile_state)
     if rolling is None:
         return control
     target, plan = rolling
 
+    physical_export_allowed = bool(control.desired_grid_export_allowed) and not bool(
+        control.island_mode_active
+    )
+    raw_export_kw = target["battery_export_kw"]
+    physical_export_kw = raw_export_kw if physical_export_allowed else 0.0
+    physical_total_discharge_kw = (
+        target["total_discharge_kw"]
+        if physical_export_allowed
+        else target["battery_to_home_kw"]
+    )
+    export_blocked = raw_export_kw > 0.01 and not physical_export_allowed
+
     solar = max(control.virtual_scenario_solar_power_kw, 0.0)
-    total_output = solar + target["total_discharge_kw"]
+    total_output = solar + physical_total_discharge_kw
     target_within_limits = bool(
-        target["charge_kw"] <= config.max_charge_kw + 1e-6
-        and target["total_discharge_kw"] <= config.max_discharge_kw + 1e-6
-        and target["battery_export_kw"] <= config.export_limit_kw + 1e-6
-        and not (target["charge_kw"] > 1e-6 and target["total_discharge_kw"] > 1e-6)
-        and total_output <= config.inverter_limit_kw + 1e-6
+        target["charge_kw"] <= config.max_charge_kw + _EPSILON
+        and physical_total_discharge_kw <= config.max_discharge_kw + _EPSILON
+        and physical_export_kw <= config.export_limit_kw + _EPSILON
+        and not (
+            target["charge_kw"] > _EPSILON
+            and physical_total_discharge_kw > _EPSILON
+        )
+        and total_output <= config.inverter_limit_kw + _EPSILON
         and not control.site_import_limit_exceeded
     )
     target_soc = _number(plan.get("target_soc_percent"))
@@ -236,6 +256,8 @@ def align_agile_control_state(
         or agile_state.get("current_action")
         or "Follow the exact current Agile rolling target"
     )
+    if export_blocked:
+        action = f"{action}; physical export blocked; house load only"
     dispatch_mode = str(plan.get("dispatch_mode") or "rolling")
 
     return replace(
@@ -244,12 +266,12 @@ def align_agile_control_state(
         desired_work_mode=(
             control.desired_work_mode
             if target["charge_kw"] > 0.01
-            else ("Feed-in First" if target["battery_export_kw"] > 0.01 else "Self Use")
+            else ("Feed-in First" if physical_export_kw > 0.01 else "Self Use")
         ),
         desired_charge_power_kw=round(target["charge_kw"], 3),
         desired_battery_to_home_power_kw=round(target["battery_to_home_kw"], 3),
-        desired_battery_export_power_kw=round(target["battery_export_kw"], 3),
-        desired_total_discharge_power_kw=round(target["total_discharge_kw"], 3),
+        desired_battery_export_power_kw=round(physical_export_kw, 3),
+        desired_total_discharge_power_kw=round(physical_total_discharge_kw, 3),
         desired_min_soc_percent=(
             control.desired_min_soc_percent
             if target_soc is None
@@ -265,7 +287,7 @@ def align_agile_control_state(
         blocked_reason=(
             control.blocked_reason
             if target_within_limits
-            else "Exact Agile rolling target failed the control power envelope"
+            else "Physical Agile target failed the control power envelope"
         ),
         next_action=action,
     )
