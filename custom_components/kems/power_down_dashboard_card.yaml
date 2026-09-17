@@ -2,6 +2,7 @@
         title: Power Down
         content: |
           {% set sim = 'sensor.kems_export_tariff_status' %}
+          {% set result_entity = 'binary_sensor.kems_last_power_down_result_available' %}
           {% set mode = states('select.kems_operating_mode') %}
           {% set joined = state_attr(sim, 'saving_session_joined') | default(false, true) %}
           {% set active = state_attr(sim, 'saving_session_active') | default(false, true) %}
@@ -22,6 +23,7 @@
           {% set duration = state_attr(sim, 'saving_session_duration_minutes') %}
           {% set points = state_attr(sim, 'saving_session_octopoints_per_kwh') %}
           {% set bonus_rate = state_attr(sim, 'saving_session_bonus_rate_pence') %}
+          {% set completed = state_attr(result_entity, 'completed_sessions_today') or [] %}
           {% if active %}
           {% set status = 'Active' %}
           {% elif joined and start and now() < as_local(start) %}
@@ -47,6 +49,26 @@
           **Estimated combined income:** {{ ('GBP %.2f' | format((total_income | float) / 100)) if total_income is not none else '-' }}
           **Battery reserved:** {{ 'yes' if state_attr(sim, 'battery_reserved_for_saving_session') else 'no' }}
           **Normal battery export held back:** {{ 'yes' if state_attr(sim, 'battery_export_reduced_for_saving_session') else 'no' }}
+
+          **Completed sessions today:** {{ completed | count }}
+          {% if completed %}
+          {% for item in completed %}
+          {% set completed_start = as_datetime(item.get('session_start')) if item.get('session_start') else none %}
+          {% set completed_end = as_datetime(item.get('session_end')) if item.get('session_end') else none %}
+          **{{ as_local(completed_start).strftime('%H:%M') if completed_start else '?' }}-{{ as_local(completed_end).strftime('%H:%M') if completed_end else '?' }} — {{ 'Completed successfully' if item.get('completed_successfully') else item.get('completion_reason', 'Completed') }}**
+          SOC: {{ item.get('starting_simulated_soc_percent', '-') }}% → {{ item.get('finishing_simulated_soc_percent', '-') }}%  
+          Rewardable reduction: {{ item.get('rewardable_reduction_kwh', '-') }} kWh  
+          KEMS recorded Power Down bonus: {{ 'GBP %.2f' | format((item.get('bonus_pence', 0) | float) / 100) }}  
+          Event export income: {{ 'GBP %.2f' | format((item.get('fixed_export_income_pence', 0) | float) / 100) }}  
+          Combined event income: {{ 'GBP %.2f' | format((item.get('combined_income_pence', 0) | float) / 100) }}  
+          Maximum inverter output: {{ item.get('maximum_inverter_output_kw', '-') }} kW  
+          EV blocked: {{ 'yes' if item.get('ev_successfully_blocked') else 'no' }} · Plan safe: {{ 'yes' if item.get('plan_safe_throughout') else 'no' }}
+
+          {% endfor %}
+          _Completed-event figures are KEMS retained event results, not supplier-settled Octopoints/cash. Octopus settlement may differ._
+          {% else %}
+          _No completed Power Down sessions have been retained for today._
+          {% endif %}
 
           {% if mode | lower != 'control' %}
           **Execution authority:** **Simulation/read-only - KEMS will not write hardware.**
