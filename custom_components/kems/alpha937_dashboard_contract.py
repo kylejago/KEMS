@@ -20,7 +20,9 @@ _installed = False
 
 POWER_DOWN_CARD_PATH = Path(__file__).with_name("power_down_dashboard_card.yaml")
 _KEMS_HAPPY_HOUR_MARKER = "      - type: markdown\n        title: Weekend Happy Hour\n"
-_KEMS_POWER_HISTORY_MARKER = "      - type: markdown\n        title: Power history — today\n"
+_KEMS_POWER_HISTORY_MARKER = (
+    "      - type: markdown\n        title: Power history — today\n"
+)
 
 _ROI_ENTITY_RENAMES = {
     "sensor.kems_financial_house_consumption": (
@@ -306,7 +308,9 @@ def _repair_kems_event_cards(content: str) -> str:
     kems_start = content.find(kems_marker)
     if kems_start < 0:
         return content
-    compare_start = content.find("\n  - title: Compare\n", kems_start + len(kems_marker))
+    compare_start = content.find(
+        "\n  - title: Compare\n", kems_start + len(kems_marker)
+    )
     if compare_start < 0:
         return content
 
