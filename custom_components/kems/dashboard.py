@@ -27,6 +27,9 @@ PACKAGED_DASHBOARD_PATH = Path(__file__).with_name(MANAGED_DASHBOARD_FILENAME)
 PACKAGED_AGILE_DASHBOARD_PATH = Path(__file__).with_name(
     "kems_agile_smart_export_dashboard.yaml"
 )
+PACKAGED_POWER_DOWN_CARD_PATH = Path(__file__).with_name(
+    "power_down_dashboard_card.yaml"
+)
 
 MANAGED_PANEL_FILENAME = "kems16x16.yaml"
 MANAGED_PANEL_HEADER = b"# KEMS-MANAGED-ESPHOME-PANEL"
@@ -95,6 +98,31 @@ def _dashboard_readability_pass(content: str) -> str:
     return content.replace(supplier_credit_row, supplier_rewards_row)
 
 
+def _inject_power_down_card(content: str) -> str:
+    """Add permanent Power Down evidence after Weekend Happy Hour on KEMS view."""
+    if "        title: Power Down\n" in content:
+        return content
+
+    anchor = (
+        "          _This is KEMS planning/booking evidence. Live Data remains "
+        "measured property reality._\n"
+        "      - type: markdown\n"
+        "        title: Power history — today"
+    )
+    if anchor not in content:
+        raise ValueError("Managed KEMS dashboard has no Power Down insertion anchor")
+
+    card = PACKAGED_POWER_DOWN_CARD_PATH.read_text(encoding="utf-8").rstrip()
+    replacement = (
+        "          _This is KEMS planning/booking evidence. Live Data remains "
+        "measured property reality._\n"
+        f"{card}\n"
+        "      - type: markdown\n"
+        "        title: Power history — today"
+    )
+    return content.replace(anchor, replacement, 1)
+
+
 def _combined_master_dashboard_bytes() -> bytes:
     """Return the managed master dashboard with Agile comparison views appended."""
     master = PACKAGED_DASHBOARD_PATH.read_text(encoding="utf-8").rstrip()
@@ -104,6 +132,7 @@ def _combined_master_dashboard_bytes() -> bytes:
         raise ValueError("Packaged Agile Smart Export dashboard has no views section")
     agile_views = agile.split(marker, 1)[1].lstrip("\n")
     master = _dashboard_readability_pass(master)
+    master = _inject_power_down_card(master)
     agile_views = _dashboard_readability_pass(agile_views)
     return f"{master}\n\n{agile_views}".encode()
 

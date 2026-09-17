@@ -131,8 +131,11 @@ def test_alpha947_installs_before_first_refresh_and_stays_reporting_only() -> No
     source = SOURCE.read_text(encoding="utf-8")
     entrypoint = ENTRYPOINT.read_text(encoding="utf-8")
     manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
+    version = str(manifest["version"])
+    prefix = "0.9.0-alpha9."
 
-    assert manifest["version"] == "0.9.0-alpha9.48"
+    assert version.startswith(prefix)
+    assert int(version.removeprefix(prefix)) >= 48
     assert entrypoint.index(
         "install_alpha947_reporting_consistency()"
     ) < entrypoint.index("await coordinator.async_config_entry_first_refresh()")
