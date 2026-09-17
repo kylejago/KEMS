@@ -33,9 +33,7 @@ def _runtime_dashboard() -> tuple[object, bytes]:
 
 def _kems_view(payload: bytes) -> str:
     text = payload.decode()
-    return text.split("\n  - title: KEMS\n", 1)[1].split(
-        "\n  - title: Compare\n", 1
-    )[0]
+    return text.split("\n  - title: KEMS\n", 1)[1].split("\n  - title: Compare\n", 1)[0]
 
 
 def test_alpha950_runtime_pipeline_keeps_both_event_cards_in_order() -> None:
