@@ -266,9 +266,7 @@ def align_agile_control_state(
         desired_battery_to_home_power_kw=round(
             physical_target["battery_to_home_kw"], 3
         ),
-        desired_battery_export_power_kw=round(
-            physical_target["battery_export_kw"], 3
-        ),
+        desired_battery_export_power_kw=round(physical_target["battery_export_kw"], 3),
         desired_total_discharge_power_kw=round(
             physical_target["total_discharge_kw"], 3
         ),
