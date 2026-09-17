@@ -134,6 +134,62 @@ def test_counterfactual_export_cannot_leak_into_physical_control_state() -> None
     )
 
 
+def test_island_state_also_fails_closed_for_rolling_export() -> None:
+    """Island mode must never inherit a counterfactual grid-export target."""
+    simulation = SimulationState(ready=True)
+    agile_state = _rolling_export_state()
+    config = ControlConfig(
+        export_limit_kw=6.4,
+        max_discharge_kw=7.0,
+        inverter_limit_kw=7.0,
+    )
+    island_control = ControlState(
+        operating_reason="island",
+        desired_work_mode="Self Use / EPS",
+        desired_battery_to_home_power_kw=0.862,
+        desired_battery_export_power_kw=0.0,
+        desired_total_discharge_power_kw=0.862,
+        desired_grid_export_allowed=True,
+        desired_min_soc_percent=10.0,
+        island_mode_active=True,
+        data_fresh=True,
+        plan_safe=True,
+        control_enabled=False,
+        commissioned=False,
+        real_backend_available=False,
+        commands_permitted=False,
+        blocked_reason="Island mode",
+    )
+
+    physical = alignment.align_agile_control_state(
+        island_control,
+        simulation,
+        agile_state,
+        config,
+    )
+
+    assert physical.island_mode_active is True
+    assert physical.desired_battery_export_power_kw == 0.0
+    assert physical.desired_battery_to_home_power_kw == 0.862
+    assert physical.desired_total_discharge_power_kw == 0.862
+    assert physical.desired_work_mode == "Self Use"
+    assert physical.real_backend_available is False
+    assert physical.commands_permitted is False
+    assert physical.control_enabled is False
+    assert physical.commissioned is False
+
+    shadow = build_foxess_command_shadow(physical, export_limit_kw=6.4)
+    proposed = shadow["proposed_foxess_command"]
+    assert shadow["translation_status"] == WAIT
+    assert "EPS/island semantics" in shadow["translation_reason"]
+    assert proposed["force_discharge_power_kw"] is None
+    assert proposed["discharge_enabled"] is False
+    assert shadow["commands_permitted"] is False
+    assert shadow["real_hardware_writes"] == "blocked"
+
+    assert agile_state["rolling_export_plan"]["current_battery_export_target_kw"] == 5.538
+
+
 def test_contradictory_no_export_state_fails_closed_before_force_discharge() -> None:
     """Defense in depth must reject export intent when export permission is off."""
     contradictory = ControlState(
