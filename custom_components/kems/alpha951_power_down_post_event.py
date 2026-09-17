@@ -13,13 +13,18 @@ from dataclasses import replace
 from datetime import date
 from typing import Any
 
-from homeassistant.util import dt as dt_util
-
 from .kems_core import PowerDownResult, SimulationState
 
 _INSTALLED = False
 _ACTIVE_RECORDER: Any | None = None
 _MAX_HISTORY = 64
+
+
+def _dt_util():
+    """Return Home Assistant's timezone-aware datetime helper lazily."""
+    from homeassistant.util import dt as dt_util
+
+    return dt_util
 
 
 def _normalise_history(values: Any) -> list[PowerDownResult]:
@@ -35,7 +40,7 @@ def _normalise_history(values: Any) -> list[PowerDownResult]:
             results[str(result.session_id)] = result
     ordered = sorted(
         results.values(),
-        key=lambda item: item.session_end or item.session_start or dt_util.utcnow(),
+        key=lambda item: item.session_end or item.session_start or _dt_util().utcnow(),
     )
     return ordered[-_MAX_HISTORY:]
 
@@ -45,7 +50,7 @@ def _local_date(value) -> date | None:
     if value is None:
         return None
     try:
-        return dt_util.as_local(value).date()
+        return _dt_util().as_local(value).date()
     except (TypeError, ValueError):
         return None
 
@@ -74,7 +79,7 @@ def _today_completed_results() -> list[PowerDownResult]:
     recorder = _ACTIVE_RECORDER
     if recorder is None:
         return []
-    return _results_for_date(recorder, dt_util.now().date())
+    return _results_for_date(recorder, _dt_util().now().date())
 
 
 def _authoritative_today_bonus(simulation: SimulationState) -> float | None:
@@ -84,14 +89,11 @@ def _authoritative_today_bonus(simulation: SimulationState) -> float | None:
         return None
 
     bonus = sum(max(float(item.bonus_pence or 0.0), 0.0) for item in completed)
-    now = dt_util.now()
     current_end = simulation.saving_session_end
-    current_open = bool(
-        simulation.saving_session_joined
-        and current_end is not None
-        and current_end > now
-        and _local_date(current_end) == now.date()
-    )
+    current_open = False
+    if simulation.saving_session_joined and current_end is not None:
+        now = _dt_util().now()
+        current_open = current_end > now and _local_date(current_end) == now.date()
     if current_open and simulation.estimated_saving_session_bonus_pence is not None:
         bonus += max(float(simulation.estimated_saving_session_bonus_pence), 0.0)
     return round(bonus, 2)
@@ -166,7 +168,7 @@ def _install_history_patch() -> None:
                 by_id.values(),
                 key=lambda item: item.session_end
                 or item.session_start
-                or dt_util.utcnow(),
+                or _dt_util().utcnow(),
             )[-_MAX_HISTORY:]
             await self.async_save()
         return result
@@ -226,7 +228,7 @@ def _install_binary_sensor_patch() -> None:
             return attrs
 
         recorder = getattr(self.coordinator, "_power_down", None)
-        today = dt_util.now().date()
+        today = _dt_util().now().date()
         completed = (
             recorder.results_for_local_date(today)
             if recorder is not None and hasattr(recorder, "results_for_local_date")
@@ -311,7 +313,7 @@ def _install_diagnostics_patch() -> None:
         payload = await original(hass, entry)
         recorder = getattr(entry.runtime_data, "_power_down", None)
         history = getattr(recorder, "_completed_history", []) if recorder else []
-        today = dt_util.now().date()
+        today = _dt_util().now().date()
         completed_today = (
             recorder.results_for_local_date(today)
             if recorder is not None and hasattr(recorder, "results_for_local_date")
