@@ -18,6 +18,7 @@ from .alpha937_dashboard_contract import install_alpha937_dashboard_contract
 from .alpha946_solar_actual import install_alpha946_solar_actual
 from .alpha947_reporting_consistency import install_alpha947_reporting_consistency
 from .alpha948_physical_daily_actual import install_alpha948_physical_daily_actual
+from .alpha951_power_down_post_event import install_alpha951_power_down_post_event
 from .collector import Collector
 from .const import (
     CONF_BATTERY_RESERVE,
@@ -103,6 +104,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # Alpha9.47 reconciles all customer-facing Full KEMS breakdowns onto the
     # authoritative current-day ledger and tidies reporting-only diagnostics.
     install_alpha947_reporting_consistency()
+    # Alpha9.51 retains completed same-day Power Down results and makes their
+    # recorded reward credit authoritative for post-event customer reporting.
+    install_alpha951_power_down_post_event()
     # Alpha9.40 installs recommendation/booking before dashboard composition and
     # before the first coordinator refresh. The external join path remains
     # fail-closed unless Control + commissioning + explicit auto-join all pass.
