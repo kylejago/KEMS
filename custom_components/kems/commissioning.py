@@ -871,7 +871,10 @@ def build_commissioning_snapshot(hass: HomeAssistant, coordinator) -> dict[str, 
             "Real hardware write lock",
             PASS if not data.control.commands_permitted else FAIL,
             (
-                "Real inverter writes remain hard-blocked until commissioning and write-authority gates permit control"
+                (
+                    "Real inverter writes remain hard-blocked until commissioning "
+                    "and write-authority gates permit control"
+                )
                 if not data.control.commands_permitted
                 else "Unexpected: control commands are currently permitted"
             ),
