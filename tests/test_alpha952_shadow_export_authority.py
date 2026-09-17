@@ -187,7 +187,9 @@ def test_island_state_also_fails_closed_for_rolling_export() -> None:
     assert shadow["commands_permitted"] is False
     assert shadow["real_hardware_writes"] == "blocked"
 
-    assert agile_state["rolling_export_plan"]["current_battery_export_target_kw"] == 5.538
+    assert (
+        agile_state["rolling_export_plan"]["current_battery_export_target_kw"] == 5.538
+    )
 
 
 def test_contradictory_no_export_state_fails_closed_before_force_discharge() -> None:
