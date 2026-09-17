@@ -208,25 +208,37 @@ def align_agile_control_state(
     agile_state: dict[str, Any],
     config: ControlConfig,
 ) -> ControlState:
-    """Make the published ControlState exactly match the current rolling target.
+    """Reconcile the physical ControlState with the current rolling target.
 
-    ControlEngine still supplies the independent safety/context envelope. This
-    final reconciliation changes only the battery command target and associated
-    explanatory/output fields, then recomputes the simple power-limit safety
-    envelope. Hardware permissions are explicitly forced closed.
+    ControlEngine supplies the physical policy/safety envelope. The Full-KEMS
+    rolling plan remains the counterfactual simulation authority, but its
+    deliberate export target must not override a physical no-export decision.
+    Hardware permissions are explicitly forced closed.
     """
     rolling = _rolling_target(simulation, agile_state)
     if rolling is None:
         return control
     target, plan = rolling
 
+    physical_target = dict(target)
+    if not control.desired_grid_export_allowed:
+        # Full-KEMS may legitimately model profitable export even when the live
+        # installation is configured No paid export. Preserve that rolling plan
+        # unchanged, but project only house-support discharge into the physical
+        # ControlState so counterfactual export cannot become command intent.
+        physical_target["battery_export_kw"] = 0.0
+        physical_target["total_discharge_kw"] = physical_target["battery_to_home_kw"]
+
     solar = max(control.virtual_scenario_solar_power_kw, 0.0)
-    total_output = solar + target["total_discharge_kw"]
+    total_output = solar + physical_target["total_discharge_kw"]
     target_within_limits = bool(
-        target["charge_kw"] <= config.max_charge_kw + 1e-6
-        and target["total_discharge_kw"] <= config.max_discharge_kw + 1e-6
-        and target["battery_export_kw"] <= config.export_limit_kw + 1e-6
-        and not (target["charge_kw"] > 1e-6 and target["total_discharge_kw"] > 1e-6)
+        physical_target["charge_kw"] <= config.max_charge_kw + 1e-6
+        and physical_target["total_discharge_kw"] <= config.max_discharge_kw + 1e-6
+        and physical_target["battery_export_kw"] <= config.export_limit_kw + 1e-6
+        and not (
+            physical_target["charge_kw"] > 1e-6
+            and physical_target["total_discharge_kw"] > 1e-6
+        )
         and total_output <= config.inverter_limit_kw + 1e-6
         and not control.site_import_limit_exceeded
     )
@@ -243,13 +255,23 @@ def align_agile_control_state(
         operating_reason=f"agile_rolling_{dispatch_mode}",
         desired_work_mode=(
             control.desired_work_mode
-            if target["charge_kw"] > 0.01
-            else ("Feed-in First" if target["battery_export_kw"] > 0.01 else "Self Use")
+            if physical_target["charge_kw"] > 0.01
+            else (
+                "Feed-in First"
+                if physical_target["battery_export_kw"] > 0.01
+                else "Self Use"
+            )
         ),
-        desired_charge_power_kw=round(target["charge_kw"], 3),
-        desired_battery_to_home_power_kw=round(target["battery_to_home_kw"], 3),
-        desired_battery_export_power_kw=round(target["battery_export_kw"], 3),
-        desired_total_discharge_power_kw=round(target["total_discharge_kw"], 3),
+        desired_charge_power_kw=round(physical_target["charge_kw"], 3),
+        desired_battery_to_home_power_kw=round(
+            physical_target["battery_to_home_kw"], 3
+        ),
+        desired_battery_export_power_kw=round(
+            physical_target["battery_export_kw"], 3
+        ),
+        desired_total_discharge_power_kw=round(
+            physical_target["total_discharge_kw"], 3
+        ),
         desired_min_soc_percent=(
             control.desired_min_soc_percent
             if target_soc is None
