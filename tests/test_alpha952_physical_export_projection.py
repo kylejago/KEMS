@@ -66,11 +66,11 @@ def _control(*, export_allowed: bool) -> ControlState:
 
 def _agile_state() -> dict:
     return {
-        "current_action": "planned battery export — total-discharge ledger; house first",
+        "current_action": "planned battery export; house first",
         "rolling_export_plan": {
             "available": True,
             "dispatch_mode": "price_optimised",
-            "dispatch_action": "price-optimised total discharge; house first, export remainder",
+            "dispatch_action": "price-optimised discharge; house first",
             "current_house_battery_kw": 0.862,
             "current_battery_discharge_target_kw": 6.4,
             "current_battery_export_target_kw": 5.538,
