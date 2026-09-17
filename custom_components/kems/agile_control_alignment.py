@@ -13,7 +13,6 @@ from typing import Any
 
 from .kems_core import ControlConfig, ControlState, SimulationState
 
-
 _EPSILON = 1e-6
 
 
@@ -244,8 +243,7 @@ def align_agile_control_state(
         and physical_total_discharge_kw <= config.max_discharge_kw + _EPSILON
         and physical_export_kw <= config.export_limit_kw + _EPSILON
         and not (
-            target["charge_kw"] > _EPSILON
-            and physical_total_discharge_kw > _EPSILON
+            target["charge_kw"] > _EPSILON and physical_total_discharge_kw > _EPSILON
         )
         and total_output <= config.inverter_limit_kw + _EPSILON
         and not control.site_import_limit_exceeded
