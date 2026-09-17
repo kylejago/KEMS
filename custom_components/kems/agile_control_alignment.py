@@ -212,8 +212,8 @@ def align_agile_control_state(
 
     ControlEngine supplies the physical policy/safety envelope. The Full-KEMS
     rolling plan remains the counterfactual simulation authority, but its
-    deliberate export target must not override a physical no-export decision.
-    Hardware permissions are explicitly forced closed.
+    deliberate export target must not override a physical no-export or island
+    decision. Hardware permissions are explicitly forced closed.
     """
     rolling = _rolling_target(simulation, agile_state)
     if rolling is None:
@@ -221,11 +221,15 @@ def align_agile_control_state(
     target, plan = rolling
 
     physical_target = dict(target)
-    if not getattr(control, "desired_grid_export_allowed", True):
+    physical_export_allowed = bool(
+        getattr(control, "desired_grid_export_allowed", True)
+    ) and not bool(getattr(control, "island_mode_active", False))
+    if not physical_export_allowed:
         # Full-KEMS may legitimately model profitable export even when the live
-        # installation is configured No paid export. Preserve that rolling plan
-        # unchanged, but project only house-support discharge into the physical
-        # ControlState so counterfactual export cannot become command intent.
+        # installation is configured No paid export or is islanded. Preserve
+        # that rolling plan unchanged, but project only house-support discharge
+        # into the physical ControlState so counterfactual export cannot become
+        # command intent.
         physical_target["battery_export_kw"] = 0.0
         physical_target["total_discharge_kw"] = physical_target["battery_to_home_kw"]
 
