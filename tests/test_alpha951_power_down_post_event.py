@@ -29,7 +29,9 @@ def _completed(session_id: str, bonus: float) -> PowerDownResult:
 
 def test_completed_event_credit_replaces_stale_estimate(monkeypatch) -> None:
     """Recorded completion evidence is authoritative once the event is over."""
-    monkeypatch.setattr(alpha951, "_today_completed_results", lambda: [_completed("6302", 12.76)])
+    monkeypatch.setattr(
+        alpha951, "_today_completed_results", lambda: [_completed("6302", 12.76)]
+    )
     simulation = SimulationState(
         simulated_cost_pence=-500.24,
         saving_pence=100.0,
@@ -61,7 +63,9 @@ def test_dashboard_surfaces_completed_sessions_and_event_credit() -> None:
     """Both the event card and daily cost ledger expose post-event evidence."""
     root = Path(__file__).resolve().parents[1]
     card = (root / "custom_components/kems/power_down_dashboard_card.yaml").read_text()
-    patch = (root / "custom_components/kems/alpha951_power_down_post_event.py").read_text()
+    patch = (
+        root / "custom_components/kems/alpha951_power_down_post_event.py"
+    ).read_text()
 
     assert "Completed sessions today" in card
     assert "completed_sessions_today" in card
