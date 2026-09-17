@@ -320,8 +320,7 @@ def _install_diagnostics_patch() -> None:
             "completed_today": [_result_dict(item) for item in completed_today],
             "completed_bonus_today_pence": round(
                 sum(
-                    max(float(item.bonus_pence or 0.0), 0.0)
-                    for item in completed_today
+                    max(float(item.bonus_pence or 0.0), 0.0) for item in completed_today
                 ),
                 2,
             ),
