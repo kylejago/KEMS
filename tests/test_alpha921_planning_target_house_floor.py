@@ -206,10 +206,6 @@ def test_configured_15_target_limits_export_even_if_incoming_forecast_floor_is_l
         forecast_floor_percent=10.0,
     )
 
-    # The old Alpha9.21/22 wrapper lowered effective config reserve to 10% and
-    # allowed this row to consume the whole 3 kWh export request, ending near
-    # 13%. Alpha9.23 must reserve 15% for deliberate export while still letting
-    # the house consume its normal 0.6 kWh without expensive Grid import.
     assert row["battery_to_home_kwh"] == pytest.approx(0.6)
     assert 0.0 < row["battery_export_kwh"] < 3.0
     assert row["grid_import_kwh"] == pytest.approx(0.0)
@@ -254,7 +250,7 @@ def test_alpha923_release_scope_is_projection_only() -> None:
     )
     source = (INTEGRATION / "agile_flow_reserve_policy.py").read_text(encoding="utf-8")
 
-    assert manifest["version"] == "0.9.0-alpha9.50"
+    assert manifest["version"] == "0.9.0-alpha9.51"
     reason = bundle["maintenance"]["reason"].lower()
     assert "export-floor correction" in reason
     assert "15% planning/export target" in reason

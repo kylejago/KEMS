@@ -34,13 +34,14 @@ def test_alpha927_is_reporting_only_and_keeps_panel_profile_release() -> None:
     maintenance = bundle["maintenance"]
     reason = maintenance["reason"]
 
-    assert manifest["version"] == "0.9.0-alpha9.50"
+    assert manifest["version"] == "0.9.0-alpha9.51"
     assert "reporting-only" in reason.lower()
     assert "policy" in reason.lower()
     assert "15%" in reason
     assert "10% absolute floor" in reason
     assert "12%" in reason
-    assert "0.9.0-alpha9-panel.3" in reason
-    assert "0.9.0-alpha9-web.0" in reason
-    assert "0.9.0-alpha9-public.0" in reason
+    assert bundle["components"]["panel"]["version"] == "0.9.0-alpha9-panel.3"
+    assert bundle["components"]["property_web"]["version"] == "0.9.0-alpha9-web.0"
+    assert bundle["components"]["pi_agent"]["version"] == "0.9.0-alpha9-web.0"
+    assert bundle["components"]["public_web"]["version"] == "0.9.0-alpha9-public.0"
     assert "hardware writes remain hard-blocked" in reason

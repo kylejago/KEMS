@@ -29,7 +29,6 @@ def test_alpha928_v2_launches_next_packet_at_fourth_position_only() -> None:
     assert "flow_vertical_v2(11, 10, 12, 14" in v2
     assert "flow_vertical_v2_dual(" in v2
 
-    # The established V1 2x4 paths keep the original one-packet helper.
     v1 = panel.split("if (layout_v2) {", 1)[1].split("return;", 1)[1]
     assert "flow_vertical(8, 3, 9, 6" in v1
     assert "flow_horizontal(3, 8, 6, 9" in v1
@@ -43,7 +42,7 @@ def test_alpha928_versions_coordinate_core_and_panel2() -> None:
     panel_health = PANEL_HEALTH.read_text(encoding="utf-8")
     reason = str(bundle["maintenance"]["reason"]).lower()
 
-    assert manifest["version"] == "0.9.0-alpha9.50"
+    assert manifest["version"] == "0.9.0-alpha9.51"
     assert bundle["components"]["panel"]["version"] == "0.9.0-alpha9-panel.3"
     assert 'panel_config_version: "0.9.0-alpha9-panel.3"' in panel
     assert 'PANEL_CONFIG_VERSION = "0.9.0-alpha9-panel.3"' in panel_health

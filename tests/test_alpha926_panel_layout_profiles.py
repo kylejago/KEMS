@@ -47,7 +47,6 @@ def test_alpha926_panel_firmware_subscribes_to_kems_layout_and_keeps_v1() -> Non
     assert 'const bool layout_v2 = panel_layout == "V2 — Inverter centred";' in panel
     assert "if (layout_v2)" in panel
 
-    # V1's established central-hub geometry remains present.
     assert "rect(7, 7, 10, 10, RAINBOW);" in panel
     assert "flow_horizontal(3, 8, 6, 9" in panel
     assert "flow_horizontal(11, 8, 14, 9" in panel
@@ -80,7 +79,7 @@ def test_alpha926_versions_and_bundle_are_coordinated() -> None:
     panel = PANEL.read_text(encoding="utf-8")
     panel_health = PANEL_HEALTH.read_text(encoding="utf-8")
 
-    assert manifest["version"] == "0.9.0-alpha9.50"
+    assert manifest["version"] == "0.9.0-alpha9.51"
     assert bundle["components"]["panel"]["version"] == "0.9.0-alpha9-panel.3"
     assert 'panel_config_version: "0.9.0-alpha9-panel.3"' in panel
     assert 'PANEL_CONFIG_VERSION = "0.9.0-alpha9-panel.3"' in panel_health
