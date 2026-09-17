@@ -86,6 +86,7 @@ def build_foxess_command_shadow(
     observed_values = dict(observed or {})
     desired_export = max(control.desired_battery_export_power_kw, 0.0)
     desired_charge = max(control.desired_charge_power_kw, 0.0)
+    configured_export_limit_kw = max(float(export_limit_kw), 0.0)
 
     translation_status = PASS
     translation_reason = (
@@ -115,6 +116,12 @@ def build_foxess_command_shadow(
     elif control.desired_work_mode in {"No change", "Stop KEMS writes"}:
         translation_status = WAIT
         translation_reason = "KEMS explicitly requests no hardware state change"
+    elif desired_export > 0.001 and not control.desired_grid_export_allowed:
+        translation_status = WAIT
+        translation_reason = (
+            "Contradictory KEMS decision: deliberate battery export was requested "
+            "while grid export is disabled"
+        )
     elif control.desired_work_mode == "Force Charge":
         proposed_work_mode = "Force Charge"
         force_charge_power_kw = round(desired_charge, 3)
@@ -131,7 +138,8 @@ def build_foxess_command_shadow(
         translation_reason = f"Unreviewed KEMS work mode: {control.desired_work_mode}"
 
     proposed_export_limit_w = round(
-        (export_limit_kw if control.desired_grid_export_allowed else 0.0) * 1000
+        (configured_export_limit_kw if control.desired_grid_export_allowed else 0.0)
+        * 1000
     )
     proposed_min_soc_on_grid = round(control.desired_min_soc_percent, 1)
 
@@ -220,6 +228,7 @@ def build_foxess_command_shadow(
     return {
         "scope": "translation/proof only",
         "reviewed_foxess_modbus_version": "1.15.0",
+        "configured_export_limit_kw": round(configured_export_limit_kw, 3),
         "commands_permitted": False,
         "real_hardware_writes": "blocked",
         "maximum_allowed_stage": "shadow",
