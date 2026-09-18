@@ -218,7 +218,10 @@ def test_alpha956_release_identity_and_scope() -> None:
     prefix = "0.9.0-alpha9."
     assert version.startswith(prefix)
     assert int(version.removeprefix(prefix)) >= 56
-    assert "Alpha9.56 introduces the first bounded opt-in real FoxESS control backend" in reason
+    assert (
+        "Alpha9.56 introduces the first bounded opt-in real FoxESS control backend"
+        in reason
+    )
     assert "Self Use" in reason
     assert "confirmed-cheap-period Force Charge" in reason
     assert "Min SoC-on-grid" in reason
