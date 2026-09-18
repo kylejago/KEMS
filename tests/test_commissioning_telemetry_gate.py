@@ -45,5 +45,10 @@ def test_telemetry_gate_alone_cannot_unlock_real_control() -> None:
     assert 'control.operating_mode != "control"' in (
         ROOT / "custom_components" / "kems" / "kems_core" / "control_write_authority.py"
     ).read_text(encoding="utf-8")
-    assert 'master_control_enabled=bool(coordinator.settings.control.control_enabled)' in backend
-    assert 'user_commissioned=bool(coordinator.settings.control.commissioned)' in backend
+    assert (
+        "master_control_enabled=bool(coordinator.settings.control.control_enabled)"
+        in backend
+    )
+    assert (
+        "user_commissioned=bool(coordinator.settings.control.commissioned)" in backend
+    )
