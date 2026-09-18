@@ -28,7 +28,7 @@ from .happy_hour_auto_join import (
     CONF_HAPPY_HOUR_AUTO_JOIN_ENABLED,
     happy_hour_auto_join_state,
 )
-from .runtime_options import async_set_runtime_option
+from .runtime_options import async_set_control_gate_option, async_set_runtime_option
 from .update_orchestrator import build_update_switch_entities
 
 # Apply the Alpha9.34 commissioning contract before any switch state is exposed.
@@ -179,9 +179,9 @@ class KEMSCommissionedForControlSwitch(KEMSEntity, SwitchEntity):
             raise HomeAssistantError(
                 "KEMS control-critical commissioning evidence is not ready"
             )
-        await async_set_runtime_option(
+        await async_set_control_gate_option(
             self.hass,
-            self.coordinator.entry,
+            self.coordinator,
             CONF_SYSTEM_COMMISSIONED,
             True,
         )
@@ -211,10 +211,23 @@ class KEMSMasterControlEnableSwitch(KEMSEntity, SwitchEntity):
         return self.coordinator.settings.control.control_enabled
 
     async def async_turn_on(self, **kwargs) -> None:
-        """Record the explicit master control opt-in."""
-        await async_set_runtime_option(
+        """Record the explicit master control opt-in without resetting proof."""
+        readiness = build_commissioning_snapshot(self.hass, self.coordinator)
+        if not readiness.get("ready_for_control"):
+            raise HomeAssistantError(
+                "KEMS control-critical commissioning evidence is not ready"
+            )
+        if not self.coordinator.settings.control.commissioned:
+            raise HomeAssistantError(
+                "KEMS must be commissioned for control before Master control is enabled"
+            )
+        if self.coordinator.settings.control.operating_mode != "control":
+            raise HomeAssistantError(
+                "KEMS Mode must be Control before Master control is enabled"
+            )
+        await async_set_control_gate_option(
             self.hass,
-            self.coordinator.entry,
+            self.coordinator,
             CONF_CONTROL_ENABLED,
             True,
         )
