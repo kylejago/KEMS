@@ -11,7 +11,10 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_registry as er
 
 from .commissioning_export_limit import build_foxess_export_limit_readback_check
-from .commissioning_session import collect_foxess_session_records
+from .commissioning_session import (
+    collect_battery_direction_records,
+    collect_foxess_session_records,
+)
 from .const import (
     CONF_BATTERY_CURRENT,
     CONF_BATTERY_POWER,
@@ -25,6 +28,8 @@ from .const import (
 from .entity import KEMSEntity
 from .foxess_command_shadow import build_foxess_command_shadow_snapshot
 from .kems_core.commissioning_evidence import (
+    BatteryDirectionObservation,
+    assess_battery_power_direction,
     assess_foxess_power_balance,
     assess_foxess_telemetry_stability,
     assess_foxess_unit_contract,
@@ -265,50 +270,83 @@ def _foxess_unit_evidence(
     return evidence, tuple(sorted(signature)), battery_power_derived
 
 
-def _detect_battery_power_convention(
-    records: tuple[Any, ...],
-) -> tuple[bool | None, int, float]:
-    """Infer whether positive battery power means discharge from SOC movement."""
-    recent = records[-360:]
-    positive_is_discharge_votes = 0
-    positive_is_charge_votes = 0
+def _related_foxess_entity(
+    hass: HomeAssistant,
+    reference_entity_id: str | None,
+    suffix: str,
+) -> str | None:
+    """Return one available FoxESS entity on the same device with a known suffix."""
+    if not reference_entity_id:
+        return None
+    registry = er.async_get(hass)
+    reference = registry.async_get(reference_entity_id)
+    if reference is None or reference.platform != FOXESS_PLATFORM:
+        return None
 
-    for earlier, later in zip(recent, recent[1:], strict=False):
-        earlier_soc = getattr(earlier, "battery_soc", None)
-        later_soc = getattr(later, "battery_soc", None)
-        earlier_power = getattr(earlier, "battery_power_kw", None)
-        later_power = getattr(later, "battery_power_kw", None)
-        if None in {earlier_soc, later_soc, earlier_power, later_power}:
-            continue
-        try:
-            gap = (later.timestamp - earlier.timestamp).total_seconds()
-        except (AttributeError, TypeError):
-            continue
-        if gap <= 0 or gap > 20 * 60:
-            continue
+    candidates = [
+        item.entity_id
+        for item in registry.entities.values()
+        if item.platform == FOXESS_PLATFORM
+        and getattr(item, "device_id", None) == getattr(reference, "device_id", None)
+        and getattr(item, "disabled_by", None) is None
+        and item.entity_id.endswith(suffix)
+        and _entity_available(hass, item.entity_id)
+    ]
+    return candidates[0] if len(candidates) == 1 else None
 
-        delta_soc = float(later_soc) - float(earlier_soc)
-        average_power = (float(earlier_power) + float(later_power)) / 2.0
-        if abs(delta_soc) < 0.2 or abs(average_power) < 0.25:
-            continue
 
-        positive_is_discharge = (delta_soc < 0 and average_power > 0) or (
-            delta_soc > 0 and average_power < 0
+def _battery_direction_observation(
+    hass: HomeAssistant,
+    mappings: Mapping[str, str],
+    snapshot: Any,
+) -> tuple[BatteryDirectionObservation, tuple[tuple[str, str | None], ...]]:
+    """Build one read-only direction observation from authoritative FoxESS sources."""
+    reference_entity_id = (
+        mappings.get(CONF_BATTERY_POWER)
+        or mappings.get(CONF_BATTERY_SOC)
+        or mappings.get(CONF_BATTERY_CURRENT)
+        or mappings.get(CONF_BATTERY_VOLTAGE)
+    )
+    definitions = (
+        ("battery_energy_remaining_kwh", "_bms_kwh_remaining"),
+        ("battery_charge_today_kwh", "_battery_charge_today"),
+        ("battery_discharge_today_kwh", "_battery_discharge_today"),
+    )
+    values: dict[str, float | None] = {}
+    signature: list[tuple[str, str | None]] = []
+
+    for role, suffix in definitions:
+        entity_id = _related_foxess_entity(hass, reference_entity_id, suffix)
+        unit = _entity_unit(hass, entity_id)
+        normalised_unit = (
+            str(unit).strip().casefold().replace(" ", "") if unit else None
         )
-        if positive_is_discharge:
-            positive_is_discharge_votes += 1
-        else:
-            positive_is_charge_votes += 1
+        value = (
+            _entity_numeric_state(hass, entity_id) if normalised_unit == "kwh" else None
+        )
+        values[role] = value
+        signature.append(
+            (
+                role,
+                (
+                    f"{entity_id}|{unit}"
+                    if entity_id and normalised_unit == "kwh"
+                    else None
+                ),
+            )
+        )
 
-    total = positive_is_discharge_votes + positive_is_charge_votes
-    if total < 2:
-        return None, total, 0.0
-
-    dominant = max(positive_is_discharge_votes, positive_is_charge_votes)
-    confidence = round(100.0 * dominant / total, 1)
-    if confidence < 75.0:
-        return None, total, confidence
-    return positive_is_discharge_votes > positive_is_charge_votes, total, confidence
+    return (
+        BatteryDirectionObservation(
+            timestamp=getattr(snapshot, "timestamp", None),
+            battery_power_kw=getattr(snapshot, "battery_power_kw", None),
+            battery_soc=getattr(snapshot, "battery_soc", None),
+            battery_energy_remaining_kwh=values["battery_energy_remaining_kwh"],
+            battery_charge_today_kwh=values["battery_charge_today_kwh"],
+            battery_discharge_today_kwh=values["battery_discharge_today_kwh"],
+        ),
+        tuple(signature),
+    )
 
 
 def _foxess_registered_entities(hass: HomeAssistant) -> list[str]:
@@ -615,9 +653,20 @@ def build_commissioning_snapshot(
             )
     checks.append(telemetry_check)
 
-    detected_positive_is_discharge, direction_samples, direction_confidence = (
-        _detect_battery_power_convention(records)
+    direction_observation, direction_source_signature = _battery_direction_observation(
+        hass, mappings, data.snapshot
     )
+    direction_records, direction_session_metadata = collect_battery_direction_records(
+        coordinator,
+        source_signature=source_signature + direction_source_signature,
+        record=direction_observation,
+        ready=foxess_evidence_sources_ready,
+    )
+    direction_evidence = assess_battery_power_direction(direction_records)
+    direction_evidence_payload = direction_evidence.to_dict()
+    detected_positive_is_discharge = direction_evidence.positive_is_discharge
+    direction_samples = direction_evidence.evidence_samples
+    direction_confidence = direction_evidence.confidence_percent
     configured_positive_is_discharge = bool(
         coordinator.settings.simulation.battery_power_positive_is_discharge
     )
@@ -641,8 +690,10 @@ def build_commissioning_snapshot(
             "Battery power direction",
             WAIT,
             (
-                "Waiting for fresh-session SOC movement while battery power is above "
-                f"0.25 kW ({direction_samples} evidence sample(s))"
+                "Waiting for fresh-session battery energy movement while battery "
+                "power is above 0.25 kW; evidence preference is BMS remaining "
+                "energy, then daily charge/discharge counters, then SOC "
+                f"({direction_samples} evidence sample(s))"
             ),
         )
     elif detected_positive_is_discharge == configured_positive_is_discharge:
@@ -655,7 +706,10 @@ def build_commissioning_snapshot(
             "battery_power_direction",
             "Battery power direction",
             PASS,
-            f"Observed {convention}; {direction_confidence:.1f}% confidence",
+            (
+                f"Observed {convention}; {direction_confidence:.1f}% confidence; "
+                f"basis={dict(direction_evidence.basis_counts)}"
+            ),
         )
     else:
         observed = (
@@ -1052,7 +1106,9 @@ def build_commissioning_snapshot(
         "foxess_unit_contract": unit_evidence_payload,
         "foxess_battery_power_derived": battery_power_derived,
         "foxess_commissioning_session": session_metadata,
+        "foxess_battery_direction_session": direction_session_metadata,
         "foxess_telemetry_stability": telemetry_evidence_payload,
+        "foxess_battery_direction_evidence": direction_evidence_payload,
         "foxess_power_balance": power_balance_evidence_payload,
         "foxess_site_telemetry_proof_ready": foxess_site_telemetry_proof_ready,
         "foxess_telemetry_proof_ready": foxess_telemetry_proof_ready,
