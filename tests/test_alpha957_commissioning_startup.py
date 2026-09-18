@@ -19,7 +19,10 @@ def test_alpha957_commissioning_wrappers_forward_data_override() -> None:
 
     assert "data_override: Any | None = None" in runtime
     assert runtime.count("data_override=data_override") >= 2
-    assert "data = data_override if data_override is not None else coordinator.data" in runtime
+    assert (
+        "data = data_override if data_override is not None else coordinator.data"
+        in runtime
+    )
     assert "data_override: Any | None = None" in reporting
     assert "data_override=data_override" in reporting
     assert "Real inverter writes remain hard-blocked until" not in reporting
