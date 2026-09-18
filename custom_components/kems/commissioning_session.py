@@ -11,6 +11,7 @@ from __future__ import annotations
 from typing import Any
 
 SESSION_ATTR = "_foxess_commissioning_session"
+DIRECTION_SESSION_ATTR = "_foxess_battery_direction_session"
 DEFAULT_MAX_RECORDS = 360
 
 
@@ -96,3 +97,77 @@ def collect_foxess_session_records(
         ],
     }
     return tuple(records), metadata
+
+def collect_battery_direction_records(
+    owner: Any,
+    *,
+    source_signature: tuple[tuple[str, str | None], ...],
+    record: Any,
+    ready: bool,
+    max_records: int = DEFAULT_MAX_RECORDS,
+) -> tuple[tuple[Any, ...], dict[str, Any]]:
+    """Retain non-persistent battery-direction evidence for this coordinator session.
+
+    This mirrors the physical commissioning evidence boundary: a restart, source
+    identity/unit change, or loss of the physical-source gate clears all retained
+    observations. Only strictly newer timestamps are accepted.
+    """
+    session = getattr(owner, DIRECTION_SESSION_ATTR, None)
+    reset_reason: str | None = None
+
+    if not ready:
+        reset_reason = "physical_sources_not_ready"
+        session = {
+            "signature": source_signature,
+            "records": [],
+            "started_at": None,
+            "reset_reason": reset_reason,
+        }
+        setattr(owner, DIRECTION_SESSION_ATTR, session)
+    elif not isinstance(session, dict):
+        reset_reason = "session_started"
+        session = {
+            "signature": source_signature,
+            "records": [],
+            "started_at": None,
+            "reset_reason": reset_reason,
+        }
+        setattr(owner, DIRECTION_SESSION_ATTR, session)
+    elif session.get("signature") != source_signature:
+        reset_reason = "source_signature_changed"
+        session = {
+            "signature": source_signature,
+            "records": [],
+            "started_at": None,
+            "reset_reason": reset_reason,
+        }
+        setattr(owner, DIRECTION_SESSION_ATTR, session)
+
+    records = session["records"]
+    if ready:
+        timestamp = getattr(record, "timestamp", None)
+        previous_timestamp = (
+            getattr(records[-1], "timestamp", None) if records else None
+        )
+        if timestamp is not None and (
+            previous_timestamp is None or timestamp > previous_timestamp
+        ):
+            records.append(record)
+            if session["started_at"] is None:
+                session["started_at"] = timestamp
+            limit = max(int(max_records), 1)
+            if len(records) > limit:
+                del records[:-limit]
+
+    metadata = {
+        "scope": "current coordinator session only",
+        "persistent": False,
+        "sample_count": len(records),
+        "started_at": _timestamp_text(session.get("started_at")),
+        "reset_reason": reset_reason or session.get("reset_reason"),
+        "source_signature": [
+            {"role": role, "identity": identity} for role, identity in source_signature
+        ],
+    }
+    return tuple(records), metadata
+
