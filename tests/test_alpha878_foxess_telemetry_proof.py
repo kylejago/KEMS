@@ -110,7 +110,9 @@ def test_lost_mapping_gate_clears_evidence_and_restart_inherits_nothing() -> Non
     assert metadata["reset_reason"] == "session_started"
 
 
-def test_commissioning_uses_only_fresh_foxess_proof_before_control_eligibility() -> None:
+def test_commissioning_uses_only_fresh_foxess_proof_before_control_eligibility() -> (
+    None
+):
     source = Path("custom_components/kems/commissioning.py").read_text()
     backend = BACKEND.read_text()
 
@@ -123,8 +125,13 @@ def test_commissioning_uses_only_fresh_foxess_proof_before_control_eligibility()
     assert '"foxess_telemetry_proof_ready"' in source
     assert "coordinator._history" not in source
     assert '"ready_for_control": ready_for_control' in source
-    assert 'and not solar_only_commissioning' in source
-    assert 'and command_surface_ready' in source
-    assert 'master_control_enabled=bool(coordinator.settings.control.control_enabled)' in backend
-    assert 'user_commissioned=bool(coordinator.settings.control.commissioned)' in backend
+    assert "and not solar_only_commissioning" in source
+    assert "and command_surface_ready" in source
+    assert (
+        "master_control_enabled=bool(coordinator.settings.control.control_enabled)"
+        in backend
+    )
+    assert (
+        "user_commissioned=bool(coordinator.settings.control.commissioned)" in backend
+    )
     assert '"deliberate_force_discharge": "blocked"' in backend
