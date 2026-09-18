@@ -15,6 +15,7 @@ ROOT = Path(__file__).parents[1]
 KEMS_ROOT = ROOT / "custom_components" / "kems"
 PACKAGE = "kems_alpha954_export_limit_test"
 TRANSLATIONS = KEMS_ROOT / "translations" / "en.json"
+COMMISSIONING = KEMS_ROOT / "commissioning.py"
 
 
 def _load_export_limit_module():
@@ -175,3 +176,10 @@ def test_options_call_the_setting_kems_maximum_export() -> None:
     description = battery["data_description"]["export_limit_kw"]
     assert "lower than the FoxESS installer/current hardware limit" in description
     assert "never widens the FoxESS limit" in description
+
+
+def test_commissioning_allows_zero_kems_export_ceiling() -> None:
+    source = COMMISSIONING.read_text(encoding="utf-8")
+
+    assert "0 <= float(kems_export_limit)" in source
+    assert "kh7_positive_limits_safe and kems_export_limit_safe" in source
