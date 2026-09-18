@@ -76,13 +76,16 @@ def test_observed_export_limit_below_dno_ceiling_passes() -> None:
     assert "observed=5.000 kW" in result["detail"]
 
 
-def test_live_like_14_5_kw_readback_fails_against_6_4_kw_ceiling() -> None:
+def test_live_like_14_5_kw_readback_is_usable_hardware_ceiling() -> None:
+    # Alpha9.54 supersedes Alpha9.53's equality assumption: the FoxESS setting
+    # may be higher than the user-selected KEMS ceiling.
     result = _assess(14500.0)
 
-    assert result["status"] == "FAIL"
+    assert result["status"] == "PASS"
     assert result["required"] is True
-    assert "observed=14.500 kW exceeds" in result["detail"]
-    assert "ceiling=6.400 kW" in result["detail"]
+    assert "FoxESS hardware ceiling=14.500 kW" in result["detail"]
+    assert "KEMS ceiling=6.400 kW" in result["detail"]
+    assert result["effective_export_limit_kw"] == 6.4
 
 
 def test_missing_or_unusable_export_limit_readback_waits() -> None:

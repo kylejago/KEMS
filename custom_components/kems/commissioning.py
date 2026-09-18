@@ -798,7 +798,7 @@ def build_commissioning_snapshot(hass: HomeAssistant, coordinator) -> dict[str, 
                 f"inverter={limits['inverter_limit_kw']} kW; "
                 f"charge={limits['battery_charge_limit_kw']} kW; "
                 f"discharge={limits['battery_discharge_limit_kw']} kW; "
-                f"export={limits['export_limit_kw']} kW"
+                f"KEMS export={limits['export_limit_kw']} kW"
             ),
         )
     )
