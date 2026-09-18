@@ -192,8 +192,13 @@ def test_solar_only_commissioning_remains_read_only_and_defers_battery_proof() -
     assert "battery_installation_pending" in content
     assert "and not solar_only_commissioning" in content
     assert '"ready_for_control": ready_for_control' in content
-    assert '"maximum_allowed_stage": "control" if ready_for_control else "shadow"' in content
-    assert '"eligible_with_explicit_opt_in" if ready_for_control else "blocked"' in content
+    assert (
+        '"maximum_allowed_stage": "control" if ready_for_control else "shadow"'
+        in content
+    )
+    assert (
+        '"eligible_with_explicit_opt_in" if ready_for_control else "blocked"' in content
+    )
 
 
 def test_alpha930_versions_core_only_panel_remains_alpha9_panel3() -> None:
