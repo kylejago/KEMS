@@ -1,4 +1,4 @@
-"""Hardware-independent KEMS control planner and pre-installation lab."""
+"""Hardware-independent KEMS control planner and guarded control lab."""
 
 from __future__ import annotations
 
@@ -36,7 +36,7 @@ class _Inputs:
 
 
 class ControlEngine:
-    """Create safe desired commands without writing to hardware."""
+    """Create safe desired commands; hardware authority is owned elsewhere."""
 
     def plan(
         self,
@@ -619,7 +619,7 @@ def _valid_scenario(value: str) -> str:
 
 
 def _backend_block_reason(config: ControlConfig) -> str:
-    """Explain why alpha6 will not issue a real inverter write."""
+    """Explain why the planner itself does not grant inverter write authority."""
     if config.operating_mode == "simulate":
         return "Virtual backend only"
     if config.operating_mode == "shadow":
@@ -630,7 +630,7 @@ def _backend_block_reason(config: ControlConfig) -> str:
         return "System has not been commissioned"
     if not config.control_enabled:
         return "Master control enable is off"
-    return "Real FoxESS control backend is intentionally unavailable in alpha6"
+    return "Awaiting bounded FoxESS runtime write-authority gates"
 
 
 def run_preflight_suite(config: ControlConfig) -> tuple[int, int]:
