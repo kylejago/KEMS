@@ -245,13 +245,14 @@ def test_user_setting_is_safe_default_and_exposed_in_control_options() -> None:
     assert "sends no hardware writes" in description
 
 
-def test_alpha955_release_identity_and_scope() -> None:
+def test_alpha955_scope_is_retained_by_current_successor_release() -> None:
     manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
     bundle = json.loads(BUNDLE.read_text(encoding="utf-8"))
     reason = str(bundle["maintenance"]["reason"])
 
-    assert manifest["version"] == "0.9.0-alpha9.55"
-    assert reason.startswith("Alpha9.55")
+    assert manifest["version"] == "0.9.0-alpha9.56"
+    assert reason.startswith("Alpha9.56")
+    assert "Alpha9.55 adds an optional user-selected Grid import prevention bias" in reason
     assert "Grid import prevention bias" in reason
-    assert "commands_permitted remains false" in reason
-    assert "real FoxESS hardware writes remain blocked" in reason
+    assert "remains Shadow-only" in reason
+    assert "10 W bias remains Shadow-only" in reason
