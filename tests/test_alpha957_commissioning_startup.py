@@ -36,8 +36,7 @@ def test_alpha957_release_identity_and_scope() -> None:
     assert manifest["version"] == "0.9.0-alpha9.58"
     assert (
         "Alpha9.57 fixes the first-refresh startup regression exposed immediately "
-        "after installing Alpha9.56"
-        in reason
+        "after installing Alpha9.56" in reason
     )
     assert "provisional data_override payload" in reason
     assert "does not broaden FoxESS write authority" in reason
