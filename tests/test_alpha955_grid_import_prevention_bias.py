@@ -252,7 +252,9 @@ def test_alpha955_scope_is_retained_by_current_successor_release() -> None:
 
     assert manifest["version"] == "0.9.0-alpha9.56"
     assert reason.startswith("Alpha9.56")
-    assert "Alpha9.55 adds an optional user-selected Grid import prevention bias" in reason
+    assert (
+        "Alpha9.55 adds an optional user-selected Grid import prevention bias" in reason
+    )
     assert "Grid import prevention bias" in reason
     assert "remains Shadow-only" in reason
     assert "10 W bias remains Shadow-only" in reason
