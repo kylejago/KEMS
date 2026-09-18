@@ -33,6 +33,7 @@ async def async_set_runtime_option(
     """Persist one option and reload KEMS so every engine sees it atomically."""
     await async_set_runtime_options(hass, entry, {key: value})
 
+
 _CONTROL_GATE_KEYS = frozenset({CONF_CONTROL_ENABLED, CONF_SYSTEM_COMMISSIONED})
 
 
