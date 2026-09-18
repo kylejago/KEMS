@@ -104,9 +104,10 @@ def test_kems_ceiling_above_foxess_hardware_ceiling_fails_closed() -> None:
     assert result["status"] == "FAIL"
     assert result["foxess_hardware_limit_kw"] == 5.0
     assert result["effective_export_limit_kw"] == 5.0
-    assert "KEMS ceiling=6.400 kW exceeds FoxESS hardware ceiling=5.000 kW" in result[
-        "detail"
-    ]
+    assert (
+        "KEMS ceiling=6.400 kW exceeds FoxESS hardware ceiling=5.000 kW"
+        in result["detail"]
+    )
 
 
 def test_zero_kems_export_ceiling_is_valid_and_effective_zero() -> None:
@@ -135,8 +136,7 @@ def test_shadow_uses_lower_kems_ceiling_when_foxess_allows_more() -> None:
     assert result["real_hardware_writes"] == "blocked"
 
 
-def test_shadow_clamps_to_lower_foxess_ceiling_even_before_commissioning_fails(
-) -> None:
+def test_shadow_clamps_to_lower_foxess_ceiling_even_before_commissioning_fails() -> None:
     result = build_foxess_command_shadow(
         _export_control(5.744),
         observed={"export_power_limit_w": 5000.0},
