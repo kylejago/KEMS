@@ -3,6 +3,8 @@ from __future__ import annotations
 import importlib.util
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+
+BACKEND = Path("custom_components/kems/foxess_control_backend.py")
 from types import SimpleNamespace
 
 _SESSION_PATH = Path("custom_components/kems/commissioning_session.py")
@@ -108,8 +110,9 @@ def test_lost_mapping_gate_clears_evidence_and_restart_inherits_nothing() -> Non
     assert metadata["reset_reason"] == "session_started"
 
 
-def test_commissioning_uses_only_fresh_foxess_proof_and_keeps_writes_blocked() -> None:
+def test_commissioning_uses_only_fresh_foxess_proof_before_control_eligibility() -> None:
     source = Path("custom_components/kems/commissioning.py").read_text()
+    backend = BACKEND.read_text()
 
     assert "collect_foxess_session_records" in source
     assert "assess_foxess_unit_contract" in source
@@ -119,6 +122,9 @@ def test_commissioning_uses_only_fresh_foxess_proof_and_keeps_writes_blocked() -
     assert '"foxess_power_balance"' in source
     assert '"foxess_telemetry_proof_ready"' in source
     assert "coordinator._history" not in source
-    assert '"real_hardware_writes": "blocked"' in source
-    assert '"ready_for_control": False' in source
-    assert '"maximum_allowed_stage": "shadow"' in source
+    assert '"ready_for_control": ready_for_control' in source
+    assert 'and not solar_only_commissioning' in source
+    assert 'and command_surface_ready' in source
+    assert 'master_control_enabled=bool(coordinator.settings.control.control_enabled)' in backend
+    assert 'user_commissioned=bool(coordinator.settings.control.commissioned)' in backend
+    assert '"deliberate_force_discharge": "blocked"' in backend
