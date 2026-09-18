@@ -4,6 +4,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).parents[1]
 COMMISSIONING = ROOT / "custom_components" / "kems" / "commissioning.py"
+BACKEND = ROOT / "custom_components" / "kems" / "foxess_control_backend.py"
 
 
 def test_commissioning_requires_stable_foxess_telemetry_for_shadow_readiness() -> None:
@@ -30,13 +31,19 @@ def test_commissioning_requires_stable_foxess_telemetry_for_shadow_readiness() -
     )
 
 
-def test_telemetry_gate_cannot_unlock_real_control() -> None:
-    """Commissioning telemetry evidence must remain shadow-only."""
+def test_telemetry_gate_alone_cannot_unlock_real_control() -> None:
+    """Telemetry is necessary; independent runtime opt-ins still own writes."""
     content = COMMISSIONING.read_text(encoding="utf-8")
+    backend = BACKEND.read_text(encoding="utf-8")
 
-    assert '"ready_for_control": False' in content
-    assert '"maximum_allowed_stage": "shadow"' in content
-    assert '"real_hardware_writes": "blocked"' in content
+    assert '"ready_for_control": ready_for_control' in content
+    assert 'state == "Ready for Shadow"' in content
+    assert "and command_surface_ready" in content
+    assert "and not solar_only_commissioning" in content
     assert "commands_permitted = True" not in content
     assert "safe_to_write_hardware = True" not in content
-    assert ".services.async_call(" not in content
+    assert 'control.operating_mode != "control"' in (
+        ROOT / "custom_components" / "kems" / "kems_core" / "control_write_authority.py"
+    ).read_text(encoding="utf-8")
+    assert 'master_control_enabled=bool(coordinator.settings.control.control_enabled)' in backend
+    assert 'user_commissioned=bool(coordinator.settings.control.commissioned)' in backend
