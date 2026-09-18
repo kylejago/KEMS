@@ -165,9 +165,7 @@ def build_foxess_command_shadow(
     proposed_export_limit_kw = (
         effective_export_limit_kw
         if control.desired_grid_export_allowed
-        else min(desired_bias_export, effective_export_limit_kw)
-        if bias_active
-        else 0.0
+        else min(desired_bias_export, effective_export_limit_kw) if bias_active else 0.0
     )
     proposed_export_limit_w = round(proposed_export_limit_kw * 1000)
     proposed_min_soc_on_grid = round(control.desired_min_soc_percent, 1)
@@ -188,11 +186,11 @@ def build_foxess_command_shadow(
         ),
         "grid_export_allowed": bool(control.desired_grid_export_allowed),
         "grid_bias_export_allowed": bias_active,
-        "grid_bias_export_power_kw": round(
-            min(desired_bias_export, effective_export_limit_kw), 3
-        )
-        if bias_active
-        else 0.0,
+        "grid_bias_export_power_kw": (
+            round(min(desired_bias_export, effective_export_limit_kw), 3)
+            if bias_active
+            else 0.0
+        ),
         "remote_control_required": proposed_work_mode
         in {"Force Charge", "Force Discharge"},
         "schedule_strategy": (
