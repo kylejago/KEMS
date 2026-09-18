@@ -489,7 +489,8 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
         snapshot.forecast_confidence_percent = plan.confidence_percent
 
     async def async_shutdown(self) -> None:
-        """Flush retained KEMS state before unloading."""
+        """Release live control and flush retained KEMS state before unloading."""
+        await self._foxess_control.async_shutdown(self)
         await self._happy_hour_ohme.async_shutdown()
         await self._history.async_save()
         await self._forecast_validation.async_save()
@@ -514,7 +515,7 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
         if operating_mode == "shadow":
             return f"{base} → Shadow"
         if operating_mode == "control":
-            return f"{base} → Control (blocked until commissioning)"
+            return f"{base} → Control"
         if operating_mode == "simulate":
             return f"{base} → Control Lab"
         return base
