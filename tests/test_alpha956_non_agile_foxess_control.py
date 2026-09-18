@@ -214,8 +214,11 @@ def test_alpha956_release_identity_and_scope() -> None:
     bundle = json.loads(BUNDLE.read_text(encoding="utf-8"))
     reason = str(bundle["maintenance"]["reason"])
 
-    assert manifest["version"] == "0.9.0-alpha9.56"
-    assert reason.startswith("Alpha9.56")
+    version = str(manifest["version"])
+    prefix = "0.9.0-alpha9."
+    assert version.startswith(prefix)
+    assert int(version.removeprefix(prefix)) >= 56
+    assert "Alpha9.56 introduces the first bounded opt-in real FoxESS control backend" in reason
     assert "Self Use" in reason
     assert "confirmed-cheap-period Force Charge" in reason
     assert "Min SoC-on-grid" in reason
