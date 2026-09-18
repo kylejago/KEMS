@@ -124,6 +124,35 @@ class PowerBalanceEvidence:
 
 
 @dataclass(frozen=True, slots=True)
+class BatteryDirectionEvidence:
+    """Read-only evidence for the FoxESS battery-power sign convention."""
+
+    state: str
+    ready: bool
+    positive_is_discharge: bool | None
+    evidence_samples: int
+    positive_is_discharge_votes: int
+    positive_is_charge_votes: int
+    confidence_percent: float
+    minimum_battery_power_kw: float
+    minimum_residual_separation_kw: float
+
+    def to_dict(self) -> dict[str, Any]:
+        """Return a stable serialisable commissioning payload."""
+        return {
+            "state": self.state,
+            "ready": self.ready,
+            "positive_is_discharge": self.positive_is_discharge,
+            "evidence_samples": self.evidence_samples,
+            "positive_is_discharge_votes": self.positive_is_discharge_votes,
+            "positive_is_charge_votes": self.positive_is_charge_votes,
+            "confidence_percent": self.confidence_percent,
+            "minimum_battery_power_kw": self.minimum_battery_power_kw,
+            "minimum_residual_separation_kw": self.minimum_residual_separation_kw,
+        }
+
+
+@dataclass(frozen=True, slots=True)
 class PhysicalShadowComparison:
     """Informational comparison between KEMS battery intent and FoxESS telemetry."""
 
@@ -330,6 +359,136 @@ def _battery_routing(
         charge = max(raw_power_kw, 0.0)
         discharge = max(-raw_power_kw, 0.0)
     return charge, discharge
+
+
+def infer_battery_power_convention_from_balance(
+    records: tuple[Any, ...] | list[Any],
+    *,
+    minimum_evidence_samples: int = 3,
+    minimum_battery_power_kw: float = 0.25,
+    minimum_confidence_percent: float = 75.0,
+    minimum_residual_separation_kw: float = 0.15,
+    recent_sample_limit: int = 60,
+) -> BatteryDirectionEvidence:
+    """Infer battery sign from repeated whole-site conservation residuals.
+
+    This is a fallback for large batteries whose integer SOC telemetry can take
+    a long time to move. It never writes hardware and does not assume either
+    sign. For each fresh sample with meaningful battery power KEMS evaluates
+    both possible sign conventions and records a vote only when one convention
+    produces a physically plausible site balance and is decisively better than
+    the other. Ambiguous samples are ignored.
+    """
+    recent = list(records)[-max(int(recent_sample_limit), 1) :]
+    required = set(FOXESS_POWER_UNIT_FIELDS)
+    positive_is_discharge_votes = 0
+    positive_is_charge_votes = 0
+    minimum_power = max(float(minimum_battery_power_kw), 0.0)
+    minimum_separation = max(float(minimum_residual_separation_kw), 0.0)
+
+    for record in recent:
+        if required & set(getattr(record, "stale_fields", ()) or ()):
+            continue
+
+        values: dict[str, float] = {}
+        unusable = False
+        for field in required:
+            value = getattr(record, field, None)
+            if value is None:
+                unusable = True
+                break
+            try:
+                numeric = float(value)
+            except (TypeError, ValueError):
+                unusable = True
+                break
+            if not isfinite(numeric):
+                unusable = True
+                break
+            values[field] = numeric
+        if unusable:
+            continue
+
+        if any(
+            values[field] < -0.05
+            for field in (
+                "solar_power_kw",
+                "house_load_kw",
+                "grid_import_kw",
+                "grid_export_kw",
+            )
+        ):
+            continue
+
+        battery_power = values["battery_power_kw"]
+        if abs(battery_power) < minimum_power:
+            continue
+
+        solar = max(values["solar_power_kw"], 0.0)
+        house = max(values["house_load_kw"], 0.0)
+        grid_import = max(values["grid_import_kw"], 0.0)
+        grid_export = max(values["grid_export_kw"], 0.0)
+
+        site_without_battery = solar + grid_import - house - grid_export
+        positive_discharge_residual = abs(site_without_battery + battery_power)
+        positive_charge_residual = abs(site_without_battery - battery_power)
+        separation = abs(
+            positive_discharge_residual - positive_charge_residual
+        )
+
+        throughput = max(
+            solar + grid_import + abs(battery_power),
+            house + grid_export + abs(battery_power),
+            1.0,
+        )
+        plausible_residual = max(0.35, throughput * 0.15)
+        decisive_separation = max(
+            minimum_separation,
+            abs(battery_power) * 0.5,
+        )
+
+        winner = min(positive_discharge_residual, positive_charge_residual)
+        if winner > plausible_residual or separation < decisive_separation:
+            continue
+
+        if positive_discharge_residual < positive_charge_residual:
+            positive_is_discharge_votes += 1
+        elif positive_charge_residual < positive_discharge_residual:
+            positive_is_charge_votes += 1
+
+    evidence_samples = positive_is_discharge_votes + positive_is_charge_votes
+    if evidence_samples:
+        dominant = max(positive_is_discharge_votes, positive_is_charge_votes)
+        confidence = round(100.0 * dominant / evidence_samples, 1)
+    else:
+        confidence = 0.0
+
+    required_samples = max(int(minimum_evidence_samples), 1)
+    required_confidence = max(float(minimum_confidence_percent), 0.0)
+    if evidence_samples < required_samples:
+        state = "collecting"
+        ready = False
+        detected: bool | None = None
+    elif confidence < required_confidence:
+        state = "ambiguous"
+        ready = False
+        detected = None
+    else:
+        state = "inferred"
+        ready = True
+        detected = positive_is_discharge_votes > positive_is_charge_votes
+
+    return BatteryDirectionEvidence(
+        state=state,
+        ready=ready,
+        positive_is_discharge=detected,
+        evidence_samples=evidence_samples,
+        positive_is_discharge_votes=positive_is_discharge_votes,
+        positive_is_charge_votes=positive_is_charge_votes,
+        confidence_percent=confidence,
+        minimum_battery_power_kw=round(minimum_power, 3),
+        minimum_residual_separation_kw=round(minimum_separation, 3),
+    )
 
 
 def assess_foxess_power_balance(
