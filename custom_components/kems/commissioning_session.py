@@ -98,6 +98,7 @@ def collect_foxess_session_records(
     }
     return tuple(records), metadata
 
+
 def collect_battery_direction_records(
     owner: Any,
     *,
@@ -170,4 +171,3 @@ def collect_battery_direction_records(
         ],
     }
     return tuple(records), metadata
-
