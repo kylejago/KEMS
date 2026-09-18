@@ -12,7 +12,6 @@ from homeassistant.helpers import entity_registry as er
 
 from .commissioning_export_limit import build_foxess_export_limit_readback_check
 from .commissioning_session import collect_foxess_session_records
-from .foxess_command_shadow import build_foxess_command_shadow_snapshot
 from .const import (
     CONF_BATTERY_CURRENT,
     CONF_BATTERY_POWER,
@@ -24,6 +23,7 @@ from .const import (
     CONF_SOLAR_POWER,
 )
 from .entity import KEMSEntity
+from .foxess_command_shadow import build_foxess_command_shadow_snapshot
 from .kems_core.commissioning_evidence import (
     assess_foxess_power_balance,
     assess_foxess_telemetry_stability,
