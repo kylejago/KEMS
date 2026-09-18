@@ -63,4 +63,3 @@ async def async_set_control_gate_option(
         control=next_settings.control,
     )
     await coordinator.async_request_refresh()
-
