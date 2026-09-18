@@ -12,6 +12,7 @@ from homeassistant.helpers import entity_registry as er
 
 from .commissioning_export_limit import build_foxess_export_limit_readback_check
 from .commissioning_session import collect_foxess_session_records
+from .foxess_command_shadow import build_foxess_command_shadow_snapshot
 from .const import (
     CONF_BATTERY_CURRENT,
     CONF_BATTERY_POWER,
@@ -374,9 +375,14 @@ def _physical_source_uniqueness_check(
     )
 
 
-def build_commissioning_snapshot(hass: HomeAssistant, coordinator) -> dict[str, Any]:
-    """Build the complete read-only commissioning readiness payload."""
-    data = coordinator.data
+def build_commissioning_snapshot(
+    hass: HomeAssistant,
+    coordinator,
+    *,
+    data_override: Any | None = None,
+) -> dict[str, Any]:
+    """Build the complete commissioning readiness payload."""
+    data = data_override if data_override is not None else coordinator.data
     mappings = coordinator.entities.as_dict()
     panel = panel_health_snapshot(hass)
     foxess_registered = _foxess_registered_entities(hass)
@@ -394,16 +400,18 @@ def build_commissioning_snapshot(hass: HomeAssistant, coordinator) -> dict[str, 
     checks.append(
         _check(
             "data_quality",
-            "Data quality",
+            "Overall reporting data quality",
             (
                 PASS
                 if data.quality.score >= 95.0 and not data.quality.stale_fields
-                else WAIT if solar_only_commissioning else FAIL
+                else WAIT
             ),
             (
-                f"{data.quality.score:.0f}% quality; "
-                f"{len(data.quality.stale_fields)} stale field(s)"
+                f"{data.quality.score:.0f}% overall quality; "
+                f"{len(data.quality.stale_fields)} stale field(s); "
+                "informational only for control commissioning"
             ),
+            required=False,
         )
     )
     checks.append(
@@ -811,8 +819,41 @@ def build_commissioning_snapshot(hass: HomeAssistant, coordinator) -> dict[str, 
         hass,
         coordinator,
         configured_export_limit_kw=limits["export_limit_kw"],
+        control_override=data.control,
     )
     checks.append(export_limit_readback_check)
+
+    command_shadow = build_foxess_command_shadow_snapshot(
+        hass,
+        coordinator,
+        control_override=data.control,
+    )
+    binding = command_shadow.get("entity_binding") or {}
+    binding_entities = binding.get("entities") or {}
+    control_command_keys = ("work_mode", "force_charge_power", "min_soc_on_grid")
+    command_surface_ready = bool(
+        binding.get("status") == PASS
+        and all(
+            (binding_entities.get(key) or {}).get("status") == PASS
+            for key in control_command_keys
+        )
+    )
+    checks.append(
+        _check(
+            "foxess_control_command_surface",
+            "FoxESS non-Agile control command surface",
+            PASS if command_surface_ready else WAIT,
+            (
+                "Unique work-mode, force-charge-power and Min SoC-on-grid "
+                "entities are bound to the authoritative FoxESS device"
+                if command_surface_ready
+                else str(
+                    binding.get("reason")
+                    or "Waiting for reviewed FoxESS control command entities"
+                )
+            ),
+        )
+    )
     eps_limit = limits["eps_output_limit_kw"]
     checks.append(
         _check(
@@ -870,19 +911,28 @@ def build_commissioning_snapshot(hass: HomeAssistant, coordinator) -> dict[str, 
             ),
         )
     )
+    bounded_write_authority = bool(
+        not data.control.commands_permitted
+        or (
+            data.control.real_backend_available
+            and data.control.operating_mode == "control"
+            and coordinator.settings.control.control_enabled
+            and coordinator.settings.control.commissioned
+            and data.control.data_fresh
+            and data.control.plan_safe
+        )
+    )
     checks.append(
         _check(
             "real_write_lock",
-            "Real hardware write lock",
-            PASS if not data.control.commands_permitted else FAIL,
+            "Real hardware write authority",
+            PASS if bounded_write_authority else FAIL,
             (
-                (
-                    "Real inverter writes remain hard-blocked until commissioning "
-                    "and write-authority gates permit control"
-                )
+                "No real FoxESS command is currently permitted"
                 if not data.control.commands_permitted
-                else "Unexpected: control commands are currently permitted"
+                else "Bounded Alpha9.56 non-Agile FoxESS control authority is active"
             ),
+            required=False,
         )
     )
 
@@ -966,12 +1016,20 @@ def build_commissioning_snapshot(hass: HomeAssistant, coordinator) -> dict[str, 
         status == PASS for status in site_telemetry_proof_checks.values()
     )
 
+    ready_for_control = bool(
+        state == "Ready for Shadow"
+        and not solar_only_commissioning
+        and command_surface_ready
+    )
+
     return {
         "state": state,
         "ready_for_shadow": state == "Ready for Shadow",
-        "ready_for_control": False,
-        "maximum_allowed_stage": "shadow",
-        "real_hardware_writes": "blocked",
+        "ready_for_control": ready_for_control,
+        "maximum_allowed_stage": "control" if ready_for_control else "shadow",
+        "real_hardware_writes": (
+            "eligible_with_explicit_opt_in" if ready_for_control else "blocked"
+        ),
         "pass_count": pass_count,
         "wait_count": wait_count,
         "fail_count": fail_count,
