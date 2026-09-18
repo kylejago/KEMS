@@ -439,8 +439,7 @@ def assess_battery_power_direction(
                 else None
             )
             charge_moved = (
-                charge_delta is not None
-                and charge_delta >= minimum_energy_delta_kwh
+                charge_delta is not None and charge_delta >= minimum_energy_delta_kwh
             )
             discharge_moved = (
                 discharge_delta is not None
