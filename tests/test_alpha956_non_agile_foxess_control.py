@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 from kems_core import ControlState
@@ -13,6 +14,8 @@ BACKEND = KEMS / "foxess_control_backend.py"
 COMMISSIONING = KEMS / "commissioning.py"
 SWITCH = KEMS / "switch.py"
 CONTRACT = KEMS / "foxess_modbus_contract.py"
+MANIFEST = KEMS / "manifest.json"
+BUNDLE = ROOT / "release" / "kems-bundle.template.json"
 
 
 def _control(**overrides: object) -> ControlState:
@@ -192,3 +195,20 @@ def test_static_contract_is_bounded_not_general_write_authority() -> None:
     assert '"Force Discharge"' in source
     assert '"grid-import prevention bias"' in source
     assert '"export-power-limit writes"' in source
+
+
+def test_alpha956_release_identity_and_scope() -> None:
+    manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
+    bundle = json.loads(BUNDLE.read_text(encoding="utf-8"))
+    reason = str(bundle["maintenance"]["reason"])
+
+    assert manifest["version"] == "0.9.0-alpha9.56"
+    assert reason.startswith("Alpha9.56")
+    assert "Self Use" in reason
+    assert "confirmed-cheap-period Force Charge" in reason
+    assert "Min SoC-on-grid" in reason
+    assert "foxess_modbus v1.15.0" in reason
+    assert "Force Discharge" in reason
+    assert "Grid import prevention bias" in reason
+    assert "remains Shadow-only" in reason
+    assert "Export Power Limit writes remain outside the live-control scope" in reason
