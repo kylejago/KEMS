@@ -438,12 +438,8 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
             control = replace(
                 control,
                 commissioned=technical_commissioned,
-                real_backend_available=bool(
-                    foxess_control.get("backend_available")
-                ),
-                commands_permitted=bool(
-                    foxess_control.get("commands_permitted")
-                ),
+                real_backend_available=bool(foxess_control.get("backend_available")),
+                commands_permitted=bool(foxess_control.get("commands_permitted")),
                 blocked_reason=(
                     str(foxess_control.get("decision_reason") or "")
                     if control.operating_mode == "control"
