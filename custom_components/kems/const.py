@@ -102,7 +102,7 @@ CONF_DISCHARGE_EFFICIENCY = "discharge_efficiency"
 CONF_EXPORT_RATE = "export_rate_pence"
 CONF_EXPORT_TARIFF_STATUS = "export_tariff_status"
 CONF_INVERTER_LIMIT = "inverter_ac_limit_kw"
-# User-selected KEMS export ceiling. The live FoxESS limit is independent hardware evidence.
+# User-selected KEMS export ceiling. The live FoxESS limit is independent\n# hardware evidence.
 CONF_EXPORT_LIMIT = "export_limit_kw"
 CONF_SITE_IMPORT_LIMIT = "site_import_limit_kw"
 CONF_BATTERY_EXPORT_ENABLED = "battery_export_enabled"
