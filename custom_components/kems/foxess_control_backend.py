@@ -245,6 +245,39 @@ class FoxESSControlBackend:
             return True
         return False
 
+    async def async_shutdown(self, coordinator: Any) -> None:
+        """Release any KEMS-owned FoxESS state before integration unload."""
+        if not self._owned:
+            return
+        writes: list[str] = []
+        try:
+            shadow = build_foxess_command_shadow_snapshot(
+                self._hass,
+                coordinator,
+                control_override=coordinator.data.control,
+            )
+            entities = self._binding_entities(shadow)
+            restored = await self._async_restore(entities, writes)
+            self._status = {
+                **self._status,
+                "shutdown_release_attempted": True,
+                "shutdown_release_restored": restored,
+                "shutdown_release_writes": writes,
+                "owned_by_kems": self._owned,
+                "last_write_result": self._last_write_result,
+            }
+        except Exception as err:
+            self._last_write_result = f"FoxESS shutdown restore failed: {err}"
+            self._status = {
+                **self._status,
+                "shutdown_release_attempted": True,
+                "shutdown_release_restored": False,
+                "shutdown_release_writes": writes,
+                "owned_by_kems": self._owned,
+                "last_write_result": self._last_write_result,
+                "upstream_watchdog_fallback": True,
+            }
+
     async def async_update(
         self,
         *,
