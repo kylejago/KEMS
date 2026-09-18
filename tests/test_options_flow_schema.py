@@ -57,13 +57,13 @@ def test_normal_control_page_exposes_four_types_and_three_simple_modes() -> None
         '("simulate", "Simulate")',
         '("control", "Control")',
         "CONF_CONTROL_ENABLED",
-        "CONF_SYSTEM_COMMISSIONED",
         "CONF_EMERGENCY_STOP",
         "CONF_GRID_STABILITY_SECONDS",
         "CONF_EPS_LIMIT",
         "CONF_ISLAND_RESERVE_PERCENT",
     ):
         assert token in source
+    assert "CONF_SYSTEM_COMMISSIONED" not in source
     assert "CONF_VIRTUAL_SCENARIO" not in source
     assert '"grid_outage_daylight"' not in source
     assert '("shadow",' not in source
