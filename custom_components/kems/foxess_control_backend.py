@@ -156,10 +156,16 @@ class FoxESSControlBackend:
             minimum = _number(state.attributes.get("min"))
             maximum = _number(state.attributes.get("max"))
             if minimum is not None and value < minimum - tolerance:
-                self._last_write_result = f"FoxESS number target {value} is below {entity_id} minimum {minimum}"
+                self._last_write_result = (
+                    f"FoxESS number target {value} is below {entity_id} "
+                    f"minimum {minimum}"
+                )
                 return False
             if maximum is not None and value > maximum + tolerance:
-                self._last_write_result = f"FoxESS number target {value} exceeds {entity_id} maximum {maximum}"
+                self._last_write_result = (
+                    f"FoxESS number target {value} exceeds {entity_id} "
+                    f"maximum {maximum}"
+                )
                 return False
         try:
             async with asyncio.timeout(15):
