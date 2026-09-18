@@ -318,13 +318,21 @@ def _battery_direction_observation(
     for role, suffix in definitions:
         entity_id = _related_foxess_entity(hass, reference_entity_id, suffix)
         unit = _entity_unit(hass, entity_id)
-        normalised_unit = str(unit).strip().casefold().replace(" ", "") if unit else None
-        value = _entity_numeric_state(hass, entity_id) if normalised_unit == "kwh" else None
+        normalised_unit = (
+            str(unit).strip().casefold().replace(" ", "") if unit else None
+        )
+        value = (
+            _entity_numeric_state(hass, entity_id) if normalised_unit == "kwh" else None
+        )
         values[role] = value
         signature.append(
             (
                 role,
-                f"{entity_id}|{unit}" if entity_id and normalised_unit == "kwh" else None,
+                (
+                    f"{entity_id}|{unit}"
+                    if entity_id and normalised_unit == "kwh"
+                    else None
+                ),
             )
         )
 
@@ -645,8 +653,8 @@ def build_commissioning_snapshot(
             )
     checks.append(telemetry_check)
 
-    direction_observation, direction_source_signature = (
-        _battery_direction_observation(hass, mappings, data.snapshot)
+    direction_observation, direction_source_signature = _battery_direction_observation(
+        hass, mappings, data.snapshot
     )
     direction_records, direction_session_metadata = collect_battery_direction_records(
         coordinator,
