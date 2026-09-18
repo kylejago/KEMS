@@ -9,7 +9,7 @@ ROOT = Path(__file__).parents[1]
 INTEGRATION = ROOT / "custom_components" / "kems"
 
 
-def test_alpha8_1_safety_scope_remains_blocked_in_later_alpha8_releases() -> None:
+def test_alpha8_1_shadow_safety_remains_frozen_under_later_bounded_control() -> None:
     manifest = json.loads((INTEGRATION / "manifest.json").read_text(encoding="utf-8"))
     shadow = (INTEGRATION / "agile_shadow_command_runtime.py").read_text(
         encoding="utf-8"
@@ -21,6 +21,6 @@ def test_alpha8_1_safety_scope_remains_blocked_in_later_alpha8_releases() -> Non
     assert '"real_backend_available": False' in shadow
     assert '"commands_permitted": False' in shadow
     assert '"safe_to_write_hardware": False' in shadow
-    assert '"ready_for_control": False' in commissioning
-    assert '"maximum_allowed_stage": "shadow"' in commissioning
-    assert '"real_hardware_writes": "blocked"' in commissioning
+    assert '"ready_for_control": ready_for_control' in commissioning
+    assert '"maximum_allowed_stage": "control" if ready_for_control else "shadow"' in commissioning
+    assert '"eligible_with_explicit_opt_in" if ready_for_control else "blocked"' in commissioning
