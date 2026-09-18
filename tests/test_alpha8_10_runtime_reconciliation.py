@@ -224,6 +224,43 @@ def test_daytime_completed_offpeak_end_does_not_fail_tariff_readiness() -> None:
     assert payload["fail_count"] == 0
 
 
+def test_commissioning_reconciliation_forwards_provisional_data_override() -> None:
+    ns = _load_functions(
+        {"_repair_commissioning_tariff_check", "_install_commissioning_reconciliation"}
+    )
+    provisional = SimpleNamespace(
+        snapshot=SimpleNamespace(
+            current_import_rate=28.3036,
+            cheap_period_confirmed=False,
+            tariff_stale_fields=("offpeak_end",),
+        )
+    )
+    seen: dict[str, object] = {}
+
+    def original(hass, coordinator, *, data_override=None):
+        seen["data_override"] = data_override
+        return {"checks": []}
+
+    commissioning = SimpleNamespace(
+        build_commissioning_snapshot=original,
+        PASS="PASS",
+        WAIT="WAIT",
+        FAIL="FAIL",
+    )
+    ns["commissioning"] = commissioning
+    coordinator = SimpleNamespace(data=None)
+
+    ns["_install_commissioning_reconciliation"]()
+    payload = commissioning.build_commissioning_snapshot(
+        object(),
+        coordinator,
+        data_override=provisional,
+    )
+
+    assert seen["data_override"] is provisional
+    assert payload["tariff_freshness_reconciled"] is True
+
+
 def test_reconciliation_is_final_canonical_shadow_only_boundary() -> None:
     compat = COMPAT.read_text(encoding="utf-8")
     source = RECONCILIATION.read_text(encoding="utf-8")
