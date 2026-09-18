@@ -616,9 +616,11 @@ def build_commissioning_snapshot(
             )
     checks.append(telemetry_check)
 
-    soc_detected_positive_is_discharge, soc_direction_samples, soc_direction_confidence = (
-        _detect_battery_power_convention(records)
-    )
+    (
+        soc_detected_positive_is_discharge,
+        soc_direction_samples,
+        soc_direction_confidence,
+    ) = _detect_battery_power_convention(records)
     balance_direction_evidence = infer_battery_power_convention_from_balance(records)
     balance_direction_payload = balance_direction_evidence.to_dict()
     direction_conflict = bool(
