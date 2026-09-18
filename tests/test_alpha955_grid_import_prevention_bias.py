@@ -15,6 +15,8 @@ INTEGRATION = ROOT / "custom_components" / "kems"
 CONST = INTEGRATION / "const.py"
 CONFIG_FLOW = INTEGRATION / "config_flow.py"
 TRANSLATIONS = INTEGRATION / "translations" / "en.json"
+MANIFEST = INTEGRATION / "manifest.json"
+BUNDLE = ROOT / "release" / "kems-bundle.template.json"
 NOW = datetime(2026, 9, 18, 10, 0, tzinfo=UTC)
 
 
@@ -241,3 +243,15 @@ def test_user_setting_is_safe_default_and_exposed_in_control_options() -> None:
     assert "0 disables it" in description
     assert "not paid-export income" in description
     assert "sends no hardware writes" in description
+
+
+def test_alpha955_release_identity_and_scope() -> None:
+    manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
+    bundle = json.loads(BUNDLE.read_text(encoding="utf-8"))
+    reason = str(bundle["maintenance"]["reason"])
+
+    assert manifest["version"] == "0.9.0-alpha9.55"
+    assert reason.startswith("Alpha9.55")
+    assert "Grid import prevention bias" in reason
+    assert "commands_permitted remains false" in reason
+    assert "real FoxESS hardware writes remain blocked" in reason
