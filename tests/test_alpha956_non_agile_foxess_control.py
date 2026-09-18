@@ -14,6 +14,7 @@ BACKEND = KEMS / "foxess_control_backend.py"
 COMMISSIONING = KEMS / "commissioning.py"
 SWITCH = KEMS / "switch.py"
 CONTRACT = KEMS / "foxess_modbus_contract.py"
+CONFIG_FLOW = KEMS / "config_flow.py"
 MANIFEST = KEMS / "manifest.json"
 BUNDLE = ROOT / "release" / "kems-bundle.template.json"
 
@@ -181,10 +182,15 @@ def test_commissioning_control_readiness_uses_control_critical_evidence() -> Non
 
 def test_commissioning_acknowledgement_switch_refuses_early_enable() -> None:
     source = SWITCH.read_text(encoding="utf-8")
+    flow = CONFIG_FLOW.read_text(encoding="utf-8")
+    control_schema = flow.split("CONTROL_SCHEMA = vol.Schema(", 1)[1].split(
+        "class KEMSConfigFlow", 1
+    )[0]
 
     assert "class KEMSCommissionedForControlSwitch" in source
     assert 'if not readiness.get("ready_for_control")' in source
     assert "KEMS control-critical commissioning evidence is not ready" in source
+    assert "CONF_SYSTEM_COMMISSIONED" not in control_schema
 
 
 def test_static_contract_is_bounded_not_general_write_authority() -> None:
