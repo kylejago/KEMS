@@ -27,8 +27,8 @@ from .foxess_command_shadow import build_foxess_command_shadow_snapshot
 from .kems_core.commissioning_evidence import (
     assess_foxess_power_balance,
     assess_foxess_telemetry_stability,
-    infer_battery_power_convention_from_balance,
     assess_foxess_unit_contract,
+    infer_battery_power_convention_from_balance,
 )
 from .panel import PANEL_CONFIG_VERSION, panel_health_snapshot
 from .source_authority import PHYSICAL_SOURCE_KEYS, duplicate_physical_sources
