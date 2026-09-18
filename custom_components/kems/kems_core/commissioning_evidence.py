@@ -432,9 +432,7 @@ def infer_battery_power_convention_from_balance(
         site_without_battery = solar + grid_import - house - grid_export
         positive_discharge_residual = abs(site_without_battery + battery_power)
         positive_charge_residual = abs(site_without_battery - battery_power)
-        separation = abs(
-            positive_discharge_residual - positive_charge_residual
-        )
+        separation = abs(positive_discharge_residual - positive_charge_residual)
 
         throughput = max(
             solar + grid_import + abs(battery_power),
