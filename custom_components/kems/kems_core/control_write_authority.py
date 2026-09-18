@@ -73,10 +73,15 @@ def assess_foxess_control_write_authority(
         return blocked("Control-critical commissioning evidence is not ready")
     if not control.data_fresh or not control.plan_safe:
         return blocked("Current KEMS control plan is not fresh and safe")
-    if control.preflight_total <= 0 or control.preflight_passed != control.preflight_total:
+    if (
+        control.preflight_total <= 0
+        or control.preflight_passed != control.preflight_total
+    ):
         return blocked("KEMS preflight suite is not fully passing")
     if control.island_mode_active or not control.grid_available:
-        return blocked("Grid unavailable/island mode is owned by local inverter protection")
+        return blocked(
+            "Grid unavailable/island mode is owned by local inverter protection"
+        )
     if not no_paid_export_mode:
         return blocked("Paid/Agile export control is outside the Alpha9.56 scope")
     if (
