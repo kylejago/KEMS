@@ -3,10 +3,9 @@ from __future__ import annotations
 import importlib.util
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-
-BACKEND = Path("custom_components/kems/foxess_control_backend.py")
 from types import SimpleNamespace
 
+BACKEND = Path("custom_components/kems/foxess_control_backend.py")
 _SESSION_PATH = Path("custom_components/kems/commissioning_session.py")
 _SESSION_SPEC = importlib.util.spec_from_file_location(
     "kems_alpha878_commissioning_session",
