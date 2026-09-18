@@ -274,9 +274,7 @@ def build_foxess_command_shadow_snapshot(
         )
 
     control = (
-        control_override
-        if control_override is not None
-        else coordinator.data.control
+        control_override if control_override is not None else coordinator.data.control
     )
     shadow = build_foxess_command_shadow(
         control,
