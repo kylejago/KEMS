@@ -234,7 +234,10 @@ def test_coordinator_aligns_after_agile_update_before_shadow_validation() -> Non
 
     assert agile_update < views < plan < reconcile < shadow
     assert "simulation=shadow_simulation" in source[shadow : shadow + 500]
-    assert "simulation=simulation" in source[source.index("return KEMSData") :]
+    provisional = source.index("provisional = KEMSData(", shadow)
+    assert "simulation=simulation" in source[provisional:]
+    backend = source.index("await self._foxess_control.async_update(", provisional)
+    assert shadow < provisional < backend
     assert (
         "commands_permitted=False"
         in (ROOT / "custom_components/kems/agile_control_alignment.py").read_text()
