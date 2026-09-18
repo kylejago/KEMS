@@ -42,14 +42,16 @@ def _record(
     )
 
 
-def test_commissioning_is_read_only_and_shadow_limited() -> None:
-    """The readiness layer must not unlock real inverter writes."""
+def test_commissioning_only_exposes_conditionally_bounded_control() -> None:
+    """Readiness can reach Control only after the complete technical gate."""
     content = COMMISSIONING.read_text(encoding="utf-8")
-    assert '"maximum_allowed_stage": "shadow"' in content
-    assert '"ready_for_control": False' in content
-    assert '"real_hardware_writes": "blocked"' in content
+    assert '"ready_for_control": ready_for_control' in content
+    assert '"maximum_allowed_stage": "control" if ready_for_control else "shadow"' in content
+    assert '"eligible_with_explicit_opt_in" if ready_for_control else "blocked"' in content
+    assert 'state == "Ready for Shadow"' in content
+    assert "and not solar_only_commissioning" in content
+    assert "and command_surface_ready" in content
     assert "commands_permitted" in content
-    assert "Real inverter writes remain hard-blocked" in content
 
 
 def test_commissioning_checks_foxess_sources_directions_and_limits() -> None:
