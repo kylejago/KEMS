@@ -137,9 +137,14 @@ def build_foxess_export_limit_readback_check(
     coordinator: KEMSCoordinator,
     *,
     configured_export_limit_kw: object,
+    control_override: object | None = None,
 ) -> dict[str, Any]:
     """Use the exact Shadow binding/readback path for commissioning proof."""
-    shadow = build_foxess_command_shadow_snapshot(hass, coordinator)
+    shadow = build_foxess_command_shadow_snapshot(
+        hass,
+        coordinator,
+        control_override=control_override,
+    )
     entity_binding = shadow.get("entity_binding")
     binding_root = dict(entity_binding) if isinstance(entity_binding, Mapping) else {}
     entities = binding_root.get("entities")
