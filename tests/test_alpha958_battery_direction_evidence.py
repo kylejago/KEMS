@@ -45,7 +45,9 @@ def _observation(
     )
 
 
-def test_bms_remaining_energy_proves_direction_without_whole_percent_soc_change() -> None:
+def test_bms_remaining_energy_proves_direction_without_whole_percent_soc_change() -> (
+    None
+):
     start = datetime(2026, 9, 18, 14, 0, tzinfo=UTC)
     records = [
         _observation(start, power_kw=-1.0, remaining_kwh=30.000),
