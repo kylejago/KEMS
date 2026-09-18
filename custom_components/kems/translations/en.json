@@ -232,7 +232,7 @@
           "manual_offpeak_start": "Start of the normal cheap period in local Home Assistant time.",
           "manual_offpeak_end": "End of the normal cheap period. Overnight periods are supported.",
           "intelligent_slots_enabled": "Allow a live Intelligent slot plus active EV charging to confirm an extra cheap period.",
-          "export_tariff_status": "Not active switches KEMS to no-export self-use planning: battery export is disabled, export value becomes 0p, solar serves the home then battery, and overnight charging leaves forecast solar headroom."
+          "export_tariff_status": "Not active switches KEMS to no-paid-export self-use planning: economic battery export is disabled and valued at 0p. An optional Grid import prevention bias may still request a tiny operational export trim solely to avoid standing import."
         }
       },
       "battery": {
@@ -267,7 +267,7 @@
       },
       "solar": {
         "title": "Solar, export and Power Down",
-        "description": "Configure the solar estimate, normal export strategy and Octoplus Power Down simulation. Export settings are automatically overridden while the export tariff is not active.",
+        "description": "Configure the solar estimate, normal economic export strategy and Octoplus Power Down simulation. Economic export settings are overridden while the export tariff is not active; the separate grid import prevention bias is an operational trim only.",
         "data": {
           "proposal_solar_enabled": "Use proposal solar model when live PV is unavailable",
           "proposal_solar_factor": "Proposal solar/weather factor (0.0-2.0)",
@@ -278,7 +278,7 @@
         "data_description": {
           "proposal_solar_enabled": "Models 21 x 460W panels, 9.66kWp, three roof orientations, and the proposal monthly generation baseline.",
           "proposal_solar_factor": "Scale the proposal baseline for cloud/weather sensitivity; 1.0 uses the proposal average.",
-          "battery_export_enabled": "Used only while the export tariff is Active. In Awaiting Export Tariff mode KEMS always disables deliberate battery export.",
+          "battery_export_enabled": "Used only while the export tariff is Active. In Awaiting Export Tariff mode KEMS disables economic battery export; the separate grid import prevention bias remains an operational zero-point trim and is never valued as paid export.",
           "simulation_strategy": "Used while the export tariff is Active. Awaiting Export Tariff mode automatically uses self-consumption-first planning.",
           "saving_session_enabled": "Hold battery energy before a joined session, cover the home, and maximise permitted export during the higher-reward window. KEMS remains read-only and does not join sessions itself."
         }
@@ -327,7 +327,7 @@
       },
       "control": {
         "title": "Control Lab and EPS safety",
-        "description": "Configure simulation, shadow planning and safeguards. Alpha4 still blocks real FoxESS and charger commands.",
+        "description": "Configure simulation, shadow planning and safeguards. Real FoxESS writes remain blocked until a separately proven control backend is commissioned.",
         "data": {
           "operating_mode": "Control Lab operating mode",
           "virtual_scenario": "Virtual KH7 test scenario",
@@ -336,6 +336,7 @@
           "emergency_stop": "Emergency stop latched",
           "stale_data_seconds": "Control data stale timeout (seconds)",
           "grid_stability_seconds": "Grid-restoration stability hold (seconds)",
+          "grid_import_prevention_bias_w": "Grid import prevention bias (W)",
           "eps_limit_kw": "Whole-house EPS continuous limit (kW)",
           "eps_warning_percent": "EPS warning threshold (%)",
           "eps_critical_percent": "EPS critical threshold (%)",
@@ -349,6 +350,7 @@
           "emergency_stop": "When enabled, KEMS plans zero charge/discharge/export commands and blocks all future writes.",
           "stale_data_seconds": "Fail-safe age after which desired control commands are withdrawn.",
           "grid_stability_seconds": "How long a restored grid must remain stable before normal planning may resume.",
+          "grid_import_prevention_bias_w": "Optional 0-100W near-zero-grid bias. 0 disables it. When safe, KEMS Shadow targets this many watts of export to avoid a few watts of standing import. It is suppressed during cheap charging, deliberate export, island mode, low SOC, unsafe/stale plans, insufficient headroom, or grid exchange outside the trim window. It is not paid-export income and Alpha9.55 still sends no hardware writes.",
           "eps_limit_kw": "Use the installer-confirmed whole-house EPS continuous limit. The pre-install default is 7kW.",
           "eps_warning_percent": "Whole-house island-load level that raises an early warning.",
           "eps_critical_percent": "Whole-house island-load level that raises a critical warning.",
