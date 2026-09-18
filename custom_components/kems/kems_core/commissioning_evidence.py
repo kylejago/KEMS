@@ -66,6 +66,47 @@ class TelemetryStabilityEvidence:
 
 
 @dataclass(frozen=True, slots=True)
+class BatteryDirectionObservation:
+    """One read-only observation used to prove the battery power sign convention."""
+
+    timestamp: Any
+    battery_power_kw: float | None
+    battery_soc: float | None = None
+    battery_energy_remaining_kwh: float | None = None
+    battery_charge_today_kwh: float | None = None
+    battery_discharge_today_kwh: float | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class BatteryDirectionEvidence:
+    """Evidence that signed battery power agrees with physical energy movement."""
+
+    state: str
+    ready: bool
+    positive_is_discharge: bool | None
+    evidence_samples: int
+    confidence_percent: float
+    positive_is_discharge_votes: int
+    positive_is_charge_votes: int
+    basis_counts: tuple[tuple[str, int], ...]
+    minimum_power_kw: float
+
+    def to_dict(self) -> dict[str, Any]:
+        """Return a stable serialisable battery-direction payload."""
+        return {
+            "state": self.state,
+            "ready": self.ready,
+            "positive_is_discharge": self.positive_is_discharge,
+            "evidence_samples": self.evidence_samples,
+            "confidence_percent": self.confidence_percent,
+            "positive_is_discharge_votes": self.positive_is_discharge_votes,
+            "positive_is_charge_votes": self.positive_is_charge_votes,
+            "basis_counts": dict(self.basis_counts),
+            "minimum_power_kw": self.minimum_power_kw,
+        }
+
+
+@dataclass(frozen=True, slots=True)
 class UnitContractEvidence:
     """Evidence that raw FoxESS source units match KEMS conversion assumptions."""
 
@@ -314,6 +355,155 @@ def assess_foxess_telemetry_stability(
         allowed_gap_seconds=allowed_gap,
         missing_fields=tuple(sorted(missing)),
         stale_fields=tuple(sorted(stale)),
+    )
+
+
+def assess_battery_power_direction(
+    records: tuple[Any, ...] | list[Any],
+    *,
+    minimum_power_kw: float = 0.25,
+    minimum_evidence_samples: int = 2,
+    minimum_confidence_percent: float = 75.0,
+    minimum_energy_delta_kwh: float = 0.002,
+    minimum_soc_delta_percent: float = 0.2,
+) -> BatteryDirectionEvidence:
+    """Infer the signed battery-power convention from fresh physical movement.
+
+    Evidence is deliberately session-scoped by the caller. Prefer BMS remaining
+    energy because it can move long before a large battery changes one whole SOC
+    percentage point. If that source is unavailable or unchanged, use the FoxESS
+    daily charge/discharge energy counters, then fall back to SOC movement.
+
+    A pair contributes at most one vote and only while average battery power is
+    above the commissioning threshold. Counter resets are ignored.
+    """
+    recent = list(records)[-360:]
+    positive_is_discharge_votes = 0
+    positive_is_charge_votes = 0
+    basis_counts: dict[str, int] = {
+        "bms_energy_remaining": 0,
+        "daily_energy_counters": 0,
+        "soc": 0,
+    }
+
+    def numeric(record: Any, name: str) -> float | None:
+        value = getattr(record, name, None)
+        if value is None:
+            return None
+        try:
+            number = float(value)
+        except (TypeError, ValueError):
+            return None
+        return number if isfinite(number) else None
+
+    for earlier, later in zip(recent, recent[1:], strict=False):
+        try:
+            gap = float((later.timestamp - earlier.timestamp).total_seconds())
+        except (AttributeError, TypeError, ValueError):
+            continue
+        if gap <= 0 or gap > 20 * 60:
+            continue
+
+        earlier_power = numeric(earlier, "battery_power_kw")
+        later_power = numeric(later, "battery_power_kw")
+        if earlier_power is None or later_power is None:
+            continue
+        average_power = (earlier_power + later_power) / 2.0
+        if abs(average_power) < minimum_power_kw:
+            continue
+
+        physical_direction: str | None = None
+        basis: str | None = None
+
+        earlier_remaining = numeric(earlier, "battery_energy_remaining_kwh")
+        later_remaining = numeric(later, "battery_energy_remaining_kwh")
+        if earlier_remaining is not None and later_remaining is not None:
+            delta_remaining = later_remaining - earlier_remaining
+            if abs(delta_remaining) >= minimum_energy_delta_kwh:
+                physical_direction = "discharge" if delta_remaining < 0 else "charge"
+                basis = "bms_energy_remaining"
+
+        if physical_direction is None:
+            earlier_charge = numeric(earlier, "battery_charge_today_kwh")
+            later_charge = numeric(later, "battery_charge_today_kwh")
+            earlier_discharge = numeric(earlier, "battery_discharge_today_kwh")
+            later_discharge = numeric(later, "battery_discharge_today_kwh")
+            charge_delta = (
+                later_charge - earlier_charge
+                if earlier_charge is not None and later_charge is not None
+                else None
+            )
+            discharge_delta = (
+                later_discharge - earlier_discharge
+                if earlier_discharge is not None and later_discharge is not None
+                else None
+            )
+            charge_moved = (
+                charge_delta is not None
+                and charge_delta >= minimum_energy_delta_kwh
+            )
+            discharge_moved = (
+                discharge_delta is not None
+                and discharge_delta >= minimum_energy_delta_kwh
+            )
+            counter_reset = (
+                charge_delta is not None and charge_delta < -minimum_energy_delta_kwh
+            ) or (
+                discharge_delta is not None
+                and discharge_delta < -minimum_energy_delta_kwh
+            )
+            if not counter_reset and charge_moved != discharge_moved:
+                physical_direction = "charge" if charge_moved else "discharge"
+                basis = "daily_energy_counters"
+
+        if physical_direction is None:
+            earlier_soc = numeric(earlier, "battery_soc")
+            later_soc = numeric(later, "battery_soc")
+            if earlier_soc is not None and later_soc is not None:
+                delta_soc = later_soc - earlier_soc
+                if abs(delta_soc) >= minimum_soc_delta_percent:
+                    physical_direction = "discharge" if delta_soc < 0 else "charge"
+                    basis = "soc"
+
+        if physical_direction is None or basis is None:
+            continue
+
+        positive_is_discharge = (
+            physical_direction == "discharge" and average_power > 0
+        ) or (physical_direction == "charge" and average_power < 0)
+        if positive_is_discharge:
+            positive_is_discharge_votes += 1
+        else:
+            positive_is_charge_votes += 1
+        basis_counts[basis] += 1
+
+    total = positive_is_discharge_votes + positive_is_charge_votes
+    dominant = max(positive_is_discharge_votes, positive_is_charge_votes)
+    confidence = round(100.0 * dominant / total, 1) if total else 0.0
+
+    if total < max(int(minimum_evidence_samples), 1):
+        state = "collecting"
+        ready = False
+        observed = None
+    elif confidence < float(minimum_confidence_percent):
+        state = "ambiguous"
+        ready = False
+        observed = None
+    else:
+        state = "proven"
+        ready = True
+        observed = positive_is_discharge_votes > positive_is_charge_votes
+
+    return BatteryDirectionEvidence(
+        state=state,
+        ready=ready,
+        positive_is_discharge=observed,
+        evidence_samples=total,
+        confidence_percent=confidence,
+        positive_is_discharge_votes=positive_is_discharge_votes,
+        positive_is_charge_votes=positive_is_charge_votes,
+        basis_counts=tuple(sorted(basis_counts.items())),
+        minimum_power_kw=float(minimum_power_kw),
     )
 
 
