@@ -111,7 +111,7 @@ def build_foxess_command_shadow(
         translation_status = WAIT
         translation_reason = (
             "EPS/island semantics require commissioned inverter-state proof; "
-            "Alpha8.79 will not guess a grid-connected work-mode write"
+            "KEMS will not guess a grid-connected work-mode write"
         )
     elif control.desired_work_mode in {"No change", "Stop KEMS writes"}:
         translation_status = WAIT
@@ -202,7 +202,8 @@ def build_foxess_command_shadow(
         observed_parity = DIFF
         parity_reason = (
             "Observed FoxESS state differs from the proposed command; this is "
-            "expected while Alpha8.79 is shadow-only and sends no commands"
+            "expected while KEMS hardware control remains disabled and Shadow "
+            "sends no commands"
         )
     else:
         observed_parity = MATCH

@@ -10,6 +10,7 @@ from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_registry as er
 
+from .commissioning_export_limit import build_foxess_export_limit_readback_check
 from .commissioning_session import collect_foxess_session_records
 from .const import (
     CONF_BATTERY_CURRENT,
@@ -801,6 +802,12 @@ def build_commissioning_snapshot(hass: HomeAssistant, coordinator) -> dict[str, 
             ),
         )
     )
+    export_limit_readback_check = build_foxess_export_limit_readback_check(
+        hass,
+        coordinator,
+        configured_export_limit_kw=limits["export_limit_kw"],
+    )
+    checks.append(export_limit_readback_check)
     eps_limit = limits["eps_output_limit_kw"]
     checks.append(
         _check(
@@ -864,7 +871,10 @@ def build_commissioning_snapshot(hass: HomeAssistant, coordinator) -> dict[str, 
             "Real hardware write lock",
             PASS if not data.control.commands_permitted else FAIL,
             (
-                "Real inverter writes remain hard-blocked in Alpha8.78 telemetry proof"
+                (
+                    "Real inverter writes remain hard-blocked until commissioning "
+                    "and write-authority gates permit control"
+                )
                 if not data.control.commands_permitted
                 else "Unexpected: control commands are currently permitted"
             ),
