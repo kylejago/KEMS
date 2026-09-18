@@ -15,6 +15,7 @@ COMMISSIONING = KEMS / "commissioning.py"
 SWITCH = KEMS / "switch.py"
 CONTRACT = KEMS / "foxess_modbus_contract.py"
 CONFIG_FLOW = KEMS / "config_flow.py"
+COORDINATOR = KEMS / "coordinator.py"
 MANIFEST = KEMS / "manifest.json"
 BUNDLE = ROOT / "release" / "kems-bundle.template.json"
 
@@ -162,10 +163,15 @@ def test_backend_live_write_surface_excludes_force_discharge_and_export_limit() 
 
 def test_backend_persists_and_restores_pre_kems_state() -> None:
     source = BACKEND.read_text(encoding="utf-8")
+    coordinator = COORDINATOR.read_text(encoding="utf-8")
 
     assert '"previous_work_mode"' in source
     assert '"previous_min_soc_on_grid"' in source
     assert "await self._async_restore(entities, writes)" in source
+    assert "async def async_shutdown" in source
+    assert '"shutdown_release_attempted": True' in source
+    assert '"upstream_watchdog_fallback": True' in source
+    assert "await self._foxess_control.async_shutdown(self)" in coordinator
     assert '"owned_by_kems": self._owned' in source
 
 
