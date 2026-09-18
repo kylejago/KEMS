@@ -15,9 +15,9 @@ BUNDLE = ROOT / "release" / "kems-bundle.template.json"
 
 def test_control_opt_in_switches_preserve_session_evidence_on_enable() -> None:
     source = SWITCH.read_text(encoding="utf-8")
-    commissioned = source.split(
-        "class KEMSCommissionedForControlSwitch", 1
-    )[1].split("class KEMSMasterControlEnableSwitch", 1)[0]
+    commissioned = source.split("class KEMSCommissionedForControlSwitch", 1)[1].split(
+        "class KEMSMasterControlEnableSwitch", 1
+    )[0]
     master = source.split("class KEMSMasterControlEnableSwitch", 1)[1].split(
         "class KEMSWeekendHappyHourPlanningSwitch", 1
     )[0]
