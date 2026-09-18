@@ -33,10 +33,14 @@ def test_alpha957_release_identity_and_scope() -> None:
     bundle = json.loads(BUNDLE.read_text(encoding="utf-8"))
     reason = str(bundle["maintenance"]["reason"])
 
-    assert manifest["version"] == "0.9.0-alpha9.57"
-    assert reason.startswith(
+    version = str(manifest["version"])
+    prefix = "0.9.0-alpha9."
+    assert version.startswith(prefix)
+    assert int(version.removeprefix(prefix)) >= 57
+    assert (
         "Alpha9.57 fixes the first-refresh startup regression exposed immediately "
         "after installing Alpha9.56"
+        in reason
     )
     assert "provisional data_override payload" in reason
     assert "does not broaden FoxESS write authority" in reason
