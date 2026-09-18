@@ -781,14 +781,21 @@ def build_commissioning_snapshot(hass: HomeAssistant, coordinator) -> dict[str, 
         "eps_output_limit_kw": data.simulation.eps_output_limit_kw,
         "site_import_limit_kw": data.control.site_import_limit_kw,
     }
-    kh7_limits = [
-        value
-        for key, value in limits.items()
-        if key not in {"eps_output_limit_kw", "site_import_limit_kw"}
-    ]
-    kh7_limits_safe = bool(kh7_limits) and all(
-        value is not None and 0 < float(value) <= 7.0 for value in kh7_limits
+    kh7_positive_limits = (
+        limits["inverter_limit_kw"],
+        limits["battery_charge_limit_kw"],
+        limits["battery_discharge_limit_kw"],
     )
+    kh7_positive_limits_safe = all(
+        value is not None and 0 < float(value) <= 7.0
+        for value in kh7_positive_limits
+    )
+    kems_export_limit = limits["export_limit_kw"]
+    kems_export_limit_safe = (
+        kems_export_limit is not None
+        and 0 <= float(kems_export_limit) <= float(limits["inverter_limit_kw"])
+    )
+    kh7_limits_safe = kh7_positive_limits_safe and kems_export_limit_safe
     checks.append(
         _check(
             "kh7_limits",
