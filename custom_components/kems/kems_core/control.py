@@ -630,7 +630,7 @@ def _backend_block_reason(config: ControlConfig) -> str:
         return "System has not been commissioned"
     if not config.control_enabled:
         return "Master control enable is off"
-    return "Awaiting bounded FoxESS runtime write-authority gates"
+    return "Awaiting bounded FoxESS control backend write-authority gates"
 
 
 def run_preflight_suite(config: ControlConfig) -> tuple[int, int]:
