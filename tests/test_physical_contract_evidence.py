@@ -6,6 +6,7 @@ from kems_core.commissioning_evidence import (
     assess_foxess_power_balance,
     assess_foxess_unit_contract,
     compare_shadow_battery_target,
+    infer_battery_power_convention_from_balance,
 )
 
 
@@ -98,6 +99,70 @@ def test_unit_contract_fails_closed_when_metadata_is_missing() -> None:
     assert evidence.ready is False
     assert evidence.state == "unit_missing"
     assert evidence.missing_fields == ("house_load_kw",)
+
+
+def test_battery_direction_can_be_inferred_from_decisive_site_balance() -> None:
+    """Large-battery commissioning must not wait for integer SOC movement."""
+    records = [
+        _record(
+            battery_soc=63.0,
+            battery_power_kw=-0.30,
+            solar_power_kw=0.68,
+            house_load_kw=0.39,
+            grid_import_kw=0.01,
+            grid_export_kw=0.0,
+        )
+        for _ in range(4)
+    ]
+
+    evidence = infer_battery_power_convention_from_balance(records)
+
+    assert evidence.ready is True
+    assert evidence.state == "inferred"
+    assert evidence.positive_is_discharge is True
+    assert evidence.evidence_samples == 4
+    assert evidence.confidence_percent == 100.0
+
+
+def test_battery_direction_balance_inference_ignores_ambiguous_low_power() -> None:
+    """Tiny or physically ambiguous battery flow must not manufacture proof."""
+    records = [
+        _record(
+            battery_power_kw=-0.10,
+            solar_power_kw=0.50,
+            house_load_kw=0.50,
+            grid_import_kw=0.0,
+            grid_export_kw=0.0,
+        )
+        for _ in range(8)
+    ]
+
+    evidence = infer_battery_power_convention_from_balance(records)
+
+    assert evidence.ready is False
+    assert evidence.state == "collecting"
+    assert evidence.positive_is_discharge is None
+    assert evidence.evidence_samples == 0
+
+
+def test_battery_direction_balance_inference_rejects_stale_site_telemetry() -> None:
+    """Stale physical fields cannot become battery-direction evidence."""
+    records = [
+        _record(
+            battery_power_kw=-1.0,
+            solar_power_kw=1.0,
+            house_load_kw=2.0,
+            grid_import_kw=0.0,
+            grid_export_kw=0.0,
+            stale_fields=("house_load_kw",),
+        )
+        for _ in range(6)
+    ]
+
+    evidence = infer_battery_power_convention_from_balance(records)
+
+    assert evidence.ready is False
+    assert evidence.evidence_samples == 0
 
 
 def test_repeated_physical_power_balance_passes_consistent_site_flows() -> None:
