@@ -261,7 +261,7 @@ def build_foxess_command_shadow(
                 else round(foxess_hardware_limit_kw, 3)
             ),
             "effective_ceiling_kw": round(effective_export_limit_kw, 3),
-            "basis": "minimum of KEMS user ceiling and observed FoxESS hardware ceiling",
+            "basis": (\n                "minimum of KEMS user ceiling and observed FoxESS hardware ceiling"\n            ),
         },
         "commands_permitted": False,
         "real_hardware_writes": "blocked",
