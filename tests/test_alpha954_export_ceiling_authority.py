@@ -181,5 +181,7 @@ def test_options_call_the_setting_kems_maximum_export() -> None:
 def test_commissioning_allows_zero_kems_export_ceiling() -> None:
     source = COMMISSIONING.read_text(encoding="utf-8")
 
-    assert "0 <= float(kems_export_limit)" in source
+    assert "kems_export_limit_safe = kems_export_limit is not None and 0 <= float(" in source
+    assert "kems_export_limit" in source
+    assert ') <= float(limits["inverter_limit_kw"])' in source
     assert "kh7_positive_limits_safe and kems_export_limit_safe" in source
