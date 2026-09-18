@@ -137,9 +137,7 @@ def test_every_explicit_control_gate_is_required() -> None:
     assert (
         _decision(_control(), master_control_enabled=False).commands_permitted is False
     )
-    assert (
-        _decision(_control(operating_mode="simulate")).commands_permitted is False
-    )
+    assert _decision(_control(operating_mode="simulate")).commands_permitted is False
     assert _decision(_control(data_fresh=False)).commands_permitted is False
     assert _decision(_control(plan_safe=False)).commands_permitted is False
 
@@ -147,7 +145,10 @@ def test_every_explicit_control_gate_is_required() -> None:
 def test_backend_live_write_surface_excludes_force_discharge_and_export_limit() -> None:
     source = BACKEND.read_text(encoding="utf-8")
 
-    assert 'required_keys = ("work_mode", "force_charge_power", "min_soc_on_grid")' in source
+    assert (
+        'required_keys = ("work_mode", "force_charge_power", "min_soc_on_grid")'
+        in source
+    )
     assert '_entity_id(entities, "force_discharge_power")' not in source
     assert '_entity_id(entities, "export_power_limit")' not in source
     assert '"deliberate_force_discharge": "blocked"' in source
