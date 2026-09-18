@@ -84,7 +84,8 @@ async def async_get_config_entry_diagnostics(
             "real_hardware_writes",
             "blocked",
         ),
-        "real_backend_available": bool(shadow_validation.get("real_backend_available")),
+        "real_backend_available": bool(data.control.real_backend_available),
+        "ready_for_control": bool(commissioning.get("ready_for_control")),
         "meaning": (
             "Digital-twin shadow validates desired commands against simulation; "
             "hardware shadow additionally requires commissioned FoxESS mappings."
@@ -156,6 +157,7 @@ async def async_get_config_entry_diagnostics(
             hass,
             coordinator,
         ),
+        "foxess_control": coordinator.foxess_control_state,
         "learning": asdict(data.learned),
         "gas": asdict(data.gas),
         "advice": {
