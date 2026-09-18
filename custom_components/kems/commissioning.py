@@ -787,8 +787,7 @@ def build_commissioning_snapshot(hass: HomeAssistant, coordinator) -> dict[str, 
         limits["battery_discharge_limit_kw"],
     )
     kh7_positive_limits_safe = all(
-        value is not None and 0 < float(value) <= 7.0
-        for value in kh7_positive_limits
+        value is not None and 0 < float(value) <= 7.0 for value in kh7_positive_limits
     )
     kems_export_limit = limits["export_limit_kw"]
     kems_export_limit_safe = (
