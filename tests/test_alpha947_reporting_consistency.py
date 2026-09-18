@@ -142,7 +142,9 @@ def test_alpha947_installs_before_first_refresh_and_stays_reporting_only() -> No
     assert (
         "self._finalise_best_day(self._tracking_date, self._tracking_values)" in source
     )
-    assert "Real inverter writes remain hard-blocked until" in source
+    assert "data_override: Any | None = None" in source
+    assert "data_override=data_override" in source
+    assert "Real inverter writes remain hard-blocked until" not in source
     assert "No older replay days were recovered" in source
     assert "solar_destinations_within_generation" in source
     assert "import_energy_breakdown_balance" in source

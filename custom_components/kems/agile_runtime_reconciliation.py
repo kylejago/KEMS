@@ -243,12 +243,20 @@ def _install_rolling_reconciliation() -> None:
     rolling._rolling_plan = rolling_plan_reconciled
 
 
-def _repair_commissioning_tariff_check(payload: dict[str, Any], coordinator) -> None:
+def _repair_commissioning_tariff_check(
+    payload: dict[str, Any],
+    coordinator,
+    *,
+    data_override: Any | None = None,
+) -> None:
     """Ignore completed offpeak_end staleness when the cheap period is not active."""
     checks = payload.get("checks")
     if not isinstance(checks, list):
         return
-    snapshot = coordinator.data.snapshot
+    data = data_override if data_override is not None else coordinator.data
+    if data is None:
+        return
+    snapshot = data.snapshot
     stale = set(getattr(snapshot, "tariff_stale_fields", ()) or ())
     if not bool(getattr(snapshot, "cheap_period_confirmed", False)):
         stale.discard("offpeak_end")
@@ -292,6 +300,22 @@ def _repair_commissioning_tariff_check(payload: dict[str, Any], coordinator) -> 
         state = "Ready for Shadow"
     payload["state"] = state
     payload["ready_for_shadow"] = state == "Ready for Shadow"
+    command_surface_ready = any(
+        isinstance(item, dict)
+        and item.get("key") == "foxess_control_command_surface"
+        and item.get("status") == commissioning.PASS
+        for item in checks
+    )
+    ready_for_control = bool(
+        payload["ready_for_shadow"]
+        and not bool(payload.get("solar_only_commissioning"))
+        and command_surface_ready
+    )
+    payload["ready_for_control"] = ready_for_control
+    payload["maximum_allowed_stage"] = "control" if ready_for_control else "shadow"
+    payload["real_hardware_writes"] = (
+        "eligible_with_explicit_opt_in" if ready_for_control else "blocked"
+    )
 
 
 def _install_commissioning_reconciliation() -> None:
@@ -299,9 +323,22 @@ def _install_commissioning_reconciliation() -> None:
     if getattr(original, "_kems_runtime_reconciliation", False):
         return
 
-    def build_reconciled(hass, coordinator):
-        payload = original(hass, coordinator)
-        _repair_commissioning_tariff_check(payload, coordinator)
+    def build_reconciled(
+        hass,
+        coordinator,
+        *,
+        data_override: Any | None = None,
+    ):
+        payload = original(
+            hass,
+            coordinator,
+            data_override=data_override,
+        )
+        _repair_commissioning_tariff_check(
+            payload,
+            coordinator,
+            data_override=data_override,
+        )
         payload["tariff_freshness_reconciled"] = True
         return payload
 

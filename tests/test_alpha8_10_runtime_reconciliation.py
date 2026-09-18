@@ -224,6 +224,90 @@ def test_daytime_completed_offpeak_end_does_not_fail_tariff_readiness() -> None:
     assert payload["fail_count"] == 0
 
 
+def test_tariff_reconciliation_keeps_control_readiness_fields_consistent() -> None:
+    ns = _load_functions({"_repair_commissioning_tariff_check"})
+    ns["commissioning"] = SimpleNamespace(PASS="PASS", WAIT="WAIT", FAIL="FAIL")
+    snapshot = SimpleNamespace(
+        current_import_rate=28.3036,
+        cheap_period_confirmed=False,
+        tariff_stale_fields=("offpeak_end",),
+    )
+    coordinator = SimpleNamespace(data=SimpleNamespace(snapshot=snapshot))
+    payload = {
+        "state": "Blocked",
+        "ready_for_shadow": False,
+        "ready_for_control": False,
+        "maximum_allowed_stage": "shadow",
+        "real_hardware_writes": "blocked",
+        "solar_only_commissioning": False,
+        "foxess_registered_entity_count": 3,
+        "checks": [
+            {
+                "key": "tariff_data",
+                "label": "Tariff data",
+                "status": "FAIL",
+                "detail": "stale",
+                "required": True,
+            },
+            {
+                "key": "foxess_control_command_surface",
+                "label": "FoxESS non-Agile control command surface",
+                "status": "PASS",
+                "detail": "ready",
+                "required": True,
+            },
+        ],
+        "fail_count": 1,
+        "wait_count": 0,
+        "pass_count": 1,
+    }
+
+    ns["_repair_commissioning_tariff_check"](payload, coordinator)
+
+    assert payload["state"] == "Ready for Shadow"
+    assert payload["ready_for_shadow"] is True
+    assert payload["ready_for_control"] is True
+    assert payload["maximum_allowed_stage"] == "control"
+    assert payload["real_hardware_writes"] == "eligible_with_explicit_opt_in"
+
+
+def test_commissioning_reconciliation_forwards_provisional_data_override() -> None:
+    ns = _load_functions(
+        {"_repair_commissioning_tariff_check", "_install_commissioning_reconciliation"}
+    )
+    provisional = SimpleNamespace(
+        snapshot=SimpleNamespace(
+            current_import_rate=28.3036,
+            cheap_period_confirmed=False,
+            tariff_stale_fields=("offpeak_end",),
+        )
+    )
+    seen: dict[str, object] = {}
+
+    def original(hass, coordinator, *, data_override=None):
+        seen["data_override"] = data_override
+        return {"checks": []}
+
+    commissioning = SimpleNamespace(
+        build_commissioning_snapshot=original,
+        PASS="PASS",
+        WAIT="WAIT",
+        FAIL="FAIL",
+    )
+    ns["commissioning"] = commissioning
+    coordinator = SimpleNamespace(data=None)
+
+    ns["_install_commissioning_reconciliation"]()
+    payload = commissioning.build_commissioning_snapshot(
+        object(),
+        coordinator,
+        data_override=provisional,
+    )
+
+    assert seen["data_override"] is provisional
+    assert payload["tariff_freshness_reconciled"] is True
+
+
 def test_reconciliation_is_final_canonical_shadow_only_boundary() -> None:
     compat = COMPAT.read_text(encoding="utf-8")
     source = RECONCILIATION.read_text(encoding="utf-8")

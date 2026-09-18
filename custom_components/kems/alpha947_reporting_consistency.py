@@ -382,17 +382,20 @@ def _install_commissioning_patch() -> None:
         return
     original = commissioning.build_commissioning_snapshot
 
-    def patched(hass, coordinator):
-        payload = original(hass, coordinator)
-        checks = payload.get("checks")
-        if isinstance(checks, list):
-            for item in checks:
-                if isinstance(item, dict) and item.get("key") == "real_write_lock":
-                    item["detail"] = (
-                        "Real inverter writes remain hard-blocked until "
-                        "commissioning and write-authority gates permit control"
-                    )
-        return payload
+    def patched(
+        hass,
+        coordinator,
+        *,
+        data_override: Any | None = None,
+    ):
+        # Alpha9.56 commissioning can be evaluated against provisional first-refresh
+        # data before coordinator.data exists. Preserve that keyword through this
+        # compatibility layer and leave the current bounded-control wording intact.
+        return original(
+            hass,
+            coordinator,
+            data_override=data_override,
+        )
 
     commissioning.build_commissioning_snapshot = patched
     diagnostics.build_commissioning_snapshot = patched
