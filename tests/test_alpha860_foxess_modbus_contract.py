@@ -72,8 +72,8 @@ def _fox_candidate(
     )
 
 
-def test_v115_kh_contract_is_read_only_and_uses_direct_battery_power() -> None:
-    """The reviewed KH contract must prefer invbatpower and block writes."""
+def test_v115_kh_contract_uses_direct_battery_power_and_bounded_control() -> None:
+    """The reviewed KH contract keeps telemetry stable and limits live writes."""
     _, _, contract = _load_modules()
     snapshot = contract.foxess_modbus_contract_snapshot()
 
@@ -87,8 +87,11 @@ def test_v115_kh_contract_is_read_only_and_uses_direct_battery_power() -> None:
     assert snapshot["battery_power_fallback"]["battery_current"]["key"] == (
         "invbatcurrent"
     )
-    assert snapshot["writes_permitted"] is False
-    assert snapshot["hardware_writes"] == "blocked"
+    assert snapshot["writes_permitted"] is True
+    assert snapshot["hardware_writes"] == "conditional_bounded_control"
+    assert snapshot["maximum_allowed_stage"] == "control"
+    assert "Force Discharge" in snapshot["blocked_live_capabilities"]
+    assert "export-power-limit writes" in snapshot["blocked_live_capabilities"]
 
 
 def test_real_v115_kh_inventory_auto_maps_all_required_kems_sources() -> None:
