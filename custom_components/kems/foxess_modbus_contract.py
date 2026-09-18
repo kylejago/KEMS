@@ -1,4 +1,4 @@
-"""Frozen FoxESS Modbus KH commissioning and command-shadow contract."""
+"""Frozen FoxESS Modbus KH commissioning and bounded-control contract."""
 
 from __future__ import annotations
 
@@ -77,8 +77,10 @@ FOXESS_MODBUS_OPTIONAL_DIAGNOSTICS: Final = {
     "pv4_power": {"key": "pv4_power", "name": "PV4 Power"},
 }
 
-# Writable entities reviewed from upstream v1.15.0. Alpha8.79 may discover and
-# read a small subset for command-shadow parity, but never calls or writes them.
+# Writable entities reviewed from upstream v1.15.0. Alpha9.56 introduces a
+# narrow opt-in backend for Self Use, confirmed-cheap Force Charge and Min SoC
+# on grid. Deliberate export/Force Discharge and export-limit writes remain
+# outside the live-control scope.
 FOXESS_MODBUS_KNOWN_WRITABLE_CAPABILITIES: Final = {
     "work_mode": "Work Mode",
     "force_charge_power": "Force Charge Power (remote control, kW)",
@@ -94,7 +96,7 @@ FOXESS_MODBUS_KNOWN_WRITABLE_CAPABILITIES: Final = {
 
 
 def foxess_modbus_contract_snapshot() -> dict[str, Any]:
-    """Return the reviewed read-only commissioning contract for diagnostics."""
+    """Return the reviewed commissioning/control contract for diagnostics."""
     return {
         "platform": FOXESS_MODBUS_PLATFORM,
         "reviewed_upstream_version": FOXESS_MODBUS_REVIEWED_VERSION,
@@ -111,10 +113,18 @@ def foxess_modbus_contract_snapshot() -> dict[str, Any]:
             for key, value in FOXESS_MODBUS_OPTIONAL_DIAGNOSTICS.items()
         },
         "known_writable_capabilities": dict(FOXESS_MODBUS_KNOWN_WRITABLE_CAPABILITIES),
-        "writes_permitted": False,
-        "hardware_writes": "blocked",
-        "maximum_allowed_stage": "shadow",
+        "writes_permitted": True,
+        "hardware_writes": "conditional_bounded_control",
+        "maximum_allowed_stage": "control",
         "control_scope": (
-            "read-only command translation/parity; no FoxESS write path is enabled"
+            "Alpha9.56 opt-in non-Agile control: Self Use, confirmed-cheap "
+            "Force Charge and Min SoC-on-grid only"
         ),
+        "blocked_live_capabilities": [
+            "Force Discharge",
+            "deliberate economic export",
+            "Agile/paid-export control",
+            "grid-import prevention bias",
+            "export-power-limit writes",
+        ],
     }

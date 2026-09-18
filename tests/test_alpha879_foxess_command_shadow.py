@@ -162,8 +162,8 @@ def test_ha_adapter_is_device_scoped_and_has_no_write_surface() -> None:
         assert forbidden not in source
 
 
-def test_diagnostics_contract_and_release_identity_expose_shadow_only_scope() -> None:
-    """Alpha8.79 should be visible while the hardware-write boundary stays frozen."""
+def test_diagnostics_contract_and_release_identity_preserve_shadow_boundary() -> None:
+    """Alpha8.79 Shadow stays read-only even after later bounded control exists."""
     diagnostics = DIAGNOSTICS.read_text(encoding="utf-8")
     contract = CONTRACT.read_text(encoding="utf-8")
     manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
@@ -173,6 +173,7 @@ def test_diagnostics_contract_and_release_identity_expose_shadow_only_scope() ->
     )
     assert '"force_charge_power"' in contract
     assert '"force_discharge_power"' in contract
-    assert '"writes_permitted": False' in contract
-    assert '"hardware_writes": "blocked"' in contract
+    assert '"writes_permitted": True' in contract
+    assert '"hardware_writes": "conditional_bounded_control"' in contract
+    assert '"maximum_allowed_stage": "control"' in contract
     assert manifest["version"].startswith("0.9.0-alpha9.")

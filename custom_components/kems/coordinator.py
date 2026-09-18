@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from dataclasses import replace
 from datetime import timedelta
 
 from homeassistant.config_entries import ConfigEntry
@@ -18,6 +19,7 @@ from .agile_current_day_presentation import reconciled_current_day_simulation
 from .agile_history_backfill import AgileHistoryBackfill
 from .agile_smart_export_runtime import EfficientAgileSmartExportManager
 from .collector import Collector
+from .commissioning import build_commissioning_snapshot
 from .const import NAME
 from .entity_discovery import SourceValidationResult
 from .export_accounting import (
@@ -28,6 +30,7 @@ from .export_accounting import (
 )
 from .forecast_validation import ForecastValidationRecorder
 from .forecasting import SolarForecastCoordinator
+from .foxess_control_backend import FoxESSControlBackend
 from .happy_hour_budget import apply_happy_hour_control
 from .happy_hour_ohme_control import OhmeHappyHourController
 from .history import HistoryRecorder
@@ -102,6 +105,7 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
         )
         self._whole_home = WholeHomeEngine()
         self._control = ControlEngine()
+        self._foxess_control = FoxESSControlBackend(hass, entry)
         self._happy_hour_ohme = OhmeHappyHourController(
             hass, entry, ev_status_entity=entities.ev_status
         )
@@ -143,6 +147,11 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
         return self._happy_hour_ohme.status
 
     @property
+    def foxess_control_state(self) -> dict:
+        """Return the bounded FoxESS real-control audit state."""
+        return self._foxess_control.status
+
+    @property
     def agile_history_backfill_state(self) -> dict:
         """Return Home Assistant statistics backfill diagnostics."""
         return self._agile_history_backfill.state
@@ -150,6 +159,7 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
     async def _async_setup(self) -> None:
         """Load retained learning history and permanent supporting ledgers."""
         await self._happy_hour_ohme.async_setup()
+        await self._foxess_control.async_setup()
         await self._history.async_load()
         await self._forecast_validation.async_load()
         await self._lifetime.async_load()
@@ -390,7 +400,7 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                 simulation.ready,
                 control.operating_mode,
             )
-            return KEMSData(
+            provisional = KEMSData(
                 snapshot=snapshot,
                 learned=learned,
                 gas=gas,
@@ -409,6 +419,34 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                 history_samples=len(records),
                 phase=phase,
             )
+            commissioning = build_commissioning_snapshot(
+                self.hass,
+                self,
+                data_override=provisional,
+            )
+            foxess_control = await self._foxess_control.async_update(
+                coordinator=self,
+                control=control,
+                technical_ready=bool(commissioning.get("ready_for_control")),
+                no_paid_export_mode=bool(simulation.no_export_mode_active),
+                cheap_period_confirmed=bool(snapshot.cheap_period_confirmed),
+            )
+            technical_commissioned = bool(
+                commissioning.get("ready_for_control")
+                and self.settings.control.commissioned
+            )
+            control = replace(
+                control,
+                commissioned=technical_commissioned,
+                real_backend_available=bool(foxess_control.get("backend_available")),
+                commands_permitted=bool(foxess_control.get("commands_permitted")),
+                blocked_reason=(
+                    str(foxess_control.get("decision_reason") or "")
+                    if control.operating_mode == "control"
+                    else control.blocked_reason
+                ),
+            )
+            return replace(provisional, control=control)
         except Exception as err:
             raise UpdateFailed(f"KEMS analysis failed: {err}") from err
 
@@ -451,7 +489,8 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
         snapshot.forecast_confidence_percent = plan.confidence_percent
 
     async def async_shutdown(self) -> None:
-        """Flush retained KEMS state before unloading."""
+        """Release live control and flush retained KEMS state before unloading."""
+        await self._foxess_control.async_shutdown(self)
         await self._happy_hour_ohme.async_shutdown()
         await self._history.async_save()
         await self._forecast_validation.async_save()
@@ -476,7 +515,7 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
         if operating_mode == "shadow":
             return f"{base} → Shadow"
         if operating_mode == "control":
-            return f"{base} → Control (blocked until commissioning)"
+            return f"{base} → Control"
         if operating_mode == "simulate":
             return f"{base} → Control Lab"
         return base

@@ -190,9 +190,15 @@ def test_solar_only_commissioning_remains_read_only_and_defers_battery_proof() -
     content = COMMISSIONING.read_text(encoding="utf-8")
     assert "solar_only_commissioning" in content
     assert "battery_installation_pending" in content
-    assert '"ready_for_control": False' in content
-    assert '"real_hardware_writes": "blocked"' in content
-    assert '"maximum_allowed_stage": "shadow"' in content
+    assert "and not solar_only_commissioning" in content
+    assert '"ready_for_control": ready_for_control' in content
+    assert (
+        '"maximum_allowed_stage": "control" if ready_for_control else "shadow"'
+        in content
+    )
+    assert (
+        '"eligible_with_explicit_opt_in" if ready_for_control else "blocked"' in content
+    )
 
 
 def test_alpha930_versions_core_only_panel_remains_alpha9_panel3() -> None:
@@ -201,7 +207,7 @@ def test_alpha930_versions_core_only_panel_remains_alpha9_panel3() -> None:
     bundle = json.loads(BUNDLE.read_text(encoding="utf-8"))
     panel = PANEL.read_text(encoding="utf-8")
 
-    assert manifest["version"] == "0.9.0-alpha9.55"
+    assert manifest["version"] == "0.9.0-alpha9.56"
     assert bundle["bundle"] == "__RELEASE_VERSION__"
     assert bundle["components"]["kems_core"]["version"] == "__RELEASE_VERSION__"
     assert bundle["components"]["panel"]["version"] == "0.9.0-alpha9-panel.3"

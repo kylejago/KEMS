@@ -46,7 +46,9 @@ def test_commissioning_requires_unique_physical_source_roles() -> None:
     assert '"physical_source_authority": physical_source_authority' in source
     assert '"duplicate_physical_sources": {' in source
     assert '"physical_source_uniqueness",' in source
-    assert '"real_hardware_writes": "blocked"' in source
+    assert '"ready_for_control": ready_for_control' in source
+    assert '"eligible_with_explicit_opt_in"' in source
+    assert 'else "blocked"' in source
 
 
 def test_dispatch_diagnostic_has_no_obsolete_second_reserve_target() -> None:

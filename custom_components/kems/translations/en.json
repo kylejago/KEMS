@@ -7,7 +7,7 @@
     "step": {
       "user": {
         "title": "Set up KEMS",
-        "description": "KEMS will scan Home Assistant for compatible Octopus electricity and gas, Ohme, and FoxESS Modbus entities. The Control Lab calculates safe desired behaviour but real hardware writes remain blocked."
+        "description": "KEMS will scan Home Assistant for compatible Octopus electricity and gas, Ohme, and FoxESS Modbus entities. Real FoxESS control is disabled by default and only the bounded reviewed Alpha9.56 scope can be enabled after commissioning and explicit opt-in."
       },
       "confirm": {
         "title": "Choose how KEMS gets your tariff",
@@ -327,12 +327,11 @@
       },
       "control": {
         "title": "Control Lab and EPS safety",
-        "description": "Configure simulation, shadow planning and safeguards. Real FoxESS writes remain blocked until a separately proven control backend is commissioned.",
+        "description": "Configure simulation, shadow planning and the bounded Alpha9.56 FoxESS control trial. Live control supports Self Use, confirmed-cheap Force Charge and Min SoC-on-grid only; deliberate export, Agile/paid-export control and the grid-import prevention bias remain Shadow-only.",
         "data": {
           "operating_mode": "Control Lab operating mode",
           "virtual_scenario": "Virtual KH7 test scenario",
           "control_enabled": "Master control opt-in",
-          "system_commissioned": "System commissioning confirmed",
           "emergency_stop": "Emergency stop latched",
           "stale_data_seconds": "Control data stale timeout (seconds)",
           "grid_stability_seconds": "Grid-restoration stability hold (seconds)",
@@ -343,14 +342,13 @@
           "island_reserve_percent": "Island conservation threshold (%)"
         },
         "data_description": {
-          "operating_mode": "Observe, virtual simulation, shadow planning, or control. Real control remains hard-blocked in alpha6.",
+          "operating_mode": "Observe, virtual simulation, shadow planning, or Control. Alpha9.56 permits only the bounded non-Agile FoxESS scope after all independent commissioning and opt-in gates pass.",
           "virtual_scenario": "Inject normal, solar, cloud, high-load, Power Down, outage, overload, or unstable-grid conditions.",
-          "control_enabled": "Records explicit control opt-in only. It cannot permit real writes until a verified backend exists.",
-          "system_commissioned": "Leave off before the installer has commissioned the KH7 and KEMS has verified all readings and limits.",
+          "control_enabled": "Master opt-in for bounded FoxESS writes. Control mode, technical commissioning readiness and the separate Commissioned for control acknowledgement must also pass.",
           "emergency_stop": "When enabled, KEMS plans zero charge/discharge/export commands and blocks all future writes.",
           "stale_data_seconds": "Fail-safe age after which desired control commands are withdrawn.",
           "grid_stability_seconds": "How long a restored grid must remain stable before normal planning may resume.",
-          "grid_import_prevention_bias_w": "Optional 0-100W near-zero-grid bias. 0 disables it. When safe, KEMS Shadow targets this many watts of export to avoid a few watts of standing import. It is suppressed during cheap charging, deliberate export, island mode, low SOC, unsafe/stale plans, insufficient headroom, or grid exchange outside the trim window. It is not paid-export income and Alpha9.55 still sends no hardware writes.",
+          "grid_import_prevention_bias_w": "Optional 0-100W near-zero-grid bias. 0 disables it. It is not paid-export income. Alpha9.56 keeps this bias Shadow-only and sends no hardware writes for it because the reviewed FoxESS remote-control setpoint is inverter active power rather than a proven net-grid-power target.",
           "eps_limit_kw": "Use the installer-confirmed whole-house EPS continuous limit. The pre-install default is 7kW.",
           "eps_warning_percent": "Whole-house island-load level that raises an early warning.",
           "eps_critical_percent": "Whole-house island-load level that raises a critical warning.",

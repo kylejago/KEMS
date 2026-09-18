@@ -150,6 +150,8 @@ def _power_w(value: object, unit: str | None) -> float | None:
 def build_foxess_command_shadow_snapshot(
     hass: HomeAssistant,
     coordinator: KEMSCoordinator,
+    *,
+    control_override: object | None = None,
 ) -> dict[str, Any]:
     """Build a deterministic read-only FoxESS command/parity diagnostic."""
     registry = er.async_get(hass)
@@ -271,8 +273,11 @@ def build_foxess_command_shadow_snapshot(
             + ", ".join(sorted(ambiguous_keys))
         )
 
+    control = (
+        control_override if control_override is not None else coordinator.data.control
+    )
     shadow = build_foxess_command_shadow(
-        coordinator.data.control,
+        control,
         observed,
         export_limit_kw=coordinator.settings.control.export_limit_kw,
     )
