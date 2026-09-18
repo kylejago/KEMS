@@ -300,6 +300,22 @@ def _repair_commissioning_tariff_check(
         state = "Ready for Shadow"
     payload["state"] = state
     payload["ready_for_shadow"] = state == "Ready for Shadow"
+    command_surface_ready = any(
+        isinstance(item, dict)
+        and item.get("key") == "foxess_control_command_surface"
+        and item.get("status") == commissioning.PASS
+        for item in checks
+    )
+    ready_for_control = bool(
+        payload["ready_for_shadow"]
+        and not bool(payload.get("solar_only_commissioning"))
+        and command_surface_ready
+    )
+    payload["ready_for_control"] = ready_for_control
+    payload["maximum_allowed_stage"] = "control" if ready_for_control else "shadow"
+    payload["real_hardware_writes"] = (
+        "eligible_with_explicit_opt_in" if ready_for_control else "blocked"
+    )
 
 
 def _install_commissioning_reconciliation() -> None:
