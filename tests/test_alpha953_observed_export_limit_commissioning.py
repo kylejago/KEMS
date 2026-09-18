@@ -59,21 +59,24 @@ def _assess(observed_w: object, *, binding: dict[str, object] | None = None):
     )
 
 
-def test_observed_export_limit_at_dno_ceiling_passes() -> None:
+def test_observed_export_limit_at_kems_ceiling_passes() -> None:
     result = _assess(6400.0)
 
     assert result["status"] == "PASS"
     assert result["required"] is True
-    assert "observed=6.400 kW" in result["detail"]
-    assert "ceiling=6.400 kW" in result["detail"]
+    assert "FoxESS hardware ceiling=6.400 kW" in result["detail"]
+    assert "KEMS ceiling=6.400 kW" in result["detail"]
+    assert result["effective_export_limit_kw"] == 6.4
 
 
-def test_observed_export_limit_below_dno_ceiling_passes() -> None:
+def test_observed_export_limit_below_kems_ceiling_fails_closed() -> None:
     result = _assess(5000.0)
 
-    assert result["status"] == "PASS"
+    assert result["status"] == "FAIL"
     assert result["required"] is True
-    assert "observed=5.000 kW" in result["detail"]
+    assert "FoxESS hardware ceiling=5.000 kW" in result["detail"]
+    assert "KEMS ceiling=6.400 kW exceeds" in result["detail"]
+    assert result["effective_export_limit_kw"] == 5.0
 
 
 def test_live_like_14_5_kw_readback_is_usable_hardware_ceiling() -> None:
