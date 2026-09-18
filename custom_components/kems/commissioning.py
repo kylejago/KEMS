@@ -28,6 +28,7 @@ from .kems_core.commissioning_evidence import (
     assess_foxess_power_balance,
     assess_foxess_telemetry_stability,
     assess_foxess_unit_contract,
+    infer_battery_power_convention_from_balance,
 )
 from .panel import PANEL_CONFIG_VERSION, panel_health_snapshot
 from .source_authority import PHYSICAL_SOURCE_KEYS, duplicate_physical_sources
@@ -615,9 +616,42 @@ def build_commissioning_snapshot(
             )
     checks.append(telemetry_check)
 
-    detected_positive_is_discharge, direction_samples, direction_confidence = (
-        _detect_battery_power_convention(records)
+    (
+        soc_detected_positive_is_discharge,
+        soc_direction_samples,
+        soc_direction_confidence,
+    ) = _detect_battery_power_convention(records)
+    balance_direction_evidence = infer_battery_power_convention_from_balance(records)
+    balance_direction_payload = balance_direction_evidence.to_dict()
+    direction_conflict = bool(
+        soc_detected_positive_is_discharge is not None
+        and balance_direction_evidence.ready
+        and balance_direction_evidence.positive_is_discharge
+        != soc_detected_positive_is_discharge
     )
+    if soc_detected_positive_is_discharge is not None:
+        detected_positive_is_discharge = soc_detected_positive_is_discharge
+        direction_samples = soc_direction_samples
+        direction_confidence = soc_direction_confidence
+        direction_method = "soc_movement"
+    elif balance_direction_evidence.ready:
+        detected_positive_is_discharge = (
+            balance_direction_evidence.positive_is_discharge
+        )
+        direction_samples = balance_direction_evidence.evidence_samples
+        direction_confidence = balance_direction_evidence.confidence_percent
+        direction_method = "whole_site_balance"
+    else:
+        detected_positive_is_discharge = None
+        direction_samples = max(
+            soc_direction_samples,
+            balance_direction_evidence.evidence_samples,
+        )
+        direction_confidence = max(
+            soc_direction_confidence,
+            balance_direction_evidence.confidence_percent,
+        )
+        direction_method = "collecting"
     configured_positive_is_discharge = bool(
         coordinator.settings.simulation.battery_power_positive_is_discharge
     )
@@ -635,14 +669,26 @@ def build_commissioning_snapshot(
             WAIT,
             "Waiting for valid fresh-session FoxESS telemetry sources",
         )
+    elif direction_conflict:
+        battery_direction = _check(
+            "battery_power_direction",
+            "Battery power direction",
+            FAIL,
+            (
+                "Fresh-session SOC movement and whole-site balance evidence "
+                "disagree on the FoxESS battery-power sign convention"
+            ),
+        )
     elif detected_positive_is_discharge is None:
         battery_direction = _check(
             "battery_power_direction",
             "Battery power direction",
             WAIT,
             (
-                "Waiting for fresh-session SOC movement while battery power is above "
-                f"0.25 kW ({direction_samples} evidence sample(s))"
+                "Waiting for fresh-session SOC movement or decisive whole-site "
+                "balance while battery power is above 0.25 kW "
+                f"(SOC={soc_direction_samples}; balance="
+                f"{balance_direction_evidence.evidence_samples}/3 evidence samples)"
             ),
         )
     elif detected_positive_is_discharge == configured_positive_is_discharge:
@@ -655,7 +701,11 @@ def build_commissioning_snapshot(
             "battery_power_direction",
             "Battery power direction",
             PASS,
-            f"Observed {convention}; {direction_confidence:.1f}% confidence",
+            (
+                f"Observed {convention} via {direction_method.replace('_', ' ')}; "
+                f"{direction_confidence:.1f}% confidence from "
+                f"{direction_samples} evidence sample(s)"
+            ),
         )
     else:
         observed = (
@@ -1062,6 +1112,9 @@ def build_commissioning_snapshot(
         "detected_battery_power_positive_is_discharge": detected_positive_is_discharge,
         "battery_direction_evidence_samples": direction_samples,
         "battery_direction_confidence_percent": direction_confidence,
+        "battery_direction_evidence_method": direction_method,
+        "battery_direction_evidence_conflict": direction_conflict,
+        "battery_direction_balance_evidence": balance_direction_payload,
         "limits": limits,
         "panel": panel,
         "shadow_command": {
