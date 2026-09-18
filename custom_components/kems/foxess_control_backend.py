@@ -72,9 +72,7 @@ class FoxESSControlBackend:
         self._previous_work_mode = (
             str(previous_mode) if previous_mode in _LOCAL_WORK_MODES else None
         )
-        self._previous_min_soc_on_grid = _number(
-            data.get("previous_min_soc_on_grid")
-        )
+        self._previous_min_soc_on_grid = _number(data.get("previous_min_soc_on_grid"))
 
     async def _async_save(self) -> None:
         await self._store.async_save(
@@ -118,7 +116,10 @@ class FoxESSControlBackend:
         writes: list[str],
     ) -> bool:
         state = self._hass.states.get(entity_id)
-        options = tuple(str(item) for item in ((state.attributes.get("options") if state else None) or ()))
+        options = tuple(
+            str(item)
+            for item in ((state.attributes.get("options") if state else None) or ())
+        )
         if option not in options:
             self._last_write_result = f"FoxESS option unavailable: {option}"
             return False
@@ -155,14 +156,10 @@ class FoxESSControlBackend:
             minimum = _number(state.attributes.get("min"))
             maximum = _number(state.attributes.get("max"))
             if minimum is not None and value < minimum - tolerance:
-                self._last_write_result = (
-                    f"FoxESS number target {value} is below {entity_id} minimum {minimum}"
-                )
+                self._last_write_result = f"FoxESS number target {value} is below {entity_id} minimum {minimum}"
                 return False
             if maximum is not None and value > maximum + tolerance:
-                self._last_write_result = (
-                    f"FoxESS number target {value} exceeds {entity_id} maximum {maximum}"
-                )
+                self._last_write_result = f"FoxESS number target {value} exceeds {entity_id} maximum {maximum}"
                 return False
         try:
             async with asyncio.timeout(15):
@@ -382,7 +379,9 @@ class FoxESSControlBackend:
             "binding_ready": binding_ready,
             "technical_commissioning_ready": technical_ready,
             "operating_mode": control.operating_mode,
-            "master_control_enabled": bool(coordinator.settings.control.control_enabled),
+            "master_control_enabled": bool(
+                coordinator.settings.control.control_enabled
+            ),
             "user_commissioned": bool(coordinator.settings.control.commissioned),
             "no_paid_export_mode": bool(no_paid_export_mode),
             "cheap_period_confirmed": bool(cheap_period_confirmed),
