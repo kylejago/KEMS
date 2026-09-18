@@ -31,7 +31,6 @@ from .forecasting import SolarForecastCoordinator
 from .happy_hour_budget import apply_happy_hour_control
 from .happy_hour_ohme_control import OhmeHappyHourController
 from .history import HistoryRecorder
-from .kems_core.grid_import_prevention import apply_grid_import_prevention_bias
 from .kems_core import (
     AdviceEngine,
     ControlEngine,
@@ -48,6 +47,7 @@ from .kems_core import (
     WholeHomeEngine,
     assess_quality,
 )
+from .kems_core.grid_import_prevention import apply_grid_import_prevention_bias
 from .lifetime import LifetimeLedgerRecorder
 from .power_down import PowerDownHistoryRecorder
 from .product_types import (
