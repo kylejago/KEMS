@@ -22,5 +22,11 @@ def test_alpha8_1_shadow_safety_remains_frozen_under_later_bounded_control() -> 
     assert '"commands_permitted": False' in shadow
     assert '"safe_to_write_hardware": False' in shadow
     assert '"ready_for_control": ready_for_control' in commissioning
-    assert '"maximum_allowed_stage": "control" if ready_for_control else "shadow"' in commissioning
-    assert '"eligible_with_explicit_opt_in" if ready_for_control else "blocked"' in commissioning
+    assert (
+        '"maximum_allowed_stage": "control" if ready_for_control else "shadow"'
+        in commissioning
+    )
+    assert (
+        '"eligible_with_explicit_opt_in" if ready_for_control else "blocked"'
+        in commissioning
+    )
