@@ -1,4 +1,4 @@
-"""Fail-closed FoxESS export-limit commissioning proof."""
+"""Fail-closed FoxESS/KEMS export-ceiling commissioning proof."""
 
 from __future__ import annotations
 
@@ -17,14 +17,24 @@ WAIT = "WAIT"
 FAIL = "FAIL"
 
 
-def _check(status: str, detail: str) -> dict[str, Any]:
-    """Return the required export-limit commissioning checklist item."""
+def _check(
+    status: str,
+    detail: str,
+    *,
+    kems_export_limit_kw: float | None = None,
+    foxess_hardware_limit_kw: float | None = None,
+    effective_export_limit_kw: float | None = None,
+) -> dict[str, Any]:
+    """Return the required export-ceiling commissioning checklist item."""
     return {
         "key": "foxess_export_limit_readback",
-        "label": "FoxESS export-limit readback",
+        "label": "FoxESS / KEMS export ceilings",
         "status": status,
         "detail": detail,
         "required": True,
+        "kems_export_limit_kw": kems_export_limit_kw,
+        "foxess_hardware_limit_kw": foxess_hardware_limit_kw,
+        "effective_export_limit_kw": effective_export_limit_kw,
     }
 
 
@@ -35,15 +45,16 @@ def assess_foxess_export_limit_readback(
     binding: Mapping[str, object] | None,
     observed_export_limit_w: object,
 ) -> dict[str, Any]:
-    """Assess one reviewed FoxESS export-limit sensor against the DNO ceiling."""
+    """Prove the KEMS user ceiling does not exceed the live FoxESS ceiling."""
     try:
-        configured_kw = float(configured_export_limit_kw)
+        kems_kw = float(configured_export_limit_kw)
     except (TypeError, ValueError):
-        return _check(FAIL, "Configured KEMS/DNO export ceiling is not numeric")
-    if configured_kw <= 0:
+        return _check(FAIL, "Configured KEMS export ceiling is not numeric")
+    if kems_kw < 0:
         return _check(
             FAIL,
-            f"Configured KEMS/DNO export ceiling is invalid: {configured_kw} kW",
+            f"Configured KEMS export ceiling is invalid: {kems_kw} kW",
+            kems_export_limit_kw=kems_kw,
         )
 
     if not selected_device_id:
@@ -51,8 +62,9 @@ def assess_foxess_export_limit_readback(
             WAIT,
             (
                 "Waiting for one authoritative FoxESS telemetry device before "
-                "proving the export limit"
+                "proving the export ceilings"
             ),
+            kems_export_limit_kw=kems_kw,
         )
 
     binding_data = dict(binding or {})
@@ -61,7 +73,7 @@ def assess_foxess_export_limit_readback(
         detail = "Waiting for one usable FoxESS export-limit command/readback binding"
         if candidates:
             detail += f"; candidates={list(candidates)}"
-        return _check(WAIT, detail)
+        return _check(WAIT, detail, kems_export_limit_kw=kems_kw)
 
     readback_entity_id = binding_data.get("readback_entity_id")
     observation_source = binding_data.get("observation_source")
@@ -69,6 +81,7 @@ def assess_foxess_export_limit_readback(
         return _check(
             WAIT,
             "Waiting for the dedicated read-only FoxESS export-limit sensor readback",
+            kems_export_limit_kw=kems_kw,
         )
 
     try:
@@ -80,31 +93,42 @@ def assess_foxess_export_limit_readback(
                 "FoxESS export-limit readback is unavailable or non-numeric: "
                 f"{readback_entity_id}"
             ),
+            kems_export_limit_kw=kems_kw,
         )
 
     if observed_w < 0:
         return _check(
             FAIL,
             f"{readback_entity_id}: observed export limit is invalid: {observed_w} W",
+            kems_export_limit_kw=kems_kw,
         )
 
-    configured_w = configured_kw * 1000.0
-    tolerance_w = 1.0
-    if observed_w > configured_w + tolerance_w:
+    foxess_kw = observed_w / 1000.0
+    effective_kw = min(kems_kw, foxess_kw)
+    tolerance_kw = 0.001
+
+    if kems_kw > foxess_kw + tolerance_kw:
         return _check(
             FAIL,
             (
-                f"{readback_entity_id}: observed={observed_w / 1000.0:.3f} kW exceeds "
-                f"configured/DNO ceiling={configured_kw:.3f} kW"
+                f"{readback_entity_id}: KEMS ceiling={kems_kw:.3f} kW exceeds "
+                f"FoxESS hardware ceiling={foxess_kw:.3f} kW; "
+                f"effective ceiling={effective_kw:.3f} kW"
             ),
+            kems_export_limit_kw=kems_kw,
+            foxess_hardware_limit_kw=foxess_kw,
+            effective_export_limit_kw=effective_kw,
         )
 
     return _check(
         PASS,
         (
-            f"{readback_entity_id}: observed={observed_w / 1000.0:.3f} kW; "
-            f"configured/DNO ceiling={configured_kw:.3f} kW"
+            f"{readback_entity_id}: FoxESS hardware ceiling={foxess_kw:.3f} kW; "
+            f"KEMS ceiling={kems_kw:.3f} kW; effective ceiling={effective_kw:.3f} kW"
         ),
+        kems_export_limit_kw=kems_kw,
+        foxess_hardware_limit_kw=foxess_kw,
+        effective_export_limit_kw=effective_kw,
     )
 
 

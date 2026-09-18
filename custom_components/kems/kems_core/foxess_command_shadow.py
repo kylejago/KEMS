@@ -87,6 +87,17 @@ def build_foxess_command_shadow(
     desired_export = max(control.desired_battery_export_power_kw, 0.0)
     desired_charge = max(control.desired_charge_power_kw, 0.0)
     configured_export_limit_kw = max(float(export_limit_kw), 0.0)
+    observed_export_limit_w = _number(observed_values.get("export_power_limit_w"))
+    foxess_hardware_limit_kw = (
+        max(observed_export_limit_w / 1000.0, 0.0)
+        if observed_export_limit_w is not None
+        else None
+    )
+    effective_export_limit_kw = (
+        min(configured_export_limit_kw, foxess_hardware_limit_kw)
+        if foxess_hardware_limit_kw is not None
+        else configured_export_limit_kw
+    )
 
     translation_status = PASS
     translation_reason = (
@@ -130,7 +141,9 @@ def build_foxess_command_shadow(
         # request. Battery-to-home remains an observed/self-use flow and must
         # never be added to the force-discharge setpoint.
         proposed_work_mode = "Force Discharge"
-        force_discharge_power_kw = round(desired_export, 3)
+        force_discharge_power_kw = round(
+            min(desired_export, effective_export_limit_kw), 3
+        )
     elif control.desired_work_mode in {"Self Use", "Feed-in First"}:
         proposed_work_mode = control.desired_work_mode
     else:
@@ -138,7 +151,7 @@ def build_foxess_command_shadow(
         translation_reason = f"Unreviewed KEMS work mode: {control.desired_work_mode}"
 
     proposed_export_limit_w = round(
-        (configured_export_limit_kw if control.desired_grid_export_allowed else 0.0)
+        (effective_export_limit_kw if control.desired_grid_export_allowed else 0.0)
         * 1000
     )
     proposed_min_soc_on_grid = round(control.desired_min_soc_percent, 1)
@@ -153,7 +166,9 @@ def build_foxess_command_shadow(
             proposed_work_mode == "Force Charge" and desired_charge > 0
         ),
         "discharge_enabled": bool(
-            proposed_work_mode == "Force Discharge" and desired_export > 0
+            proposed_work_mode == "Force Discharge"
+            and force_discharge_power_kw is not None
+            and force_discharge_power_kw > 0
         ),
         "grid_export_allowed": bool(control.desired_grid_export_allowed),
         "remote_control_required": proposed_work_mode
@@ -229,7 +244,27 @@ def build_foxess_command_shadow(
     return {
         "scope": "translation/proof only",
         "reviewed_foxess_modbus_version": "1.15.0",
+        # Compatibility key retained; Alpha9.54 defines this as the KEMS user ceiling.
         "configured_export_limit_kw": round(configured_export_limit_kw, 3),
+        "kems_export_limit_kw": round(configured_export_limit_kw, 3),
+        "foxess_hardware_export_limit_kw": (
+            None
+            if foxess_hardware_limit_kw is None
+            else round(foxess_hardware_limit_kw, 3)
+        ),
+        "effective_export_limit_kw": round(effective_export_limit_kw, 3),
+        "export_limit_authority": {
+            "kems_user_ceiling_kw": round(configured_export_limit_kw, 3),
+            "foxess_hardware_ceiling_kw": (
+                None
+                if foxess_hardware_limit_kw is None
+                else round(foxess_hardware_limit_kw, 3)
+            ),
+            "effective_ceiling_kw": round(effective_export_limit_kw, 3),
+            "basis": (
+                "minimum of KEMS user ceiling and observed FoxESS hardware ceiling"
+            ),
+        },
         "commands_permitted": False,
         "real_hardware_writes": "blocked",
         "maximum_allowed_stage": "shadow",
