@@ -6,6 +6,7 @@ from homeassistant.components.switch import SwitchEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .battery_installation import (
@@ -13,11 +14,13 @@ from .battery_installation import (
     battery_telemetry_snapshot,
     install_battery_installation_contract,
 )
+from .commissioning import build_commissioning_snapshot
 from .const import (
     CONF_BATTERY_INSTALLED,
     CONF_CONTROL_ENABLED,
     CONF_EMERGENCY_STOP,
     CONF_HAPPY_HOUR_OHME_CONTROL_ENABLED,
+    CONF_SYSTEM_COMMISSIONED,
 )
 from .entity import KEMSEntity
 from .happy_hour import CONF_HAPPY_HOUR_ENABLED
@@ -43,6 +46,7 @@ async def async_setup_entry(
     entities = [
         KEMSBatteryInstalledSwitch(coordinator),
         KEMSEmergencyStopSwitch(coordinator),
+        KEMSCommissionedForControlSwitch(coordinator),
         KEMSMasterControlEnableSwitch(coordinator),
         KEMSWeekendHappyHourPlanningSwitch(coordinator),
         KEMSWeekendHappyHourAutoJoinSwitch(coordinator),
@@ -141,8 +145,58 @@ class KEMSEmergencyStopSwitch(KEMSEntity, SwitchEntity):
         )
 
 
+class KEMSCommissionedForControlSwitch(KEMSEntity, SwitchEntity):
+    """Explicit user acknowledgement after technical commissioning passes."""
+
+    _attr_name = "Commissioned for control"
+    _attr_icon = "mdi:check-decagram-outline"
+    _attr_entity_category = EntityCategory.CONFIG
+
+    def __init__(self, coordinator) -> None:
+        super().__init__(coordinator, "commissioned_for_control_switch")
+
+    @property
+    def is_on(self) -> bool:
+        return bool(self.coordinator.settings.control.commissioned)
+
+    @property
+    def extra_state_attributes(self):
+        readiness = build_commissioning_snapshot(self.hass, self.coordinator)
+        return {
+            "technical_ready_for_control": bool(readiness.get("ready_for_control")),
+            "commissioning_state": readiness.get("state"),
+            "maximum_allowed_stage": readiness.get("maximum_allowed_stage"),
+            "setting_is_authoritative": True,
+            "control_authority": (
+                "Acknowledgement only; Control mode and Master control enable "
+                "must also be active before bounded FoxESS writes are permitted"
+            ),
+        }
+
+    async def async_turn_on(self, **kwargs) -> None:
+        readiness = build_commissioning_snapshot(self.hass, self.coordinator)
+        if not readiness.get("ready_for_control"):
+            raise HomeAssistantError(
+                "KEMS control-critical commissioning evidence is not ready"
+            )
+        await async_set_runtime_option(
+            self.hass,
+            self.coordinator.entry,
+            CONF_SYSTEM_COMMISSIONED,
+            True,
+        )
+
+    async def async_turn_off(self, **kwargs) -> None:
+        await async_set_runtime_option(
+            self.hass,
+            self.coordinator.entry,
+            CONF_SYSTEM_COMMISSIONED,
+            False,
+        )
+
+
 class KEMSMasterControlEnableSwitch(KEMSEntity, SwitchEntity):
-    """Master opt-in; alpha2 still hard-blocks all real writes."""
+    """Master opt-in for the bounded, commissioned FoxESS backend."""
 
     _attr_name = "Master control enable"
     _attr_icon = "mdi:shield-key-outline"
@@ -157,7 +211,7 @@ class KEMSMasterControlEnableSwitch(KEMSEntity, SwitchEntity):
         return self.coordinator.settings.control.control_enabled
 
     async def async_turn_on(self, **kwargs) -> None:
-        """Record opt-in; no real backend exists in alpha2."""
+        """Record the explicit master control opt-in."""
         await async_set_runtime_option(
             self.hass,
             self.coordinator.entry,
