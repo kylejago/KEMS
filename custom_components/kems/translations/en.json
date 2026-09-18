@@ -350,7 +350,7 @@
           "emergency_stop": "When enabled, KEMS plans zero charge/discharge/export commands and blocks all future writes.",
           "stale_data_seconds": "Fail-safe age after which desired control commands are withdrawn.",
           "grid_stability_seconds": "How long a restored grid must remain stable before normal planning may resume.",
-          "grid_import_prevention_bias_w": "Optional 0-100W near-zero-grid bias. 0 disables it. KEMS Shadow may target this many watts of export to avoid standing import, but Alpha9.56 deliberately keeps the bias Shadow-only because the reviewed FoxESS remote-control setpoint is inverter active power rather than a proven net-grid-power target.",
+          "grid_import_prevention_bias_w": "Optional 0-100W near-zero-grid bias. 0 disables it. It is not paid-export income. Alpha9.56 keeps this bias Shadow-only and sends no hardware writes for it because the reviewed FoxESS remote-control setpoint is inverter active power rather than a proven net-grid-power target.",
           "eps_limit_kw": "Use the installer-confirmed whole-house EPS continuous limit. The pre-install default is 7kW.",
           "eps_warning_percent": "Whole-house island-load level that raises an early warning.",
           "eps_critical_percent": "Whole-house island-load level that raises a critical warning.",
