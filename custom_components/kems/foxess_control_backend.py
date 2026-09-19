@@ -457,7 +457,7 @@ class FoxESSControlBackend:
                         await self._async_restore(entities, writes)
 
         payload = {
-            "scope": "alpha9.62_non_agile_trial",
+            "scope": "alpha9.63_non_agile_trial",
             "reviewed_foxess_modbus_version": FOXESS_MODBUS_REVIEWED_VERSION,
             "observed_foxess_modbus_version": observed_version,
             "reviewed_version_matches": version_matches,
@@ -509,7 +509,7 @@ class FoxESSControlBackend:
             "grid_import_prevention_applied_correction_kw": (
                 decision.grid_bias_applied_correction_kw
             ),
-            "grid_import_prevention_previous_correction_kw": round(
+            "grid_import_prevention_controller_correction_kw": round(
                 self._grid_bias_correction_kw,
                 3,
             ),
