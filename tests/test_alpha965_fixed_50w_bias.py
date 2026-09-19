@@ -226,4 +226,4 @@ def test_alpha965_release_identity_and_scope() -> None:
     assert "no measured-grid feedback" in reason
     assert "Import Power Limit" in reason
     assert "Agile" in reason
-    assert "higher priority" in reason
+    assert "higher-priority" in reason
