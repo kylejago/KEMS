@@ -69,7 +69,7 @@ def _config(**overrides: object) -> ControlConfig:
     return ControlConfig(**values)
 
 
-def test_10w_bias_activates_near_zero_even_without_economic_export() -> None:
+def test_successor_fixed_50w_bias_activates_without_economic_export() -> None:
     state = apply_grid_import_prevention_bias(
         _control(desired_grid_export_allowed=False),
         _snapshot(grid_import_kw=0.005),
@@ -77,10 +77,10 @@ def test_10w_bias_activates_near_zero_even_without_economic_export() -> None:
     )
 
     assert state.grid_import_prevention_bias_active is True
-    assert state.grid_import_prevention_bias_w == 10.0
-    assert state.grid_import_prevention_target_grid_power_w == -10.0
+    assert state.grid_import_prevention_bias_w == 50.0
+    assert state.grid_import_prevention_target_grid_power_w == -50.0
     assert state.grid_import_prevention_observed_grid_power_w == 5.0
-    assert state.desired_grid_bias_export_power_kw == 0.01
+    assert state.desired_grid_bias_export_power_kw == 0.05
     assert state.desired_battery_export_power_kw == 0.0
     assert state.desired_grid_export_allowed is False
     assert state.grid_import_prevention_bias_suppressed_reason is None
@@ -101,41 +101,31 @@ def test_bias_shadow_is_separate_from_no_paid_export_authority() -> None:
 
     assert shadow["translation_status"] == "PASS"
     assert shadow["grid_import_prevention_bias"]["active"] is True
-    assert shadow["grid_import_prevention_bias"]["configured_w"] == 10.0
+    assert shadow["grid_import_prevention_bias"]["configured_w"] == 50.0
     assert (
         shadow["grid_import_prevention_bias"]["economic_export_authority_unchanged"]
         is True
     )
     assert proposed["work_mode"] == "Force Discharge"
-    assert proposed["force_discharge_power_kw"] == 0.815
-    assert proposed["export_power_limit_w"] == 10
+    assert proposed["force_discharge_power_kw"] == 0.85
+    assert proposed["export_power_limit_w"] is None
     assert proposed["grid_export_allowed"] is False
     assert proposed["grid_bias_export_allowed"] is True
-    assert proposed["grid_bias_export_power_kw"] == 0.01
+    assert proposed["grid_bias_export_power_kw"] == 0.05
     assert shadow["commands_permitted"] is False
     assert shadow["real_hardware_writes"] == "blocked"
 
 
-def test_zero_setting_disables_bias_and_preserves_alpha954_no_export_shadow() -> None:
+def test_legacy_zero_setting_is_ignored_by_fixed_successor_policy() -> None:
     state = apply_grid_import_prevention_bias(
         _control(),
         _snapshot(),
         _config(grid_import_prevention_bias_w=0.0),
     )
-    shadow = build_foxess_command_shadow(
-        state,
-        observed={"export_power_limit_w": 14500.0},
-        export_limit_kw=6.4,
-    )
-    proposed = shadow["proposed_foxess_command"]
 
-    assert state.grid_import_prevention_bias_active is False
-    assert state.grid_import_prevention_bias_suppressed_reason == "disabled"
-    assert state.desired_grid_bias_export_power_kw == 0.0
-    assert proposed["work_mode"] == "Self Use"
-    assert proposed["force_discharge_power_kw"] is None
-    assert proposed["export_power_limit_w"] == 0
-
+    assert state.grid_import_prevention_bias_active is True
+    assert state.grid_import_prevention_bias_w == 50.0
+    assert state.desired_grid_bias_export_power_kw == 0.05
 
 def test_bias_suppresses_during_cheap_charge() -> None:
     state = apply_grid_import_prevention_bias(
@@ -189,22 +179,18 @@ def test_bias_suppresses_during_deliberate_economic_export() -> None:
     )
 
     assert state.grid_import_prevention_bias_active is False
-    assert state.grid_import_prevention_bias_suppressed_reason == "deliberate_export"
+    assert state.grid_import_prevention_bias_suppressed_reason == "deliberate_export_has_priority"
 
 
-def test_bias_suppresses_outside_small_grid_trim_window() -> None:
+def test_fixed_bias_does_not_depend_on_current_grid_exchange() -> None:
     state = apply_grid_import_prevention_bias(
         _control(),
         _snapshot(grid_import_kw=0.25),
         _config(),
     )
 
-    assert state.grid_import_prevention_bias_active is False
-    assert (
-        state.grid_import_prevention_bias_suppressed_reason
-        == "grid_exchange_outside_trim_window"
-    )
-
+    assert state.grid_import_prevention_bias_active is True
+    assert state.desired_grid_bias_export_power_kw == 0.05
 
 def test_bias_cannot_bypass_user_kems_export_ceiling() -> None:
     state = apply_grid_import_prevention_bias(
@@ -216,11 +202,11 @@ def test_bias_cannot_bypass_user_kems_export_ceiling() -> None:
     assert state.grid_import_prevention_bias_active is False
     assert (
         state.grid_import_prevention_bias_suppressed_reason
-        == "kems_export_ceiling_below_bias"
+        == "kems_export_ceiling_below_fixed_bias"
     )
 
 
-def test_user_setting_is_safe_default_and_exposed_in_control_options() -> None:
+def test_successor_policy_is_fixed_and_not_exposed_as_user_tunable() -> None:
     const_source = CONST.read_text(encoding="utf-8")
     flow_source = CONFIG_FLOW.read_text(encoding="utf-8")
     translations = json.loads(TRANSLATIONS.read_text(encoding="utf-8"))
@@ -230,28 +216,18 @@ def test_user_setting_is_safe_default_and_exposed_in_control_options() -> None:
         'CONF_GRID_IMPORT_PREVENTION_BIAS_W = "grid_import_prevention_bias_w"'
         in const_source
     )
-    assert "CONF_GRID_IMPORT_PREVENTION_BIAS_W: 0.0" in const_source
-    assert (
-        'vol.Required(CONF_GRID_IMPORT_PREVENTION_BIAS_W): _number(0, 100, 5, "W")'
-        in flow_source
-    )
-    assert (
-        control["data"]["grid_import_prevention_bias_w"]
-        == "Grid import prevention bias (W)"
-    )
-    description = control["data_description"]["grid_import_prevention_bias_w"]
-    assert "0 disables it" in description
-    assert "not paid-export income" in description
-    assert "may apply it live only in No paid export Control" in description
-
+    assert "CONF_GRID_IMPORT_PREVENTION_BIAS_W: 50.0" in const_source
+    assert "CONF_GRID_IMPORT_PREVENTION_BIAS_W" not in flow_source
+    assert "grid_import_prevention_bias_w" not in control["data"]
+    assert "grid_import_prevention_bias_w" not in control["data_description"]
 
 def test_alpha955_scope_is_retained_by_current_successor_release() -> None:
     manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
     bundle = json.loads(BUNDLE.read_text(encoding="utf-8"))
     reason = str(bundle["maintenance"]["reason"])
 
-    assert manifest["version"] == "0.9.0-alpha9.64"
-    assert reason.startswith("Alpha9.64")
+    assert manifest["version"] == "0.9.0-alpha9.65"
+    assert reason.startswith("Alpha9.65")
     assert (
         "Alpha9.55 adds an optional user-selected Grid import prevention bias" in reason
     )
