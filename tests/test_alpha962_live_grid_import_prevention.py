@@ -136,8 +136,8 @@ def test_contract_keeps_economic_export_blocked() -> None:
 
     assert "fixed 50 W anti-import bias" in source
     assert "Force Discharge outside fixed 50 W anti-import bias" in source
-    assert '"deliberate economic export"' in source
-    assert '"Agile/paid-export control"' in source
+    assert "deliberate economic export in the current release" in source
+    assert "Agile/paid-export control in the current release" in source
     assert '"export-power-limit writes"' in source
     assert '"import-power-limit writes"' in source
 
