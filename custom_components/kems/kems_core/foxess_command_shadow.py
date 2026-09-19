@@ -206,6 +206,10 @@ def build_foxess_command_shadow(
             if bias_active
             else 0.0
         ),
+        "grid_bias_requested_correction_kw": round(
+            requested_grid_correction_kw,
+            3,
+        ),
         "remote_control_required": proposed_work_mode
         in {"Force Charge", "Force Discharge"},
         "schedule_strategy": (
