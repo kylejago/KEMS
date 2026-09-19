@@ -194,9 +194,7 @@ def test_cheap_period_suppresses_live_force_discharge_bias() -> None:
     assert "Cheap period suppresses" in decision.reason
 
 
-def test_backend_never_inherits_dormant_force_discharge_number_and_sets_power_first() -> (
-    None
-):
+def test_backend_ignores_dormant_force_discharge_and_sets_power_first() -> None:
     source = BACKEND.read_text(encoding="utf-8")
 
     assert "grid_bias_force_discharge_kw" in source
