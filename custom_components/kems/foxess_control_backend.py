@@ -518,7 +518,7 @@ class FoxESSControlBackend:
             "grid_import_prevention_max_step_kw": 0.05,
             "deliberate_force_discharge": "blocked_except_bounded_grid_bias_trim",
             "paid_or_agile_export_control": "blocked",
-            "export_power_limit_write": "never_written_by_alpha9.62",
+            "export_power_limit_write": "never_written_by_alpha9.63",
             "safety_release": (
                 "restore pre-KEMS local mode and Min SoC-on-grid when owned"
             ),
