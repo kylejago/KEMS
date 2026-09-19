@@ -1,4 +1,4 @@
-"""Pure authority gate for bounded FoxESS control, including Alpha9.63 grid trim."""
+"""Pure authority gate for bounded FoxESS control, including Alpha9.64 grid trim."""
 
 from __future__ import annotations
 
@@ -55,7 +55,7 @@ def assess_foxess_control_write_authority(
 ) -> FoxESSControlDecision:
     """Return the narrow non-Agile hardware action.
 
-    Alpha9.63 retains the tightly bounded Force Discharge exception for the
+    Alpha9.64 retains the tightly bounded Force Discharge exception for the
     optional near-zero grid-import trim, but closes the loop on measured grid
     power. The correction follows observed minus target grid power, is clamped
     by planner headroom, rate-limited here and held through a small deadband.
