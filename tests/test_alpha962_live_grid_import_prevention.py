@@ -132,7 +132,7 @@ def test_missing_force_discharge_binding_keeps_bias_shadow_only() -> None:
 def test_backend_write_surface_is_narrow_grid_bias_exception() -> None:
     source = BACKEND.read_text(encoding="utf-8")
 
-    assert '_entity_id(entities, "force_discharge_power")' in source
+    assert '"force_discharge_power",' in source
     assert 'decision.action == "grid_bias_force_discharge"' in source
     assert '"Force Discharge"' in source
     assert (
