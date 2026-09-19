@@ -162,7 +162,7 @@ def test_backend_live_write_surface_allows_only_bounded_bias_force_discharge() -
         in source
     )
     assert '"paid_or_agile_export_control": "blocked"' in source
-    assert '"export_power_limit_write": "never_written_by_alpha9.64"' in source
+    assert '"export_power_limit_write": "never_written_by_alpha9.65"' in source
 
 
 def test_backend_persists_and_restores_pre_kems_state() -> None:
