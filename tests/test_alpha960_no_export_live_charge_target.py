@@ -13,7 +13,6 @@ import kems_core
 from kems_core import (
     ControlConfig,
     ControlEngine,
-    ControlState,
     SimulationState,
     Snapshot,
 )
@@ -134,27 +133,6 @@ def test_full_kems_alignment_remains_counterfactual_for_customer_views() -> None
     assert metadata["target"]["charge_kw"] == 7.0
 
 
-def test_full_kems_alignment_cannot_overwrite_no_export_physical_control() -> None:
-    original = ControlState(
-        operating_mode="control",
-        operating_reason="awaiting_export_tariff_charge",
-        desired_work_mode="Self Use",
-        desired_charge_power_kw=0.0,
-        desired_min_soc_percent=55.0,
-        desired_grid_export_allowed=False,
-        plan_safe=True,
-    )
-
-    result = alignment.align_agile_control_state(
-        original,
-        _no_export_simulation(charge_kw=0.0, target_soc=53.9),
-        _full_kems_cheap_charge(),
-        _control_config(),
-    )
-
-    assert result == original
-
-
 def test_no_export_target_satisfied_holds_battery_and_keeps_house_on_cheap_grid() -> (
     None
 ):
@@ -234,10 +212,11 @@ def test_coordinator_keeps_live_no_export_control_separate_from_customer_twin() 
     assert "if base_simulation.no_export_mode_active:" in source
     assert "control_simulation = base_simulation" in source
     assert "aligned_agile_control_views(simulation, agile_state)" in source
+    assert "if not base_simulation.no_export_mode_active:" in source
     assert (
         "align_agile_control_state(\n"
-        "                control,\n"
-        "                control_simulation,"
+        "                    control,\n"
+        "                    control_simulation,"
     ) in source
 
 
