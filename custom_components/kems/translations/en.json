@@ -7,7 +7,7 @@
     "step": {
       "user": {
         "title": "Set up KEMS",
-        "description": "KEMS will scan Home Assistant for compatible Octopus electricity and gas, Ohme, and FoxESS Modbus entities. Real FoxESS control is disabled by default and only the bounded reviewed Alpha9.64 scope can be enabled after commissioning and explicit opt-in."
+        "description": "KEMS will scan Home Assistant for compatible Octopus electricity and gas, Ohme, and FoxESS Modbus entities. Real FoxESS control is disabled by default and only the bounded reviewed Alpha9.65 scope can be enabled after commissioning and explicit opt-in."
       },
       "confirm": {
         "title": "Choose how KEMS gets your tariff",
@@ -232,7 +232,7 @@
           "manual_offpeak_start": "Start of the normal cheap period in local Home Assistant time.",
           "manual_offpeak_end": "End of the normal cheap period. Overnight periods are supported.",
           "intelligent_slots_enabled": "Allow a live Intelligent slot plus active EV charging to confirm an extra cheap period.",
-          "export_tariff_status": "Not active switches KEMS to no-paid-export self-use planning: economic battery export is disabled and valued at 0p. An optional Grid import prevention bias may still request a tiny operational export trim solely to avoid standing import."
+          "export_tariff_status": "Not active switches KEMS to no-paid-export self-use planning: economic battery export is disabled and valued at 0p. A fixed 50W operational export bias may still be used solely to reduce standing import."
         }
       },
       "battery": {
@@ -267,7 +267,7 @@
       },
       "solar": {
         "title": "Solar, export and Power Down",
-        "description": "Configure the solar estimate, normal economic export strategy and Octoplus Power Down simulation. Economic export settings are overridden while the export tariff is not active; the separate grid import prevention bias is an operational trim only.",
+        "description": "Configure the solar estimate, normal economic export strategy and Octoplus Power Down simulation. Economic export settings are overridden while the export tariff is not active; the fixed 50W grid import prevention bias is an operational trim only.",
         "data": {
           "proposal_solar_enabled": "Use proposal solar model when live PV is unavailable",
           "proposal_solar_factor": "Proposal solar/weather factor (0.0-2.0)",
@@ -278,7 +278,7 @@
         "data_description": {
           "proposal_solar_enabled": "Models 21 x 460W panels, 9.66kWp, three roof orientations, and the proposal monthly generation baseline.",
           "proposal_solar_factor": "Scale the proposal baseline for cloud/weather sensitivity; 1.0 uses the proposal average.",
-          "battery_export_enabled": "Used only while the export tariff is Active. In Awaiting Export Tariff mode KEMS disables economic battery export; the separate grid import prevention bias remains an operational zero-point trim and is never valued as paid export.",
+          "battery_export_enabled": "Used only while the export tariff is Active. In Awaiting Export Tariff mode KEMS disables economic battery export; the fixed 50W grid import prevention bias remains an operational trim and is never valued as paid export.",
           "simulation_strategy": "Used while the export tariff is Active. Awaiting Export Tariff mode automatically uses self-consumption-first planning.",
           "saving_session_enabled": "Hold battery energy before a joined session, cover the home, and maximise permitted export during the higher-reward window. KEMS remains read-only and does not join sessions itself."
         }
@@ -327,7 +327,7 @@
       },
       "control": {
         "title": "Control Lab and EPS safety",
-        "description": "Configure simulation, shadow planning and the bounded Alpha9.64 FoxESS control trial. Live control supports Self Use, confirmed-cheap Force Charge, Min SoC-on-grid and the optional near-zero grid-import trim; deliberate/economic export and Agile/paid-export control remain blocked.",
+        "description": "Configure simulation, shadow planning and the bounded Alpha9.65 FoxESS control trial. Live control supports Self Use, confirmed-cheap Force Charge, Min SoC-on-grid and a fixed 50W daytime anti-import export bias. Measured-grid feedback tracking is removed; deliberate/economic export remains blocked in this release and will take priority over the fixed bias when Agile export authority is introduced.",
         "data": {
           "operating_mode": "Control Lab operating mode",
           "virtual_scenario": "Virtual KH7 test scenario",
@@ -335,20 +335,18 @@
           "emergency_stop": "Emergency stop latched",
           "stale_data_seconds": "Control data stale timeout (seconds)",
           "grid_stability_seconds": "Grid-restoration stability hold (seconds)",
-          "grid_import_prevention_bias_w": "Grid import prevention bias (W)",
           "eps_limit_kw": "Whole-house EPS continuous limit (kW)",
           "eps_warning_percent": "EPS warning threshold (%)",
           "eps_critical_percent": "EPS critical threshold (%)",
           "island_reserve_percent": "Island conservation threshold (%)"
         },
         "data_description": {
-          "operating_mode": "Observe, virtual simulation, shadow planning, or Control. Alpha9.64 permits only the bounded non-Agile FoxESS scope after all independent commissioning and opt-in gates pass.",
+          "operating_mode": "Observe, virtual simulation, shadow planning, or Control. Alpha9.65 permits only the bounded non-Agile FoxESS scope after all independent commissioning and opt-in gates pass.",
           "virtual_scenario": "Inject normal, solar, cloud, high-load, Power Down, outage, overload, or unstable-grid conditions.",
           "control_enabled": "Master opt-in for bounded FoxESS writes. Control mode, technical commissioning readiness and the separate Commissioned for control acknowledgement must also pass.",
           "emergency_stop": "When enabled, KEMS plans zero charge/discharge/export commands and blocks all future writes.",
           "stale_data_seconds": "Fail-safe age after which desired control commands are withdrawn.",
           "grid_stability_seconds": "How long a restored grid must remain stable before normal planning may resume.",
-          "grid_import_prevention_bias_w": "Optional 0-100W near-zero-grid bias. 0 disables it. It is not paid-export income. Alpha9.64 may apply it live only in No paid export Control after every normal commissioning/safety gate passes: KEMS keeps the 60-second planner authoritative, then while its bounded grid-bias Force Discharge command remains authorised it may nudge only that existing power setpoint from fresh FoxESS grid telemetry on a 5-second scheduler. Each fresh sample can move at most 50W within a +/-100W envelope around the latest planner target, with a 5W deadband; work mode and Export Power Limit are never changed by the fast loop. Deliberate/economic export and Export Power Limit writes remain blocked.",
           "eps_limit_kw": "Use the installer-confirmed whole-house EPS continuous limit. The pre-install default is 7kW.",
           "eps_warning_percent": "Whole-house island-load level that raises an early warning.",
           "eps_critical_percent": "Whole-house island-load level that raises a critical warning.",
