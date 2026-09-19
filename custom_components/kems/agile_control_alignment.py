@@ -162,7 +162,9 @@ def aligned_agile_control_views(
             _replace_known(simulation, routing_values),
             {
                 "active": False,
-                "reason": "live no-export simulation retains physical control authority",
+                "reason": (
+                    "live no-export simulation retains physical control authority"
+                ),
                 "basis": "Full KEMS routing remains counterfactual/shadow only",
                 "hardware_writes": "blocked",
             },
