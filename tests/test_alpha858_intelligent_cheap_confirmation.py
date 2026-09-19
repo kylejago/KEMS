@@ -60,6 +60,10 @@ def test_field_intelligent_slot_is_confirmed_from_octopus_and_ohme() -> None:
     assert resolved.intelligent_slot_evidence["large_import_permitted"] is True
     assert resolved.intelligent_slot_evidence["octopus_price_corroborated"] is True
     assert resolved.intelligent_slot_evidence["octopus_demand_corroborated"] is True
+    assert (
+        resolved.intelligent_slot_evidence["octopus_demand_corroboration_required"]
+        is False
+    )
     assert resolved.intelligent_slot_evidence["ohme_power_active"] is True
 
     snapshot = Snapshot(
@@ -84,7 +88,6 @@ def test_extra_slot_fails_closed_when_any_primary_confirmation_is_missing() -> N
         {"ev_power_kw": 0.0},
         {"ev_soc": 156.0},
         {"live_current_import_rate": 28.3036, "live_next_import_rate": 28.3036},
-        {"live_current_demand_kw": 0.0},
     )
     for override in cases:
         resolved = _field_resolution(**override)

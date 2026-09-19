@@ -186,7 +186,10 @@ def _intelligent_extra_slot_evidence(
         ("Ohme charging power is below confirmation threshold", power_active),
         ("Ohme vehicle SOC is implausible", soc_plausible),
         ("Octopus price data does not corroborate the cheap rate", price_corroborated),
-        ("Octopus current demand contradicts Ohme charging power", demand_corroborated),
+        # Grid demand is diagnostic-only here: while Self Use is active, the battery
+        # can supply most of the EV load and make genuine Intelligent slots look like
+        # low-import contradictions. The authoritative slot/window plus Ohme evidence
+        # must therefore not be vetoed by current grid demand.
     )
     confirmed = all(passed for _, passed in checks)
     reason = "confirmed"
@@ -213,6 +216,7 @@ def _intelligent_extra_slot_evidence(
         "octopus_price_corroborated": price_corroborated,
         "octopus_current_demand_kw": live_current_demand_kw,
         "octopus_demand_corroborated": demand_corroborated,
+        "octopus_demand_corroboration_required": False,
         "minimum_expected_demand_kw": minimum_expected_demand_kw,
         "ohme_connected": ev_connected,
         "ohme_charging": ev_charging,
