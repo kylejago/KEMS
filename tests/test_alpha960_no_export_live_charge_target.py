@@ -152,7 +152,9 @@ def test_full_kems_alignment_cannot_overwrite_no_export_physical_control() -> No
 
 def test_no_export_target_satisfied_holds_battery_and_keeps_house_on_cheap_grid() -> None:
     snapshot = _cheap_snapshot(soc=55.0)
-    simulation = _no_export_simulation(charge_kw=0.0, target_soc=53.9)
+    # The replay may still be behind live hardware and asking for charge.
+    # Fresh physical SOC at/above the no-export target must win.
+    simulation = _no_export_simulation(charge_kw=7.0, target_soc=53.9)
 
     control = ControlEngine().plan(
         snapshot,
