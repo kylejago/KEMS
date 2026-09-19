@@ -1,4 +1,4 @@
-"""Grid zero-point bias planning for avoiding tiny standing imports."""
+"""Fixed daytime export bias for avoiding standing grid import."""
 
 from __future__ import annotations
 
@@ -6,20 +6,9 @@ from dataclasses import replace
 
 from .models import ControlConfig, ControlState, Snapshot
 
-_GRID_TRIM_WINDOW_KW = 0.100
-GRID_BIAS_MAX_CORRECTION_KW = 0.100
+FIXED_GRID_BIAS_W = 50.0
+FIXED_GRID_BIAS_KW = FIXED_GRID_BIAS_W / 1000.0
 _EPSILON_KW = 0.001
-
-
-def grid_bias_required_correction_kw(
-    observed_grid_power_w: float | None,
-    target_grid_power_w: float,
-) -> float:
-    """Return the bounded extra inverter output needed to reach the grid target."""
-    if observed_grid_power_w is None:
-        return 0.0
-    error_kw = (float(observed_grid_power_w) - float(target_grid_power_w)) / 1000.0
-    return min(max(error_kw, 0.0), GRID_BIAS_MAX_CORRECTION_KW)
 
 
 def apply_grid_import_prevention_bias(
@@ -27,27 +16,21 @@ def apply_grid_import_prevention_bias(
     snapshot: Snapshot,
     config: ControlConfig,
 ) -> ControlState:
-    """Apply a tiny, separately-accounted grid-export bias when safe.
+    """Apply the fixed 50 W non-economic export bias when safe.
 
-    This is not economic battery export. It represents a user-selected
-    near-zero-grid operating target. Alpha9.63 derives the extra inverter
-    output from the measured grid error rather than treating the configured
-    target export as a fixed inverter-output offset.
+    Alpha9.65 deliberately removes measured-grid-error tracking. Outside a
+    confirmed cheap period, KEMS requests its normal house-support KH7 output
+    plus a fixed 50 W export allowance. This bias is lower priority than any
+    deliberate/economic export request, so future Agile export authority
+    supersedes it rather than stacking with it.
     """
-    configured_w = min(
-        max(float(config.grid_import_prevention_bias_w), 0.0),
-        100.0,
-    )
-    bias_kw = configured_w / 1000.0
-    target_grid_w = -configured_w
+    configured_w = FIXED_GRID_BIAS_W
+    bias_kw = FIXED_GRID_BIAS_KW
+    target_grid_w = -FIXED_GRID_BIAS_W
     grid_import_kw = max(float(snapshot.grid_import_kw or 0.0), 0.0)
     grid_export_kw = max(float(snapshot.grid_export_kw or 0.0), 0.0)
     observed_grid_kw = grid_import_kw - grid_export_kw
     observed_grid_w = round(observed_grid_kw * 1000.0, 1)
-    required_correction_kw = grid_bias_required_correction_kw(
-        observed_grid_w,
-        target_grid_w,
-    )
     reserve_percent = max(
         float(config.normal_reserve_percent),
         float(control.desired_min_soc_percent),
@@ -55,9 +38,7 @@ def apply_grid_import_prevention_bias(
     battery_soc = snapshot.battery_soc
 
     reason: str | None = None
-    if configured_w <= 0:
-        reason = "disabled"
-    elif config.emergency_stop or control.operating_reason == "emergency_stop":
+    if config.emergency_stop or control.operating_reason == "emergency_stop":
         reason = "emergency_stop"
     elif control.operating_mode == "observe" or control.desired_work_mode in {
         "No change",
@@ -73,36 +54,34 @@ def apply_grid_import_prevention_bias(
     elif control.desired_charge_power_kw > _EPSILON_KW:
         reason = "deliberate_charge"
     elif control.desired_battery_export_power_kw > _EPSILON_KW:
-        reason = "deliberate_export"
+        # Deliberate/Agile export is always higher authority than the standing
+        # 50 W anti-import bias. Never stack the two export intents.
+        reason = "deliberate_export_has_priority"
     elif bias_kw > config.export_limit_kw + 1e-9:
-        reason = "kems_export_ceiling_below_bias"
-    elif required_correction_kw > config.export_limit_kw + 1e-9:
-        reason = "kems_export_ceiling_below_required_correction"
+        reason = "kems_export_ceiling_below_fixed_bias"
     elif battery_soc is None:
         reason = "battery_soc_unavailable"
     elif float(battery_soc) <= reserve_percent + 1e-6:
         reason = "battery_at_or_below_reserve"
-    elif abs(observed_grid_kw) > _GRID_TRIM_WINDOW_KW + 1e-9:
-        reason = "grid_exchange_outside_trim_window"
     elif (
-        control.total_kh7_ac_output_kw + required_correction_kw
+        control.total_kh7_ac_output_kw + bias_kw
         > config.inverter_limit_kw + 1e-9
     ):
-        reason = "inverter_headroom_below_grid_correction"
+        reason = "inverter_headroom_below_fixed_bias"
     elif (
-        control.desired_total_discharge_power_kw + required_correction_kw
+        control.desired_total_discharge_power_kw + bias_kw
         > config.max_discharge_kw + 1e-9
     ):
-        reason = "battery_discharge_headroom_below_grid_correction"
+        reason = "battery_discharge_headroom_below_fixed_bias"
 
     active = reason is None
     requested_bias_kw = bias_kw if active else 0.0
     return replace(
         control,
         desired_grid_bias_export_power_kw=round(requested_bias_kw, 3),
-        grid_import_prevention_bias_w=round(configured_w, 1),
+        grid_import_prevention_bias_w=FIXED_GRID_BIAS_W,
         grid_import_prevention_bias_active=active,
-        grid_import_prevention_target_grid_power_w=round(target_grid_w, 1),
+        grid_import_prevention_target_grid_power_w=target_grid_w,
         grid_import_prevention_observed_grid_power_w=observed_grid_w,
         grid_import_prevention_bias_suppressed_reason=reason,
     )
