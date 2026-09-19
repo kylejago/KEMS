@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
+from math import ceil
 
 from .models import ControlConfig, ControlState, SimulationState, Snapshot
 
@@ -236,6 +237,25 @@ class ControlEngine:
                 else config.max_charge_kw
             )
             desired_charge = min(requested_charge, available_site_headroom)
+            no_export_hold_soc = config.normal_reserve_percent
+            if simulation.no_export_mode_active:
+                target_soc = simulation.overnight_charge_target_percent
+                if target_soc is not None:
+                    no_export_hold_soc = max(no_export_hold_soc, float(target_soc))
+                if (
+                    snapshot.battery_soc is not None
+                    and "battery_soc" not in snapshot.stale_fields
+                ):
+                    no_export_hold_soc = max(
+                        no_export_hold_soc,
+                        float(snapshot.battery_soc),
+                    )
+                no_export_hold_soc = float(
+                    min(
+                        max(ceil(no_export_hold_soc), config.normal_reserve_percent),
+                        100,
+                    )
+                )
             planned_site_import = planned_house_grid + desired_charge
             planned_site_headroom = (
                 None
@@ -253,9 +273,17 @@ class ControlEngine:
                     if simulation.no_export_mode_active
                     else "confirmed_cheap_charge"
                 ),
-                desired_work_mode="Force Charge",
+                desired_work_mode=(
+                    "Self Use"
+                    if simulation.no_export_mode_active and desired_charge <= 0.01
+                    else "Force Charge"
+                ),
                 desired_charge_power_kw=round(desired_charge, 3),
-                desired_min_soc_percent=config.normal_reserve_percent,
+                desired_min_soc_percent=(
+                    no_export_hold_soc
+                    if simulation.no_export_mode_active
+                    else config.normal_reserve_percent
+                ),
                 desired_ev_charging_allowed=True,
                 desired_grid_export_allowed=False,
                 grid_bypass_power_kw=round(planned_house_grid, 3),
@@ -269,8 +297,13 @@ class ControlEngine:
                     else _backend_block_reason(config)
                 ),
                 next_action=(
-                    "Charge only to the solar-aware no-export target and "
-                    "supply the remaining home demand from cheap grid power"
+                    (
+                        "Hold the battery at the solar-aware no-export target and "
+                        "supply home/EV demand from cheap grid power"
+                        if desired_charge <= 0.01
+                        else "Charge only to the solar-aware no-export target and "
+                        "supply home/EV demand from cheap grid power"
+                    )
                     if simulation.no_export_mode_active
                     else "Charge battery at the available site-import headroom "
                     "and supply home from grid"
