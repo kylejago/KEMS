@@ -82,7 +82,9 @@ def test_grid_bias_shadow_translation_uses_total_inverter_output_setpoint() -> N
     assert proposed["grid_export_allowed"] is False
 
 
-def test_grid_bias_hysteresis_enters_on_import_and_releases_on_material_export() -> None:
+def test_grid_bias_hysteresis_enters_on_import_and_releases_on_material_export() -> (
+    None
+):
     enter = _decision(_control(grid_import_prevention_observed_grid_power_w=5.0))
     already_exporting = _decision(
         _control(grid_import_prevention_observed_grid_power_w=-5.0)
@@ -103,7 +105,9 @@ def test_grid_bias_hysteresis_enters_on_import_and_releases_on_material_export()
 
 
 def test_grid_bias_cannot_bypass_control_or_export_safety_gates() -> None:
-    assert _decision(_control(), master_control_enabled=False).commands_permitted is False
+    assert (
+        _decision(_control(), master_control_enabled=False).commands_permitted is False
+    )
     assert _decision(_control(), technical_ready=False).commands_permitted is False
     assert _decision(_control(), no_paid_export_mode=False).commands_permitted is False
 
@@ -131,9 +135,10 @@ def test_backend_write_surface_is_narrow_grid_bias_exception() -> None:
     assert '_entity_id(entities, "force_discharge_power")' in source
     assert 'decision.action == "grid_bias_force_discharge"' in source
     assert '"Force Discharge"' in source
-    assert '"export_power_limit"' not in source.split(
-        "async def async_update", 1
-    )[1].split('payload = {', 1)[0]
+    assert (
+        '"export_power_limit"'
+        not in source.split("async def async_update", 1)[1].split("payload = {", 1)[0]
+    )
     assert '"blocked_except_bounded_grid_bias_trim"' in source
     assert '"never_written_by_alpha9.62"' in source
 
@@ -158,7 +163,9 @@ def test_alpha962_release_identity_and_scope() -> None:
     reason = str(bundle["maintenance"]["reason"])
 
     assert manifest["version"] == "0.9.0-alpha9.62"
-    assert reason.startswith("Alpha9.62 promotes the optional Grid import prevention bias")
+    assert reason.startswith(
+        "Alpha9.62 promotes the optional Grid import prevention bias"
+    )
     assert "desired total KH7 AC output plus the configured tiny bias" in reason
     assert "at least 5 W import" in reason
     assert "natural export reaches 50 W" in reason
