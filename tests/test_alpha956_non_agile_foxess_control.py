@@ -158,7 +158,7 @@ def test_backend_live_write_surface_allows_only_bounded_bias_force_discharge() -
     assert 'decision.action == "grid_bias_force_discharge"' in source
     assert '_entity_id(entities, "export_power_limit")' not in source
     assert (
-        '"deliberate_force_discharge": "blocked_except_bounded_grid_bias_trim"'
+        '"deliberate_force_discharge": "blocked_except_fixed_50w_grid_bias"'
         in source
     )
     assert '"paid_or_agile_export_control": "blocked"' in source
