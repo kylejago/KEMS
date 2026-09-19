@@ -38,9 +38,7 @@ def test_intelligent_extra_slot_is_not_vetoed_by_battery_supported_ev_load() -> 
         live_standing_charge=53.70435,
         live_off_peak=False,
         live_intelligent_slot=True,
-        live_next_offpeak_start=datetime(
-            2026, 9, 19, 10, 47, 0, tzinfo=LONDON
-        ),
+        live_next_offpeak_start=datetime(2026, 9, 19, 10, 47, 0, tzinfo=LONDON),
         live_offpeak_end=datetime(2026, 9, 19, 11, 0, 0, tzinfo=LONDON),
         ev_connected=True,
         ev_charging=True,
@@ -79,9 +77,7 @@ def test_intelligent_extra_slot_still_fails_closed_without_active_ohme_charge() 
         live_standing_charge=53.70435,
         live_off_peak=False,
         live_intelligent_slot=True,
-        live_next_offpeak_start=datetime(
-            2026, 9, 19, 10, 47, 0, tzinfo=LONDON
-        ),
+        live_next_offpeak_start=datetime(2026, 9, 19, 10, 47, 0, tzinfo=LONDON),
         live_offpeak_end=datetime(2026, 9, 19, 11, 0, 0, tzinfo=LONDON),
         ev_connected=True,
         ev_charging=False,
