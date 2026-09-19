@@ -107,7 +107,7 @@ def test_bias_shadow_is_separate_from_no_paid_export_authority() -> None:
         is True
     )
     assert proposed["work_mode"] == "Force Discharge"
-    assert proposed["force_discharge_power_kw"] == 0.81
+    assert proposed["force_discharge_power_kw"] == 0.815
     assert proposed["export_power_limit_w"] == 10
     assert proposed["grid_export_allowed"] is False
     assert proposed["grid_bias_export_allowed"] is True
@@ -250,8 +250,8 @@ def test_alpha955_scope_is_retained_by_current_successor_release() -> None:
     bundle = json.loads(BUNDLE.read_text(encoding="utf-8"))
     reason = str(bundle["maintenance"]["reason"])
 
-    assert manifest["version"] == "0.9.0-alpha9.62"
-    assert reason.startswith("Alpha9.62")
+    assert manifest["version"] == "0.9.0-alpha9.63"
+    assert reason.startswith("Alpha9.63")
     assert (
         "Alpha9.55 adds an optional user-selected Grid import prevention bias" in reason
     )

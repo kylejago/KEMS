@@ -63,7 +63,7 @@ def test_live_grid_bias_uses_total_kh7_output_not_tiny_export_power() -> None:
 
     assert result.commands_permitted is True
     assert result.action == "grid_bias_force_discharge"
-    assert result.force_discharge_power_kw == 1.291
+    assert result.force_discharge_power_kw == 1.311
     assert result.grid_bias_live is True
     assert result.grid_bias_shadow_only is False
 
@@ -77,7 +77,7 @@ def test_grid_bias_shadow_translation_uses_total_inverter_output_setpoint() -> N
     proposed = shadow["proposed_foxess_command"]
 
     assert proposed["work_mode"] == "Force Discharge"
-    assert proposed["force_discharge_power_kw"] == 1.291
+    assert proposed["force_discharge_power_kw"] == 1.311
     assert proposed["grid_bias_export_power_kw"] == 0.01
     assert proposed["grid_export_allowed"] is False
 
@@ -140,7 +140,7 @@ def test_backend_write_surface_is_narrow_grid_bias_exception() -> None:
         not in source.split("async def async_update", 1)[1].split("payload = {", 1)[0]
     )
     assert '"blocked_except_bounded_grid_bias_trim"' in source
-    assert '"never_written_by_alpha9.62"' in source
+    assert '"never_written_by_alpha9.63"' in source
 
 
 def test_contract_keeps_economic_export_blocked() -> None:
@@ -162,10 +162,9 @@ def test_alpha962_release_identity_and_scope() -> None:
     )
     reason = str(bundle["maintenance"]["reason"])
 
-    assert manifest["version"] == "0.9.0-alpha9.62"
-    assert reason.startswith(
-        "Alpha9.62 promotes the optional Grid import prevention bias"
-    )
+    assert manifest["version"] == "0.9.0-alpha9.63"
+    assert reason.startswith("Alpha9.63 closes the Alpha9.62 near-zero-grid trim loop")
+    assert "Alpha9.62 promotes the optional Grid import prevention bias" in reason
     assert "desired total KH7 AC output plus the configured tiny bias" in reason
     assert "at least 5 W import" in reason
     assert "natural export reaches 50 W" in reason
