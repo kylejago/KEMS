@@ -95,7 +95,6 @@ class FoxESSControlBackend:
             self._previous_min_soc_on_grid = _number(
                 data.get("previous_min_soc_on_grid")
             )
-        self._ensure_fast_trim_task()
 
     async def _async_save(self) -> None:
         await self._store.async_save(
