@@ -155,6 +155,19 @@ def aligned_agile_control_views(
     priority path. The original SimulationState remains untouched for finance
     and history.
     """
+    if simulation.no_export_mode_active:
+        routing_values = _routing_values(simulation, agile_state)
+        return (
+            simulation,
+            _replace_known(simulation, routing_values),
+            {
+                "active": False,
+                "reason": "live no-export simulation retains physical control authority",
+                "basis": "Full KEMS routing remains counterfactual/shadow only",
+                "hardware_writes": "blocked",
+            },
+        )
+
     rolling = _rolling_target(simulation, agile_state)
     if rolling is None:
         return (
@@ -215,6 +228,9 @@ def align_agile_control_state(
     deliberate export target must not override a physical no-export or island
     decision. Hardware permissions are explicitly forced closed.
     """
+    if simulation.no_export_mode_active:
+        return control
+
     rolling = _rolling_target(simulation, agile_state)
     if rolling is None:
         return control
