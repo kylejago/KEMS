@@ -512,7 +512,9 @@ class FoxESSControlBackend:
             ),
             "main_planner_interval_seconds": coordinator.settings.scan_interval_seconds,
             "deliberate_force_discharge": "blocked_except_fixed_50w_grid_bias",
-            "paid_or_agile_export_control": "blocked_in_current_release_but_higher_priority_than_fixed_bias",
+            "paid_or_agile_export_control": (
+                "blocked_in_current_release_but_higher_priority_than_fixed_bias"
+            ),
             "export_power_limit_write": "never_written_by_alpha9.65",
             "import_power_limit_write": "never_written_by_alpha9.65",
             "safety_release": (
