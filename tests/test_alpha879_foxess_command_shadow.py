@@ -57,7 +57,7 @@ def test_force_charge_maps_to_reviewed_remote_control_surface() -> None:
     assert proposed["work_mode"] == "Force Charge"
     assert proposed["force_charge_power_kw"] == 4.2
     assert proposed["force_discharge_power_kw"] is None
-    assert proposed["export_power_limit_w"] == 0
+    assert proposed["export_power_limit_w"] is None
 
 
 def test_force_discharge_uses_deliberate_export_not_total_battery_output() -> None:
