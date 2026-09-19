@@ -680,6 +680,7 @@ class FoxESSControlBackend:
         reason = decision.reason
 
         if not decision.commands_permitted:
+            self._disarm_fast_grid_trim("main_planner_withdrew_authority")
             if self._owned:
                 applied = await self._async_restore(entities, writes)
                 if not applied:
@@ -738,6 +739,9 @@ class FoxESSControlBackend:
                         if action_ok:
                             self._grid_bias_engaged = False
                             self._grid_bias_correction_kw = 0.0
+                            self._disarm_fast_grid_trim(
+                                "main_planner_selected_self_use"
+                            )
                     elif (
                         min_soc_ok
                         and decision.action == "force_charge"
@@ -757,6 +761,9 @@ class FoxESSControlBackend:
                             if action_ok:
                                 self._grid_bias_engaged = False
                                 self._grid_bias_correction_kw = 0.0
+                                self._disarm_fast_grid_trim(
+                                    "main_planner_selected_force_charge"
+                                )
                     elif (
                         min_soc_ok
                         and decision.action == "grid_bias_force_discharge"
@@ -780,12 +787,19 @@ class FoxESSControlBackend:
                                 self._grid_bias_correction_kw = float(
                                     decision.grid_bias_applied_correction_kw
                                 )
+                                self._arm_fast_grid_trim(
+                                    coordinator=coordinator,
+                                    entities=entities,
+                                    control=control,
+                                    force_discharge_entity=force_discharge_entity,
+                                    work_mode_entity=work_mode_entity,
+                                )
                     applied = bool(min_soc_ok and action_ok)
                     if applied:
                         self._last_write_result = (
-                            "Alpha9.63 bounded FoxESS command applied"
+                            "Alpha9.64 bounded FoxESS command applied"
                             if writes
-                            else "Alpha9.63 bounded FoxESS command already matched"
+                            else "Alpha9.64 bounded FoxESS command already matched"
                         )
                     else:
                         decision = FoxESSControlDecision(
@@ -799,7 +813,7 @@ class FoxESSControlBackend:
                         await self._async_restore(entities, writes)
 
         payload = {
-            "scope": "alpha9.63_non_agile_trial",
+            "scope": "alpha9.64_fast_trim_trial",
             "reviewed_foxess_modbus_version": FOXESS_MODBUS_REVIEWED_VERSION,
             "observed_foxess_modbus_version": observed_version,
             "reviewed_version_matches": version_matches,
@@ -856,9 +870,11 @@ class FoxESSControlBackend:
                 3,
             ),
             "grid_import_prevention_max_step_kw": 0.05,
+            "main_planner_interval_seconds": coordinator.settings.scan_interval_seconds,
+            "fast_grid_trim": dict(self._fast_trim_status),
             "deliberate_force_discharge": "blocked_except_bounded_grid_bias_trim",
             "paid_or_agile_export_control": "blocked",
-            "export_power_limit_write": "never_written_by_alpha9.63",
+            "export_power_limit_write": "never_written_by_alpha9.64",
             "safety_release": (
                 "restore pre-KEMS local mode and Min SoC-on-grid when owned"
             ),
