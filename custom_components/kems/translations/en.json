@@ -7,7 +7,7 @@
     "step": {
       "user": {
         "title": "Set up KEMS",
-        "description": "KEMS will scan Home Assistant for compatible Octopus electricity and gas, Ohme, and FoxESS Modbus entities. Real FoxESS control is disabled by default and only the bounded reviewed Alpha9.56 scope can be enabled after commissioning and explicit opt-in."
+        "description": "KEMS will scan Home Assistant for compatible Octopus electricity and gas, Ohme, and FoxESS Modbus entities. Real FoxESS control is disabled by default and only the bounded reviewed Alpha9.62 scope can be enabled after commissioning and explicit opt-in."
       },
       "confirm": {
         "title": "Choose how KEMS gets your tariff",
@@ -327,7 +327,7 @@
       },
       "control": {
         "title": "Control Lab and EPS safety",
-        "description": "Configure simulation, shadow planning and the bounded Alpha9.56 FoxESS control trial. Live control supports Self Use, confirmed-cheap Force Charge and Min SoC-on-grid only; deliberate export, Agile/paid-export control and the grid-import prevention bias remain Shadow-only.",
+        "description": "Configure simulation, shadow planning and the bounded Alpha9.62 FoxESS control trial. Live control supports Self Use, confirmed-cheap Force Charge, Min SoC-on-grid and the optional near-zero grid-import trim; deliberate/economic export and Agile/paid-export control remain blocked.",
         "data": {
           "operating_mode": "Control Lab operating mode",
           "virtual_scenario": "Virtual KH7 test scenario",
@@ -342,13 +342,13 @@
           "island_reserve_percent": "Island conservation threshold (%)"
         },
         "data_description": {
-          "operating_mode": "Observe, virtual simulation, shadow planning, or Control. Alpha9.56 permits only the bounded non-Agile FoxESS scope after all independent commissioning and opt-in gates pass.",
+          "operating_mode": "Observe, virtual simulation, shadow planning, or Control. Alpha9.62 permits only the bounded non-Agile FoxESS scope after all independent commissioning and opt-in gates pass.",
           "virtual_scenario": "Inject normal, solar, cloud, high-load, Power Down, outage, overload, or unstable-grid conditions.",
           "control_enabled": "Master opt-in for bounded FoxESS writes. Control mode, technical commissioning readiness and the separate Commissioned for control acknowledgement must also pass.",
           "emergency_stop": "When enabled, KEMS plans zero charge/discharge/export commands and blocks all future writes.",
           "stale_data_seconds": "Fail-safe age after which desired control commands are withdrawn.",
           "grid_stability_seconds": "How long a restored grid must remain stable before normal planning may resume.",
-          "grid_import_prevention_bias_w": "Optional 0-100W near-zero-grid bias. 0 disables it. It is not paid-export income. Alpha9.56 keeps this bias Shadow-only and sends no hardware writes for it because the reviewed FoxESS remote-control setpoint is inverter active power rather than a proven net-grid-power target.",
+          "grid_import_prevention_bias_w": "Optional 0-100W near-zero-grid bias. 0 disables it. It is not paid-export income. Alpha9.62 may apply it live only in No paid export Control after every normal commissioning/safety gate passes: KEMS drives the reviewed FoxESS total active-power setpoint to the bounded KH7 home-support target plus this tiny bias, enters only on small import, and releases to Self Use on material natural export. Deliberate/economic export and Export Power Limit writes remain blocked.",
           "eps_limit_kw": "Use the installer-confirmed whole-house EPS continuous limit. The pre-install default is 7kW.",
           "eps_warning_percent": "Whole-house island-load level that raises an early warning.",
           "eps_critical_percent": "Whole-house island-load level that raises a critical warning.",

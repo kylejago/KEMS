@@ -1,4 +1,4 @@
-"""Pure Alpha9.56 authority gate for bounded FoxESS control."""
+"""Pure authority gate for bounded FoxESS control, including Alpha9.62 grid trim."""
 
 from __future__ import annotations
 
@@ -7,6 +7,8 @@ from dataclasses import dataclass
 from .models import ControlState
 
 _EPSILON_KW = 0.001
+_GRID_BIAS_ENTER_IMPORT_W = 5.0
+_GRID_BIAS_EXIT_EXPORT_W = -50.0
 
 
 @dataclass(frozen=True, slots=True)
@@ -18,7 +20,9 @@ class FoxESSControlDecision:
     action: str
     reason: str
     force_charge_power_kw: float | None = None
+    force_discharge_power_kw: float | None = None
     min_soc_on_grid_percent: float | None = None
+    grid_bias_live: bool = False
     grid_bias_shadow_only: bool = False
 
 
@@ -33,13 +37,17 @@ def assess_foxess_control_write_authority(
     user_commissioned: bool,
     master_control_enabled: bool,
     emergency_stop: bool,
+    grid_bias_force_discharge_ready: bool = False,
+    grid_bias_engaged: bool = False,
+    inverter_limit_kw: float = 7.0,
 ) -> FoxESSControlDecision:
-    """Return the narrow non-Agile Alpha9.56 hardware action.
+    """Return the narrow non-Agile hardware action.
 
-    Alpha9.56 deliberately excludes every deliberate export/Force Discharge
-    action. The grid-import prevention bias also remains Shadow-only until KEMS
-    has a closed-loop grid-power controller rather than an inverter-output
-    setpoint.
+    Alpha9.62 adds one tightly bounded use of Force Discharge for the optional
+    near-zero grid-import trim. It remains separate from deliberate/economic
+    export: the remote active-power target follows KEMS total desired KH7 AC
+    output plus only the configured tiny bias, with hysteresis deciding whether
+    remote trim should be engaged.
     """
     backend_available = bool(binding_ready and reviewed_version_matches)
     bias_shadow_only = bool(
@@ -114,14 +122,61 @@ def assess_foxess_control_write_authority(
         )
 
     if control.desired_work_mode in {"Self Use", "Feed-in First"}:
+        if bias_shadow_only:
+            observed_grid_w = control.grid_import_prevention_observed_grid_power_w
+            if grid_bias_force_discharge_ready and observed_grid_w is not None:
+                should_engage = (
+                    float(observed_grid_w) > _GRID_BIAS_EXIT_EXPORT_W
+                    if grid_bias_engaged
+                    else float(observed_grid_w) >= _GRID_BIAS_ENTER_IMPORT_W
+                )
+                if should_engage:
+                    bias_kw = max(
+                        float(control.desired_grid_bias_export_power_kw),
+                        0.0,
+                    )
+                    total_output_kw = min(
+                        max(float(control.total_kh7_ac_output_kw), 0.0) + bias_kw,
+                        max(float(inverter_limit_kw), 0.0),
+                    )
+                    if total_output_kw > _EPSILON_KW:
+                        return FoxESSControlDecision(
+                            backend_available=True,
+                            commands_permitted=True,
+                            action="grid_bias_force_discharge",
+                            reason=(
+                                "Bounded live grid-import prevention trim is active; "
+                                "economic export authority remains disabled"
+                            ),
+                            force_discharge_power_kw=round(total_output_kw, 3),
+                            min_soc_on_grid_percent=min_soc,
+                            grid_bias_live=True,
+                            grid_bias_shadow_only=False,
+                        )
+                return FoxESSControlDecision(
+                    backend_available=True,
+                    commands_permitted=True,
+                    action="self_use",
+                    reason=(
+                        "Grid-import prevention trim is not engaged because "
+                        "natural grid flow is already beyond the live hysteresis target"
+                    ),
+                    min_soc_on_grid_percent=min_soc,
+                    grid_bias_live=False,
+                    grid_bias_shadow_only=False,
+                )
+
         return FoxESSControlDecision(
             backend_available=True,
             commands_permitted=True,
             action="self_use",
             reason=(
-                "No-paid-export Self Use is inside the Alpha9.56 scope"
+                "No-paid-export Self Use is inside the bounded control scope"
                 if not bias_shadow_only
-                else "Self Use permitted; 10 W grid bias remains Shadow-only"
+                else (
+                    "Self Use permitted; grid-import prevention remains Shadow-only "
+                    "because the reviewed Force Discharge command is unavailable"
+                )
             ),
             min_soc_on_grid_percent=min_soc,
             grid_bias_shadow_only=bias_shadow_only,

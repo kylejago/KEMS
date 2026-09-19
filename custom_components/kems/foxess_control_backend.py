@@ -1,4 +1,4 @@
-"""Bounded Alpha9.56 FoxESS control backend.
+"""Bounded Alpha9.62 FoxESS control backend.
 
 The first real KEMS FoxESS backend intentionally supports only:
 - local Self Use ownership,
@@ -6,8 +6,9 @@ The first real KEMS FoxESS backend intentionally supports only:
 - Min SoC-on-grid enforcement,
 - fail-safe release back to the pre-KEMS local mode.
 
-Deliberate export, Force Discharge, Agile/paid-export control and the grid
-zero-point bias remain Shadow-only.
+Deliberate/economic export and Agile/paid-export control remain blocked. Alpha9.62
+permits Force Discharge only as the bounded near-zero grid-import trim; Export
+Power Limit is never written by this backend.
 """
 
 from __future__ import annotations
@@ -57,6 +58,7 @@ class FoxESSControlBackend:
         self._previous_min_soc_on_grid: float | None = None
         self._last_write_at: str | None = None
         self._last_write_result = "Never commanded"
+        self._grid_bias_engaged = False
         self._status: dict[str, Any] = {}
 
     @property
@@ -240,6 +242,7 @@ class FoxESSControlBackend:
             )
         if mode_ok and soc_ok:
             self._owned = False
+            self._grid_bias_engaged = False
             self._last_write_result = "KEMS FoxESS ownership released safely"
             await self._async_save()
             return True
@@ -287,7 +290,7 @@ class FoxESSControlBackend:
         no_paid_export_mode: bool,
         cheap_period_confirmed: bool,
     ) -> dict[str, Any]:
-        """Apply at most the bounded Alpha9.56 command for this scan."""
+        """Apply at most the bounded Alpha9.62 command for this scan."""
         shadow = build_foxess_command_shadow_snapshot(
             self._hass,
             coordinator,
@@ -305,6 +308,10 @@ class FoxESSControlBackend:
                 for key in required_keys
             )
         )
+        grid_bias_force_discharge_ready = bool(
+            isinstance(entities.get("force_discharge_power"), dict)
+            and entities["force_discharge_power"].get("status") == "PASS"
+        )
         observed_version = await self._foxess_version()
         version_matches = observed_version == FOXESS_MODBUS_REVIEWED_VERSION
 
@@ -318,6 +325,9 @@ class FoxESSControlBackend:
             user_commissioned=bool(coordinator.settings.control.commissioned),
             master_control_enabled=bool(coordinator.settings.control.control_enabled),
             emergency_stop=bool(coordinator.settings.control.emergency_stop),
+            grid_bias_force_discharge_ready=grid_bias_force_discharge_ready,
+            grid_bias_engaged=self._grid_bias_engaged,
+            inverter_limit_kw=float(coordinator.settings.control.inverter_limit_kw),
         )
 
         writes: list[str] = []
@@ -348,6 +358,10 @@ class FoxESSControlBackend:
                     "force_charge_power",
                 )
                 min_soc_entity = self._entity_id(entities, "min_soc_on_grid")
+                force_discharge_entity = self._entity_id(
+                    entities,
+                    "force_discharge_power",
+                )
                 if (
                     work_mode_entity is None
                     or charge_power_entity is None
@@ -376,6 +390,8 @@ class FoxESSControlBackend:
                             "Self Use",
                             writes,
                         )
+                        if action_ok:
+                            self._grid_bias_engaged = False
                     elif (
                         min_soc_ok
                         and decision.action == "force_charge"
@@ -392,12 +408,34 @@ class FoxESSControlBackend:
                                 "Force Charge",
                                 writes,
                             )
+                            if action_ok:
+                                self._grid_bias_engaged = False
+                    elif (
+                        min_soc_ok
+                        and decision.action == "grid_bias_force_discharge"
+                        and decision.force_discharge_power_kw is not None
+                        and force_discharge_entity is not None
+                    ):
+                        power_ok = await self._async_number(
+                            force_discharge_entity,
+                            float(decision.force_discharge_power_kw),
+                            writes,
+                            tolerance=0.01,
+                        )
+                        if power_ok:
+                            action_ok = await self._async_select(
+                                work_mode_entity,
+                                "Force Discharge",
+                                writes,
+                            )
+                            if action_ok:
+                                self._grid_bias_engaged = True
                     applied = bool(min_soc_ok and action_ok)
                     if applied:
                         self._last_write_result = (
-                            "Alpha9.56 bounded FoxESS command applied"
+                            "Alpha9.62 bounded FoxESS command applied"
                             if writes
-                            else "Alpha9.56 bounded FoxESS command already matched"
+                            else "Alpha9.62 bounded FoxESS command already matched"
                         )
                     else:
                         decision = FoxESSControlDecision(
@@ -411,7 +449,7 @@ class FoxESSControlBackend:
                         await self._async_restore(entities, writes)
 
         payload = {
-            "scope": "alpha9.56_non_agile_trial",
+            "scope": "alpha9.62_non_agile_trial",
             "reviewed_foxess_modbus_version": FOXESS_MODBUS_REVIEWED_VERSION,
             "observed_foxess_modbus_version": observed_version,
             "reviewed_version_matches": version_matches,
@@ -435,11 +473,30 @@ class FoxESSControlBackend:
             "last_write_at": self._last_write_at,
             "last_write_result": self._last_write_result,
             "grid_import_prevention_bias": (
-                "shadow_only" if decision.grid_bias_shadow_only else "inactive"
+                "live_engaged"
+                if self._grid_bias_engaged
+                else (
+                    "shadow_only"
+                    if decision.grid_bias_shadow_only
+                    else (
+                        "live_ready"
+                        if control.grid_import_prevention_bias_active
+                        else "inactive"
+                    )
+                )
             ),
-            "deliberate_force_discharge": "blocked",
+            "grid_import_prevention_observed_w": (
+                control.grid_import_prevention_observed_grid_power_w
+            ),
+            "grid_import_prevention_target_w": (
+                control.grid_import_prevention_target_grid_power_w
+            ),
+            "grid_import_prevention_force_discharge_kw": (
+                decision.force_discharge_power_kw
+            ),
+            "deliberate_force_discharge": "blocked_except_bounded_grid_bias_trim",
             "paid_or_agile_export_control": "blocked",
-            "export_power_limit_write": "never_written_by_alpha9.56",
+            "export_power_limit_write": "never_written_by_alpha9.62",
             "safety_release": (
                 "restore pre-KEMS local mode and Min SoC-on-grid when owned"
             ),

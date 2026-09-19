@@ -149,12 +149,14 @@ def build_foxess_command_shadow(
             min(desired_export, effective_export_limit_kw), 3
         )
     elif bias_active:
-        # Alpha9.55 keeps the zero-point bias separate from economic export.
-        # It is represented in Shadow as a tiny remote-control grid-feed request
-        # but does not grant normal export authority or permit a hardware write.
+        # Alpha9.62's live trim uses FoxESS remote active power as a total
+        # inverter AC-output setpoint. The tiny bias is therefore added to the
+        # already-bounded KEMS KH7 AC-output target; sending only 0.01 kW would
+        # incorrectly cap the whole inverter rather than create a 10 W grid bias.
         proposed_work_mode = "Force Discharge"
         force_discharge_power_kw = round(
-            min(desired_bias_export, effective_export_limit_kw), 3
+            max(control.total_kh7_ac_output_kw, 0.0) + desired_bias_export,
+            3,
         )
     elif control.desired_work_mode in {"Self Use", "Feed-in First"}:
         proposed_work_mode = control.desired_work_mode
@@ -254,6 +256,9 @@ def build_foxess_command_shadow(
         "deliberate_battery_export_power_kw": round(desired_export, 3),
         "requested_total_discharge_power_kw": round(
             max(control.desired_total_discharge_power_kw, 0.0), 3
+        ),
+        "requested_total_kh7_ac_output_kw": round(
+            max(control.total_kh7_ac_output_kw, 0.0), 3
         ),
         "requested_min_soc_on_grid_percent": proposed_min_soc_on_grid,
         "desired_grid_export_allowed": bool(control.desired_grid_export_allowed),

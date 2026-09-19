@@ -65,7 +65,7 @@ def test_self_use_is_live_but_grid_bias_remains_shadow_only() -> None:
     assert result.action == "self_use"
     assert result.min_soc_on_grid_percent == 15.0
     assert result.grid_bias_shadow_only is True
-    assert "bias remains Shadow-only" in result.reason
+    assert "grid-import prevention remains Shadow-only" in result.reason
 
 
 def test_confirmed_cheap_force_charge_is_live() -> None:
@@ -147,18 +147,22 @@ def test_every_explicit_control_gate_is_required() -> None:
     assert _decision(_control(plan_safe=False)).commands_permitted is False
 
 
-def test_backend_live_write_surface_excludes_force_discharge_and_export_limit() -> None:
+def test_backend_live_write_surface_allows_only_bounded_bias_force_discharge() -> None:
     source = BACKEND.read_text(encoding="utf-8")
 
     assert (
         'required_keys = ("work_mode", "force_charge_power", "min_soc_on_grid")'
         in source
     )
-    assert '_entity_id(entities, "force_discharge_power")' not in source
+    assert '"force_discharge_power",' in source
+    assert 'decision.action == "grid_bias_force_discharge"' in source
     assert '_entity_id(entities, "export_power_limit")' not in source
-    assert '"deliberate_force_discharge": "blocked"' in source
+    assert (
+        '"deliberate_force_discharge": "blocked_except_bounded_grid_bias_trim"'
+        in source
+    )
     assert '"paid_or_agile_export_control": "blocked"' in source
-    assert '"export_power_limit_write": "never_written_by_alpha9.56"' in source
+    assert '"export_power_limit_write": "never_written_by_alpha9.62"' in source
 
 
 def test_backend_persists_and_restores_pre_kems_state() -> None:
@@ -204,8 +208,8 @@ def test_static_contract_is_bounded_not_general_write_authority() -> None:
 
     assert '"hardware_writes": "conditional_bounded_control"' in source
     assert '"maximum_allowed_stage": "control"' in source
-    assert '"Force Discharge"' in source
-    assert '"grid-import prevention bias"' in source
+    assert "Force Discharge outside bounded grid-import prevention trim" in source
+    assert "bounded grid-import prevention trim" in source
     assert '"export-power-limit writes"' in source
 
 
