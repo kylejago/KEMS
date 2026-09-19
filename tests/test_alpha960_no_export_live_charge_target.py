@@ -120,9 +120,7 @@ def _no_export_simulation(*, charge_kw: float, target_soc: float) -> SimulationS
     )
 
 
-def test_no_export_control_view_is_not_replaced_by_full_kems_100_percent_charge() -> (
-    None
-):
+def test_full_kems_alignment_remains_counterfactual_for_customer_views() -> None:
     live = _no_export_simulation(charge_kw=0.0, target_soc=53.9)
 
     control_view, shadow_view, metadata = alignment.aligned_agile_control_views(
@@ -130,11 +128,10 @@ def test_no_export_control_view_is_not_replaced_by_full_kems_100_percent_charge(
         _full_kems_cheap_charge(),
     )
 
-    assert control_view.current_simulated_battery_charge_power_kw == 0.0
-    assert control_view.overnight_charge_target_percent == 53.9
+    assert control_view.current_simulated_battery_charge_power_kw == 7.0
     assert shadow_view.current_simulated_battery_charge_power_kw == 7.0
-    assert metadata["active"] is False
-    assert "no-export" in metadata["reason"]
+    assert metadata["active"] is True
+    assert metadata["target"]["charge_kw"] == 7.0
 
 
 def test_full_kems_alignment_cannot_overwrite_no_export_physical_control() -> None:
