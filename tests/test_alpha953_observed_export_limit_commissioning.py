@@ -159,9 +159,9 @@ def test_shadow_parity_wording_is_release_neutral_and_writes_remain_blocked() ->
         export_limit_kw=6.4,
     )
 
-    assert result["parity_result"] == "MATCH"
+    assert result["parity_result"] == "DIFF"
     assert "Alpha8.79" not in result["parity_reason"]
-    assert "already matches" in result["parity_reason"]
+    assert "hardware control remains disabled" in result["parity_reason"]
     proposed = result["proposed_foxess_command"]
     assert proposed["export_power_limit_w"] is None
     assert proposed["force_discharge_power_kw"] is None
