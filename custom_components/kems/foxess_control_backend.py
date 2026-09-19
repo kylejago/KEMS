@@ -564,6 +564,14 @@ class FoxESSControlBackend:
 
     async def async_shutdown(self, coordinator: Any) -> None:
         """Release any KEMS-owned FoxESS state before integration unload."""
+        task = self._fast_trim_task
+        self._fast_trim_task = None
+        self._fast_trim_context = None
+        self._fast_trim_last_sample_fingerprint = None
+        if task is not None and not task.done():
+            task.cancel()
+            with suppress(asyncio.CancelledError):
+                await task
         if not self._owned:
             return
         writes: list[str] = []
@@ -604,7 +612,27 @@ class FoxESSControlBackend:
         no_paid_export_mode: bool,
         cheap_period_confirmed: bool,
     ) -> dict[str, Any]:
-        """Apply at most the bounded Alpha9.63 command for this scan."""
+        """Serialize the 60-second planner write with the Alpha9.64 fast loop."""
+        self._ensure_fast_trim_task()
+        async with self._write_lock:
+            return await self._async_update_locked(
+                coordinator=coordinator,
+                control=control,
+                technical_ready=technical_ready,
+                no_paid_export_mode=no_paid_export_mode,
+                cheap_period_confirmed=cheap_period_confirmed,
+            )
+
+    async def _async_update_locked(
+        self,
+        *,
+        coordinator: Any,
+        control: Any,
+        technical_ready: bool,
+        no_paid_export_mode: bool,
+        cheap_period_confirmed: bool,
+    ) -> dict[str, Any]:
+        """Apply the authoritative Alpha9.64 command for this planner scan."""
         shadow = build_foxess_command_shadow_snapshot(
             self._hass,
             coordinator,
