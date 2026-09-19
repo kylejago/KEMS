@@ -134,6 +134,6 @@ def test_commissioning_uses_only_fresh_foxess_proof_before_control_eligibility()
         "user_commissioned=bool(coordinator.settings.control.commissioned)" in backend
     )
     assert (
-        '"deliberate_force_discharge": "blocked_except_bounded_grid_bias_trim"'
+        '"deliberate_force_discharge": "blocked_except_fixed_50w_grid_bias"'
         in backend
     )

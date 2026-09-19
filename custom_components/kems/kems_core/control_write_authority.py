@@ -1,20 +1,13 @@
-"""Pure authority gate for bounded FoxESS control, including Alpha9.64 grid trim."""
+"""Pure authority gate for bounded FoxESS control, including Alpha9.65 fixed bias."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 
-from .grid_import_prevention import (
-    GRID_BIAS_MAX_CORRECTION_KW,
-    grid_bias_required_correction_kw,
-)
+from .grid_import_prevention import FIXED_GRID_BIAS_KW
 from .models import ControlState
 
 _EPSILON_KW = 0.001
-_GRID_BIAS_ENTER_IMPORT_W = 5.0
-_GRID_BIAS_EXIT_EXPORT_W = -50.0
-_GRID_BIAS_ERROR_DEADBAND_W = 5.0
-_GRID_BIAS_MAX_STEP_KW = 0.050
 
 
 @dataclass(frozen=True, slots=True)
@@ -55,10 +48,10 @@ def assess_foxess_control_write_authority(
 ) -> FoxESSControlDecision:
     """Return the narrow non-Agile hardware action.
 
-    Alpha9.64 retains the tightly bounded Force Discharge exception for the
-    optional near-zero grid-import trim, but closes the loop on measured grid
-    power. The correction follows observed minus target grid power, is clamped
-    by planner headroom, rate-limited here and held through a small deadband.
+    Alpha9.65 removes measured-grid-error feedback. The optional daytime
+    anti-import path is a deterministic fixed 50 W export bias added to the
+    already-bounded KH7 house-support output. Deliberate/economic export is a
+    separate, higher-priority authority and is never stacked with this bias.
     """
     backend_available = bool(binding_ready and reviewed_version_matches)
     bias_shadow_only = bool(
@@ -136,100 +129,46 @@ def assess_foxess_control_write_authority(
         )
 
     if control.desired_work_mode in {"Self Use", "Feed-in First"}:
-        if bias_shadow_only:
-            observed_grid_w = control.grid_import_prevention_observed_grid_power_w
-            if grid_bias_force_discharge_ready and observed_grid_w is not None:
-                should_engage = (
-                    float(observed_grid_w) > _GRID_BIAS_EXIT_EXPORT_W
-                    if grid_bias_engaged
-                    else float(observed_grid_w) >= _GRID_BIAS_ENTER_IMPORT_W
-                )
-                if should_engage:
-                    target_grid_w = float(
-                        control.grid_import_prevention_target_grid_power_w
-                    )
-                    error_w = float(observed_grid_w) - target_grid_w
-                    requested_correction_kw = grid_bias_required_correction_kw(
-                        float(observed_grid_w),
-                        target_grid_w,
-                    )
-                    previous_correction_kw = (
-                        min(
-                            max(float(grid_bias_previous_correction_kw), 0.0),
-                            GRID_BIAS_MAX_CORRECTION_KW,
-                        )
-                        if grid_bias_engaged
-                        else 0.0
-                    )
-                    if (
-                        grid_bias_engaged
-                        and abs(error_w) <= _GRID_BIAS_ERROR_DEADBAND_W
-                    ):
-                        applied_correction_kw = previous_correction_kw
-                    else:
-                        lower = max(
-                            previous_correction_kw - _GRID_BIAS_MAX_STEP_KW,
-                            0.0,
-                        )
-                        upper = previous_correction_kw + _GRID_BIAS_MAX_STEP_KW
-                        applied_correction_kw = min(
-                            max(requested_correction_kw, lower),
-                            upper,
-                        )
-
-                    base_output_kw = max(float(control.total_kh7_ac_output_kw), 0.0)
-                    discharge_headroom_kw = max(
-                        float(max_discharge_kw)
-                        - max(float(control.desired_total_discharge_power_kw), 0.0),
-                        0.0,
-                    )
-                    inverter_headroom_kw = max(
-                        float(inverter_limit_kw) - base_output_kw,
-                        0.0,
-                    )
-                    applied_correction_kw = min(
-                        applied_correction_kw,
-                        discharge_headroom_kw,
-                        inverter_headroom_kw,
-                        max(float(export_limit_kw), 0.0),
-                        GRID_BIAS_MAX_CORRECTION_KW,
-                    )
-                    total_output_kw = base_output_kw + applied_correction_kw
-                    actual_correction_kw = applied_correction_kw
-                    if total_output_kw > _EPSILON_KW:
-                        return FoxESSControlDecision(
-                            backend_available=True,
-                            commands_permitted=True,
-                            action="grid_bias_force_discharge",
-                            reason=(
-                                "Bounded closed-loop grid-import prevention trim is "
-                                "active; economic export authority remains disabled"
-                            ),
-                            force_discharge_power_kw=round(total_output_kw, 3),
-                            min_soc_on_grid_percent=min_soc,
-                            grid_bias_live=True,
-                            grid_bias_shadow_only=False,
-                            grid_bias_error_w=round(error_w, 1),
-                            grid_bias_requested_correction_kw=round(
-                                requested_correction_kw,
-                                3,
-                            ),
-                            grid_bias_applied_correction_kw=round(
-                                actual_correction_kw,
-                                3,
-                            ),
-                        )
+        if bias_shadow_only and grid_bias_force_discharge_ready:
+            base_output_kw = max(float(control.total_kh7_ac_output_kw), 0.0)
+            fixed_bias_kw = min(
+                max(float(control.desired_grid_bias_export_power_kw), 0.0),
+                FIXED_GRID_BIAS_KW,
+            )
+            discharge_headroom_kw = max(
+                float(max_discharge_kw)
+                - max(float(control.desired_total_discharge_power_kw), 0.0),
+                0.0,
+            )
+            inverter_headroom_kw = max(
+                float(inverter_limit_kw) - base_output_kw,
+                0.0,
+            )
+            applied_bias_kw = min(
+                fixed_bias_kw,
+                discharge_headroom_kw,
+                inverter_headroom_kw,
+                max(float(export_limit_kw), 0.0),
+            )
+            total_output_kw = base_output_kw + applied_bias_kw
+            if (
+                applied_bias_kw >= FIXED_GRID_BIAS_KW - 1e-9
+                and total_output_kw > _EPSILON_KW
+            ):
                 return FoxESSControlDecision(
                     backend_available=True,
                     commands_permitted=True,
-                    action="self_use",
+                    action="grid_bias_force_discharge",
                     reason=(
-                        "Grid-import prevention trim is not engaged because "
-                        "natural grid flow is already beyond the live hysteresis target"
+                        "Fixed 50 W grid-import-prevention export bias is active; "
+                        "economic export authority remains separate and higher priority"
                     ),
+                    force_discharge_power_kw=round(total_output_kw, 3),
                     min_soc_on_grid_percent=min_soc,
-                    grid_bias_live=False,
+                    grid_bias_live=True,
                     grid_bias_shadow_only=False,
+                    grid_bias_requested_correction_kw=round(FIXED_GRID_BIAS_KW, 3),
+                    grid_bias_applied_correction_kw=round(applied_bias_kw, 3),
                 )
 
         return FoxESSControlDecision(
@@ -240,8 +179,8 @@ def assess_foxess_control_write_authority(
                 "No-paid-export Self Use is inside the bounded control scope"
                 if not bias_shadow_only
                 else (
-                    "Self Use permitted; grid-import prevention remains Shadow-only "
-                    "because the reviewed Force Discharge command is unavailable"
+                    "Self Use permitted; fixed 50 W grid-import-prevention bias "
+                    "cannot be applied on the reviewed Force Discharge surface"
                 )
             ),
             min_soc_on_grid_percent=min_soc,
