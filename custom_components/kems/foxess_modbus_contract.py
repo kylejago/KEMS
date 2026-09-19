@@ -77,10 +77,10 @@ FOXESS_MODBUS_OPTIONAL_DIAGNOSTICS: Final = {
     "pv4_power": {"key": "pv4_power", "name": "PV4 Power"},
 }
 
-# Writable entities reviewed from upstream v1.15.0. Alpha9.56 introduces a
-# narrow opt-in backend for Self Use, confirmed-cheap Force Charge and Min SoC
-# on grid. Deliberate export/Force Discharge and export-limit writes remain
-# outside the live-control scope.
+# Writable entities reviewed from upstream v1.15.0. Alpha9.62 retains the
+# narrow opt-in backend and additionally permits Force Discharge only for the
+# bounded near-zero grid-import trim. Deliberate/economic export and
+# export-limit writes remain outside the live-control scope.
 FOXESS_MODBUS_KNOWN_WRITABLE_CAPABILITIES: Final = {
     "work_mode": "Work Mode",
     "force_charge_power": "Force Charge Power (remote control, kW)",
@@ -117,14 +117,13 @@ def foxess_modbus_contract_snapshot() -> dict[str, Any]:
         "hardware_writes": "conditional_bounded_control",
         "maximum_allowed_stage": "control",
         "control_scope": (
-            "Alpha9.56 opt-in non-Agile control: Self Use, confirmed-cheap "
-            "Force Charge and Min SoC-on-grid only"
+            "Alpha9.62 opt-in non-Agile control: Self Use, confirmed-cheap "
+            "Force Charge, Min SoC-on-grid and bounded grid-import prevention trim"
         ),
         "blocked_live_capabilities": [
-            "Force Discharge",
+            "Force Discharge outside bounded grid-import prevention trim",
             "deliberate economic export",
             "Agile/paid-export control",
-            "grid-import prevention bias",
             "export-power-limit writes",
         ],
     }
