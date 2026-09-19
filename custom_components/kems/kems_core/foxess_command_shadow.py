@@ -12,6 +12,7 @@ from collections.abc import Mapping
 from dataclasses import asdict
 from typing import Any
 
+from .grid_import_prevention import grid_bias_required_correction_kw
 from .models import ControlState
 
 PASS = "PASS"
@@ -149,13 +150,16 @@ def build_foxess_command_shadow(
             min(desired_export, effective_export_limit_kw), 3
         )
     elif bias_active:
-        # Alpha9.62's live trim uses FoxESS remote active power as a total
-        # inverter AC-output setpoint. The tiny bias is therefore added to the
-        # already-bounded KEMS KH7 AC-output target; sending only 0.01 kW would
-        # incorrectly cap the whole inverter rather than create a 10 W grid bias.
+        # Alpha9.63 closes the near-zero trim loop on measured grid error. FoxESS
+        # remote active power remains a total inverter AC-output setpoint, so the
+        # requested correction is added to KEMS' already-bounded KH7 output.
+        requested_correction_kw = grid_bias_required_correction_kw(
+            control.grid_import_prevention_observed_grid_power_w,
+            control.grid_import_prevention_target_grid_power_w,
+        )
         proposed_work_mode = "Force Discharge"
         force_discharge_power_kw = round(
-            max(control.total_kh7_ac_output_kw, 0.0) + desired_bias_export,
+            max(control.total_kh7_ac_output_kw, 0.0) + requested_correction_kw,
             3,
         )
     elif control.desired_work_mode in {"Self Use", "Feed-in First"}:
@@ -163,6 +167,15 @@ def build_foxess_command_shadow(
     else:
         translation_status = WAIT
         translation_reason = f"Unreviewed KEMS work mode: {control.desired_work_mode}"
+
+    requested_grid_correction_kw = (
+        grid_bias_required_correction_kw(
+            control.grid_import_prevention_observed_grid_power_w,
+            control.grid_import_prevention_target_grid_power_w,
+        )
+        if bias_active
+        else 0.0
+    )
 
     proposed_export_limit_kw = (
         effective_export_limit_kw
@@ -308,6 +321,19 @@ def build_foxess_command_shadow(
                 else round(control.grid_import_prevention_observed_grid_power_w, 1)
             ),
             "requested_bias_export_kw": round(desired_bias_export, 3),
+            "grid_error_w": (
+                None
+                if control.grid_import_prevention_observed_grid_power_w is None
+                else round(
+                    float(control.grid_import_prevention_observed_grid_power_w)
+                    - float(control.grid_import_prevention_target_grid_power_w),
+                    1,
+                )
+            ),
+            "requested_correction_kw": round(
+                requested_grid_correction_kw,
+                3,
+            ),
             "suppressed_reason": (
                 control.grid_import_prevention_bias_suppressed_reason
             ),
