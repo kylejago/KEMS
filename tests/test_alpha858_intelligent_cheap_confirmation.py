@@ -60,7 +60,7 @@ def test_field_intelligent_slot_is_confirmed_from_octopus_and_ohme() -> None:
     assert resolved.intelligent_slot_evidence["large_import_permitted"] is True
     assert resolved.intelligent_slot_evidence["octopus_price_corroborated"] is True
     assert resolved.intelligent_slot_evidence["octopus_demand_corroborated"] is True
-    assert resolved.intelligent_slot_evidence["octopus_demand_corroboration_required"] is False
+    assert (\n        resolved.intelligent_slot_evidence["octopus_demand_corroboration_required"]\n        is False\n    )
     assert resolved.intelligent_slot_evidence["ohme_power_active"] is True
 
     snapshot = Snapshot(
