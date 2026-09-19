@@ -1,4 +1,4 @@
-"""Bounded Alpha9.63 FoxESS control backend.
+"""Bounded Alpha9.64 FoxESS control backend.
 
 The first real KEMS FoxESS backend intentionally supports only:
 - local Self Use ownership,
@@ -6,14 +6,16 @@ The first real KEMS FoxESS backend intentionally supports only:
 - Min SoC-on-grid enforcement,
 - fail-safe release back to the pre-KEMS local mode.
 
-Deliberate/economic export and Agile/paid-export control remain blocked. Alpha9.63
-permits Force Discharge only as the bounded near-zero grid-import trim; Export
-Power Limit is never written by this backend.
+Deliberate/economic export and Agile/paid-export control remain blocked. Alpha9.64
+retains Force Discharge only as the bounded near-zero grid-import trim and adds a
+small fast loop around an already-authorised command; Export Power Limit is never
+written by this backend.
 """
 
 from __future__ import annotations
 
 import asyncio
+from contextlib import suppress
 from datetime import UTC, datetime
 from typing import Any
 
@@ -27,6 +29,11 @@ from .kems_core.control_write_authority import (
     FoxESSControlDecision,
     assess_foxess_control_write_authority,
 )
+from .kems_core.fast_grid_trim import (
+    FAST_GRID_TRIM_POLL_SECONDS,
+    calculate_fast_grid_trim,
+)
+from .providers.foxess import FoxESSProvider
 
 _STORAGE_VERSION = 1
 _LOCAL_WORK_MODES = {"Self Use", "Feed-in First", "Back-up"}
@@ -60,6 +67,17 @@ class FoxESSControlBackend:
         self._last_write_result = "Never commanded"
         self._grid_bias_engaged = False
         self._grid_bias_correction_kw = 0.0
+        self._write_lock = asyncio.Lock()
+        self._fast_trim_task: asyncio.Task[None] | None = None
+        self._fast_trim_context: dict[str, Any] | None = None
+        self._fast_trim_last_sample_fingerprint: tuple[Any, ...] | None = None
+        self._fast_trim_status: dict[str, Any] = {
+            "state": "idle",
+            "scheduler_interval_seconds": FAST_GRID_TRIM_POLL_SECONDS,
+            "fresh_sample_required": True,
+            "writes_work_mode": False,
+            "writes_export_power_limit": False,
+        }
         self._status: dict[str, Any] = {}
 
     @property
@@ -68,14 +86,16 @@ class FoxESSControlBackend:
 
     async def async_setup(self) -> None:
         data = await self._store.async_load()
-        if not isinstance(data, dict):
-            return
-        self._owned = bool(data.get("owned"))
-        previous_mode = data.get("previous_work_mode")
-        self._previous_work_mode = (
-            str(previous_mode) if previous_mode in _LOCAL_WORK_MODES else None
-        )
-        self._previous_min_soc_on_grid = _number(data.get("previous_min_soc_on_grid"))
+        if isinstance(data, dict):
+            self._owned = bool(data.get("owned"))
+            previous_mode = data.get("previous_work_mode")
+            self._previous_work_mode = (
+                str(previous_mode) if previous_mode in _LOCAL_WORK_MODES else None
+            )
+            self._previous_min_soc_on_grid = _number(
+                data.get("previous_min_soc_on_grid")
+            )
+        self._ensure_fast_trim_task()
 
     async def _async_save(self) -> None:
         await self._store.async_save(
