@@ -146,3 +146,21 @@ def test_contract_keeps_economic_export_blocked() -> None:
     assert '"deliberate economic export"' in source
     assert '"Agile/paid-export control"' in source
     assert '"export-power-limit writes"' in source
+
+
+def test_alpha962_release_identity_and_scope() -> None:
+    import json
+
+    manifest = json.loads((KEMS / "manifest.json").read_text(encoding="utf-8"))
+    bundle = json.loads(
+        (ROOT / "release" / "kems-bundle.template.json").read_text(encoding="utf-8")
+    )
+    reason = str(bundle["maintenance"]["reason"])
+
+    assert manifest["version"] == "0.9.0-alpha9.62"
+    assert reason.startswith("Alpha9.62 promotes the optional Grid import prevention bias")
+    assert "desired total KH7 AC output plus the configured tiny bias" in reason
+    assert "at least 5 W import" in reason
+    assert "natural export reaches 50 W" in reason
+    assert "Deliberate/economic Force Discharge" in reason
+    assert "Export Power Limit writes remain blocked" in reason
