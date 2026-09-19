@@ -23,10 +23,10 @@ def _control(**overrides: object) -> ControlState:
         "desired_battery_export_power_kw": 0.0,
         "desired_grid_export_allowed": False,
         "desired_min_soc_percent": 15.0,
-        "desired_grid_bias_export_power_kw": 0.01,
-        "grid_import_prevention_bias_w": 10.0,
+        "desired_grid_bias_export_power_kw": 0.05,
+        "grid_import_prevention_bias_w": 50.0,
         "grid_import_prevention_bias_active": True,
-        "grid_import_prevention_target_grid_power_w": -10.0,
+        "grid_import_prevention_target_grid_power_w": -50.0,
         "grid_import_prevention_observed_grid_power_w": 20.0,
         "total_kh7_ac_output_kw": 1.281,
         "grid_available": True,
@@ -63,7 +63,7 @@ def test_live_grid_bias_uses_total_kh7_output_not_tiny_export_power() -> None:
 
     assert result.commands_permitted is True
     assert result.action == "grid_bias_force_discharge"
-    assert result.force_discharge_power_kw == 1.311
+    assert result.force_discharge_power_kw == 1.331
     assert result.grid_bias_live is True
     assert result.grid_bias_shadow_only is False
 
@@ -77,32 +77,19 @@ def test_grid_bias_shadow_translation_uses_total_inverter_output_setpoint() -> N
     proposed = shadow["proposed_foxess_command"]
 
     assert proposed["work_mode"] == "Force Discharge"
-    assert proposed["force_discharge_power_kw"] == 1.311
-    assert proposed["grid_bias_export_power_kw"] == 0.01
+    assert proposed["force_discharge_power_kw"] == 1.331
+    assert proposed["grid_bias_export_power_kw"] == 0.05
     assert proposed["grid_export_allowed"] is False
 
 
-def test_grid_bias_hysteresis_enters_on_import_and_releases_on_material_export() -> (
-    None
-):
-    enter = _decision(_control(grid_import_prevention_observed_grid_power_w=5.0))
-    already_exporting = _decision(
-        _control(grid_import_prevention_observed_grid_power_w=-5.0)
-    )
-    remain = _decision(
-        _control(grid_import_prevention_observed_grid_power_w=-20.0),
-        grid_bias_engaged=True,
-    )
-    release = _decision(
-        _control(grid_import_prevention_observed_grid_power_w=-50.0),
-        grid_bias_engaged=True,
-    )
+def test_fixed_grid_bias_is_independent_of_observed_grid_flow() -> None:
+    importing = _decision(_control(grid_import_prevention_observed_grid_power_w=500.0))
+    exporting = _decision(_control(grid_import_prevention_observed_grid_power_w=-500.0))
 
-    assert enter.action == "grid_bias_force_discharge"
-    assert already_exporting.action == "self_use"
-    assert remain.action == "grid_bias_force_discharge"
-    assert release.action == "self_use"
-
+    assert importing.action == "grid_bias_force_discharge"
+    assert importing.force_discharge_power_kw == 1.331
+    assert exporting.action == "grid_bias_force_discharge"
+    assert exporting.force_discharge_power_kw == 1.331
 
 def test_grid_bias_cannot_bypass_control_or_export_safety_gates() -> None:
     assert (
@@ -139,18 +126,20 @@ def test_backend_write_surface_is_narrow_grid_bias_exception() -> None:
         '"export_power_limit"'
         not in source.split("async def async_update", 1)[1].split("payload = {", 1)[0]
     )
-    assert '"blocked_except_bounded_grid_bias_trim"' in source
-    assert '"never_written_by_alpha9.64"' in source
+    assert '"blocked_except_fixed_50w_grid_bias"' in source
+    assert '"never_written_by_alpha9.65"' in source
+    assert '"import_power_limit_write": "never_written_by_alpha9.65"' in source
 
 
 def test_contract_keeps_economic_export_blocked() -> None:
     source = CONTRACT.read_text(encoding="utf-8")
 
-    assert "bounded grid-import prevention trim" in source
-    assert "Force Discharge outside bounded grid-import prevention trim" in source
+    assert "fixed 50 W anti-import bias" in source
+    assert "Force Discharge outside fixed 50 W anti-import bias" in source
     assert '"deliberate economic export"' in source
     assert '"Agile/paid-export control"' in source
     assert '"export-power-limit writes"' in source
+    assert '"import-power-limit writes"' in source
 
 
 def test_alpha962_release_identity_and_scope() -> None:
@@ -162,11 +151,11 @@ def test_alpha962_release_identity_and_scope() -> None:
     )
     reason = str(bundle["maintenance"]["reason"])
 
-    assert manifest["version"] == "0.9.0-alpha9.64"
-    assert reason.startswith("Alpha9.64 adds a fast FoxESS grid-trim loop")
+    assert manifest["version"] == "0.9.0-alpha9.65"
+    assert reason.startswith("Alpha9.65 replaces the closed-loop grid trim")
     assert "Alpha9.62 promotes the optional Grid import prevention bias" in reason
     assert "desired total KH7 AC output plus the configured tiny bias" in reason
-    assert "at least 5 W import" in reason
-    assert "natural export reaches 50 W" in reason
+    assert "fixed 50 W" in reason
+    assert "no measured-grid feedback" in reason
     assert "Deliberate/economic Force Discharge" in reason
     assert "Export Power Limit writes remain blocked" in reason
