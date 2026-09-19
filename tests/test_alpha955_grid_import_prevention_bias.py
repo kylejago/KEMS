@@ -127,6 +127,7 @@ def test_legacy_zero_setting_is_ignored_by_fixed_successor_policy() -> None:
     assert state.grid_import_prevention_bias_w == 50.0
     assert state.desired_grid_bias_export_power_kw == 0.05
 
+
 def test_bias_suppresses_during_cheap_charge() -> None:
     state = apply_grid_import_prevention_bias(
         _control(desired_work_mode="Force Charge", desired_charge_power_kw=4.0),
@@ -179,7 +180,10 @@ def test_bias_suppresses_during_deliberate_economic_export() -> None:
     )
 
     assert state.grid_import_prevention_bias_active is False
-    assert state.grid_import_prevention_bias_suppressed_reason == "deliberate_export_has_priority"
+    assert (
+        state.grid_import_prevention_bias_suppressed_reason
+        == "deliberate_export_has_priority"
+    )
 
 
 def test_fixed_bias_does_not_depend_on_current_grid_exchange() -> None:
@@ -191,6 +195,7 @@ def test_fixed_bias_does_not_depend_on_current_grid_exchange() -> None:
 
     assert state.grid_import_prevention_bias_active is True
     assert state.desired_grid_bias_export_power_kw == 0.05
+
 
 def test_bias_cannot_bypass_user_kems_export_ceiling() -> None:
     state = apply_grid_import_prevention_bias(
@@ -220,6 +225,7 @@ def test_successor_policy_is_fixed_and_not_exposed_as_user_tunable() -> None:
     assert "CONF_GRID_IMPORT_PREVENTION_BIAS_W" not in flow_source
     assert "grid_import_prevention_bias_w" not in control["data"]
     assert "grid_import_prevention_bias_w" not in control["data_description"]
+
 
 def test_alpha955_scope_is_retained_by_current_successor_release() -> None:
     manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
