@@ -166,11 +166,13 @@ def build_foxess_command_shadow(
     requested_grid_correction_kw = FIXED_GRID_BIAS_KW if bias_active else 0.0
 
     proposed_export_limit_kw = (
-        effective_export_limit_kw
-        if control.desired_grid_export_allowed
-        else min(desired_bias_export, effective_export_limit_kw) if bias_active else 0.0
+        effective_export_limit_kw if control.desired_grid_export_allowed else None
     )
-    proposed_export_limit_w = round(proposed_export_limit_kw * 1000)
+    proposed_export_limit_w = (
+        None
+        if proposed_export_limit_kw is None
+        else round(proposed_export_limit_kw * 1000)
+    )
     proposed_min_soc_on_grid = round(control.desired_min_soc_percent, 1)
 
     proposed = {
@@ -194,10 +196,7 @@ def build_foxess_command_shadow(
             if bias_active
             else 0.0
         ),
-        "grid_bias_requested_correction_kw": round(
-            requested_grid_correction_kw,
-            3,
-        ),
+        "grid_bias_fixed_export_kw": round(requested_grid_correction_kw, 3),
         "remote_control_required": proposed_work_mode
         in {"Force Charge", "Force Discharge"},
         "schedule_strategy": (
@@ -314,7 +313,7 @@ def build_foxess_command_shadow(
             ),
             "requested_bias_export_kw": round(desired_bias_export, 3),
             "grid_error_w": None,
-            "requested_correction_kw": round(requested_grid_correction_kw, 3),
+            "fixed_export_kw": round(requested_grid_correction_kw, 3),
             "control_strategy": "fixed_50w_export_bias_no_grid_error_tracking",
             "suppressed_reason": (
                 control.grid_import_prevention_bias_suppressed_reason
