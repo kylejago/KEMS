@@ -138,8 +138,8 @@ def test_alpha945_release_identity_and_scope() -> None:
         (root / "release" / "kems-bundle.template.json").read_text(encoding="utf-8")
     )
     reason = str(bundle["maintenance"]["reason"])
-    assert manifest["version"] == "0.9.0-alpha9.59"
-    assert reason.startswith("Alpha9.59")
+    assert manifest["version"] == "0.9.0-alpha9.60"
+    assert reason.startswith("Alpha9.60")
     assert "Alpha9.45" in reason
     assert "raw 6 reports 3 rewards rather than 6" in reason
     assert "two-one-hour-reward event-day limit" in reason
