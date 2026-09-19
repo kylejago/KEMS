@@ -63,7 +63,10 @@ def assess_foxess_control_write_authority(
     backend_available = bool(binding_ready and reviewed_version_matches)
     bias_shadow_only = bool(
         control.grid_import_prevention_bias_active
-        and control.grid_import_prevention_bias_w > 0.0
+        and (
+            control.grid_import_prevention_bias_w > 0.0
+            or control.desired_grid_bias_export_power_kw > _EPSILON_KW
+        )
     )
 
     def blocked(reason: str, *, action: str = "release") -> FoxESSControlDecision:
