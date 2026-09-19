@@ -88,7 +88,7 @@ def test_5w_deadband_does_not_chase_single_watts() -> None:
 def test_fast_loop_cadence_is_five_seconds_but_fresh_sample_gated() -> None:
     assert FAST_GRID_TRIM_POLL_SECONDS == 5
     source = BACKEND.read_text(encoding="utf-8")
-    assert "fast_grid_trim_last_sample_fingerprint" in source
+    assert "_fast_trim_last_sample_fingerprint" in source
     assert "duplicate_grid_sample" in source
 
 
