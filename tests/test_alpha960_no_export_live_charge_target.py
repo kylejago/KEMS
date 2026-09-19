@@ -10,7 +10,13 @@ from pathlib import Path
 from types import ModuleType
 
 import kems_core
-from kems_core import ControlConfig, ControlEngine, ControlState, SimulationState, Snapshot
+from kems_core import (
+    ControlConfig,
+    ControlEngine,
+    ControlState,
+    SimulationState,
+    Snapshot,
+)
 from kems_core.control_write_authority import assess_foxess_control_write_authority
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -114,7 +120,9 @@ def _no_export_simulation(*, charge_kw: float, target_soc: float) -> SimulationS
     )
 
 
-def test_no_export_control_view_is_not_replaced_by_full_kems_100_percent_charge() -> None:
+def test_no_export_control_view_is_not_replaced_by_full_kems_100_percent_charge() -> (
+    None
+):
     live = _no_export_simulation(charge_kw=0.0, target_soc=53.9)
 
     control_view, shadow_view, metadata = alignment.aligned_agile_control_views(
@@ -150,7 +158,9 @@ def test_full_kems_alignment_cannot_overwrite_no_export_physical_control() -> No
     assert result == original
 
 
-def test_no_export_target_satisfied_holds_battery_and_keeps_house_on_cheap_grid() -> None:
+def test_no_export_target_satisfied_holds_battery_and_keeps_house_on_cheap_grid() -> (
+    None
+):
     snapshot = _cheap_snapshot(soc=55.0)
     # The replay may still be behind live hardware and asking for charge.
     # Fresh physical SOC at/above the no-export target must win.
@@ -240,7 +250,9 @@ def test_alpha960_release_identity_and_scope() -> None:
     reason = str(bundle["maintenance"]["reason"])
 
     assert manifest["version"] == "0.9.0-alpha9.60"
-    assert reason.startswith("Alpha9.60 fixes no-paid-export cheap-period target authority")
+    assert reason.startswith(
+        "Alpha9.60 fixes no-paid-export cheap-period target authority"
+    )
     assert "Full KEMS" in reason
     assert "solar-aware overnight target" in reason
     assert "Min SoC-on-grid" in reason
