@@ -63,10 +63,7 @@ def apply_grid_import_prevention_bias(
         reason = "battery_soc_unavailable"
     elif float(battery_soc) <= reserve_percent + 1e-6:
         reason = "battery_at_or_below_reserve"
-    elif (
-        control.total_kh7_ac_output_kw + bias_kw
-        > config.inverter_limit_kw + 1e-9
-    ):
+    elif control.total_kh7_ac_output_kw + bias_kw > config.inverter_limit_kw + 1e-9:
         reason = "inverter_headroom_below_fixed_bias"
     elif (
         control.desired_total_discharge_power_kw + bias_kw
