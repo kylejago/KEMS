@@ -236,6 +236,20 @@ class ControlEngine:
                 if simulation.no_export_mode_active
                 else config.max_charge_kw
             )
+            if simulation.no_export_mode_active:
+                target_soc = simulation.overnight_charge_target_percent
+                observed_soc = (
+                    float(snapshot.battery_soc)
+                    if snapshot.battery_soc is not None
+                    and "battery_soc" not in snapshot.stale_fields
+                    else None
+                )
+                if (
+                    target_soc is not None
+                    and observed_soc is not None
+                    and observed_soc + 1e-6 >= float(target_soc)
+                ):
+                    requested_charge = 0.0
             desired_charge = min(requested_charge, available_site_headroom)
             no_export_hold_soc = config.normal_reserve_percent
             if simulation.no_export_mode_active:
