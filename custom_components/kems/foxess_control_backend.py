@@ -331,6 +331,8 @@ class FoxESSControlBackend:
             grid_bias_engaged=self._grid_bias_engaged,
             grid_bias_previous_correction_kw=self._grid_bias_correction_kw,
             inverter_limit_kw=float(coordinator.settings.control.inverter_limit_kw),
+            max_discharge_kw=float(coordinator.settings.control.max_discharge_kw),
+            export_limit_kw=float(coordinator.settings.control.export_limit_kw),
         )
 
         writes: list[str] = []
