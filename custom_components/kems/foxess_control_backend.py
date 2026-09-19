@@ -344,9 +344,7 @@ class FoxESSControlBackend:
             "intelligent_slot_entity": coordinator.entities.intelligent_slot,
             "planner_base_output_kw": float(control.total_kh7_ac_output_kw),
             "planner_discharge_kw": float(control.desired_total_discharge_power_kw),
-            "target_grid_w": float(
-                control.grid_import_prevention_target_grid_power_w
-            ),
+            "target_grid_w": float(control.grid_import_prevention_target_grid_power_w),
             "min_soc_percent": float(control.desired_min_soc_percent),
             "inverter_limit_kw": float(coordinator.settings.control.inverter_limit_kw),
             "max_discharge_kw": float(coordinator.settings.control.max_discharge_kw),
@@ -424,9 +422,7 @@ class FoxESSControlBackend:
                 or settings.emergency_stop
                 or settings.operating_mode != "control"
             ):
-                await self._async_fast_grid_trim_release(
-                    "live_control_gate_withdrawn"
-                )
+                await self._async_fast_grid_trim_release("live_control_gate_withdrawn")
                 return
             if self._state_is_on(self._hass, context.get("off_peak_entity")) or (
                 self._state_is_on(
