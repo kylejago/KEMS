@@ -309,21 +309,29 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                 snapshot,
                 self.entities.configured_snapshot_fields(),
             )
-            control_simulation, shadow_simulation, _alignment = (
-                aligned_agile_control_views(simulation, agile_state)
-            )
+            if base_simulation.no_export_mode_active:
+                control_simulation = base_simulation
+                _, shadow_simulation, _alignment = aligned_agile_control_views(
+                    simulation,
+                    agile_state,
+                )
+            else:
+                control_simulation, shadow_simulation, _alignment = (
+                    aligned_agile_control_views(simulation, agile_state)
+                )
             control = self._control.plan(
                 snapshot,
                 control_simulation,
                 now,
                 self.settings.control,
             )
-            control = align_agile_control_state(
-                control,
-                simulation,
-                agile_state,
-                self.settings.control,
-            )
+            if not base_simulation.no_export_mode_active:
+                control = align_agile_control_state(
+                    control,
+                    control_simulation,
+                    agile_state,
+                    self.settings.control,
+                )
             happy_hour_plan = agile_state.get("happy_hour_plan")
             if not isinstance(happy_hour_plan, dict):
                 happy_hour_plan = {}
