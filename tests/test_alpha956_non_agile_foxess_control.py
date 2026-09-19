@@ -147,18 +147,15 @@ def test_every_explicit_control_gate_is_required() -> None:
     assert _decision(_control(plan_safe=False)).commands_permitted is False
 
 
-def test_backend_live_write_surface_excludes_force_discharge_and_export_limit() -> None:
+def test_backend_live_write_surface_keeps_force_discharge_narrow_and_export_limit_blocked() -> None:
     source = BACKEND.read_text(encoding="utf-8")
 
-    assert (
-        'required_keys = ("work_mode", "force_charge_power", "min_soc_on_grid")'
-        in source
-    )
-    assert '_entity_id(entities, "force_discharge_power")' not in source
+    assert '"force_discharge_power",' in source
+    assert '_entity_id(entities, "force_discharge_power")' in source
     assert '_entity_id(entities, "export_power_limit")' not in source
-    assert '"deliberate_force_discharge": "blocked"' in source
+    assert '"deliberate_force_discharge": "blocked_except_bounded_grid_bias"' in source
     assert '"paid_or_agile_export_control": "blocked"' in source
-    assert '"export_power_limit_write": "never_written_by_alpha9.56"' in source
+    assert '"export_power_limit_write": "never_written_by_alpha9.62"' in source
 
 
 def test_backend_persists_and_restores_pre_kems_state() -> None:
@@ -181,7 +178,8 @@ def test_commissioning_control_readiness_uses_control_critical_evidence() -> Non
     assert '"Overall reporting data quality"' in source
     assert '"informational only for control commissioning"' in source
     assert '"foxess_control_command_surface"' in source
-    assert '"work_mode", "force_charge_power", "min_soc_on_grid"' in source
+    assert '"force_discharge_power",' in source
+    assert '"min_soc_on_grid",' in source
     assert '"ready_for_control": ready_for_control' in source
     assert '"eligible_with_explicit_opt_in"' in source
 
@@ -204,8 +202,8 @@ def test_static_contract_is_bounded_not_general_write_authority() -> None:
 
     assert '"hardware_writes": "conditional_bounded_control"' in source
     assert '"maximum_allowed_stage": "control"' in source
-    assert '"Force Discharge"' in source
-    assert '"grid-import prevention bias"' in source
+    assert '"Force Discharge outside bounded grid-bias control"' in source
+    assert "bounded <=100 W closed-loop" in source
     assert '"export-power-limit writes"' in source
 
 
@@ -228,5 +226,5 @@ def test_alpha956_release_identity_and_scope() -> None:
     assert "foxess_modbus v1.15.0" in reason
     assert "Force Discharge" in reason
     assert "Grid import prevention bias" in reason
-    assert "remains Shadow-only" in reason
-    assert "Export Power Limit writes remain outside the live-control scope" in reason
+    assert "bounded live No paid export trial" in reason
+    assert "never writes FoxESS Export Power Limit" in reason
