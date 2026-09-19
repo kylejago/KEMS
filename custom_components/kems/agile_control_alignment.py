@@ -215,9 +215,6 @@ def align_agile_control_state(
     deliberate export target must not override a physical no-export or island
     decision. Hardware permissions are explicitly forced closed.
     """
-    if bool(getattr(simulation, "no_export_mode_active", False)):
-        return control
-
     rolling = _rolling_target(simulation, agile_state)
     if rolling is None:
         return control
