@@ -884,7 +884,12 @@ def build_commissioning_snapshot(
     )
     binding = command_shadow.get("entity_binding") or {}
     binding_entities = binding.get("entities") or {}
-    control_command_keys = ("work_mode", "force_charge_power", "min_soc_on_grid")
+    control_command_keys = (
+        "work_mode",
+        "force_charge_power",
+        "force_discharge_power",
+        "min_soc_on_grid",
+    )
     command_surface_ready = bool(
         binding.get("status") == PASS
         and all(
@@ -898,8 +903,9 @@ def build_commissioning_snapshot(
             "FoxESS non-Agile control command surface",
             PASS if command_surface_ready else WAIT,
             (
-                "Unique work-mode, force-charge-power and Min SoC-on-grid "
-                "entities are bound to the authoritative FoxESS device"
+                "Unique work-mode, force-charge-power, force-discharge-power "
+                "and Min SoC-on-grid entities are bound to the authoritative "
+                "FoxESS device"
                 if command_surface_ready
                 else str(
                     binding.get("reason")
@@ -984,7 +990,7 @@ def build_commissioning_snapshot(
             (
                 "No real FoxESS command is currently permitted"
                 if not data.control.commands_permitted
-                else "Bounded Alpha9.56 non-Agile FoxESS control authority is active"
+                else "Bounded Alpha9.62 non-Agile FoxESS control authority is active"
             ),
             required=False,
         )

@@ -149,9 +149,9 @@ def build_foxess_command_shadow(
             min(desired_export, effective_export_limit_kw), 3
         )
     elif bias_active:
-        # Alpha9.55 keeps the zero-point bias separate from economic export.
-        # It is represented in Shadow as a tiny remote-control grid-feed request
-        # but does not grant normal export authority or permit a hardware write.
+        # The zero-point bias remains separate from economic export. Shadow
+        # represents the configured nominal bias; Alpha9.62's live backend may
+        # only adjust that target inside its independent <=100 W closed loop.
         proposed_work_mode = "Force Discharge"
         force_discharge_power_kw = round(
             min(desired_bias_export, effective_export_limit_kw), 3

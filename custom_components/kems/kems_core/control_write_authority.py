@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from .grid_bias_closed_loop import GRID_BIAS_MAX_COMMAND_KW
 from .models import ControlState
 
 _EPSILON_KW = 0.001
@@ -18,8 +19,10 @@ class FoxESSControlDecision:
     action: str
     reason: str
     force_charge_power_kw: float | None = None
+    force_discharge_power_kw: float | None = None
     min_soc_on_grid_percent: float | None = None
     grid_bias_shadow_only: bool = False
+    grid_bias_live: bool = False
 
 
 def assess_foxess_control_write_authority(
@@ -33,13 +36,14 @@ def assess_foxess_control_write_authority(
     user_commissioned: bool,
     master_control_enabled: bool,
     emergency_stop: bool,
+    grid_bias_force_discharge_kw: float | None = None,
 ) -> FoxESSControlDecision:
     """Return the narrow non-Agile Alpha9.56 hardware action.
 
-    Alpha9.56 deliberately excludes every deliberate export/Force Discharge
-    action. The grid-import prevention bias also remains Shadow-only until KEMS
-    has a closed-loop grid-power controller rather than an inverter-output
-    setpoint.
+    Deliberate export/Force Discharge remains blocked. Alpha9.62 adds one narrow
+    exception: a closed-loop, sub-100 W Force Discharge setpoint may be supplied
+    explicitly for the grid-import-prevention bias. Callers that do not supply
+    that closed-loop setpoint retain the earlier Shadow-only behaviour.
     """
     backend_available = bool(binding_ready and reviewed_version_matches)
     bias_shadow_only = bool(
@@ -114,14 +118,50 @@ def assess_foxess_control_write_authority(
         )
 
     if control.desired_work_mode in {"Self Use", "Feed-in First"}:
+        if bias_shadow_only and grid_bias_force_discharge_kw is not None:
+            requested_bias_kw = max(float(grid_bias_force_discharge_kw), 0.0)
+            if cheap_period_confirmed:
+                return FoxESSControlDecision(
+                    backend_available=True,
+                    commands_permitted=True,
+                    action="self_use",
+                    reason="Cheap period suppresses live grid-bias Force Discharge",
+                    min_soc_on_grid_percent=min_soc,
+                )
+            if requested_bias_kw > GRID_BIAS_MAX_COMMAND_KW + 1e-9:
+                return blocked(
+                    "Grid-bias Force Discharge exceeds the Alpha9.62 100 W ceiling"
+                )
+            if requested_bias_kw > _EPSILON_KW:
+                return FoxESSControlDecision(
+                    backend_available=True,
+                    commands_permitted=True,
+                    action="grid_bias",
+                    reason=(
+                        "Bounded Alpha9.62 grid-import-prevention correction is "
+                        "inside the no-paid-export live scope"
+                    ),
+                    force_discharge_power_kw=round(requested_bias_kw, 3),
+                    min_soc_on_grid_percent=min_soc,
+                    grid_bias_shadow_only=False,
+                    grid_bias_live=True,
+                )
+            return FoxESSControlDecision(
+                backend_available=True,
+                commands_permitted=True,
+                action="self_use",
+                reason="Grid-bias target is satisfied; return to local Self Use",
+                min_soc_on_grid_percent=min_soc,
+            )
         return FoxESSControlDecision(
             backend_available=True,
             commands_permitted=True,
             action="self_use",
             reason=(
-                "No-paid-export Self Use is inside the Alpha9.56 scope"
+                "No-paid-export Self Use is inside the bounded live scope"
                 if not bias_shadow_only
-                else "Self Use permitted; 10 W grid bias remains Shadow-only"
+                else "Self Use permitted; grid bias remains Shadow-only without a "
+                "closed-loop live setpoint"
             ),
             min_soc_on_grid_percent=min_soc,
             grid_bias_shadow_only=bias_shadow_only,

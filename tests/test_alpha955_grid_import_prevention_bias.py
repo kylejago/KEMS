@@ -250,11 +250,12 @@ def test_alpha955_scope_is_retained_by_current_successor_release() -> None:
     bundle = json.loads(BUNDLE.read_text(encoding="utf-8"))
     reason = str(bundle["maintenance"]["reason"])
 
-    assert manifest["version"] == "0.9.0-alpha9.61"
-    assert reason.startswith("Alpha9.61")
+    assert manifest["version"] == "0.9.0-alpha9.62"
+    assert reason.startswith("Alpha9.62")
     assert (
         "Alpha9.55 adds an optional user-selected Grid import prevention bias" in reason
     )
     assert "Grid import prevention bias" in reason
-    assert "remains Shadow-only" in reason
-    assert "10 W bias remains Shadow-only" in reason
+    assert "Shadow-only modelling" in reason
+    assert "bounded live No paid export trial" in reason
+    assert "hard 100 W Force Discharge ceiling" in reason

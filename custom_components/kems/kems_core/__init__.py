@@ -28,6 +28,14 @@ from .forecast_validation import (
 )
 from .foxess import GridPower, calculate_battery_power_kw, normalise_grid_power
 from .gas import GasEngine
+from .grid_bias_closed_loop import (
+    GRID_BIAS_DEADBAND_W,
+    GRID_BIAS_MAX_ADJUSTMENT_W,
+    GRID_BIAS_MAX_COMMAND_KW,
+    GRID_BIAS_MAX_COMMAND_W,
+    GridBiasControlStep,
+    next_grid_bias_control_step,
+)
 from .learning import LearningEngine
 from .lifetime_accounting import (
     COMMISSIONED_VALUE_KEYS,
@@ -132,6 +140,11 @@ __all__ = [
     "FOXHOLE_PROPOSAL_PROFILE",
     "GasEngine",
     "GasSummary",
+    "GRID_BIAS_DEADBAND_W",
+    "GRID_BIAS_MAX_ADJUSTMENT_W",
+    "GRID_BIAS_MAX_COMMAND_KW",
+    "GRID_BIAS_MAX_COMMAND_W",
+    "GridBiasControlStep",
     "GridPower",
     "OPERATING_MODES",
     "KEMSData",
@@ -167,6 +180,7 @@ __all__ = [
     "configure_ev_charge_policy",
     "ev_policy_from_options",
     "normalise_grid_power",
+    "next_grid_bias_control_step",
     "run_preflight_suite",
     "period_value_keys",
     "period_value_kwargs",
