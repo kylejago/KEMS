@@ -475,11 +475,15 @@ class FoxESSControlBackend:
             "grid_import_prevention_bias": (
                 "live_engaged"
                 if self._grid_bias_engaged
-                else "shadow_only"
-                if decision.grid_bias_shadow_only
-                else "live_ready"
-                if control.grid_import_prevention_bias_active
-                else "inactive"
+                else (
+                    "shadow_only"
+                    if decision.grid_bias_shadow_only
+                    else (
+                        "live_ready"
+                        if control.grid_import_prevention_bias_active
+                        else "inactive"
+                    )
+                )
             ),
             "grid_import_prevention_observed_w": (
                 control.grid_import_prevention_observed_grid_power_w
