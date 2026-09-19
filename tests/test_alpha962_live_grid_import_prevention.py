@@ -91,6 +91,7 @@ def test_fixed_grid_bias_is_independent_of_observed_grid_flow() -> None:
     assert exporting.action == "grid_bias_force_discharge"
     assert exporting.force_discharge_power_kw == 1.331
 
+
 def test_grid_bias_cannot_bypass_control_or_export_safety_gates() -> None:
     assert (
         _decision(_control(), master_control_enabled=False).commands_permitted is False
