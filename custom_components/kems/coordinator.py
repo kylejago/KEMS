@@ -309,9 +309,16 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                 snapshot,
                 self.entities.configured_snapshot_fields(),
             )
-            control_simulation, shadow_simulation, _alignment = (
-                aligned_agile_control_views(simulation, agile_state)
-            )
+            if base_simulation.no_export_mode_active:
+                control_simulation = base_simulation
+                _, shadow_simulation, _alignment = aligned_agile_control_views(
+                    simulation,
+                    agile_state,
+                )
+            else:
+                control_simulation, shadow_simulation, _alignment = (
+                    aligned_agile_control_views(simulation, agile_state)
+                )
             control = self._control.plan(
                 snapshot,
                 control_simulation,
@@ -320,7 +327,7 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
             )
             control = align_agile_control_state(
                 control,
-                simulation,
+                control_simulation,
                 agile_state,
                 self.settings.control,
             )
