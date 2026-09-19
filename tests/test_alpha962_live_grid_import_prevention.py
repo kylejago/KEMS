@@ -140,7 +140,7 @@ def test_backend_write_surface_is_narrow_grid_bias_exception() -> None:
         not in source.split("async def async_update", 1)[1].split("payload = {", 1)[0]
     )
     assert '"blocked_except_bounded_grid_bias_trim"' in source
-    assert '"never_written_by_alpha9.63"' in source
+    assert '"never_written_by_alpha9.64"' in source
 
 
 def test_contract_keeps_economic_export_blocked() -> None:
@@ -162,8 +162,8 @@ def test_alpha962_release_identity_and_scope() -> None:
     )
     reason = str(bundle["maintenance"]["reason"])
 
-    assert manifest["version"] == "0.9.0-alpha9.63"
-    assert reason.startswith("Alpha9.63 closes the Alpha9.62 near-zero-grid trim loop")
+    assert manifest["version"] == "0.9.0-alpha9.64"
+    assert reason.startswith("Alpha9.64 adds a fast FoxESS grid-trim loop")
     assert "Alpha9.62 promotes the optional Grid import prevention bias" in reason
     assert "desired total KH7 AC output plus the configured tiny bias" in reason
     assert "at least 5 W import" in reason
