@@ -147,9 +147,7 @@ def test_every_explicit_control_gate_is_required() -> None:
     assert _decision(_control(plan_safe=False)).commands_permitted is False
 
 
-def test_backend_live_write_surface_keeps_force_discharge_narrow_and_export_limit_blocked() -> (
-    None
-):
+def test_backend_keeps_force_discharge_narrow_and_export_limit_blocked() -> None:
     source = BACKEND.read_text(encoding="utf-8")
 
     assert '"force_discharge_power",' in source
