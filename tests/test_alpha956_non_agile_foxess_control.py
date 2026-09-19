@@ -65,7 +65,7 @@ def test_self_use_is_live_but_grid_bias_remains_shadow_only() -> None:
     assert result.action == "self_use"
     assert result.min_soc_on_grid_percent == 15.0
     assert result.grid_bias_shadow_only is True
-    assert "grid-import prevention remains Shadow-only" in result.reason
+    assert "fixed 50 W grid-import-prevention bias" in result.reason
 
 
 def test_confirmed_cheap_force_charge_is_live() -> None:
@@ -158,11 +158,12 @@ def test_backend_live_write_surface_allows_only_bounded_bias_force_discharge() -
     assert 'decision.action == "grid_bias_force_discharge"' in source
     assert '_entity_id(entities, "export_power_limit")' not in source
     assert (
-        '"deliberate_force_discharge": "blocked_except_bounded_grid_bias_trim"'
-        in source
+        '"deliberate_force_discharge": "blocked_except_fixed_50w_grid_bias"' in source
     )
-    assert '"paid_or_agile_export_control": "blocked"' in source
-    assert '"export_power_limit_write": "never_written_by_alpha9.64"' in source
+    assert '"paid_or_agile_export_control"' in source
+    assert "blocked_in_current_release_but_higher_priority_than_fixed_bias" in source
+    assert '"export_power_limit_write": "never_written_by_alpha9.65"' in source
+    assert '"import_power_limit_write": "never_written_by_alpha9.65"' in source
 
 
 def test_backend_persists_and_restores_pre_kems_state() -> None:
@@ -208,9 +209,10 @@ def test_static_contract_is_bounded_not_general_write_authority() -> None:
 
     assert '"hardware_writes": "conditional_bounded_control"' in source
     assert '"maximum_allowed_stage": "control"' in source
-    assert "Force Discharge outside bounded grid-import prevention trim" in source
-    assert "bounded grid-import prevention trim" in source
+    assert "Force Discharge outside fixed 50 W anti-import bias" in source
+    assert "fixed 50 W anti-import bias" in source
     assert '"export-power-limit writes"' in source
+    assert '"import-power-limit writes"' in source
 
 
 def test_alpha956_release_identity_and_scope() -> None:

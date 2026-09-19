@@ -91,10 +91,11 @@ def test_v115_kh_contract_uses_direct_battery_power_and_bounded_control() -> Non
     assert snapshot["hardware_writes"] == "conditional_bounded_control"
     assert snapshot["maximum_allowed_stage"] == "control"
     assert (
-        "Force Discharge outside bounded grid-import prevention trim"
+        "Force Discharge outside fixed 50 W anti-import bias"
         in snapshot["blocked_live_capabilities"]
     )
     assert "export-power-limit writes" in snapshot["blocked_live_capabilities"]
+    assert "import-power-limit writes" in snapshot["blocked_live_capabilities"]
 
 
 def test_real_v115_kh_inventory_auto_maps_all_required_kems_sources() -> None:

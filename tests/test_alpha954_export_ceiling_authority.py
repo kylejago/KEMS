@@ -152,7 +152,7 @@ def test_shadow_clamps_to_lower_foxess_ceiling() -> None:
     assert result["real_hardware_writes"] == "blocked"
 
 
-def test_no_export_policy_still_proposes_zero_with_14_5_kw_foxess_ceiling() -> None:
+def test_no_export_policy_requires_no_export_limit_write_with_14_5_kw_ceiling() -> None:
     result = build_foxess_command_shadow(
         _export_control(5.744, allowed=False),
         observed={"work_mode": "Self Use", "export_power_limit_w": 14500.0},
@@ -161,7 +161,7 @@ def test_no_export_policy_still_proposes_zero_with_14_5_kw_foxess_ceiling() -> N
 
     proposed = result["proposed_foxess_command"]
     assert result["effective_export_limit_kw"] == 6.4
-    assert proposed["export_power_limit_w"] == 0
+    assert proposed["export_power_limit_w"] is None
     assert proposed["force_discharge_power_kw"] is None
     assert proposed["grid_export_allowed"] is False
     assert result["commands_permitted"] is False

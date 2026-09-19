@@ -163,7 +163,7 @@ def test_shadow_parity_wording_is_release_neutral_and_writes_remain_blocked() ->
     assert "Alpha8.79" not in result["parity_reason"]
     assert "hardware control remains disabled" in result["parity_reason"]
     proposed = result["proposed_foxess_command"]
-    assert proposed["export_power_limit_w"] == 0
+    assert proposed["export_power_limit_w"] is None
     assert proposed["force_discharge_power_kw"] is None
     assert proposed["discharge_enabled"] is False
     assert result["commands_permitted"] is False
@@ -190,6 +190,6 @@ def test_island_shadow_wording_is_release_neutral_and_fails_closed() -> None:
     assert result["translation_status"] == WAIT
     assert "Alpha8.79" not in result["translation_reason"]
     assert "will not guess" in result["translation_reason"]
-    assert result["proposed_foxess_command"]["export_power_limit_w"] == 0
+    assert result["proposed_foxess_command"]["export_power_limit_w"] is None
     assert result["commands_permitted"] is False
     assert result["real_hardware_writes"] == "blocked"

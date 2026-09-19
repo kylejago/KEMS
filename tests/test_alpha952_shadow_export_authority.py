@@ -117,7 +117,7 @@ def test_counterfactual_export_cannot_leak_into_physical_control_state() -> None
     shadow = build_foxess_command_shadow(physical, export_limit_kw=6.4)
     proposed = shadow["proposed_foxess_command"]
     assert shadow["configured_export_limit_kw"] == 6.4
-    assert proposed["export_power_limit_w"] == 0
+    assert proposed["export_power_limit_w"] is None
     assert proposed["force_discharge_power_kw"] is None
     assert proposed["discharge_enabled"] is False
     assert proposed["grid_export_allowed"] is False
@@ -214,7 +214,7 @@ def test_contradictory_no_export_state_fails_closed_before_force_discharge() -> 
     assert result["translation_status"] == WAIT
     assert "grid export is disabled" in result["translation_reason"]
     assert result["configured_export_limit_kw"] == 6.4
-    assert proposed["export_power_limit_w"] == 0
+    assert proposed["export_power_limit_w"] is None
     assert proposed["work_mode"] is None
     assert proposed["force_discharge_power_kw"] is None
     assert proposed["discharge_enabled"] is False
