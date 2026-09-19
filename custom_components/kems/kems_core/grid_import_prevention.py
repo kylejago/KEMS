@@ -24,7 +24,6 @@ def apply_grid_import_prevention_bias(
     deliberate/economic export request, so future Agile export authority
     supersedes it rather than stacking with it.
     """
-    configured_w = FIXED_GRID_BIAS_W
     bias_kw = FIXED_GRID_BIAS_KW
     target_grid_w = -FIXED_GRID_BIAS_W
     grid_import_kw = max(float(snapshot.grid_import_kw or 0.0), 0.0)
