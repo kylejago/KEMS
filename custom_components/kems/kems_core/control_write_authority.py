@@ -4,7 +4,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from .grid_import_prevention import grid_bias_required_correction_kw
+from .grid_import_prevention import (
+    GRID_BIAS_MAX_CORRECTION_KW,
+    grid_bias_required_correction_kw,
+)
 from .models import ControlState
 
 _EPSILON_KW = 0.001
@@ -47,6 +50,8 @@ def assess_foxess_control_write_authority(
     grid_bias_engaged: bool = False,
     grid_bias_previous_correction_kw: float = 0.0,
     inverter_limit_kw: float = 7.0,
+    max_discharge_kw: float = 7.0,
+    export_limit_kw: float = 7.0,
 ) -> FoxESSControlDecision:
     """Return the narrow non-Agile hardware action.
 
@@ -146,7 +151,10 @@ def assess_foxess_control_write_authority(
                         target_grid_w,
                     )
                     previous_correction_kw = (
-                        max(float(grid_bias_previous_correction_kw), 0.0)
+                        min(
+                            max(float(grid_bias_previous_correction_kw), 0.0),
+                            GRID_BIAS_MAX_CORRECTION_KW,
+                        )
                         if grid_bias_engaged
                         else 0.0
                     )
@@ -167,11 +175,24 @@ def assess_foxess_control_write_authority(
                         )
 
                     base_output_kw = max(float(control.total_kh7_ac_output_kw), 0.0)
-                    total_output_kw = min(
-                        base_output_kw + applied_correction_kw,
-                        max(float(inverter_limit_kw), 0.0),
+                    discharge_headroom_kw = max(
+                        float(max_discharge_kw)
+                        - max(float(control.desired_total_discharge_power_kw), 0.0),
+                        0.0,
                     )
-                    actual_correction_kw = max(total_output_kw - base_output_kw, 0.0)
+                    inverter_headroom_kw = max(
+                        float(inverter_limit_kw) - base_output_kw,
+                        0.0,
+                    )
+                    applied_correction_kw = min(
+                        applied_correction_kw,
+                        discharge_headroom_kw,
+                        inverter_headroom_kw,
+                        max(float(export_limit_kw), 0.0),
+                        GRID_BIAS_MAX_CORRECTION_KW,
+                    )
+                    total_output_kw = base_output_kw + applied_correction_kw
+                    actual_correction_kw = applied_correction_kw
                     if total_output_kw > _EPSILON_KW:
                         return FoxESSControlDecision(
                             backend_available=True,
