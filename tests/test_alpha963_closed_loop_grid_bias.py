@@ -146,7 +146,7 @@ def test_backend_exposes_controller_proof_without_export_limit_writes() -> None:
     assert "grid_import_prevention_applied_correction_kw" in source
     assert "grid_import_prevention_controller_correction_kw" in source
     assert "grid_import_prevention_max_step_kw" in source
-    assert '"export_power_limit_write": "never_written_by_alpha9.63"' in source
+    assert '"export_power_limit_write": "never_written_by_alpha9.64"' in source
     assert '_entity_id(entities, "export_power_limit")' not in source
 
 
@@ -155,8 +155,8 @@ def test_alpha963_release_identity_and_scope() -> None:
     bundle = json.loads(BUNDLE.read_text(encoding="utf-8"))
     reason = str(bundle["maintenance"]["reason"])
 
-    assert manifest["version"] == "0.9.0-alpha9.63"
-    assert reason.startswith("Alpha9.63 closes the Alpha9.62 near-zero-grid trim loop")
+    assert manifest["version"] == "0.9.0-alpha9.64"
+    assert reason.startswith("Alpha9.64 adds a fast FoxESS grid-trim loop")
     assert "correction = observed grid power - target grid power" in reason
     assert "capped at 100 W" in reason
     assert "rate-limited to 50 W per control scan" in reason
