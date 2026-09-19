@@ -1,14 +1,17 @@
-"""Pure authority gate for bounded FoxESS control, including Alpha9.62 grid trim."""
+"""Pure authority gate for bounded FoxESS control, including Alpha9.63 grid trim."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 
+from .grid_import_prevention import grid_bias_required_correction_kw
 from .models import ControlState
 
 _EPSILON_KW = 0.001
 _GRID_BIAS_ENTER_IMPORT_W = 5.0
 _GRID_BIAS_EXIT_EXPORT_W = -50.0
+_GRID_BIAS_ERROR_DEADBAND_W = 5.0
+_GRID_BIAS_MAX_STEP_KW = 0.050
 
 
 @dataclass(frozen=True, slots=True)
@@ -24,6 +27,9 @@ class FoxESSControlDecision:
     min_soc_on_grid_percent: float | None = None
     grid_bias_live: bool = False
     grid_bias_shadow_only: bool = False
+    grid_bias_error_w: float | None = None
+    grid_bias_requested_correction_kw: float = 0.0
+    grid_bias_applied_correction_kw: float = 0.0
 
 
 def assess_foxess_control_write_authority(
@@ -39,20 +45,20 @@ def assess_foxess_control_write_authority(
     emergency_stop: bool,
     grid_bias_force_discharge_ready: bool = False,
     grid_bias_engaged: bool = False,
+    grid_bias_previous_correction_kw: float = 0.0,
     inverter_limit_kw: float = 7.0,
 ) -> FoxESSControlDecision:
     """Return the narrow non-Agile hardware action.
 
-    Alpha9.62 adds one tightly bounded use of Force Discharge for the optional
-    near-zero grid-import trim. It remains separate from deliberate/economic
-    export: the remote active-power target follows KEMS total desired KH7 AC
-    output plus only the configured tiny bias, with hysteresis deciding whether
-    remote trim should be engaged.
+    Alpha9.63 retains the tightly bounded Force Discharge exception for the
+    optional near-zero grid-import trim, but closes the loop on measured grid
+    power. The correction follows observed minus target grid power, is clamped
+    by planner headroom, rate-limited here and held through a small deadband.
     """
     backend_available = bool(binding_ready and reviewed_version_matches)
     bias_shadow_only = bool(
         control.grid_import_prevention_bias_active
-        and control.desired_grid_bias_export_power_kw > _EPSILON_KW
+        and control.grid_import_prevention_bias_w > 0.0
     )
 
     def blocked(reason: str, *, action: str = "release") -> FoxESSControlDecision:
@@ -131,27 +137,63 @@ def assess_foxess_control_write_authority(
                     else float(observed_grid_w) >= _GRID_BIAS_ENTER_IMPORT_W
                 )
                 if should_engage:
-                    bias_kw = max(
-                        float(control.desired_grid_bias_export_power_kw),
-                        0.0,
+                    target_grid_w = float(
+                        control.grid_import_prevention_target_grid_power_w
                     )
+                    error_w = float(observed_grid_w) - target_grid_w
+                    requested_correction_kw = grid_bias_required_correction_kw(
+                        float(observed_grid_w),
+                        target_grid_w,
+                    )
+                    previous_correction_kw = (
+                        max(float(grid_bias_previous_correction_kw), 0.0)
+                        if grid_bias_engaged
+                        else 0.0
+                    )
+                    if (
+                        grid_bias_engaged
+                        and abs(error_w) <= _GRID_BIAS_ERROR_DEADBAND_W
+                    ):
+                        applied_correction_kw = previous_correction_kw
+                    else:
+                        lower = max(
+                            previous_correction_kw - _GRID_BIAS_MAX_STEP_KW,
+                            0.0,
+                        )
+                        upper = previous_correction_kw + _GRID_BIAS_MAX_STEP_KW
+                        applied_correction_kw = min(
+                            max(requested_correction_kw, lower),
+                            upper,
+                        )
+
+                    base_output_kw = max(float(control.total_kh7_ac_output_kw), 0.0)
                     total_output_kw = min(
-                        max(float(control.total_kh7_ac_output_kw), 0.0) + bias_kw,
+                        base_output_kw + applied_correction_kw,
                         max(float(inverter_limit_kw), 0.0),
                     )
+                    actual_correction_kw = max(total_output_kw - base_output_kw, 0.0)
                     if total_output_kw > _EPSILON_KW:
                         return FoxESSControlDecision(
                             backend_available=True,
                             commands_permitted=True,
                             action="grid_bias_force_discharge",
                             reason=(
-                                "Bounded live grid-import prevention trim is active; "
-                                "economic export authority remains disabled"
+                                "Bounded closed-loop grid-import prevention trim is "
+                                "active; economic export authority remains disabled"
                             ),
                             force_discharge_power_kw=round(total_output_kw, 3),
                             min_soc_on_grid_percent=min_soc,
                             grid_bias_live=True,
                             grid_bias_shadow_only=False,
+                            grid_bias_error_w=round(error_w, 1),
+                            grid_bias_requested_correction_kw=round(
+                                requested_correction_kw,
+                                3,
+                            ),
+                            grid_bias_applied_correction_kw=round(
+                                actual_correction_kw,
+                                3,
+                            ),
                         )
                 return FoxESSControlDecision(
                     backend_available=True,
