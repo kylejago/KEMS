@@ -194,7 +194,9 @@ def test_cheap_period_suppresses_live_force_discharge_bias() -> None:
     assert "Cheap period suppresses" in decision.reason
 
 
-def test_backend_never_inherits_dormant_force_discharge_number_and_sets_power_first() -> None:
+def test_backend_never_inherits_dormant_force_discharge_number_and_sets_power_first() -> (
+    None
+):
     source = BACKEND.read_text(encoding="utf-8")
 
     assert "grid_bias_force_discharge_kw" in source
@@ -232,7 +234,9 @@ def test_alpha962_release_identity_and_safety_scope() -> None:
     reason = str(bundle["maintenance"]["reason"])
 
     assert manifest["version"] == "0.9.0-alpha9.62"
-    assert reason.startswith("Alpha9.62 advances the existing Grid import prevention bias")
+    assert reason.startswith(
+        "Alpha9.62 advances the existing Grid import prevention bias"
+    )
     assert "10 W in the commissioning evidence" in reason
     assert "5 W deadband" in reason
     assert "25 W change per coordinator scan" in reason

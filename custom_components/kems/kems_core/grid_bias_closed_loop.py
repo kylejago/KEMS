@@ -162,9 +162,11 @@ def next_grid_bias_control_step(
         reason=(
             "increase_bounded_grid_bias"
             if next_w > previous_w
-            else "decrease_bounded_grid_bias"
-            if next_w < previous_w
-            else "grid_bias_saturated"
+            else (
+                "decrease_bounded_grid_bias"
+                if next_w < previous_w
+                else "grid_bias_saturated"
+            )
         ),
         observed_grid_power_w=round(observed_w, 1),
         target_grid_power_w=round(target_w, 1),
