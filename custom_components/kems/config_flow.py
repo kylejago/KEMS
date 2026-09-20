@@ -243,20 +243,12 @@ MANUAL_TARIFF_FIELDS = {
 SCHEDULED_TARIFF_FIELDS = {
     vol.Optional(CONF_TARIFF_CHANGE_1_DATE): DateSelector(),
     vol.Required(CONF_TARIFF_CHANGE_1_DAY_RATE): _number(0, 200, "any", "p/kWh"),
-    vol.Required(CONF_TARIFF_CHANGE_1_OFFPEAK_RATE): _number(
-        0, 200, "any", "p/kWh"
-    ),
-    vol.Required(CONF_TARIFF_CHANGE_1_STANDING_CHARGE): _number(
-        0, 500, "any", "p/day"
-    ),
+    vol.Required(CONF_TARIFF_CHANGE_1_OFFPEAK_RATE): _number(0, 200, "any", "p/kWh"),
+    vol.Required(CONF_TARIFF_CHANGE_1_STANDING_CHARGE): _number(0, 500, "any", "p/day"),
     vol.Optional(CONF_TARIFF_CHANGE_2_DATE): DateSelector(),
     vol.Required(CONF_TARIFF_CHANGE_2_DAY_RATE): _number(0, 200, "any", "p/kWh"),
-    vol.Required(CONF_TARIFF_CHANGE_2_OFFPEAK_RATE): _number(
-        0, 200, "any", "p/kWh"
-    ),
-    vol.Required(CONF_TARIFF_CHANGE_2_STANDING_CHARGE): _number(
-        0, 500, "any", "p/day"
-    ),
+    vol.Required(CONF_TARIFF_CHANGE_2_OFFPEAK_RATE): _number(0, 200, "any", "p/kWh"),
+    vol.Required(CONF_TARIFF_CHANGE_2_STANDING_CHARGE): _number(0, 500, "any", "p/day"),
 }
 
 TARIFF_SCHEMA = vol.Schema(
