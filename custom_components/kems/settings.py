@@ -63,13 +63,21 @@ from .const import (
     CONF_SYSTEM_COMMISSIONED,
     CONF_SYSTEM_COST,
     CONF_SYSTEM_TYPE,
+    CONF_TARIFF_CHANGE_1_DATE,
+    CONF_TARIFF_CHANGE_1_DAY_RATE,
+    CONF_TARIFF_CHANGE_1_OFFPEAK_RATE,
+    CONF_TARIFF_CHANGE_1_STANDING_CHARGE,
+    CONF_TARIFF_CHANGE_2_DATE,
+    CONF_TARIFF_CHANGE_2_DAY_RATE,
+    CONF_TARIFF_CHANGE_2_OFFPEAK_RATE,
+    CONF_TARIFF_CHANGE_2_STANDING_CHARGE,
     CONF_TARIFF_MODE,
     CONF_VIRTUAL_SCENARIO,
     DEFAULT_OPTIONS,
 )
 from .kems_core import ControlConfig, ForecastConfig, ROIConfig, SimulationConfig
 from .product_types import effective_operating_mode, normalise_system_type
-from .tariff import TariffSettings, parse_time
+from .tariff import ScheduledTariffChange, TariffSettings, parse_time
 
 
 @dataclass(frozen=True, slots=True)
@@ -122,6 +130,26 @@ class KEMSSettings:
                 ),
                 # Intelligent extra slots remain opt-in and fail closed by default.
                 intelligent_slots_enabled=bool(values[CONF_INTELLIGENT_SLOTS_ENABLED]),
+                scheduled_changes=tuple(
+                    change
+                    for change in (
+                        _scheduled_tariff_change(
+                            values,
+                            CONF_TARIFF_CHANGE_1_DATE,
+                            CONF_TARIFF_CHANGE_1_DAY_RATE,
+                            CONF_TARIFF_CHANGE_1_OFFPEAK_RATE,
+                            CONF_TARIFF_CHANGE_1_STANDING_CHARGE,
+                        ),
+                        _scheduled_tariff_change(
+                            values,
+                            CONF_TARIFF_CHANGE_2_DATE,
+                            CONF_TARIFF_CHANGE_2_DAY_RATE,
+                            CONF_TARIFF_CHANGE_2_OFFPEAK_RATE,
+                            CONF_TARIFF_CHANGE_2_STANDING_CHARGE,
+                        ),
+                    )
+                    if change is not None
+                ),
             ),
             simulation=SimulationConfig(
                 battery_capacity_kwh=float(values[CONF_BATTERY_CAPACITY]),
@@ -254,6 +282,25 @@ class KEMSSettings:
                 ),
             ),
         )
+
+
+def _scheduled_tariff_change(
+    values: Mapping[str, Any],
+    date_key: str,
+    day_rate_key: str,
+    offpeak_rate_key: str,
+    standing_charge_key: str,
+) -> ScheduledTariffChange | None:
+    """Build one optional scheduled tariff fallback from config-entry options."""
+    effective_from = _parse_date(values.get(date_key))
+    if effective_from is None:
+        return None
+    return ScheduledTariffChange(
+        effective_from=effective_from,
+        day_rate_pence=max(float(values[day_rate_key]), 0.0),
+        offpeak_rate_pence=max(float(values[offpeak_rate_key]), 0.0),
+        standing_charge_pence=max(float(values[standing_charge_key]), 0.0),
+    )
 
 
 def _parse_date(value: Any) -> date | None:

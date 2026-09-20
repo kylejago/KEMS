@@ -86,6 +86,14 @@ CONF_MANUAL_OFFPEAK_RATE = "manual_offpeak_rate_pence"
 CONF_MANUAL_STANDING_CHARGE = "manual_standing_charge_pence"
 CONF_MANUAL_OFFPEAK_START = "manual_offpeak_start"
 CONF_MANUAL_OFFPEAK_END = "manual_offpeak_end"
+CONF_TARIFF_CHANGE_1_DATE = "tariff_change_1_effective_date"
+CONF_TARIFF_CHANGE_1_DAY_RATE = "tariff_change_1_day_rate_pence"
+CONF_TARIFF_CHANGE_1_OFFPEAK_RATE = "tariff_change_1_offpeak_rate_pence"
+CONF_TARIFF_CHANGE_1_STANDING_CHARGE = "tariff_change_1_standing_charge_pence"
+CONF_TARIFF_CHANGE_2_DATE = "tariff_change_2_effective_date"
+CONF_TARIFF_CHANGE_2_DAY_RATE = "tariff_change_2_day_rate_pence"
+CONF_TARIFF_CHANGE_2_OFFPEAK_RATE = "tariff_change_2_offpeak_rate_pence"
+CONF_TARIFF_CHANGE_2_STANDING_CHARGE = "tariff_change_2_standing_charge_pence"
 # Opt-in Intelligent extra-slot authority; omitted legacy entries remain disabled.
 CONF_INTELLIGENT_SLOTS_ENABLED = "intelligent_slots_enabled"
 
@@ -162,6 +170,18 @@ DEFAULT_OPTIONS = {
     CONF_MANUAL_STANDING_CHARGE: 53.70435,
     CONF_MANUAL_OFFPEAK_START: "23:30:00",
     CONF_MANUAL_OFFPEAK_END: "05:30:00",
+    # 1 Oct 2026: UK domestic electricity VAT moves from 5% to 0%. These
+    # fallback values are the current tariff with only the VAT removed.
+    CONF_TARIFF_CHANGE_1_DATE: "2026-10-01",
+    CONF_TARIFF_CHANGE_1_DAY_RATE: 26.9558095238,
+    CONF_TARIFF_CHANGE_1_OFFPEAK_RATE: 3.326952381,
+    CONF_TARIFF_CHANGE_1_STANDING_CHARGE: 51.147,
+    # 4 Oct 2026: renewed Intelligent tariff quoted by Octopus. Automatic
+    # live Octopus entities remain authoritative; these are scheduled fallbacks.
+    CONF_TARIFF_CHANGE_2_DATE: "2026-10-04",
+    CONF_TARIFF_CHANGE_2_DAY_RATE: 37.17,
+    CONF_TARIFF_CHANGE_2_OFFPEAK_RATE: 8.0,
+    CONF_TARIFF_CHANGE_2_STANDING_CHARGE: 55.52,
     CONF_INTELLIGENT_SLOTS_ENABLED: False,
     CONF_HAPPY_HOUR_OHME_CONTROL_ENABLED: False,
     CONF_SCAN_INTERVAL: DEFAULT_SCAN_INTERVAL_SECONDS,

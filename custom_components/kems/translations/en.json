@@ -211,7 +211,7 @@
       },
       "tariff": {
         "title": "Tariff and prices",
-        "description": "Use automatic pricing from Home Assistant or enter a tariff manually. Automatic mode keeps the manual values as a safe fallback.",
+        "description": "Use automatic pricing from Home Assistant or enter a tariff manually. Automatic mode keeps date-aware manual values as safe fallbacks; scheduled changes do not take effect before their dates.",
         "data": {
           "tariff_mode": "Tariff source",
           "manual_day_rate_pence": "Day rate",
@@ -221,7 +221,15 @@
           "manual_offpeak_start": "Off-peak starts",
           "manual_offpeak_end": "Off-peak ends",
           "intelligent_slots_enabled": "Use confirmed Intelligent extra slots",
-          "export_tariff_status": "Export tariff status"
+          "export_tariff_status": "Export tariff status",
+          "tariff_change_1_effective_date": "Scheduled tariff change 1 date",
+          "tariff_change_1_day_rate_pence": "Change 1 day rate",
+          "tariff_change_1_offpeak_rate_pence": "Change 1 off-peak rate",
+          "tariff_change_1_standing_charge_pence": "Change 1 standing charge",
+          "tariff_change_2_effective_date": "Scheduled tariff change 2 date",
+          "tariff_change_2_day_rate_pence": "Change 2 day rate",
+          "tariff_change_2_offpeak_rate_pence": "Change 2 off-peak rate",
+          "tariff_change_2_standing_charge_pence": "Change 2 standing charge"
         },
         "data_description": {
           "tariff_mode": "Automatic follows configured Home Assistant tariff entities. When a live value is unavailable, KEMS uses the manual fallback values below. Manual always uses the values below.",
@@ -232,7 +240,15 @@
           "manual_offpeak_start": "Start of the normal cheap period in local Home Assistant time.",
           "manual_offpeak_end": "End of the normal cheap period. Overnight periods are supported.",
           "intelligent_slots_enabled": "Allow a live Intelligent slot plus active EV charging to confirm an extra cheap period.",
-          "export_tariff_status": "Not active switches KEMS to no-paid-export self-use planning: economic battery export is disabled and valued at 0p."
+          "export_tariff_status": "Not active switches KEMS to no-paid-export self-use planning: economic battery export is disabled and valued at 0p.",
+          "tariff_change_1_effective_date": "Optional local date when the first staged fallback becomes active. Before this date KEMS keeps the current fallback unchanged.",
+          "tariff_change_1_day_rate_pence": "Fallback day rate from change 1 onward. Automatic mode still prefers live Octopus prices.",
+          "tariff_change_1_offpeak_rate_pence": "Fallback cheap rate from change 1 onward and the expected cheap rate used to corroborate Intelligent extra slots.",
+          "tariff_change_1_standing_charge_pence": "Fallback daily standing charge from change 1 onward.",
+          "tariff_change_2_effective_date": "Optional local date when the second staged fallback replaces change 1.",
+          "tariff_change_2_day_rate_pence": "Fallback day rate from change 2 onward. Automatic mode still prefers live Octopus prices.",
+          "tariff_change_2_offpeak_rate_pence": "Fallback cheap rate from change 2 onward and the expected cheap rate used to corroborate Intelligent extra slots.",
+          "tariff_change_2_standing_charge_pence": "Fallback daily standing charge from change 2 onward."
         }
       },
       "battery": {

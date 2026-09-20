@@ -1,3 +1,13 @@
+## 0.9.0-alpha9.68 — scheduled tariff renewal
+
+- Added two effective-dated electricity tariff fallback changes while keeping live Octopus/Home Assistant values authoritative in Automatic mode.
+- Kept the current fallback unchanged through 30 September 2026.
+- From 1 October 2026, removes the former 5% VAT from the existing tariff fallback: 26.9558095238p day, 3.326952381p off-peak and 51.147p/day standing charge.
+- From 4 October 2026, switches the fallback to the renewed tariff: 37.17p day, 8.00p off-peak and 55.52p/day standing charge.
+- Intelligent extra-slot price corroboration now uses the effective cheap rate for the current date, so the 4 October renewal cannot be rejected for still expecting the old 3.4933p rate.
+- Added editable dates/rates on the Tariff and prices options page. Clearing an effective date disables that scheduled change.
+- Scheduled values do not override available live Octopus rates.
+
 ## 0.9.0-alpha9.67 — physical cheap-charge authority
 
 - Made fresh physical battery SOC authoritative for no-paid-export cheap-period charging.
