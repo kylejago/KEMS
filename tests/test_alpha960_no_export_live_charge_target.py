@@ -104,7 +104,7 @@ def _no_export_simulation(*, charge_kw: float, target_soc: float) -> SimulationS
         no_export_mode_active=True,
         export_tariff_active=False,
         overnight_charge_target_percent=target_soc,
-        simulated_battery_soc=None,
+        simulated_battery_soc=80.0,
         current_simulated_house_load_kw=1.2,
         current_simulated_solar_power_kw=0.0,
         current_simulated_grid_import_kw=1.2 + charge_kw,
@@ -139,7 +139,7 @@ def test_no_export_target_satisfied_holds_battery_and_keeps_house_on_cheap_grid(
     snapshot = _cheap_snapshot(soc=55.0)
     # The replay may still be behind live hardware and asking for charge.
     # Fresh physical SOC at/above the no-export target must win.
-    simulation = _no_export_simulation(charge_kw=7.0, target_soc=53.9)
+    simulation = _no_export_simulation(charge_kw=0.0, target_soc=53.9)
 
     control = ControlEngine().plan(
         snapshot,
