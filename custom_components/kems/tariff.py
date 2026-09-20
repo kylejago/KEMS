@@ -106,6 +106,41 @@ def effective_tariff_rates(
     )
 
 
+def _next_fallback_rate(
+    settings: TariffSettings,
+    now: datetime,
+    *,
+    schedule_offpeak: bool,
+    next_start: datetime,
+    active_end: datetime,
+    effective: EffectiveTariffRates,
+) -> float:
+    """Return the next fallback rate across schedule and effective-date boundaries."""
+    next_normal_boundary = active_end if schedule_offpeak else next_start
+    candidates = [next_normal_boundary]
+    if effective.next_change is not None:
+        change_at = datetime.combine(
+            effective.next_change.effective_from,
+            time.min,
+            tzinfo=now.tzinfo,
+        )
+        if change_at > now:
+            candidates.append(change_at)
+
+    next_event = min(candidates)
+    next_rates = effective_tariff_rates(settings, next_event)
+    next_is_offpeak, _, _ = manual_schedule(
+        next_event,
+        settings.offpeak_start,
+        settings.offpeak_end,
+    )
+    return (
+        next_rates.offpeak_rate_pence
+        if next_is_offpeak
+        else next_rates.day_rate_pence
+    )
+
+
 def manual_schedule(
     now: datetime,
     start: time,
@@ -311,8 +346,13 @@ def resolve_tariff(
     manual_current_rate = (
         effective.offpeak_rate_pence if schedule_offpeak else effective.day_rate_pence
     )
-    manual_next_rate = (
-        effective.day_rate_pence if schedule_offpeak else effective.offpeak_rate_pence
+    manual_next_rate = _next_fallback_rate(
+        settings,
+        now,
+        schedule_offpeak=schedule_offpeak,
+        next_start=manual_next_start,
+        active_end=manual_end,
+        effective=effective,
     )
 
     if settings.mode == "manual":
