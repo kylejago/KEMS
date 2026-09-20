@@ -346,3 +346,45 @@ def test_intelligent_extra_slot_uses_effective_renewed_cheap_rate() -> None:
         result.intelligent_slot_evidence["effective_fallback_offpeak_rate_pence"]
         == 8.0
     )
+
+
+def test_next_fallback_rate_switches_at_vat_midnight_inside_cheap_window() -> None:
+    """The 1 Oct rate change occurs at midnight even though cheap continues."""
+    result = resolve_tariff(
+        settings=_renewal_settings(),
+        now=datetime(2026, 9, 30, 23, 45, tzinfo=LONDON),
+        live_current_import_rate=None,
+        live_next_import_rate=None,
+        live_current_export_rate=None,
+        live_standing_charge=None,
+        live_off_peak=True,
+        live_intelligent_slot=False,
+        live_next_offpeak_start=None,
+        live_offpeak_end=None,
+        ev_charging=False,
+        fallback_export_rate=0.0,
+    )
+
+    assert result.current_import_rate == 3.4933
+    assert result.next_import_rate == 3.326952381
+
+
+def test_next_fallback_rate_switches_at_renewal_midnight_inside_cheap_window() -> None:
+    """The 4 Oct renewal replaces the cheap rate at midnight, not 05:30."""
+    result = resolve_tariff(
+        settings=_renewal_settings(),
+        now=datetime(2026, 10, 3, 23, 45, tzinfo=LONDON),
+        live_current_import_rate=None,
+        live_next_import_rate=None,
+        live_current_export_rate=None,
+        live_standing_charge=None,
+        live_off_peak=True,
+        live_intelligent_slot=False,
+        live_next_offpeak_start=None,
+        live_offpeak_end=None,
+        ev_charging=False,
+        fallback_export_rate=0.0,
+    )
+
+    assert result.current_import_rate == 3.326952381
+    assert result.next_import_rate == 8.0
