@@ -647,6 +647,9 @@ class KEMSOptionsFlow(OptionsFlowWithReload):
         values = {**DEFAULT_OPTIONS, **dict(self.config_entry.options)}
         if not values.get(CONF_COMMISSIONING_DATE):
             values.pop(CONF_COMMISSIONING_DATE, None)
+        for key in (CONF_TARIFF_CHANGE_1_DATE, CONF_TARIFF_CHANGE_2_DATE):
+            if not values.get(key):
+                values.pop(key, None)
         # Shadow remains an engineering mode but is intentionally not a user
         # choice. Existing shadow installs show as Simulate in the normal UI.
         if values.get(CONF_OPERATING_MODE) == "shadow":
@@ -677,9 +680,13 @@ class KEMSOptionsFlow(OptionsFlowWithReload):
         )
 
     async def async_step_tariff(self, user_input: dict[str, Any] | None = None):
-        """Configure import/export prices and cheap-period times."""
+        """Configure import/export prices, cheap-period times and dated changes."""
         if user_input is not None:
-            return self._save_options(user_input)
+            cleaned = dict(user_input)
+            for key in (CONF_TARIFF_CHANGE_1_DATE, CONF_TARIFF_CHANGE_2_DATE):
+                if key not in cleaned:
+                    cleaned[key] = ""
+            return self._save_options(cleaned)
         return self._show_category("tariff", TARIFF_SCHEMA)
 
     async def async_step_battery(self, user_input: dict[str, Any] | None = None):
