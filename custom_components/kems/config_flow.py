@@ -99,6 +99,14 @@ from .const import (
     CONF_STALE_DATA_SECONDS,
     CONF_SYSTEM_COST,
     CONF_SYSTEM_TYPE,
+    CONF_TARIFF_CHANGE_1_DATE,
+    CONF_TARIFF_CHANGE_1_DAY_RATE,
+    CONF_TARIFF_CHANGE_1_OFFPEAK_RATE,
+    CONF_TARIFF_CHANGE_1_STANDING_CHARGE,
+    CONF_TARIFF_CHANGE_2_DATE,
+    CONF_TARIFF_CHANGE_2_DAY_RATE,
+    CONF_TARIFF_CHANGE_2_OFFPEAK_RATE,
+    CONF_TARIFF_CHANGE_2_STANDING_CHARGE,
     CONF_TARIFF_MODE,
     DEFAULT_OPTIONS,
     DOMAIN,
@@ -232,10 +240,30 @@ MANUAL_TARIFF_FIELDS = {
     vol.Required(CONF_MANUAL_OFFPEAK_START): TIME_SELECTOR,
     vol.Required(CONF_MANUAL_OFFPEAK_END): TIME_SELECTOR,
 }
+SCHEDULED_TARIFF_FIELDS = {
+    vol.Optional(CONF_TARIFF_CHANGE_1_DATE): DateSelector(),
+    vol.Required(CONF_TARIFF_CHANGE_1_DAY_RATE): _number(0, 200, "any", "p/kWh"),
+    vol.Required(CONF_TARIFF_CHANGE_1_OFFPEAK_RATE): _number(
+        0, 200, "any", "p/kWh"
+    ),
+    vol.Required(CONF_TARIFF_CHANGE_1_STANDING_CHARGE): _number(
+        0, 500, "any", "p/day"
+    ),
+    vol.Optional(CONF_TARIFF_CHANGE_2_DATE): DateSelector(),
+    vol.Required(CONF_TARIFF_CHANGE_2_DAY_RATE): _number(0, 200, "any", "p/kWh"),
+    vol.Required(CONF_TARIFF_CHANGE_2_OFFPEAK_RATE): _number(
+        0, 200, "any", "p/kWh"
+    ),
+    vol.Required(CONF_TARIFF_CHANGE_2_STANDING_CHARGE): _number(
+        0, 500, "any", "p/day"
+    ),
+}
+
 TARIFF_SCHEMA = vol.Schema(
     {
         vol.Required(CONF_TARIFF_MODE): TARIFF_MODE_SELECTOR,
         **MANUAL_TARIFF_FIELDS,
+        **SCHEDULED_TARIFF_FIELDS,
     }
 )
 MANUAL_TARIFF_SCHEMA = vol.Schema(MANUAL_TARIFF_FIELDS)
