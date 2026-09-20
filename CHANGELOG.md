@@ -1,3 +1,13 @@
+## 0.9.0-alpha9.67 — physical cheap-charge authority
+
+- Made fresh physical battery SOC authoritative for no-paid-export cheap-period charging.
+- Kept the solar-aware no-export target forecast-derived, but removed simulated SOC / simulated charge power from the real charge/no-charge decision.
+- When physical SOC is below target, KEMS requests Force Charge up to the configured maximum while respecting available site-import headroom.
+- When physical SOC reaches the target, KEMS returns to Self Use and holds with Min SoC-on-grid.
+- If physical SOC or the no-export target is unavailable, KEMS does not authorise battery charging.
+- Kept Intelligent-slot confirmation, commissioning, ownership/restoration, stale-data, island/EPS and emergency-stop gates unchanged.
+- Deliberate/economic Force Discharge, Agile/paid-export control, Import Power Limit writes and Export Power Limit writes remain blocked.
+
 ## 0.9.0-alpha9.66 — remove daytime anti-import Force Discharge
 
 - Removed the fixed 50 W daytime anti-import bias and all earlier grid-trim/feedback variants from the current control architecture.
