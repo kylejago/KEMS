@@ -247,9 +247,11 @@ class ControlEngine:
                     and "battery_soc" not in snapshot.stale_fields
                     else None
                 )
-                if target_soc is None or observed_soc is None:
-                    requested_charge = 0.0
-                elif observed_soc + 1e-6 >= target_soc:
+                if (
+                    target_soc is None
+                    or observed_soc is None
+                    or observed_soc + 1e-6 >= target_soc
+                ):
                     requested_charge = 0.0
             desired_charge = min(requested_charge, available_site_headroom)
             no_export_hold_soc = config.normal_reserve_percent
