@@ -106,7 +106,6 @@ CONF_INVERTER_LIMIT = "inverter_ac_limit_kw"
 # hardware evidence.
 CONF_EXPORT_LIMIT = "export_limit_kw"
 CONF_SITE_IMPORT_LIMIT = "site_import_limit_kw"
-CONF_GRID_IMPORT_PREVENTION_BIAS_W = "grid_import_prevention_bias_w"
 CONF_BATTERY_EXPORT_ENABLED = "battery_export_enabled"
 CONF_PROPOSAL_SOLAR_ENABLED = "proposal_solar_enabled"
 CONF_PROPOSAL_SOLAR_FACTOR = "proposal_solar_factor"
@@ -184,7 +183,6 @@ DEFAULT_OPTIONS = {
     CONF_INVERTER_LIMIT: 7.0,
     CONF_EXPORT_LIMIT: 7.0,
     CONF_SITE_IMPORT_LIMIT: 0.0,
-    CONF_GRID_IMPORT_PREVENTION_BIAS_W: 50.0,
     CONF_BATTERY_EXPORT_ENABLED: True,
     CONF_PROPOSAL_SOLAR_ENABLED: True,
     CONF_PROPOSAL_SOLAR_FACTOR: 1.0,

@@ -77,11 +77,10 @@ FOXESS_MODBUS_OPTIONAL_DIAGNOSTICS: Final = {
     "pv4_power": {"key": "pv4_power", "name": "PV4 Power"},
 }
 
-# Writable entities reviewed from upstream v1.15.0. Alpha9.65 retains the
-# narrow opt-in backend and permits Force Discharge only for the fixed 50 W
-# non-economic daytime anti-import bias. Measured-grid feedback tracking is
-# intentionally absent. Deliberate/economic export remains a separate,
-# higher-priority future authority; import/export limit writes remain outside scope.
+# Writable entities reviewed from upstream v1.15.0. The live KEMS backend is
+# intentionally narrower than the available FoxESS surface: Self Use,
+# confirmed-cheap Force Charge and Min SoC-on-grid only. Deliberate/economic
+# Force Discharge and import/export power-limit writes remain outside scope.
 FOXESS_MODBUS_KNOWN_WRITABLE_CAPABILITIES: Final = {
     "work_mode": "Work Mode",
     "force_charge_power": "Force Charge Power (remote control, kW)",
@@ -118,11 +117,11 @@ def foxess_modbus_contract_snapshot() -> dict[str, Any]:
         "hardware_writes": "conditional_bounded_control",
         "maximum_allowed_stage": "control",
         "control_scope": (
-            "Alpha9.65 opt-in non-Agile control: Self Use, confirmed-cheap "
-            "Force Charge, Min SoC-on-grid and fixed 50 W anti-import bias"
+            "Alpha9.66 bounded non-Agile control: Self Use, confirmed-cheap "
+            "Force Charge and Min SoC-on-grid"
         ),
         "blocked_live_capabilities": [
-            "Force Discharge outside fixed 50 W anti-import bias",
+            "deliberate Force Discharge in the current release",
             "deliberate economic export in the current release",
             "Agile/paid-export control in the current release",
             "export-power-limit writes",

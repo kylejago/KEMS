@@ -1,3 +1,12 @@
+## 0.9.0-alpha9.66 — remove daytime anti-import Force Discharge
+
+- Removed the fixed 50 W daytime anti-import bias and all earlier grid-trim/feedback variants from the current control architecture.
+- Removed the anti-import configuration/model state, diagnostics and live Force Discharge exception.
+- Restored normal non-cheap live operation to plain FoxESS Self Use; small natural inverter grid import is accepted rather than actively trimmed.
+- Kept confirmed-cheap Force Charge and Min SoC-on-grid control unchanged for independent cheap-slot testing.
+- Deliberate/economic Force Discharge, Agile/paid-export control, Import Power Limit writes and Export Power Limit writes remain blocked.
+- Retained existing commissioning, fail-safe ownership/restoration, stale-data, island/EPS and emergency-stop gates.
+
 ## 0.7.0-alpha7 - cross-midnight SOC continuity
 
 - Fixed live simulation day-start SOC so the previous day’s full simulated battery state is carried across midnight instead of resetting to the configured initial SOC before replaying only the cheap-period tail.

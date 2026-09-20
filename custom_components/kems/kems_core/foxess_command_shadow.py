@@ -12,7 +12,6 @@ from collections.abc import Mapping
 from dataclasses import asdict
 from typing import Any
 
-from .grid_import_prevention import FIXED_GRID_BIAS_KW
 from .models import ControlState
 
 PASS = "PASS"
@@ -86,10 +85,6 @@ def build_foxess_command_shadow(
     """
     observed_values = dict(observed or {})
     desired_export = max(control.desired_battery_export_power_kw, 0.0)
-    desired_bias_export = max(control.desired_grid_bias_export_power_kw, 0.0)
-    bias_active = bool(
-        control.grid_import_prevention_bias_active and desired_bias_export > 0.001
-    )
     desired_charge = max(control.desired_charge_power_kw, 0.0)
     configured_export_limit_kw = max(float(export_limit_kw), 0.0)
     observed_export_limit_w = _number(observed_values.get("export_power_limit_w"))
@@ -149,21 +144,11 @@ def build_foxess_command_shadow(
         force_discharge_power_kw = round(
             min(desired_export, effective_export_limit_kw), 3
         )
-    elif bias_active:
-        # Alpha9.65 uses a deterministic fixed 50 W non-economic export bias.
-        # Deliberate/economic export is checked first and therefore always wins.
-        proposed_work_mode = "Force Discharge"
-        force_discharge_power_kw = round(
-            max(control.total_kh7_ac_output_kw, 0.0) + FIXED_GRID_BIAS_KW,
-            3,
-        )
     elif control.desired_work_mode in {"Self Use", "Feed-in First"}:
         proposed_work_mode = control.desired_work_mode
     else:
         translation_status = WAIT
         translation_reason = f"Unreviewed KEMS work mode: {control.desired_work_mode}"
-
-    requested_grid_correction_kw = FIXED_GRID_BIAS_KW if bias_active else 0.0
 
     proposed_export_limit_kw = (
         effective_export_limit_kw if control.desired_grid_export_allowed else None
@@ -190,13 +175,6 @@ def build_foxess_command_shadow(
             and force_discharge_power_kw > 0
         ),
         "grid_export_allowed": bool(control.desired_grid_export_allowed),
-        "grid_bias_export_allowed": bias_active,
-        "grid_bias_export_power_kw": (
-            round(min(desired_bias_export, effective_export_limit_kw), 3)
-            if bias_active
-            else 0.0
-        ),
-        "grid_bias_fixed_export_kw": round(requested_grid_correction_kw, 3),
         "remote_control_required": proposed_work_mode
         in {"Force Charge", "Force Discharge"},
         "schedule_strategy": (
@@ -266,24 +244,6 @@ def build_foxess_command_shadow(
         ),
         "requested_min_soc_on_grid_percent": proposed_min_soc_on_grid,
         "desired_grid_export_allowed": bool(control.desired_grid_export_allowed),
-        "desired_grid_bias_export_power_kw": round(desired_bias_export, 3),
-        "grid_import_prevention_bias_w": round(
-            control.grid_import_prevention_bias_w, 1
-        ),
-        "grid_import_prevention_bias_active": bool(
-            control.grid_import_prevention_bias_active
-        ),
-        "grid_import_prevention_target_grid_power_w": round(
-            control.grid_import_prevention_target_grid_power_w, 1
-        ),
-        "grid_import_prevention_observed_grid_power_w": (
-            None
-            if control.grid_import_prevention_observed_grid_power_w is None
-            else round(control.grid_import_prevention_observed_grid_power_w, 1)
-        ),
-        "grid_import_prevention_bias_suppressed_reason": (
-            control.grid_import_prevention_bias_suppressed_reason
-        ),
         "data_fresh": bool(control.data_fresh),
         "plan_safe": bool(control.plan_safe),
     }
@@ -300,26 +260,6 @@ def build_foxess_command_shadow(
             else round(foxess_hardware_limit_kw, 3)
         ),
         "effective_export_limit_kw": round(effective_export_limit_kw, 3),
-        "grid_import_prevention_bias": {
-            "configured_w": round(control.grid_import_prevention_bias_w, 1),
-            "active": bool(control.grid_import_prevention_bias_active),
-            "target_grid_power_w": round(
-                control.grid_import_prevention_target_grid_power_w, 1
-            ),
-            "observed_grid_power_w": (
-                None
-                if control.grid_import_prevention_observed_grid_power_w is None
-                else round(control.grid_import_prevention_observed_grid_power_w, 1)
-            ),
-            "requested_bias_export_kw": round(desired_bias_export, 3),
-            "grid_error_w": None,
-            "fixed_export_kw": round(requested_grid_correction_kw, 3),
-            "control_strategy": "fixed_50w_export_bias_no_grid_error_tracking",
-            "suppressed_reason": (
-                control.grid_import_prevention_bias_suppressed_reason
-            ),
-            "economic_export_authority_unchanged": True,
-        },
         "export_limit_authority": {
             "kems_user_ceiling_kw": round(configured_export_limit_kw, 3),
             "foxess_hardware_ceiling_kw": (

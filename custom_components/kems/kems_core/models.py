@@ -891,7 +891,6 @@ class ControlConfig:
     emergency_stop: bool = False
     stale_data_seconds: int = 180
     grid_stability_seconds: int = 300
-    grid_import_prevention_bias_w: float = 0.0
     eps_limit_kw: float = 7.0
     eps_warning_percent: float = 70.0
     eps_critical_percent: float = 90.0
@@ -921,12 +920,6 @@ class ControlState:
     desired_min_soc_percent: float = 10.0
     desired_ev_charging_allowed: bool = True
     desired_grid_export_allowed: bool = True
-    desired_grid_bias_export_power_kw: float = 0.0
-    grid_import_prevention_bias_w: float = 0.0
-    grid_import_prevention_bias_active: bool = False
-    grid_import_prevention_target_grid_power_w: float = 0.0
-    grid_import_prevention_observed_grid_power_w: float | None = None
-    grid_import_prevention_bias_suppressed_reason: str | None = "disabled"
     grid_available: bool = True
     island_mode_active: bool = False
     whole_house_eps_load_kw: float = 0.0

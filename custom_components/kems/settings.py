@@ -229,10 +229,6 @@ class KEMSSettings:
                 grid_stability_seconds=max(
                     int(values[CONF_GRID_STABILITY_SECONDS]), 30
                 ),
-                # Alpha9.65 policy: fixed non-economic 50 W daytime export bias.
-                # The legacy option key is retained for config-entry compatibility
-                # but no longer controls runtime behaviour.
-                grid_import_prevention_bias_w=50.0,
                 eps_limit_kw=max(float(values[CONF_EPS_LIMIT]), 0.1),
                 eps_warning_percent=float(values[CONF_EPS_WARNING_PERCENT]),
                 eps_critical_percent=float(values[CONF_EPS_CRITICAL_PERCENT]),

@@ -50,7 +50,6 @@ from .kems_core import (
     WholeHomeEngine,
     assess_quality,
 )
-from .kems_core.grid_import_prevention import apply_grid_import_prevention_bias
 from .lifetime import LifetimeLedgerRecorder
 from .power_down import PowerDownHistoryRecorder
 from .product_types import (
@@ -339,11 +338,6 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
             if not isinstance(power_down_plan, dict):
                 power_down_plan = {}
             control = apply_happy_hour_control(control, snapshot, happy_hour_plan)
-            control = apply_grid_import_prevention_bias(
-                control,
-                snapshot,
-                self.settings.control,
-            )
             await self._shadow_validation.async_update(
                 snapshot=snapshot,
                 simulation=shadow_simulation,

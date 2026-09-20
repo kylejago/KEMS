@@ -91,7 +91,7 @@ def test_v115_kh_contract_uses_direct_battery_power_and_bounded_control() -> Non
     assert snapshot["hardware_writes"] == "conditional_bounded_control"
     assert snapshot["maximum_allowed_stage"] == "control"
     assert (
-        "Force Discharge outside fixed 50 W anti-import bias"
+        "deliberate Force Discharge in the current release"
         in snapshot["blocked_live_capabilities"]
     )
     assert "export-power-limit writes" in snapshot["blocked_live_capabilities"]
