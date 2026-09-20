@@ -367,6 +367,22 @@ def resolve_tariff(
         ev_soc=ev_soc,
     )
 
+    evidence["effective_fallback_day_rate_pence"] = effective.day_rate_pence
+    evidence["effective_fallback_offpeak_rate_pence"] = effective.offpeak_rate_pence
+    evidence["effective_fallback_standing_charge_pence"] = (
+        effective.standing_charge_pence
+    )
+    evidence["fallback_effective_from"] = (
+        effective.effective_from.isoformat()
+        if effective.effective_from is not None
+        else None
+    )
+    evidence["next_scheduled_change"] = (
+        effective.next_change.effective_from.isoformat()
+        if effective.next_change is not None
+        else None
+    )
+
     used_live = any(
         value is not None
         for value in (
@@ -400,21 +416,6 @@ def resolve_tariff(
         )
 
     evidence["large_import_permitted"] = schedule_offpeak
-    evidence["effective_fallback_day_rate_pence"] = effective.day_rate_pence
-    evidence["effective_fallback_offpeak_rate_pence"] = effective.offpeak_rate_pence
-    evidence["effective_fallback_standing_charge_pence"] = (
-        effective.standing_charge_pence
-    )
-    evidence["fallback_effective_from"] = (
-        effective.effective_from.isoformat()
-        if effective.effective_from is not None
-        else None
-    )
-    evidence["next_scheduled_change"] = (
-        effective.next_change.effective_from.isoformat()
-        if effective.next_change is not None
-        else None
-    )
     return ResolvedTariff(
         current_import_rate=(
             live_current_import_rate
