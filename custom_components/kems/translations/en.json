@@ -7,7 +7,7 @@
     "step": {
       "user": {
         "title": "Set up KEMS",
-        "description": "KEMS will scan Home Assistant for compatible Octopus electricity and gas, Ohme, and FoxESS Modbus entities. Real FoxESS control is disabled by default and only the bounded reviewed Alpha9.65 scope can be enabled after commissioning and explicit opt-in."
+        "description": "KEMS will scan Home Assistant for compatible Octopus electricity and gas, Ohme, and FoxESS Modbus entities. Real FoxESS control is disabled by default and only the bounded reviewed Alpha9.66 scope can be enabled after commissioning and explicit opt-in."
       },
       "confirm": {
         "title": "Choose how KEMS gets your tariff",
