@@ -139,7 +139,7 @@ def test_no_export_target_satisfied_holds_battery_and_keeps_house_on_cheap_grid(
     snapshot = _cheap_snapshot(soc=55.0)
     # The replay may still be behind live hardware and asking for charge.
     # Fresh physical SOC at/above the no-export target must win.
-    simulation = _no_export_simulation(charge_kw=0.0, target_soc=53.9)
+    simulation = _no_export_simulation(charge_kw=7.0, target_soc=53.9)
 
     control = ControlEngine().plan(
         snapshot,
@@ -175,7 +175,10 @@ def test_no_export_target_satisfied_holds_battery_and_keeps_house_on_cheap_grid(
 
 def test_no_export_below_target_force_charges_only_to_forecast_target() -> None:
     snapshot = _cheap_snapshot(soc=52.0)
-    simulation = _no_export_simulation(charge_kw=7.0, target_soc=53.9)
+    # Regression for Alpha9.67: the customer twin may believe the battery is
+    # already full enough and request 0 kW, but fresh physical SOC below the
+    # no-export target must still request real Force Charge.
+    simulation = _no_export_simulation(charge_kw=0.0, target_soc=53.9)
 
     control = ControlEngine().plan(
         snapshot,
