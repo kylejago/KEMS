@@ -341,8 +341,7 @@ def test_intelligent_extra_slot_uses_effective_renewed_cheap_rate() -> None:
     assert result.intelligent_slot_confirmation == "confirmed"
     assert result.intelligent_slot_evidence["octopus_price_corroborated"] is True
     assert (
-        result.intelligent_slot_evidence["effective_fallback_offpeak_rate_pence"]
-        == 8.0
+        result.intelligent_slot_evidence["effective_fallback_offpeak_rate_pence"] == 8.0
     )
 
 
