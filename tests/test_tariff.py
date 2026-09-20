@@ -281,12 +281,10 @@ def test_automatic_live_values_remain_authoritative_after_renewal() -> None:
     assert result.next_import_rate == 8.01
     assert result.electricity_standing_charge == 55.54
     assert (
-        result.intelligent_slot_evidence["effective_fallback_day_rate_pence"]
-        == 37.17
+        result.intelligent_slot_evidence["effective_fallback_day_rate_pence"] == 37.17
     )
     assert (
-        result.intelligent_slot_evidence["effective_fallback_offpeak_rate_pence"]
-        == 8.0
+        result.intelligent_slot_evidence["effective_fallback_offpeak_rate_pence"] == 8.0
     )
     assert result.intelligent_slot_evidence["fallback_effective_from"] == "2026-10-04"
 
