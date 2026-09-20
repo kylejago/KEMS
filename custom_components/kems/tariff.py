@@ -88,7 +88,9 @@ def effective_tariff_rates(
     active_from: date | None = None
     next_change: ScheduledTariffChange | None = None
 
-    for change in sorted(settings.scheduled_changes, key=lambda item: item.effective_from):
+    for change in sorted(
+        settings.scheduled_changes, key=lambda item: item.effective_from
+    ):
         if change.effective_from <= target_date:
             day_rate = max(float(change.day_rate_pence), 0.0)
             offpeak_rate = max(float(change.offpeak_rate_pence), 0.0)
@@ -135,9 +137,7 @@ def _next_fallback_rate(
         settings.offpeak_end,
     )
     return (
-        next_rates.offpeak_rate_pence
-        if next_is_offpeak
-        else next_rates.day_rate_pence
+        next_rates.offpeak_rate_pence if next_is_offpeak else next_rates.day_rate_pence
     )
 
 
