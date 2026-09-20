@@ -38,7 +38,10 @@ def _live_extra_slot_snapshot(*, soc: float | None = 16.0) -> Snapshot:
         timestamp=NOW,
         current_import_rate=3.4933,
         next_import_rate=28.3036,
-        off_peak=False,
+        # Cheap-slot confirmation itself is proven separately by the tariff
+        # resolver regressions. This test exercises the downstream Control
+        # boundary after that authority has already been confirmed.
+        off_peak=True,
         intelligent_slot=True,
         ev_charging=True,
         ev_power_kw=6.071,
