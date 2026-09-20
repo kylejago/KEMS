@@ -139,7 +139,7 @@ def test_alpha945_release_identity_and_scope() -> None:
     )
     reason = str(bundle["maintenance"]["reason"])
     assert manifest["version"] == "0.9.0-alpha9.68"
-    assert reason.startswith("Alpha9.67")
+    assert reason.startswith("Alpha9.68")
     assert "Alpha9.45" in reason
     assert "raw 6 reports 3 rewards rather than 6" in reason
     assert "two-one-hour-reward event-day limit" in reason
