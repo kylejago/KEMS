@@ -394,9 +394,9 @@ class FoxESSControlBackend:
                     applied = bool(min_soc_ok and action_ok)
                     if applied:
                         self._last_write_result = (
-                            "Alpha9.66 bounded FoxESS command applied"
+                            "Alpha9.67 bounded FoxESS command applied"
                             if writes
-                            else "Alpha9.66 bounded FoxESS command already matched"
+                            else "Alpha9.67 bounded FoxESS command already matched"
                         )
                     else:
                         decision = FoxESSControlDecision(
@@ -409,7 +409,7 @@ class FoxESSControlBackend:
                         await self._async_restore(entities, writes)
 
         payload = {
-            "scope": "alpha9.66_self_use_cheap_charge",
+            "scope": "alpha9.67_self_use_cheap_charge",
             "reviewed_foxess_modbus_version": FOXESS_MODBUS_REVIEWED_VERSION,
             "observed_foxess_modbus_version": observed_version,
             "reviewed_version_matches": version_matches,
@@ -435,8 +435,8 @@ class FoxESSControlBackend:
             "normal_non_cheap_mode": "Self Use",
             "deliberate_force_discharge": "blocked_in_current_release",
             "paid_or_agile_export_control": "blocked_in_current_release",
-            "export_power_limit_write": "never_written_by_alpha9.66",
-            "import_power_limit_write": "never_written_by_alpha9.66",
+            "export_power_limit_write": "never_written_by_alpha9.67",
+            "import_power_limit_write": "never_written_by_alpha9.67",
             "safety_release": (
                 "restore pre-KEMS local mode and Min SoC-on-grid when owned"
             ),

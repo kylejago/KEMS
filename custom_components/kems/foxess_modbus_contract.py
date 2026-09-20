@@ -117,7 +117,7 @@ def foxess_modbus_contract_snapshot() -> dict[str, Any]:
         "hardware_writes": "conditional_bounded_control",
         "maximum_allowed_stage": "control",
         "control_scope": (
-            "Alpha9.66 bounded non-Agile control: Self Use, confirmed-cheap "
+            "Alpha9.67 bounded non-Agile control: Self Use, confirmed-cheap "
             "Force Charge and Min SoC-on-grid"
         ),
         "blocked_live_capabilities": [

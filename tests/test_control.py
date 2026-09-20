@@ -288,34 +288,40 @@ def test_awaiting_export_tariff_control_forces_self_use_and_zero_export() -> Non
     assert state.total_site_import_kw == 0.0
 
 
-def test_awaiting_export_tariff_cheap_control_honours_smart_charge_request() -> None:
-    """Control should use the simulation's reduced overnight grid-charge target."""
+def test_awaiting_export_tariff_cheap_control_uses_physical_soc_authority() -> None:
+    """Physical SOC below the no-export target must request real charge."""
     state = ControlEngine().plan(
-        _snapshot(off_peak=True, house_load_kw=1.0),
+        _snapshot(off_peak=True, house_load_kw=1.0, battery_soc=20.0),
         _simulation(
             no_export_mode_active=True,
             export_tariff_active=False,
-            current_simulated_battery_charge_power_kw=2.5,
-            current_simulated_total_site_import_kw=3.5,
+            simulated_battery_soc=80.0,
+            overnight_charge_target_percent=50.0,
+            current_simulated_battery_charge_power_kw=0.0,
+            current_simulated_total_site_import_kw=1.0,
         ),
         NOW,
         ControlConfig(),
     )
     assert state.operating_reason == "awaiting_export_tariff_charge"
-    assert state.desired_charge_power_kw == 2.5
+    assert state.desired_work_mode == "Force Charge"
+    assert state.desired_charge_power_kw == 7.0
+    assert state.desired_min_soc_percent == 50.0
     assert state.desired_grid_export_allowed is False
 
 
 def test_awaiting_export_tariff_cheap_control_uses_solar_for_house_headroom() -> None:
     """Solar-serving house load should leave more site headroom for cheap charging."""
     state = ControlEngine().plan(
-        _snapshot(off_peak=True, house_load_kw=3.0),
+        _snapshot(off_peak=True, house_load_kw=3.0, battery_soc=20.0),
         _simulation(
             no_export_mode_active=True,
             export_tariff_active=False,
+            simulated_battery_soc=80.0,
+            overnight_charge_target_percent=50.0,
             current_simulated_house_load_kw=3.0,
             current_simulated_solar_power_kw=2.0,
-            current_simulated_battery_charge_power_kw=4.0,
+            current_simulated_battery_charge_power_kw=0.0,
             current_simulated_grid_bypass_power_kw=None,
         ),
         NOW,

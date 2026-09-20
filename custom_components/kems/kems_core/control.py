@@ -231,13 +231,16 @@ class ControlEngine:
                 if config.site_import_limit_kw is None
                 else max(config.site_import_limit_kw - planned_house_grid, 0.0)
             )
-            requested_charge = (
-                max(simulation.current_simulated_battery_charge_power_kw or 0.0, 0.0)
-                if simulation.no_export_mode_active
-                else config.max_charge_kw
-            )
+            requested_charge = config.max_charge_kw
+            target_soc: float | None = None
+            observed_soc: float | None = None
             if simulation.no_export_mode_active:
-                target_soc = simulation.overnight_charge_target_percent
+                # Alpha9.67 control authority is deliberately physical here.
+                # The simulation owns the forecast-derived target, but whether
+                # the real battery still needs charging must be decided from
+                # fresh observed SOC, never from simulated SOC/charge power.
+                if simulation.overnight_charge_target_percent is not None:
+                    target_soc = float(simulation.overnight_charge_target_percent)
                 observed_soc = (
                     float(snapshot.battery_soc)
                     if snapshot.battery_soc is not None
@@ -245,25 +248,18 @@ class ControlEngine:
                     else None
                 )
                 if (
-                    target_soc is not None
-                    and observed_soc is not None
-                    and observed_soc + 1e-6 >= float(target_soc)
+                    target_soc is None
+                    or observed_soc is None
+                    or observed_soc + 1e-6 >= target_soc
                 ):
                     requested_charge = 0.0
             desired_charge = min(requested_charge, available_site_headroom)
             no_export_hold_soc = config.normal_reserve_percent
             if simulation.no_export_mode_active:
-                target_soc = simulation.overnight_charge_target_percent
                 if target_soc is not None:
-                    no_export_hold_soc = max(no_export_hold_soc, float(target_soc))
-                if (
-                    snapshot.battery_soc is not None
-                    and "battery_soc" not in snapshot.stale_fields
-                ):
-                    no_export_hold_soc = max(
-                        no_export_hold_soc,
-                        float(snapshot.battery_soc),
-                    )
+                    no_export_hold_soc = max(no_export_hold_soc, target_soc)
+                if observed_soc is not None:
+                    no_export_hold_soc = max(no_export_hold_soc, observed_soc)
                 no_export_hold_soc = float(
                     min(
                         max(ceil(no_export_hold_soc), config.normal_reserve_percent),
@@ -312,11 +308,16 @@ class ControlEngine:
                 ),
                 next_action=(
                     (
-                        "Hold the battery at the solar-aware no-export target and "
-                        "supply home/EV demand from cheap grid power"
+                        (
+                            "Wait for a fresh physical battery SOC and no-export "
+                            "charge target before commanding battery charge"
+                            if target_soc is None or observed_soc is None
+                            else "Hold the battery at the solar-aware no-export "
+                            "target and supply home/EV demand from cheap grid power"
+                        )
                         if desired_charge <= 0.01
-                        else "Charge only to the solar-aware no-export target and "
-                        "supply home/EV demand from cheap grid power"
+                        else "Charge the physical battery to the solar-aware "
+                        "no-export target using available site-import headroom"
                     )
                     if simulation.no_export_mode_active
                     else "Charge battery at the available site-import headroom "

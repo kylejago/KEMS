@@ -104,7 +104,7 @@ def _no_export_simulation(*, charge_kw: float, target_soc: float) -> SimulationS
         no_export_mode_active=True,
         export_tariff_active=False,
         overnight_charge_target_percent=target_soc,
-        simulated_battery_soc=None,
+        simulated_battery_soc=80.0,
         current_simulated_house_load_kw=1.2,
         current_simulated_solar_power_kw=0.0,
         current_simulated_grid_import_kw=1.2 + charge_kw,
@@ -175,7 +175,10 @@ def test_no_export_target_satisfied_holds_battery_and_keeps_house_on_cheap_grid(
 
 def test_no_export_below_target_force_charges_only_to_forecast_target() -> None:
     snapshot = _cheap_snapshot(soc=52.0)
-    simulation = _no_export_simulation(charge_kw=7.0, target_soc=53.9)
+    # Regression for Alpha9.67: the customer twin may believe the battery is
+    # already full enough and request 0 kW, but fresh physical SOC below the
+    # no-export target must still request real Force Charge.
+    simulation = _no_export_simulation(charge_kw=0.0, target_soc=53.9)
 
     control = ControlEngine().plan(
         snapshot,
@@ -225,7 +228,7 @@ def test_alpha960_release_identity_and_scope() -> None:
     bundle = json.loads(BUNDLE.read_text(encoding="utf-8"))
     reason = str(bundle["maintenance"]["reason"])
 
-    assert manifest["version"] == "0.9.0-alpha9.66"
+    assert manifest["version"] == "0.9.0-alpha9.67"
     assert "Alpha9.60 fixes no-paid-export cheap-period target authority" in reason
     assert "Full KEMS" in reason
     assert "solar-aware overnight target" in reason
