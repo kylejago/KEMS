@@ -3,11 +3,32 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime, time, timedelta
+from datetime import date, datetime, time, timedelta
 from typing import Any
 
 INTELLIGENT_EV_MIN_POWER_KW = 0.5
 INTELLIGENT_RATE_TOLERANCE_PENCE = 0.25
+
+
+@dataclass(frozen=True, slots=True)
+class ScheduledTariffChange:
+    """One future tariff fallback that becomes active from a local calendar date."""
+
+    effective_from: date
+    day_rate_pence: float
+    offpeak_rate_pence: float
+    standing_charge_pence: float
+
+
+@dataclass(frozen=True, slots=True)
+class EffectiveTariffRates:
+    """Date-resolved tariff fallback values used for live and future resolution."""
+
+    day_rate_pence: float
+    offpeak_rate_pence: float
+    standing_charge_pence: float
+    effective_from: date | None = None
+    next_change: ScheduledTariffChange | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -21,6 +42,7 @@ class TariffSettings:
     offpeak_start: time
     offpeak_end: time
     intelligent_slots_enabled: bool
+    scheduled_changes: tuple[ScheduledTariffChange, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -52,6 +74,36 @@ def parse_time(value: object, default: time) -> time:
             except ValueError:
                 continue
     return default
+
+
+def effective_tariff_rates(
+    settings: TariffSettings,
+    when: datetime | date,
+) -> EffectiveTariffRates:
+    """Return the fallback tariff that applies on a local calendar date."""
+    target_date = when.date() if isinstance(when, datetime) else when
+    day_rate = max(float(settings.day_rate_pence), 0.0)
+    offpeak_rate = max(float(settings.offpeak_rate_pence), 0.0)
+    standing_charge = max(float(settings.standing_charge_pence), 0.0)
+    active_from: date | None = None
+    next_change: ScheduledTariffChange | None = None
+
+    for change in sorted(settings.scheduled_changes, key=lambda item: item.effective_from):
+        if change.effective_from <= target_date:
+            day_rate = max(float(change.day_rate_pence), 0.0)
+            offpeak_rate = max(float(change.offpeak_rate_pence), 0.0)
+            standing_charge = max(float(change.standing_charge_pence), 0.0)
+            active_from = change.effective_from
+        elif next_change is None:
+            next_change = change
+
+    return EffectiveTariffRates(
+        day_rate_pence=day_rate,
+        offpeak_rate_pence=offpeak_rate,
+        standing_charge_pence=standing_charge,
+        effective_from=active_from,
+        next_change=next_change,
+    )
 
 
 def manual_schedule(
@@ -133,6 +185,7 @@ def _intelligent_extra_slot_evidence(
     *,
     settings: TariffSettings,
     now: datetime,
+    cheap_rate_pence: float,
     live_current_import_rate: float | None,
     live_next_import_rate: float | None,
     live_off_peak: bool | None,
@@ -162,10 +215,10 @@ def _intelligent_extra_slot_evidence(
     soc_plausible = ev_soc is None or 0.0 <= float(ev_soc) <= 100.0
     price_corroborated = _rate_matches_cheap(
         live_current_import_rate,
-        settings.offpeak_rate_pence,
+        cheap_rate_pence,
     ) or _rate_matches_cheap(
         live_next_import_rate,
-        settings.offpeak_rate_pence,
+        cheap_rate_pence,
     )
 
     demand_corroborated = True
@@ -249,16 +302,17 @@ def resolve_tariff(
     live_current_demand_kw: float | None = None,
 ) -> ResolvedTariff:
     """Resolve normal overnight cheap periods plus fail-closed Intelligent extras."""
+    effective = effective_tariff_rates(settings, now)
     schedule_offpeak, manual_next_start, manual_end = manual_schedule(
         now,
         settings.offpeak_start,
         settings.offpeak_end,
     )
     manual_current_rate = (
-        settings.offpeak_rate_pence if schedule_offpeak else settings.day_rate_pence
+        effective.offpeak_rate_pence if schedule_offpeak else effective.day_rate_pence
     )
     manual_next_rate = (
-        settings.day_rate_pence if schedule_offpeak else settings.offpeak_rate_pence
+        effective.day_rate_pence if schedule_offpeak else effective.offpeak_rate_pence
     )
 
     if settings.mode == "manual":
@@ -266,7 +320,7 @@ def resolve_tariff(
             current_import_rate=manual_current_rate,
             next_import_rate=manual_next_rate,
             current_export_rate=max(fallback_export_rate, 0.0),
-            electricity_standing_charge=settings.standing_charge_pence,
+            electricity_standing_charge=effective.standing_charge_pence,
             off_peak=schedule_offpeak,
             intelligent_slot=False,
             next_offpeak_start=manual_next_start,
@@ -278,12 +332,28 @@ def resolve_tariff(
                 "confirmed": False,
                 "reason": "manual tariff mode",
                 "large_import_permitted": schedule_offpeak,
+                "effective_fallback_day_rate_pence": effective.day_rate_pence,
+                "effective_fallback_offpeak_rate_pence": effective.offpeak_rate_pence,
+                "effective_fallback_standing_charge_pence": (
+                    effective.standing_charge_pence
+                ),
+                "fallback_effective_from": (
+                    effective.effective_from.isoformat()
+                    if effective.effective_from is not None
+                    else None
+                ),
+                "next_scheduled_change": (
+                    effective.next_change.effective_from.isoformat()
+                    if effective.next_change is not None
+                    else None
+                ),
             },
         )
 
     extra_slot_confirmed, confirmation, evidence = _intelligent_extra_slot_evidence(
         settings=settings,
         now=now,
+        cheap_rate_pence=effective.offpeak_rate_pence,
         live_current_import_rate=live_current_import_rate,
         live_next_import_rate=live_next_import_rate,
         live_off_peak=live_off_peak,
@@ -308,8 +378,8 @@ def resolve_tariff(
     )
     if extra_slot_confirmed and not schedule_offpeak:
         return ResolvedTariff(
-            current_import_rate=settings.offpeak_rate_pence,
-            next_import_rate=settings.day_rate_pence,
+            current_import_rate=effective.offpeak_rate_pence,
+            next_import_rate=effective.day_rate_pence,
             current_export_rate=(
                 live_current_export_rate
                 if live_current_export_rate is not None
@@ -318,7 +388,7 @@ def resolve_tariff(
             electricity_standing_charge=(
                 live_standing_charge
                 if live_standing_charge is not None
-                else settings.standing_charge_pence
+                else effective.standing_charge_pence
             ),
             off_peak=False,
             intelligent_slot=True,
@@ -330,6 +400,21 @@ def resolve_tariff(
         )
 
     evidence["large_import_permitted"] = schedule_offpeak
+    evidence["effective_fallback_day_rate_pence"] = effective.day_rate_pence
+    evidence["effective_fallback_offpeak_rate_pence"] = effective.offpeak_rate_pence
+    evidence["effective_fallback_standing_charge_pence"] = (
+        effective.standing_charge_pence
+    )
+    evidence["fallback_effective_from"] = (
+        effective.effective_from.isoformat()
+        if effective.effective_from is not None
+        else None
+    )
+    evidence["next_scheduled_change"] = (
+        effective.next_change.effective_from.isoformat()
+        if effective.next_change is not None
+        else None
+    )
     return ResolvedTariff(
         current_import_rate=(
             live_current_import_rate
@@ -349,7 +434,7 @@ def resolve_tariff(
         electricity_standing_charge=(
             live_standing_charge
             if live_standing_charge is not None
-            else settings.standing_charge_pence
+            else effective.standing_charge_pence
         ),
         off_peak=schedule_offpeak,
         intelligent_slot=False,
