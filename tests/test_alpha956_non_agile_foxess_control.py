@@ -195,6 +195,6 @@ def test_current_release_identity_and_scope() -> None:
     assert "Self Use" in reason
     assert "confirmed-cheap Force Charge" in reason
     assert "Min SoC-on-grid" in reason
-    assert "deliberate/economic Force Discharge" in reason
+    assert "Deliberate/economic Force Discharge" in reason
     assert "Import Power Limit" in reason
     assert "Export Power Limit" in reason
