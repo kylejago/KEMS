@@ -82,7 +82,7 @@ def assess_foxess_control_write_authority(
         control.desired_grid_export_allowed
         or control.desired_battery_export_power_kw > _EPSILON_KW
     ):
-        return blocked("Deliberate battery/grid export is outside the current live scope")
+        return blocked(\n            "Deliberate battery/grid export is outside the current live scope"\n        )
 
     min_soc = round(control.desired_min_soc_percent, 1)
     if control.desired_work_mode == "Force Charge":
