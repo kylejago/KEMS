@@ -18,9 +18,9 @@ BUNDLE = ROOT / "release" / "kems-bundle.template.json"
 def test_october_tariff_changes_are_staged_not_immediate_defaults() -> None:
     source = CONST.read_text(encoding="utf-8")
 
-    assert 'CONF_MANUAL_DAY_RATE: 28.3036' in source
-    assert 'CONF_MANUAL_OFFPEAK_RATE: 3.4933' in source
-    assert 'CONF_MANUAL_STANDING_CHARGE: 53.70435' in source
+    assert "CONF_MANUAL_DAY_RATE: 28.3036" in source
+    assert "CONF_MANUAL_OFFPEAK_RATE: 3.4933" in source
+    assert "CONF_MANUAL_STANDING_CHARGE: 53.70435" in source
 
     assert 'CONF_TARIFF_CHANGE_1_DATE: "2026-10-01"' in source
     assert "CONF_TARIFF_CHANGE_1_DAY_RATE: 26.9558095238" in source
@@ -77,4 +77,7 @@ def test_alpha968_release_identity_and_scope() -> None:
     assert "37.17p/kWh" in reason
     assert "8.00p/kWh" in reason
     assert "55.52p/day" in reason
-    assert "Automatic mode continues to prefer live Home Assistant Octopus values" in reason
+    assert (
+        "Automatic mode continues to prefer live Home Assistant Octopus values"
+        in reason
+    )
