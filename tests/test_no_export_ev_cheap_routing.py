@@ -10,7 +10,6 @@ from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
 import pytest
-
 from kems_core import SimulationConfig, SimulationEngine, Snapshot
 from kems_core.no_export_cheap_policy import route_no_export_cheap
 
