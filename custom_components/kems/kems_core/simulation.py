@@ -196,7 +196,9 @@ class SimulationEngine:
 
             # No-export uses complete site demand when the EV is proven external;
             # paid-export comparison accounting remains unchanged.
-            demand = split_no_export_demand(current, load_kw) if no_export_mode else None
+            demand = (
+                split_no_export_demand(current, load_kw) if no_export_mode else None
+            )
             actual_house_kwh = (
                 demand.site_kw * hours if demand is not None else load_kw * hours
             )
@@ -1837,11 +1839,13 @@ class SimulationEngine:
                     "house": round(route.site_load_kwh, 3),
                     "non_ev_house": (
                         round(route.site_load_kwh - route.ev_grid_kwh, 3)
-                        if route.ev_separation_proven else None
+                        if route.ev_separation_proven
+                        else None
                     ),
                     "ev_grid": (
                         round(route.ev_grid_kwh, 3)
-                        if route.ev_separation_proven else None
+                        if route.ev_separation_proven
+                        else None
                     ),
                     "no_export_ev_scope_reason": route.evidence_reason,
                     "solar": round(solar, 3),
@@ -1948,7 +1952,8 @@ class SimulationEngine:
                     available_ac,
                     max(inverter_limit - solar_to_home, 0.0),
                 )
-                if split.ev_separation_proven else 0.0
+                if split.ev_separation_proven
+                else 0.0
             )
             grid_import = split.ev_grid_kw + max(net_load - home_from_battery, 0.0)
             (
