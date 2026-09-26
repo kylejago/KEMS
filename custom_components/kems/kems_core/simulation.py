@@ -899,6 +899,16 @@ class SimulationEngine:
                 "overnight_charge_target_percent"
             ),
             overnight_charge_target_kwh=current_plan.get("overnight_charge_target_kwh"),
+            home_reserve_forecast_source=str(
+                current_plan.get("reserve_source", "unavailable")
+            ),
+            forecast_home_until_next_cheap_kwh=current_plan.get(
+                "forecast_home_until_next_cheap_kwh"
+            ),
+            forecast_solar_until_next_cheap_kwh=current_plan.get(
+                "forecast_solar_until_next_cheap_kwh"
+            ),
+            forecast_solar_credit_kwh=current_plan.get("forecast_solar_credit_kwh"),
             inverter_limit_kw=config.inverter_limit_kw,
             export_limit_kw=min(config.export_limit_kw, config.inverter_limit_kw),
             battery_charge_limit_kw=config.max_charge_kw,
