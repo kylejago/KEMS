@@ -128,7 +128,6 @@ def test_current_plan_matches_selective_routing_and_keeps_target() -> None:
     assert plan["overnight_charge_target_percent"] < 80.0
 
 
-
 def test_historical_no_export_replay_uses_ev_grid_and_house_battery() -> None:
     start = datetime(2026, 9, 26, 0, 0, tzinfo=UTC)
     records = [
