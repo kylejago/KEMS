@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime
 from math import ceil
 
 from .models import ControlConfig, ControlState, SimulationState, Snapshot
+from .no_export_cheap import no_export_cheap_period_kind, split_no_export_demand
 
 OPERATING_MODES = ("observe", "simulate", "shadow", "control")
 VIRTUAL_SCENARIOS = (
@@ -207,7 +208,18 @@ class ControlEngine:
                 next_action="Continue recording live sources",
             )
 
-        if inputs.cheap_period:
+        if (
+            inputs.cheap_period
+            and simulation.no_export_mode_active
+            and not inputs.saving_session_active
+        ):
+            return self._no_export_cheap_plan(
+                snapshot, simulation, inputs, config, base
+            )
+
+        if inputs.cheap_period and not (
+            simulation.no_export_mode_active and inputs.saving_session_active
+        ):
             if simulation.no_export_mode_active:
                 if simulation.current_simulated_grid_bypass_power_kw is not None:
                     planned_house_grid = max(
@@ -578,6 +590,201 @@ class ControlEngine:
             blocked_reason=(
                 "Whole-house demand exceeds the configured EPS limit"
                 if not safe
+                else _backend_block_reason(config)
+            ),
+            next_action=action,
+        )
+
+    @staticmethod
+    def _no_export_cheap_plan(
+        snapshot: Snapshot,
+        simulation: SimulationState,
+        inputs: _Inputs,
+        config: ControlConfig,
+        base: dict[str, object],
+    ) -> ControlState:
+        """Use physical SOC for the floor; never grant unproven EV isolation."""
+        kind = no_export_cheap_period_kind(snapshot)
+        assert kind is not None  # Caller has already passed cheap confirmation.
+        raw_load = (
+            snapshot.house_load_kw
+            if snapshot.house_load_kw is not None
+            and "house_load_kw" not in snapshot.stale_fields
+            else inputs.house_load_kw
+        )
+        # Without fresh raw site evidence, a simulated whole-site demand cannot
+        # be subtracted again: it may already include a separately metered EV.
+        split_snapshot = snapshot
+        if snapshot.house_load_kw is None or "house_load_kw" in snapshot.stale_fields:
+            split_snapshot = replace(snapshot, ev_load_in_house_load=None)
+        split = split_no_export_demand(split_snapshot, raw_load)
+        ev_active = snapshot.ev_charging is True or (
+            snapshot.ev_power_kw is not None and snapshot.ev_power_kw > 0.1
+        )
+        ev_unknown = (
+            snapshot.ev_connected is True
+            and snapshot.ev_charging is not False
+            and (snapshot.ev_power_kw is None or "ev_power_kw" in snapshot.stale_fields)
+        )
+        observed_soc = (
+            float(snapshot.battery_soc)
+            if snapshot.battery_soc is not None
+            and "battery_soc" not in snapshot.stale_fields
+            else None
+        )
+        target = simulation.overnight_charge_target_percent
+        target = (
+            max(float(target), config.normal_reserve_percent)
+            if target is not None
+            else None
+        )
+        target_floor = (
+            float(min(max(ceil(target), config.normal_reserve_percent), 100))
+            if target is not None
+            else config.normal_reserve_percent
+        )
+
+        solar_home = min(
+            max(inputs.solar_power_kw, 0.0),
+            split.house_kw,
+            max(config.inverter_limit_kw, 0.0),
+        )
+        non_ev_net = max(split.house_kw - solar_home, 0.0)
+        battery_home = 0.0
+        if (
+            observed_soc is not None
+            and target is not None
+            and split.ev_separation_proven
+        ):
+            # Five-minute replanning bound prevents a large command from
+            # crossing the floor before the next physical SOC readback.
+            available_kwh = max(observed_soc - target_floor, 0.0) * (
+                config.battery_capacity_kwh / 100
+            )
+            battery_home = min(
+                non_ev_net,
+                config.max_discharge_kw,
+                max(config.inverter_limit_kw - solar_home, 0.0),
+                available_kwh * config.discharge_efficiency * 12.0,
+            )
+        live_ev_fallback = bool(
+            (ev_active or ev_unknown) and config.operating_mode == "control"
+        )
+        if live_ev_fallback:
+            # Self Use/Force Charge plus MinSOC cannot enforce a household-only
+            # discharge while EV is on the same AC bus. Never claim otherwise.
+            battery_home = 0.0
+
+        bypass = split.ev_grid_kw + max(non_ev_net - battery_home, 0.0)
+        if ev_active and not split.ev_separation_proven:
+            bypass = max(bypass, max(snapshot.grid_import_kw or 0.0, 0.0))
+        site_charge_headroom = (
+            config.max_charge_kw
+            if config.site_import_limit_kw is None
+            else max(config.site_import_limit_kw - bypass, 0.0)
+        )
+        # Extra slots must have an actual forward-demand forecast and deadline.
+        extra_forecast_ready = bool(
+            kind == "extra_intelligent"
+            and simulation.home_reserve_forecast_source not in (None, "unavailable")
+            and simulation.forecast_home_until_next_cheap_kwh is not None
+            and snapshot.next_offpeak_start is not None
+            and snapshot.next_offpeak_start > snapshot.timestamp
+        )
+        missing_evidence = bool(
+            target is None
+            or observed_soc is None
+            or (kind == "extra_intelligent" and not extra_forecast_ready)
+            or ev_unknown
+            or (
+                ev_active
+                and (snapshot.ev_power_kw is None or not split.ev_separation_proven)
+            )
+        )
+        requested_charge = 0.0
+        if (
+            not missing_evidence
+            and observed_soc is not None
+            and target is not None
+            and observed_soc + 1e-6 < target
+        ):
+            shortfall_input_kwh = (
+                (target - observed_soc) * config.battery_capacity_kwh / 100.0 / 0.95
+            )
+            requested_charge = min(
+                config.max_charge_kw,
+                shortfall_input_kwh * 12.0,
+                site_charge_headroom,
+            )
+        # Without a proven EV-only grid path, hold at physical SOC while the
+        # EV charges; above-target discharge remains an explicit twin intent.
+        min_soc = target_floor
+        if observed_soc is None or target is None:
+            min_soc = float(
+                max(
+                    config.normal_reserve_percent,
+                    ceil(observed_soc) if observed_soc is not None else 0,
+                )
+            )
+        if live_ev_fallback and observed_soc is not None:
+            min_soc = float(max(min_soc, ceil(observed_soc)))
+
+        planned_import = bypass + requested_charge
+        headroom = (
+            None
+            if config.site_import_limit_kw is None
+            else round(config.site_import_limit_kw - planned_import, 3)
+        )
+        site_exceeded = bool(headroom is not None and headroom < -1e-6)
+        reason = (
+            "no_export_overnight" if kind == "overnight" else "no_export_extra_slot"
+        )
+        if live_ev_fallback:
+            reason += "_ev_isolation_fallback"
+        action = (
+            "Conservative live EV fallback: KH7 cannot independently guarantee "
+            "grid-only EV and battery-only house; hold physical SOC. "
+            "Twin flows are not physical grid-origin proof."
+            if live_ev_fallback
+            else "Preserve the no-export minimum SOC floor; supply non-EV house "
+            "demand from available solar and above-floor battery energy."
+        )
+        if missing_evidence:
+            action = (
+                "Do not charge without fresh physical SOC, a justified target, "
+                "verified Ohme/load scope and (for extra slots) forecast deadline. "
+                + action
+            )
+        elif requested_charge > 0.001:
+            action = (
+                "Charge only the physical shortfall to the no-export floor "
+                "within measured site-import headroom. " + action
+            )
+        return _control_state(
+            base,
+            operating_reason=reason,
+            desired_work_mode=(
+                "Force Charge" if requested_charge > 0.001 else "Self Use"
+            ),
+            desired_charge_power_kw=round(requested_charge, 3),
+            desired_battery_to_home_power_kw=round(battery_home, 3),
+            desired_battery_export_power_kw=0.0,
+            desired_total_discharge_power_kw=round(battery_home, 3),
+            desired_min_soc_percent=min_soc,
+            desired_ev_charging_allowed=True,
+            desired_grid_export_allowed=False,
+            grid_bypass_power_kw=round(bypass, 3),
+            total_site_import_kw=round(planned_import, 3),
+            site_import_headroom_kw=headroom,
+            site_import_limit_exceeded=site_exceeded,
+            total_kh7_ac_output_kw=round(solar_home + battery_home, 3),
+            kh7_output_headroom_kw=round(
+                max(config.inverter_limit_kw - solar_home - battery_home, 0.0), 3
+            ),
+            plan_safe=not site_exceeded,
+            blocked_reason=(
+                "Configured site-import limit exceeded"
+                if site_exceeded
                 else _backend_block_reason(config)
             ),
             next_action=action,

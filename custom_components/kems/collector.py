@@ -5,6 +5,7 @@ from __future__ import annotations
 from homeassistant.util import dt as dt_util
 
 from .kems_core import Snapshot
+from .kems_core.no_export_cheap import infer_ev_load_in_house_load
 from .kems_core.simulation_fallback import apply_simulation_demand_fallback
 from .providers.foxess import FoxESSProvider
 from .providers.gas import GasProvider
@@ -34,6 +35,10 @@ class Collector:
         self._foxess = foxess
         self._octoplus = octoplus
         self._settings = settings
+        # Simulation-only provenance: require three consecutive physical balances.
+        # This does not prove the KH7 can isolate EV demand for live control.
+        self._ev_load_candidate: bool | None = None
+        self._ev_load_candidate_count = 0
 
     def collect(self) -> Snapshot:
         """Create a complete whole-home monitoring snapshot."""
@@ -75,6 +80,27 @@ class Collector:
             fallback_demand_kw=octopus.current_demand_kw,
             fallback_age_seconds=octopus.current_demand_age_seconds,
         )
+
+        candidate = infer_ev_load_in_house_load(
+            house_kw=foxess.house_load_kw,
+            ev_kw=ohme.power_kw if ohme.charging is True else None,
+            solar_kw=foxess.solar_power_kw,
+            battery_kw=foxess.battery_power_kw,
+            grid_import_kw=foxess.grid_import_kw,
+            grid_export_kw=foxess.grid_export_kw,
+            battery_positive_is_discharge=(
+                self._settings.simulation.battery_power_positive_is_discharge
+            ),
+        )
+        if candidate is None:
+            self._ev_load_candidate = None
+            self._ev_load_candidate_count = 0
+        elif candidate == self._ev_load_candidate:
+            self._ev_load_candidate_count += 1
+        else:
+            self._ev_load_candidate = candidate
+            self._ev_load_candidate_count = 1
+        proven_ev_scope = candidate if self._ev_load_candidate_count >= 3 else None
 
         return Snapshot(
             timestamp=now,
@@ -122,6 +148,7 @@ class Collector:
             ev_charging=ohme.charging,
             ev_power_kw=ohme.power_kw,
             ev_soc=ohme.vehicle_soc,
+            ev_load_in_house_load=proven_ev_scope,
             house_load_kw=demand.house_load_kw,
             battery_soc=foxess.battery_soc,
             battery_power_kw=foxess.battery_power_kw,

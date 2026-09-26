@@ -81,6 +81,20 @@ def _apply_policy(policy: str, snapshot: Any, simulation: Any, state: Any):
     """Apply EV permission and battery-isolation rules to a desired command."""
     allowed = _policy_allows(policy, snapshot, simulation, state)
     if allowed:
+        if (
+            getattr(simulation, "no_export_mode_active", False)
+            and snapshot.cheap_period_confirmed
+            and state.operating_reason.startswith("no_export_")
+        ):
+            # The core no-export decision already distinguishes protected
+            # home discharge from EV grid import and applies the conservative
+            # live KH7 fallback. Do not universally erase that house intent.
+            return replace(
+                state,
+                desired_ev_charging_allowed=True,
+                desired_battery_export_power_kw=0.0,
+                desired_grid_export_allowed=False,
+            )
         return replace(
             state,
             desired_ev_charging_allowed=True,
@@ -93,7 +107,15 @@ def _apply_policy(policy: str, snapshot: Any, simulation: Any, state: Any):
     blocked = replace(state, desired_ev_charging_allowed=False)
     # Outside higher-priority Power Down, if the real charger has not stopped
     # yet, shadow KEMS also isolates the battery until the EV load disappears.
-    if snapshot.ev_charging and not snapshot.saving_session_active:
+    uncertain_no_export_ev = bool(
+        getattr(simulation, "no_export_mode_active", False)
+        and snapshot.ev_connected is True
+        and snapshot.ev_charging is not False
+        and (snapshot.ev_power_kw is None or "ev_power_kw" in snapshot.stale_fields)
+    )
+    if (
+        snapshot.ev_charging or uncertain_no_export_ev
+    ) and not snapshot.saving_session_active:
         blocked = replace(
             blocked,
             desired_battery_to_home_power_kw=0.0,

@@ -13,6 +13,7 @@ from kems_core import (
 )
 
 NOW = datetime(2026, 8, 4, 12, 0, tzinfo=UTC)
+NIGHT = datetime(2026, 8, 4, 23, 0, tzinfo=UTC)
 
 
 def _snapshot(**changes) -> Snapshot:
@@ -291,7 +292,7 @@ def test_awaiting_export_tariff_control_forces_self_use_and_zero_export() -> Non
 def test_awaiting_export_tariff_cheap_control_uses_physical_soc_authority() -> None:
     """Physical SOC below the no-export target must request real charge."""
     state = ControlEngine().plan(
-        _snapshot(off_peak=True, house_load_kw=1.0, battery_soc=20.0),
+        _snapshot(timestamp=NIGHT, off_peak=True, house_load_kw=1.0, battery_soc=20.0),
         _simulation(
             no_export_mode_active=True,
             export_tariff_active=False,
@@ -300,10 +301,10 @@ def test_awaiting_export_tariff_cheap_control_uses_physical_soc_authority() -> N
             current_simulated_battery_charge_power_kw=0.0,
             current_simulated_total_site_import_kw=1.0,
         ),
-        NOW,
+        NIGHT,
         ControlConfig(),
     )
-    assert state.operating_reason == "awaiting_export_tariff_charge"
+    assert state.operating_reason == "no_export_overnight"
     assert state.desired_work_mode == "Force Charge"
     assert state.desired_charge_power_kw == 7.0
     assert state.desired_min_soc_percent == 50.0
@@ -313,7 +314,7 @@ def test_awaiting_export_tariff_cheap_control_uses_physical_soc_authority() -> N
 def test_awaiting_export_tariff_cheap_control_uses_solar_for_house_headroom() -> None:
     """Solar-serving house load should leave more site headroom for cheap charging."""
     state = ControlEngine().plan(
-        _snapshot(off_peak=True, house_load_kw=3.0, battery_soc=20.0),
+        _snapshot(timestamp=NIGHT, off_peak=True, house_load_kw=3.0, battery_soc=20.0),
         _simulation(
             no_export_mode_active=True,
             export_tariff_active=False,
@@ -324,7 +325,7 @@ def test_awaiting_export_tariff_cheap_control_uses_solar_for_house_headroom() ->
             current_simulated_battery_charge_power_kw=0.0,
             current_simulated_grid_bypass_power_kw=None,
         ),
-        NOW,
+        NIGHT,
         ControlConfig(site_import_limit_kw=5.0),
     )
     assert state.grid_bypass_power_kw == 1.0
