@@ -128,6 +128,39 @@ def test_current_plan_matches_selective_routing_and_keeps_target() -> None:
     assert plan["overnight_charge_target_percent"] < 80.0
 
 
+
+def test_historical_no_export_replay_uses_ev_grid_and_house_battery() -> None:
+    start = datetime(2026, 9, 26, 0, 0, tzinfo=UTC)
+    records = [
+        Snapshot(
+            timestamp=start + timedelta(minutes=30 * i),
+            current_import_rate=3.4933,
+            off_peak=True,
+            offpeak_end=start + timedelta(hours=6),
+            next_offpeak_start=start + timedelta(hours=24),
+            house_load_kw=8.0,
+            ev_charging=True,
+            ev_power_kw=7.0,
+            solar_power_kw=0.0,
+            battery_soc=80.0,
+            grid_import_kw=7.0,
+        )
+        for i in range(3)
+    ]
+    result = SimulationEngine().simulate_today(
+        records,
+        start + timedelta(hours=1),
+        _config(),
+        forecast_energy_until_offpeak_kwh=50.0,
+        current_snapshot=records[-1],
+    )
+    assert result.no_export_mode_active is True
+    assert result.simulated_cheap_import_kwh == 7.0
+    assert result.simulated_battery_to_home_kwh == 1.0
+    assert result.simulated_grid_export_kwh == 0.0
+    assert result.simulated_battery_export_kwh == 0.0
+
+
 def test_paid_export_cheap_plan_is_untouched() -> None:
     snapshot = _snapshot()
     paid = SimulationConfig(
