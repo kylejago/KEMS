@@ -57,10 +57,7 @@ def split_no_export_demand(snapshot: Snapshot, load_kw: float) -> DemandSplit:
         if (
             snapshot.ev_connected is True
             and snapshot.ev_charging is not False
-            and (
-                snapshot.ev_power_kw is None
-                or "ev_power_kw" in snapshot.stale_fields
-            )
+            and (snapshot.ev_power_kw is None or "ev_power_kw" in snapshot.stale_fields)
         ):
             return DemandSplit(
                 load, load, 0.0, False, "Connected EV state/power unavailable"
