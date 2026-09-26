@@ -54,6 +54,17 @@ def split_no_export_demand(snapshot: Snapshot, load_kw: float) -> DemandSplit:
         snapshot.ev_power_kw is not None and snapshot.ev_power_kw > 0.1
     )
     if not active:
+        if (
+            snapshot.ev_connected is True
+            and snapshot.ev_charging is not False
+            and (
+                snapshot.ev_power_kw is None
+                or "ev_power_kw" in snapshot.stale_fields
+            )
+        ):
+            return DemandSplit(
+                load, load, 0.0, False, "Connected EV state/power unavailable"
+            )
         return DemandSplit(load, load, 0.0, True, "EV not charging")
     power = snapshot.ev_power_kw
     if (
@@ -193,7 +204,7 @@ def route_no_export_cheap(
             max(floor - stored, 0.0) / max(config.charge_efficiency, 0.01),
             site_headroom,
         )
-        if allow_grid_charge
+        if allow_grid_charge and split.ev_separation_proven
         else 0.0
     )
     stored += grid_charge_input * config.charge_efficiency
