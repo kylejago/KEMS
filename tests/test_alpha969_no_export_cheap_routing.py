@@ -439,6 +439,66 @@ def test_no_export_ev_accounting_does_not_change_paid_export_replay():
     assert result.current_simulated_ev_grid_import_kw is None
 
 
+@pytest.mark.parametrize("included,load", [(True, 8.0), (False, 2.0)])
+def test_no_export_future_house_forecast_excludes_verified_ev(included, load):
+    next_cheap = EXTRA + timedelta(hours=9, minutes=30)
+    records = [
+        _snapshot(
+            when=EXTRA + timedelta(minutes=15 * i),
+            house=load,
+            ev_charging=True,
+            ev_power_kw=6.0,
+            ev_load_in_house_load=included,
+            next_offpeak_start=next_cheap,
+        )
+        for i in range(3)
+    ]
+    net, source, home, solar, credit = SimulationEngine()._no_export_home_forecast(
+        records[-1],
+        records,
+        SimulationConfig(proposal_solar_enabled=False, export_tariff_status="awaiting"),
+        forecast_energy_until_offpeak_kwh=80.0,
+    )
+    assert source == "recent_non_ev_average"
+    assert home == pytest.approx(18.0)
+    assert solar == 0.0
+    assert credit == 0.0
+    assert net == pytest.approx(19.8)
+
+
+def test_extra_slot_with_one_sample_carries_usable_forecast_to_control():
+    snap = _snapshot(
+        when=EXTRA,
+        house=0.5,
+        soc=20.0,
+        next_offpeak_start=EXTRA + timedelta(hours=3),
+        offpeak_end=EXTRA + timedelta(hours=1),
+        ev_charging=True,
+        ev_power_kw=6.0,
+        ev_load_in_house_load=False,
+    )
+    simulation = SimulationEngine()._empty_current_state(
+        snap,
+        [snap],
+        SimulationConfig(
+            battery_capacity_kwh=10.0,
+            battery_reserve_percent=10.0,
+            battery_initial_percent=20.0,
+            proposal_solar_enabled=False,
+            export_tariff_status="awaiting",
+        ),
+        forecast_energy_until_offpeak_kwh=40.0,
+    )
+    assert simulation.home_reserve_forecast_source == "recent_non_ev_average"
+    assert simulation.forecast_home_until_next_cheap_kwh == pytest.approx(1.0)
+    assert simulation.overnight_charge_target_percent < 50.0
+    state = ControlEngine().plan(snap, simulation, snap.timestamp, _config(mode="control"))
+    assert state.operating_reason == "no_export_extra_slot_ev_isolation_fallback"
+    assert state.desired_charge_power_kw > 0
+    assert state.desired_charge_power_kw < 7
+    assert state.desired_battery_to_home_power_kw == 0
+
+
 def test_paid_export_path_still_uses_original_cheap_charge():
     snap = _snapshot()
     state = ControlEngine().plan(
