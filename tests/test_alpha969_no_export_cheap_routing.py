@@ -162,6 +162,28 @@ def test_unproven_ev_membership_falls_back_without_double_counting():
     assert route.ev_grid_kwh == 0  # No false attribution to a separate stream.
 
 
+def test_connected_ev_missing_power_cannot_be_assumed_grid_isolated():
+    snap = _snapshot(
+        house=8,
+        soc=55,
+        ev_connected=True,
+        ev_charging=None,
+        ev_power_kw=None,
+    )
+    split = split_no_export_demand(snap, 8)
+    assert not split.ev_separation_proven
+    route = _route(snap, stored=5.5, target=6)
+    assert route.battery_to_home_kwh == 0
+    assert route.grid_to_battery_input_kwh == 0
+    assert route.ev_grid_kwh == 0
+    state = ControlEngine().plan(
+        snap, _simulation(), snap.timestamp, _config(mode="control")
+    )
+    assert state.desired_charge_power_kw == 0
+    assert state.desired_battery_to_home_power_kw == 0
+    assert "ev_isolation_fallback" in state.operating_reason
+
+
 def test_extra_slot_protection_only_replenishes_shortfall():
     snap = _snapshot(
         when=EXTRA,
