@@ -615,10 +615,7 @@ class ControlEngine:
         # Without fresh raw site evidence, a simulated whole-site demand cannot
         # be subtracted again: it may already include a separately metered EV.
         split_snapshot = snapshot
-        if (
-            snapshot.house_load_kw is None
-            or "house_load_kw" in snapshot.stale_fields
-        ):
+        if snapshot.house_load_kw is None or "house_load_kw" in snapshot.stale_fields:
             split_snapshot = replace(snapshot, ev_load_in_house_load=None)
         split = split_no_export_demand(split_snapshot, raw_load)
         ev_active = snapshot.ev_charging is True or (
