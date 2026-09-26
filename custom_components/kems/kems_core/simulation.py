@@ -6,7 +6,11 @@ from datetime import date, datetime, timedelta
 from statistics import fmean
 
 from .models import SimulationConfig, SimulationState, Snapshot
-from .no_export_cheap import route_no_export_cheap, split_no_export_demand, no_export_cheap_period_kind
+from .no_export_cheap import (
+    route_no_export_cheap,
+    split_no_export_demand,
+    no_export_cheap_period_kind,
+)
 from .system_profile import FOXHOLE_PROPOSAL_PROFILE
 
 MAX_INTERVAL_HOURS = 0.5
@@ -309,9 +313,7 @@ class SimulationEngine:
                 interval_grid_to_battery = (
                     route.grid_to_battery_input_kwh * config.charge_efficiency
                 )
-                battery_charge += (
-                    interval_solar_to_battery + interval_grid_to_battery
-                )
+                battery_charge += interval_solar_to_battery + interval_grid_to_battery
                 battery_to_home += route.battery_to_home_kwh
                 avoided_day_import += route.battery_to_home_kwh
                 interval_import = route.grid_import_kwh
@@ -846,7 +848,9 @@ class SimulationEngine:
             no_export_mode_active=not self._export_tariff_active(config),
             no_export_cheap_policy=current_plan.get("no_export_cheap_policy"),
             no_export_ev_load_proven=bool(current_plan.get("no_export_ev_load_proven")),
-            overnight_charge_target_percent=current_plan.get("overnight_charge_target_percent"),
+            overnight_charge_target_percent=current_plan.get(
+                "overnight_charge_target_percent"
+            ),
             overnight_charge_target_kwh=current_plan.get("overnight_charge_target_kwh"),
             inverter_limit_kw=config.inverter_limit_kw,
             export_limit_kw=min(config.export_limit_kw, config.inverter_limit_kw),
@@ -1787,16 +1791,15 @@ class SimulationEngine:
                     "total_kh7_output": round(
                         route.solar_to_home_kwh + route.battery_to_home_kwh, 3
                     ),
-                    "grid_bypass": round(
-                        route.ev_grid_kwh + route.house_grid_kwh, 3
-                    ),
+                    "grid_bypass": round(route.ev_grid_kwh + route.house_grid_kwh, 3),
                     "total_site_import": round(route.grid_import_kwh, 3),
                     "site_import_headroom": site_headroom,
                     "site_import_exceeded": site_exceeded,
                     "exportable_battery": 0.0,
                     "reserved_for_home": round(required_home, 3),
                     "hours_until_cheap": (
-                        0.0 if route.kind == "overnight"
+                        0.0
+                        if route.kind == "overnight"
                         else self._hours_until_next_cheap(snapshot)
                     ),
                     "projected_soc_at_cheap": round(100 * battery_kwh / capacity, 1),
