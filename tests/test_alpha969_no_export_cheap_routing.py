@@ -104,7 +104,7 @@ def test_cheap_window_classification_requires_confirmed_tariff():
                 off_peak=False,
                 intelligent_slot=True,
                 ev_charging=True,
-                intelligent_slot_evidence={"large_import_permitted": True}
+                intelligent_slot_evidence={"large_import_permitted": True},
             )
         )
         == "extra_intelligent"
