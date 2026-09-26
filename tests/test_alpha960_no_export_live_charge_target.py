@@ -178,9 +178,7 @@ def test_no_export_below_target_force_charges_only_to_forecast_target() -> None:
     # Regression for Alpha9.67: the customer twin may believe the battery is
     # already full enough and request 0 kW, but fresh physical SOC below the
     # no-export target must still request real Force Charge.
-    simulation = _no_export_simulation(
-        charge_kw=0.0, target_soc=53.9, bypass_kw=1.2
-    )
+    simulation = _no_export_simulation(charge_kw=0.0, target_soc=53.9, bypass_kw=1.2)
 
     control = ControlEngine().plan(
         snapshot,
