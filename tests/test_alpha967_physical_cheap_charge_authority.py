@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from kems_core import ControlConfig, ControlEngine, SimulationState, Snapshot
@@ -51,6 +51,8 @@ def _live_extra_slot_snapshot(*, soc: float | None = 16.0) -> Snapshot:
         grid_export_kw=0.0,
         battery_soc=soc,
         battery_power_kw=-3.751,
+        ev_load_in_house_load=True,
+        next_offpeak_start=NOW + timedelta(hours=14),
         tariff_source_age_seconds={"intelligent_slot": 23.8},
         tariff_stale_fields=(),
         stale_fields=(),
@@ -64,6 +66,8 @@ def _divergent_twin() -> SimulationState:
         export_tariff_active=False,
         simulated_battery_soc=80.3,
         overnight_charge_target_percent=27.4,
+        home_reserve_forecast_source="recent_average",
+        forecast_home_until_next_cheap_kwh=8.0,
         current_simulated_house_load_kw=12.074,
         current_simulated_solar_power_kw=1.278,
         current_simulated_grid_import_kw=10.796,
@@ -82,7 +86,7 @@ def test_live_extra_slot_uses_physical_soc_not_divergent_twin() -> None:
     control = ControlEngine().plan(snapshot, _divergent_twin(), NOW, _config())
 
     assert snapshot.cheap_period_confirmed is True
-    assert control.operating_reason == "awaiting_export_tariff_charge"
+    assert control.operating_reason == "no_export_extra_slot_ev_isolation_fallback"
     assert control.desired_work_mode == "Force Charge"
     assert control.desired_charge_power_kw == 3.704
     assert control.desired_min_soc_percent == 28.0
@@ -116,7 +120,7 @@ def test_physical_target_reached_returns_to_self_use_even_if_twin_disagrees() ->
     assert control.desired_work_mode == "Self Use"
     assert control.desired_charge_power_kw == 0.0
     assert control.desired_min_soc_percent == 28.0
-    assert "Hold the battery" in control.next_action
+    assert "Conservative live EV fallback" in control.next_action
 
 
 def test_missing_physical_soc_never_uses_twin_soc_to_authorise_charge() -> None:
