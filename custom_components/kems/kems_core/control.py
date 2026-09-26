@@ -217,7 +217,9 @@ class ControlEngine:
                 snapshot, simulation, inputs, config, base
             )
 
-        if inputs.cheap_period:
+        if inputs.cheap_period and not (
+            simulation.no_export_mode_active and inputs.saving_session_active
+        ):
             if simulation.no_export_mode_active:
                 if simulation.current_simulated_grid_bypass_power_kw is not None:
                     planned_house_grid = max(
