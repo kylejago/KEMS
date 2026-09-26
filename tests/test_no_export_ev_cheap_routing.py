@@ -178,6 +178,17 @@ def test_overnight_current_plan_discharge_stops_at_floor_not_at_start_soc() -> N
     assert plan["battery_export"] == 0.0
 
 
+def test_overnight_home_reserve_does_not_treat_active_ev_as_home_load() -> None:
+    # Learned forecast includes the remainder of cheap time. Subtracting the
+    # current whole-site 8 kW (7 kW EV) would falsely shrink the home reserve.
+    snapshot = _snapshot(overnight=True, soc=60.0)
+    plan = _plan(snapshot, stored=60.0, learned=50.0)
+    assert plan["forecast_home_until_next_cheap_kwh"] > 40.0
+    assert plan["overnight_charge_target_percent"] > 60.0
+    assert plan["battery_to_home"] == 0.0
+    assert plan["battery_charge"] > 0.0
+
+
 def test_daytime_extra_slot_uses_next_cheap_requirement() -> None:
     snapshot = _snapshot(overnight=False, soc=10.0)
     assert snapshot.cheap_period_confirmed
