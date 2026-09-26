@@ -87,9 +87,7 @@ def infer_ev_load_in_house_load(
     authority. The collector must see repeated consistent candidates; an
     ambiguous, missing or conflicting reading must clear the evidence.
     """
-    readings = (
-        house_kw, ev_kw, solar_kw, battery_kw, grid_import_kw, grid_export_kw
-    )
+    readings = (house_kw, ev_kw, solar_kw, battery_kw, grid_import_kw, grid_export_kw)
     if any(value is None or not isfinite(float(value)) for value in readings):
         return None
     house = max(float(house_kw), 0.0)
@@ -161,12 +159,16 @@ def route_no_export_cheap(
 
     solar_home = min(solar, house, inverter)
     net_house = max(house - solar_home, 0.0)
-    battery_home = min(
-        net_house,
-        max(config.max_discharge_kw, 0.0) * duration,
-        max(inverter - solar_home, 0.0),
-        max(stored - floor, 0.0) * config.discharge_efficiency,
-    ) if split.ev_separation_proven else 0.0
+    battery_home = (
+        min(
+            net_house,
+            max(config.max_discharge_kw, 0.0) * duration,
+            max(inverter - solar_home, 0.0),
+            max(stored - floor, 0.0) * config.discharge_efficiency,
+        )
+        if split.ev_separation_proven
+        else 0.0
+    )
     stored -= battery_home / max(config.discharge_efficiency, 0.01)
     house_grid = max(net_house - battery_home, 0.0)
 
