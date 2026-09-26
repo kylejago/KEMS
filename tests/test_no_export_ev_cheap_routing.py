@@ -216,7 +216,7 @@ def test_retained_no_export_replay_excludes_ev_from_battery_discharge() -> None:
         stop.timestamp,
         _config(),
         forecast_energy_until_offpeak_kwh=50.0,
-        current_snapshot=stop
+        current_snapshot=stop,
     )
     assert result.simulated_battery_to_home_kwh == 0.5
     assert result.simulated_grid_import_kwh == 3.5
