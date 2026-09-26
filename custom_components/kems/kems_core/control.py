@@ -624,10 +624,7 @@ class ControlEngine:
         ev_unknown = (
             snapshot.ev_connected is True
             and snapshot.ev_charging is not False
-            and (
-                snapshot.ev_power_kw is None
-                or "ev_power_kw" in snapshot.stale_fields
-            )
+            and (snapshot.ev_power_kw is None or "ev_power_kw" in snapshot.stale_fields)
         )
         observed_soc = (
             float(snapshot.battery_soc)
