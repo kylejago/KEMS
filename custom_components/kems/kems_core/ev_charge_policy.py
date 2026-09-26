@@ -111,15 +111,11 @@ def _apply_policy(policy: str, snapshot: Any, simulation: Any, state: Any):
         getattr(simulation, "no_export_mode_active", False)
         and snapshot.ev_connected is True
         and snapshot.ev_charging is not False
-        and (
-            snapshot.ev_power_kw is None
-            or "ev_power_kw" in snapshot.stale_fields
-        )
+        and (snapshot.ev_power_kw is None or "ev_power_kw" in snapshot.stale_fields)
     )
     if (
-        (snapshot.ev_charging or uncertain_no_export_ev)
-        and not snapshot.saving_session_active
-    ):
+        snapshot.ev_charging or uncertain_no_export_ev
+    ) and not snapshot.saving_session_active:
         blocked = replace(
             blocked,
             desired_battery_to_home_power_kw=0.0,
