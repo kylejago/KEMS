@@ -81,6 +81,20 @@ def _apply_policy(policy: str, snapshot: Any, simulation: Any, state: Any):
     """Apply EV permission and battery-isolation rules to a desired command."""
     allowed = _policy_allows(policy, snapshot, simulation, state)
     if allowed:
+        if (
+            getattr(simulation, "no_export_mode_active", False)
+            and snapshot.cheap_period_confirmed
+            and state.operating_reason.startswith("no_export_")
+        ):
+            # The core no-export decision already distinguishes protected
+            # home discharge from EV grid import and applies the conservative
+            # live KH7 fallback. Do not universally erase that house intent.
+            return replace(
+                state,
+                desired_ev_charging_allowed=True,
+                desired_battery_export_power_kw=0.0,
+                desired_grid_export_allowed=False,
+            )
         return replace(
             state,
             desired_ev_charging_allowed=True,
