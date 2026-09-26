@@ -46,6 +46,30 @@ demand. Paid-export replay and customer Full KEMS comparisons keep their
 existing accounting contracts. The new evidence field is not a statement that
 the inverter can independently allocate physical AC flows.
 
+## No-export daily accounting and forecast authority
+
+The EV/non-EV split also applies to the no-export replay outside cheap time:
+the proposed battery only supplies non-EV house demand; measured EV demand
+remains a separate grid allocation. Included EV is subtracted once; external EV
+is added once to whole-site demand. Where membership is unavailable, do not
+attribute an EV-only grid stream or discharge the battery in the replay. Daily
+EV-grid attribution is nullable rather than silently reporting an invented zero.
+The observed-import fallback likewise uses full verified site demand when
+FoxESS grid import is missing. All of these changes are scoped to No paid
+export, not the paid-export comparison contract.
+
+The generic learned load profile can include charging demand. Once EV use
+appears in the retained day's records, the no-export protective forecast uses
+recent *verified non-EV* samples, not the generic learned whole-site estimate.
+If non-EV source evidence is unavailable, the forecast is unavailable; missing
+forecast/deadline must not authorise extra-slot grid charging. This does not
+retroactively establish the EV contribution to older learned profiles; future
+model refinements can provide explicitly segregated long-term house learning.
+
+Current power-flow fields distinguish total site load, non-EV household load,
+and the EV grid allocation. These are **proposed simulation allocations**,
+not direct measurement of the origin of power at individual AC circuits.
+
 ## Live scope — conservative by design
 
 The reviewed KH7 interface offers Self Use / Force Charge, force-charge power
