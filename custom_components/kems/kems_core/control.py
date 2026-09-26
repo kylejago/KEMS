@@ -614,8 +614,7 @@ class ControlEngine:
         # be subtracted again: it may already include a separately metered EV.
         split_snapshot = snapshot
         if raw_load is inputs.house_load_kw and (
-            snapshot.house_load_kw is None
-            or "house_load_kw" in snapshot.stale_fields
+            snapshot.house_load_kw is None or "house_load_kw" in snapshot.stale_fields
         ):
             from dataclasses import replace
 
@@ -636,9 +635,11 @@ class ControlEngine:
             if target is not None
             else None
         )
-        target_floor = float(
-            min(max(ceil(target), config.normal_reserve_percent), 100)
-        ) if target is not None else config.normal_reserve_percent
+        target_floor = (
+            float(min(max(ceil(target), config.normal_reserve_percent), 100))
+            if target is not None
+            else config.normal_reserve_percent
+        )
 
         solar_home = min(
             max(inputs.solar_power_kw, 0.0),
@@ -647,7 +648,11 @@ class ControlEngine:
         )
         non_ev_net = max(split.house_kw - solar_home, 0.0)
         battery_home = 0.0
-        if observed_soc is not None and target is not None and split.ev_separation_proven:
+        if (
+            observed_soc is not None
+            and target is not None
+            and split.ev_separation_proven
+        ):
             # Five-minute replanning bound prevents a large command from
             # crossing the floor before the next physical SOC readback.
             available_kwh = max(observed_soc - target_floor, 0.0) * (
@@ -685,10 +690,10 @@ class ControlEngine:
             target is None
             or observed_soc is None
             or (kind == "extra_intelligent" and not extra_forecast_ready)
-            or (ev_active and (
-                snapshot.ev_power_kw is None
-                or not split.ev_separation_proven
-            ))
+            or (
+                ev_active
+                and (snapshot.ev_power_kw is None or not split.ev_separation_proven)
+            )
         )
         requested_charge = 0.0
         if (
@@ -698,10 +703,7 @@ class ControlEngine:
             and observed_soc + 1e-6 < target
         ):
             shortfall_input_kwh = (
-                (target - observed_soc)
-                * config.battery_capacity_kwh
-                / 100.0
-                / 0.95
+                (target - observed_soc) * config.battery_capacity_kwh / 100.0 / 0.95
             )
             requested_charge = min(
                 config.max_charge_kw,
@@ -728,7 +730,9 @@ class ControlEngine:
             else round(config.site_import_limit_kw - planned_import, 3)
         )
         site_exceeded = bool(headroom is not None and headroom < -1e-6)
-        reason = "no_export_overnight" if kind == "overnight" else "no_export_extra_slot"
+        reason = (
+            "no_export_overnight" if kind == "overnight" else "no_export_extra_slot"
+        )
         if live_ev_fallback:
             reason += "_ev_isolation_fallback"
         action = (
@@ -774,7 +778,8 @@ class ControlEngine:
             plan_safe=not site_exceeded,
             blocked_reason=(
                 "Configured site-import limit exceeded"
-                if site_exceeded else _backend_block_reason(config)
+                if site_exceeded
+                else _backend_block_reason(config)
             ),
             next_action=action,
         )
