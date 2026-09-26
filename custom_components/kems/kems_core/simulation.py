@@ -1220,7 +1220,8 @@ class SimulationEngine:
             recent_load = fmean(non_ev_loads) if non_ev_loads else None
             current_split = (
                 split_no_export_demand(snapshot, current_load)
-                if current_load is not None else None
+                if current_load is not None
+                else None
             )
             current_load = (
                 current_split.house_kw
@@ -1243,7 +1244,8 @@ class SimulationEngine:
             if ev_in_history:
                 source = (
                     "recent_non_ev_average"
-                    if recent_load is not None else "current_non_ev_load"
+                    if recent_load is not None
+                    else "current_non_ev_load"
                 )
             else:
                 source = "recent_average" if recent_load is not None else "current_load"
