@@ -1199,11 +1199,39 @@ class SimulationEngine:
             0.0,
         )
 
+        # The generic learned site-demand profile can contain Ohme energy.
+        # Once EV use appears in the retained day, derive this no-export
+        # household projection from verified non-EV samples instead of
+        # repeatedly budgeting EV demand as future household consumption.
+        ev_in_history = any(
+            item.ev_charging is True
+            or (item.ev_power_kw is not None and item.ev_power_kw > 0.1)
+            for item in records
+        )
         recent_load = self._recent_average_load_kw(records, snapshot)
         current_load = _load_kw(snapshot)
+        if ev_in_history:
+            cutoff = snapshot.timestamp - timedelta(hours=RECENT_LOAD_WINDOW_HOURS)
+            non_ev_loads = [
+                split.house_kw
+                for item in records
+                if cutoff <= item.timestamp <= snapshot.timestamp
+                if (value := _load_kw(item)) is not None
+                if (split := split_no_export_demand(item, value)).ev_separation_proven
+            ]
+            recent_load = fmean(non_ev_loads) if non_ev_loads else None
+            current_split = (
+                split_no_export_demand(snapshot, current_load)
+                if current_load is not None else None
+            )
+            current_load = (
+                current_split.house_kw
+                if current_split is not None and current_split.ev_separation_proven
+                else None
+            )
         fallback_load = recent_load if recent_load is not None else current_load
 
-        if forecast_energy_until_offpeak_kwh is not None:
+        if forecast_energy_until_offpeak_kwh is not None and not ev_in_history:
             home = max(forecast_energy_until_offpeak_kwh, 0.0)
             source = "learned_profile"
             if active_cheap_end is not None and fallback_load is not None:
@@ -1214,7 +1242,13 @@ class SimulationEngine:
                 home = max(home - fallback_load * cheap_hours_remaining, 0.0)
         elif fallback_load is not None:
             home = fallback_load * forecast_hours
-            source = "recent_average" if recent_load is not None else "current_load"
+            if ev_in_history:
+                source = (
+                    "recent_non_ev_average"
+                    if recent_load is not None else "current_non_ev_load"
+                )
+            else:
+                source = "recent_average" if recent_load is not None else "current_load"
         else:
             return 0.0, "unavailable", 0.0, 0.0, 0.0
 
@@ -1264,8 +1298,11 @@ class SimulationEngine:
             load = _load_kw(current)
             if load is None:
                 continue
+            split = split_no_export_demand(current, load)
+            if not split.ev_separation_proven:
+                continue  # Unknown EV demand is not justified house energy.
             solar = self._simulated_solar_power(current, config)
-            known += max(load - solar, 0.0) * hours
+            known += max(split.house_kw - solar, 0.0) * hours
 
         if today:
             latest = today[-1]
