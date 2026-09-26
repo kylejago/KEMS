@@ -1748,6 +1748,9 @@ class SimulationEngine:
         if load is None:
             return {
                 "house": None,
+                "non_ev_house": None,
+                "ev_grid": None,
+                "no_export_ev_scope_reason": "load unavailable",
                 "solar": None,
                 "grid_import": None,
                 "grid_export": None,
@@ -1822,6 +1825,15 @@ class SimulationEngine:
                 grid_charge = route.grid_to_battery_input_kwh
                 return {
                     "house": round(route.site_load_kwh, 3),
+                    "non_ev_house": (
+                        round(route.site_load_kwh - route.ev_grid_kwh, 3)
+                        if route.ev_separation_proven else None
+                    ),
+                    "ev_grid": (
+                        round(route.ev_grid_kwh, 3)
+                        if route.ev_separation_proven else None
+                    ),
+                    "no_export_ev_scope_reason": route.evidence_reason,
                     "solar": round(solar, 3),
                     "grid_import": round(route.grid_import_kwh, 3),
                     "grid_export": 0.0,
@@ -1907,24 +1919,28 @@ class SimulationEngine:
             }
 
         if no_export_mode:
-            solar_to_home = min(solar, load, inverter_limit)
+            split = split_no_export_demand(snapshot, load)
+            solar_to_home = min(solar, split.house_kw, inverter_limit)
             solar_surplus = max(solar - solar_to_home, 0.0)
             solar_to_battery = min(
                 solar_surplus,
                 config.max_charge_kw,
                 max(capacity - battery_kwh, 0.0) / max(config.charge_efficiency, 0.01),
             )
-            net_load = max(load - solar_to_home, 0.0)
+            net_load = max(split.house_kw - solar_to_home, 0.0)
             available_ac = max(battery_kwh - reserve_kwh, 0.0) * (
                 config.discharge_efficiency
             )
-            home_from_battery = min(
-                net_load,
-                config.max_discharge_kw,
-                available_ac,
-                max(inverter_limit - solar_to_home, 0.0),
+            home_from_battery = (
+                min(
+                    net_load,
+                    config.max_discharge_kw,
+                    available_ac,
+                    max(inverter_limit - solar_to_home, 0.0),
+                )
+                if split.ev_separation_proven else 0.0
             )
-            grid_import = max(net_load - home_from_battery, 0.0)
+            grid_import = split.ev_grid_kw + max(net_load - home_from_battery, 0.0)
             (
                 required_home_energy,
                 reserve_source,
@@ -1946,7 +1962,14 @@ class SimulationEngine:
             projected_soc = 100 * max(projected_stored, reserve_kwh) / capacity
             total_output = solar_to_home + home_from_battery
             return {
-                "house": round(load, 3),
+                "house": round(split.site_kw, 3),
+                "non_ev_house": (
+                    round(split.house_kw, 3) if split.ev_separation_proven else None
+                ),
+                "ev_grid": (
+                    round(split.ev_grid_kw, 3) if split.ev_separation_proven else None
+                ),
+                "no_export_ev_scope_reason": split.reason,
                 "solar": round(solar, 3),
                 "grid_import": round(grid_import, 3),
                 "grid_export": 0.0,
@@ -1979,6 +2002,7 @@ class SimulationEngine:
                 "reserve_source": reserve_source,
                 "projected_grid_import": round(projected_grid_import, 3),
                 "export_paused_for_home": False,
+                "no_export_ev_load_proven": split.ev_separation_proven,
                 "forecast_home_until_next_cheap_kwh": round(forecast_home, 3),
                 "forecast_solar_until_next_cheap_kwh": round(forecast_solar, 3),
                 "forecast_solar_credit_kwh": round(solar_credit, 3),
