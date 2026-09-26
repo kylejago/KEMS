@@ -324,9 +324,7 @@ class SimulationEngine:
                 stored_solar = (
                     flow.solar_to_battery_input_kwh * config.charge_efficiency
                 )
-                stored_grid = (
-                    flow.grid_to_battery_input_kwh * config.charge_efficiency
-                )
+                stored_grid = flow.grid_to_battery_input_kwh * config.charge_efficiency
                 battery_charge += stored_solar + stored_grid
                 battery_to_home += flow.battery_to_home_kwh
                 avoided_day_import += flow.battery_to_home_kwh
@@ -342,9 +340,9 @@ class SimulationEngine:
                 house_grid_kwh = actual_house_kwh
                 target_stored_kwh = capacity
                 charge_power_budget_kwh = max(config.max_charge_kw, 0.0) * hours
-                charge_room_input_kwh = max(
-                    target_stored_kwh - battery_kwh, 0.0
-                ) / max(config.charge_efficiency, 0.01)
+                charge_room_input_kwh = max(target_stored_kwh - battery_kwh, 0.0) / max(
+                    config.charge_efficiency, 0.01
+                )
                 solar_charge_input_kwh = min(
                     solar_energy, charge_power_budget_kwh, charge_room_input_kwh
                 )
@@ -1774,7 +1772,8 @@ class SimulationEngine:
                         - (
                             flow.grid_to_battery_input_kwh
                             + flow.solar_to_battery_input_kwh
-                        ) * config.charge_efficiency,
+                        )
+                        * config.charge_efficiency,
                         3,
                     ),
                     "battery_charge": round(flow.grid_to_battery_input_kwh, 3),
@@ -1794,9 +1793,7 @@ class SimulationEngine:
                     "exportable_battery": 0.0,
                     "reserved_for_home": round(required_home, 3),
                     "hours_until_cheap": 0.0,
-                    "projected_soc_at_cheap": round(
-                        100 * battery_kwh / capacity, 1
-                    ),
+                    "projected_soc_at_cheap": round(100 * battery_kwh / capacity, 1),
                     "reserve_source": reserve_source,
                     "projected_grid_import": 0.0,
                     "export_paused_for_home": False,
@@ -1806,9 +1803,7 @@ class SimulationEngine:
                         else None
                     ),
                     "overnight_charge_target_kwh": (
-                        round(target_stored, 3)
-                        if target_stored is not None
-                        else None
+                        round(target_stored, 3) if target_stored is not None else None
                     ),
                     "forecast_home_until_next_cheap_kwh": round(forecast_home, 3),
                     "forecast_solar_until_next_cheap_kwh": round(forecast_solar, 3),
