@@ -44,7 +44,6 @@ def _load_kw(snapshot: Snapshot) -> float | None:
     return None
 
 
-
 def _no_export_cheap_route(
     snapshot: Snapshot,
     load_kw: float,
@@ -116,9 +115,7 @@ def _no_export_cheap_route(
         max(target - after_house, 0.0) / charge_eff,
         charge_headroom,
     )
-    after_charge = min(
-        after_house + grid_charge_input * charge_eff, capacity_kwh
-    )
+    after_charge = min(after_house + grid_charge_input * charge_eff, capacity_kwh)
     grid_import = ev_grid + grid_home + grid_charge_input
     return {
         "ev_grid": ev_grid,
