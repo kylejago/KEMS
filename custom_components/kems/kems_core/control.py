@@ -258,7 +258,10 @@ class ControlEngine:
             if simulation.no_export_mode_active:
                 if target_soc is not None:
                     no_export_hold_soc = max(no_export_hold_soc, target_soc)
-                if observed_soc is not None:
+                if observed_soc is not None and snapshot.ev_charging:
+                    # FoxESS Self Use sees combined site demand, not a distinct
+                    # EV circuit. Holding physical SOC prevents unintended EV
+                    # battery discharge until EV-only grid routing is proven.
                     no_export_hold_soc = max(no_export_hold_soc, observed_soc)
                 no_export_hold_soc = float(
                     min(
@@ -312,8 +315,15 @@ class ControlEngine:
                             "Wait for a fresh physical battery SOC and no-export "
                             "charge target before commanding battery charge"
                             if target_soc is None or observed_soc is None
-                            else "Hold the battery at the solar-aware no-export "
-                            "target and supply home/EV demand from cheap grid power"
+                            else (
+                                "Hold physical SOC while the EV charges: current "
+                                "FoxESS Self Use cannot isolate EV demand from "
+                                "house-only battery discharge"
+                                if snapshot.ev_charging
+                                else "Use battery for the house only down to the "
+                                "no-export forecast target; never discharge to "
+                                "export or chase the target"
+                            )
                         )
                         if desired_charge <= 0.01
                         else "Charge the physical battery to the solar-aware "
