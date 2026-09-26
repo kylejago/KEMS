@@ -621,6 +621,14 @@ class ControlEngine:
         ev_active = snapshot.ev_charging is True or (
             snapshot.ev_power_kw is not None and snapshot.ev_power_kw > 0.1
         )
+        ev_unknown = (
+            snapshot.ev_connected is True
+            and snapshot.ev_charging is not False
+            and (
+                snapshot.ev_power_kw is None
+                or "ev_power_kw" in snapshot.stale_fields
+            )
+        )
         observed_soc = (
             float(snapshot.battery_soc)
             if snapshot.battery_soc is not None
@@ -662,7 +670,9 @@ class ControlEngine:
                 max(config.inverter_limit_kw - solar_home, 0.0),
                 available_kwh * config.discharge_efficiency * 12.0,
             )
-        live_ev_fallback = bool(ev_active and config.operating_mode == "control")
+        live_ev_fallback = bool(
+            (ev_active or ev_unknown) and config.operating_mode == "control"
+        )
         if live_ev_fallback:
             # Self Use/Force Charge plus MinSOC cannot enforce a household-only
             # discharge while EV is on the same AC bus. Never claim otherwise.
@@ -688,6 +698,7 @@ class ControlEngine:
             target is None
             or observed_soc is None
             or (kind == "extra_intelligent" and not extra_forecast_ready)
+            or ev_unknown
             or (
                 ev_active
                 and (snapshot.ev_power_kw is None or not split.ev_separation_proven)
