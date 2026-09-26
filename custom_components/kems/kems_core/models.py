@@ -53,6 +53,9 @@ class Snapshot:
     ev_charging: bool | None = None
     ev_power_kw: float | None = None
     ev_soc: float | None = None
+    # Proven from repeated independent site-balance observations, not sensor name.
+    # None means that EV demand cannot safely be split from house_load_kw.
+    ev_load_in_house_load: bool | None = None
 
     house_load_kw: float | None = None
     battery_soc: float | None = None
@@ -431,6 +434,8 @@ class SimulationState:
     export_tariff_status: str = "active"
     export_tariff_active: bool = True
     no_export_mode_active: bool = False
+    no_export_cheap_policy: str | None = None
+    no_export_ev_load_proven: bool = False
     overnight_charge_target_percent: float | None = None
     overnight_charge_target_kwh: float | None = None
     forecast_home_until_next_cheap_kwh: float | None = None
