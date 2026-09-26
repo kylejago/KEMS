@@ -187,21 +187,19 @@ class SimulationEngine:
             observed_solar_kw = _fresh_snapshot_value(current, "solar_power_kw")
             observed_grid_import_kw = _fresh_snapshot_value(current, "grid_import_kw")
             observed_grid_export_kw = _fresh_snapshot_value(current, "grid_export_kw")
-            actual_import_kw = (
-                max(observed_grid_import_kw, 0.0)
-                if observed_grid_import_kw is not None
-                else max(load_kw - max(observed_solar_kw or 0.0, 0.0), 0.0)
-            )
-            actual_export_kw = max(observed_grid_export_kw or 0.0, 0.0)
-
-            # No-export uses complete site demand when the EV is proven external;
-            # paid-export comparison accounting remains unchanged.
+            # The no-export meter fallback includes an external Ohme load
+            # exactly once; paid-export historical accounting is unchanged.
             demand = (
                 split_no_export_demand(current, load_kw) if no_export_mode else None
             )
-            actual_house_kwh = (
-                demand.site_kw * hours if demand is not None else load_kw * hours
+            site_load_kw = demand.site_kw if demand is not None else load_kw
+            actual_import_kw = (
+                max(observed_grid_import_kw, 0.0)
+                if observed_grid_import_kw is not None
+                else max(site_load_kw - max(observed_solar_kw or 0.0, 0.0), 0.0)
             )
+            actual_export_kw = max(observed_grid_export_kw or 0.0, 0.0)
+            actual_house_kwh = site_load_kw * hours
             actual_import_kwh = actual_import_kw * hours
             actual_export_kwh = actual_export_kw * hours
             actual_house += actual_house_kwh
