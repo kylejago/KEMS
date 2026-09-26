@@ -525,7 +525,9 @@ def test_extra_slot_with_one_sample_carries_usable_forecast_to_control():
     assert simulation.home_reserve_forecast_source == "recent_non_ev_average"
     assert simulation.forecast_home_until_next_cheap_kwh == pytest.approx(1.0)
     assert simulation.overnight_charge_target_percent < 50.0
-    state = ControlEngine().plan(snap, simulation, snap.timestamp, _config(mode="control"))
+    state = ControlEngine().plan(
+        snap, simulation, snap.timestamp, _config(mode="control")
+    )
     assert state.operating_reason == "no_export_extra_slot_ev_isolation_fallback"
     assert state.desired_charge_power_kw > 0
     assert state.desired_charge_power_kw < 7
