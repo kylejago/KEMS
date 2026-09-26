@@ -534,6 +534,29 @@ def test_extra_slot_with_one_sample_carries_usable_forecast_to_control():
     assert state.desired_battery_to_home_power_kw == 0
 
 
+def test_no_export_ev_overlay_blocks_stale_connected_ev_outside_cheap():
+    snap = _snapshot(
+        when=EXTRA,
+        house=3.0,
+        off_peak=False,
+        ev_connected=True,
+        ev_charging=None,
+        ev_power_kw=None,
+    )
+    plan = ControlEngine().plan(
+        snap,
+        _simulation(
+            current_simulated_house_load_kw=3.0,
+            current_simulated_battery_to_home_power_kw=3.0,
+        ),
+        snap.timestamp,
+        _config(mode="control"),
+    )
+    assert plan.desired_battery_to_home_power_kw == 0.0
+    assert plan.desired_total_discharge_power_kw == 0.0
+    assert plan.desired_battery_export_power_kw == 0.0
+
+
 def test_paid_export_path_still_uses_original_cheap_charge():
     snap = _snapshot()
     state = ControlEngine().plan(
