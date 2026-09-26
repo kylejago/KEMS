@@ -98,6 +98,18 @@ def test_unknown_or_inconsistent_ev_split_fails_closed(ev_kw, stale) -> None:
     assert flow.grid_import_kwh >= 8.0
 
 
+def test_completely_missing_ev_telemetry_fails_closed() -> None:
+    flow = _flow(
+        whole_site_load_kw=8.0,
+        ev_charging=None,
+        ev_power_kw=None,
+    )
+    assert not flow.ev_evidence_valid
+    assert flow.grid_import_kwh == 8.0
+    assert flow.battery_to_home_kwh == 0.0
+    assert flow.grid_to_battery_input_kwh == 0.0
+
+
 def test_no_ev_house_only_routing_never_exports_battery() -> None:
     flow = _flow(whole_site_load_kw=1.0, ev_charging=False, ev_power_kw=0.0)
     assert flow.grid_to_ev_kwh == 0.0
