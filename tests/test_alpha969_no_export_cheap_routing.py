@@ -409,6 +409,39 @@ def test_extra_slot_missing_forward_deadline_does_not_grid_charge_twin():
     assert result.current_simulated_ev_grid_import_kw == 6.0
 
 
+def test_no_export_missing_grid_meter_fallback_counts_external_ev_once():
+    records = [
+        _snapshot(
+            when=EXTRA + timedelta(minutes=30 * i),
+            house=2.0,
+            soc=80.0,
+            off_peak=False,
+            current_import_rate=28.3,
+            solar_power_kw=0.0,
+            grid_import_kw=None,
+            ev_charging=True,
+            ev_power_kw=6.0,
+            ev_load_in_house_load=False,
+        )
+        for i in range(3)
+    ]
+    result = SimulationEngine().simulate_today(
+        records,
+        records[-1].timestamp + timedelta(minutes=1),
+        SimulationConfig(
+            battery_capacity_kwh=10.0,
+            battery_initial_percent=80.0,
+            proposal_solar_enabled=False,
+            export_tariff_status="awaiting",
+            saving_session_enabled=False,
+        ),
+    )
+    assert result.actual_house_consumption_kwh == 8.0
+    assert result.actual_grid_import_kwh == 8.0
+    assert result.actual_ev_energy_kwh == 6.0
+    assert result.baseline_no_system_cost_pence == 226.4
+
+
 def test_no_export_ev_accounting_does_not_change_paid_export_replay():
     records = [
         _snapshot(
