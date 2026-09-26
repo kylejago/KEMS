@@ -116,7 +116,7 @@ def test_physical_target_reached_returns_to_self_use_even_if_twin_disagrees() ->
     assert control.desired_work_mode == "Self Use"
     assert control.desired_charge_power_kw == 0.0
     assert control.desired_min_soc_percent == 28.0
-    assert "Hold the battery" in control.next_action
+    assert "Hold physical SOC while the EV charges" in control.next_action
 
 
 def test_missing_physical_soc_never_uses_twin_soc_to_authorise_charge() -> None:
