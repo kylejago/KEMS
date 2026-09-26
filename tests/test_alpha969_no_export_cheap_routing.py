@@ -8,7 +8,13 @@ from zoneinfo import ZoneInfo
 
 import pytest
 
-from kems_core import ControlConfig, ControlEngine, SimulationConfig, SimulationState, Snapshot
+from kems_core import (
+    ControlConfig,
+    ControlEngine,
+    SimulationConfig,
+    SimulationState,
+    Snapshot,
+)
 from kems_core.no_export_cheap import (
     infer_ev_load_in_house_load,
     no_export_cheap_period_kind,
@@ -61,9 +67,14 @@ def _route(snapshot, *, stored=8.0, target=6.0, solar=0.0, capacity=10.0):
 
 def _config(*, mode="shadow"):
     return ControlConfig(
-        operating_mode=mode, control_enabled=True, commissioned=True,
-        normal_reserve_percent=10, battery_capacity_kwh=10,
-        max_charge_kw=7, max_discharge_kw=7, inverter_limit_kw=7,
+        operating_mode=mode,
+        control_enabled=True,
+        commissioned=True,
+        normal_reserve_percent=10,
+        battery_capacity_kwh=10,
+        max_charge_kw=7,
+        max_discharge_kw=7,
+        inverter_limit_kw=7,
         site_import_limit_kw=14.5,
     )
 
@@ -87,9 +98,14 @@ def test_cheap_window_classification_requires_confirmed_tariff():
     assert no_export_cheap_period_kind(_snapshot()) == "overnight"
     assert no_export_cheap_period_kind(_snapshot(when=EXTRA)) == "extra_intelligent"
     assert no_export_cheap_period_kind(_snapshot(off_peak=False)) is None
-    assert no_export_cheap_period_kind(
-        _snapshot(when=EXTRA, off_peak=False, intelligent_slot=True, ev_charging=True)
-    ) == "extra_intelligent"
+    assert (
+        no_export_cheap_period_kind(
+            _snapshot(
+                when=EXTRA, off_peak=False, intelligent_slot=True, ev_charging=True
+            )
+        )
+        == "extra_intelligent"
+    )
 
 
 def test_80_to_70_stays_70_without_export_or_forced_discharge():
@@ -118,7 +134,9 @@ def test_at_floor_holds_and_below_floor_charges_only_shortfall():
 @pytest.mark.parametrize("included,load", [(True, 8.0), (False, 2.0)])
 def test_ev_grid_and_house_battery_are_disjoint_when_scope_proven(included, load):
     snap = _snapshot(
-        house=load, ev_charging=True, ev_power_kw=6.0,
+        house=load,
+        ev_charging=True,
+        ev_power_kw=6.0,
         ev_load_in_house_load=included,
     )
     split = split_no_export_demand(snap, load)
@@ -143,7 +161,10 @@ def test_unproven_ev_membership_falls_back_without_double_counting():
 
 def test_extra_slot_protection_only_replenishes_shortfall():
     snap = _snapshot(
-        when=EXTRA, house=2, ev_charging=True, ev_power_kw=6,
+        when=EXTRA,
+        house=2,
+        ev_charging=True,
+        ev_power_kw=6,
         ev_load_in_house_load=False,
     )
     enough = _route(snap, stored=8, target=6)
@@ -168,14 +189,18 @@ def test_solar_goes_to_house_then_natural_battery_charge():
 
 def test_shadow_floor_discharge_and_live_ev_fallback_are_separate():
     snap = _snapshot(
-        house=8, ev_charging=True, ev_power_kw=6,
+        house=8,
+        ev_charging=True,
+        ev_power_kw=6,
         ev_load_in_house_load=True,
     )
     shadow = ControlEngine().plan(snap, _simulation(), snap.timestamp, _config())
     assert shadow.desired_battery_to_home_power_kw == 2.0
     assert shadow.desired_min_soc_percent == 60
     assert shadow.desired_battery_export_power_kw == 0
-    live = ControlEngine().plan(snap, _simulation(), snap.timestamp, _config(mode="control"))
+    live = ControlEngine().plan(
+        snap, _simulation(), snap.timestamp, _config(mode="control")
+    )
     assert live.desired_battery_to_home_power_kw == 0
     assert live.desired_min_soc_percent == 80
     assert "ev_isolation_fallback" in live.operating_reason
@@ -195,8 +220,10 @@ def test_physical_soc_wins_over_divergent_simulated_soc():
 def test_extra_missing_forecast_or_ev_scope_cannot_request_charge():
     snap = _snapshot(when=EXTRA, soc=55)
     no_forecast = ControlEngine().plan(
-        snap, _simulation(home_reserve_forecast_source="unavailable"),
-        snap.timestamp, _config(),
+        snap,
+        _simulation(home_reserve_forecast_source="unavailable"),
+        snap.timestamp,
+        _config(),
     )
     assert no_forecast.desired_charge_power_kw == 0
     unknown_scope = replace(snap, ev_charging=True, ev_power_kw=None)
@@ -209,8 +236,11 @@ def test_extra_missing_forecast_or_ev_scope_cannot_request_charge():
 
 def test_physical_site_balance_only_produces_candidate_not_live_authority():
     common = dict(
-        ev_kw=6, solar_kw=0, battery_kw=1,
-        grid_import_kw=7, grid_export_kw=0,
+        ev_kw=6,
+        solar_kw=0,
+        battery_kw=1,
+        grid_import_kw=7,
+        grid_export_kw=0,
         battery_positive_is_discharge=True,
     )
     assert infer_ev_load_in_house_load(house_kw=8, **common) is True
@@ -221,8 +251,7 @@ def test_physical_site_balance_only_produces_candidate_not_live_authority():
 def test_paid_export_path_still_uses_original_cheap_charge():
     snap = _snapshot()
     state = ControlEngine().plan(
-        snap, SimulationState(no_export_mode_active=False),
-        snap.timestamp, _config()
+        snap, SimulationState(no_export_mode_active=False), snap.timestamp, _config()
     )
     assert state.operating_reason == "confirmed_cheap_charge"
     assert state.desired_work_mode == "Force Charge"
