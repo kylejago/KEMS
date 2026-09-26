@@ -11,6 +11,7 @@ from kems_core import (
     ControlConfig,
     ControlEngine,
     SimulationConfig,
+    SimulationEngine,
     SimulationState,
     Snapshot,
 )
@@ -300,6 +301,144 @@ def test_power_down_island_and_emergency_take_priority_over_cheap_route():
     )
     assert emergency.operating_reason == "emergency_stop"
     assert emergency.desired_charge_power_kw == 0
+
+
+@pytest.mark.parametrize("included,load", [(True, 8.0), (False, 2.0)])
+def test_no_export_day_replay_never_battery_supplies_ev_or_counts_twice(
+    included, load
+):
+    records = [
+        _snapshot(
+            when=EXTRA + timedelta(minutes=30 * i),
+            house=load,
+            soc=80.0,
+            off_peak=False,
+            current_import_rate=28.3,
+            ev_charging=True,
+            ev_power_kw=6.0,
+            ev_load_in_house_load=included,
+            grid_import_kw=6.0,
+        )
+        for i in range(3)
+    ]
+    result = SimulationEngine().simulate_today(
+        records,
+        records[-1].timestamp + timedelta(minutes=1),
+        SimulationConfig(
+            battery_capacity_kwh=10.0,
+            battery_reserve_percent=10.0,
+            battery_initial_percent=80.0,
+            max_charge_kw=7.0,
+            max_discharge_kw=7.0,
+            charge_efficiency=1.0,
+            discharge_efficiency=1.0,
+            proposal_solar_enabled=False,
+            export_tariff_status="awaiting",
+            saving_session_enabled=False,
+        ),
+    )
+    assert result.actual_house_consumption_kwh == 8.0
+    assert result.actual_ev_energy_kwh == 6.0
+    assert result.simulated_ev_grid_import_kwh == 6.0
+    assert result.simulated_battery_to_home_kwh == 2.0
+    assert result.simulated_grid_import_kwh == 6.0
+    assert result.current_simulated_house_load_kw == 8.0
+    assert result.current_simulated_non_ev_house_load_kw == 2.0
+    assert result.current_simulated_ev_grid_import_kw == 6.0
+    assert result.current_simulated_battery_to_home_power_kw == 2.0
+    assert result.current_simulated_grid_import_kw == 6.0
+
+
+def test_no_export_day_replay_unproven_ev_scope_has_no_false_attribution():
+    records = [
+        _snapshot(
+            when=EXTRA + timedelta(minutes=30 * i),
+            house=8.0,
+            soc=80.0,
+            off_peak=False,
+            current_import_rate=28.3,
+            ev_charging=True,
+            ev_power_kw=6.0,
+            ev_load_in_house_load=None,
+        )
+        for i in range(3)
+    ]
+    result = SimulationEngine().simulate_today(
+        records,
+        records[-1].timestamp + timedelta(minutes=1),
+        SimulationConfig(
+            battery_capacity_kwh=10.0,
+            battery_reserve_percent=10.0,
+            battery_initial_percent=80.0,
+            proposal_solar_enabled=False,
+            export_tariff_status="awaiting",
+            saving_session_enabled=False,
+        ),
+    )
+    assert result.simulated_ev_grid_import_kwh is None
+    assert result.simulated_battery_to_home_kwh == 0.0
+    assert result.simulated_grid_import_kwh == 8.0
+    assert result.current_simulated_ev_grid_import_kw is None
+    assert result.current_simulated_non_ev_house_load_kw is None
+    assert result.no_export_ev_load_proven is False
+    assert result.no_export_ev_scope_reason == "EV/load measurement scope unproven"
+
+
+def test_extra_slot_missing_forward_deadline_does_not_grid_charge_twin():
+    snap = _snapshot(
+        when=EXTRA,
+        house=2.0,
+        off_peak=True,
+        next_offpeak_start=None,
+        ev_charging=True,
+        ev_power_kw=6.0,
+        ev_load_in_house_load=False,
+    )
+    result = SimulationEngine()._empty_current_state(
+        snap,
+        [snap],
+        SimulationConfig(
+            battery_capacity_kwh=10.0,
+            battery_reserve_percent=10.0,
+            battery_initial_percent=20.0,
+            proposal_solar_enabled=False,
+            export_tariff_status="awaiting",
+        ),
+    )
+    assert result.no_export_cheap_policy == "extra_intelligent"
+    assert result.current_simulated_battery_charge_power_kw == 0.0
+    assert result.home_reserve_forecast_source == "unavailable"
+    assert result.current_simulated_ev_grid_import_kw == 6.0
+
+
+def test_no_export_ev_accounting_does_not_change_paid_export_replay():
+    records = [
+        _snapshot(
+            when=EXTRA + timedelta(minutes=30 * i),
+            house=2.0,
+            soc=80.0,
+            off_peak=False,
+            current_import_rate=28.3,
+            ev_charging=True,
+            ev_power_kw=6.0,
+            ev_load_in_house_load=False,
+        )
+        for i in range(3)
+    ]
+    result = SimulationEngine().simulate_today(
+        records,
+        records[-1].timestamp + timedelta(minutes=1),
+        SimulationConfig(
+            battery_capacity_kwh=10.0,
+            battery_initial_percent=80.0,
+            proposal_solar_enabled=False,
+            export_tariff_status="active",
+            saving_session_enabled=False,
+        ),
+    )
+    assert result.actual_house_consumption_kwh == 2.0
+    assert result.simulated_ev_grid_import_kwh is None
+    assert result.current_simulated_ev_grid_import_kw is None
 
 
 def test_paid_export_path_still_uses_original_cheap_charge():
