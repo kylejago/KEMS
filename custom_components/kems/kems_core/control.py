@@ -258,10 +258,12 @@ class ControlEngine:
             if simulation.no_export_mode_active:
                 if target_soc is not None:
                     no_export_hold_soc = max(no_export_hold_soc, target_soc)
-                if observed_soc is not None and snapshot.ev_charging:
-                    # FoxESS Self Use sees combined site demand, not a distinct
-                    # EV circuit. Holding physical SOC prevents unintended EV
-                    # battery discharge until EV-only grid routing is proven.
+                if observed_soc is not None and (
+                    snapshot.ev_charging or target_soc is None
+                ):
+                    # Preserve the observed battery if target authority is
+                    # missing, or if the EV is drawing through combined site
+                    # load: Self Use cannot distinguish home from EV discharge.
                     no_export_hold_soc = max(no_export_hold_soc, observed_soc)
                 no_export_hold_soc = float(
                     min(
