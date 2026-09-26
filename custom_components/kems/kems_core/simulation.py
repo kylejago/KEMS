@@ -1093,6 +1093,19 @@ class SimulationEngine:
             return None
         return end
 
+    @staticmethod
+    def _no_export_home_only_load_kw(snapshot: Snapshot) -> float | None:
+        """Remove observed EV demand once from whole-site demand for reserves."""
+        whole = _load_kw(snapshot)
+        if whole is None:
+            return None
+        ev = _fresh_snapshot_value(snapshot, "ev_power_kw")
+        if snapshot.ev_charging is True or (ev is not None and ev > 0.1):
+            if ev is None or ev > whole + 1e-6:
+                return None
+            return max(whole - ev, 0.0)
+        return whole
+
     def _no_export_home_forecast(
         self,
         snapshot: Snapshot,
@@ -1118,8 +1131,15 @@ class SimulationEngine:
             0.0,
         )
 
-        recent_load = self._recent_average_load_kw(records, snapshot)
-        current_load = _load_kw(snapshot)
+        cutoff = snapshot.timestamp - timedelta(hours=RECENT_LOAD_WINDOW_HOURS)
+        recent_home = [
+            home
+            for item in records
+            if cutoff <= item.timestamp <= snapshot.timestamp
+            if (home := self._no_export_home_only_load_kw(item)) is not None
+        ]
+        recent_load = max(fmean(recent_home), 0.0) if recent_home else None
+        current_load = self._no_export_home_only_load_kw(snapshot)
         fallback_load = recent_load if recent_load is not None else current_load
 
         if forecast_energy_until_offpeak_kwh is not None:
