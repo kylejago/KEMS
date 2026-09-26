@@ -99,7 +99,9 @@ def _control_config() -> ControlConfig:
     )
 
 
-def _no_export_simulation(*, charge_kw: float, target_soc: float) -> SimulationState:
+def _no_export_simulation(
+    *, charge_kw: float, target_soc: float, bypass_kw: float = 0.0
+) -> SimulationState:
     return SimulationState(
         no_export_mode_active=True,
         export_tariff_active=False,
@@ -112,7 +114,7 @@ def _no_export_simulation(*, charge_kw: float, target_soc: float) -> SimulationS
         current_simulated_battery_charge_power_kw=charge_kw,
         current_simulated_battery_to_home_power_kw=0.0,
         current_simulated_battery_export_power_kw=0.0,
-        current_simulated_grid_bypass_power_kw=0.0,
+        current_simulated_grid_bypass_power_kw=bypass_kw,
         current_simulated_total_site_import_kw=1.2 + charge_kw,
         site_import_limit_kw=14.5,
         site_import_headroom_kw=14.5 - 1.2 - charge_kw,
@@ -176,7 +178,9 @@ def test_no_export_below_target_force_charges_only_to_forecast_target() -> None:
     # Regression for Alpha9.67: the customer twin may believe the battery is
     # already full enough and request 0 kW, but fresh physical SOC below the
     # no-export target must still request real Force Charge.
-    simulation = _no_export_simulation(charge_kw=0.0, target_soc=53.9)
+    simulation = _no_export_simulation(
+        charge_kw=0.0, target_soc=53.9, bypass_kw=1.2
+    )
 
     control = ControlEngine().plan(
         snapshot,
