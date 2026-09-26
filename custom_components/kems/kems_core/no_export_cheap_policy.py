@@ -68,14 +68,8 @@ def route_no_export_cheap(
     discharge_budget = max(float(max_discharge_kw), 0.0) * hours
     inverter_budget = max(float(inverter_limit_kw), 0.0) * hours
 
-    reported_ev = (
-        max(float(ev_power_kw), 0.0)
-        if ev_power_kw is not None
-        else None
-    )
-    ev_active = ev_charging is True or (
-        reported_ev is not None and reported_ev > 0.1
-    )
+    reported_ev = max(float(ev_power_kw), 0.0) if ev_power_kw is not None else None
+    ev_active = ev_charging is True or (reported_ev is not None and reported_ev > 0.1)
     valid_ev = not ev_active or (
         reported_ev is not None
         and not ev_power_stale
@@ -110,8 +104,10 @@ def route_no_export_cheap(
     )
     after_pv = min(stored + pv_charge * charge_eff, capacity)
 
-    floor = reserve if target_stored_kwh is None else min(
-        max(float(target_stored_kwh), reserve), capacity
+    floor = (
+        reserve
+        if target_stored_kwh is None
+        else min(max(float(target_stored_kwh), reserve), capacity)
     )
     net_home = max(home - solar_home, 0.0)
     battery_home = min(
