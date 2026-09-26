@@ -129,7 +129,7 @@ def test_missing_physical_soc_never_uses_twin_soc_to_authorise_charge() -> None:
 
     assert control.desired_work_mode == "Self Use"
     assert control.desired_charge_power_kw == 0.0
-    assert "fresh physical battery SOC" in control.next_action
+    assert "fresh physical SOC" in control.next_action
 
 
 def test_alpha967_release_identity_and_scope() -> None:
