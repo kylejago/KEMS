@@ -6,7 +6,13 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from kems_core import ControlConfig, ControlEngine, SimulationConfig, SimulationState, Snapshot
+from kems_core import (
+    ControlConfig,
+    ControlEngine,
+    SimulationConfig,
+    SimulationState,
+    Snapshot,
+)
 from kems_core.simulation import SimulationEngine, _no_export_cheap_route
 
 NOW = datetime(2026, 9, 26, 23, 30, tzinfo=UTC)
@@ -46,9 +52,7 @@ def _snapshot(*, load: float = 8.0, ev: float = 7.0, solar: float = 0.0) -> Snap
 
 def test_overnight_above_target_discharge_is_house_only_and_never_export() -> None:
     snapshot = _snapshot()
-    result = _no_export_cheap_route(
-        snapshot, 8.0, 0.0, 80.0, 60.0, 100.0, _config()
-    )
+    result = _no_export_cheap_route(snapshot, 8.0, 0.0, 80.0, 60.0, 100.0, _config())
     assert result["ev_grid"] == 7.0
     assert result["battery_home"] == 1.0
     assert result["grid_home"] == 0.0
@@ -59,9 +63,7 @@ def test_overnight_above_target_discharge_is_house_only_and_never_export() -> No
 
 def test_target_is_floor_not_a_forced_discharge_destination() -> None:
     snapshot = _snapshot(load=7.0, ev=7.0)
-    result = _no_export_cheap_route(
-        snapshot, 7.0, 0.0, 80.0, 60.0, 100.0, _config()
-    )
+    result = _no_export_cheap_route(snapshot, 7.0, 0.0, 80.0, 60.0, 100.0, _config())
     assert result["battery_home"] == 0.0
     assert result["battery_after"] == 80.0
     assert result["grid_import"] == 7.0
@@ -69,9 +71,7 @@ def test_target_is_floor_not_a_forced_discharge_destination() -> None:
 
 def test_at_target_grid_covers_ev_and_remaining_house() -> None:
     snapshot = _snapshot()
-    result = _no_export_cheap_route(
-        snapshot, 8.0, 0.0, 60.0, 60.0, 100.0, _config()
-    )
+    result = _no_export_cheap_route(snapshot, 8.0, 0.0, 60.0, 60.0, 100.0, _config())
     assert result["battery_home"] == 0.0
     assert result["grid_home"] == 1.0
     assert result["ev_grid"] == 7.0
@@ -81,9 +81,7 @@ def test_at_target_grid_covers_ev_and_remaining_house() -> None:
 
 def test_below_target_charges_only_with_site_headroom() -> None:
     snapshot = _snapshot()
-    result = _no_export_cheap_route(
-        snapshot, 8.0, 0.0, 50.0, 60.0, 100.0, _config()
-    )
+    result = _no_export_cheap_route(snapshot, 8.0, 0.0, 50.0, 60.0, 100.0, _config())
     assert result["battery_home"] == 0.0
     assert result["grid_charge_input"] == 6.5
     assert result["grid_import"] == 14.5
@@ -96,9 +94,7 @@ def test_extra_intelligent_slot_above_target_uses_grid_for_ev_only() -> None:
     snapshot.intelligent_slot = True
     snapshot.intelligent_slot_evidence = {"large_import_permitted": True}
     assert snapshot.cheap_period_confirmed is True
-    result = _no_export_cheap_route(
-        snapshot, 8.0, 0.0, 80.0, 60.0, 100.0, _config()
-    )
+    result = _no_export_cheap_route(snapshot, 8.0, 0.0, 80.0, 60.0, 100.0, _config())
     assert result["battery_home"] == 1.0
     assert result["ev_grid"] == result["grid_import"] == 7.0
     assert result["grid_charge_input"] == 0.0
@@ -106,9 +102,7 @@ def test_extra_intelligent_slot_above_target_uses_grid_for_ev_only() -> None:
 
 def test_solar_covers_house_and_surplus_charges_battery_not_ev() -> None:
     snapshot = _snapshot(solar=2.0)
-    result = _no_export_cheap_route(
-        snapshot, 8.0, 2.0, 80.0, 60.0, 100.0, _config()
-    )
+    result = _no_export_cheap_route(snapshot, 8.0, 2.0, 80.0, 60.0, 100.0, _config())
     assert result["solar_home"] == 1.0
     assert result["solar_charge_input"] == 1.0
     assert result["ev_grid"] == result["grid_import"] == 7.0
@@ -118,9 +112,7 @@ def test_solar_covers_house_and_surplus_charges_battery_not_ev() -> None:
 def test_unknown_ev_draw_fails_closed_in_simulation() -> None:
     snapshot = _snapshot()
     snapshot.ev_power_kw = None
-    result = _no_export_cheap_route(
-        snapshot, 8.0, 0.0, 80.0, 60.0, 100.0, _config()
-    )
+    result = _no_export_cheap_route(snapshot, 8.0, 0.0, 80.0, 60.0, 100.0, _config())
     assert result["battery_home"] == 0.0
     assert result["ev_grid"] == 8.0
 
