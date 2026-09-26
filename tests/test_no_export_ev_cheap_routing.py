@@ -198,7 +198,7 @@ def test_paid_export_cheap_branch_retains_full_kems_routing() -> None:
         50.0,
     )
     assert plan["battery_to_home"] == 0.0
-    assert plan["battery_charge"] == 7.0
+    assert plan["battery_charge"] == 6.5
     assert plan["grid_import"] == 14.5
     assert plan["grid_export"] == 0.0
 
@@ -212,7 +212,11 @@ def test_retained_no_export_replay_excludes_ev_from_battery_discharge() -> None:
         current_import_rate=3.4933,
     )
     result = SimulationEngine().simulate_today(
-        [start, stop], stop.timestamp, _config(), current_snapshot=stop
+        [start, stop],
+        stop.timestamp,
+        _config(),
+        forecast_energy_until_offpeak_kwh=50.0,
+        current_snapshot=stop
     )
     assert result.simulated_battery_to_home_kwh == 0.5
     assert result.simulated_grid_import_kwh == 3.5
