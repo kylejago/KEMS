@@ -304,9 +304,7 @@ def test_power_down_island_and_emergency_take_priority_over_cheap_route():
 
 
 @pytest.mark.parametrize("included,load", [(True, 8.0), (False, 2.0)])
-def test_no_export_day_replay_never_battery_supplies_ev_or_counts_twice(
-    included, load
-):
+def test_no_export_day_replay_never_battery_supplies_ev_or_counts_twice(included, load):
     records = [
         _snapshot(
             when=EXTRA + timedelta(minutes=30 * i),
