@@ -70,20 +70,26 @@ def route_no_export_cheap(
 
     reported_ev = max(float(ev_power_kw), 0.0) if ev_power_kw is not None else None
     ev_active = ev_charging is True or (reported_ev is not None and reported_ev > 0.1)
-    valid_ev = not ev_active or (
-        reported_ev is not None
-        and not ev_power_stale
-        and reported_ev > 0.0
-        and reported_ev * hours <= load + 1e-6
+    ev_unknown = ev_charging is None and reported_ev is None
+    valid_ev = not ev_unknown and (
+        not ev_active
+        or (
+            reported_ev is not None
+            and not ev_power_stale
+            and reported_ev > 0.0
+            and reported_ev * hours <= load + 1e-6
+        )
     )
     if not valid_ev:
         # Unknown load split: never treat a possible EV load as battery-home
         # demand. The site-input cap is a diagnostic, not an EV throttling tool.
         pv_charge = min(solar, charge_budget, max(capacity - stored, 0.0) / charge_eff)
+        ev_grid = (reported_ev or 0.0) * hours
+        grid_bypass = max(load, ev_grid)
         return NoExportCheapFlow(
-            grid_import_kwh=max(load, (reported_ev or 0.0) * hours),
-            grid_to_ev_kwh=(reported_ev or 0.0) * hours,
-            grid_to_home_kwh=load,
+            grid_import_kwh=grid_bypass,
+            grid_to_ev_kwh=ev_grid,
+            grid_to_home_kwh=max(grid_bypass - ev_grid, 0.0),
             grid_to_battery_input_kwh=0.0,
             solar_to_home_kwh=0.0,
             solar_to_battery_input_kwh=pv_charge,
