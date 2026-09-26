@@ -100,7 +100,11 @@ def test_cheap_window_classification_requires_confirmed_tariff():
     assert (
         no_export_cheap_period_kind(
             _snapshot(
-                when=EXTRA, off_peak=False, intelligent_slot=True, ev_charging=True
+                when=EXTRA,
+                off_peak=False,
+                intelligent_slot=True,
+                ev_charging=True,
+                intelligent_slot_evidence={"large_import_permitted": True}
             )
         )
         == "extra_intelligent"
