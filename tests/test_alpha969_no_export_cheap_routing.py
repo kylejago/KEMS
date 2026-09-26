@@ -273,6 +273,35 @@ def test_physical_site_balance_only_produces_candidate_not_live_authority():
     assert infer_ev_load_in_house_load(house_kw=None, **common) is None
 
 
+def test_power_down_island_and_emergency_take_priority_over_cheap_route():
+    snap = _snapshot(saving_session_active=True)
+    power_down = ControlEngine().plan(
+        snap, _simulation(), snap.timestamp, _config(mode="control")
+    )
+    assert power_down.operating_reason == "awaiting_export_tariff_power_down"
+    assert power_down.desired_charge_power_kw == 0
+    assert power_down.desired_ev_charging_allowed is False
+
+    island = ControlEngine().plan(
+        _snapshot(),
+        _simulation(),
+        OVERNIGHT,
+        replace(_config(mode="control"), virtual_scenario="grid_outage_night"),
+    )
+    assert island.island_mode_active
+    assert island.desired_charge_power_kw == 0
+    assert island.desired_ev_charging_allowed is False
+
+    emergency = ControlEngine().plan(
+        _snapshot(),
+        _simulation(),
+        OVERNIGHT,
+        replace(_config(mode="control"), emergency_stop=True),
+    )
+    assert emergency.operating_reason == "emergency_stop"
+    assert emergency.desired_charge_power_kw == 0
+
+
 def test_paid_export_path_still_uses_original_cheap_charge():
     snap = _snapshot()
     state = ControlEngine().plan(
