@@ -43,6 +43,35 @@ measured validation.
    expanded by this PR. No Force Discharge, import/export limit, direct Ohme
    control or new FoxESS service writes are proposed here.
 
+## Automatic read-only shared-bus balance audit
+
+The collector now saves `shared_bus_ev_audit` on each KEMS snapshot, exposes
+the latest result through the **EV shared-bus allocation audit** diagnostic
+sensor and includes it in KEMS diagnostics. It uses **existing** Ohme,
+FoxESS and grid measurements: no extra user mapping or duplicate power
+sensors. Ohme power report age is retained and samples older than 90 seconds
+are excluded. The three-sample EV/load membership classifier likewise clears
+its evidence when Ohme is old or a required physical input is stale.
+
+An actively charging EV is assessed only when the measured load boundary is
+identified, every required power reading is finite and carries acceptable
+freshness, and the no-paid-export policy applies. The audit compares observed
+battery discharge with non-EV residual home demand after solar and compares
+grid import with EV power after giving any surplus PV credit. It reports
+`net_allocation_consistent`, `deviation`, `unavailable`, `idle` or
+`not_applicable`, plus the separate measured quantities and a *candidate*
+inverter site-output ceiling. The comparison is **not** electrical isolation
+proof, closed-loop control, a Force Discharge setpoint or a safety interlock.
+Neither a single green snapshot nor three measurement-membership samples
+authorise physical KH7 writes.
+
+KEMS's normal retained history is a five-minute observation series; audit
+readouts update each coordinator scan and are retained at that sampling
+interval. Pre-upgrade snapshots have no Ohme report-age or shared-bus audit,
+so historical evidence cannot be retroactively declared verified. For
+short transitions, a future read-only event trace may be required, using the
+same mapped KEMS sources and recording actual work-mode/MinSOC readbacks.
+
 ## Passive evidence capture — no KEMS hardware writes
 
 Capture the same timestamp/window for each item:
