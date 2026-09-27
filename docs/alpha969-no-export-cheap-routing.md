@@ -25,6 +25,31 @@ permission to charge to 100%. The charger should take confirmed cheap grid
 power while sufficiently stored battery energy serves non-EV household load in
 the proposed twin.
 
+## Shared-bus topology and evidence
+
+The owner has confirmed that grid and inverter feed EPS/changeover equipment,
+then the Henley blocks supply both main and EV consumer units. The load sources
+are on a shared downstream AC bus. We can use KEMS's existing Octopus, Ohme,
+FoxESS and retained history; no repeat wiring diagram or manual transcription
+of KEMS dashboard power figures is required.
+
+The intended grid-to-EV and battery-to-house split is a **measured net-power
+allocation** on that bus, not an electrically segregated supply. For an EV at
+7 kW and non-EV house demand of 1 kW with no PV or battery charging, about
+1 kW inverter output and about 7 kW grid import would be the target
+allocation. The actual KH7 output must be constrained and verified against
+fresh Ohme and grid/CT data; Self Use alone can discharge battery into EV
+demand on the shared bus. If bounded output control is unavailable or
+unproven, hold fresh physical SOC during EV charging instead. EPS/island
+protection and EV shedding must not depend solely on cloud Ohme response.
+
+Prior live Alpha9.59 evidence already established bounded confirmed-cheap
+Force Charge, measured battery charge/grid import and mode/MinSOC restoration.
+The new target-limited below-floor sequence, simultaneous EV dispatch and
+transitions still require their own readback evidence, not a duplicate basic
+Force Charge trial. KEMS's retained history records at five-minute intervals;
+a short read-only charging transition capture may be needed for time alignment.
+
 ## EV scope and accounting
 
 KEMS's house_load_kw is the mapped FoxESS Load Power reading where available,
@@ -120,8 +145,8 @@ turning on Master Control.
 A future live change to enable battery-to-house concurrently with EV charging
 requires independently validated Ohme power, site CT and FoxESS battery/grid
 power over repeated transitions, documented source membership, a supported
-means of enforcing EV grid supply, readback, and confirmed physical energy
-balance. Simulation tests or a single balanced snapshot do not provide that
+means of limiting KH7 output to non-EV demand while confirming equivalent
+EV grid import, readback, and a measured whole-site energy balance. Simulation tests or a single balanced snapshot do not provide that
 proof. Below-target Force Charge in the new Alpha9.69 route is **not authorised to
 write** and is **not** declared hardware-proven. The old Alpha9.67 charging
 route retains only its existing reviewed bounded authority.
