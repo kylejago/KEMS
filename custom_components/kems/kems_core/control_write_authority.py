@@ -95,7 +95,7 @@ def assess_foxess_control_write_authority(
     ):
         return blocked(
             "Alpha9.69 no-export routing is shadow-only pending physical "
-            "EV/load isolation and below-floor Force Charge validation"
+            "shared-bus EV/grid allocation and below-floor Force Charge validation"
         )
 
     min_soc = round(control.desired_min_soc_percent, 1)
