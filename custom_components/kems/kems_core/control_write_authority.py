@@ -87,11 +87,10 @@ def assess_foxess_control_write_authority(
         )
 
     # Alpha9.69 introduces new SOC-floor and EV/load routing semantics. The
-    # existing Alpha9.67 write contract never validated their physical KH7
-    # behaviour. Preserve the previous release's bounded authority, but
-    # explicitly fail closed on every new Alpha9.69 cheap-route plan until a
-    # separate, reviewed physical evidence gate grants that specific authority.
-    if control.operating_reason.startswith(
+    # old Alpha9.67 live contract never validated their physical KH7 behaviour.
+    # The sticky flag survives dataclasses.replace overlays (e.g. Happy Hour
+    # replacing operating_reason); the reason check is defence in depth.
+    if control.alpha969_routing_shadow_only or control.operating_reason.startswith(
         ("no_export_overnight", "no_export_extra_slot")
     ):
         return blocked(
