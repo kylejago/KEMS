@@ -121,19 +121,24 @@ def protect_live_cheap_ev(
     conservative_demand = max(house, control.grid_bypass_power_kw, 0.0)
     if snapshot.ev_load_in_house_load is not True:
         conservative_demand += ev
-    conservative_demand = max(conservative_demand, grid)
+    # Actual CT import can already include an existing Force Charge request.
+    # Adding it again to planned charge would double-count and oscillate the
+    # controller. Use CT import only as an independent over-limit veto.
+    observed_over_limit = grid > limit + 0.001
     charge = min(
-        max(control.desired_charge_power_kw, 0.0),
+        0.0 if observed_over_limit else max(control.desired_charge_power_kw, 0.0),
         max(config.max_charge_kw, 0.0),
         max(limit - conservative_demand, 0.0),
     )
     total = conservative_demand + charge
-    safe = control.plan_safe and total <= limit + 0.001
+    safe = control.plan_safe and not observed_over_limit and total <= limit + 0.001
     guard_status = (
         "ev_battery_hold_with_cheap_charge" if charge > 0.001 else "ev_battery_hold"
     )
     if snapshot.ev_load_in_house_load is not True:
         guard_status += "_conservative_scope"
+    if observed_over_limit:
+        guard_status = "observed_site_import_limit_exceeded"
     return replace(
         control,
         ev_grid_guard_status=guard_status,
@@ -147,6 +152,11 @@ def protect_live_cheap_ev(
         site_import_headroom_kw=round(limit - total, 3),
         site_import_limit_exceeded=not safe,
         plan_safe=safe,
+        blocked_reason=(
+            "Observed grid import exceeds configured site limit"
+            if observed_over_limit
+            else control.blocked_reason
+        ),
         next_action=(
             "EV active: hold battery with physical MinSOC and use confirmed "
             "cheap grid for the shared home/EV bus; this does not provide "
