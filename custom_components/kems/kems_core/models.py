@@ -56,6 +56,9 @@ class Snapshot:
     # Proven from repeated independent site-balance observations, not sensor name.
     # None means that EV demand cannot safely be split from house_load_kw.
     ev_load_in_house_load: bool | None = None
+    # Read-only site-balance audit, retained with the observation for replay.
+    # A consistent balance never grants KH7 write authority or circuit isolation.
+    shared_bus_ev_audit: dict[str, Any] = field(default_factory=dict)
 
     house_load_kw: float | None = None
     battery_soc: float | None = None
