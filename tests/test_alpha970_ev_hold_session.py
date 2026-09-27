@@ -136,7 +136,10 @@ def test_restart_preserves_max_floor_until_confirmed_charge_stop():
 
     one, two, three, waiting, stop, status = asyncio.run(exercise())
     assert [x.desired_min_soc_percent for x in (one, two, three, waiting)] == [
-        64.0, 64.0, 64.0, 64.0
+        64.0,
+        64.0,
+        64.0,
+        64.0,
     ]
     assert waiting.desired_charge_power_kw == 0.0
     assert status["latched_min_soc_percent"] is None
