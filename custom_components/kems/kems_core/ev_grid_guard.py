@@ -30,6 +30,7 @@ def protect_live_cheap_ev(
     config: ControlConfig,
     *,
     no_paid_export_mode: bool,
+    held_floor_percent: float | None = None,
 ) -> ControlState:
     """Guard a confirmed-cheap live plan when Ohme draws power or is unknown.
 
@@ -52,10 +53,18 @@ def protect_live_cheap_ev(
         return control
 
     ev = _nonnegative(snapshot.ev_power_kw)
+    explicit_stop = bool(
+        snapshot.ev_charging is False
+        and ev is not None
+        and ev <= _EV_ACTIVE_KW
+        and snapshot.ev_power_age_seconds is not None
+        and snapshot.ev_power_age_seconds <= _MAX_OHME_AGE_SECONDS
+    )
     ev_active = bool(
         snapshot.ev_charging is True
         or (ev is not None and ev > _EV_ACTIVE_KW)
         or (snapshot.ev_connected is True and snapshot.ev_charging is None)
+        or (held_floor_percent is not None and not explicit_stop)
     )
     if not ev_active:
         return control
@@ -74,12 +83,21 @@ def protect_live_cheap_ev(
             desired_work_mode="No change",
             desired_charge_power_kw=0.0,
             plan_safe=False,
-            blocked_reason="EV active: no fresh physical battery SOC for safe MinSOC hold",
+            blocked_reason=(
+                "EV active: no fresh physical battery SOC for safe MinSOC hold"
+            ),
         )
 
     # MinSOC-on-grid is a *whole-bus* floor, not a per-circuit power limit.
     # A one-percentage-point buffer avoids relying on an exact rounded SOC.
-    held_soc = min(100.0, max(control.desired_min_soc_percent, float(ceil(soc) + 1)))
+    held_soc = min(
+        100.0,
+        max(
+            control.desired_min_soc_percent,
+            float(ceil(soc) + 1),
+            held_floor_percent or 0.0,
+        ),
+    )
     ev_fresh = bool(
         snapshot.ev_charging is True
         and ev is not None
