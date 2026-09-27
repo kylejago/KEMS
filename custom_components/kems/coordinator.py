@@ -50,6 +50,7 @@ from .kems_core import (
     WholeHomeEngine,
     assess_quality,
 )
+from .kems_core.shared_bus_balance import assess_shared_bus_balance
 from .lifetime import LifetimeLedgerRecorder
 from .power_down import PowerDownHistoryRecorder
 from .product_types import (
@@ -59,7 +60,6 @@ from .product_types import (
 )
 from .providers.entity_map import KEMSEntities
 from .roi_accounting import async_reconcile_financial_commissioning
-from .kems_core.shared_bus_balance import assess_shared_bus_balance
 from .settings import KEMSSettings
 from .shadow_validation import ShadowValidationRecorder
 
