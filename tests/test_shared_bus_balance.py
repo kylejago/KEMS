@@ -26,6 +26,7 @@ def _snapshot(**kwargs: object) -> Snapshot:
         "ev_connected": True,
         "ev_charging": True,
         "ev_power_kw": 6.0,
+        "ev_power_age_seconds": 10.0,
         "ev_load_in_house_load": True,
         "house_load_kw": 8.0,
         "solar_power_kw": 0.0,
@@ -91,6 +92,11 @@ def test_unknown_ev_measurement_scope_refuses_attribution() -> None:
     result = _audit(_snapshot(ev_load_in_house_load=None))
     assert result.status == "unavailable"
     assert result.non_ev_house_kw is None
+
+
+def test_aged_ohme_report_cannot_validate_shared_bus() -> None:
+    assert _audit(_snapshot(ev_power_age_seconds=None)).status == "unavailable"
+    assert _audit(_snapshot(ev_power_age_seconds=91.0)).status == "unavailable"
 
 
 def test_stale_or_undated_readings_fail_closed() -> None:
