@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import date, datetime, timedelta
 from statistics import fmean
 
@@ -1180,6 +1181,7 @@ class SimulationEngine:
         forecast_energy_until_offpeak_kwh: float | None,
         *,
         exclude_active_cheap: bool = False,
+        preserve_alpha968_control_forecast: bool = False,
     ) -> tuple[float, str, float, float, float]:
         """Return conservative net home demand and transparent forecast inputs."""
         remaining_hours = self._hours_until_next_cheap(snapshot)
@@ -1208,7 +1210,7 @@ class SimulationEngine:
         )
         recent_load = self._recent_average_load_kw(records, snapshot)
         current_load = _load_kw(snapshot)
-        if ev_in_history:
+        if ev_in_history and not preserve_alpha968_control_forecast:
             cutoff = snapshot.timestamp - timedelta(hours=RECENT_LOAD_WINDOW_HOURS)
             non_ev_loads = [
                 split.house_kw
@@ -1230,7 +1232,9 @@ class SimulationEngine:
             )
         fallback_load = recent_load if recent_load is not None else current_load
 
-        if forecast_energy_until_offpeak_kwh is not None and not ev_in_history:
+        if forecast_energy_until_offpeak_kwh is not None and (
+            not ev_in_history or preserve_alpha968_control_forecast
+        ):
             home = max(forecast_energy_until_offpeak_kwh, 0.0)
             source = "learned_profile"
             if active_cheap_end is not None and fallback_load is not None:
@@ -1241,7 +1245,7 @@ class SimulationEngine:
                 home = max(home - fallback_load * cheap_hours_remaining, 0.0)
         elif fallback_load is not None:
             home = fallback_load * forecast_hours
-            if ev_in_history:
+            if ev_in_history and not preserve_alpha968_control_forecast:
                 source = (
                     "recent_non_ev_average"
                     if recent_load is not None
@@ -1263,6 +1267,56 @@ class SimulationEngine:
         )
         net_required = max(home - solar_credit, 0.0) * HOME_RESERVE_SAFETY_FACTOR
         return net_required, source, home, solar, solar_credit
+
+    def legacy_no_export_control_view(
+        self,
+        snapshot: Snapshot,
+        records: list[Snapshot],
+        config: SimulationConfig,
+        forecast_energy_until_offpeak_kwh: float | None,
+        simulation: SimulationState,
+    ) -> SimulationState:
+        """Preserve Alpha9.68's physical cheap-charge target and site budget.
+
+        Alpha9.69 EV-excluded forecasts belong to the proposed twin, not the
+        commissioned Control-mode target. The physical backend still receives
+        the approved Self Use / Force Charge / MinSOC commands. This method
+        never changes the published simulation or permits new hardware writes.
+        """
+        if not simulation.no_export_mode_active or not snapshot.cheap_period_confirmed:
+            return simulation
+        required, source, forecast_home, forecast_solar, solar_credit = (
+            self._no_export_home_forecast(
+                snapshot,
+                records,
+                config,
+                forecast_energy_until_offpeak_kwh,
+                exclude_active_cheap=True,
+                preserve_alpha968_control_forecast=True,
+            )
+        )
+        capacity = max(config.battery_capacity_kwh, 0.01)
+        reserve_kwh = capacity * config.battery_reserve_percent / 100.0
+        target = self._no_export_charge_target_stored_kwh(
+            required, reserve_kwh, capacity, config
+        )
+        load = _load_kw(snapshot)
+        solar = self._simulated_solar_power(snapshot, config)
+        if load is None:
+            bypass = None
+        else:
+            solar_to_home = min(solar, load, max(config.inverter_limit_kw, 0.0))
+            bypass = round(max(load - solar_to_home, 0.0), 3)
+        return replace(
+            simulation,
+            overnight_charge_target_percent=round(100 * target / capacity, 1),
+            overnight_charge_target_kwh=round(target, 3),
+            home_reserve_forecast_source=source,
+            forecast_home_until_next_cheap_kwh=round(forecast_home, 3),
+            forecast_solar_until_next_cheap_kwh=round(forecast_solar, 3),
+            forecast_solar_credit_kwh=round(solar_credit, 3),
+            current_simulated_grid_bypass_power_kw=bypass,
+        )
 
     @staticmethod
     def _no_export_charge_target_stored_kwh(
