@@ -84,13 +84,27 @@ the fallback. Neither Force Discharge nor import/export power-limit writes are
 added. Existing write-authority, emergency stop, commissioning, ownership
 restoration, grid/island and site-import gates remain in place.
 
+**Explicit release gate:** the pre-existing Alpha9.67 write-authority contract
+can otherwise turn a new Alpha9.69 Force Charge plan into a hardware command
+with only the older commissioning checks. Alpha9.69 therefore adds a fail-closed
+rule in `assess_foxess_control_write_authority` for the new
+`no_export_overnight*` and `no_export_extra_slot*` reasons. This applies to
+both new Self Use and Force Charge intent, including the EV fallback. They
+remain available for shadow/replay, but the existing backend must release its
+owned state rather than issue their unvalidated work-mode/MinSOC writes.
+Previously reviewed Alpha9.67 commands retain their older authority when
+their existing conditions hold. A future live enablement requires a separate,
+reviewed proof-and-authority change, not merely changing the operating mode or
+turning on Master Control.
+
 A future live change to enable battery-to-house concurrently with EV charging
 requires independently validated Ohme power, site CT and FoxESS battery/grid
 power over repeated transitions, documented source membership, a supported
 means of enforcing EV grid supply, readback, and confirmed physical energy
 balance. Simulation tests or a single balanced snapshot do not provide that
-proof. Below-target Force Charge remains subject to the pre-existing
-commissioning and live readback gates and is **not** declared hardware-proven.
+proof. Below-target Force Charge in the new Alpha9.69 route is **not authorised to
+write** and is **not** declared hardware-proven. The old Alpha9.67 charging
+route retains only its existing reviewed bounded authority.
 
 ## Validation / release boundary
 
