@@ -7,7 +7,10 @@ a closed-loop controller, or authority to change the KH7 work mode.
 
 from __future__ import annotations
 
+from collections import Counter
+from collections.abc import Sequence
 from dataclasses import asdict, dataclass
+from datetime import datetime, timedelta
 from math import isfinite
 
 from .models import Snapshot
@@ -151,3 +154,36 @@ def assess_shared_bus_balance(
         ),
         load_scope_reason=split.reason,
     )
+
+def summarise_shared_bus_audits(
+    records: Sequence[Snapshot],
+    now: datetime,
+    *,
+    lookback_hours: float = 24.0,
+    max_samples: int = 72,
+) -> dict[str, object]:
+    """Bounded, retained evidence from KEMS's existing five-minute snapshots.
+
+    A historical series of matching readings can inform commissioning review.
+    It never converts a measurement verdict into hardware command permission.
+    """
+    cutoff = now - timedelta(hours=max(lookback_hours, 0.0))
+    recent = [
+        item.shared_bus_ev_audit
+        for item in records
+        if item.timestamp >= cutoff and isinstance(item.shared_bus_ev_audit, dict)
+        and item.shared_bus_ev_audit.get("status")
+    ]
+    counts = Counter(str(item["status"]) for item in recent)
+    return {
+        "lookback_hours": lookback_hours,
+        "recorded_samples": len(recent),
+        "status_counts": dict(sorted(counts.items())),
+        "samples": recent[-max(max_samples, 1):],
+        "physical_isolation_proven": False,
+        "hardware_write_authorised": False,
+        "sample_period_note": (
+            "Existing KEMS history samples at five-minute intervals; short "
+            "charging transitions need separate time-aligned observation"
+        ),
+    }
