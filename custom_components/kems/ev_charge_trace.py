@@ -125,10 +125,7 @@ class EVChargeTraceRecorder:
             or (snapshot.ev_power_kw or 0.0) > 0.1
             or self._previous_connected
             or self._previous_charging
-            or (
-                self._post_until is not None
-                and snapshot.timestamp <= self._post_until
-            )
+            or (self._post_until is not None and snapshot.timestamp <= self._post_until)
         )
 
     async def async_load(self) -> None:
@@ -161,19 +158,18 @@ class EVChargeTraceRecorder:
         plugged = connected and not self._previous_connected
         unplugged = self._previous_connected and not connected
         cheap_changed = cheap != self._previous_cheap
-        event = (
-            "charge_start"
-            if started
-            else "charge_stop"
-            if stopped
-            else "plugged"
-            if plugged
-            else "unplugged"
-            if unplugged
-            else "cheap_slot_transition"
-            if cheap_changed and (active or self._previous_connected)
-            else "scan"
-        )
+        if started:
+            event = "charge_start"
+        elif stopped:
+            event = "charge_stop"
+        elif plugged:
+            event = "plugged"
+        elif unplugged:
+            event = "unplugged"
+        elif cheap_changed and (active or self._previous_connected):
+            event = "cheap_slot_transition"
+        else:
+            event = "scan"
         sample = build_ev_trace_sample(
             snapshot,
             event=event,
@@ -184,7 +180,8 @@ class EVChargeTraceRecorder:
             self._prelude.append(sample)
             cutoff = now - timedelta(minutes=PRELUDE_MINUTES)
             self._prelude = [
-                item for item in self._prelude
+                item
+                for item in self._prelude
                 if datetime.fromisoformat(item["timestamp"]) >= cutoff
             ][-32:]
             return False
@@ -194,17 +191,16 @@ class EVChargeTraceRecorder:
             self._prelude.clear()
         if unplugged:
             self._post_until = now + timedelta(minutes=POSTLUDE_MINUTES)
-        due = (
-            not self._records
-            or (now - datetime.fromisoformat(self._records[-1]["timestamp"]))
-            >= timedelta(seconds=MIN_INTERVAL_SECONDS)
-        )
+        due = not self._records or (
+            now - datetime.fromisoformat(self._records[-1]["timestamp"])
+        ) >= timedelta(seconds=MIN_INTERVAL_SECONDS)
         transition = event != "scan"
         if due or transition:
             self._records.append(sample)
             cutoff = now - timedelta(hours=RETENTION_HOURS)
             self._records = [
-                item for item in self._records
+                item
+                for item in self._records
                 if datetime.fromisoformat(item["timestamp"]) >= cutoff
             ][-MAX_RECORDS:]
             self._unsaved += 1
