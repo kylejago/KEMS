@@ -10,6 +10,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 from kems_core import ControlState, Snapshot
+from kems_core.control_write_authority import assess_foxess_control_write_authority
 
 INTEGRATION_DIR = Path(__file__).parents[1] / "custom_components" / "kems"
 
@@ -204,6 +205,55 @@ def test_happy_hour_ev_overlay_is_separate_from_normal_cheap_authority() -> None
         },
     )
     assert capped == base
+
+
+def test_happy_hour_overlay_cannot_unlock_alpha969_shadow_route() -> None:
+    """An overwritten reason cannot promote new cheap routing to live KH7."""
+    snapshot = Snapshot(
+        timestamp=START,
+        off_peak=True,
+        ev_connected=True,
+    )
+    proposal = ControlState(
+        operating_mode="control",
+        operating_reason="no_export_extra_slot",
+        alpha969_routing_shadow_only=True,
+        desired_work_mode="Force Charge",
+        desired_charge_power_kw=2.0,
+        desired_min_soc_percent=60.0,
+        desired_grid_export_allowed=False,
+        desired_battery_export_power_kw=0.0,
+        grid_available=True,
+        data_fresh=True,
+        plan_safe=True,
+        preflight_passed=15,
+        preflight_total=15,
+    )
+    overlaid = apply_happy_hour_control(
+        proposal,
+        snapshot,
+        {
+            "happy_hour_import_authority_active": True,
+            "ev_happy_hour_allowed": True,
+            "charge_target_kw": 7.0,
+        },
+    )
+    assert overlaid.operating_reason == "happy_hour_reward_hour"
+    assert overlaid.alpha969_routing_shadow_only is True
+    decision = assess_foxess_control_write_authority(
+        overlaid,
+        technical_ready=True,
+        binding_ready=True,
+        reviewed_version_matches=True,
+        no_paid_export_mode=True,
+        cheap_period_confirmed=True,
+        user_commissioned=True,
+        master_control_enabled=True,
+        emergency_stop=False,
+    )
+    assert decision.commands_permitted is False
+    assert decision.action == "release"
+    assert "shadow-only pending physical" in decision.reason
 
 
 def test_ohme_write_requires_automatic_happy_hour_and_cap_margin() -> None:
