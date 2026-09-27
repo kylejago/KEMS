@@ -124,6 +124,21 @@ BINARY_SENSORS: tuple[KEMSBinarySensorEntityDescription, ...] = (
         is_on_fn=lambda data: data.simulation.no_export_mode_active,
     ),
     KEMSBinarySensorEntityDescription(
+        key="alpha969_routing_shadow_only",
+        name="Alpha9.69 routing shadow-only",
+        icon="mdi:shield-lock-outline",
+        is_on_fn=lambda data: data.control.alpha969_routing_shadow_only,
+    ),
+    KEMSBinarySensorEntityDescription(
+        key="no_export_ev_load_scope_identified",
+        name="No-export EV load measurement scope identified",
+        icon="mdi:meter-electric-outline",
+        is_on_fn=lambda data: (
+            data.simulation.no_export_mode_active
+            and data.simulation.no_export_ev_load_proven
+        ),
+    ),
+    KEMSBinarySensorEntityDescription(
         key="battery_export_simulated",
         name="Full KEMS battery export present in simulation",
         icon="mdi:battery-arrow-down-outline",
