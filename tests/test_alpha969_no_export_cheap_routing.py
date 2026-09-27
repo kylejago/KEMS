@@ -233,7 +233,7 @@ def test_shadow_floor_discharge_and_live_ev_fallback_are_separate():
     assert "ev_isolation_fallback" in live.operating_reason
     assert "KH7" in live.next_action
     assert "shadow-only" in live.next_action
-    assert "physical KH7 routing proof is pending" in live.blocked_reason
+    assert "measured shared-bus output/import proof is pending" in live.blocked_reason
     assert live.commands_permitted is False
 
 
