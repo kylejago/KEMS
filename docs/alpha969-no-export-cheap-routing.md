@@ -87,9 +87,12 @@ restoration, grid/island and site-import gates remain in place.
 **Explicit release gate:** the pre-existing Alpha9.67 write-authority contract
 can otherwise turn a new Alpha9.69 Force Charge plan into a hardware command
 with only the older commissioning checks. Alpha9.69 therefore adds a fail-closed
-rule in `assess_foxess_control_write_authority` for the new
-`no_export_overnight*` and `no_export_extra_slot*` reasons. This applies to
-both new Self Use and Force Charge intent, including the EV fallback. They
+rule in `assess_foxess_control_write_authority` using the dedicated
+`alpha969_routing_shadow_only` state flag, with the
+`no_export_overnight*` and `no_export_extra_slot*` reasons as additional
+defence. The flag survives downstream `dataclasses.replace` overlays such as
+Happy Hour, which replaces the operating reason and charge request. This applies
+to both new Self Use and Force Charge intent, including the EV fallback. They
 remain available for shadow/replay, but the existing backend must release its
 owned state rather than issue their unvalidated work-mode/MinSOC writes.
 Previously reviewed Alpha9.67 commands retain their older authority when
