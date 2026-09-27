@@ -81,9 +81,25 @@ class Collector:
             fallback_age_seconds=octopus.current_demand_age_seconds,
         )
 
+        # The cloud Ohme sample and local Modbus samples are not atomic.
+        # Do not accumulate a measurement-scope proof from aged Ohme data or
+        # stale physical sources.
+        scope_fresh = not any(
+            key in foxess.stale_fields
+            for key in (
+                "house_load_kw",
+                "battery_power_kw",
+                "solar_power_kw",
+                "grid_import_kw",
+                "grid_export_kw",
+            )
+        ) and (
+            ohme.power_age_seconds is not None
+            and ohme.power_age_seconds <= 90.0
+        )
         candidate = infer_ev_load_in_house_load(
-            house_kw=foxess.house_load_kw,
-            ev_kw=ohme.power_kw if ohme.charging is True else None,
+            house_kw=foxess.house_load_kw if scope_fresh else None,
+            ev_kw=ohme.power_kw if scope_fresh and ohme.charging is True else None,
             solar_kw=foxess.solar_power_kw,
             battery_kw=foxess.battery_power_kw,
             grid_import_kw=foxess.grid_import_kw,
@@ -147,6 +163,7 @@ class Collector:
             ev_connected=ohme.connected,
             ev_charging=ohme.charging,
             ev_power_kw=ohme.power_kw,
+            ev_power_age_seconds=ohme.power_age_seconds,
             ev_soc=ohme.vehicle_soc,
             ev_load_in_house_load=proven_ev_scope,
             house_load_kw=demand.house_load_kw,
