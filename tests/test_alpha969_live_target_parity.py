@@ -48,17 +48,12 @@ def _config():
 def test_live_forecast_retains_old_learned_profile_not_ev_excluded_twin():
     engine = SimulationEngine()
     snap = _snapshot()
-    records = [
-        _snapshot(timestamp=WHEN - timedelta(minutes=10 * i))
-        for i in (2, 1, 0)
-    ]
+    records = [_snapshot(timestamp=WHEN - timedelta(minutes=10 * i)) for i in (2, 1, 0)]
     config = _config()
     twin = engine._empty_current_state(
         snap, records, config, forecast_energy_until_offpeak_kwh=12.0
     )
-    live = engine.legacy_no_export_control_view(
-        snap, records, config, 12.0, twin
-    )
+    live = engine.legacy_no_export_control_view(snap, records, config, 12.0, twin)
     assert twin.no_export_mode_active is True
     assert twin.home_reserve_forecast_source == "recent_non_ev_average"
     assert live.home_reserve_forecast_source == "learned_profile"
@@ -95,9 +90,12 @@ def test_real_backend_receives_legacy_view_and_separate_twin_is_advisory():
     kems = Path(__file__).parents[1] / "custom_components" / "kems"
     coordinator = (kems / "coordinator.py").read_text(encoding="utf-8")
     assert "self._simulation.legacy_no_export_control_view(" in coordinator
-    assert "if self.settings.control.operating_mode == \"control\"" in coordinator
+    assert 'if self.settings.control.operating_mode == "control"' in coordinator
     assert "control_simulation," in coordinator
-    assert "proposal = self._control.plan(\n                    snapshot,\n                    base_simulation," in coordinator
+    assert (
+        "proposal = self._control.plan(\n                    snapshot,\n                    base_simulation,"
+        in coordinator
+    )
     assert "control=control,\n                technical_ready=" in coordinator
     assert "control=proposal,\n                technical_ready=" not in coordinator
     assert "self._ev_charge_trace.async_record(" in coordinator
