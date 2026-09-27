@@ -135,6 +135,7 @@ async def async_get_config_entry_diagnostics(
         "phase": data.phase,
         "snapshot": data.snapshot.to_dict(),
         "shared_bus_ev_balance": dict(data.snapshot.shared_bus_ev_audit),
+        "shared_bus_ev_evidence": coordinator.shared_bus_ev_evidence,
         "grid_diagnostics": {
             "raw_import_kw": data.snapshot.raw_grid_import_kw,
             "raw_export_kw": data.snapshot.raw_grid_export_kw,
