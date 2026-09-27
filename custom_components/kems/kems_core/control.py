@@ -603,7 +603,7 @@ class ControlEngine:
         config: ControlConfig,
         base: dict[str, object],
     ) -> ControlState:
-        """Use physical SOC for the floor; never grant unproven EV isolation."""
+        """Use physical SOC for the floor; do not assert shared-bus EV supply."""
         kind = no_export_cheap_period_kind(snapshot)
         assert kind is not None  # Caller has already passed cheap confirmation.
         raw_load = (
@@ -742,9 +742,9 @@ class ControlEngine:
         if live_ev_fallback:
             reason += "_ev_isolation_fallback"
         action = (
-            "Conservative live EV fallback: KH7 cannot independently guarantee "
-            "grid-only EV and battery-only house; hold physical SOC. "
-            "Twin flows are not physical grid-origin proof."
+            "Conservative live EV fallback: house and EV share the downstream "
+            "bus; Self Use can discharge into EV demand. Hold physical SOC. "
+            "Twin allocations are not separate AC source proof."
             if live_ev_fallback
             else "Preserve the no-export minimum SOC floor; supply non-EV house "
             "demand from available solar and above-floor battery energy."
@@ -792,7 +792,7 @@ class ControlEngine:
             blocked_reason=(
                 "Configured site-import limit exceeded"
                 if site_exceeded
-                else "Alpha9.69 shadow-only: physical KH7 routing proof is pending"
+                else "Alpha9.69 shadow-only: measured shared-bus output/import proof is pending"
             ),
             next_action=action,
         )
