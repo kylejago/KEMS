@@ -86,6 +86,18 @@ def assess_foxess_control_write_authority(
             "Deliberate battery/grid export is outside the current live scope"
         )
 
+    # Alpha9.69 introduces new SOC-floor and EV/load routing semantics. The
+    # old Alpha9.67 live contract never validated their physical KH7 behaviour.
+    # The sticky flag survives dataclasses.replace overlays (e.g. Happy Hour
+    # replacing operating_reason); the reason check is defence in depth.
+    if control.alpha969_routing_shadow_only or control.operating_reason.startswith(
+        ("no_export_overnight", "no_export_extra_slot")
+    ):
+        return blocked(
+            "Alpha9.69 no-export routing is shadow-only pending physical "
+            "shared-bus EV/grid allocation and below-floor Force Charge validation"
+        )
+
     min_soc = round(control.desired_min_soc_percent, 1)
     if control.desired_work_mode == "Force Charge":
         if not cheap_period_confirmed:

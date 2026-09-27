@@ -134,6 +134,9 @@ async def async_get_config_entry_diagnostics(
         "options": dict(entry.options),
         "phase": data.phase,
         "snapshot": data.snapshot.to_dict(),
+        "shared_bus_ev_balance": dict(data.snapshot.shared_bus_ev_audit),
+        "shared_bus_ev_evidence": coordinator.shared_bus_ev_evidence,
+        "ev_charge_trace": coordinator.ev_charge_trace_state,
         "grid_diagnostics": {
             "raw_import_kw": data.snapshot.raw_grid_import_kw,
             "raw_export_kw": data.snapshot.raw_grid_export_kw,
@@ -183,6 +186,7 @@ async def async_get_config_entry_diagnostics(
         },
         "roi": asdict(data.roi),
         "control": asdict(data.control),
+        "alpha969_shadow_plan": dict(data.alpha969_shadow_plan),
         "shadow_validation": shadow_validation,
         "shadow_readiness": shadow_readiness,
         "commissioning": build_commissioning_snapshot(hass, coordinator),

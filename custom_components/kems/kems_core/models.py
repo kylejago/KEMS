@@ -52,7 +52,14 @@ class Snapshot:
     ev_connected: bool | None = None
     ev_charging: bool | None = None
     ev_power_kw: float | None = None
+    ev_power_age_seconds: float | None = None
     ev_soc: float | None = None
+    # Proven from repeated independent site-balance observations, not sensor name.
+    # None means that EV demand cannot safely be split from house_load_kw.
+    ev_load_in_house_load: bool | None = None
+    # Read-only site-balance audit, retained with the observation for replay.
+    # A consistent balance never grants KH7 write authority or circuit isolation.
+    shared_bus_ev_audit: dict[str, Any] = field(default_factory=dict)
 
     house_load_kw: float | None = None
     battery_soc: float | None = None
@@ -368,6 +375,8 @@ class SimulationState:
     actual_grid_import_kwh: float | None = None
     actual_grid_export_kwh: float | None = None
     simulated_grid_import_kwh: float | None = None
+    # Proposed no-export EV-grid allocation; None when attribution is incomplete.
+    simulated_ev_grid_import_kwh: float | None = None
     simulated_cheap_import_kwh: float | None = None
     simulated_day_import_kwh: float | None = None
     simulated_grid_export_kwh: float | None = None
@@ -388,6 +397,8 @@ class SimulationState:
     actual_system_value_pence: float | None = None
     simulated_system_value_pence: float | None = None
     current_simulated_house_load_kw: float | None = None
+    current_simulated_non_ev_house_load_kw: float | None = None
+    current_simulated_ev_grid_import_kw: float | None = None
     current_simulated_solar_power_kw: float | None = None
     current_simulated_grid_import_kw: float | None = None
     current_simulated_grid_export_kw: float | None = None
@@ -431,6 +442,9 @@ class SimulationState:
     export_tariff_status: str = "active"
     export_tariff_active: bool = True
     no_export_mode_active: bool = False
+    no_export_cheap_policy: str | None = None
+    no_export_ev_load_proven: bool = False
+    no_export_ev_scope_reason: str | None = None
     overnight_charge_target_percent: float | None = None
     overnight_charge_target_kwh: float | None = None
     forecast_home_until_next_cheap_kwh: float | None = None
@@ -952,6 +966,8 @@ class ControlState:
     commissioned: bool = False
     real_backend_available: bool = False
     commands_permitted: bool = False
+    # Sticky across dataclasses.replace overlays: not an Alpha9.67 live command.
+    alpha969_routing_shadow_only: bool = False
     blocked_reason: str = "Simulation/shadow only"
     next_action: str = "Continue observing"
     preflight_passed: int = 0
@@ -1035,3 +1051,5 @@ class KEMSData:
     forecast_plan: ForecastPlanState = field(default_factory=ForecastPlanState)
     last_power_down: PowerDownResult = field(default_factory=PowerDownResult)
     periods: dict[str, PeriodTotals] = field(default_factory=dict)
+    # Separate advisory proposal; never passes through FoxESS write authority.
+    alpha969_shadow_plan: dict[str, Any] = field(default_factory=dict)

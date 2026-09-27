@@ -22,6 +22,7 @@ from .collector import Collector
 from .commissioning import build_commissioning_snapshot
 from .const import NAME
 from .entity_discovery import SourceValidationResult
+from .ev_charge_trace import EVChargeTraceRecorder
 from .export_accounting import (
     actual_export_income_pence,
     async_repair_no_paid_export_income,
@@ -30,6 +31,7 @@ from .export_accounting import (
 )
 from .forecast_validation import ForecastValidationRecorder
 from .forecasting import SolarForecastCoordinator
+from .foxess_command_shadow import build_foxess_command_shadow_snapshot
 from .foxess_control_backend import FoxESSControlBackend
 from .happy_hour_budget import apply_happy_hour_control
 from .happy_hour_ohme_control import OhmeHappyHourController
@@ -49,6 +51,10 @@ from .kems_core import (
     SimulationEngine,
     WholeHomeEngine,
     assess_quality,
+)
+from .kems_core.shared_bus_balance import (
+    assess_shared_bus_balance,
+    summarise_shared_bus_audits,
 )
 from .lifetime import LifetimeLedgerRecorder
 from .power_down import PowerDownHistoryRecorder
@@ -88,6 +94,7 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
             entry.entry_id,
             settings.history_days,
         )
+        self._ev_charge_trace = EVChargeTraceRecorder(hass, entry.entry_id)
         self._learning = LearningEngine()
         self._forecast = SolarForecastCoordinator(hass, settings.forecast)
         self._forecast_planning = ForecastPlanningEngine()
@@ -146,6 +153,16 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
         return self._happy_hour_ohme.status
 
     @property
+    def shared_bus_ev_evidence(self) -> dict:
+        """Summarise recent read-only EV/house balance from retained KEMS history."""
+        return summarise_shared_bus_audits(self._history.records, dt_util.now())
+
+    @property
+    def ev_charge_trace_state(self) -> dict:
+        """Return retained event-frequency EV evidence from existing sensors."""
+        return self._ev_charge_trace.state
+
+    @property
     def foxess_control_state(self) -> dict:
         """Return the bounded FoxESS real-control audit state."""
         return self._foxess_control.status
@@ -160,6 +177,7 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
         await self._happy_hour_ohme.async_setup()
         await self._foxess_control.async_setup()
         await self._history.async_load()
+        await self._ev_charge_trace.async_load()
         await self._forecast_validation.async_load()
         await self._lifetime.async_load()
         if (
@@ -186,6 +204,18 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
         """Run the complete read-only KEMS analysis pipeline."""
         try:
             snapshot = self._collector.collect()
+            # Use the same already-collected physical snapshot as every other
+            # KEMS flow. This read-only audit never enters hardware authority.
+            snapshot.shared_bus_ev_audit = assess_shared_bus_balance(
+                snapshot,
+                no_paid_export_mode=(
+                    self.settings.simulation.export_tariff_status != "active"
+                ),
+                battery_positive_is_discharge=(
+                    self.settings.simulation.battery_power_positive_is_discharge
+                ),
+                inverter_limit_kw=self.settings.control.inverter_limit_kw,
+            ).to_dict()
             now = dt_util.now()
 
             # Forecast planning is calculated before history recording so the
@@ -309,7 +339,17 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                 self.entities.configured_snapshot_fields(),
             )
             if base_simulation.no_export_mode_active:
-                control_simulation = base_simulation
+                control_simulation = (
+                    self._simulation.legacy_no_export_control_view(
+                        snapshot,
+                        records,
+                        self.settings.simulation,
+                        learned.predicted_energy_until_offpeak_kwh,
+                        base_simulation,
+                    )
+                    if self.settings.control.operating_mode == "control"
+                    else base_simulation
+                )
                 _, shadow_simulation, _alignment = aligned_agile_control_views(
                     simulation,
                     agile_state,
@@ -324,6 +364,43 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                 now,
                 self.settings.control,
             )
+            alpha969_shadow_plan: dict[str, object] = {}
+            if (
+                control.operating_mode == "control"
+                and base_simulation.no_export_mode_active
+                and snapshot.cheap_period_confirmed
+                and not snapshot.saving_session_active
+            ):
+                # This independent proposal is visible while the *legacy*
+                # Control-mode plan continues through normal write authority.
+                # Never feed the Alpha9.69 proposal into a FoxESS or Ohme
+                # backend, including the Happy Hour overlay path.
+                proposal = self._control.plan(
+                    snapshot,
+                    base_simulation,
+                    now,
+                    replace(self.settings.control, operating_mode="shadow"),
+                )
+                alpha969_shadow_plan = {
+                    "status": (
+                        "shadow_only"
+                        if proposal.alpha969_routing_shadow_only
+                        else "higher_priority"
+                    ),
+                    "operating_reason": proposal.operating_reason,
+                    "desired_work_mode": proposal.desired_work_mode,
+                    "desired_min_soc_percent": proposal.desired_min_soc_percent,
+                    "desired_charge_power_kw": proposal.desired_charge_power_kw,
+                    "desired_battery_to_home_power_kw": (
+                        proposal.desired_battery_to_home_power_kw
+                    ),
+                    "desired_ev_charging_allowed": (
+                        proposal.desired_ev_charging_allowed
+                    ),
+                    "blocked_reason": proposal.blocked_reason,
+                    "next_action": proposal.next_action,
+                    "hardware_write_authorised": False,
+                }
             if not base_simulation.no_export_mode_active:
                 control = align_agile_control_state(
                     control,
@@ -420,6 +497,7 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                 periods=periods,
                 history_samples=len(records),
                 phase=phase,
+                alpha969_shadow_plan=alpha969_shadow_plan,
             )
             commissioning = build_commissioning_snapshot(
                 self.hass,
@@ -437,6 +515,24 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                 commissioning.get("ready_for_control")
                 and self.settings.control.commissioned
             )
+            # Record actual charging transitions at coordinator scan cadence,
+            # not just the five-minute summary history. No extra hardware
+            # commands: the command shadow is a read-only source/readback view.
+            try:
+                trace_shadow = (
+                    build_foxess_command_shadow_snapshot(
+                        self.hass, self, control_override=control
+                    )
+                    if self._ev_charge_trace.wants_capture(snapshot)
+                    else None
+                )
+                await self._ev_charge_trace.async_record(
+                    snapshot,
+                    foxess_control=foxess_control,
+                    command_shadow=trace_shadow,
+                )
+            except Exception:
+                LOGGER.exception("Read-only EV charge trace capture failed")
             control = replace(
                 control,
                 commissioned=technical_commissioned,
@@ -495,6 +591,7 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
         await self._foxess_control.async_shutdown(self)
         await self._happy_hour_ohme.async_shutdown()
         await self._history.async_save()
+        await self._ev_charge_trace.async_save()
         await self._forecast_validation.async_save()
         await self._lifetime.async_save()
         await self._power_down.async_save()

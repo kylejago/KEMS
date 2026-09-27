@@ -133,7 +133,7 @@ def test_full_kems_alignment_remains_counterfactual_for_customer_views() -> None
     assert metadata["target"]["charge_kw"] == 7.0
 
 
-def test_no_export_target_satisfied_holds_battery_and_keeps_house_on_cheap_grid() -> (
+def test_no_export_above_target_supplies_house_without_forcing_discharge_to_floor() -> (
     None
 ):
     snapshot = _cheap_snapshot(soc=55.0)
@@ -151,11 +151,13 @@ def test_no_export_target_satisfied_holds_battery_and_keeps_house_on_cheap_grid(
     assert control.desired_work_mode == "Self Use"
     assert control.desired_charge_power_kw == 0.0
     assert control.desired_min_soc_percent == 55.0
+    assert control.desired_battery_to_home_power_kw == 0.0
     assert control.desired_ev_charging_allowed is True
     assert control.desired_grid_export_allowed is False
     assert control.grid_bypass_power_kw == 1.2
     assert control.total_site_import_kw == 1.2
-    assert "Hold the battery" in control.next_action
+    assert control.alpha969_routing_shadow_only is False
+    assert "Hold the battery at the solar-aware no-export target" in control.next_action
 
     decision = assess_foxess_control_write_authority(
         control,
@@ -204,6 +206,7 @@ def test_no_export_below_target_force_charges_only_to_forecast_target() -> None:
         master_control_enabled=True,
         emergency_stop=False,
     )
+    assert decision.commands_permitted is True
     assert decision.action == "force_charge"
     assert decision.force_charge_power_kw == 7.0
     assert decision.min_soc_on_grid_percent == 54.0
@@ -213,7 +216,8 @@ def test_coordinator_keeps_live_no_export_control_separate_from_customer_twin() 
     source = COORDINATOR.read_text(encoding="utf-8")
 
     assert "if base_simulation.no_export_mode_active:" in source
-    assert "control_simulation = base_simulation" in source
+    assert "self._simulation.legacy_no_export_control_view(" in source
+    assert "else base_simulation" in source
     assert "aligned_agile_control_views(simulation, agile_state)" in source
     assert "if not base_simulation.no_export_mode_active:" in source
     assert (
@@ -228,7 +232,7 @@ def test_alpha960_release_identity_and_scope() -> None:
     bundle = json.loads(BUNDLE.read_text(encoding="utf-8"))
     reason = str(bundle["maintenance"]["reason"])
 
-    assert manifest["version"] == "0.9.0-alpha9.68"
+    assert manifest["version"] == "0.9.0-alpha9.69"
     assert "Alpha9.60 fixes no-paid-export cheap-period target authority" in reason
     assert "Full KEMS" in reason
     assert "solar-aware overnight target" in reason

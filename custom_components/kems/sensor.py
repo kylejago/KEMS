@@ -221,6 +221,7 @@ def _simulation_attributes(data: KEMSData) -> Mapping[str, Any]:
         "actual_grid_import_kwh": simulation.actual_grid_import_kwh,
         "actual_grid_export_kwh": simulation.actual_grid_export_kwh,
         "simulated_grid_import_kwh": simulation.simulated_grid_import_kwh,
+        "simulated_ev_grid_import_kwh": simulation.simulated_ev_grid_import_kwh,
         "simulated_cheap_import_kwh": simulation.simulated_cheap_import_kwh,
         "simulated_day_import_kwh": simulation.simulated_day_import_kwh,
         "simulated_grid_export_kwh": simulation.simulated_grid_export_kwh,
@@ -234,6 +235,13 @@ def _simulation_attributes(data: KEMSData) -> Mapping[str, Any]:
         "simulated_battery_to_home_kwh": simulation.simulated_battery_to_home_kwh,
         "simulated_battery_export_kwh": simulation.simulated_battery_export_kwh,
         "simulated_battery_soc": simulation.simulated_battery_soc,
+        "current_simulated_site_load_kw": simulation.current_simulated_house_load_kw,
+        "current_simulated_non_ev_house_load_kw": (
+            simulation.current_simulated_non_ev_house_load_kw
+        ),
+        "current_simulated_ev_grid_import_kw": (
+            simulation.current_simulated_ev_grid_import_kw
+        ),
         "current_simulated_battery_charge_power_kw": (
             simulation.current_simulated_battery_charge_power_kw
         ),
@@ -325,6 +333,10 @@ def _simulation_attributes(data: KEMSData) -> Mapping[str, Any]:
         "export_tariff_status": simulation.export_tariff_status,
         "export_tariff_active": simulation.export_tariff_active,
         "no_export_mode_active": simulation.no_export_mode_active,
+        "no_export_cheap_policy": simulation.no_export_cheap_policy,
+        "no_export_ev_load_proven": simulation.no_export_ev_load_proven,
+        "no_export_ev_scope_reason": simulation.no_export_ev_scope_reason,
+        "no_export_ev_isolation_physically_proven": False,
         "overnight_charge_target_percent": (simulation.overnight_charge_target_percent),
         "overnight_charge_target_kwh": simulation.overnight_charge_target_kwh,
         "forecast_home_until_next_cheap_kwh": (
@@ -646,6 +658,24 @@ SENSORS: tuple[KEMSSensorEntityDescription, ...] = (
         device_class=SensorDeviceClass.TIMESTAMP,
         source_key=CONF_OFFPEAK_END,
         value_fn=lambda data: data.snapshot.offpeak_end,
+    ),
+    KEMSSensorEntityDescription(
+        key="alpha969_shadow_proposal",
+        name="Alpha9.69 shadow proposal",
+        icon="mdi:shield-eye-outline",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda data: data.alpha969_shadow_plan.get("status", "inactive"),
+        attributes_fn=lambda data: dict(data.alpha969_shadow_plan),
+    ),
+    KEMSSensorEntityDescription(
+        key="shared_bus_ev_balance",
+        name="EV shared-bus allocation audit",
+        icon="mdi:ev-station",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda data: data.snapshot.shared_bus_ev_audit.get(
+            "status", "unavailable"
+        ),
+        attributes_fn=lambda data: dict(data.snapshot.shared_bus_ev_audit),
     ),
     KEMSSensorEntityDescription(
         key="ev_power",

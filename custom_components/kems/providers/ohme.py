@@ -23,6 +23,7 @@ class OhmeState:
     connected: bool | None = None
     charging: bool | None = None
     power_kw: float | None = None
+    power_age_seconds: float | None = None
     vehicle_soc: float | None = None
 
 
@@ -68,6 +69,7 @@ class OhmeProvider(HomeAssistantStateReader):
             self._stale_data_seconds,
             reference,
         )
+        power_age = self._report_age_seconds(self._entities.ev_power_kw, reference)
         vehicle_soc = self._fresh_float(
             self._entities.ev_soc,
             self._stale_data_seconds,
@@ -108,5 +110,10 @@ class OhmeProvider(HomeAssistantStateReader):
             connected=connected,
             charging=charging,
             power_kw=power_kw,
+            power_age_seconds=(
+                round(power_age, 1)
+                if power_kw is not None and power_age is not None
+                else None
+            ),
             vehicle_soc=vehicle_soc,
         )
