@@ -169,8 +169,9 @@ def test_no_export_above_target_supplies_house_without_forcing_discharge_to_floo
         master_control_enabled=True,
         emergency_stop=False,
     )
-    assert decision.commands_permitted is True
-    assert decision.action == "self_use"
+    assert decision.commands_permitted is False
+    assert decision.action == "release"
+    assert "shadow-only pending physical" in decision.reason
     assert decision.min_soc_on_grid_percent == 54.0
 
 
