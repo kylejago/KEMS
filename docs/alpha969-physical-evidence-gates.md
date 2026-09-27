@@ -70,10 +70,15 @@ authorise physical KH7 writes.
 
 KEMS's normal retained history is a five-minute observation series; audit
 readouts update each coordinator scan and are retained at that sampling
-interval. Pre-upgrade snapshots have no Ohme report-age or shared-bus audit,
-so historical evidence cannot be retroactively declared verified. For
-short transitions, a future read-only event trace may be required, using the
-same mapped KEMS sources and recording actual work-mode/MinSOC readbacks.
+interval. Alpha9.69 also includes a separate persisted `ev_charge_trace`: it
+records each coordinator scan while plugged/charging, with a 15-minute
+prelude/postlude and bounded 960-sample/72-hour retention. Diagnostics include
+plug/charge/cheap-slot transitions, existing physical telemetry, source ages,
+FoxESS command/readback provenance and the approved live-control decision.
+A command-entity state is labelled as such; it is **not** an independent
+inverter-power confirmation. No extra FoxESS/Ohme write occurs. Pre-upgrade
+snapshots cannot be retroactively declared verified, and this trace only starts
+**after the candidate is installed and HA is restarted**.
 
 ## Passive evidence capture — no KEMS hardware writes
 
