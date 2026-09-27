@@ -158,7 +158,9 @@ def test_no_override_of_outside_cheap_priority_or_shadow_paths(
 ):
     snap = _snap(**snap_updates)
     plan = _plan(**plan_updates)
-    assert _guard(snap, plan, _config(**config_updates), no_paid_export_mode=mode) is plan
+    assert (
+        _guard(snap, plan, _config(**config_updates), no_paid_export_mode=mode) is plan
+    )
 
 
 def test_charge_and_hold_use_only_old_reviewed_backend_authority():
@@ -181,18 +183,26 @@ def test_charge_and_hold_use_only_old_reviewed_backend_authority():
     assert decision(charge).force_charge_power_kw == 6.5
     assert decision(hold).action == "self_use"
     assert decision(hold).min_soc_on_grid_percent == 61.0
-    assert not decision(replace(charge, alpha969_routing_shadow_only=True)).commands_permitted
+    assert not decision(
+        replace(charge, alpha969_routing_shadow_only=True)
+    ).commands_permitted
     assert not decision(replace(charge, plan_safe=False)).commands_permitted
 
 
 def test_coordinator_routes_guard_only_into_reviewed_existing_backend():
     root = Path(__file__).parents[1] / "custom_components" / "kems"
     coordinator = (root / "coordinator.py").read_text(encoding="utf-8")
-    assert "control = apply_happy_hour_control(control, snapshot, happy_hour_plan)" in coordinator
+    assert (
+        "control = apply_happy_hour_control(control, snapshot, happy_hour_plan)"
+        in coordinator
+    )
     assert "control = protect_live_cheap_ev(" in coordinator
     assert "control=control,\n                technical_ready=" in coordinator
     assert "control=proposal,\n                technical_ready=" not in coordinator
     backend = (root / "foxess_control_backend.py").read_text(encoding="utf-8")
-    assert '"Force Discharge"' not in backend.split('async def async_update(', 1)[1].split('payload =', 1)[0]
+    assert (
+        '"Force Discharge"'
+        not in backend.split("async def async_update(", 1)[1].split("payload =", 1)[0]
+    )
     assert "export_power_limit_write" in backend
     assert 'key="ev_grid_guard"' in (root / "sensor.py").read_text(encoding="utf-8")
