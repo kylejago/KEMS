@@ -1051,3 +1051,5 @@ class KEMSData:
     forecast_plan: ForecastPlanState = field(default_factory=ForecastPlanState)
     last_power_down: PowerDownResult = field(default_factory=PowerDownResult)
     periods: dict[str, PeriodTotals] = field(default_factory=dict)
+    # Separate advisory proposal; never passes through FoxESS write authority.
+    alpha969_shadow_plan: dict[str, Any] = field(default_factory=dict)
