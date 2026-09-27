@@ -1917,7 +1917,9 @@ class SimulationEngine:
                     "projected_grid_import": 0.0,
                     "export_paused_for_home": False,
                     "no_export_cheap_policy": route.kind,
-                    "no_export_ev_load_proven": route.ev_separation_proven,
+                    "no_export_ev_load_proven": (
+                        route.ev_separation_proven and route.ev_grid_kwh > 0.1
+                    ),
                     "overnight_charge_target_percent": round(
                         100 * target_stored / capacity, 1
                     ),
@@ -2054,7 +2056,9 @@ class SimulationEngine:
                 "reserve_source": reserve_source,
                 "projected_grid_import": round(projected_grid_import, 3),
                 "export_paused_for_home": False,
-                "no_export_ev_load_proven": split.ev_separation_proven,
+                "no_export_ev_load_proven": (
+                    split.ev_separation_proven and split.ev_grid_kw > 0.1
+                ),
                 "forecast_home_until_next_cheap_kwh": round(forecast_home, 3),
                 "forecast_solar_until_next_cheap_kwh": round(forecast_solar, 3),
                 "forecast_solar_credit_kwh": round(solar_credit, 3),
