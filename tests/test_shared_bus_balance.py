@@ -38,6 +38,7 @@ def _snapshot(**kwargs: object) -> Snapshot:
         "grid_import_kw": 6.0,
         "grid_export_kw": 0.0,
         "source_age_seconds": dict(AGES),
+        "source_data_age_seconds": 10.0,
     }
     payload.update(kwargs)
     return Snapshot(**payload)
@@ -103,8 +104,24 @@ def test_aged_ohme_report_cannot_validate_shared_bus() -> None:
 def test_stale_or_undated_readings_fail_closed() -> None:
     assert _audit(_snapshot(stale_fields=("battery_power_kw",))).status == "unavailable"
     assert _audit(_snapshot(source_age_seconds={})).status == "unavailable"
+    assert _audit(_snapshot(source_data_age_seconds=None)).status == "unavailable"
     old = dict(AGES, house_load_kw=181.0)
     assert _audit(_snapshot(source_age_seconds=old)).status == "unavailable"
+
+
+def test_static_zero_export_uses_verified_foxess_polling_cohort() -> None:
+    zero_export_age = dict(AGES, grid_export_kw=181.0)
+    result = _audit(_snapshot(source_age_seconds=zero_export_age))
+    assert result.status == "net_allocation_consistent"
+    assert (
+        _audit(
+            _snapshot(
+                source_age_seconds=zero_export_age,
+                grid_export_kw=0.2,
+            )
+        ).status
+        == "unavailable"
+    )
 
 
 def test_unknown_or_inconsistent_ev_state_does_not_look_valid() -> None:
