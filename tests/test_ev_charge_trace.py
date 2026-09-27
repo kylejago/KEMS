@@ -115,6 +115,7 @@ def test_event_trace_preserves_ohme_foxess_and_actual_readback_provenance():
 def test_plug_charge_stop_and_slot_edges_are_retained_across_restart():
     module, _ = _load_trace_module()
     recorder = module.EVChargeTraceRecorder(object(), "sample")
+
     async def exercise():
         await recorder.async_load()
         await recorder.async_record(_snapshot())
