@@ -179,9 +179,7 @@ def test_connected_ev_missing_power_cannot_be_assumed_grid_isolated():
     assert route.battery_to_home_kwh == 0
     assert route.grid_to_battery_input_kwh == 0
     assert route.ev_grid_kwh == 0
-    state = ControlEngine().plan(
-        snap, _simulation(), snap.timestamp, _config()
-    )
+    state = ControlEngine().plan(snap, _simulation(), snap.timestamp, _config())
     assert state.desired_charge_power_kw == 0
     assert state.desired_battery_to_home_power_kw == 0
     assert state.alpha969_routing_shadow_only is True
@@ -557,9 +555,7 @@ def test_extra_slot_with_one_sample_carries_usable_forecast_to_control():
     assert simulation.home_reserve_forecast_source == "recent_non_ev_average"
     assert simulation.forecast_home_until_next_cheap_kwh == pytest.approx(1.0)
     assert simulation.overnight_charge_target_percent < 50.0
-    state = ControlEngine().plan(
-        snap, simulation, snap.timestamp, _config()
-    )
+    state = ControlEngine().plan(snap, simulation, snap.timestamp, _config())
     assert state.operating_reason == "no_export_extra_slot"
     assert state.alpha969_routing_shadow_only is True
     assert state.desired_charge_power_kw > 0
@@ -632,8 +628,13 @@ def test_alpha969_evidence_is_visible_without_confusing_it_with_live_authority()
 def test_alpha969_shadow_never_displaces_reviewed_live_cheap_charge(
     soc, expected_mode, expected_charge
 ):
-    snap = _snapshot(soc=soc, house=8.0, ev_charging=True, ev_power_kw=6.0,
-                     ev_load_in_house_load=True)
+    snap = _snapshot(
+        soc=soc,
+        house=8.0,
+        ev_charging=True,
+        ev_power_kw=6.0,
+        ev_load_in_house_load=True,
+    )
     sim = _simulation(
         target=60.0,
         current_simulated_grid_bypass_power_kw=7.0,
@@ -664,9 +665,7 @@ def test_alpha969_shadow_never_displaces_reviewed_live_cheap_charge(
     old_authority = assess_foxess_control_write_authority(live, **kwargs)
     new_authority = assess_foxess_control_write_authority(proposal, **kwargs)
     assert old_authority.commands_permitted is True
-    assert old_authority.action == (
-        "force_charge" if expected_charge else "self_use"
-    )
+    assert old_authority.action == ("force_charge" if expected_charge else "self_use")
     assert new_authority.commands_permitted is False
     assert new_authority.action == "release"
 
@@ -679,14 +678,17 @@ def test_live_plan_and_independent_shadow_preview_are_not_cross_wired() -> None:
     assert 'mode != "control"' in control
     assert 'replace(self.settings.control, operating_mode="shadow")' in coordinator
     assert '"hardware_write_authorised": False' in coordinator
-    assert 'alpha969_shadow_plan=alpha969_shadow_plan' in coordinator
-    assert "control = apply_happy_hour_control(control, snapshot, happy_hour_plan)" in coordinator
-    assert 'control=control,\n                technical_ready=' in coordinator
-    assert 'control=proposal,\n                technical_ready=' not in coordinator
+    assert "alpha969_shadow_plan=alpha969_shadow_plan" in coordinator
+    assert (
+        "control = apply_happy_hour_control(control, snapshot, happy_hour_plan)"
+        in coordinator
+    )
+    assert "control=control,\n                technical_ready=" in coordinator
+    assert "control=proposal,\n                technical_ready=" not in coordinator
     assert "alpha969_shadow_plan: dict[str, Any]" in data
-    assert 'key="alpha969_shadow_proposal"' in (
-        root / "sensor.py"
-    ).read_text(encoding="utf-8")
+    assert 'key="alpha969_shadow_proposal"' in (root / "sensor.py").read_text(
+        encoding="utf-8"
+    )
     assert '"alpha969_shadow_plan": dict(data.alpha969_shadow_plan)' in (
         root / "diagnostics.py"
     ).read_text(encoding="utf-8")
