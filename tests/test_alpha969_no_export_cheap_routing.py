@@ -349,6 +349,7 @@ def test_no_export_day_replay_never_battery_supplies_ev_or_counts_twice(included
     assert result.current_simulated_ev_grid_import_kw == 6.0
     assert result.current_simulated_battery_to_home_power_kw == 2.0
     assert result.current_simulated_grid_import_kw == 6.0
+    assert result.no_export_ev_load_proven is True
 
 
 def test_no_export_day_replay_unproven_ev_scope_has_no_false_attribution():
@@ -384,6 +385,31 @@ def test_no_export_day_replay_unproven_ev_scope_has_no_false_attribution():
     assert result.current_simulated_non_ev_house_load_kw is None
     assert result.no_export_ev_load_proven is False
     assert result.no_export_ev_scope_reason == "EV/load measurement scope unproven"
+
+
+def test_ev_scope_is_not_claimed_proven_just_because_charger_is_idle():
+    snap = _snapshot(
+        when=EXTRA,
+        house=2.0,
+        off_peak=False,
+        ev_connected=False,
+        ev_charging=False,
+        ev_power_kw=0.0,
+    )
+    result = SimulationEngine()._empty_current_state(
+        snap,
+        [snap],
+        SimulationConfig(
+            battery_capacity_kwh=10.0,
+            battery_initial_percent=80.0,
+            proposal_solar_enabled=False,
+            export_tariff_status="awaiting",
+        ),
+    )
+    assert result.current_simulated_ev_grid_import_kw == 0.0
+    assert result.current_simulated_non_ev_house_load_kw == 2.0
+    assert result.no_export_ev_load_proven is False
+    assert result.no_export_ev_scope_reason == "EV not charging"
 
 
 def test_extra_slot_missing_forward_deadline_does_not_grid_charge_twin():
