@@ -962,6 +962,8 @@ class ControlState:
     commissioned: bool = False
     real_backend_available: bool = False
     commands_permitted: bool = False
+    # Sticky across dataclasses.replace overlays: not an Alpha9.67 live command.
+    alpha969_routing_shadow_only: bool = False
     blocked_reason: str = "Simulation/shadow only"
     next_action: str = "Continue observing"
     preflight_passed: int = 0
