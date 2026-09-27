@@ -70,6 +70,23 @@ Current power-flow fields distinguish total site load, non-EV household load,
 and the EV grid allocation. These are **proposed simulation allocations**,
 not direct measurement of the origin of power at individual AC circuits.
 
+## Home Assistant observability
+
+The existing simulation sensor attributes now show the optional daily EV grid
+allocation (nullable when any interval cannot be attributed), live simulated
+whole-site/non-EV house/EV grid streams, cheap-period kind, EV scope proof flag
+and its reason. The scope proof is a **simulation load-measurement classification**,
+not a demonstration of where physical EV electricity originates.
+
+Two binary sensors distinguish `Alpha9.69 routing shadow-only` (the sticky
+no-hardware-authority flag on the control plan) from
+`No-export EV load measurement scope identified` (the read-only measurement
+split). The simulation sensor reports
+`no_export_ev_isolation_physically_proven: false` for this candidate.
+Existing control blocked-reason and next-action sensors explain why the new
+proposed work-mode/MinSOC must not be sent to FoxESS. These are diagnostic
+readouts only; they are not extra write entities or a commissioning bypass.
+
 ## Live scope — conservative by design
 
 The reviewed KH7 interface offers Self Use / Force Charge, force-charge power
