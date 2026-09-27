@@ -339,7 +339,17 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                 self.entities.configured_snapshot_fields(),
             )
             if base_simulation.no_export_mode_active:
-                control_simulation = base_simulation
+                control_simulation = (
+                    self._simulation.legacy_no_export_control_view(
+                        snapshot,
+                        records,
+                        self.settings.simulation,
+                        learned.predicted_energy_until_offpeak_kwh,
+                        base_simulation,
+                    )
+                    if self.settings.control.operating_mode == "control"
+                    else base_simulation
+                )
                 _, shadow_simulation, _alignment = aligned_agile_control_views(
                     simulation,
                     agile_state,
@@ -367,7 +377,7 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                 # backend, including the Happy Hour overlay path.
                 proposal = self._control.plan(
                     snapshot,
-                    control_simulation,
+                    base_simulation,
                     now,
                     replace(self.settings.control, operating_mode="shadow"),
                 )
