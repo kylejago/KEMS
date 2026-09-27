@@ -17,6 +17,12 @@ physical backends. The sticky `alpha969_routing_shadow_only` gate and
 reason-family check reject any accidental new write even if the operating
 reason is rewritten by an overlay.
 
+The `legacy_no_export_control_view` now separately replays the reviewed
+Alpha9.68 forecast input, charge-target and cheap-site-bypass calculation for
+Control mode even when EV history exists. The EV-excluded Alpha9.69 forecast
+stays with the independent proposal. This prevents the new model from silently
+changing the live cheap-charge target or site-import headroom.
+
 The approved Alpha9.68 physical control contract is unchanged: only bounded
 Self Use, confirmed-cheap Force Charge and MinSOC-on-grid with prior-state
 ownership/restoration; still no economic Force Discharge, import/export
@@ -38,7 +44,13 @@ non-EV house/battery allowance and equivalent EV grid import, conservatively
 accounting for solar surplus. It preserves the Ohme power report age and
 refuses stale/inconsistent/unknown EV scope. The current result is a
 diagnostic sensor and export field; `shared_bus_ev_evidence` provides bounded
-24-hour status counts and up to 72 retained samples. The **candidate** KH7
+24-hour status counts and up to 72 retained samples. The separate persisted
+`ev_charge_trace` records at coordinator scan cadence while plugged/charging,
+including a 15-minute prelude/postlude, actual Ohme/FoxESS/CT values, tariff
+transitions, source ages, and labelled work-mode/MinSOC readback provenance.
+The trace is bounded to 960 samples/72 hours, survives HA restart and is
+included in diagnostics. **Installing the new release is required for the new
+trace to run; a GitHub commit alone cannot collect live HA data.** The **candidate** KH7
 site-output ceiling is diagnostic, never a physical setpoint.
 
 Earlier Alpha9.59 evidence recorded a bounded 7 kW Force Charge request,
@@ -51,8 +63,9 @@ simultaneous shared-bus route.
 
 1. Verify exact candidate HEAD is based on the reviewed main and all push/PR
    Validate, ESPHome panel, HACS and hassfest jobs are green, including legacy
-   Alpha9.60/9.67 physical SOC/target/charge assertions and independent
-   shadow-versus-live tests.
+   Alpha9.60/9.67 physical SOC/target/charge assertions, original learned
+   forecast and import-headroom parity, independent shadow-versus-live tests,
+   and persistent EV transition-trace tests.
 2. Manifest version, maintenance bundle reason and release-identity
    assertions must all identify `0.9.0-alpha9.69`.
 3. PR title/body and release notes must state **shadow-only observability
@@ -64,8 +77,8 @@ simultaneous shared-bus route.
 
 ## Separate gate for expanded physical routing
 
-Use the retained evidence in `alpha969-physical-evidence-gates.md` and any
-more granular read-only event trace to establish site-balance behaviour at
+Use the retained evidence in `alpha969-physical-evidence-gates.md` and the
+new persisted read-only `ev_charge_trace` to establish site-balance behaviour at
 EV start/steady/stop, tariff transitions and low SOC. Independently confirm
 the KH7 exposes a **supported bounded output-control** mechanism and that
 measured import/Ohme/battery responses close the loop on the shared bus.
