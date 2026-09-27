@@ -1,107 +1,80 @@
-# Alpha9.69 — merge and release readiness
+# Alpha9.69 — shadow-only release scope and proof gates
 
-Date: 27 September 2026. Candidate PR #296, branch
-`feature/no-export-cheap-routing-alpha969`; reviewed base Alpha9.68 main
+Date: 27 September 2026. PR #296 based on released Alpha9.68 main
 `8663995905d8b272d8d10095eceafc7bf3e6a67a`.
 
-## Verified source/CI
+## Actual release scope
 
-- Candidate `a48a060cf080485ba0d1d8930d1b7878030f60bd`: push and PR Validate,
-  HACS and hassfest passed. Core validation reports 1,533 passing tests,
-  Black, Ruff, Python compilation, dashboard checks; ESPHome panel compile passed.
-- New no-export cheap routing is a proposed twin/shadow policy, **not** a
-  physically commissioned KH7 energy-routing capability.
-- `alpha969_routing_shadow_only` is checked by the FoxESS write authority,
-  survives Happy Hour replacement of the operating reason, and forces the
-  existing safe release path for this new plan. It does not grant any new
-  hardware command.
+This is a **simulation, diagnostic and physical-evidence** release, NOT an
+activation of the proposed EV-grid/house-battery shared-bus routing. The user's
+existing reviewed Alpha9.68 Control-mode cheap-period planner remains the
+authoritative physical path. `ControlEngine.plan` invokes the new
+`_no_export_cheap_plan` only outside Control mode; coordinator separately
+calculates its proposed shadow state while Control mode remains active, and
+exposes `alpha969_shadow_plan` in KEMSData, HA diagnostic sensor and
+diagnostics. It never forwards that proposal to the Happy Hour, Ohme or FoxESS
+physical backends. The sticky `alpha969_routing_shadow_only` gate and
+reason-family check reject any accidental new write even if the operating
+reason is rewritten by an overlay.
 
-## Confirmed property topology and existing KEMS data (27 September)
+The approved Alpha9.68 physical control contract is unchanged: only bounded
+Self Use, confirmed-cheap Force Charge and MinSOC-on-grid with prior-state
+ownership/restoration; still no economic Force Discharge, import/export
+power-limit writes or paid-export actuation. Normal commissioning, Master
+Enable and safety gates still apply to that *existing* authority. No new
+KH7 output-control command is enabled.
 
-The owner confirms **grid and inverter enter the EPS/changeover equipment;
-its downstream output feeds Henley blocks supplying both the main and EV
-consumer units**. House and EV are therefore on a shared downstream supply,
-not two independently selectable KH7 outputs. This description is sufficient
-for planning; do not request the same wiring diagram again. The precise EPS
-changeover/island isolation and EV shedding still require readback or installer
-verification before island-mode authority is broadened.
+## Existing measurements and property topology
 
-Use the already configured KEMS Octopus/Ohme/FoxESS providers and snapshots:
-Ohme status/power, FoxESS Load/PV/battery/grid powers, SOC, confirmed cheap
-slot, source freshness, work-mode/MinSOC and existing retained history.
-`Collector` already compares both EV membership hypotheses across three
-consecutive balances and records `ev_load_in_house_load`; KEMS retains
-read-only snapshots every 300 seconds. The snapshot history is not a
-high-frequency synchronized physical commissioning trace, so a dedicated
-read-only event capture or HA history around transitions may still be needed.
-Current uploaded diagnostics captured with the EV idle cannot substitute for
-actual charging transition measurements; this does **not** require the owner
-to re-enter readings already available to KEMS.
+The owner has confirmed grid and inverter feed EPS/changeover equipment and
+Henley blocks downstream feed **both** main and EV consumer units. This is a
+shared bus, so KEMS must describe the desired EV-grid/house-battery split as
+a **net allocation**, never physical isolation or separate individual AC feeds.
 
-Earlier live Alpha9.59 evidence already demonstrates bounded, confirmed-cheap
-Force Charge at a 7 kW request, approximately 6.8 kW battery charge, 8.1 kW
-site import and safe Self Use/MinSOC restoration. Reuse that as existing
-proof, **not** as evidence of the new target-limited below-floor sequence
-or simultaneous EV/grid and household/battery dispatch.
+KEMS already measures Ohme status/power, FoxESS Load/PV/battery/grid powers,
+SOC, confirmed tariff and source freshness. It records snapshots every five
+minutes. The Alpha9.69 read-only `shared_bus_ev_audit` compares the measured
+non-EV house/battery allowance and equivalent EV grid import, conservatively
+accounting for solar surplus. It preserves the Ohme power report age and
+refuses stale/inconsistent/unknown EV scope. The current result is a
+diagnostic sensor and export field; `shared_bus_ev_evidence` provides bounded
+24-hour status counts and up to 72 retained samples. The **candidate** KH7
+site-output ceiling is diagnostic, never a physical setpoint.
 
-The engineering objective on the shared bus is a measured **site-level power
-balance**: constrain total KH7 AC/battery output to verified non-EV demand
-while checking that site grid import covers at least the equivalent Ohme
-power (subject to PV/charging states and physical limits). This is a grid
-allocation, not proof of electron/circuit isolation. Presently reviewed
-Self Use/Force Charge/MinSOC authority cannot independently cap KH7 output
-while retaining battery-to-house supply under EV load; enabling an additional
-output-control mechanism would need its own measured fail-closed validation.
-If the control cannot enforce this balance, retain the EV-active SOC hold
-rather than claiming EV/grid isolation.
+Earlier Alpha9.59 evidence recorded a bounded 7 kW Force Charge request,
+approximately 6.8 kW actual battery charging, approximately 8.1 kW site
+import and pre-KEMS Self Use/MinSOC restoration. This is existing proof for
+the reviewed old write scope, not for the proposed new target-limited or
+simultaneous shared-bus route.
 
-## Blocking findings
+## Required before merge and tag
 
-1. Existing KEMS measurements can identify and estimate EV demand, but no
-   retained charging-transition evidence yet demonstrates a supported KH7
-   output constraint plus the site-grid-import response necessary to achieve
-   the target shared-bus EV/house allocation. Strict separate physical feeds
-   cannot be created by software on the confirmed shared supply.
-2. Existing Alpha9.59 Force Charge and restoration were physically observed;
-   the new **below-floor to target** limiter, stop, transition and EV-overlap
-   sequence remains unproven against actual readbacks.
-3. The candidate planner selects the new Alpha9.69 route during a confirmed
-   cheap period even in Control mode. Its physical write barrier correctly
-   rejects that route, but this also suspends the previously reviewed
-   Alpha9.67 cheap-period live write path. Thus merging the current PR would
-   change existing live behaviour and cannot be called a transparent
-   shadow-only update.
-4. The manifest and bundle template still identify Alpha9.68. The automatic
-   publish workflow keys off the manifest version and skips an existing tag;
-   merging unchanged would **not** publish an Alpha9.69 release, irrespective
-   of green CI. Do not bump the manifest or merge while the physical/behavioural
-   gates remain open.
+1. Verify exact candidate HEAD is based on the reviewed main and all push/PR
+   Validate, ESPHome panel, HACS and hassfest jobs are green, including legacy
+   Alpha9.60/9.67 physical SOC/target/charge assertions and independent
+   shadow-versus-live tests.
+2. Manifest version, maintenance bundle reason and release-identity
+   assertions must all identify `0.9.0-alpha9.69`.
+3. PR title/body and release notes must state **shadow-only observability
+   plus unchanged existing live control**, rather than claiming the desired
+   new physical EV routing is live.
+4. Merge the frozen reviewed candidate, verify its exact main merge SHA,
+   release tag target, generated bundle and SHA-256 checksum asset. Do not
+   tag the draft branch or bump Pi/Web/panel component versions.
 
-## Acceptable paths to a release
+## Separate gate for expanded physical routing
 
-**A. Full physical Alpha9.69:** acquire the passive transition evidence in
-`alpha969-physical-evidence-gates.md`; prove a supported KH7 means of
-enforcing the measured shared-bus site-import/EV allocation (or explicitly retain the physical
-EV-active fallback); validate the new below-floor command sequence and all
-failure/ownership transitions. Only a separately reviewed and tested
-write-authority change may lift the sticky shadow barrier. Retain accurate
-readback and current/previous configuration restore proof.
+Use the retained evidence in `alpha969-physical-evidence-gates.md` and any
+more granular read-only event trace to establish site-balance behaviour at
+EV start/steady/stop, tariff transitions and low SOC. Independently confirm
+the KH7 exposes a **supported bounded output-control** mechanism and that
+measured import/Ohme/battery responses close the loop on the shared bus.
+Self Use and MinSOC alone do not enforce that allocation. Repeat supervised
+target-limited below-floor charge, headroom and mode/MinSOC restoration;
+prove stale-data, grid loss/EPS and Power Down priority paths. If no supported
+output-control route exists, retain the EV-active SOC hold fallback. These
+conditions require a **new separately reviewed live-authority change**;
+merging this shadow-only release never waives them.
 
-**B. Distinct shadow-only release:** explicitly preserve the Alpha9.68
-production Control-mode tariff target, work-mode/MinSOC and existing bounded
-charging behaviour while exposing the Alpha9.69 simulation and diagnostic
-readouts independently. Add cross-mode regressions proving existing live
-commands and all higher-priority overrides are unchanged. This requires a
-separate behavioural review and revised release scope; merely leaving the
-current block in place is insufficient.
-
-After the chosen scope is proven: ensure exact HEAD CI is all green, update
-`manifest.json` and the canonical maintenance reason to
-`0.9.0-alpha9.69`, revise identity assertions, freeze the candidate, merge
-the reviewed PR, verify the merge SHA is on main, verify the release tag points
-exactly at that merge commit, and verify the automatic release bundle and its
-checksum. No implicit Pi/Web or panel component version bump. Do not publish
-a tag pointing at the draft branch.
-
-**Present decision:** HOLD — draft PR only, no merge, no new hardware writes,
-no release identity bump. This is a factual release gate, not a CI failure.
+Status: shadow-only candidate may proceed after exact-head release proof.
+Expanded physical routing is explicitly NOT released.
