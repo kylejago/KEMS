@@ -613,6 +613,6 @@ def test_alpha969_evidence_is_visible_without_confusing_it_with_live_authority()
         assert f'"{key}"' in sensor
     assert '"no_export_ev_isolation_physically_proven": False' in sensor
     assert 'key="alpha969_routing_shadow_only"' in binary
-    assert 'data.control.alpha969_routing_shadow_only' in binary
+    assert "data.control.alpha969_routing_shadow_only" in binary
     assert 'key="no_export_ev_load_scope_identified"' in binary
-    assert 'data.simulation.no_export_ev_load_proven' in binary
+    assert "data.simulation.no_export_ev_load_proven" in binary
