@@ -100,13 +100,26 @@ def assess_shared_bus_balance(
         return unavailable(
             "Complete finite physical FoxESS power readings are required"
         )
-    if any(
-        snapshot.source_age_seconds.get(key, max_age_seconds + 1) > max_age_seconds
-        for key in _REQUIRED
+    # FoxESS may retain an unchanged zero feed-in reading while a fresh
+    # sibling from the same device proves polling is still active. Reuse
+    # KEMS's existing effective cohort age for that one static zero only.
+    if (
+        snapshot.source_data_age_seconds is None
+        or snapshot.source_data_age_seconds > max_age_seconds
     ):
-        return unavailable(
-            "A source has no current timestamp or exceeds the audit age limit"
+        return unavailable("FoxESS device cohort freshness is unavailable")
+    if any(key not in snapshot.source_age_seconds for key in _REQUIRED):
+        return unavailable("Required physical source report timestamps are missing")
+    if any(
+        age > max_age_seconds
+        and not (
+            key == "grid_export_kw"
+            and snapshot.grid_export_kw == 0.0
         )
+        for key, age in snapshot.source_age_seconds.items()
+        if key in _REQUIRED
+    ):
+        return unavailable("A changing physical source exceeds the audit age limit")
 
     split = split_no_export_demand(snapshot, snapshot.house_load_kw)
     if not split.ev_separation_proven:
