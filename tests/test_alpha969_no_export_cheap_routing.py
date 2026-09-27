@@ -179,11 +179,12 @@ def test_connected_ev_missing_power_cannot_be_assumed_grid_isolated():
     assert route.grid_to_battery_input_kwh == 0
     assert route.ev_grid_kwh == 0
     state = ControlEngine().plan(
-        snap, _simulation(), snap.timestamp, _config(mode="control")
+        snap, _simulation(), snap.timestamp, _config()
     )
     assert state.desired_charge_power_kw == 0
     assert state.desired_battery_to_home_power_kw == 0
-    assert "ev_isolation_fallback" in state.operating_reason
+    assert state.alpha969_routing_shadow_only is True
+    assert state.operating_reason == "no_export_overnight"
 
 
 def test_extra_slot_protection_only_replenishes_shortfall():
@@ -230,10 +231,10 @@ def test_shadow_floor_discharge_and_live_ev_fallback_are_separate():
     )
     assert live.desired_battery_to_home_power_kw == 0
     assert live.desired_min_soc_percent == 80
-    assert "ev_isolation_fallback" in live.operating_reason
-    assert "house and EV share the downstream bus" in live.next_action
-    assert "shadow-only" in live.next_action
-    assert "measured shared-bus output/import proof is pending" in live.blocked_reason
+    assert live.operating_reason == "awaiting_export_tariff_charge"
+    assert live.desired_work_mode == "Self Use"
+    assert live.alpha969_routing_shadow_only is False
+    assert live.desired_charge_power_kw == 0
     assert live.commands_permitted is False
 
 
@@ -258,7 +259,7 @@ def test_extra_missing_forecast_or_ev_scope_cannot_request_charge():
     assert no_forecast.desired_charge_power_kw == 0
     unknown_scope = replace(snap, ev_charging=True, ev_power_kw=None)
     missing_power = ControlEngine().plan(
-        unknown_scope, _simulation(), snap.timestamp, _config(mode="control")
+        unknown_scope, _simulation(), snap.timestamp, _config()
     )
     assert missing_power.desired_charge_power_kw == 0
     assert missing_power.desired_battery_to_home_power_kw == 0
@@ -556,9 +557,10 @@ def test_extra_slot_with_one_sample_carries_usable_forecast_to_control():
     assert simulation.forecast_home_until_next_cheap_kwh == pytest.approx(1.0)
     assert simulation.overnight_charge_target_percent < 50.0
     state = ControlEngine().plan(
-        snap, simulation, snap.timestamp, _config(mode="control")
+        snap, simulation, snap.timestamp, _config()
     )
-    assert state.operating_reason == "no_export_extra_slot_ev_isolation_fallback"
+    assert state.operating_reason == "no_export_extra_slot"
+    assert state.alpha969_routing_shadow_only is True
     assert state.desired_charge_power_kw > 0
     assert state.desired_charge_power_kw < 7
     assert state.desired_battery_to_home_power_kw == 0
