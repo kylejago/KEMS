@@ -166,6 +166,7 @@ def test_no_override_of_outside_cheap_priority_or_shadow_paths(
 def test_charge_and_hold_use_only_old_reviewed_backend_authority():
     charge = _guard()
     hold = _guard(_snap(ev_power_age_seconds=150.0))
+
     def decision(control):
         return assess_foxess_control_write_authority(
             control,
