@@ -1,8 +1,9 @@
-# Alpha9.69 proposal — No paid export cheap routing
+# Alpha9.69 — No paid export proposed cheap routing and shared-bus evidence
 
-Review-only work, based on Alpha9.68 main at
-8663995905d8b272d8d10095eceafc7bf3e6a67a. Do not merge or release
-without independent validation and live physical evidence.
+Shadow-only proposal and observability release, based on Alpha9.68 main at
+8663995905d8b272d8d10095eceafc7bf3e6a67a. The proposed routing is
+**not** enabled as an expanded physical KH7 control. Existing Alpha9.68
+Control-mode charging and its reviewed authority remain in place.
 
 ## Policy
 
@@ -104,13 +105,18 @@ and its reason. The scope proof is a **simulation load-measurement classificatio
 not a demonstration of where physical EV electricity originates.
 
 Two binary sensors distinguish `Alpha9.69 routing shadow-only` (the sticky
-no-hardware-authority flag on the control plan) from
+no-hardware-authority flag on a proposed cheap route, not the restored live
+Control-mode plan) from
 `No-export EV load measurement scope identified` (the read-only measurement
 split). The simulation sensor reports
 `no_export_ev_isolation_physically_proven: false` for this candidate.
-Existing control blocked-reason and next-action sensors explain why the new
-proposed work-mode/MinSOC must not be sent to FoxESS. These are diagnostic
-readouts only; they are not extra write entities or a commissioning bypass.
+While Control mode is active, a **separate Alpha9.69 shadow proposal** sensor
+and diagnostics field exposes the new planner's desired work mode, MinSOC,
+battery charge and house intent without replacing the actual live control
+plan. KEMS's EV shared-bus allocation audit sensor and the bounded retained
+`shared_bus_ev_evidence` diagnostics separately expose observed power-balance
+status, reason and source freshness. Proposals and measurements are not extra
+write entities or a commissioning bypass.
 
 ## Live scope — conservative by design
 
@@ -118,13 +124,14 @@ The reviewed KH7 interface offers Self Use / Force Charge, force-charge power
 and MinSOC-on-grid. These controls alone cannot ensure that Self Use discharges
 only into the house when Ohme is simultaneously charging on the same AC bus.
 
-Therefore, while the EV is active in Control mode, the physical MinSOC is held
-at least at current fresh physical SOC and battery-to-house intent is zero for
-the live command. Proposed simulation/shadow battery-to-house flow must NOT be
-described as measured physical flow. The control reason and next action expose
-the fallback. Neither Force Discharge nor import/export power-limit writes are
-added. Existing write-authority, emergency stop, commissioning, ownership
-restoration, grid/island and site-import gates remain in place.
+The proposed route computes a conservative EV-active SOC-hold fallback,
+but **it is not this release's live hardware command**. The actual
+Control-mode route remains the already reviewed Alpha9.68 planner, including
+its bounded confirmed-cheap charging, MinSOC and ownership restoration.
+Proposed simulation/shadow battery-to-house flow must NOT be described as
+measured physical flow. Neither Force Discharge nor import/export power-limit
+writes are added. Existing write-authority, emergency stop, commissioning,
+ownership restoration, grid/island and site-import gates remain in place.
 
 **Explicit release gate:** the pre-existing Alpha9.67 write-authority contract
 can otherwise turn a new Alpha9.69 Force Charge plan into a hardware command
@@ -138,7 +145,10 @@ to both new Self Use and Force Charge intent, including the EV fallback. They
 remain available for shadow/replay, but the existing backend must release its
 owned state rather than issue their unvalidated work-mode/MinSOC writes.
 Previously reviewed Alpha9.67 commands retain their older authority when
-their existing conditions hold. A future live enablement requires a separate,
+their existing conditions hold, because the new planner is never selected
+as the authoritative Control-mode route. Its independent proposal remains
+visible, and the sticky flag rejects an accidental new write even after
+Happy Hour changes the reason. A future live enablement requires a separate,
 reviewed proof-and-authority change, not merely changing the operating mode or
 turning on Master Control.
 
@@ -153,6 +163,9 @@ route retains only its existing reviewed bounded authority.
 
 ## Validation / release boundary
 
-Review the focused Alpha9.69 tests, updated Alpha9.60 and Alpha9.67 assertions,
-Alpha9.41 paid-export comparison contract and full repository validation.
-No implicit Pi, public-web or panel version bump, merge or release.
+Review the focused Alpha9.69 tests, restored Alpha9.60 and Alpha9.67
+live-authority assertions, Alpha9.41 paid-export comparison contract and
+full repository validation. A shadow-only release may merge with green
+exact-head CI and correct version/bundle proof. The proposed physical
+EV-grid/non-EV-house routing remains a separately gated future change.
+No implicit Pi, public-web or panel component version bump.
