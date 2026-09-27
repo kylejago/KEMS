@@ -130,9 +130,7 @@ def protect_live_cheap_ev(
     total = conservative_demand + charge
     safe = control.plan_safe and total <= limit + 0.001
     guard_status = (
-        "ev_battery_hold_with_cheap_charge"
-        if charge > 0.001
-        else "ev_battery_hold"
+        "ev_battery_hold_with_cheap_charge" if charge > 0.001 else "ev_battery_hold"
     )
     if snapshot.ev_load_in_house_load is not True:
         guard_status += "_conservative_scope"
