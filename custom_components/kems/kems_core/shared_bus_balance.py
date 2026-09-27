@@ -112,10 +112,7 @@ def assess_shared_bus_balance(
         return unavailable("Required physical source report timestamps are missing")
     if any(
         age > max_age_seconds
-        and not (
-            key == "grid_export_kw"
-            and snapshot.grid_export_kw == 0.0
-        )
+        and not (key == "grid_export_kw" and snapshot.grid_export_kw == 0.0)
         for key, age in snapshot.source_age_seconds.items()
         if key in _REQUIRED
     ):
@@ -168,6 +165,7 @@ def assess_shared_bus_balance(
         load_scope_reason=split.reason,
     )
 
+
 def summarise_shared_bus_audits(
     records: Sequence[Snapshot],
     now: datetime,
@@ -184,7 +182,8 @@ def summarise_shared_bus_audits(
     recent = [
         item.shared_bus_ev_audit
         for item in records
-        if item.timestamp >= cutoff and isinstance(item.shared_bus_ev_audit, dict)
+        if item.timestamp >= cutoff
+        and isinstance(item.shared_bus_ev_audit, dict)
         and item.shared_bus_ev_audit.get("status")
     ]
     counts = Counter(str(item["status"]) for item in recent)
@@ -192,7 +191,7 @@ def summarise_shared_bus_audits(
         "lookback_hours": lookback_hours,
         "recorded_samples": len(recent),
         "status_counts": dict(sorted(counts.items())),
-        "samples": recent[-max(max_samples, 1):],
+        "samples": recent[-max(max_samples, 1) :],
         "physical_isolation_proven": False,
         "hardware_write_authorised": False,
         "sample_period_note": (
