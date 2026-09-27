@@ -231,6 +231,9 @@ def test_shadow_floor_discharge_and_live_ev_fallback_are_separate():
     assert live.desired_min_soc_percent == 80
     assert "ev_isolation_fallback" in live.operating_reason
     assert "KH7" in live.next_action
+    assert "shadow-only" in live.next_action
+    assert "physical KH7 routing proof is pending" in live.blocked_reason
+    assert live.commands_permitted is False
 
 
 def test_physical_soc_wins_over_divergent_simulated_soc():
