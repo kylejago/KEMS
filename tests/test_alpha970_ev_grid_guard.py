@@ -103,13 +103,19 @@ def test_outside_or_unknown_ev_membership_is_counted_conservatively(scope):
     assert not state.desired_grid_export_allowed
 
 
-def test_reused_grid_reading_cannot_hide_import_budget_exhaustion():
-    state = _guard(
-        _snap(grid_import_kw=14.25),
-        _plan(),
-    )
-    assert state.desired_charge_power_kw == 0.25
+def test_grid_ct_containing_existing_charge_is_not_added_again():
+    state = _guard(_snap(grid_import_kw=14.25), _plan())
+    assert state.desired_charge_power_kw == 6.5
     assert state.total_site_import_kw == 14.5
+    assert state.plan_safe
+
+
+def test_actual_grid_import_over_limit_inhibits_additional_charge():
+    state = _guard(_snap(grid_import_kw=14.8), _plan())
+    assert state.desired_charge_power_kw == 0.0
+    assert not state.plan_safe
+    assert state.ev_grid_guard_status == "observed_site_import_limit_exceeded"
+    assert "Observed grid import exceeds" in state.blocked_reason
 
 
 @pytest.mark.parametrize(
