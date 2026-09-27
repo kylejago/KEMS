@@ -216,7 +216,8 @@ def test_coordinator_keeps_live_no_export_control_separate_from_customer_twin() 
     source = COORDINATOR.read_text(encoding="utf-8")
 
     assert "if base_simulation.no_export_mode_active:" in source
-    assert "control_simulation = base_simulation" in source
+    assert "self._simulation.legacy_no_export_control_view(" in source
+    assert "else base_simulation" in source
     assert "aligned_agile_control_views(simulation, agile_state)" in source
     assert "if not base_simulation.no_export_mode_active:" in source
     assert (
