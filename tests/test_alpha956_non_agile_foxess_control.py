@@ -80,7 +80,7 @@ def test_confirmed_cheap_force_charge_is_live() -> None:
 
 
 def test_alpha969_new_cheap_routes_never_inherit_alpha967_live_authority() -> None:
-    """Shadow routing is not proof that KH7 EV isolation/charge is safe."""
+    """Shadow EV allocation is not proof of shared-bus KH7 output control."""
     reasons = (
         "no_export_overnight",
         "no_export_overnight_ev_isolation_fallback",
@@ -101,6 +101,7 @@ def test_alpha969_new_cheap_routes_never_inherit_alpha967_live_authority() -> No
             assert result.commands_permitted is False
             assert result.action == "release"
             assert "shadow-only pending physical" in result.reason
+            assert "shared-bus EV/grid allocation" in result.reason
 
 
 def test_alpha967_legacy_cheap_authority_is_not_changed_by_alpha969_guard() -> None:
