@@ -69,6 +69,20 @@ def build_ev_trace_sample(
         "off_peak": snapshot.off_peak,
         "intelligent_slot": snapshot.intelligent_slot,
         "cheap_period_confirmed": snapshot.cheap_period_confirmed,
+        "offpeak_end": (
+            snapshot.offpeak_end.isoformat()
+            if snapshot.offpeak_end is not None
+            else None
+        ),
+        "next_offpeak_start": (
+            snapshot.next_offpeak_start.isoformat()
+            if snapshot.next_offpeak_start is not None
+            else None
+        ),
+        "intelligent_slot_confirmation": snapshot.intelligent_slot_confirmation,
+        "saving_session_active": snapshot.saving_session_active,
+        "source_data_age_seconds": snapshot.source_data_age_seconds,
+        "tariff_source_data_age_seconds": snapshot.tariff_source_data_age_seconds,
         "source_age_seconds": dict(snapshot.source_age_seconds),
         "stale_fields": list(snapshot.stale_fields),
         "tariff_source_age_seconds": dict(snapshot.tariff_source_age_seconds),
