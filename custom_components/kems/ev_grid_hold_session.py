@@ -44,7 +44,8 @@ class EVGridHoldSession:
             return
         if (
             timestamp.tzinfo is not None
-            and timedelta(0) <= datetime.now(UTC) - timestamp.astimezone(UTC)
+            and timedelta(0)
+            <= datetime.now(UTC) - timestamp.astimezone(UTC)
             <= _MAX_RETAINED_AGE
             and isfinite(candidate)
             and 0.0 <= candidate <= 100.0
