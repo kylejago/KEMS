@@ -792,7 +792,8 @@ class ControlEngine:
             blocked_reason=(
                 "Configured site-import limit exceeded"
                 if site_exceeded
-                else "Alpha9.69 shadow-only: measured shared-bus output/import proof is pending"
+                else "Alpha9.69 shadow-only: measured shared-bus "
+                "output/import proof is pending"
             ),
             next_action=action,
         )
