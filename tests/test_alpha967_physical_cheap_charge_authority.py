@@ -86,7 +86,8 @@ def test_live_extra_slot_uses_physical_soc_not_divergent_twin() -> None:
     control = ControlEngine().plan(snapshot, _divergent_twin(), NOW, _config())
 
     assert snapshot.cheap_period_confirmed is True
-    assert control.operating_reason == "no_export_extra_slot_ev_isolation_fallback"
+    assert control.operating_reason == "awaiting_export_tariff_charge"
+    assert control.alpha969_routing_shadow_only is False
     assert control.desired_work_mode == "Force Charge"
     assert control.desired_charge_power_kw == 3.704
     assert control.desired_min_soc_percent == 28.0
@@ -106,10 +107,9 @@ def test_live_extra_slot_uses_physical_soc_not_divergent_twin() -> None:
         master_control_enabled=True,
         emergency_stop=False,
     )
-    assert decision.commands_permitted is False
-    assert decision.action == "release"
-    assert decision.force_charge_power_kw is None
-    assert "shadow-only pending physical" in decision.reason
+    assert decision.commands_permitted is True
+    assert decision.action == "force_charge"
+    assert decision.force_charge_power_kw == 3.704
     assert decision.min_soc_on_grid_percent == 28.0
 
 
@@ -121,7 +121,7 @@ def test_physical_target_reached_returns_to_self_use_even_if_twin_disagrees() ->
     assert control.desired_work_mode == "Self Use"
     assert control.desired_charge_power_kw == 0.0
     assert control.desired_min_soc_percent == 28.0
-    assert "Conservative live EV fallback" in control.next_action
+    assert "Hold the battery at the solar-aware no-export target" in control.next_action
 
 
 def test_missing_physical_soc_never_uses_twin_soc_to_authorise_charge() -> None:
@@ -130,7 +130,7 @@ def test_missing_physical_soc_never_uses_twin_soc_to_authorise_charge() -> None:
 
     assert control.desired_work_mode == "Self Use"
     assert control.desired_charge_power_kw == 0.0
-    assert "fresh physical SOC" in control.next_action
+    assert "fresh physical battery SOC" in control.next_action
 
 
 def test_alpha967_release_identity_and_scope() -> None:
