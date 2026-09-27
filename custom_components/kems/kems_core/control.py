@@ -769,6 +769,7 @@ class ControlEngine:
         return _control_state(
             base,
             operating_reason=reason,
+            alpha969_routing_shadow_only=True,
             desired_work_mode=(
                 "Force Charge" if requested_charge > 0.001 else "Self Use"
             ),
