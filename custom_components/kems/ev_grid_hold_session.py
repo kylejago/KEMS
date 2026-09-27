@@ -78,10 +78,13 @@ class EVGridHoldSession:
             and snapshot.ev_power_age_seconds is not None
             and snapshot.ev_power_age_seconds <= 90
         )
-        if not snapshot.cheap_period_confirmed or not no_paid_export_mode or stopped:
-            if self._held_floor is not None:
-                self._held_floor = None
-                await self.async_save()
+        if (
+            not snapshot.cheap_period_confirmed
+            or not no_paid_export_mode
+            or stopped
+        ) and self._held_floor is not None:
+            self._held_floor = None
+            await self.async_save()
 
         guarded = protect_live_cheap_ev(
             snapshot,
