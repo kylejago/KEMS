@@ -86,6 +86,19 @@ def assess_foxess_control_write_authority(
             "Deliberate battery/grid export is outside the current live scope"
         )
 
+    # Alpha9.69 introduces new SOC-floor and EV/load routing semantics. The
+    # existing Alpha9.67 write contract never validated their physical KH7
+    # behaviour. Preserve the previous release's bounded authority, but
+    # explicitly fail closed on every new Alpha9.69 cheap-route plan until a
+    # separate, reviewed physical evidence gate grants that specific authority.
+    if control.operating_reason.startswith(
+        ("no_export_overnight", "no_export_extra_slot")
+    ):
+        return blocked(
+            "Alpha9.69 no-export routing is shadow-only pending physical "
+            "EV/load isolation and below-floor Force Charge validation"
+        )
+
     min_soc = round(control.desired_min_soc_percent, 1)
     if control.desired_work_mode == "Force Charge":
         if not cheap_period_confirmed:
