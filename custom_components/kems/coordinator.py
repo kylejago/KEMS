@@ -345,6 +345,43 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                 now,
                 self.settings.control,
             )
+            alpha969_shadow_plan: dict[str, object] = {}
+            if (
+                control.operating_mode == "control"
+                and base_simulation.no_export_mode_active
+                and snapshot.cheap_period_confirmed
+                and not snapshot.saving_session_active
+            ):
+                # This independent proposal is visible while the *legacy*
+                # Control-mode plan continues through normal write authority.
+                # Never feed the Alpha9.69 proposal into a FoxESS or Ohme
+                # backend, including the Happy Hour overlay path.
+                proposal = self._control.plan(
+                    snapshot,
+                    control_simulation,
+                    now,
+                    replace(self.settings.control, operating_mode="shadow"),
+                )
+                alpha969_shadow_plan = {
+                    "status": (
+                        "shadow_only"
+                        if proposal.alpha969_routing_shadow_only
+                        else "higher_priority"
+                    ),
+                    "operating_reason": proposal.operating_reason,
+                    "desired_work_mode": proposal.desired_work_mode,
+                    "desired_min_soc_percent": proposal.desired_min_soc_percent,
+                    "desired_charge_power_kw": proposal.desired_charge_power_kw,
+                    "desired_battery_to_home_power_kw": (
+                        proposal.desired_battery_to_home_power_kw
+                    ),
+                    "desired_ev_charging_allowed": (
+                        proposal.desired_ev_charging_allowed
+                    ),
+                    "blocked_reason": proposal.blocked_reason,
+                    "next_action": proposal.next_action,
+                    "hardware_write_authorised": False,
+                }
             if not base_simulation.no_export_mode_active:
                 control = align_agile_control_state(
                     control,
@@ -441,6 +478,7 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                 periods=periods,
                 history_samples=len(records),
                 phase=phase,
+                alpha969_shadow_plan=alpha969_shadow_plan,
             )
             commissioning = build_commissioning_snapshot(
                 self.hass,
