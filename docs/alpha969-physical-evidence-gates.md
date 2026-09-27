@@ -1,9 +1,12 @@
 # Alpha9.69 — physical evidence and commissioning gates
 
-Status: **proposed evidence protocol only**. Alpha9.69 remains a draft, shadow-only
-routing change. This document does not grant write authority or request anyone
-to operate the inverter. Use an appropriately qualified installer for controlled
-electrical/inverter validation and follow FoxESS/Ohme operating instructions.
+Status: physical commissioning protocol for a **future expanded live routing**
+change. The Alpha9.69 candidate publishes only simulation, read-only evidence
+and an independently visible shadow proposal while preserving Alpha9.68 live
+cheap charging. Merging that narrower release never grants new write authority.
+This document does not request anyone to operate the inverter. Use an
+appropriately qualified installer for controlled electrical/inverter validation
+and follow FoxESS/Ohme operating instructions.
 
 ## Confirmed topology and existing evidence
 
@@ -137,4 +140,7 @@ readback validation. If KH7 cannot enforce the split, preserve the conservative
 EV-active hold-SOC fallback rather than asserting an unachievable independent
 EV circuit supply.
 
-For **this PR**, remain draft and do not merge/release merely on green CI.
+For the Alpha9.69 **shadow-only** PR, merge/release only after the existing
+live charging planner is preserved and independently tested, release identity
+is correct and all exact-head checks pass. No unproven new KH7 commands become
+live as a result; require a separate future PR for any expanded authority.
