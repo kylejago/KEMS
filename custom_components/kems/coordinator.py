@@ -50,7 +50,10 @@ from .kems_core import (
     WholeHomeEngine,
     assess_quality,
 )
-from .kems_core.shared_bus_balance import assess_shared_bus_balance
+from .kems_core.shared_bus_balance import (
+    assess_shared_bus_balance,
+    summarise_shared_bus_audits,
+)
 from .lifetime import LifetimeLedgerRecorder
 from .power_down import PowerDownHistoryRecorder
 from .product_types import (
@@ -145,6 +148,11 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
     def happy_hour_ohme_control_state(self) -> dict:
         """Return the narrow Happy Hour Ohme-control audit state."""
         return self._happy_hour_ohme.status
+
+    @property
+    def shared_bus_ev_evidence(self) -> dict:
+        """Summarise recent read-only EV/house balance from retained KEMS history."""
+        return summarise_shared_bus_audits(self._history.records, dt_util.now())
 
     @property
     def foxess_control_state(self) -> dict:
