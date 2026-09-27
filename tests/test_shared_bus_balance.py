@@ -117,13 +117,13 @@ def test_paid_export_mode_remains_outside_no_export_audit() -> None:
 
 def test_audit_persists_with_snapshot_and_has_no_write_path() -> None:
     result = _audit(_snapshot())
-    persisted = Snapshot.from_dict(Snapshot(shared_bus_ev_audit=result.to_dict()).to_dict())
+    persisted = Snapshot.from_dict(
+        Snapshot(shared_bus_ev_audit=result.to_dict()).to_dict()
+    )
     assert persisted.shared_bus_ev_audit["status"] == "net_allocation_consistent"
     assert persisted.shared_bus_ev_audit["hardware_write_authorised"] is False
 
-    source = (ROOT / "kems_core" / "shared_bus_balance.py").read_text(
-        encoding="utf-8"
-    )
+    source = (ROOT / "kems_core" / "shared_bus_balance.py").read_text(encoding="utf-8")
     assert "async_call(" not in source
     assert "set_value(" not in source
     assert "select_option(" not in source
@@ -134,6 +134,6 @@ def test_audit_persists_with_snapshot_and_has_no_write_path() -> None:
     assert '"shared_bus_ev_balance": dict(data.snapshot.shared_bus_ev_audit)' in (
         ROOT / "diagnostics.py"
     ).read_text(encoding="utf-8")
-    assert 'key="shared_bus_ev_balance"' in (
-        ROOT / "sensor.py"
-    ).read_text(encoding="utf-8")
+    assert 'key="shared_bus_ev_balance"' in (ROOT / "sensor.py").read_text(
+        encoding="utf-8"
+    )
