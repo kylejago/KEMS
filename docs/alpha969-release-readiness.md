@@ -16,15 +16,55 @@ Date: 27 September 2026. Candidate PR #296, branch
   existing safe release path for this new plan. It does not grant any new
   hardware command.
 
+## Confirmed property topology and existing KEMS data (27 September)
+
+The owner confirms **grid and inverter enter the EPS/changeover equipment;
+its downstream output feeds Henley blocks supplying both the main and EV
+consumer units**. House and EV are therefore on a shared downstream supply,
+not two independently selectable KH7 outputs. This description is sufficient
+for planning; do not request the same wiring diagram again. The precise EPS
+changeover/island isolation and EV shedding still require readback or installer
+verification before island-mode authority is broadened.
+
+Use the already configured KEMS Octopus/Ohme/FoxESS providers and snapshots:
+Ohme status/power, FoxESS Load/PV/battery/grid powers, SOC, confirmed cheap
+slot, source freshness, work-mode/MinSOC and existing retained history.
+`Collector` already compares both EV membership hypotheses across three
+consecutive balances and records `ev_load_in_house_load`; KEMS retains
+read-only snapshots every 300 seconds. The snapshot history is not a
+high-frequency synchronized physical commissioning trace, so a dedicated
+read-only event capture or HA history around transitions may still be needed.
+Current uploaded diagnostics captured with the EV idle cannot substitute for
+actual charging transition measurements; this does **not** require the owner
+to re-enter readings already available to KEMS.
+
+Earlier live Alpha9.59 evidence already demonstrates bounded, confirmed-cheap
+Force Charge at a 7 kW request, approximately 6.8 kW battery charge, 8.1 kW
+site import and safe Self Use/MinSOC restoration. Reuse that as existing
+proof, **not** as evidence of the new target-limited below-floor sequence
+or simultaneous EV/grid and household/battery dispatch.
+
+The engineering objective on the shared bus is a measured **site-level power
+balance**: constrain total KH7 AC/battery output to verified non-EV demand
+while checking that site grid import covers at least the equivalent Ohme
+power (subject to PV/charging states and physical limits). This is a grid
+allocation, not proof of electron/circuit isolation. Presently reviewed
+Self Use/Force Charge/MinSOC authority cannot independently cap KH7 output
+while retaining battery-to-house supply under EV load; enabling an additional
+output-control mechanism would need its own measured fail-closed validation.
+If the control cannot enforce this balance, retain the EV-active SOC hold
+rather than claiming EV/grid isolation.
+
 ## Blocking findings
 
-1. No retained, independently corroborated physical data demonstrates
-   EV-only grid supply and house-only battery support when the Ohme ePod is
-   active on the KH7 AC bus. Software power accounting cannot prove physical
-   power-source isolation.
-2. No installer-controlled proof demonstrates the new below-floor Force Charge
-   start, limiter, target-stop, MinSOC and restoration sequence under actual
-   inverter/charger readbacks.
+1. Existing KEMS measurements can identify and estimate EV demand, but no
+   retained charging-transition evidence yet demonstrates a supported KH7
+   output constraint plus the site-grid-import response necessary to achieve
+   the target shared-bus EV/house allocation. Strict separate physical feeds
+   cannot be created by software on the confirmed shared supply.
+2. Existing Alpha9.59 Force Charge and restoration were physically observed;
+   the new **below-floor to target** limiter, stop, transition and EV-overlap
+   sequence remains unproven against actual readbacks.
 3. The candidate planner selects the new Alpha9.69 route during a confirmed
    cheap period even in Control mode. Its physical write barrier correctly
    rejects that route, but this also suspends the previously reviewed
@@ -41,7 +81,7 @@ Date: 27 September 2026. Candidate PR #296, branch
 
 **A. Full physical Alpha9.69:** acquire the passive transition evidence in
 `alpha969-physical-evidence-gates.md`; prove a supported KH7 means of
-enforcing EV-grid/home-battery separation (or explicitly retain the physical
+enforcing the measured shared-bus site-import/EV allocation (or explicitly retain the physical
 EV-active fallback); validate the new below-floor command sequence and all
 failure/ownership transitions. Only a separately reviewed and tested
 write-authority change may lift the sticky shadow barrier. Retain accurate
