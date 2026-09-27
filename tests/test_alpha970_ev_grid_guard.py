@@ -169,6 +169,32 @@ def test_no_override_of_outside_cheap_priority_or_shadow_paths(
     )
 
 
+def test_prior_session_floor_never_chases_falling_soc_down():
+    previous = 68.0
+    state = protect_live_cheap_ev(
+        _snap(battery_soc=62.0),
+        _plan(desired_min_soc_percent=60.0),
+        _config(),
+        no_paid_export_mode=True,
+        held_floor_percent=previous,
+    )
+    assert state.desired_min_soc_percent == 68.0
+    assert state.ev_grid_guard_status.startswith("ev_battery_hold")
+
+
+def test_unknown_ohme_after_active_scan_retains_existing_floor():
+    state = protect_live_cheap_ev(
+        _snap(ev_connected=None, ev_charging=None, ev_power_kw=None),
+        _plan(),
+        _config(),
+        no_paid_export_mode=True,
+        held_floor_percent=70.0,
+    )
+    assert state.ev_grid_guard_status == "battery_hold_ev_or_site_unverified"
+    assert state.desired_min_soc_percent == 70.0
+    assert state.desired_charge_power_kw == 0.0
+
+
 def test_charge_and_hold_use_only_old_reviewed_backend_authority():
     charge = _guard()
     hold = _guard(_snap(ev_power_age_seconds=150.0))
@@ -203,7 +229,7 @@ def test_coordinator_routes_guard_only_into_reviewed_existing_backend():
         "control = apply_happy_hour_control(control, snapshot, happy_hour_plan)"
         in coordinator
     )
-    assert "control = protect_live_cheap_ev(" in coordinator
+    assert "control = await self._ev_grid_hold.async_apply(" in coordinator
     assert "control=control,\n                technical_ready=" in coordinator
     assert "control=proposal,\n                technical_ready=" not in coordinator
     backend = (root / "foxess_control_backend.py").read_text(encoding="utf-8")
