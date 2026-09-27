@@ -660,6 +660,16 @@ SENSORS: tuple[KEMSSensorEntityDescription, ...] = (
         value_fn=lambda data: data.snapshot.offpeak_end,
     ),
     KEMSSensorEntityDescription(
+        key="shared_bus_ev_balance",
+        name="EV shared-bus allocation audit",
+        icon="mdi:ev-station",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda data: data.snapshot.shared_bus_ev_audit.get(
+            "status", "unavailable"
+        ),
+        attributes_fn=lambda data: dict(data.snapshot.shared_bus_ev_audit),
+    ),
+    KEMSSensorEntityDescription(
         key="ev_power",
         name="EV charging power",
         icon="mdi:ev-station",
