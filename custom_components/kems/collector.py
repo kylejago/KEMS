@@ -93,10 +93,7 @@ class Collector:
                 "grid_import_kw",
                 "grid_export_kw",
             )
-        ) and (
-            ohme.power_age_seconds is not None
-            and ohme.power_age_seconds <= 90.0
-        )
+        ) and (ohme.power_age_seconds is not None and ohme.power_age_seconds <= 90.0)
         candidate = infer_ev_load_in_house_load(
             house_kw=foxess.house_load_kw if scope_fresh else None,
             ev_kw=ohme.power_kw if scope_fresh and ohme.charging is True else None,
