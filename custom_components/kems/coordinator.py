@@ -52,6 +52,7 @@ from .kems_core import (
     WholeHomeEngine,
     assess_quality,
 )
+from .kems_core.ev_grid_guard import protect_live_cheap_ev
 from .kems_core.shared_bus_balance import (
     assess_shared_bus_balance,
     summarise_shared_bus_audits,
@@ -415,6 +416,14 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
             if not isinstance(power_down_plan, dict):
                 power_down_plan = {}
             control = apply_happy_hour_control(control, snapshot, happy_hour_plan)
+            # Existing reviewed MinSOC/Force Charge scope only. Higher-priority
+            # Happy Hour, Power Down, island and emergency paths are untouched.
+            control = protect_live_cheap_ev(
+                snapshot,
+                control,
+                self.settings.control,
+                no_paid_export_mode=base_simulation.no_export_mode_active,
+            )
             await self._shadow_validation.async_update(
                 snapshot=snapshot,
                 simulation=shadow_simulation,
