@@ -231,7 +231,7 @@ def test_shadow_floor_discharge_and_live_ev_fallback_are_separate():
     assert live.desired_battery_to_home_power_kw == 0
     assert live.desired_min_soc_percent == 80
     assert "ev_isolation_fallback" in live.operating_reason
-    assert "KH7" in live.next_action
+    assert "house and EV share the downstream bus" in live.next_action
     assert "shadow-only" in live.next_action
     assert "measured shared-bus output/import proof is pending" in live.blocked_reason
     assert live.commands_permitted is False
