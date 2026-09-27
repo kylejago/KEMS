@@ -149,7 +149,19 @@ def protect_live_cheap_ev(
         max(limit - conservative_demand, 0.0),
     )
     total = conservative_demand + charge
-    safe = control.plan_safe and not observed_over_limit and total <= limit + 0.001
+    # The reviewed cheap planner may have rejected its *uncapped* 7 kW
+    # request solely for import headroom. Re-evaluate that one condition
+    # after reducing charge rather than leaving a safe hold falsely blocked.
+    prior_site_only_failure = bool(
+        control.site_import_limit_exceeded
+        and control.blocked_reason
+        == "Configured site-import limit leaves no safe charging headroom"
+    )
+    safe = (
+        (control.plan_safe or prior_site_only_failure)
+        and not observed_over_limit
+        and total <= limit + 0.001
+    )
     guard_status = (
         "ev_battery_hold_with_cheap_charge" if charge > 0.001 else "ev_battery_hold"
     )
@@ -173,7 +185,7 @@ def protect_live_cheap_ev(
         blocked_reason=(
             "Observed grid import exceeds configured site limit"
             if observed_over_limit
-            else control.blocked_reason
+            else "" if safe and prior_site_only_failure else control.blocked_reason
         ),
         next_action=(
             "EV active: hold battery with physical MinSOC and use confirmed "
