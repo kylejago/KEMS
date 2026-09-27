@@ -59,6 +59,7 @@ from .product_types import (
 )
 from .providers.entity_map import KEMSEntities
 from .roi_accounting import async_reconcile_financial_commissioning
+from .kems_core.shared_bus_balance import assess_shared_bus_balance
 from .settings import KEMSSettings
 from .shadow_validation import ShadowValidationRecorder
 
@@ -186,6 +187,18 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
         """Run the complete read-only KEMS analysis pipeline."""
         try:
             snapshot = self._collector.collect()
+            # Use the same already-collected physical snapshot as every other
+            # KEMS flow. This read-only audit never enters hardware authority.
+            snapshot.shared_bus_ev_audit = assess_shared_bus_balance(
+                snapshot,
+                no_paid_export_mode=(
+                    self.settings.simulation.export_tariff_status != "active"
+                ),
+                battery_positive_is_discharge=(
+                    self.settings.simulation.battery_power_positive_is_discharge
+                ),
+                inverter_limit_kw=self.settings.control.inverter_limit_kw,
+            ).to_dict()
             now = dt_util.now()
 
             # Forecast planning is calculated before history recording so the
