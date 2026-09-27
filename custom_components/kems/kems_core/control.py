@@ -760,6 +760,12 @@ class ControlEngine:
                 "Charge only the physical shortfall to the no-export floor "
                 "within measured site-import headroom. " + action
             )
+        # The physical write-authority gate explicitly rejects both new
+        # Alpha9.69 reason families pending controlled KH7 validation.
+        action += (
+            " Alpha9.69 is shadow-only: this proposed work mode / MinSOC "
+            "is not authorised as a FoxESS hardware write."
+        )
         return _control_state(
             base,
             operating_reason=reason,
@@ -785,7 +791,7 @@ class ControlEngine:
             blocked_reason=(
                 "Configured site-import limit exceeded"
                 if site_exceeded
-                else _backend_block_reason(config)
+                else "Alpha9.69 shadow-only: physical KH7 routing proof is pending"
             ),
             next_action=action,
         )
