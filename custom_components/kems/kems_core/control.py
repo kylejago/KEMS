@@ -208,8 +208,12 @@ class ControlEngine:
                 next_action="Continue recording live sources",
             )
 
+        # The Alpha9.69 proposal must not replace the reviewed Alpha9.68
+        # physical cheap-charge planner. Its novel SOC-floor/EV allocation
+        # remains independently available in Simulate/Shadow only.
         if (
-            inputs.cheap_period
+            mode != "control"
+            and inputs.cheap_period
             and simulation.no_export_mode_active
             and not inputs.saving_session_active
         ):
