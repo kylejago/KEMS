@@ -83,6 +83,11 @@ def assess_shared_bus_balance(
     ev = snapshot.ev_power_kw
     if ev is None or not isfinite(ev) or ev <= 0.1:
         return unavailable("Active Ohme power is unavailable or inconsistent")
+    if (
+        snapshot.ev_power_age_seconds is None
+        or snapshot.ev_power_age_seconds > 90.0
+    ):
+        return unavailable("Ohme power report is too old for a matched EV audit")
     if snapshot.ev_load_in_house_load is None:
         return unavailable("EV membership in FoxESS Load Power is unproven")
     if snapshot.stale_fields and any(key in snapshot.stale_fields for key in _REQUIRED):
