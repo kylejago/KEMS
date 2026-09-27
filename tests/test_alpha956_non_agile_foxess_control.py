@@ -79,6 +79,43 @@ def test_confirmed_cheap_force_charge_is_live() -> None:
     assert result.force_charge_power_kw == 6.25
 
 
+def test_alpha969_new_cheap_routes_never_inherit_alpha967_live_authority() -> None:
+    """Shadow routing is not proof that KH7 EV isolation/charge is safe."""
+    reasons = (
+        "no_export_overnight",
+        "no_export_overnight_ev_isolation_fallback",
+        "no_export_extra_slot",
+        "no_export_extra_slot_ev_isolation_fallback",
+    )
+    for reason in reasons:
+        for mode, charge_kw in (("Force Charge", 3.5), ("Self Use", 0.0)):
+            result = _decision(
+                _control(
+                    operating_reason=reason,
+                    desired_work_mode=mode,
+                    desired_charge_power_kw=charge_kw,
+                    desired_min_soc_percent=80.0,
+                ),
+                cheap_period_confirmed=True,
+            )
+            assert result.commands_permitted is False
+            assert result.action == "release"
+            assert "shadow-only pending physical" in result.reason
+
+
+def test_alpha967_legacy_cheap_authority_is_not_changed_by_alpha969_guard() -> None:
+    result = _decision(
+        _control(
+            operating_reason="awaiting_export_tariff_charge",
+            desired_work_mode="Force Charge",
+            desired_charge_power_kw=3.5,
+        ),
+        cheap_period_confirmed=True,
+    )
+    assert result.commands_permitted is True
+    assert result.action == "force_charge"
+
+
 def test_force_charge_without_confirmed_cheap_period_fails_closed() -> None:
     result = _decision(
         _control(
