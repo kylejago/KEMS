@@ -86,10 +86,7 @@ def assess_shared_bus_balance(
     ev = snapshot.ev_power_kw
     if ev is None or not isfinite(ev) or ev <= 0.1:
         return unavailable("Active Ohme power is unavailable or inconsistent")
-    if (
-        snapshot.ev_power_age_seconds is None
-        or snapshot.ev_power_age_seconds > 90.0
-    ):
+    if snapshot.ev_power_age_seconds is None or snapshot.ev_power_age_seconds > 90.0:
         return unavailable("Ohme power report is too old for a matched EV audit")
     if snapshot.ev_load_in_house_load is None:
         return unavailable("EV membership in FoxESS Load Power is unproven")
@@ -97,12 +94,16 @@ def assess_shared_bus_balance(
         return unavailable("A physical FoxESS balance input is stale")
     values = [getattr(snapshot, key) for key in _REQUIRED]
     if any(value is None or not isfinite(value) for value in values):
-        return unavailable("Complete finite physical FoxESS power readings are required")
+        return unavailable(
+            "Complete finite physical FoxESS power readings are required"
+        )
     if any(
         snapshot.source_age_seconds.get(key, max_age_seconds + 1) > max_age_seconds
         for key in _REQUIRED
     ):
-        return unavailable("A source has no current timestamp or exceeds the audit age limit")
+        return unavailable(
+            "A source has no current timestamp or exceeds the audit age limit"
+        )
 
     split = split_no_export_demand(snapshot, snapshot.house_load_kw)
     if not split.ev_separation_proven:
