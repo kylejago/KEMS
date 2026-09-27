@@ -185,6 +185,7 @@ async def async_get_config_entry_diagnostics(
         },
         "roi": asdict(data.roi),
         "control": asdict(data.control),
+        "alpha969_shadow_plan": dict(data.alpha969_shadow_plan),
         "shadow_validation": shadow_validation,
         "shadow_readiness": shadow_readiness,
         "commissioning": build_commissioning_snapshot(hass, coordinator),
