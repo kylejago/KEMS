@@ -93,9 +93,10 @@ def test_real_backend_receives_legacy_view_and_separate_twin_is_advisory():
     assert 'if self.settings.control.operating_mode == "control"' in coordinator
     assert "control_simulation," in coordinator
     assert (
-        "proposal = self._control.plan(\n                    snapshot,\n                    base_simulation,"
-        in coordinator
-    )
+        "proposal = self._control.plan(\n"
+        "                    snapshot,\n"
+        "                    base_simulation,"
+    ) in coordinator
     assert "control=control,\n                technical_ready=" in coordinator
     assert "control=proposal,\n                technical_ready=" not in coordinator
     assert "self._ev_charge_trace.async_record(" in coordinator
