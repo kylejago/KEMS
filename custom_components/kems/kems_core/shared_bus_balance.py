@@ -75,7 +75,10 @@ def assess_shared_bus_balance(
         return SharedBusBalance(status=status, reason=reason, **common)
 
     if not no_paid_export_mode:
-        return unavailable("Paid-export operation is outside this no-export audit", status="not_applicable")
+        return unavailable(
+            "Paid-export operation is outside this no-export audit",
+            status="not_applicable",
+        )
     if snapshot.ev_charging is not True:
         if snapshot.ev_charging is False and not (snapshot.ev_power_kw or 0.0) > 0.1:
             return unavailable("EV is not charging", status="idle")
@@ -95,7 +98,10 @@ def assess_shared_bus_balance(
     values = [getattr(snapshot, key) for key in _REQUIRED]
     if any(value is None or not isfinite(value) for value in values):
         return unavailable("Complete finite physical FoxESS power readings are required")
-    if any(snapshot.source_age_seconds.get(key, max_age_seconds + 1) > max_age_seconds for key in _REQUIRED):
+    if any(
+        snapshot.source_age_seconds.get(key, max_age_seconds + 1) > max_age_seconds
+        for key in _REQUIRED
+    ):
         return unavailable("A source has no current timestamp or exceeds the audit age limit")
 
     split = split_no_export_demand(snapshot, snapshot.house_load_kw)
@@ -113,7 +119,9 @@ def assess_shared_bus_balance(
     pv_surplus = max(solar - home, 0.0)
     # PV on the same bus can reduce EV grid import; no per-circuit source claim.
     ev_grid_requirement = max(split.ev_grid_kw - pv_surplus, 0.0)
-    grid_shortfall = max(ev_grid_requirement - max(float(snapshot.grid_import_kw), 0.0), 0.0)
+    grid_shortfall = max(
+        ev_grid_requirement - max(float(snapshot.grid_import_kw), 0.0), 0.0
+    )
     consistent = battery_excess <= _TOLERANCE_KW and grid_shortfall <= _TOLERANCE_KW
     reason = (
         "Observed whole-site allocation is consistent with the conservative "
