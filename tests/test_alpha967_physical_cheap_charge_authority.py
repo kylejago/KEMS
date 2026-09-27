@@ -106,9 +106,10 @@ def test_live_extra_slot_uses_physical_soc_not_divergent_twin() -> None:
         master_control_enabled=True,
         emergency_stop=False,
     )
-    assert decision.commands_permitted is True
-    assert decision.action == "force_charge"
-    assert decision.force_charge_power_kw == 3.704
+    assert decision.commands_permitted is False
+    assert decision.action == "release"
+    assert decision.force_charge_power_kw is None
+    assert "shadow-only pending physical" in decision.reason
     assert decision.min_soc_on_grid_percent == 28.0
 
 
