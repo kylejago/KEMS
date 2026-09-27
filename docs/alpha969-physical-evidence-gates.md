@@ -5,13 +5,36 @@ routing change. This document does not grant write authority or request anyone
 to operate the inverter. Use an appropriately qualified installer for controlled
 electrical/inverter validation and follow FoxESS/Ohme operating instructions.
 
+## Confirmed topology and existing evidence
+
+Owner-confirmed: grid and inverter feed the EPS/changeover equipment; its
+output runs to Henley blocks supplying both the main and EV consumer units.
+House and EV therefore share the downstream AC supply. There is no dedicated
+KH7 output for the EV in the known topology; **do not request another wiring
+diagram or promise physical circuit-by-circuit source isolation**. The
+installation's EPS changeover, island protection and EV load-shedding design
+still need their own protective readback/installer validation before changing
+island behaviour.
+
+KEMS already records Ohme status/power, FoxESS Load/PV/battery/grid readings,
+SOC, tariff evidence and source ages. Use those sources, its existing
+EV-membership inference and retained snapshots; do not request duplicate
+manual data entry. Retained snapshots are sampled every 300 seconds; faster
+charge-start/stop evidence may need a bounded read-only event capture or HA
+history. Prior physical Alpha9.59 testing already verified a bounded 7 kW
+Force Charge request, about 6.8 kW observed battery charge and about 8.1 kW
+site import, with Self Use/MinSOC restoration. The distinct **target-limited
+below-floor sequence and simultaneous EV/house power allocation** still need
+measured validation.
+
 ## Non-negotiable separation
 
 1. A confirmed cheap tariff proves the **price window**, not the physical
    origin of electricity feeding the charger.
 2. Three consistent site-balance observations can support whether Ohme power is
    inside or outside FoxESS Load Power. They do **not** prove that a KH7 work
-   mode can route battery power exclusively to home loads while the EV is active.
+   mode can constrain total shared-bus inverter output so the measured grid
+   import supplies the equivalent EV demand.
 3. A desired ControlState `Force Charge`, `Self Use` or MinSOC is not evidence
    that the physical inverter followed that request. This PR blocks writes
    using `alpha969_routing_shadow_only`, which persists through downstream
@@ -41,8 +64,14 @@ samples. The existing candidate classifier uses a 0.40 kW minimum / 6%
 site-balance tolerance, but its verdict is **measurement membership only**.
 Require observations of **EV idle, plug-in, charge start, steady charge,
 charge stop and unplug**. A flag observed only while idle is not EV-scope proof.
-Keep the physical EV-origin claim explicitly *unproven* regardless of a
-successful measurement classification.
+Do not claim a physically segregated EV source from a successful
+measurement classification. On a shared bus, validate **net allocation**:
+site import at least the equivalent verified Ohme load while KH7 output is
+limited to independently verified non-EV demand. For example, with 1 kW
+non-EV home demand, 7 kW EV demand and no PV, 1 kW KH7 output plus 7 kW
+net grid import meets the proposed accounting objective. It does not prove
+which individual AC circuit receives which electrons; charging the battery
+or adding PV requires separately balanced accounting and import headroom.
 
 ## Stage-gate matrix (no enabling in this PR)
 
@@ -51,9 +80,9 @@ successful measurement classification.
 | Overnight, SOC above floor, EV idle | PV to home first; available battery to non-EV house, hold floor | Fresh physical SOC, house/load scope, grid/CT balance across load changes; no forced discharge to target |
 | Overnight, SOC at floor | Hold battery floor; home may use grid | SOC and MinSOC readback after transitions; no accidental below-floor discharge |
 | Overnight, SOC below floor | Request only shortfall in shadow | Separate controlled proof that Force Charge responds, respects limits and stops on fresh target readback |
-| Extra confirmed Intelligent slot | Grid allocation for EV; protect future house forecast | Independent tariff confirmation, valid end/deadline, fresh EV and grid evidence, physical isolation capability (not inferred from twin) |
+| Extra confirmed Intelligent slot | Grid allocation for EV; protect future house forecast | Independent tariff confirmation, valid end/deadline, fresh EV and grid evidence, measured shared-bus import/Ohme balance and a proven KH7 output constraint (not inferred from twin) |
 | EV active or status/power unknown | Hold physical SOC in proposed live fallback | Measured charger/house/battery/grid balance at charge start and stop; loss of either Ohme or CT must fail closed |
-| Solar surplus | Solar to house then natural battery charge, no paid export | CT/import/export readings and inverter readback; never invent EV isolation from PV routing |
+| Solar surplus | Solar to house then natural battery charge, no paid export | CT/import/export readings and inverter readback; include PV and battery charge in measured site balance; never infer circuit isolation |
 | Slot end, tariff stale/unconfirmed, grid outage or Power Down | Existing higher-priority safety/Power Down authority takes precedence | Repeat readback/restore/fail-safe checks without relying on merely planned flow values |
 
 For each proposed test, record configured import limit, inverter and charge
@@ -64,17 +93,19 @@ test does not satisfy the future hardware gate.
 ## Stop conditions and release boundary
 
 Stop the physical exercise if source freshness, charger state, CT direction,
-MinSOC/charge-mode readback or expected isolation cannot be established; if
+MinSOC/charge-mode readback or required site-grid/EV balance cannot be established; if
 grid import exceeds the configured safe limit; if battery SOC crosses its
 intended floor; or if unexpected export, island operation or a safety/Power
 Down priority conflict occurs. Record the observed outcome rather than
 adjusting the algorithm to assume a success.
 
 Before a future **separate** live-authority change: collect a retained physical
-evidence pack, explicitly identify which KH7 controls actually enforce
-EV-grid/home-battery separation, have the installer review failure behavior,
+evidence pack, explicitly identify which KH7 controls can limit shared-bus
+output and achieve the verified grid-import/EV allocation, have the installer
+review failure behavior,
 add boundary/transition regressions, and re-run exact-head CI and manual
 readback validation. If KH7 cannot enforce the split, preserve the conservative
-EV-active hold-SOC fallback rather than asserting physical EV-grid routing.
+EV-active hold-SOC fallback rather than asserting an unachievable independent
+EV circuit supply.
 
 For **this PR**, remain draft and do not merge/release merely on green CI.
