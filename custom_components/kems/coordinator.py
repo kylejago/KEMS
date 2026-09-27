@@ -23,6 +23,7 @@ from .commissioning import build_commissioning_snapshot
 from .const import NAME
 from .entity_discovery import SourceValidationResult
 from .ev_charge_trace import EVChargeTraceRecorder
+from .ev_grid_hold_session import EVGridHoldSession
 from .export_accounting import (
     actual_export_income_pence,
     async_repair_no_paid_export_income,
@@ -52,7 +53,6 @@ from .kems_core import (
     WholeHomeEngine,
     assess_quality,
 )
-from .kems_core.ev_grid_guard import protect_live_cheap_ev
 from .kems_core.shared_bus_balance import (
     assess_shared_bus_balance,
     summarise_shared_bus_audits,
@@ -96,6 +96,7 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
             settings.history_days,
         )
         self._ev_charge_trace = EVChargeTraceRecorder(hass, entry.entry_id)
+        self._ev_grid_hold = EVGridHoldSession(hass, entry.entry_id)
         self._learning = LearningEngine()
         self._forecast = SolarForecastCoordinator(hass, settings.forecast)
         self._forecast_planning = ForecastPlanningEngine()
@@ -164,6 +165,11 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
         return self._ev_charge_trace.state
 
     @property
+    def ev_grid_hold_state(self) -> dict:
+        """Report a restart-safe battery-floor latch, not circuit isolation."""
+        return self._ev_grid_hold.status
+
+    @property
     def foxess_control_state(self) -> dict:
         """Return the bounded FoxESS real-control audit state."""
         return self._foxess_control.status
@@ -179,6 +185,7 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
         await self._foxess_control.async_setup()
         await self._history.async_load()
         await self._ev_charge_trace.async_load()
+        await self._ev_grid_hold.async_load()
         await self._forecast_validation.async_load()
         await self._lifetime.async_load()
         if (
@@ -418,7 +425,7 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
             control = apply_happy_hour_control(control, snapshot, happy_hour_plan)
             # Existing reviewed MinSOC/Force Charge scope only. Higher-priority
             # Happy Hour, Power Down, island and emergency paths are untouched.
-            control = protect_live_cheap_ev(
+            control = await self._ev_grid_hold.async_apply(
                 snapshot,
                 control,
                 self.settings.control,
@@ -601,6 +608,7 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
         await self._happy_hour_ohme.async_shutdown()
         await self._history.async_save()
         await self._ev_charge_trace.async_save()
+        await self._ev_grid_hold.async_save()
         await self._forecast_validation.async_save()
         await self._lifetime.async_save()
         await self._power_down.async_save()
