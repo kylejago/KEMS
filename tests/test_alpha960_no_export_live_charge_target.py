@@ -206,8 +206,10 @@ def test_no_export_below_target_force_charges_only_to_forecast_target() -> None:
         master_control_enabled=True,
         emergency_stop=False,
     )
-    assert decision.action == "force_charge"
-    assert decision.force_charge_power_kw == 7.0
+    assert decision.commands_permitted is False
+    assert decision.action == "release"
+    assert decision.force_charge_power_kw is None
+    assert "shadow-only pending physical" in decision.reason
     assert decision.min_soc_on_grid_percent == 54.0
 
 
