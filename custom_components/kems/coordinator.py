@@ -22,6 +22,7 @@ from .collector import Collector
 from .commissioning import build_commissioning_snapshot
 from .const import NAME
 from .entity_discovery import SourceValidationResult
+from .ev_charge_trace import EVChargeTraceRecorder
 from .export_accounting import (
     actual_export_income_pence,
     async_repair_no_paid_export_income,
@@ -30,6 +31,7 @@ from .export_accounting import (
 )
 from .forecast_validation import ForecastValidationRecorder
 from .forecasting import SolarForecastCoordinator
+from .foxess_command_shadow import build_foxess_command_shadow_snapshot
 from .foxess_control_backend import FoxESSControlBackend
 from .happy_hour_budget import apply_happy_hour_control
 from .happy_hour_ohme_control import OhmeHappyHourController
@@ -92,6 +94,7 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
             entry.entry_id,
             settings.history_days,
         )
+        self._ev_charge_trace = EVChargeTraceRecorder(hass, entry.entry_id)
         self._learning = LearningEngine()
         self._forecast = SolarForecastCoordinator(hass, settings.forecast)
         self._forecast_planning = ForecastPlanningEngine()
@@ -155,6 +158,11 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
         return summarise_shared_bus_audits(self._history.records, dt_util.now())
 
     @property
+    def ev_charge_trace_state(self) -> dict:
+        """Return retained event-frequency EV evidence from existing sensors."""
+        return self._ev_charge_trace.state
+
+    @property
     def foxess_control_state(self) -> dict:
         """Return the bounded FoxESS real-control audit state."""
         return self._foxess_control.status
@@ -169,6 +177,7 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
         await self._happy_hour_ohme.async_setup()
         await self._foxess_control.async_setup()
         await self._history.async_load()
+        await self._ev_charge_trace.async_load()
         await self._forecast_validation.async_load()
         await self._lifetime.async_load()
         if (
@@ -496,6 +505,24 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                 commissioning.get("ready_for_control")
                 and self.settings.control.commissioned
             )
+            # Record actual charging transitions at coordinator scan cadence,
+            # not just the five-minute summary history. No extra hardware
+            # commands: the command shadow is a read-only source/readback view.
+            try:
+                trace_shadow = (
+                    build_foxess_command_shadow_snapshot(
+                        self.hass, self, control_override=control
+                    )
+                    if self._ev_charge_trace.wants_capture(snapshot)
+                    else None
+                )
+                await self._ev_charge_trace.async_record(
+                    snapshot,
+                    foxess_control=foxess_control,
+                    command_shadow=trace_shadow,
+                )
+            except Exception:
+                LOGGER.exception("Read-only EV charge trace capture failed")
             control = replace(
                 control,
                 commissioned=technical_commissioned,
@@ -554,6 +581,7 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
         await self._foxess_control.async_shutdown(self)
         await self._happy_hour_ohme.async_shutdown()
         await self._history.async_save()
+        await self._ev_charge_trace.async_save()
         await self._forecast_validation.async_save()
         await self._lifetime.async_save()
         await self._power_down.async_save()
