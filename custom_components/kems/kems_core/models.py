@@ -968,6 +968,8 @@ class ControlState:
     commands_permitted: bool = False
     # Sticky across dataclasses.replace overlays: not an Alpha9.67 live command.
     alpha969_routing_shadow_only: bool = False
+    # Physical whole-bus battery hold; never a claim of EV circuit isolation.
+    ev_grid_guard_status: str = "inactive"
     blocked_reason: str = "Simulation/shadow only"
     next_action: str = "Continue observing"
     preflight_passed: int = 0
