@@ -103,6 +103,27 @@ def test_outside_or_unknown_ev_membership_is_counted_conservatively(scope):
     assert not state.desired_grid_export_allowed
 
 
+def test_original_uncapped_cheap_charge_site_failure_is_rebudgeted_safely():
+    original = _plan(
+        plan_safe=False,
+        site_import_limit_exceeded=True,
+        blocked_reason="Configured site-import limit leaves no safe charging headroom",
+    )
+    corrected = _guard(plan=original)
+    assert corrected.plan_safe
+    assert corrected.site_import_limit_exceeded is False
+    assert corrected.desired_charge_power_kw == 6.5
+    assert corrected.total_site_import_kw == 14.5
+    assert corrected.blocked_reason == ""
+
+
+def test_non_site_safety_failure_is_not_waived_by_headroom_rebudget():
+    original = _plan(plan_safe=False, blocked_reason="Other safety gate failed")
+    corrected = _guard(plan=original)
+    assert corrected.plan_safe is False
+    assert corrected.blocked_reason == "Other safety gate failed"
+
+
 def test_grid_ct_containing_existing_charge_is_not_added_again():
     state = _guard(_snap(grid_import_kw=14.25), _plan())
     assert state.desired_charge_power_kw == 6.5
