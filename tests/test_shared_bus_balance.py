@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from kems_core.models import Snapshot
-from kems_core.shared_bus_balance import assess_shared_bus_balance
+from kems_core.shared_bus_balance import (
+    assess_shared_bus_balance,
+    summarise_shared_bus_audits,
+)
 
 ROOT = Path(__file__).parents[1] / "custom_components" / "kems"
 NOW = datetime(2026, 9, 27, 12, 0, tzinfo=UTC)
@@ -137,3 +140,24 @@ def test_audit_persists_with_snapshot_and_has_no_write_path() -> None:
     assert 'key="shared_bus_ev_balance"' in (ROOT / "sensor.py").read_text(
         encoding="utf-8"
     )
+
+
+def test_historical_evidence_is_bounded_and_never_implies_write_authority() -> None:
+    old = _snapshot(timestamp=NOW - timedelta(hours=26))
+    recent = [
+        _snapshot(
+            timestamp=NOW - timedelta(minutes=5 * n),
+            shared_bus_ev_audit=_audit(_snapshot()).to_dict(),
+        )
+        for n in range(5)
+    ]
+    latest = summarise_shared_bus_audits([old, *recent], NOW, max_samples=3)
+    assert latest["recorded_samples"] == 5
+    assert latest["status_counts"] == {"net_allocation_consistent": 5}
+    assert len(latest["samples"]) == 3
+    assert latest["physical_isolation_proven"] is False
+    assert latest["hardware_write_authorised"] is False
+
+    assert '"shared_bus_ev_evidence": coordinator.shared_bus_ev_evidence' in (
+        ROOT / "diagnostics.py"
+    ).read_text(encoding="utf-8")
