@@ -16,6 +16,7 @@ from kems_core import (
     SimulationState,
     Snapshot,
 )
+from kems_core.control_write_authority import assess_foxess_control_write_authority
 from kems_core.no_export_cheap import (
     infer_ev_load_in_house_load,
     no_export_cheap_period_kind,
@@ -618,3 +619,74 @@ def test_alpha969_evidence_is_visible_without_confusing_it_with_live_authority()
     assert "data.control.alpha969_routing_shadow_only" in binary
     assert 'key="no_export_ev_load_scope_identified"' in binary
     assert "data.simulation.no_export_ev_load_proven" in binary
+
+
+@pytest.mark.parametrize(
+    ("soc", "expected_mode", "expected_charge"),
+    [
+        (55.0, "Force Charge", 7.0),
+        (60.0, "Self Use", 0.0),
+        (80.0, "Self Use", 0.0),
+    ],
+)
+def test_alpha969_shadow_never_displaces_reviewed_live_cheap_charge(
+    soc, expected_mode, expected_charge
+):
+    snap = _snapshot(soc=soc, house=8.0, ev_charging=True, ev_power_kw=6.0,
+                     ev_load_in_house_load=True)
+    sim = _simulation(
+        target=60.0,
+        current_simulated_grid_bypass_power_kw=7.0,
+    )
+    engine = ControlEngine()
+    proposal = engine.plan(snap, sim, snap.timestamp, _config())
+    live = engine.plan(snap, sim, snap.timestamp, _config(mode="control"))
+    assert proposal.alpha969_routing_shadow_only is True
+    assert proposal.operating_reason == "no_export_overnight"
+    assert live.alpha969_routing_shadow_only is False
+    assert live.operating_reason == "awaiting_export_tariff_charge"
+    assert live.desired_work_mode == expected_mode
+    assert live.desired_charge_power_kw == expected_charge
+    assert live.desired_min_soc_percent == max(soc, 60.0)
+    assert live.grid_bypass_power_kw == 7.0
+    assert live.total_site_import_kw == 7.0 + expected_charge
+
+    kwargs = dict(
+        technical_ready=True,
+        binding_ready=True,
+        reviewed_version_matches=True,
+        no_paid_export_mode=True,
+        cheap_period_confirmed=True,
+        user_commissioned=True,
+        master_control_enabled=True,
+        emergency_stop=False,
+    )
+    old_authority = assess_foxess_control_write_authority(live, **kwargs)
+    new_authority = assess_foxess_control_write_authority(proposal, **kwargs)
+    assert old_authority.commands_permitted is True
+    assert old_authority.action == (
+        "force_charge" if expected_charge else "self_use"
+    )
+    assert new_authority.commands_permitted is False
+    assert new_authority.action == "release"
+
+
+def test_live_plan_and_independent_shadow_preview_are_not_cross_wired() -> None:
+    root = Path(__file__).parents[1] / "custom_components" / "kems"
+    coordinator = (root / "coordinator.py").read_text(encoding="utf-8")
+    control = (root / "kems_core" / "control.py").read_text(encoding="utf-8")
+    data = (root / "kems_core" / "models.py").read_text(encoding="utf-8")
+    assert 'mode != "control"' in control
+    assert 'replace(self.settings.control, operating_mode="shadow")' in coordinator
+    assert '"hardware_write_authorised": False' in coordinator
+    assert 'alpha969_shadow_plan=alpha969_shadow_plan' in coordinator
+    assert "control = apply_happy_hour_control(control, snapshot, happy_hour_plan)" in coordinator
+    assert 'control=control,\n                technical_ready=' in coordinator
+    assert 'control=proposal,\n                technical_ready=' not in coordinator
+    assert "alpha969_shadow_plan: dict[str, Any]" in data
+    assert 'key="alpha969_shadow_proposal"' in (
+        root / "sensor.py"
+    ).read_text(encoding="utf-8")
+    assert '"alpha969_shadow_plan": dict(data.alpha969_shadow_plan)' in (
+        root / "diagnostics.py"
+    ).read_text(encoding="utf-8")
