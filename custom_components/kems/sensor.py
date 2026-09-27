@@ -660,6 +660,14 @@ SENSORS: tuple[KEMSSensorEntityDescription, ...] = (
         value_fn=lambda data: data.snapshot.offpeak_end,
     ),
     KEMSSensorEntityDescription(
+        key="alpha969_shadow_proposal",
+        name="Alpha9.69 shadow proposal",
+        icon="mdi:shield-eye-outline",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda data: data.alpha969_shadow_plan.get("status", "inactive"),
+        attributes_fn=lambda data: dict(data.alpha969_shadow_plan),
+    ),
+    KEMSSensorEntityDescription(
         key="shared_bus_ev_balance",
         name="EV shared-bus allocation audit",
         icon="mdi:ev-station",
