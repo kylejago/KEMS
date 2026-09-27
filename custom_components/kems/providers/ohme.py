@@ -111,7 +111,8 @@ class OhmeProvider(HomeAssistantStateReader):
             charging=charging,
             power_kw=power_kw,
             power_age_seconds=(
-                round(power_age, 1) if power_kw is not None and power_age is not None
+                round(power_age, 1)
+                if power_kw is not None and power_age is not None
                 else None
             ),
             vehicle_soc=vehicle_soc,
