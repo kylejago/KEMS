@@ -52,6 +52,7 @@ class Snapshot:
     ev_connected: bool | None = None
     ev_charging: bool | None = None
     ev_power_kw: float | None = None
+    ev_power_age_seconds: float | None = None
     ev_soc: float | None = None
     # Proven from repeated independent site-balance observations, not sensor name.
     # None means that EV demand cannot safely be split from house_load_kw.
