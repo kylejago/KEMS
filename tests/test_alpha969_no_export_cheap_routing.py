@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import replace
 from datetime import datetime, timedelta
+from pathlib import Path
 from zoneinfo import ZoneInfo
 
 import pytest
@@ -567,3 +568,25 @@ def test_paid_export_path_still_uses_original_cheap_charge():
     )
     assert state.operating_reason == "confirmed_cheap_charge"
     assert state.desired_work_mode == "Force Charge"
+
+
+def test_alpha969_evidence_is_visible_without_confusing_it_with_live_authority():
+    root = Path(__file__).parents[1] / "custom_components" / "kems"
+    sensor = (root / "sensor.py").read_text(encoding="utf-8")
+    binary = (root / "binary_sensor.py").read_text(encoding="utf-8")
+    for key in (
+        "simulated_ev_grid_import_kwh",
+        "current_simulated_site_load_kw",
+        "current_simulated_non_ev_house_load_kw",
+        "current_simulated_ev_grid_import_kw",
+        "no_export_cheap_policy",
+        "no_export_ev_load_proven",
+        "no_export_ev_scope_reason",
+        "no_export_ev_isolation_physically_proven",
+    ):
+        assert f'"{key}"' in sensor
+    assert '"no_export_ev_isolation_physically_proven": False' in sensor
+    assert 'key="alpha969_routing_shadow_only"' in binary
+    assert 'data.control.alpha969_routing_shadow_only' in binary
+    assert 'key="no_export_ev_load_scope_identified"' in binary
+    assert 'data.simulation.no_export_ev_load_proven' in binary
