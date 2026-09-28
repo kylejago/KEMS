@@ -6,7 +6,10 @@ import json
 from pathlib import Path
 
 from kems_core import ControlState
-from kems_core.control_write_authority import assess_foxess_control_write_authority
+from kems_core.control_write_authority import (
+    assess_foxess_control_write_authority,
+    resolve_live_min_soc_on_grid,
+)
 
 ROOT = Path(__file__).parents[1]
 KEMS = ROOT / "custom_components" / "kems"
@@ -62,6 +65,54 @@ def test_self_use_is_live_outside_cheap_periods() -> None:
     assert result.action == "self_use"
     assert result.min_soc_on_grid_percent == 15.0
     assert "Self Use" in result.reason
+
+
+def test_non_cheap_self_use_preserves_pre_kems_min_soc_baseline() -> None:
+    decision = _decision(_control(desired_min_soc_percent=15.0))
+
+    assert decision.action == "self_use"
+    assert decision.min_soc_on_grid_percent == 15.0
+    assert (
+        resolve_live_min_soc_on_grid(
+            decision,
+            cheap_period_confirmed=False,
+            previous_min_soc_on_grid=10.0,
+        )
+        == 10.0
+    )
+
+
+def test_non_cheap_self_use_requires_a_restorable_min_soc_baseline() -> None:
+    decision = _decision(_control(desired_min_soc_percent=15.0))
+
+    assert (
+        resolve_live_min_soc_on_grid(
+            decision,
+            cheap_period_confirmed=False,
+            previous_min_soc_on_grid=None,
+        )
+        is None
+    )
+
+
+def test_confirmed_cheap_self_use_retains_requested_hold_floor() -> None:
+    decision = _decision(
+        _control(
+            operating_reason="awaiting_export_tariff_charge",
+            desired_min_soc_percent=61.0,
+        ),
+        cheap_period_confirmed=True,
+    )
+
+    assert decision.action == "self_use"
+    assert (
+        resolve_live_min_soc_on_grid(
+            decision,
+            cheap_period_confirmed=True,
+            previous_min_soc_on_grid=10.0,
+        )
+        == 61.0
+    )
 
 
 def test_confirmed_cheap_force_charge_is_live() -> None:

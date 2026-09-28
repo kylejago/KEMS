@@ -25,6 +25,7 @@ from .foxess_modbus_contract import FOXESS_MODBUS_REVIEWED_VERSION
 from .kems_core.control_write_authority import (
     FoxESSControlDecision,
     assess_foxess_control_write_authority,
+    resolve_live_min_soc_on_grid,
 )
 
 _STORAGE_VERSION = 1
@@ -362,12 +363,23 @@ class FoxESSControlBackend:
                     )
                     await self._async_restore(entities, writes)
                 else:
-                    min_soc_ok = await self._async_number(
-                        min_soc_entity,
-                        float(decision.min_soc_on_grid_percent or 0.0),
-                        writes,
-                        tolerance=0.05,
+                    effective_min_soc = resolve_live_min_soc_on_grid(
+                        decision,
+                        cheap_period_confirmed=cheap_period_confirmed,
+                        previous_min_soc_on_grid=self._previous_min_soc_on_grid,
                     )
+                    if effective_min_soc is None:
+                        self._last_write_result = (
+                            "Cannot preserve pre-KEMS Min SoC-on-grid outside cheap period"
+                        )
+                        min_soc_ok = False
+                    else:
+                        min_soc_ok = await self._async_number(
+                            min_soc_entity,
+                            effective_min_soc,
+                            writes,
+                            tolerance=0.05,
+                        )
                     action_ok = False
                     if min_soc_ok and decision.action == "self_use":
                         action_ok = await self._async_select(
@@ -429,6 +441,16 @@ class FoxESSControlBackend:
             "owned_by_kems": self._owned,
             "previous_work_mode": self._previous_work_mode,
             "previous_min_soc_on_grid": self._previous_min_soc_on_grid,
+            "effective_min_soc_on_grid": (
+                resolve_live_min_soc_on_grid(
+                    decision,
+                    cheap_period_confirmed=cheap_period_confirmed,
+                    previous_min_soc_on_grid=self._previous_min_soc_on_grid,
+                )
+                if decision.commands_permitted
+                else None
+            ),
+            "non_cheap_min_soc_policy": "preserve_pre_kems_baseline",
             "writes_this_cycle": writes,
             "last_write_at": self._last_write_at,
             "last_write_result": self._last_write_result,

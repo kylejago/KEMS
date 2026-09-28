@@ -21,6 +21,28 @@ class FoxESSControlDecision:
     min_soc_on_grid_percent: float | None = None
 
 
+def resolve_live_min_soc_on_grid(
+    decision: FoxESSControlDecision,
+    *,
+    cheap_period_confirmed: bool,
+    previous_min_soc_on_grid: float | None,
+) -> float | None:
+    """Return the physically safe MinSOC target for the reviewed live write.
+
+    The normal KEMS reserve is a planning/discharge target, not permission to
+    buy daytime grid energy. Outside a confirmed cheap period, Self Use keeps
+    the pre-KEMS MinSOC-on-grid baseline instead of raising it to the planner
+    reserve. Confirmed-cheap Self Use/Force Charge paths retain their requested
+    MinSOC, including the Alpha9.70 EV battery-hold floor.
+    """
+    requested = decision.min_soc_on_grid_percent
+    if cheap_period_confirmed or decision.action != "self_use":
+        return requested
+    if previous_min_soc_on_grid is None:
+        return None
+    return round(float(previous_min_soc_on_grid), 1)
+
+
 def assess_foxess_control_write_authority(
     control: ControlState,
     *,
