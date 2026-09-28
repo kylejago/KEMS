@@ -369,9 +369,7 @@ class FoxESSControlBackend:
                         previous_min_soc_on_grid=self._previous_min_soc_on_grid,
                     )
                     if effective_min_soc is None:
-                        self._last_write_result = (
-                            "Cannot preserve pre-KEMS Min SoC-on-grid outside cheap period"
-                        )
+                        self._last_write_result = "Cannot preserve pre-KEMS Min SoC-on-grid outside cheap period"
                         min_soc_ok = False
                     else:
                         min_soc_ok = await self._async_number(
