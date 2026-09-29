@@ -69,17 +69,11 @@ class EVGridHoldSession:
         no_paid_export_mode: bool,
     ) -> Any:
         """Apply reviewed guard and persist the floor before hardware output."""
-        power = snapshot.ev_power_kw
-        stopped = bool(
-            snapshot.ev_charging is False
-            and power is not None
-            and isfinite(power)
-            and power <= 0.25
-            and snapshot.ev_power_age_seconds is not None
-            and snapshot.ev_power_age_seconds <= 90
-        )
+        disconnected = snapshot.ev_connected is False
         if (
-            not snapshot.cheap_period_confirmed or not no_paid_export_mode or stopped
+            not snapshot.cheap_period_confirmed
+            or not no_paid_export_mode
+            or disconnected
         ) and self._held_floor is not None:
             self._held_floor = None
             await self.async_save()
@@ -93,6 +87,7 @@ class EVGridHoldSession:
         )
         self._last_status = guarded.ev_grid_guard_status
         if guarded.ev_grid_guard_status in {
+            "ev_battery_hold_prearmed",
             "ev_battery_hold",
             "ev_battery_hold_conservative_scope",
             "ev_battery_hold_with_cheap_charge",

@@ -60,13 +60,21 @@ def protect_live_cheap_ev(
         and snapshot.ev_power_age_seconds is not None
         and snapshot.ev_power_age_seconds <= _MAX_OHME_AGE_SECONDS
     )
+    ev_prearm = bool(
+        snapshot.ev_connected is True
+        and snapshot.ev_charging is False
+        and ev is not None
+        and ev <= _EV_ACTIVE_KW
+        and snapshot.ev_power_age_seconds is not None
+        and 0 <= snapshot.ev_power_age_seconds <= _MAX_OHME_AGE_SECONDS
+    )
     ev_active = bool(
         snapshot.ev_charging is True
         or (ev is not None and ev > _EV_ACTIVE_KW)
         or (snapshot.ev_connected is True and snapshot.ev_charging is None)
         or (held_floor_percent is not None and not explicit_stop)
     )
-    if not ev_active:
+    if not ev_active and not ev_prearm:
         return control
 
     soc = snapshot.battery_soc
@@ -98,6 +106,24 @@ def protect_live_cheap_ev(
             held_floor_percent or 0.0,
         ),
     )
+    if ev_prearm and not ev_active:
+        # Arm the physical floor before Ohme begins drawing.  Preserve the
+        # existing confirmed-cheap battery charge decision; only the MinSOC
+        # floor changes, so a later EV ramp cannot immediately pull energy
+        # from the battery while the next coordinator scan catches up.
+        return replace(
+            control,
+            ev_grid_guard_status="ev_battery_hold_prearmed",
+            desired_min_soc_percent=held_soc,
+            desired_battery_to_home_power_kw=0.0,
+            desired_total_discharge_power_kw=0.0,
+            next_action=(
+                "EV connected in a confirmed cheap window: pre-arm the physical "
+                "battery MinSOC floor before charging starts while preserving the "
+                "existing safe cheap-charge decision."
+            ),
+        )
+
     ev_fresh = bool(
         snapshot.ev_charging is True
         and ev is not None
