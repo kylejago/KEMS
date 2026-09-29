@@ -169,7 +169,6 @@ def test_missing_physical_soc_cannot_authorise_guard_writes():
     ("snap_updates", "plan_updates", "config_updates", "mode"),
     [
         ({"off_peak": False}, {}, {}, True),
-        ({"ev_charging": False, "ev_power_kw": 0.0}, {}, {}, True),
         ({"saving_session_active": True}, {}, {}, True),
         ({}, {"operating_reason": "happy_hour_reward_hour"}, {}, True),
         ({}, {"operating_reason": "stale_data_failsafe"}, {}, True),
@@ -188,6 +187,24 @@ def test_no_override_of_outside_cheap_priority_or_shadow_paths(
     assert (
         _guard(snap, plan, _config(**config_updates), no_paid_export_mode=mode) is plan
     )
+
+
+def test_connected_idle_ev_prearms_floor_without_cancelling_safe_charge():
+    state = _guard(
+        _snap(ev_charging=False, ev_power_kw=0.0, battery_soc=60.0),
+        _plan(
+            desired_work_mode="Force Charge",
+            desired_charge_power_kw=6.0,
+            desired_min_soc_percent=54.0,
+            grid_bypass_power_kw=1.0,
+            total_site_import_kw=7.0,
+        ),
+    )
+    assert state.ev_grid_guard_status == "ev_battery_hold_prearmed"
+    assert state.desired_min_soc_percent == 61.0
+    assert state.desired_work_mode == "Force Charge"
+    assert state.desired_charge_power_kw == 6.0
+    assert state.desired_battery_to_home_power_kw == 0.0
 
 
 def test_prior_session_floor_never_chases_falling_soc_down():

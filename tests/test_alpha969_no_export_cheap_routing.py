@@ -706,9 +706,9 @@ def test_alpha969_release_identity_is_explicitly_shadow_only() -> None:
         (root / "release" / "kems-bundle.template.json").read_text(encoding="utf-8")
     )
     reason = bundle["maintenance"]["reason"]
-    assert manifest["version"] == "0.9.0-alpha9.71"
+    assert manifest["version"] == "0.9.0-alpha9.72"
     assert reason.startswith(
-        "Alpha9.71 prevents paid-grid battery charging outside confirmed cheap periods"
+        "Alpha9.72 makes the continuously recalculated forecast-required morning SOC"
     )
     assert "Alpha9.68 Control-mode cheap-period planner" in reason
     assert "No new KH7 output control" in reason

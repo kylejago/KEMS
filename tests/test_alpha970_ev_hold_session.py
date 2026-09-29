@@ -126,15 +126,26 @@ def test_restart_preserves_max_floor_until_confirmed_charge_stop():
             _config(),
             no_paid_export_mode=True,
         )
-        stop = await restarted.async_apply(
+        prearmed = await restarted.async_apply(
             _snap(soc=60.0, charging=False, power=0.0),
             _control(),
             _config(),
             no_paid_export_mode=True,
         )
-        return one, two, three, waiting, stop, restarted.status
+        stop = await restarted.async_apply(
+            _snap(
+                soc=60.0,
+                charging=False,
+                power=0.0,
+                ev_connected=False,
+            ),
+            _control(),
+            _config(),
+            no_paid_export_mode=True,
+        )
+        return one, two, three, waiting, prearmed, stop, restarted.status
 
-    one, two, three, waiting, stop, status = asyncio.run(exercise())
+    one, two, three, waiting, prearmed, stop, status = asyncio.run(exercise())
     assert [x.desired_min_soc_percent for x in (one, two, three, waiting)] == [
         64.0,
         64.0,
@@ -142,6 +153,8 @@ def test_restart_preserves_max_floor_until_confirmed_charge_stop():
         64.0,
     ]
     assert waiting.desired_charge_power_kw == 0.0
+    assert prearmed.ev_grid_guard_status == "ev_battery_hold_prearmed"
+    assert prearmed.desired_min_soc_percent == 64.0
     assert status["latched_min_soc_percent"] is None
     assert stop.ev_grid_guard_status == "inactive"
     assert status["physical_isolation_proven"] is False

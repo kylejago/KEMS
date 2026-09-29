@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import replace
 from datetime import date, datetime, timedelta
+from math import isfinite
 from statistics import fmean
 
 from .models import SimulationConfig, SimulationState, Snapshot
@@ -666,6 +667,15 @@ class SimulationEngine:
             + simulated_export_income
             + simulated_saving_session_bonus
         )
+        published_target_percent = current_plan.get("overnight_charge_target_percent")
+        published_target_kwh = current_plan.get("overnight_charge_target_kwh")
+        if no_export_mode and live_snapshot is not None:
+            forecast_target_percent, forecast_target_kwh = (
+                self._forecast_no_export_target(live_snapshot, config, capacity)
+            )
+            if forecast_target_percent is not None:
+                published_target_percent = forecast_target_percent
+                published_target_kwh = forecast_target_kwh
 
         return SimulationState(
             ready=covered >= 3,
@@ -801,10 +811,8 @@ class SimulationEngine:
             no_export_cheap_policy=current_plan.get("no_export_cheap_policy"),
             no_export_ev_load_proven=bool(current_plan.get("no_export_ev_load_proven")),
             no_export_ev_scope_reason=current_plan.get("no_export_ev_scope_reason"),
-            overnight_charge_target_percent=current_plan.get(
-                "overnight_charge_target_percent"
-            ),
-            overnight_charge_target_kwh=current_plan.get("overnight_charge_target_kwh"),
+            overnight_charge_target_percent=published_target_percent,
+            overnight_charge_target_kwh=published_target_kwh,
             forecast_home_until_next_cheap_kwh=current_plan.get(
                 "forecast_home_until_next_cheap_kwh"
             ),
@@ -866,6 +874,15 @@ class SimulationEngine:
             forecast_energy_until_offpeak_kwh,
         )
         session = self._saving_session_plan(snapshot, records or [snapshot], config)
+        published_target_percent = current_plan.get("overnight_charge_target_percent")
+        published_target_kwh = current_plan.get("overnight_charge_target_kwh")
+        if not self._export_tariff_active(config):
+            forecast_target_percent, forecast_target_kwh = (
+                self._forecast_no_export_target(snapshot, config, capacity)
+            )
+            if forecast_target_percent is not None:
+                published_target_percent = forecast_target_percent
+                published_target_kwh = forecast_target_kwh
 
         return SimulationState(
             samples=max(len(records), 1),
@@ -896,10 +913,8 @@ class SimulationEngine:
             no_export_cheap_policy=current_plan.get("no_export_cheap_policy"),
             no_export_ev_load_proven=bool(current_plan.get("no_export_ev_load_proven")),
             no_export_ev_scope_reason=current_plan.get("no_export_ev_scope_reason"),
-            overnight_charge_target_percent=current_plan.get(
-                "overnight_charge_target_percent"
-            ),
-            overnight_charge_target_kwh=current_plan.get("overnight_charge_target_kwh"),
+            overnight_charge_target_percent=published_target_percent,
+            overnight_charge_target_kwh=published_target_kwh,
             home_reserve_forecast_source=str(
                 current_plan.get("reserve_source", "unavailable")
             ),
@@ -1300,6 +1315,12 @@ class SimulationEngine:
         target = self._no_export_charge_target_stored_kwh(
             required, reserve_kwh, capacity, config
         )
+        forecast_target_percent, forecast_target_kwh = self._forecast_no_export_target(
+            snapshot, config, capacity
+        )
+        if forecast_target_kwh is not None:
+            target = forecast_target_kwh
+            source = "forecast_required_morning_soc"
         load = _load_kw(snapshot)
         solar = self._simulated_solar_power(snapshot, config)
         if load is None:
@@ -1309,7 +1330,11 @@ class SimulationEngine:
             bypass = round(max(load - solar_to_home, 0.0), 3)
         return replace(
             simulation,
-            overnight_charge_target_percent=round(100 * target / capacity, 1),
+            overnight_charge_target_percent=(
+                forecast_target_percent
+                if forecast_target_percent is not None
+                else round(100 * target / capacity, 1)
+            ),
             overnight_charge_target_kwh=round(target, 3),
             home_reserve_forecast_source=source,
             forecast_home_until_next_cheap_kwh=round(forecast_home, 3),
@@ -1317,6 +1342,33 @@ class SimulationEngine:
             forecast_solar_credit_kwh=round(solar_credit, 3),
             current_simulated_grid_bypass_power_kw=bypass,
         )
+
+    @staticmethod
+    def _forecast_no_export_target(
+        snapshot: Snapshot,
+        config: SimulationConfig,
+        capacity: float,
+    ) -> tuple[float | None, float | None]:
+        """Return the canonical forecast-derived No-export morning target.
+
+        ForecastPlanningEngine recalculates this value throughout the day from
+        the learned house profile and solar forecast.  Alpha9.72 makes that
+        single target authoritative for both customer presentation and the
+        already-reviewed confirmed-cheap physical charge path.  The existing
+        No-export learned-load calculation remains a fail-safe fallback when
+        the forecast target is unavailable.
+        """
+        value = snapshot.forecast_required_morning_soc_percent
+        if value is None:
+            return None, None
+        try:
+            target = float(value)
+        except (TypeError, ValueError):
+            return None, None
+        if not isfinite(target):
+            return None, None
+        target = min(max(target, config.battery_reserve_percent), 100.0)
+        return round(target, 1), round(capacity * target / 100.0, 3)
 
     @staticmethod
     def _no_export_charge_target_stored_kwh(
@@ -1911,6 +1963,12 @@ class SimulationEngine:
                 target_stored = self._no_export_charge_target_stored_kwh(
                     required_home, reserve_kwh, capacity, config
                 )
+                forecast_target_percent, forecast_target_kwh = (
+                    self._forecast_no_export_target(snapshot, config, capacity)
+                )
+                if forecast_target_kwh is not None:
+                    target_stored = forecast_target_kwh
+                    reserve_source = "forecast_required_morning_soc"
                 route = route_no_export_cheap(
                     snapshot,
                     load_kw=load,
@@ -1974,8 +2032,10 @@ class SimulationEngine:
                     "no_export_ev_load_proven": (
                         route.ev_separation_proven and route.ev_grid_kwh > 0.1
                     ),
-                    "overnight_charge_target_percent": round(
-                        100 * target_stored / capacity, 1
+                    "overnight_charge_target_percent": (
+                        forecast_target_percent
+                        if forecast_target_percent is not None
+                        else round(100 * target_stored / capacity, 1)
                     ),
                     "overnight_charge_target_kwh": round(target_stored, 3),
                     "forecast_home_until_next_cheap_kwh": round(forecast_home, 3),
