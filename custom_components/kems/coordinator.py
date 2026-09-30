@@ -152,7 +152,7 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
             always_update=False,
         )
 
-        # Alpha9.73 keeps the 60-second analysis cadence but no longer makes
+        # Alpha9.73 keeps the configured analysis cadence but no longer makes
         # EV/Intelligent control wait for that poll. These discrete state
         # transitions are low-frequency authority inputs; requesting an
         # immediate coordinator refresh lets the existing Alpha9.72 safety
