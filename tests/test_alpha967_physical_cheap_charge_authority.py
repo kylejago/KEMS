@@ -138,9 +138,9 @@ def test_alpha967_release_identity_and_scope() -> None:
     bundle = json.loads(BUNDLE.read_text(encoding="utf-8"))
     reason = str(bundle["maintenance"]["reason"])
 
-    assert manifest["version"] == "0.9.0-alpha9.72"
+    assert manifest["version"] == "0.9.0-alpha9.73"
     assert reason.startswith(
-        "Alpha9.72 makes the continuously recalculated forecast-required morning SOC"
+        "Alpha9.73 removes the normal coordinator-poll delay from EV battery protection"
     )
     assert "simulated SOC" in reason
     assert "solar-aware no-export target" in reason
