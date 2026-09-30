@@ -53,6 +53,8 @@ from .kems_core import (
     SimulationEngine,
     WholeHomeEngine,
     assess_quality,
+    critical_control_refresh_entity_ids,
+    meaningful_control_state_transition,
 )
 from .kems_core.shared_bus_balance import (
     assess_shared_bus_balance,
@@ -71,23 +73,6 @@ from .settings import KEMSSettings
 from .shadow_validation import ShadowValidationRecorder
 
 LOGGER = logging.getLogger(__name__)
-
-
-def _critical_control_refresh_entities(entities: KEMSEntities) -> tuple[str, ...]:
-    """Return low-frequency source entities that can change live control authority."""
-    return tuple(
-        dict.fromkeys(
-            entity_id
-            for entity_id in (
-                entities.ev_status,
-                entities.ev_connected,
-                entities.ev_charging,
-                entities.intelligent_slot,
-                entities.off_peak,
-            )
-            if entity_id
-        )
-    )
 
 
 class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
@@ -157,7 +142,13 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
         # transitions are low-frequency authority inputs; requesting an
         # immediate coordinator refresh lets the existing Alpha9.72 safety
         # gates react as soon as Home Assistant publishes the transition.
-        self._critical_refresh_entities = _critical_control_refresh_entities(entities)
+        self._critical_refresh_entities = critical_control_refresh_entity_ids(
+            entities.ev_status,
+            entities.ev_connected,
+            entities.ev_charging,
+            entities.intelligent_slot,
+            entities.off_peak,
+        )
         self._last_critical_refresh_event: dict[str, str] | None = None
         if self._critical_refresh_entities:
             entry.async_on_unload(
@@ -173,7 +164,12 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
         """Request a prompt control scan for a meaningful discrete source change."""
         old_state = event.data.get("old_state")
         new_state = event.data.get("new_state")
-        if old_state is None or new_state is None or old_state.state == new_state.state:
+        if old_state is None or new_state is None:
+            return
+        if not meaningful_control_state_transition(
+            str(old_state.state),
+            str(new_state.state),
+        ):
             return
         entity_id = str(event.data.get("entity_id") or new_state.entity_id)
         self._last_critical_refresh_event = {
