@@ -1,6 +1,10 @@
 """Home Assistant-independent KEMS Observe/Learn/Advise/Simulate core."""
 
 from .advice import AdviceEngine
+from .control_event_refresh import (
+    critical_control_refresh_entity_ids,
+    meaningful_control_state_transition,
+)
 from .control import (
     OPERATING_MODES,
     VIRTUAL_SCENARIOS,
@@ -164,8 +168,10 @@ __all__ = [
     "WholeHomeSummary",
     "assess_quality",
     "calculate_battery_power_kw",
+    "critical_control_refresh_entity_ids",
     "configure_ev_charge_policy",
     "ev_policy_from_options",
+    "meaningful_control_state_transition",
     "normalise_grid_power",
     "run_preflight_suite",
     "period_value_keys",
