@@ -7,7 +7,8 @@ from dataclasses import replace
 from datetime import timedelta
 
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant
+from homeassistant.core import Event, HomeAssistant, callback
+from homeassistant.helpers.event import async_track_state_change_event
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
 
@@ -72,6 +73,23 @@ from .shadow_validation import ShadowValidationRecorder
 LOGGER = logging.getLogger(__name__)
 
 
+def _critical_control_refresh_entities(entities: KEMSEntities) -> tuple[str, ...]:
+    """Return low-frequency source entities that can change live control authority."""
+    return tuple(
+        dict.fromkeys(
+            entity_id
+            for entity_id in (
+                entities.ev_status,
+                entities.ev_connected,
+                entities.ev_charging,
+                entities.intelligent_slot,
+                entities.off_peak,
+            )
+            if entity_id
+        )
+    )
+
+
 class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
     """Coordinate Observe, Learn, Advise, and Simulate stages."""
 
@@ -133,6 +151,52 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
             update_interval=timedelta(seconds=settings.scan_interval_seconds),
             always_update=False,
         )
+
+        # Alpha9.73 keeps the 60-second analysis cadence but no longer makes
+        # EV/Intelligent control wait for that poll. These discrete state
+        # transitions are low-frequency authority inputs; requesting an
+        # immediate coordinator refresh lets the existing Alpha9.72 safety
+        # gates react as soon as Home Assistant publishes the transition.
+        self._critical_refresh_entities = _critical_control_refresh_entities(entities)
+        self._last_critical_refresh_event: dict[str, str] | None = None
+        if self._critical_refresh_entities:
+            entry.async_on_unload(
+                async_track_state_change_event(
+                    hass,
+                    self._critical_refresh_entities,
+                    self._handle_critical_control_source_change,
+                )
+            )
+
+    @callback
+    def _handle_critical_control_source_change(self, event: Event) -> None:
+        """Request a prompt control scan for a meaningful discrete source change."""
+        old_state = event.data.get("old_state")
+        new_state = event.data.get("new_state")
+        if old_state is None or new_state is None or old_state.state == new_state.state:
+            return
+        entity_id = str(event.data.get("entity_id") or new_state.entity_id)
+        self._last_critical_refresh_event = {
+            "entity_id": entity_id,
+            "old_state": str(old_state.state),
+            "new_state": str(new_state.state),
+            "requested_at": dt_util.now().isoformat(),
+        }
+        self.hass.async_create_task(self.async_request_refresh())
+
+    @property
+    def control_event_refresh_state(self) -> dict[str, object]:
+        """Expose the fast discrete-source refresh path for diagnostics."""
+        return {
+            "registered": bool(self._critical_refresh_entities),
+            "entities": list(self._critical_refresh_entities),
+            "normal_poll_interval_seconds": self.settings.scan_interval_seconds,
+            "last_trigger": (
+                dict(self._last_critical_refresh_event)
+                if self._last_critical_refresh_event is not None
+                else None
+            ),
+        }
 
     @property
     def forecast_validation_state(self) -> ForecastValidationState:
