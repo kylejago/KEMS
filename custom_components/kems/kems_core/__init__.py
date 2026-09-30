@@ -7,6 +7,10 @@ from .control import (
     ControlEngine,
     run_preflight_suite,
 )
+from .control_event_refresh import (
+    critical_control_refresh_entity_ids,
+    meaningful_control_state_transition,
+)
 from .ev_charge_policy import (
     CONF_EV_CHARGING_POLICY,
     DEFAULT_EV_POLICY,
@@ -164,8 +168,10 @@ __all__ = [
     "WholeHomeSummary",
     "assess_quality",
     "calculate_battery_power_kw",
+    "critical_control_refresh_entity_ids",
     "configure_ev_charge_policy",
     "ev_policy_from_options",
+    "meaningful_control_state_transition",
     "normalise_grid_power",
     "run_preflight_suite",
     "period_value_keys",

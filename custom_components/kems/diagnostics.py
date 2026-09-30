@@ -138,6 +138,7 @@ async def async_get_config_entry_diagnostics(
         "shared_bus_ev_evidence": coordinator.shared_bus_ev_evidence,
         "ev_charge_trace": coordinator.ev_charge_trace_state,
         "ev_grid_hold_session": coordinator.ev_grid_hold_state,
+        "control_event_refresh": coordinator.control_event_refresh_state,
         "grid_diagnostics": {
             "raw_import_kw": data.snapshot.raw_grid_import_kw,
             "raw_export_kw": data.snapshot.raw_grid_export_kw,
