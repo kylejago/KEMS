@@ -580,12 +580,15 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                 self,
                 data_override=provisional,
             )
+            ev_hold_state = self._ev_grid_hold.status
             foxess_control = await self._foxess_control.async_update(
                 coordinator=self,
                 control=control,
                 technical_ready=bool(commissioning.get("ready_for_control")),
                 no_paid_export_mode=bool(simulation.no_export_mode_active),
                 cheap_period_confirmed=bool(snapshot.cheap_period_confirmed),
+                ev_hold_floor_percent=ev_hold_state.get("latched_min_soc_percent"),
+                ev_connected=snapshot.ev_connected,
             )
             technical_commissioned = bool(
                 commissioning.get("ready_for_control")

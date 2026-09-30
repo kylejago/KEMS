@@ -26,6 +26,7 @@ from .kems_core.control_write_authority import (
     FoxESSControlDecision,
     assess_foxess_control_write_authority,
     resolve_live_min_soc_on_grid,
+    should_freeze_owned_ev_hold,
 )
 
 _STORAGE_VERSION = 1
@@ -56,6 +57,7 @@ class FoxESSControlBackend:
         self._owned = False
         self._previous_work_mode: str | None = None
         self._previous_min_soc_on_grid: float | None = None
+        self._last_applied_action: str | None = None
         self._last_write_at: str | None = None
         self._last_write_result = "Never commanded"
         self._status: dict[str, Any] = {}
@@ -75,6 +77,12 @@ class FoxESSControlBackend:
             self._previous_min_soc_on_grid = _number(
                 data.get("previous_min_soc_on_grid")
             )
+            last_action = data.get("last_applied_action")
+            self._last_applied_action = (
+                str(last_action)
+                if last_action in {"self_use", "force_charge"}
+                else None
+            )
 
     async def _async_save(self) -> None:
         await self._store.async_save(
@@ -82,6 +90,7 @@ class FoxESSControlBackend:
                 "owned": self._owned,
                 "previous_work_mode": self._previous_work_mode,
                 "previous_min_soc_on_grid": self._previous_min_soc_on_grid,
+                "last_applied_action": self._last_applied_action,
             }
         )
 
@@ -242,6 +251,7 @@ class FoxESSControlBackend:
             )
         if mode_ok and soc_ok:
             self._owned = False
+            self._last_applied_action = None
             self._last_write_result = "KEMS FoxESS ownership released safely"
             await self._async_save()
             return True
@@ -288,6 +298,8 @@ class FoxESSControlBackend:
         technical_ready: bool,
         no_paid_export_mode: bool,
         cheap_period_confirmed: bool,
+        ev_hold_floor_percent: float | None = None,
+        ev_connected: bool | None = None,
     ) -> dict[str, Any]:
         """Apply the authoritative bounded non-Agile command for this scan."""
         shadow = build_foxess_command_shadow_snapshot(
@@ -325,9 +337,36 @@ class FoxESSControlBackend:
         writes: list[str] = []
         applied = False
         reason = decision.reason
+        frozen_ev_hold = False
 
         if not decision.commands_permitted:
-            if self._owned:
+            frozen_ev_hold = should_freeze_owned_ev_hold(
+                owned_by_kems=self._owned,
+                latched_min_soc_percent=ev_hold_floor_percent,
+                last_applied_action=self._last_applied_action,
+                cheap_period_confirmed=cheap_period_confirmed,
+                no_paid_export_mode=no_paid_export_mode,
+                ev_connected=ev_connected,
+                operating_mode=control.operating_mode,
+                master_control_enabled=bool(
+                    coordinator.settings.control.control_enabled
+                ),
+                user_commissioned=bool(coordinator.settings.control.commissioned),
+                emergency_stop=bool(coordinator.settings.control.emergency_stop),
+                island_mode_active=bool(control.island_mode_active),
+                grid_available=bool(control.grid_available),
+            )
+            if frozen_ev_hold:
+                self._last_write_result = (
+                    "Alpha9.74 transient readiness loss: preserving the last "
+                    "applied confirmed-cheap EV MinSOC hold without new writes"
+                )
+                reason = (
+                    f"{reason}; confirmed-cheap EV hold frozen at "
+                    f"{float(ev_hold_floor_percent):.1f}% until telemetry recovers "
+                    "or release authority becomes explicit"
+                )
+            elif self._owned:
                 applied = await self._async_restore(entities, writes)
                 if not applied:
                     reason = f"{reason}; KEMS-owned state restore is pending"
@@ -406,6 +445,9 @@ class FoxESSControlBackend:
                             )
                     applied = bool(min_soc_ok and action_ok)
                     if applied:
+                        if self._last_applied_action != decision.action:
+                            self._last_applied_action = decision.action
+                            await self._async_save()
                         self._last_write_result = (
                             "Alpha9.67 bounded FoxESS command applied"
                             if writes
@@ -437,19 +479,26 @@ class FoxESSControlBackend:
             "cheap_period_confirmed": bool(cheap_period_confirmed),
             "backend_available": bool(decision.backend_available),
             "commands_permitted": bool(decision.commands_permitted and applied),
-            "decision_action": decision.action,
+            "decision_action": "freeze_ev_hold" if frozen_ev_hold else decision.action,
             "decision_reason": reason,
+            "ev_hold_frozen_on_transient_loss": frozen_ev_hold,
+            "latched_ev_hold_min_soc_percent": ev_hold_floor_percent,
             "owned_by_kems": self._owned,
             "previous_work_mode": self._previous_work_mode,
             "previous_min_soc_on_grid": self._previous_min_soc_on_grid,
+            "last_applied_action": self._last_applied_action,
             "effective_min_soc_on_grid": (
-                resolve_live_min_soc_on_grid(
-                    decision,
-                    cheap_period_confirmed=cheap_period_confirmed,
-                    previous_min_soc_on_grid=self._previous_min_soc_on_grid,
+                float(ev_hold_floor_percent)
+                if frozen_ev_hold and ev_hold_floor_percent is not None
+                else (
+                    resolve_live_min_soc_on_grid(
+                        decision,
+                        cheap_period_confirmed=cheap_period_confirmed,
+                        previous_min_soc_on_grid=self._previous_min_soc_on_grid,
+                    )
+                    if decision.commands_permitted
+                    else None
                 )
-                if decision.commands_permitted
-                else None
             ),
             "non_cheap_min_soc_policy": "preserve_pre_kems_baseline",
             "writes_this_cycle": writes,
@@ -461,7 +510,9 @@ class FoxESSControlBackend:
             "export_power_limit_write": "never_written_by_alpha9.67",
             "import_power_limit_write": "never_written_by_alpha9.67",
             "safety_release": (
-                "restore pre-KEMS local mode and Min SoC-on-grid when owned"
+                "restore pre-KEMS local mode and Min SoC-on-grid when owned; "
+                "an already-applied confirmed-cheap Self Use EV hold is frozen "
+                "without writes across transient telemetry/readiness loss"
             ),
         }
         self._status = payload

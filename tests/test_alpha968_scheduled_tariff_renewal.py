@@ -70,9 +70,9 @@ def test_alpha968_release_identity_and_scope() -> None:
     bundle = json.loads(BUNDLE.read_text(encoding="utf-8"))
     reason = str(bundle["maintenance"]["reason"])
 
-    assert manifest["version"] == "0.9.0-alpha9.73"
+    assert manifest["version"] == "0.9.0-alpha9.74"
     assert reason.startswith(
-        "Alpha9.73 removes the normal coordinator-poll delay from EV battery protection"
+        "Alpha9.74 preserves an already-applied confirmed-cheap EV MinSOC hold"
     )
     assert "Alpha9.68 adds date-aware electricity tariff fallbacks" in reason
     assert "1 October 2026" in reason
