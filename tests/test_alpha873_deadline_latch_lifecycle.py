@@ -356,7 +356,7 @@ def test_alpha873_contract_survives_successor_releases() -> None:
     assert str(bundle["components"]["property_web"]["version"]).startswith(
         ("0.8.0-alpha8-web.", "0.9.0-alpha9-web.")
     )
-    if release_number == 73:
+    if str(version).startswith("0.8.0-alpha8.") and release_number == 73:
         assert "deadline latch" in bundle["maintenance"]["reason"].lower()
     assert ".services.async_call(" not in source
     assert "providers.foxess" not in source
