@@ -43,6 +43,52 @@ def resolve_live_min_soc_on_grid(
     return round(float(previous_min_soc_on_grid), 1)
 
 
+def should_freeze_owned_ev_hold(
+    *,
+    owned_by_kems: bool,
+    latched_min_soc_percent: float | None,
+    last_applied_action: str | None,
+    cheap_period_confirmed: bool,
+    no_paid_export_mode: bool,
+    ev_connected: bool | None,
+    operating_mode: str,
+    master_control_enabled: bool,
+    user_commissioned: bool,
+    emergency_stop: bool,
+    island_mode_active: bool,
+    grid_available: bool,
+) -> bool:
+    """Return whether an already-applied cheap-window EV hold must be frozen.
+
+    Freeze means *no new FoxESS writes*. It preserves the last successfully
+    applied KEMS-owned Self Use + MinSOC state through transient telemetry or
+    commissioning-readiness loss, but never overrides an explicit loss of
+    cheap authority, disconnect, control opt-out, emergency stop, island/grid
+    loss, or an unmanaged Force Charge state.
+    """
+    if latched_min_soc_percent is None:
+        return False
+    try:
+        floor = float(latched_min_soc_percent)
+    except (TypeError, ValueError):
+        return False
+    if not 0.0 <= floor <= 100.0:
+        return False
+    return bool(
+        owned_by_kems
+        and last_applied_action == "self_use"
+        and cheap_period_confirmed
+        and no_paid_export_mode
+        and ev_connected is not False
+        and operating_mode == "control"
+        and master_control_enabled
+        and user_commissioned
+        and not emergency_stop
+        and not island_mode_active
+        and grid_available
+    )
+
+
 def assess_foxess_control_write_authority(
     control: ControlState,
     *,
