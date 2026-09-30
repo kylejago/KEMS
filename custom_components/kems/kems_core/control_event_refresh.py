@@ -2,6 +2,15 @@
 
 from __future__ import annotations
 
+_UNUSABLE_CONTROL_STATES = {"unknown", "unavailable"}
+
+
+def control_source_state_uncertain(state: str | None) -> bool:
+    """Return whether one discrete authority source is temporarily unusable."""
+    if state is None:
+        return True
+    return str(state).strip().lower() in _UNUSABLE_CONTROL_STATES
+
 
 def critical_control_refresh_entity_ids(
     *entity_ids: str | None,

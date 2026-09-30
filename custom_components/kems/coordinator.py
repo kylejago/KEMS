@@ -8,7 +8,7 @@ from datetime import timedelta
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import Event, HomeAssistant, callback
-from homeassistant.helpers.event import async_track_state_change_event
+from homeassistant.helpers.event import async_call_later, async_track_state_change_event
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
 
@@ -56,6 +56,7 @@ from .kems_core import (
     critical_control_refresh_entity_ids,
     meaningful_control_state_transition,
 )
+from .kems_core.control_event_refresh import control_source_state_uncertain
 from .kems_core.shared_bus_balance import (
     assess_shared_bus_balance,
     summarise_shared_bus_audits,
@@ -73,6 +74,9 @@ from .settings import KEMSSettings
 from .shadow_validation import ShadowValidationRecorder
 
 LOGGER = logging.getLogger(__name__)
+
+_ALPHA975_FOLLOW_UP_REFRESH_SECONDS = 2
+_ALPHA975_EV_HOLD_SOURCE_GRACE_SECONDS = 90
 
 
 class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
@@ -150,6 +154,7 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
             entities.off_peak,
         )
         self._last_critical_refresh_event: dict[str, str] | None = None
+        self._critical_refresh_retry_cancel: object | None = None
         if self._critical_refresh_entities:
             entry.async_on_unload(
                 async_track_state_change_event(
@@ -180,6 +185,39 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
         }
         self.hass.async_create_task(self.async_request_refresh())
 
+        cancel = self._critical_refresh_retry_cancel
+        if callable(cancel):
+            cancel()
+
+        @callback
+        def _follow_up_refresh(_now: object) -> None:
+            self._critical_refresh_retry_cancel = None
+            self.hass.async_create_task(self.async_request_refresh())
+
+        self._critical_refresh_retry_cancel = async_call_later(
+            self.hass,
+            _ALPHA975_FOLLOW_UP_REFRESH_SECONDS,
+            _follow_up_refresh,
+        )
+
+    def _ev_hold_source_uncertain(self) -> bool:
+        """Return whether an extra-slot authority source is temporarily unusable."""
+        entity_ids = (
+            self.entities.ev_status,
+            self.entities.ev_connected,
+            self.entities.ev_charging,
+            self.entities.intelligent_slot,
+        )
+        for entity_id in entity_ids:
+            if not entity_id:
+                continue
+            state = self.hass.states.get(entity_id)
+            if control_source_state_uncertain(
+                str(state.state) if state is not None else None
+            ):
+                return True
+        return False
+
     @property
     def control_event_refresh_state(self) -> dict[str, object]:
         """Expose the fast discrete-source refresh path for diagnostics."""
@@ -187,6 +225,9 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
             "registered": bool(self._critical_refresh_entities),
             "entities": list(self._critical_refresh_entities),
             "normal_poll_interval_seconds": self.settings.scan_interval_seconds,
+            "follow_up_refresh_seconds": _ALPHA975_FOLLOW_UP_REFRESH_SECONDS,
+            "ev_hold_source_grace_seconds": _ALPHA975_EV_HOLD_SOURCE_GRACE_SECONDS,
+            "ev_hold_source_uncertain": self._ev_hold_source_uncertain(),
             "last_trigger": (
                 dict(self._last_critical_refresh_event)
                 if self._last_critical_refresh_event is not None
@@ -485,11 +526,14 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
             control = apply_happy_hour_control(control, snapshot, happy_hour_plan)
             # Existing reviewed MinSOC/Force Charge scope only. Higher-priority
             # Happy Hour, Power Down, island and emergency paths are untouched.
+            ev_hold_source_uncertain = self._ev_hold_source_uncertain()
             control = await self._ev_grid_hold.async_apply(
                 snapshot,
                 control,
                 self.settings.control,
                 no_paid_export_mode=base_simulation.no_export_mode_active,
+                source_uncertain=ev_hold_source_uncertain,
+                source_grace_seconds=_ALPHA975_EV_HOLD_SOURCE_GRACE_SECONDS,
             )
             await self._shadow_validation.async_update(
                 snapshot=snapshot,
@@ -589,6 +633,9 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                 cheap_period_confirmed=bool(snapshot.cheap_period_confirmed),
                 ev_hold_floor_percent=ev_hold_state.get("latched_min_soc_percent"),
                 ev_connected=snapshot.ev_connected,
+                ev_hold_source_grace_active=bool(
+                    ev_hold_state.get("source_uncertainty_grace_active")
+                ),
             )
             technical_commissioned = bool(
                 commissioning.get("ready_for_control")
@@ -667,6 +714,10 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
 
     async def async_shutdown(self) -> None:
         """Release live control and flush retained KEMS state before unloading."""
+        cancel = self._critical_refresh_retry_cancel
+        if callable(cancel):
+            cancel()
+            self._critical_refresh_retry_cancel = None
         await self._foxess_control.async_shutdown(self)
         await self._happy_hour_ohme.async_shutdown()
         await self._history.async_save()

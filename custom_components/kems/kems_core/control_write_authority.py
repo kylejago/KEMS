@@ -48,7 +48,10 @@ def should_freeze_owned_ev_hold(
     owned_by_kems: bool,
     latched_min_soc_percent: float | None,
     last_applied_action: str | None,
+    observed_min_soc_on_grid_percent: float | None,
+    last_verified_min_soc_on_grid_percent: float | None,
     cheap_period_confirmed: bool,
+    source_uncertainty_grace_active: bool,
     no_paid_export_mode: bool,
     ev_connected: bool | None,
     operating_mode: str,
@@ -60,11 +63,12 @@ def should_freeze_owned_ev_hold(
 ) -> bool:
     """Return whether an already-applied cheap-window EV hold must be frozen.
 
-    Freeze means *no new FoxESS writes*. It preserves the last successfully
-    applied KEMS-owned Self Use + MinSOC state through transient telemetry or
-    commissioning-readiness loss, but never overrides an explicit loss of
-    cheap authority, disconnect, control opt-out, emergency stop, island/grid
-    loss, or an unmanaged Force Charge state.
+    Freeze means *no new FoxESS writes*. It preserves only a physically
+    verified KEMS-owned Self Use + MinSOC state through transient telemetry or
+    commissioning-readiness loss. A fresh readback below the latched floor
+    always blocks freeze; only an unavailable readback may fall back to the
+    last persisted verification. A bounded source-uncertainty grace may retain
+    that already-verified hold without becoming new cheap-period authority.
     """
     if latched_min_soc_percent is None:
         return False
@@ -74,10 +78,30 @@ def should_freeze_owned_ev_hold(
         return False
     if not 0.0 <= floor <= 100.0:
         return False
+
+    observed = observed_min_soc_on_grid_percent
+    verified = last_verified_min_soc_on_grid_percent
+    try:
+        observed_value = float(observed) if observed is not None else None
+    except (TypeError, ValueError):
+        observed_value = None
+    try:
+        verified_value = float(verified) if verified is not None else None
+    except (TypeError, ValueError):
+        verified_value = None
+
+    physical_hold_verified = (
+        observed_value is not None and observed_value + 0.05 >= floor
+    ) or (
+        observed_value is None
+        and verified_value is not None
+        and verified_value + 0.05 >= floor
+    )
     return bool(
         owned_by_kems
         and last_applied_action == "self_use"
-        and cheap_period_confirmed
+        and physical_hold_verified
+        and (cheap_period_confirmed or source_uncertainty_grace_active)
         and no_paid_export_mode
         and ev_connected is not False
         and operating_mode == "control"
