@@ -96,10 +96,12 @@ def should_freeze_owned_ev_hold(
     except (TypeError, ValueError):
         verified_value = None
 
-    physical_hold_verified = (
+    live_hold_verified = (
         observed_value is not None and observed_value + 0.05 >= floor
-    ) or (
-        observed_value is None
+    )
+    physical_hold_verified = live_hold_verified or (
+        not pending_intelligent_ev_hold_active
+        and observed_value is None
         and verified_value is not None
         and verified_value + 0.05 >= floor
     )
