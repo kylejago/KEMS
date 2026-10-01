@@ -706,7 +706,7 @@ def test_alpha969_release_identity_is_explicitly_shadow_only() -> None:
         (root / "release" / "kems-bundle.template.json").read_text(encoding="utf-8")
     )
     reason = bundle["maintenance"]["reason"]
-    assert manifest["version"] == "0.9.0-alpha9.75"
+    assert manifest["version"] == "0.9.0-alpha9.76"
     assert reason.startswith(
         "Alpha9.75 requires a physically verified FoxESS MinSOC readback"
     )

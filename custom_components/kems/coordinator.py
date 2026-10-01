@@ -152,6 +152,8 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
             entities.ev_charging,
             entities.intelligent_slot,
             entities.off_peak,
+            entities.next_offpeak_start,
+            entities.offpeak_end,
         )
         self._last_critical_refresh_event: dict[str, str] | None = None
         self._critical_refresh_retry_cancel: object | None = None
@@ -207,6 +209,8 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
             self.entities.ev_connected,
             self.entities.ev_charging,
             self.entities.intelligent_slot,
+            self.entities.next_offpeak_start,
+            self.entities.offpeak_end,
         )
         for entity_id in entity_ids:
             if not entity_id:
@@ -635,6 +639,9 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                 ev_connected=snapshot.ev_connected,
                 ev_hold_source_grace_active=bool(
                     ev_hold_state.get("source_uncertainty_grace_active")
+                ),
+                pending_intelligent_ev_hold_active=bool(
+                    ev_hold_state.get("pending_intelligent_ev_hold_active")
                 ),
             )
             technical_commissioned = bool(

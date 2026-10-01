@@ -10,7 +10,10 @@ from typing import Any
 from homeassistant.helpers.storage import Store
 
 from .const import DOMAIN, STORAGE_NAMESPACE
-from .kems_core.ev_grid_guard import protect_live_cheap_ev
+from .kems_core.ev_grid_guard import (
+    protect_live_cheap_ev,
+    protect_pending_intelligent_ev_hold,
+)
 
 _MAX_RETAINED_AGE = timedelta(hours=12)
 
@@ -25,6 +28,7 @@ class EVGridHoldSession:
         self._held_floor: float | None = None
         self._last_confirmed_cheap_at: datetime | None = None
         self._grace_active = False
+        self._pending_intelligent_hold_active = False
         self._last_status = "inactive"
 
     @property
@@ -33,6 +37,9 @@ class EVGridHoldSession:
             "status": self._last_status,
             "latched_min_soc_percent": self._held_floor,
             "source_uncertainty_grace_active": self._grace_active,
+            "pending_intelligent_ev_hold_active": (
+                self._pending_intelligent_hold_active
+            ),
             "last_confirmed_cheap_at": (
                 self._last_confirmed_cheap_at.isoformat()
                 if self._last_confirmed_cheap_at is not None
@@ -100,6 +107,28 @@ class EVGridHoldSession:
         """Apply reviewed guard and preserve only a bounded uncertain-source hold."""
         now = snapshot.timestamp
         disconnected = snapshot.ev_connected is False
+
+        pending = protect_pending_intelligent_ev_hold(
+            snapshot,
+            control,
+            config,
+            no_paid_export_mode=no_paid_export_mode,
+            held_floor_percent=self._held_floor,
+        )
+        self._pending_intelligent_hold_active = (
+            pending.ev_grid_guard_status == "ev_battery_hold_pending_intelligent_window"
+        )
+        if self._pending_intelligent_hold_active:
+            self._grace_active = False
+            self._last_status = pending.ev_grid_guard_status
+            floor = pending.desired_min_soc_percent
+            if isfinite(floor) and (
+                self._held_floor is None or floor > self._held_floor
+            ):
+                self._held_floor = floor
+                await self.async_save()
+            return pending
+
         if snapshot.cheap_period_confirmed:
             self._last_confirmed_cheap_at = now
             self._grace_active = False
@@ -122,6 +151,7 @@ class EVGridHoldSession:
             self._held_floor = None
             self._last_confirmed_cheap_at = None
             self._grace_active = False
+            self._pending_intelligent_hold_active = False
             await self.async_save()
 
         if self._grace_active:
