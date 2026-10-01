@@ -413,11 +413,7 @@ class FoxESSControlBackend:
             )
             reason = (
                 f"{reason}; verified "
-                + (
-                    "pending Intelligent "
-                    if pending_intelligent_ev_hold_active
-                    else ""
-                )
+                + ("pending Intelligent " if pending_intelligent_ev_hold_active else "")
                 + f"EV hold frozen at {float(ev_hold_floor_percent):.1f}% "
                 "until telemetry recovers or release authority becomes explicit"
             )
