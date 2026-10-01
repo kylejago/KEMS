@@ -314,6 +314,7 @@ class FoxESSControlBackend:
         ev_hold_floor_percent: float | None = None,
         ev_connected: bool | None = None,
         ev_hold_source_grace_active: bool = False,
+        pending_intelligent_ev_hold_active: bool = False,
     ) -> dict[str, Any]:
         """Apply the authoritative bounded non-Agile command for this scan."""
         shadow = build_foxess_command_shadow_snapshot(
@@ -387,6 +388,7 @@ class FoxESSControlBackend:
             emergency_stop=bool(coordinator.settings.control.emergency_stop),
             island_mode_active=bool(control.island_mode_active),
             grid_available=bool(control.grid_available),
+            pending_intelligent_ev_hold_active=pending_intelligent_ev_hold_active,
         )
         hold_grace_unverified = bool(
             ev_hold_source_grace_active
@@ -410,9 +412,14 @@ class FoxESSControlBackend:
                 "physically verified EV MinSOC hold without new writes"
             )
             reason = (
-                f"{reason}; verified EV hold frozen at "
-                f"{float(ev_hold_floor_percent):.1f}% until telemetry recovers "
-                "or release authority becomes explicit"
+                f"{reason}; verified "
+                + (
+                    "pending Intelligent "
+                    if pending_intelligent_ev_hold_active
+                    else ""
+                )
+                + f"EV hold frozen at {float(ev_hold_floor_percent):.1f}% "
+                "until telemetry recovers or release authority becomes explicit"
             )
         elif hold_grace_unverified:
             self._last_write_result = (
@@ -464,6 +471,9 @@ class FoxESSControlBackend:
                         decision,
                         cheap_period_confirmed=cheap_period_confirmed,
                         previous_min_soc_on_grid=self._previous_min_soc_on_grid,
+                        pending_intelligent_ev_hold_active=(
+                            pending_intelligent_ev_hold_active
+                        ),
                     )
                     if effective_min_soc is None:
                         self._last_write_result = (
@@ -526,11 +536,21 @@ class FoxESSControlBackend:
                                     UTC
                                 ).isoformat()
                                 await self._async_save()
-                        self._last_write_result = (
-                            "Alpha9.67 bounded FoxESS command applied"
-                            if writes
-                            else "Alpha9.67 bounded FoxESS command already matched"
-                        )
+                        if pending_intelligent_ev_hold_active:
+                            self._last_write_result = (
+                                "Alpha9.76 pending Intelligent EV MinSOC hold applied"
+                                if writes
+                                else (
+                                    "Alpha9.76 pending Intelligent EV MinSOC hold "
+                                    "already matched"
+                                )
+                            )
+                        else:
+                            self._last_write_result = (
+                                "Alpha9.67 bounded FoxESS command applied"
+                                if writes
+                                else "Alpha9.67 bounded FoxESS command already matched"
+                            )
                     else:
                         decision = FoxESSControlDecision(
                             backend_available=decision.backend_available,
@@ -563,12 +583,18 @@ class FoxESSControlBackend:
                 else (
                     "hold_grace_unverified"
                     if hold_grace_unverified
-                    else decision.action
+                    else (
+                        "pending_intelligent_ev_hold"
+                        if pending_intelligent_ev_hold_active
+                        and decision.action == "self_use"
+                        else decision.action
+                    )
                 )
             ),
             "decision_reason": reason,
             "ev_hold_frozen_on_transient_loss": frozen_ev_hold,
             "ev_hold_source_grace_active": ev_hold_source_grace_active,
+            "pending_intelligent_ev_hold_active": pending_intelligent_ev_hold_active,
             "ev_hold_grace_unverified": hold_grace_unverified,
             "latched_ev_hold_min_soc_percent": ev_hold_floor_percent,
             "observed_min_soc_on_grid": observed_min_soc,
@@ -586,12 +612,19 @@ class FoxESSControlBackend:
                         decision,
                         cheap_period_confirmed=cheap_period_confirmed,
                         previous_min_soc_on_grid=self._previous_min_soc_on_grid,
+                        pending_intelligent_ev_hold_active=(
+                            pending_intelligent_ev_hold_active
+                        ),
                     )
                     if decision.commands_permitted
                     else None
                 )
             ),
-            "non_cheap_min_soc_policy": "preserve_pre_kems_baseline",
+            "non_cheap_min_soc_policy": (
+                "pending_intelligent_ev_hold_only"
+                if pending_intelligent_ev_hold_active
+                else "preserve_pre_kems_baseline"
+            ),
             "writes_this_cycle": writes,
             "last_write_at": self._last_write_at,
             "last_write_result": self._last_write_result,
