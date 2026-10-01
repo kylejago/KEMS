@@ -58,6 +58,8 @@ class FoxESSControlBackend:
         self._previous_work_mode: str | None = None
         self._previous_min_soc_on_grid: float | None = None
         self._last_applied_action: str | None = None
+        self._last_verified_min_soc_on_grid: float | None = None
+        self._last_verified_min_soc_at: str | None = None
         self._last_write_at: str | None = None
         self._last_write_result = "Never commanded"
         self._status: dict[str, Any] = {}
@@ -83,6 +85,11 @@ class FoxESSControlBackend:
                 if last_action in {"self_use", "force_charge"}
                 else None
             )
+            self._last_verified_min_soc_on_grid = _number(
+                data.get("last_verified_min_soc_on_grid")
+            )
+            verified_at = data.get("last_verified_min_soc_at")
+            self._last_verified_min_soc_at = str(verified_at) if verified_at else None
 
     async def _async_save(self) -> None:
         await self._store.async_save(
@@ -91,6 +98,8 @@ class FoxESSControlBackend:
                 "previous_work_mode": self._previous_work_mode,
                 "previous_min_soc_on_grid": self._previous_min_soc_on_grid,
                 "last_applied_action": self._last_applied_action,
+                "last_verified_min_soc_on_grid": (self._last_verified_min_soc_on_grid),
+                "last_verified_min_soc_at": self._last_verified_min_soc_at,
             }
         )
 
@@ -217,6 +226,8 @@ class FoxESSControlBackend:
 
         self._previous_work_mode = str(work_mode)
         self._previous_min_soc_on_grid = min_soc_value
+        self._last_verified_min_soc_on_grid = None
+        self._last_verified_min_soc_at = None
         self._owned = True
         await self._async_save()
         return True, "KEMS ownership captured with restorable local settings"
@@ -252,6 +263,8 @@ class FoxESSControlBackend:
         if mode_ok and soc_ok:
             self._owned = False
             self._last_applied_action = None
+            self._last_verified_min_soc_on_grid = None
+            self._last_verified_min_soc_at = None
             self._last_write_result = "KEMS FoxESS ownership released safely"
             await self._async_save()
             return True
@@ -300,6 +313,7 @@ class FoxESSControlBackend:
         cheap_period_confirmed: bool,
         ev_hold_floor_percent: float | None = None,
         ev_connected: bool | None = None,
+        ev_hold_source_grace_active: bool = False,
     ) -> dict[str, Any]:
         """Apply the authoritative bounded non-Agile command for this scan."""
         shadow = build_foxess_command_shadow_snapshot(
@@ -322,6 +336,24 @@ class FoxESSControlBackend:
         observed_version = await self._foxess_version()
         version_matches = observed_version == FOXESS_MODBUS_REVIEWED_VERSION
 
+        min_soc_item = entities.get("min_soc_on_grid")
+        observed_min_soc = _number(
+            min_soc_item.get("normalised_observation")
+            if isinstance(min_soc_item, dict)
+            else None
+        )
+        if (
+            self._owned
+            and self._last_applied_action == "self_use"
+            and ev_hold_floor_percent is not None
+            and observed_min_soc is not None
+            and observed_min_soc + 0.05 >= float(ev_hold_floor_percent)
+            and self._last_verified_min_soc_on_grid != observed_min_soc
+        ):
+            self._last_verified_min_soc_on_grid = observed_min_soc
+            self._last_verified_min_soc_at = datetime.now(UTC).isoformat()
+            await self._async_save()
+
         decision = assess_foxess_control_write_authority(
             control,
             technical_ready=technical_ready,
@@ -339,34 +371,60 @@ class FoxESSControlBackend:
         reason = decision.reason
         frozen_ev_hold = False
 
-        if not decision.commands_permitted:
-            frozen_ev_hold = should_freeze_owned_ev_hold(
-                owned_by_kems=self._owned,
-                latched_min_soc_percent=ev_hold_floor_percent,
-                last_applied_action=self._last_applied_action,
-                cheap_period_confirmed=cheap_period_confirmed,
-                no_paid_export_mode=no_paid_export_mode,
-                ev_connected=ev_connected,
-                operating_mode=control.operating_mode,
-                master_control_enabled=bool(
-                    coordinator.settings.control.control_enabled
-                ),
-                user_commissioned=bool(coordinator.settings.control.commissioned),
-                emergency_stop=bool(coordinator.settings.control.emergency_stop),
-                island_mode_active=bool(control.island_mode_active),
-                grid_available=bool(control.grid_available),
+        frozen_ev_hold = should_freeze_owned_ev_hold(
+            owned_by_kems=self._owned,
+            latched_min_soc_percent=ev_hold_floor_percent,
+            last_applied_action=self._last_applied_action,
+            observed_min_soc_on_grid_percent=observed_min_soc,
+            last_verified_min_soc_on_grid_percent=(self._last_verified_min_soc_on_grid),
+            cheap_period_confirmed=cheap_period_confirmed,
+            source_uncertainty_grace_active=ev_hold_source_grace_active,
+            no_paid_export_mode=no_paid_export_mode,
+            ev_connected=ev_connected,
+            operating_mode=control.operating_mode,
+            master_control_enabled=bool(coordinator.settings.control.control_enabled),
+            user_commissioned=bool(coordinator.settings.control.commissioned),
+            emergency_stop=bool(coordinator.settings.control.emergency_stop),
+            island_mode_active=bool(control.island_mode_active),
+            grid_available=bool(control.grid_available),
+        )
+        hold_grace_unverified = bool(
+            ev_hold_source_grace_active
+            and ev_hold_floor_percent is not None
+            and not frozen_ev_hold
+            and self._owned
+            and self._last_applied_action == "self_use"
+            and no_paid_export_mode
+            and ev_connected is not False
+            and control.operating_mode == "control"
+            and bool(coordinator.settings.control.control_enabled)
+            and bool(coordinator.settings.control.commissioned)
+            and not bool(coordinator.settings.control.emergency_stop)
+            and not bool(control.island_mode_active)
+            and bool(control.grid_available)
+        )
+
+        if frozen_ev_hold:
+            self._last_write_result = (
+                "Alpha9.75 transient readiness loss: preserving only a "
+                "physically verified EV MinSOC hold without new writes"
             )
-            if frozen_ev_hold:
-                self._last_write_result = (
-                    "Alpha9.74 transient readiness loss: preserving the last "
-                    "applied confirmed-cheap EV MinSOC hold without new writes"
-                )
-                reason = (
-                    f"{reason}; confirmed-cheap EV hold frozen at "
-                    f"{float(ev_hold_floor_percent):.1f}% until telemetry recovers "
-                    "or release authority becomes explicit"
-                )
-            elif self._owned:
+            reason = (
+                f"{reason}; verified EV hold frozen at "
+                f"{float(ev_hold_floor_percent):.1f}% until telemetry recovers "
+                "or release authority becomes explicit"
+            )
+        elif hold_grace_unverified:
+            self._last_write_result = (
+                "Alpha9.75 source uncertainty grace: EV hold is not physically "
+                "verified, so KEMS is issuing no write and claiming no protection"
+            )
+            reason = (
+                f"{reason}; source uncertainty grace retained without writes "
+                "because the latched EV hold is not physically verified"
+            )
+        elif not decision.commands_permitted:
+            if self._owned:
                 applied = await self._async_restore(entities, writes)
                 if not applied:
                     reason = f"{reason}; KEMS-owned state restore is pending"
@@ -448,6 +506,26 @@ class FoxESSControlBackend:
                         if self._last_applied_action != decision.action:
                             self._last_applied_action = decision.action
                             await self._async_save()
+                        if (
+                            decision.action == "self_use"
+                            and ev_hold_floor_percent is not None
+                        ):
+                            current_state = self._hass.states.get(min_soc_entity)
+                            current_min_soc = _number(
+                                current_state.state
+                                if current_state is not None
+                                else None
+                            )
+                            if (
+                                current_min_soc is not None
+                                and current_min_soc + 0.05
+                                >= float(ev_hold_floor_percent)
+                            ):
+                                self._last_verified_min_soc_on_grid = current_min_soc
+                                self._last_verified_min_soc_at = datetime.now(
+                                    UTC
+                                ).isoformat()
+                                await self._async_save()
                         self._last_write_result = (
                             "Alpha9.67 bounded FoxESS command applied"
                             if writes
@@ -479,10 +557,23 @@ class FoxESSControlBackend:
             "cheap_period_confirmed": bool(cheap_period_confirmed),
             "backend_available": bool(decision.backend_available),
             "commands_permitted": bool(decision.commands_permitted and applied),
-            "decision_action": "freeze_ev_hold" if frozen_ev_hold else decision.action,
+            "decision_action": (
+                "freeze_ev_hold"
+                if frozen_ev_hold
+                else (
+                    "hold_grace_unverified"
+                    if hold_grace_unverified
+                    else decision.action
+                )
+            ),
             "decision_reason": reason,
             "ev_hold_frozen_on_transient_loss": frozen_ev_hold,
+            "ev_hold_source_grace_active": ev_hold_source_grace_active,
+            "ev_hold_grace_unverified": hold_grace_unverified,
             "latched_ev_hold_min_soc_percent": ev_hold_floor_percent,
+            "observed_min_soc_on_grid": observed_min_soc,
+            "last_verified_min_soc_on_grid": self._last_verified_min_soc_on_grid,
+            "last_verified_min_soc_at": self._last_verified_min_soc_at,
             "owned_by_kems": self._owned,
             "previous_work_mode": self._previous_work_mode,
             "previous_min_soc_on_grid": self._previous_min_soc_on_grid,

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from math import isfinite
 from typing import Any
@@ -22,6 +23,8 @@ class EVGridHoldSession:
             hass, 1, f"{DOMAIN}.{entry_id}.{STORAGE_NAMESPACE}.ev_grid_hold"
         )
         self._held_floor: float | None = None
+        self._last_confirmed_cheap_at: datetime | None = None
+        self._grace_active = False
         self._last_status = "inactive"
 
     @property
@@ -29,6 +32,12 @@ class EVGridHoldSession:
         return {
             "status": self._last_status,
             "latched_min_soc_percent": self._held_floor,
+            "source_uncertainty_grace_active": self._grace_active,
+            "last_confirmed_cheap_at": (
+                self._last_confirmed_cheap_at.isoformat()
+                if self._last_confirmed_cheap_at is not None
+                else None
+            ),
             "physical_isolation_proven": False,
             "new_hardware_write_scope": False,
         }
@@ -37,6 +46,7 @@ class EVGridHoldSession:
         data = await self._store.async_load() or {}
         value = data.get("held_floor")
         saved_at = data.get("saved_at")
+        last_confirmed = data.get("last_confirmed_cheap_at")
         try:
             timestamp = datetime.fromisoformat(str(saved_at))
             candidate = float(value)
@@ -51,11 +61,28 @@ class EVGridHoldSession:
             and 0.0 <= candidate <= 100.0
         ):
             self._held_floor = candidate
+        try:
+            confirmed_at = datetime.fromisoformat(str(last_confirmed))
+        except (TypeError, ValueError):
+            confirmed_at = None
+        if (
+            confirmed_at is not None
+            and confirmed_at.tzinfo is not None
+            and timedelta(0)
+            <= datetime.now(UTC) - confirmed_at.astimezone(UTC)
+            <= _MAX_RETAINED_AGE
+        ):
+            self._last_confirmed_cheap_at = confirmed_at
 
     async def async_save(self) -> None:
         await self._store.async_save(
             {
                 "held_floor": self._held_floor,
+                "last_confirmed_cheap_at": (
+                    self._last_confirmed_cheap_at.isoformat()
+                    if self._last_confirmed_cheap_at is not None
+                    else None
+                ),
                 "saved_at": datetime.now(UTC).isoformat(),
             }
         )
@@ -67,16 +94,42 @@ class EVGridHoldSession:
         config: Any,
         *,
         no_paid_export_mode: bool,
+        source_uncertain: bool = False,
+        source_grace_seconds: int = 90,
     ) -> Any:
-        """Apply reviewed guard and persist the floor before hardware output."""
+        """Apply reviewed guard and preserve only a bounded uncertain-source hold."""
+        now = snapshot.timestamp
         disconnected = snapshot.ev_connected is False
+        if snapshot.cheap_period_confirmed:
+            self._last_confirmed_cheap_at = now
+            self._grace_active = False
+        else:
+            grace = timedelta(seconds=max(int(source_grace_seconds), 0))
+            self._grace_active = bool(
+                self._held_floor is not None
+                and self._last_confirmed_cheap_at is not None
+                and source_uncertain
+                and not disconnected
+                and no_paid_export_mode
+                and timedelta(0) <= now - self._last_confirmed_cheap_at <= grace
+            )
+
         if (
-            not snapshot.cheap_period_confirmed
+            (not snapshot.cheap_period_confirmed and not self._grace_active)
             or not no_paid_export_mode
             or disconnected
         ) and self._held_floor is not None:
             self._held_floor = None
+            self._last_confirmed_cheap_at = None
+            self._grace_active = False
             await self.async_save()
+
+        if self._grace_active:
+            self._last_status = "ev_battery_hold_source_grace"
+            return replace(
+                control,
+                ev_grid_guard_status="ev_battery_hold_source_grace",
+            )
 
         guarded = protect_live_cheap_ev(
             snapshot,
@@ -100,5 +153,7 @@ class EVGridHoldSession:
                 self._held_floor is None or floor > self._held_floor
             ):
                 self._held_floor = floor
+                if snapshot.cheap_period_confirmed:
+                    self._last_confirmed_cheap_at = now
                 await self.async_save()
         return guarded

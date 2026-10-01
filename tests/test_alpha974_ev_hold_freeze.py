@@ -20,7 +20,10 @@ def _freeze(**overrides: object) -> bool:
         "owned_by_kems": True,
         "latched_min_soc_percent": 47.0,
         "last_applied_action": "self_use",
+        "observed_min_soc_on_grid_percent": 47.0,
+        "last_verified_min_soc_on_grid_percent": 47.0,
         "cheap_period_confirmed": True,
+        "source_uncertainty_grace_active": False,
         "no_paid_export_mode": True,
         "ev_connected": True,
         "operating_mode": "control",
@@ -62,8 +65,8 @@ def test_freeze_requires_real_owned_self_use_latched_floor() -> None:
 
 def test_backend_freeze_path_has_zero_new_write_authority() -> None:
     source = BACKEND.read_text(encoding="utf-8")
-    freeze = source.split("frozen_ev_hold = should_freeze_owned_ev_hold(", 1)[1].split(
-        "elif self._owned:", 1
+    freeze = source.split("if frozen_ev_hold:", 1)[1].split(
+        "elif hold_grace_unverified:", 1
     )[0]
 
     assert "await self._async_number" not in freeze
@@ -89,8 +92,8 @@ def test_alpha974_release_identity_and_scope() -> None:
     bundle = json.loads(BUNDLE.read_text(encoding="utf-8"))
     reason = str(bundle["maintenance"]["reason"])
 
-    assert manifest["version"] == "0.9.0-alpha9.74"
-    assert reason.startswith("Alpha9.74")
+    assert manifest["version"] == "0.9.0-alpha9.75"
+    assert reason.startswith("Alpha9.75")
     assert "transient" in reason.lower()
     assert "confirmed-cheap EV" in reason
     assert "without new writes" in reason
