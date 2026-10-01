@@ -48,8 +48,7 @@ def protect_pending_intelligent_ev_hold(
     pending_evidence = bool(
         evidence.get("enabled") is True
         and evidence.get("confirmed") is False
-        and evidence.get("reason")
-        == "Intelligent start/end window is unavailable"
+        and evidence.get("reason") == "Intelligent start/end window is unavailable"
         and evidence.get("octopus_intelligent_slot") is True
         and evidence.get("octopus_price_corroborated") is True
         and evidence.get("ohme_connected") is True
@@ -134,7 +133,9 @@ def protect_pending_intelligent_ev_hold(
             )
     else:
         projected_import = (
-            None if grid is None or battery_discharge is None else grid + battery_discharge
+            None
+            if grid is None or battery_discharge is None
+            else grid + battery_discharge
         )
 
     held_soc = min(
