@@ -116,8 +116,7 @@ class EVGridHoldSession:
             held_floor_percent=self._held_floor,
         )
         self._pending_intelligent_hold_active = (
-            pending.ev_grid_guard_status
-            == "ev_battery_hold_pending_intelligent_window"
+            pending.ev_grid_guard_status == "ev_battery_hold_pending_intelligent_window"
         )
         if self._pending_intelligent_hold_active:
             self._grace_active = False
