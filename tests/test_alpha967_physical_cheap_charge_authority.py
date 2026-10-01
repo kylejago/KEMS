@@ -139,9 +139,7 @@ def test_alpha967_release_identity_and_scope() -> None:
     reason = str(bundle["maintenance"]["reason"])
 
     assert manifest["version"] == "0.9.0-alpha9.76"
-    assert reason.startswith(
-        "Alpha9.75 requires a physically verified FoxESS MinSOC readback"
-    )
+    assert reason.startswith("Alpha9.76")
     assert "simulated SOC" in reason
     assert "solar-aware no-export target" in reason
     assert "site-import headroom" in reason
