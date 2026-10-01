@@ -26,6 +26,7 @@ def resolve_live_min_soc_on_grid(
     *,
     cheap_period_confirmed: bool,
     previous_min_soc_on_grid: float | None,
+    pending_intelligent_ev_hold_active: bool = False,
 ) -> float | None:
     """Return the physically safe MinSOC target for the reviewed live write.
 
@@ -36,7 +37,11 @@ def resolve_live_min_soc_on_grid(
     MinSOC, including the Alpha9.70 EV battery-hold floor.
     """
     requested = decision.min_soc_on_grid_percent
-    if cheap_period_confirmed or decision.action != "self_use":
+    if (
+        cheap_period_confirmed
+        or pending_intelligent_ev_hold_active
+        or decision.action != "self_use"
+    ):
         return requested
     if previous_min_soc_on_grid is None:
         return None
@@ -60,6 +65,7 @@ def should_freeze_owned_ev_hold(
     emergency_stop: bool,
     island_mode_active: bool,
     grid_available: bool,
+    pending_intelligent_ev_hold_active: bool = False,
 ) -> bool:
     """Return whether an already-applied cheap-window EV hold must be frozen.
 
@@ -101,7 +107,11 @@ def should_freeze_owned_ev_hold(
         owned_by_kems
         and last_applied_action == "self_use"
         and physical_hold_verified
-        and (cheap_period_confirmed or source_uncertainty_grace_active)
+        and (
+            cheap_period_confirmed
+            or source_uncertainty_grace_active
+            or pending_intelligent_ev_hold_active
+        )
         and no_paid_export_mode
         and ev_connected is not False
         and operating_mode == "control"
