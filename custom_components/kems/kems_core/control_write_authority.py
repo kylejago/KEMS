@@ -26,17 +26,24 @@ def resolve_live_min_soc_on_grid(
     *,
     cheap_period_confirmed: bool,
     previous_min_soc_on_grid: float | None,
+    pending_intelligent_ev_hold_active: bool = False,
 ) -> float | None:
     """Return the physically safe MinSOC target for the reviewed live write.
 
     The normal KEMS reserve is a planning/discharge target, not permission to
     buy daytime grid energy. Outside a confirmed cheap period, Self Use keeps
     the pre-KEMS MinSOC-on-grid baseline instead of raising it to the planner
-    reserve. Confirmed-cheap Self Use/Force Charge paths retain their requested
-    MinSOC, including the Alpha9.70 EV battery-hold floor.
+    reserve. The only exception is the Alpha9.76 hold-only pending Intelligent
+    EV state, which may retain its requested MinSOC without granting cheap or
+    Force Charge authority. Confirmed-cheap Self Use/Force Charge paths retain
+    their requested MinSOC, including the Alpha9.70 EV battery-hold floor.
     """
     requested = decision.min_soc_on_grid_percent
-    if cheap_period_confirmed or decision.action != "self_use":
+    if (
+        cheap_period_confirmed
+        or pending_intelligent_ev_hold_active
+        or decision.action != "self_use"
+    ):
         return requested
     if previous_min_soc_on_grid is None:
         return None
@@ -60,15 +67,18 @@ def should_freeze_owned_ev_hold(
     emergency_stop: bool,
     island_mode_active: bool,
     grid_available: bool,
+    pending_intelligent_ev_hold_active: bool = False,
 ) -> bool:
     """Return whether an already-applied cheap-window EV hold must be frozen.
 
     Freeze means *no new FoxESS writes*. It preserves only a physically
     verified KEMS-owned Self Use + MinSOC state through transient telemetry or
     commissioning-readiness loss. A fresh readback below the latched floor
-    always blocks freeze; only an unavailable readback may fall back to the
-    last persisted verification. A bounded source-uncertainty grace may retain
-    that already-verified hold without becoming new cheap-period authority.
+    always blocks freeze. A confirmed-session hold may fall back to its last
+    persisted verification only when the live readback is unavailable; a new
+    pending Intelligent hold always requires a live physical readback. A
+    bounded source-uncertainty grace may retain an already-verified confirmed
+    hold without becoming new cheap-period authority.
     """
     if latched_min_soc_percent is None:
         return False
@@ -90,10 +100,10 @@ def should_freeze_owned_ev_hold(
     except (TypeError, ValueError):
         verified_value = None
 
-    physical_hold_verified = (
-        observed_value is not None and observed_value + 0.05 >= floor
-    ) or (
-        observed_value is None
+    live_hold_verified = observed_value is not None and observed_value + 0.05 >= floor
+    physical_hold_verified = live_hold_verified or (
+        not pending_intelligent_ev_hold_active
+        and observed_value is None
         and verified_value is not None
         and verified_value + 0.05 >= floor
     )
@@ -101,7 +111,11 @@ def should_freeze_owned_ev_hold(
         owned_by_kems
         and last_applied_action == "self_use"
         and physical_hold_verified
-        and (cheap_period_confirmed or source_uncertainty_grace_active)
+        and (
+            cheap_period_confirmed
+            or source_uncertainty_grace_active
+            or pending_intelligent_ev_hold_active
+        )
         and no_paid_export_mode
         and ev_connected is not False
         and operating_mode == "control"
