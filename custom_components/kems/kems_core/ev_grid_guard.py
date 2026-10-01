@@ -24,6 +24,161 @@ def _nonnegative(value: float | None) -> float | None:
     return max(float(value), 0.0)
 
 
+def protect_pending_intelligent_ev_hold(
+    snapshot: Snapshot,
+    control: ControlState,
+    config: ControlConfig,
+    *,
+    no_paid_export_mode: bool,
+    held_floor_percent: float | None = None,
+) -> ControlState:
+    """Apply a hold-only guard while Intelligent window timestamps catch up.
+
+    This is deliberately narrower than cheap-period authority. It may only
+    raise the existing Self Use MinSOC floor when Octopus already says the
+    Intelligent slot is ON, Ohme is actively charging, cheap-rate evidence is
+    corroborated, and the only missing confirmation is the start/end window.
+    It never authorises Force Charge.
+    """
+    evidence = (
+        snapshot.intelligent_slot_evidence
+        if isinstance(snapshot.intelligent_slot_evidence, dict)
+        else {}
+    )
+    pending_evidence = bool(
+        evidence.get("enabled") is True
+        and evidence.get("confirmed") is False
+        and evidence.get("reason")
+        == "Intelligent start/end window is unavailable"
+        and evidence.get("octopus_intelligent_slot") is True
+        and evidence.get("octopus_price_corroborated") is True
+        and evidence.get("ohme_connected") is True
+        and evidence.get("ohme_charging") is True
+        and evidence.get("ohme_power_active") is True
+    )
+    if (
+        not pending_evidence
+        or snapshot.cheap_period_confirmed
+        or snapshot.intelligent_slot_source_fresh is not True
+        or snapshot.saving_session_active
+        or control.operating_mode != "control"
+        or control.operating_reason != "awaiting_export_tariff"
+        or control.desired_work_mode != "Self Use"
+        or control.desired_grid_export_allowed
+        or control.desired_battery_export_power_kw > 0.001
+        or not control.data_fresh
+        or not control.plan_safe
+        or not no_paid_export_mode
+        or config.emergency_stop
+        or control.island_mode_active
+        or not control.grid_available
+        or control.alpha969_routing_shadow_only
+    ):
+        return control
+
+    ev = _nonnegative(snapshot.ev_power_kw)
+    if (
+        snapshot.ev_connected is not True
+        or snapshot.ev_charging is not True
+        or ev is None
+        or ev <= _EV_ACTIVE_KW
+        or snapshot.ev_power_age_seconds is None
+        or not 0 <= snapshot.ev_power_age_seconds <= _MAX_OHME_AGE_SECONDS
+        or "ev_power_kw" in snapshot.stale_fields
+    ):
+        return control
+
+    soc = snapshot.battery_soc
+    if (
+        soc is None
+        or not isfinite(soc)
+        or "battery_soc" in snapshot.stale_fields
+        or snapshot.source_data_age_seconds is None
+        or snapshot.source_data_age_seconds > config.stale_data_seconds
+    ):
+        return replace(
+            control,
+            ev_grid_guard_status="pending_intelligent_hold_blocked_no_fresh_soc",
+            next_action=(
+                "Intelligent is ON and Ohme is charging, but the pending EV hold "
+                "cannot be armed without fresh physical battery SOC."
+            ),
+        )
+
+    grid = _nonnegative(snapshot.grid_import_kw)
+    battery_discharge = _nonnegative(snapshot.battery_power_kw)
+    if config.site_import_limit_kw is not None:
+        if (
+            grid is None
+            or battery_discharge is None
+            or "grid_import_kw" in snapshot.stale_fields
+            or "battery_power_kw" in snapshot.stale_fields
+        ):
+            return replace(
+                control,
+                ev_grid_guard_status="pending_intelligent_hold_blocked_site_unknown",
+                next_action=(
+                    "Pending Intelligent EV hold is blocked until grid and battery "
+                    "power are fresh enough to prove site-import headroom."
+                ),
+            )
+        projected_import = grid + battery_discharge
+        if projected_import > config.site_import_limit_kw + 0.001:
+            return replace(
+                control,
+                ev_grid_guard_status="pending_intelligent_hold_blocked_site_limit",
+                next_action=(
+                    "Pending Intelligent EV hold is blocked because replacing "
+                    "battery discharge with grid import could exceed the site limit."
+                ),
+            )
+    else:
+        projected_import = (
+            None if grid is None or battery_discharge is None else grid + battery_discharge
+        )
+
+    held_soc = min(
+        100.0,
+        max(
+            control.desired_min_soc_percent,
+            float(ceil(soc) + 1),
+            held_floor_percent or 0.0,
+        ),
+    )
+    headroom = (
+        None
+        if config.site_import_limit_kw is None or projected_import is None
+        else round(config.site_import_limit_kw - projected_import, 3)
+    )
+    return replace(
+        control,
+        ev_grid_guard_status="ev_battery_hold_pending_intelligent_window",
+        desired_work_mode="Self Use",
+        desired_charge_power_kw=0.0,
+        desired_min_soc_percent=held_soc,
+        desired_battery_to_home_power_kw=0.0,
+        desired_total_discharge_power_kw=0.0,
+        grid_bypass_power_kw=(
+            control.grid_bypass_power_kw
+            if projected_import is None
+            else round(projected_import, 3)
+        ),
+        total_site_import_kw=(
+            control.total_site_import_kw
+            if projected_import is None
+            else round(projected_import, 3)
+        ),
+        site_import_headroom_kw=headroom,
+        site_import_limit_exceeded=False,
+        next_action=(
+            "Intelligent is ON and Ohme is actively charging while Octopus window "
+            "timestamps are still settling: temporarily hold physical battery SOC "
+            "with Self Use + MinSOC only. Do not Force Charge until the full "
+            "Intelligent window is confirmed."
+        ),
+    )
+
+
 def protect_live_cheap_ev(
     snapshot: Snapshot,
     control: ControlState,
