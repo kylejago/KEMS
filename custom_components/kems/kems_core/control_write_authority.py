@@ -33,8 +33,10 @@ def resolve_live_min_soc_on_grid(
     The normal KEMS reserve is a planning/discharge target, not permission to
     buy daytime grid energy. Outside a confirmed cheap period, Self Use keeps
     the pre-KEMS MinSOC-on-grid baseline instead of raising it to the planner
-    reserve. Confirmed-cheap Self Use/Force Charge paths retain their requested
-    MinSOC, including the Alpha9.70 EV battery-hold floor.
+    reserve. The only exception is the Alpha9.76 hold-only pending Intelligent
+    EV state, which may retain its requested MinSOC without granting cheap or
+    Force Charge authority. Confirmed-cheap Self Use/Force Charge paths retain
+    their requested MinSOC, including the Alpha9.70 EV battery-hold floor.
     """
     requested = decision.min_soc_on_grid_percent
     if (
@@ -72,9 +74,11 @@ def should_freeze_owned_ev_hold(
     Freeze means *no new FoxESS writes*. It preserves only a physically
     verified KEMS-owned Self Use + MinSOC state through transient telemetry or
     commissioning-readiness loss. A fresh readback below the latched floor
-    always blocks freeze; only an unavailable readback may fall back to the
-    last persisted verification. A bounded source-uncertainty grace may retain
-    that already-verified hold without becoming new cheap-period authority.
+    always blocks freeze. A confirmed-session hold may fall back to its last
+    persisted verification only when the live readback is unavailable; a new
+    pending Intelligent hold always requires a live physical readback. A
+    bounded source-uncertainty grace may retain an already-verified confirmed
+    hold without becoming new cheap-period authority.
     """
     if latched_min_soc_percent is None:
         return False
