@@ -21,6 +21,7 @@ from .agile_history_backfill import AgileHistoryBackfill
 from .agile_smart_export_runtime import EfficientAgileSmartExportManager
 from .collector import Collector
 from .commissioning import build_commissioning_snapshot
+from .commissioning_restart_proof import CommissioningRestartProof
 from .const import NAME
 from .entity_discovery import SourceValidationResult
 from .ev_charge_trace import EVChargeTraceRecorder
@@ -103,6 +104,9 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
             settings.history_days,
         )
         self._ev_charge_trace = EVChargeTraceRecorder(hass, entry.entry_id)
+        self._commissioning_restart_proof = CommissioningRestartProof(
+            hass, entry.entry_id
+        )
         self._ev_grid_hold = EVGridHoldSession(hass, entry.entry_id)
         self._learning = LearningEngine()
         self._forecast = SolarForecastCoordinator(hass, settings.forecast)
@@ -240,6 +244,11 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
         }
 
     @property
+    def commissioning_restart_proof(self) -> dict[str, object] | None:
+        """Return the loaded restart-safe physical commissioning certificate."""
+        return self._commissioning_restart_proof.proof
+
+    @property
     def forecast_validation_state(self) -> ForecastValidationState:
         """Return the latest retained forecast-vs-actual validation state."""
         return self._forecast_validation.state
@@ -286,6 +295,7 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
 
     async def _async_setup(self) -> None:
         """Load retained learning history and permanent supporting ledgers."""
+        await self._commissioning_restart_proof.async_load()
         await self._happy_hour_ohme.async_setup()
         await self._foxess_control.async_setup()
         await self._history.async_load()
@@ -628,6 +638,7 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                 self,
                 data_override=provisional,
             )
+            await self._commissioning_restart_proof.async_capture(commissioning)
             ev_hold_state = self._ev_grid_hold.status
             foxess_control = await self._foxess_control.async_update(
                 coordinator=self,
