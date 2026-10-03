@@ -1,4 +1,4 @@
-"""Alpha9.76 pending Intelligent EV-hold regressions."""
+"""Alpha9.77 pending Intelligent EV-hold regressions."""
 
 from __future__ import annotations
 
@@ -294,8 +294,8 @@ def test_alpha976_release_identity_and_scope() -> None:
     bundle = json.loads(BUNDLE.read_text(encoding="utf-8"))
     reason = str(bundle["maintenance"]["reason"])
 
-    assert manifest["version"] == "0.9.0-alpha9.76"
-    assert reason.startswith("Alpha9.76")
+    assert manifest["version"] == "0.9.0-alpha9.77"
+    assert reason.startswith("Alpha9.77")
     assert "pending Intelligent" in reason
     assert "SOC+1" in reason
     assert "next_offpeak_start" in reason

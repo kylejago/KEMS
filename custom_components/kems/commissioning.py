@@ -11,6 +11,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_registry as er
 
 from .commissioning_export_limit import build_foxess_export_limit_readback_check
+from .commissioning_restart_proof import restart_proof_matches
 from .commissioning_session import (
     collect_battery_direction_records,
     collect_foxess_session_records,
@@ -28,6 +29,7 @@ from .const import (
 from .entity import KEMSEntity
 from .foxess_command_shadow import build_foxess_command_shadow_snapshot
 from .kems_core.commissioning_evidence import (
+    FOXESS_REQUIRED_TELEMETRY_FIELDS,
     BatteryDirectionObservation,
     assess_battery_power_direction,
     assess_foxess_power_balance,
@@ -835,6 +837,78 @@ def build_commissioning_snapshot(
             )
     checks.append(power_balance_check)
 
+    fresh_foxess_telemetry_proof_ready = bool(
+        not solar_only_commissioning
+        and all(
+            check["status"] == PASS
+            for check in (
+                unit_check,
+                telemetry_check,
+                battery_direction,
+                grid_direction_check,
+                power_balance_check,
+            )
+        )
+    )
+    restart_required_fields = set(FOXESS_REQUIRED_TELEMETRY_FIELDS)
+    telemetry_live_consistent = bool(
+        all(
+            getattr(data.snapshot, field, None) is not None
+            for field in restart_required_fields
+        )
+        and not (
+            restart_required_fields
+            & set(getattr(data.snapshot, "stale_fields", ()) or ())
+        )
+    )
+    direction_live_consistent = bool(
+        direction_evidence_payload
+        and (
+            int(direction_evidence_payload.get("positive_is_charge_votes") or 0) == 0
+            if configured_positive_is_discharge
+            else int(direction_evidence_payload.get("positive_is_discharge_votes") or 0)
+            == 0
+        )
+    )
+    restart_power_balance_evidence = assess_foxess_power_balance(
+        (data.snapshot,),
+        positive_is_discharge=configured_positive_is_discharge,
+        battery_required=True,
+        minimum_samples=1,
+    )
+    restart_power_balance_payload = restart_power_balance_evidence.to_dict()
+    power_balance_live_consistent = bool(restart_power_balance_evidence.ready)
+    restart_live_evidence_consistent = bool(
+        telemetry_live_consistent
+        and direction_live_consistent
+        and power_balance_live_consistent
+    )
+
+    restart_proof = getattr(coordinator, "commissioning_restart_proof", None)
+    restart_proof_match = restart_proof_matches(
+        restart_proof,
+        source_signature=source_signature,
+        direction_source_signature=source_signature + direction_source_signature,
+        configured_positive_is_discharge=configured_positive_is_discharge,
+    )
+    restart_bridge_checks: list[str] = []
+    if (
+        restart_proof_match
+        and restart_live_evidence_consistent
+        and commissioning_evidence_sources_ready
+        and foxess_evidence_sources_ready
+    ):
+        for check in (telemetry_check, battery_direction, power_balance_check):
+            if check["status"] != WAIT:
+                continue
+            previous_detail = str(check.get("detail") or "")
+            check["status"] = PASS
+            check["detail"] = (
+                "Restart-safe prior proof retained while fresh session evidence "
+                f"rebuilds; live check: {previous_detail}"
+            )
+            restart_bridge_checks.append(str(check["key"]))
+
     limits = {
         "inverter_limit_kw": data.simulation.inverter_limit_kw,
         "battery_charge_limit_kw": data.simulation.battery_charge_limit_kw,
@@ -1110,6 +1184,15 @@ def build_commissioning_snapshot(
         "foxess_telemetry_stability": telemetry_evidence_payload,
         "foxess_battery_direction_evidence": direction_evidence_payload,
         "foxess_power_balance": power_balance_evidence_payload,
+        "fresh_foxess_telemetry_proof_ready": fresh_foxess_telemetry_proof_ready,
+        "restart_commissioning_proof_available": isinstance(restart_proof, Mapping),
+        "restart_commissioning_proof_matches": restart_proof_match,
+        "restart_commissioning_live_evidence_consistent": (
+            restart_live_evidence_consistent
+        ),
+        "restart_commissioning_live_power_balance": restart_power_balance_payload,
+        "restart_commissioning_bridge_active": bool(restart_bridge_checks),
+        "restart_commissioning_bridge_checks": restart_bridge_checks,
         "foxess_site_telemetry_proof_ready": foxess_site_telemetry_proof_ready,
         "foxess_telemetry_proof_ready": foxess_telemetry_proof_ready,
         "configured_battery_power_positive_is_discharge": (

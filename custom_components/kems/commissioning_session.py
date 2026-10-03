@@ -1,9 +1,10 @@
 """Session-scoped physical telemetry evidence for KEMS commissioning.
 
-Commissioning proof is deliberately not persisted. A Home Assistant restart,
-physical source remap, unit change, or loss of the FoxESS mapping gate must
-start a fresh evidence window so pre-install history cannot satisfy physical
-commissioning checks.
+Raw samples remain session-scoped and are deliberately not persisted. A Home
+Assistant restart, physical source remap, unit change, or loss of the FoxESS
+mapping gate starts a fresh evidence window. Alpha9.77 may separately retain an
+identity-bound certificate that a previous session completed these checks, but
+that certificate never restores raw observations or overrides a current FAIL.
 """
 
 from __future__ import annotations
