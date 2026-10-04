@@ -34,6 +34,9 @@ CONF_EV_CONNECTED = "ev_connected"
 CONF_EV_CHARGING = "ev_charging"
 CONF_EV_POWER = "ev_power_kw"
 CONF_EV_SOC = "ev_soc"
+CONF_VEHICLE_SOC_SOURCE = "vehicle_soc_source"
+CONF_OHME_SOC_INPUT = "ohme_soc_input"
+CONF_EV_SOC_SYNC_ENABLED = "ev_soc_sync_enabled"
 CONF_HAPPY_HOUR_OHME_CONTROL_ENABLED = "happy_hour_ohme_control_enabled"
 
 CONF_HOUSE_LOAD = "house_load_kw"
@@ -67,6 +70,8 @@ ENTITY_MAPPING_KEYS = (
     CONF_EV_CHARGING,
     CONF_EV_POWER,
     CONF_EV_SOC,
+    CONF_VEHICLE_SOC_SOURCE,
+    CONF_OHME_SOC_INPUT,
     CONF_HOUSE_LOAD,
     CONF_BATTERY_SOC,
     CONF_BATTERY_POWER,
@@ -184,6 +189,7 @@ DEFAULT_OPTIONS = {
     CONF_TARIFF_CHANGE_2_STANDING_CHARGE: 55.52,
     CONF_INTELLIGENT_SLOTS_ENABLED: False,
     CONF_HAPPY_HOUR_OHME_CONTROL_ENABLED: False,
+    CONF_EV_SOC_SYNC_ENABLED: False,
     CONF_SCAN_INTERVAL: DEFAULT_SCAN_INTERVAL_SECONDS,
     CONF_HISTORY_DAYS: DEFAULT_HISTORY_DAYS,
     # Physical battery installation is explicit and fail-closed. Telemetry can

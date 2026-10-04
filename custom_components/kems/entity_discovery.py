@@ -35,10 +35,12 @@ from .const import (
     CONF_NEXT_OFFPEAK_START,
     CONF_OFF_PEAK,
     CONF_OFFPEAK_END,
+    CONF_OHME_SOC_INPUT,
     CONF_SAVING_SESSION_EVENTS,
     CONF_SAVING_SESSION_EXPORT_BASELINE,
     CONF_SAVING_SESSION_IMPORT_BASELINE,
     CONF_SOLAR_POWER,
+    CONF_VEHICLE_SOC_SOURCE,
     DOMAIN,
     ENTITY_MAPPING_KEYS,
 )
@@ -123,6 +125,7 @@ class SourceValidationResult:
 OCTOPUS_PLATFORMS = ("octopus_energy",)
 OCTOPUS_INTELLIGENT_PLATFORMS = ("octopus_intelligent",)
 OHME_PLATFORMS = ("ohme",)
+STELLANTIS_PLATFORMS = ("stellantis_vehicles",)
 FOXESS_PLATFORMS = ("foxess_modbus",)
 
 RULES = (
@@ -329,6 +332,27 @@ RULES = (
         units=("%",),
         device_classes=("battery",),
         exact_patterns=("sensor.ohme_*_vehicle_battery",),
+    ),
+    DiscoveryRule(
+        CONF_VEHICLE_SOC_SOURCE,
+        STELLANTIS_PLATFORMS,
+        ("sensor",),
+        (("battery", "soc", "state of charge"),),
+        excluded_tokens=("12v", "voltage", "range"),
+        units=("%",),
+        device_classes=("battery",),
+        exact_patterns=("sensor.*_battery",),
+    ),
+    DiscoveryRule(
+        CONF_OHME_SOC_INPUT,
+        OHME_PLATFORMS,
+        ("number",),
+        (("state of charge", "soc"), ("input",)),
+        units=("%",),
+        exact_patterns=(
+            "number.*ohme*state_of_charge_input",
+            "number.ohme_*_state_of_charge_input",
+        ),
     ),
     DiscoveryRule(
         CONF_HOUSE_LOAD,

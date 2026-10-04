@@ -7,7 +7,7 @@
     "step": {
       "user": {
         "title": "Set up KEMS",
-        "description": "KEMS will scan Home Assistant for compatible Octopus electricity and gas, Ohme, and FoxESS Modbus entities. Real FoxESS control is disabled by default and only the bounded reviewed Alpha9.67 scope can be enabled after commissioning and explicit opt-in."
+        "description": "KEMS will scan Home Assistant for compatible Octopus electricity and gas, Ohme, Stellantis vehicle SOC, and FoxESS Modbus entities. Real FoxESS control remains bounded; EV SOC sync and Happy Hour Ohme control require explicit opt-in."
       },
       "confirm": {
         "title": "Choose how KEMS gets your tariff",
@@ -23,7 +23,7 @@
       },
       "entities": {
         "title": "Review KEMS source entities",
-        "description": "Choose the entities KEMS observes. A current import-rate entity is required only in automatic tariff mode. Gas, Ohme, and FoxESS sources can be added later through Reconfigure.",
+        "description": "Choose the entities KEMS observes and the optional Ohme SOC input KEMS may write when EV SOC sync is explicitly enabled. A current import-rate entity is required only in automatic tariff mode. Other sources can be added later through Reconfigure.",
         "data": {
           "current_import_rate": "Current import rate",
           "next_import_rate": "Next import rate (optional)",
@@ -53,7 +53,9 @@
           "grid_export_kw": "Grid export power (optional)",
           "saving_session_events": "Octoplus Power Down events (optional)",
           "saving_session_import_baseline": "Power Down import baseline (optional)",
-          "saving_session_export_baseline": "Power Down export baseline (optional)"
+          "saving_session_export_baseline": "Power Down export baseline (optional)",
+          "vehicle_soc_source": "Vehicle SOC source for Ohme sync (optional)",
+          "ohme_soc_input": "Ohme SOC input target (optional)"
         },
         "data_description": {
           "current_import_rate": "Octopus current electricity import price.",
@@ -84,12 +86,14 @@
           "grid_export_kw": "FoxESS Modbus power currently exported to the grid.",
           "saving_session_events": "BottlecapDave Octopus Energy Power Down event entity containing available_events and joined_events. The legacy Saving Session event is also supported. KEMS plans only around joined sessions.",
           "saving_session_import_baseline": "Optional Octoplus Power Down import baseline sensor used to estimate rewardable net reduction. The legacy Saving Session baseline is also supported.",
-          "saving_session_export_baseline": "Optional export-meter baseline variant. KEMS subtracts it from the import baseline to estimate the net baseline."
+          "saving_session_export_baseline": "Optional export-meter baseline variant. KEMS subtracts it from the import baseline to estimate the net baseline.",
+          "vehicle_soc_source": "Actual vehicle battery percentage, for example the Stellantis vehicle battery sensor. KEMS uses state validity rather than report age because SOC may remain unchanged for long periods.",
+          "ohme_soc_input": "Ohme number entity that accepts the current vehicle state of charge. KEMS writes it only when EV SOC sync is explicitly enabled."
         }
       },
       "reconfigure": {
         "title": "Rescan KEMS source entities",
-        "description": "KEMS rescanned Octopus Energy, Octopus Intelligent, Ohme, and FoxESS Modbus.\n\nDetected mappings:\n{detected_entities}\n\nAmbiguous fields: {ambiguous}",
+        "description": "KEMS rescanned Octopus Energy, Octopus Intelligent, Ohme, Stellantis vehicle SOC, and FoxESS Modbus.\\n\\nDetected mappings:\\n{detected_entities}\\n\\nAmbiguous fields: {ambiguous}",
         "data": {
           "review_entities": "Review or change detected entities"
         },
@@ -129,7 +133,9 @@
           "grid_export_kw": "Grid export power (optional)",
           "saving_session_events": "Octoplus Power Down events (optional)",
           "saving_session_import_baseline": "Power Down import baseline (optional)",
-          "saving_session_export_baseline": "Power Down export baseline (optional)"
+          "saving_session_export_baseline": "Power Down export baseline (optional)",
+          "vehicle_soc_source": "Vehicle SOC source for Ohme sync (optional)",
+          "ohme_soc_input": "Ohme SOC input target (optional)"
         },
         "data_description": {
           "current_import_rate": "Octopus current electricity import price.",
@@ -160,7 +166,9 @@
           "grid_export_kw": "FoxESS Modbus power currently exported to the grid.",
           "saving_session_events": "BottlecapDave Octopus Energy Power Down event entity containing available_events and joined_events. The legacy Saving Session event is also supported. KEMS plans only around joined sessions.",
           "saving_session_import_baseline": "Optional Octoplus Power Down import baseline sensor used to estimate rewardable net reduction. The legacy Saving Session baseline is also supported.",
-          "saving_session_export_baseline": "Optional export-meter baseline variant. KEMS subtracts it from the import baseline to estimate the net baseline."
+          "saving_session_export_baseline": "Optional export-meter baseline variant. KEMS subtracts it from the import baseline to estimate the net baseline.",
+          "vehicle_soc_source": "Actual vehicle battery percentage, for example the Stellantis vehicle battery sensor. KEMS uses state validity rather than report age because SOC may remain unchanged for long periods.",
+          "ohme_soc_input": "Ohme number entity that accepts the current vehicle state of charge. KEMS writes it only when EV SOC sync is explicitly enabled."
         }
       },
       "manual_tariff": {
@@ -191,7 +199,7 @@
       }
     },
     "error": {
-      "invalid_source_mapping": "One or more selected entities do not belong to the supported Octopus Energy, Octopus Intelligent, Ohme, or FoxESS Modbus integration. KEMS output entities cannot be selected as inputs."
+      "invalid_source_mapping": "One or more selected entities do not belong to the supported Octopus Energy, Octopus Intelligent, Ohme, Stellantis Vehicles, or FoxESS Modbus integration. KEMS output entities cannot be selected as inputs."
     }
   },
   "options": {

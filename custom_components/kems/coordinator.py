@@ -26,6 +26,7 @@ from .const import NAME
 from .entity_discovery import SourceValidationResult
 from .ev_charge_trace import EVChargeTraceRecorder
 from .ev_grid_hold_session import EVGridHoldSession
+from .ev_soc_sync import EVSOCSyncController
 from .export_accounting import (
     actual_export_income_pence,
     async_repair_no_paid_export_income,
@@ -104,6 +105,13 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
             settings.history_days,
         )
         self._ev_charge_trace = EVChargeTraceRecorder(hass, entry.entry_id)
+        self._ev_soc_sync = EVSOCSyncController(
+            hass,
+            entry,
+            vehicle_soc_entity=entities.vehicle_soc_source,
+            ohme_soc_input_entity=entities.ohme_soc_input,
+            ev_status_entity=entities.ev_status,
+        )
         self._commissioning_restart_proof = CommissioningRestartProof(
             hass, entry.entry_id
         )
@@ -170,6 +178,24 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                 )
             )
 
+        self._last_ev_soc_sync_event: dict[str, str] | None = None
+        self._ev_soc_sync_refresh_entities = tuple(
+            entity_id
+            for entity_id in (
+                entities.vehicle_soc_source,
+                entities.ohme_soc_input,
+            )
+            if entity_id
+        )
+        if self._ev_soc_sync_refresh_entities:
+            entry.async_on_unload(
+                async_track_state_change_event(
+                    hass,
+                    self._ev_soc_sync_refresh_entities,
+                    self._handle_ev_soc_sync_source_change,
+                )
+            )
+
     @callback
     def _handle_critical_control_source_change(self, event: Event) -> None:
         """Request a prompt control scan for a meaningful discrete source change."""
@@ -189,6 +215,15 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
             "new_state": str(new_state.state),
             "requested_at": dt_util.now().isoformat(),
         }
+        if entity_id in {
+            self.entities.ev_status,
+            self.entities.ev_connected,
+            self.entities.ev_charging,
+        }:
+            self._last_ev_soc_sync_event = {
+                **self._last_critical_refresh_event,
+                "trigger": "ev_connection_state",
+            }
         self.hass.async_create_task(self.async_request_refresh())
 
         cancel = self._critical_refresh_retry_cancel
@@ -205,6 +240,29 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
             _ALPHA975_FOLLOW_UP_REFRESH_SECONDS,
             _follow_up_refresh,
         )
+
+    @callback
+    def _handle_ev_soc_sync_source_change(self, event: Event) -> None:
+        """Refresh promptly when the authoritative vehicle SOC changes."""
+        old_state = event.data.get("old_state")
+        new_state = event.data.get("new_state")
+        if old_state is None or new_state is None:
+            return
+        if str(old_state.state) == str(new_state.state):
+            return
+        entity_id = str(event.data.get("entity_id") or new_state.entity_id)
+        self._last_ev_soc_sync_event = {
+            "entity_id": entity_id,
+            "old_state": str(old_state.state),
+            "new_state": str(new_state.state),
+            "requested_at": dt_util.now().isoformat(),
+            "trigger": (
+                "vehicle_soc_change"
+                if entity_id == self.entities.vehicle_soc_source
+                else "ohme_soc_input_change"
+            ),
+        }
+        self.hass.async_create_task(self.async_request_refresh())
 
     def _ev_hold_source_uncertain(self) -> bool:
         """Return whether an extra-slot authority source is temporarily unusable."""
@@ -242,6 +300,11 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                 else None
             ),
         }
+
+    @property
+    def ev_soc_sync_state(self) -> dict[str, object]:
+        """Return the narrow EV SOC sync audit state."""
+        return self._ev_soc_sync.status
 
     @property
     def commissioning_restart_proof(self) -> dict[str, object] | None:
@@ -296,6 +359,7 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
     async def _async_setup(self) -> None:
         """Load retained learning history and permanent supporting ledgers."""
         await self._commissioning_restart_proof.async_load()
+        await self._ev_soc_sync.async_setup()
         await self._happy_hour_ohme.async_setup()
         await self._foxess_control.async_setup()
         await self._history.async_load()
@@ -339,6 +403,12 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                 ),
                 inverter_limit_kw=self.settings.control.inverter_limit_kw,
             ).to_dict()
+            await self._ev_soc_sync.async_update(
+                snapshot=snapshot,
+                emergency_stop=self.settings.control.emergency_stop,
+                trigger=self._last_ev_soc_sync_event,
+            )
+            self._last_ev_soc_sync_event = None
             now = dt_util.now()
 
             # Forecast planning is calculated before history recording so the
@@ -737,6 +807,7 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
             cancel()
             self._critical_refresh_retry_cancel = None
         await self._foxess_control.async_shutdown(self)
+        await self._ev_soc_sync.async_shutdown()
         await self._happy_hour_ohme.async_shutdown()
         await self._history.async_save()
         await self._ev_charge_trace.async_save()
