@@ -41,7 +41,7 @@ _ROI_ENTITY_RENAMES = {
 _LIVE_ENERGY_TODAY = """      - type: markdown
         title: Energy today
         content: |
-                    | Energy | Live Data |
+          | Energy | Live Data |
           |---|---:|
           | Whole-home energy | {{ states('sensor.kems_whole_home_energy_today') }} kWh |
           | Grid import | {{ states('sensor.kems_observed_grid_import_today') }} kWh |
@@ -92,7 +92,7 @@ _LIVE_PARITY_BLOCK = """      - type: grid
       - type: markdown
         title: Energy today
         content: |
-                    | Energy | Live Data |
+          | Energy | Live Data |
           |---|---:|
           | Whole-home energy | {{ states('sensor.kems_whole_home_energy_today') }} kWh |
           | Grid import | {{ states('sensor.kems_observed_grid_import_today') }} kWh |
