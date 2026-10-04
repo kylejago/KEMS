@@ -139,7 +139,7 @@ views:
             name: Grid import
           - entity: sensor.kems_observed_grid_export_today
             name: Grid export
-          - entity: sensor.kems_solar_generation_today
+          - entity: sensor.kems_observed_solar_generation_today
             name: Solar generation
           - entity: sensor.kems_gas_usage_today
             name: Gas usage
@@ -256,7 +256,7 @@ views:
           | Grid import | {{ states('sensor.kems_simulated_grid_import_today') }} kWh |
           | Grid export | {{ states('sensor.kems_simulated_grid_export_today') }} kWh |
           | Solar generation | {{ states('sensor.kems_simulated_solar_generation_today') }} kWh |
-          | Battery charged | {{ states('sensor.kems_simulated_battery_charge_today') }} kWh |
+          | Battery charged | {{ states('sensor.kems_simulated_battery_charged_today') }} kWh |
           | Battery → home | {{ states('sensor.kems_simulated_battery_to_home_today') }} kWh |
           | Battery export | {{ states('sensor.kems_simulated_battery_export_today') }} kWh |
           | Export income | £{{ '%.2f' | format((states('sensor.kems_simulated_export_income_today') | float(0)) / 100) }} |
@@ -400,7 +400,13 @@ views:
           {% set slots = state_attr('sensor.kems_agile_slots', 'today_slots') or [] %}
           **Current Agile export rate:** {{ (s.attributes.current_rate_pence ~ ' p/kWh') if s and s.attributes.current_rate_pence is not none else '—' }}  
           **Price coverage:** {{ s.attributes.today_count if s else 0 }}/{{ s.attributes.today_expected if s else 48 }} slots  
-          **Plan:** {{ state_attr('sensor.kems_agile_rolling_export_plan', 'action') or states('sensor.kems_agile_rolling_export_plan') or '—' }}
+          {% set ns = namespace(action='—') %}
+          {% for p in slots %}
+            {% if p.get('rolling_current_slot') %}
+              {% set ns.action = p.get('rolling_action') or ((p.get('actions') or ['—']) | join(', ')) %}
+            {% endif %}
+          {% endfor %}
+          **Plan:** {{ ns.action }}
 
           The plan is split into three readable sections below instead of one 48-row table.
 
@@ -777,9 +783,9 @@ views:
             name: Battery charged
           - entity: sensor.kems_lifetime_battery_discharge
             name: Battery discharged
-          - entity: sensor.kems_lifetime_gas_usage
+          - entity: sensor.kems_lifetime_gas_consumption
             name: Gas usage
-          - entity: sensor.kems_lifetime_total_energy_cost
+          - entity: sensor.kems_lifetime_net_energy_cost
             name: Total energy cost
 
   - title: System

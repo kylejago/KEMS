@@ -62,7 +62,7 @@ views:
         entities:
           - entity: sensor.kems_lifetime_avoided_import_value
             name: Avoided grid-import value
-          - entity: sensor.kems_financial_export_income
+          - entity: sensor.kems_paid_export_income_since_commissioning
             name: Paid export income
           - entity: sensor.kems_lifetime_system_value
             name: Gross system value
@@ -107,13 +107,13 @@ views:
         title: Physical evidence since commissioning
         show_header_toggle: false
         entities:
-          - entity: sensor.kems_financial_solar_generation
+          - entity: sensor.kems_solar_generation_since_commissioning
             name: Solar generated
-          - entity: sensor.kems_financial_grid_import
+          - entity: sensor.kems_grid_import_since_commissioning
             name: Grid imported
-          - entity: sensor.kems_financial_grid_export
+          - entity: sensor.kems_grid_export_since_commissioning
             name: Grid exported
-          - entity: sensor.kems_financial_house_consumption
+          - entity: sensor.kems_house_electricity_since_commissioning
             name: House electricity
 
       - type: history-graph
@@ -124,5 +124,5 @@ views:
             name: Actual system value
           - entity: sensor.kems_lifetime_avoided_import_value
             name: Avoided import
-          - entity: sensor.kems_financial_export_income
+          - entity: sensor.kems_paid_export_income_since_commissioning
             name: Paid export income

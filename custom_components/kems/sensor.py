@@ -1235,6 +1235,15 @@ SENSORS: tuple[KEMSSensorEntityDescription, ...] = (
         value_fn=lambda data: data.simulation.actual_grid_export_kwh,
     ),
     KEMSSensorEntityDescription(
+        key="actual_solar_generation_today",
+        name="Observed solar generation today",
+        icon="mdi:solar-power",
+        device_class=SensorDeviceClass.ENERGY,
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        suggested_display_precision=2,
+        value_fn=lambda data: data.simulation.actual_solar_generation_kwh,
+    ),
+    KEMSSensorEntityDescription(
         key="actual_export_income_today",
         name="Observed export income today",
         icon="mdi:cash-plus",
