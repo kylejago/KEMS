@@ -83,6 +83,7 @@ from .const import (
     CONF_NEXT_OFFPEAK_START,
     CONF_OFF_PEAK,
     CONF_OFFPEAK_END,
+    CONF_OHME_SOC_INPUT,
     CONF_OPERATING_MODE,
     CONF_PANEL_LAYOUT,
     CONF_PROPOSAL_SOLAR_ENABLED,
@@ -125,6 +126,7 @@ from .product_types import SYSTEM_TYPE_DEFINITIONS, SYSTEM_TYPES
 SENSOR_SELECTOR = EntitySelector(EntitySelectorConfig(domain="sensor"))
 BINARY_SENSOR_SELECTOR = EntitySelector(EntitySelectorConfig(domain="binary_sensor"))
 EVENT_SELECTOR = EntitySelector(EntitySelectorConfig(domain="event"))
+NUMBER_SELECTOR = EntitySelector(EntitySelectorConfig(domain="number"))
 
 BINARY_KEYS = {
     CONF_OFF_PEAK,
@@ -213,6 +215,8 @@ def _entity_schema(
     for key in ENTITY_MAPPING_KEYS:
         if key == CONF_SAVING_SESSION_EVENTS:
             entity_selector = EVENT_SELECTOR
+        elif key == CONF_OHME_SOC_INPUT:
+            entity_selector = NUMBER_SELECTOR
         else:
             entity_selector = (
                 BINARY_SENSOR_SELECTOR if key in BINARY_KEYS else SENSOR_SELECTOR
@@ -439,6 +443,7 @@ class KEMSConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     CONF_EV_CHARGING,
                     CONF_EV_POWER,
                     CONF_EV_SOC,
+                    CONF_OHME_SOC_INPUT,
                 }
                 for key in self._suggested
             ),

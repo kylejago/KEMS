@@ -19,6 +19,7 @@ from .const import (
     CONF_BATTERY_INSTALLED,
     CONF_CONTROL_ENABLED,
     CONF_EMERGENCY_STOP,
+    CONF_EV_SOC_SYNC_ENABLED,
     CONF_HAPPY_HOUR_OHME_CONTROL_ENABLED,
     CONF_SYSTEM_COMMISSIONED,
 )
@@ -51,6 +52,7 @@ async def async_setup_entry(
         KEMSWeekendHappyHourPlanningSwitch(coordinator),
         KEMSWeekendHappyHourAutoJoinSwitch(coordinator),
         KEMSHappyHourOhmeControlSwitch(coordinator),
+        KEMSEVSOCSyncSwitch(coordinator),
     ]
     entities.extend(build_update_switch_entities(hass, coordinator, entry))
     async_add_entities(entities)
@@ -361,5 +363,63 @@ class KEMSHappyHourOhmeControlSwitch(KEMSEntity, SwitchEntity):
             self.hass,
             self.coordinator.entry,
             CONF_HAPPY_HOUR_OHME_CONTROL_ENABLED,
+            False,
+        )
+
+
+class KEMSEVSOCSyncSwitch(KEMSEntity, SwitchEntity):
+    """Explicitly allow KEMS to copy vehicle SOC into Ohme."""
+
+    _attr_name = "EV SOC sync"
+    _attr_icon = "mdi:battery-sync-outline"
+    _attr_entity_category = EntityCategory.CONFIG
+
+    def __init__(self, coordinator) -> None:
+        super().__init__(coordinator, "ev_soc_sync")
+
+    @property
+    def is_on(self) -> bool:
+        return bool(
+            self.coordinator.entry.options.get(
+                CONF_EV_SOC_SYNC_ENABLED,
+                False,
+            )
+        )
+
+    @property
+    def extra_state_attributes(self):
+        state = self.coordinator.ev_soc_sync_state
+        return {
+            **state,
+            "setting_is_authoritative": True,
+            "default": "off",
+            "control_authority": (
+                "Only number.set_value on the configured Ohme SOC input; "
+                "does not start/stop charging or grant FoxESS/export authority"
+            ),
+        }
+
+    async def async_turn_on(self, **kwargs) -> None:
+        entities = self.coordinator.entities
+        if not entities.vehicle_soc_source:
+            raise HomeAssistantError(
+                "KEMS has no vehicle SOC source; use Reconfigure to map it first"
+            )
+        if not entities.ohme_soc_input:
+            raise HomeAssistantError(
+                "KEMS has no Ohme SOC input; use Reconfigure to map it first"
+            )
+        await async_set_runtime_option(
+            self.hass,
+            self.coordinator.entry,
+            CONF_EV_SOC_SYNC_ENABLED,
+            True,
+        )
+
+    async def async_turn_off(self, **kwargs) -> None:
+        await async_set_runtime_option(
+            self.hass,
+            self.coordinator.entry,
+            CONF_EV_SOC_SYNC_ENABLED,
             False,
         )

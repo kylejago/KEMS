@@ -336,6 +336,22 @@ def test_kyles_octopus_intelligent_and_ohme_inventory_auto_maps() -> None:
             "%",
             "battery",
         ),
+        candidate(
+            "sensor.vxkukzkxzmw065492_battery",
+            "stellantis_vehicles",
+            "sensor",
+            "stellantis vehicle battery",
+            "%",
+            "battery",
+        ),
+        candidate(
+            "number.energy_ohme_epod_state_of_charge_input",
+            "ohme",
+            "number",
+            "energy ohme epod state of charge input",
+            "%",
+            "",
+        ),
     ]
 
     result = discovery.discover_from_candidates(candidates)
@@ -356,6 +372,8 @@ def test_kyles_octopus_intelligent_and_ohme_inventory_auto_maps() -> None:
         constants.CONF_EV_STATUS,
         constants.CONF_EV_POWER,
         constants.CONF_EV_SOC,
+        constants.CONF_VEHICLE_SOC_SOURCE,
+        constants.CONF_OHME_SOC_INPUT,
         constants.CONF_HOUSE_LOAD,
         constants.CONF_GRID_IMPORT,
     }
@@ -364,6 +382,12 @@ def test_kyles_octopus_intelligent_and_ohme_inventory_auto_maps() -> None:
     assert result.mappings[constants.CONF_GRID_IMPORT].endswith("_current_demand")
     assert result.mappings[constants.CONF_GAS_METER_TOTAL].endswith(
         "_current_total_consumption_kwh"
+    )
+    assert result.mappings[constants.CONF_VEHICLE_SOC_SOURCE] == (
+        "sensor.vxkukzkxzmw065492_battery"
+    )
+    assert result.mappings[constants.CONF_OHME_SOC_INPUT] == (
+        "number.energy_ohme_epod_state_of_charge_input"
     )
     assert constants.CONF_GRID_EXPORT not in result.mappings
     assert constants.CONF_CURRENT_EXPORT_RATE not in result.mappings

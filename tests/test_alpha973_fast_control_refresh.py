@@ -49,8 +49,8 @@ def test_alpha973_release_identity_and_scope() -> None:
     )
     reason = str(bundle["maintenance"]["reason"])
 
-    assert manifest["version"] == "0.9.0-alpha9.77"
-    assert reason.startswith("Alpha9.77")
+    assert manifest["version"] == "0.9.0-alpha9.78"
+    assert reason.startswith("Alpha9.78")
     assert "Alpha9.75 requires a physically verified FoxESS MinSOC readback" in reason
     assert (
         "Alpha9.73 removes the normal coordinator-poll delay from EV battery protection"

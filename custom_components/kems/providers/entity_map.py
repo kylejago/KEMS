@@ -31,10 +31,12 @@ from ..const import (
     CONF_NEXT_OFFPEAK_START,
     CONF_OFF_PEAK,
     CONF_OFFPEAK_END,
+    CONF_OHME_SOC_INPUT,
     CONF_SAVING_SESSION_EVENTS,
     CONF_SAVING_SESSION_EXPORT_BASELINE,
     CONF_SAVING_SESSION_IMPORT_BASELINE,
     CONF_SOLAR_POWER,
+    CONF_VEHICLE_SOC_SOURCE,
     ENTITY_MAPPING_KEYS,
 )
 
@@ -74,6 +76,8 @@ class KEMSEntities:
     ev_charging: str | None = None
     ev_power_kw: str | None = None
     ev_soc: str | None = None
+    vehicle_soc_source: str | None = None
+    ohme_soc_input: str | None = None
     house_load_kw: str | None = None
     battery_soc: str | None = None
     battery_power_kw: str | None = None
@@ -115,6 +119,8 @@ class KEMSEntities:
             ev_charging=_safe_source(data, CONF_EV_CHARGING),
             ev_power_kw=_safe_source(data, CONF_EV_POWER),
             ev_soc=_safe_source(data, CONF_EV_SOC),
+            vehicle_soc_source=_safe_source(data, CONF_VEHICLE_SOC_SOURCE),
+            ohme_soc_input=_safe_source(data, CONF_OHME_SOC_INPUT),
             house_load_kw=_safe_source(data, CONF_HOUSE_LOAD),
             battery_soc=_safe_source(data, CONF_BATTERY_SOC),
             battery_power_kw=_safe_source(data, CONF_BATTERY_POWER),
