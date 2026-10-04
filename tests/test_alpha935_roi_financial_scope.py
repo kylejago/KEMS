@@ -135,11 +135,11 @@ def test_roi_dashboard_uses_financial_scope_for_evidence() -> None:
     parsed = yaml.safe_load(content)
     assert [view["path"] for view in parsed["views"]] == ["roi"]
     assert "sensor.kems_financial_commissioning_date" in content
-    assert "sensor.kems_financial_solar_generation" in content
-    assert "sensor.kems_financial_grid_import" in content
-    assert "sensor.kems_financial_grid_export" in content
-    assert "sensor.kems_financial_house_consumption" in content
-    assert "sensor.kems_financial_export_income" in content
+    assert "sensor.kems_solar_generation_since_commissioning" in content
+    assert "sensor.kems_grid_import_since_commissioning" in content
+    assert "sensor.kems_grid_export_since_commissioning" in content
+    assert "sensor.kems_house_electricity_since_commissioning" in content
+    assert "sensor.kems_paid_export_income_since_commissioning" in content
     assert "sensor.kems_lifetime_grid_import" not in content
     assert "sensor.kems_lifetime_grid_export" not in content
     assert "sensor.kems_lifetime_solar_generation" not in content

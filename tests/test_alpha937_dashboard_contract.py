@@ -91,7 +91,7 @@ def test_alpha937_removes_every_observed_stale_dashboard_entity_reference() -> N
     ):
         assert registered in repaired
 
-    assert "actual_solar_generation_kwh" in repaired
+    assert "sensor.kems_observed_solar_generation_today" in repaired
 
 
 def test_roi_uses_all_registered_since_commissioning_entities() -> None:
@@ -144,8 +144,8 @@ def test_alpha937_release_identity_and_scope() -> None:
     bundle = json.loads((ROOT / "release" / "kems-bundle.template.json").read_text())
     reason = str(bundle["maintenance"]["reason"])
 
-    assert manifest["version"] == "0.9.0-alpha9.78"
-    assert reason.startswith("Alpha9.78")
+    assert manifest["version"] == "0.9.0-alpha9.79"
+    assert reason.startswith("Alpha9.79")
     assert "Alpha9.37" in reason
     assert "canonical current-day KEMS cost" in reason
     assert "presentation/reporting only" in reason

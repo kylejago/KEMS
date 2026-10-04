@@ -41,13 +41,12 @@ _ROI_ENTITY_RENAMES = {
 _LIVE_ENERGY_TODAY = """      - type: markdown
         title: Energy today
         content: |
-          {% set solar = state_attr('sensor.kems_simulated_kems_cost_today', 'actual_solar_generation_kwh') %}
-          | Energy | Live Data |
+                    | Energy | Live Data |
           |---|---:|
           | Whole-home energy | {{ states('sensor.kems_whole_home_energy_today') }} kWh |
           | Grid import | {{ states('sensor.kems_observed_grid_import_today') }} kWh |
           | Grid export | {{ states('sensor.kems_observed_grid_export_today') }} kWh |
-          | Solar generation | {{ (solar ~ ' kWh') if solar is not none else '—' }} |
+          | Solar generation | {{ states('sensor.kems_observed_solar_generation_today') }} kWh |
           | Gas usage | {{ states('sensor.kems_gas_usage_today') }} kWh |
           | Export income | {{ states('sensor.kems_observed_export_income_today') }} p |
 """
@@ -93,13 +92,12 @@ _LIVE_PARITY_BLOCK = """      - type: grid
       - type: markdown
         title: Energy today
         content: |
-          {% set solar = state_attr('sensor.kems_simulated_kems_cost_today', 'actual_solar_generation_kwh') %}
-          | Energy | Live Data |
+                    | Energy | Live Data |
           |---|---:|
           | Whole-home energy | {{ states('sensor.kems_whole_home_energy_today') }} kWh |
           | Grid import | {{ states('sensor.kems_observed_grid_import_today') }} kWh |
           | Grid export | {{ states('sensor.kems_observed_grid_export_today') }} kWh |
-          | Solar generation | {{ (solar ~ ' kWh') if solar is not none else '—' }} |
+          | Solar generation | {{ states('sensor.kems_observed_solar_generation_today') }} kWh |
           | Gas usage | {{ states('sensor.kems_gas_usage_today') }} kWh |
           | Export income | {{ states('sensor.kems_observed_export_income_today') }} p |
 """
