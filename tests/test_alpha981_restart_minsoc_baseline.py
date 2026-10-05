@@ -96,7 +96,9 @@ def test_restore_keeps_ownership_until_work_mode_and_minsoc_read_back() -> None:
 def test_live_repair_is_blocked_until_every_temporary_hold_path_has_ended() -> None:
     source = BACKEND.read_text(encoding="utf-8")
     update = source.split("async def async_update", 1)[1]
-    repair = update.split("repaired_baseline = repair_contaminated_min_soc_baseline", 1)[0]
+    repair = update.split(
+        "repaired_baseline = repair_contaminated_min_soc_baseline", 1
+    )[0]
 
     assert "not cheap_period_confirmed" in repair
     assert "ev_hold_floor_percent is None" in repair
