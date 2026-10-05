@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from math import isfinite
 
 from .models import ControlState
 
@@ -19,6 +20,57 @@ class FoxESSControlDecision:
     reason: str
     force_charge_power_kw: float | None = None
     min_soc_on_grid_percent: float | None = None
+
+
+def repair_contaminated_min_soc_baseline(
+    previous_min_soc_on_grid: float | None,
+    *,
+    observed_min_soc_on_grid: float | None,
+    last_verified_min_soc_on_grid: float | None,
+    minimum_min_soc_on_grid: float | None,
+    requested_noncheap_min_soc: float | None,
+) -> float | None:
+    """Repair a persisted baseline only when a prior EV hold proves contamination.
+
+    Alpha9.81 must not let a temporary KEMS EV MinSOC hold become the remembered
+    non-cheap baseline after restart. A repair is deliberately narrow: the
+    stored baseline must be above the current normal non-cheap request, the live
+    readback and KEMS' last physical EV-hold verification must both match that
+    stored value, and the reviewed Home Assistant number entity must expose a
+    lower minimum. Otherwise the existing captured baseline is preserved.
+    """
+    if previous_min_soc_on_grid is None:
+        return None
+
+    values = (
+        previous_min_soc_on_grid,
+        observed_min_soc_on_grid,
+        last_verified_min_soc_on_grid,
+        minimum_min_soc_on_grid,
+        requested_noncheap_min_soc,
+    )
+    try:
+        previous, observed, verified, minimum, requested = (
+            float(value) if value is not None else None for value in values
+        )
+    except (TypeError, ValueError):
+        return previous_min_soc_on_grid
+
+    if any(
+        value is None or not isfinite(value) or not 0.0 <= value <= 100.0
+        for value in (previous, observed, verified, minimum, requested)
+    ):
+        return previous_min_soc_on_grid
+
+    if previous <= requested + 0.05:
+        return round(previous, 1)
+    if abs(observed - previous) > 0.05:
+        return round(previous, 1)
+    if abs(verified - previous) > 0.05:
+        return round(previous, 1)
+    if minimum + 0.05 >= previous:
+        return round(previous, 1)
+    return round(minimum, 1)
 
 
 def resolve_live_min_soc_on_grid(
