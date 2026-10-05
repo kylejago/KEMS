@@ -7,6 +7,7 @@ charger nor changes inverter work mode, power, reserve or tariff settings.
 from __future__ import annotations
 
 from datetime import datetime, timedelta
+from math import isfinite
 from typing import Any
 
 from homeassistant.core import HomeAssistant
@@ -29,6 +30,97 @@ _READBACK_KEYS = (
     "min_soc_on_grid",
     "export_power_limit",
 )
+
+
+
+def infer_pre_hold_min_soc_baseline(
+    samples: list[dict[str, Any]] | tuple[dict[str, Any], ...],
+    *,
+    contaminated_min_soc_on_grid: float | None,
+    tolerance: float = 0.05,
+) -> float | None:
+    """Recover a pre-hold MinSOC only from one retained KEMS-owned EV session.
+
+    Alpha9.82 uses the read-only event trace as an upgrade bridge when Alpha9.80
+    has already cleared the backend's last-verified hold evidence during unload.
+    A candidate is accepted only when the same retained session proves:
+    - a transition into a confirmed cheap period while the EV is connected;
+    - KEMS-owned Self Use at the elevated contaminated MinSOC during that cheap
+      period; and
+    - an earlier KEMS-owned non-cheap Self Use readback at a lower MinSOC.
+
+    The trace already has a bounded 72-hour retention window. No trace evidence
+    means no repair.
+    """
+    try:
+        contaminated = float(contaminated_min_soc_on_grid)
+    except (TypeError, ValueError):
+        return None
+    if not isfinite(contaminated) or not 0.0 <= contaminated <= 100.0:
+        return None
+
+    def _readback(sample: dict[str, Any]) -> float | None:
+        foxess = sample.get("foxess_readback")
+        if not isinstance(foxess, dict):
+            return None
+        item = foxess.get("min_soc_on_grid")
+        if not isinstance(item, dict):
+            return None
+        try:
+            value = float(item.get("value"))
+        except (TypeError, ValueError):
+            return None
+        return value if isfinite(value) and 0.0 <= value <= 100.0 else None
+
+    def _owned_self_use(sample: dict[str, Any]) -> bool:
+        control = sample.get("existing_live_control")
+        return bool(
+            isinstance(control, dict)
+            and control.get("owned_by_kems") is True
+            and control.get("decision_action") == "self_use"
+        )
+
+    records = [sample for sample in samples if isinstance(sample, dict)]
+    for start_index in range(len(records) - 1, -1, -1):
+        start = records[start_index]
+        if not (
+            start.get("event") == "cheap_slot_transition"
+            and start.get("cheap_period_confirmed") is True
+            and start.get("ev_connected") is True
+        ):
+            continue
+
+        elevated_hold_proven = False
+        for held in records[start_index:]:
+            if held.get("cheap_period_confirmed") is not True:
+                if elevated_hold_proven:
+                    break
+                continue
+            value = _readback(held)
+            if (
+                held.get("ev_connected") is True
+                and _owned_self_use(held)
+                and value is not None
+                and abs(value - contaminated) <= tolerance
+            ):
+                elevated_hold_proven = True
+                break
+        if not elevated_hold_proven:
+            continue
+
+        for previous in reversed(records[:start_index]):
+            if previous.get("cheap_period_confirmed") is True:
+                break
+            value = _readback(previous)
+            if (
+                previous.get("ev_connected") is True
+                and _owned_self_use(previous)
+                and value is not None
+                and value + tolerance < contaminated
+            ):
+                return round(value, 1)
+        return None
+    return None
 
 
 def build_ev_trace_sample(
