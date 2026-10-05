@@ -25,6 +25,7 @@ from .foxess_modbus_contract import FOXESS_MODBUS_REVIEWED_VERSION
 from .kems_core.control_write_authority import (
     FoxESSControlDecision,
     assess_foxess_control_write_authority,
+    repair_contaminated_min_soc_baseline,
     resolve_live_min_soc_on_grid,
     should_freeze_owned_ev_hold,
 )
@@ -260,7 +261,20 @@ class FoxESSControlBackend:
                 writes,
                 tolerance=0.05,
             )
-        if mode_ok and soc_ok:
+        mode_state = self._hass.states.get(work_mode_entity)
+        mode_verified = bool(
+            mode_state is not None and str(mode_state.state) == target_mode
+        )
+        soc_verified = True
+        if self._previous_min_soc_on_grid is not None:
+            soc_state = self._hass.states.get(min_soc_entity)
+            restored_soc = _number(soc_state.state if soc_state is not None else None)
+            soc_verified = bool(
+                restored_soc is not None
+                and abs(restored_soc - self._previous_min_soc_on_grid) <= 0.05
+            )
+
+        if mode_ok and soc_ok and mode_verified and soc_verified:
             self._owned = False
             self._last_applied_action = None
             self._last_verified_min_soc_on_grid = None
@@ -268,6 +282,12 @@ class FoxESSControlBackend:
             self._last_write_result = "KEMS FoxESS ownership released safely"
             await self._async_save()
             return True
+        if mode_ok and soc_ok:
+            self._last_write_result = (
+                "FoxESS restore command accepted; awaiting verified work mode / "
+                "MinSOC readback"
+            )
+            await self._async_save()
         return False
 
     async def async_shutdown(self, coordinator: Any) -> None:
@@ -343,6 +363,42 @@ class FoxESSControlBackend:
             if isinstance(min_soc_item, dict)
             else None
         )
+        min_soc_entity_id = self._entity_id(entities, "min_soc_on_grid")
+        min_soc_state = (
+            self._hass.states.get(min_soc_entity_id) if min_soc_entity_id else None
+        )
+        minimum_min_soc_on_grid = _number(
+            min_soc_state.attributes.get("min") if min_soc_state is not None else None
+        )
+        baseline_before_repair = self._previous_min_soc_on_grid
+        baseline_repair_applied = False
+        if (
+            not cheap_period_confirmed
+            and ev_hold_floor_percent is None
+            and not ev_hold_source_grace_active
+            and not pending_intelligent_ev_hold_active
+            and no_paid_export_mode
+            and control.operating_mode == "control"
+            and bool(coordinator.settings.control.control_enabled)
+            and bool(coordinator.settings.control.commissioned)
+        ):
+            repaired_baseline = repair_contaminated_min_soc_baseline(
+                self._previous_min_soc_on_grid,
+                observed_min_soc_on_grid=observed_min_soc,
+                last_verified_min_soc_on_grid=self._last_verified_min_soc_on_grid,
+                minimum_min_soc_on_grid=minimum_min_soc_on_grid,
+                requested_noncheap_min_soc=control.desired_min_soc_percent,
+            )
+            if (
+                repaired_baseline is not None
+                and self._previous_min_soc_on_grid is not None
+                and abs(repaired_baseline - self._previous_min_soc_on_grid) > 0.05
+            ):
+                self._previous_min_soc_on_grid = repaired_baseline
+                self._last_verified_min_soc_on_grid = None
+                self._last_verified_min_soc_at = None
+                baseline_repair_applied = True
+                await self._async_save()
         if (
             self._owned
             and self._last_applied_action == "self_use"
@@ -599,6 +655,14 @@ class FoxESSControlBackend:
             "owned_by_kems": self._owned,
             "previous_work_mode": self._previous_work_mode,
             "previous_min_soc_on_grid": self._previous_min_soc_on_grid,
+            "baseline_repair_applied": baseline_repair_applied,
+            "baseline_repair_from_min_soc_on_grid": (
+                baseline_before_repair if baseline_repair_applied else None
+            ),
+            "baseline_repair_to_min_soc_on_grid": (
+                self._previous_min_soc_on_grid if baseline_repair_applied else None
+            ),
+            "baseline_repair_number_minimum": minimum_min_soc_on_grid,
             "last_applied_action": self._last_applied_action,
             "effective_min_soc_on_grid": (
                 float(ev_hold_floor_percent)
