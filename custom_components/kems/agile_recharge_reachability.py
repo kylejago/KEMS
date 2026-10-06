@@ -83,9 +83,7 @@ def _required_precheap_soc_percent(
         "maximum_stored_charge_kwh": round(maximum_stored_kwh, 3),
         "maximum_soc_gain_percent": round(achievable_gain_percent, 3),
         "required_precheap_soc_percent": round(required, 3),
-        "basis": (
-            "target SOC minus guaranteed cheap-window stored-charge capability"
-        ),
+        "basis": ("target SOC minus guaranteed cheap-window stored-charge capability"),
         "hardware_writes": "blocked",
     }
 
@@ -128,8 +126,7 @@ def _rolling_plan_with_recharge_reachability(
             "configured_planning_target_percent": round(configured_target, 3),
             "effective_precheap_target_soc_percent": round(effective_target, 3),
             "reserve_raised_for_full_recharge": (
-                required is not None
-                and effective_target > configured_target + _EPSILON
+                required is not None and effective_target > configured_target + _EPSILON
             ),
             "policy": (
                 "retain enough SOC at guaranteed cheap start for the configured "
