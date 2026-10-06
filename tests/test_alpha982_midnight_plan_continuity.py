@@ -29,9 +29,7 @@ def _function():
         for node in tree.body
         if isinstance(node, ast.FunctionDef) and node.name in wanted
     ]
-    slot_flow_source = (KEMS / "kems_core" / "slot_flow.py").read_text(
-        encoding="utf-8"
-    )
+    slot_flow_source = (KEMS / "kems_core" / "slot_flow.py").read_text(encoding="utf-8")
     slot_tree = ast.parse(slot_flow_source)
     slot_nodes = [
         node
@@ -167,9 +165,10 @@ def test_unknown_battery_energy_stops_without_inventing_flow() -> None:
 
     assert _function()(state, config=_config()) == 1
     assert state["tomorrow_slots"][1]["flow_estimated_soc_percent"] == old_second
-    assert "components unavailable" in state["tomorrow_display_continuity"][
-        "stopped_reason"
-    ]
+    assert (
+        "components unavailable"
+        in state["tomorrow_display_continuity"]["stopped_reason"]
+    )
 
 
 def test_alpha982_runtime_installs_continuity_after_safety_floor() -> None:
