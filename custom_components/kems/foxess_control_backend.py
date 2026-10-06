@@ -783,6 +783,8 @@ class FoxESSControlBackend:
                     min_soc_on_grid_percent=decision.min_soc_on_grid_percent,
                 )
                 reason = ownership_reason
+                if self._owned:
+                    await self._async_restore(entities, writes)
             else:
                 work_mode_entity = self._entity_id(entities, "work_mode")
                 charge_power_entity = self._entity_id(
@@ -975,9 +977,15 @@ class FoxESSControlBackend:
                                 )
                                 if writes
                                 else (
-                                    "Alpha9.82 bounded paid-export command already matched"
+                                    (
+                                        "Alpha9.82 bounded paid-export command "
+                                        "already matched"
+                                    )
                                     if decision.action == "force_discharge"
-                                    else "Alpha9.67 bounded FoxESS command already matched"
+                                    else (
+                                        "Alpha9.67 bounded FoxESS command "
+                                        "already matched"
+                                    )
                                 )
                             )
                     else:
@@ -1102,4 +1110,4 @@ class FoxESSControlBackend:
             ),
         }
         self._status = payload
-        return dict(payload)
+        return dict(payload)\n
