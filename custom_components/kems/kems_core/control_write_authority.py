@@ -1,4 +1,4 @@
-"""Pure authority gate for bounded FoxESS control."""
+"""Pure authority gate for bounded non-Agile FoxESS control."""
 
 from __future__ import annotations
 
@@ -19,9 +19,6 @@ class FoxESSControlDecision:
     action: str
     reason: str
     force_charge_power_kw: float | None = None
-    force_discharge_power_kw: float | None = None
-    export_power_limit_w: float | None = None
-    export_commissioning_stage_limited: bool = False
     min_soc_on_grid_percent: float | None = None
 
 
@@ -86,19 +83,18 @@ def resolve_live_min_soc_on_grid(
     """Return the physically safe MinSOC target for the reviewed live write.
 
     The normal KEMS reserve is a planning/discharge target, not permission to
-    buy daytime grid energy. Outside a confirmed cheap period, Self Use and
-    paid-export Force Discharge preserve the pre-KEMS MinSOC-on-grid baseline
-    instead of raising it to the planner/export reserve. The only exception is
-    the Alpha9.76 hold-only pending Intelligent EV state, which may retain its
-    requested MinSOC without granting cheap or Force Charge authority.
-    Confirmed-cheap Self Use/Force Charge paths retain their requested MinSOC,
-    including the Alpha9.70 EV battery-hold floor.
+    buy daytime grid energy. Outside a confirmed cheap period, Self Use keeps
+    the pre-KEMS MinSOC-on-grid baseline instead of raising it to the planner
+    reserve. The only exception is the Alpha9.76 hold-only pending Intelligent
+    EV state, which may retain its requested MinSOC without granting cheap or
+    Force Charge authority. Confirmed-cheap Self Use/Force Charge paths retain
+    their requested MinSOC, including the Alpha9.70 EV battery-hold floor.
     """
     requested = decision.min_soc_on_grid_percent
     if (
         cheap_period_confirmed
         or pending_intelligent_ev_hold_active
-        or decision.action == "force_charge"
+        or decision.action != "self_use"
     ):
         return requested
     if previous_min_soc_on_grid is None:
@@ -194,20 +190,13 @@ def assess_foxess_control_write_authority(
     user_commissioned: bool,
     master_control_enabled: bool,
     emergency_stop: bool,
-    export_tariff_ready: bool = True,
-    effective_export_limit_kw: float = 0.0,
-    paid_export_commissioned: bool = False,
-    paid_export_stage_limit_kw: float = 1.0,
-    paid_export_commissioning_fault: str | None = None,
 ) -> FoxESSControlDecision:
-    """Return the bounded hardware action for the reviewed FoxESS surface.
+    """Return the narrow non-Agile hardware action.
 
-    No-paid-export retains the established Self Use / confirmed-cheap Force
-    Charge contract. Paid export adds one fail-closed Force Discharge path:
-    the economic planner must explicitly request grid export, the tariff must be
-    ready, the export ceiling must be positive, and the first physical export is
-    staged to a small commissioning limit until telemetry proves direction and
-    bounded grid feed-in.
+    Outside a confirmed cheap period the only normal grid-connected action is
+    Self Use. Confirmed cheap periods may use Force Charge. Deliberate/economic
+    Force Discharge, Agile/paid-export control and import/export power-limit
+    writes remain outside this authority.
     """
     backend_available = bool(binding_ready and reviewed_version_matches)
 
@@ -245,7 +234,20 @@ def assess_foxess_control_write_authority(
         return blocked(
             "Grid unavailable/island mode is owned by local inverter protection"
         )
+    if not no_paid_export_mode:
+        return blocked("Paid/Agile export control is outside the current live scope")
+    if (
+        control.desired_grid_export_allowed
+        or control.desired_battery_export_power_kw > _EPSILON_KW
+    ):
+        return blocked(
+            "Deliberate battery/grid export is outside the current live scope"
+        )
 
+    # Alpha9.69 introduces new SOC-floor and EV/load routing semantics. The
+    # old Alpha9.67 live contract never validated their physical KH7 behaviour.
+    # The sticky flag survives dataclasses.replace overlays (e.g. Happy Hour
+    # replacing operating_reason); the reason check is defence in depth.
     if control.alpha969_routing_shadow_only or control.operating_reason.startswith(
         ("no_export_overnight", "no_export_extra_slot")
     ):
@@ -255,61 +257,6 @@ def assess_foxess_control_write_authority(
         )
 
     min_soc = round(control.desired_min_soc_percent, 1)
-    desired_export = max(float(control.desired_battery_export_power_kw), 0.0)
-
-    if no_paid_export_mode:
-        if control.desired_grid_export_allowed or desired_export > _EPSILON_KW:
-            return blocked(
-                "Deliberate battery/grid export is outside No paid export authority"
-            )
-    else:
-        if not export_tariff_ready:
-            return blocked("Paid export tariff data is not ready")
-        if paid_export_commissioning_fault:
-            return blocked(
-                "Paid export commissioning is latched fail-closed: "
-                f"{paid_export_commissioning_fault}"
-            )
-        if desired_export > _EPSILON_KW and not control.desired_grid_export_allowed:
-            return blocked(
-                "Contradictory paid-export plan requests battery export while "
-                "grid export is disabled"
-            )
-        if desired_export > _EPSILON_KW:
-            if cheap_period_confirmed:
-                return blocked(
-                    "Deliberate paid export is blocked during a confirmed cheap period"
-                )
-            limit_kw = max(float(effective_export_limit_kw), 0.0)
-            if limit_kw <= _EPSILON_KW:
-                return blocked("Effective paid-export ceiling is zero")
-            requested_kw = min(desired_export, limit_kw)
-            staged = not paid_export_commissioned
-            if staged:
-                requested_kw = min(
-                    requested_kw,
-                    max(float(paid_export_stage_limit_kw), 0.0),
-                )
-            if requested_kw <= _EPSILON_KW:
-                return blocked("Paid export commissioning stage limit is zero")
-            return FoxESSControlDecision(
-                backend_available=True,
-                commands_permitted=True,
-                action="force_discharge",
-                reason=(
-                    "Paid export is inside the bounded live scope"
-                    if not staged
-                    else (
-                        "Paid export is limited to the Alpha9.82 physical "
-                        "commissioning stage"
-                    )
-                ),
-                force_discharge_power_kw=round(requested_kw, 3),
-                export_power_limit_w=round(limit_kw * 1000.0),
-                export_commissioning_stage_limited=staged,
-                min_soc_on_grid_percent=min_soc,
-            )
-
     if control.desired_work_mode == "Force Charge":
         if not cheap_period_confirmed:
             return blocked("Force Charge is not backed by a confirmed cheap period")
@@ -335,11 +282,7 @@ def assess_foxess_control_write_authority(
             backend_available=True,
             commands_permitted=True,
             action="self_use",
-            reason=(
-                "No-paid-export Self Use is inside the bounded live scope"
-                if no_paid_export_mode
-                else "Paid-export idle/house-support Self Use is inside the bounded live scope"
-            ),
+            reason="No-paid-export Self Use is inside the bounded live scope",
             min_soc_on_grid_percent=min_soc,
         )
 
