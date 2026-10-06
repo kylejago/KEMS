@@ -34,8 +34,8 @@ ___________________ test_alpha937_release_identity_and_scope ___________________
         assert manifest["version"] == "0.9.0-alpha9.82"
 >       assert reason.startswith("Alpha9.81")
 E       AssertionError: assert False
-E        +  where False = <built-in method startswith of str object at 0x56437c70c480>('Alpha9.81')
-E        +    where <built-in method startswith of str object at 0x56437c70c480> = 'Alpha9.82 closes the Today-to-Tomorrow Agile SOC continuity defect exposed on 6 October. Tomorrow now inherits the ex...kend Happy Hour and Power Down presentation. All prior Alpha9 safety, reporting and control contracts remain retained.'.startswith
+E        +  where False = <built-in method startswith of str object at 0x558b7a495050>('Alpha9.81')
+E        +    where <built-in method startswith of str object at 0x558b7a495050> = 'Alpha9.82 closes the Today-to-Tomorrow Agile SOC continuity defect exposed on 6 October. Tomorrow now inherits the ex...kend Happy Hour and Power Down presentation. All prior Alpha9 safety, reporting and control contracts remain retained.'.startswith
 
 tests/test_alpha937_dashboard_contract.py:148: AssertionError
 ___________________ test_alpha945_release_identity_and_scope ___________________
@@ -57,8 +57,8 @@ ___________________ test_alpha945_release_identity_and_scope ___________________
         assert manifest["version"] == "0.9.0-alpha9.82"
 >       assert reason.startswith("Alpha9.81")
 E       AssertionError: assert False
-E        +  where False = <built-in method startswith of str object at 0x56437c877bc0>('Alpha9.81')
-E        +    where <built-in method startswith of str object at 0x56437c877bc0> = 'Alpha9.82 closes the Today-to-Tomorrow Agile SOC continuity defect exposed on 6 October. Tomorrow now inherits the ex...kend Happy Hour and Power Down presentation. All prior Alpha9 safety, reporting and control contracts remain retained.'.startswith
+E        +  where False = <built-in method startswith of str object at 0x558b7a3ec4f0>('Alpha9.81')
+E        +    where <built-in method startswith of str object at 0x558b7a3ec4f0> = 'Alpha9.82 closes the Today-to-Tomorrow Agile SOC continuity defect exposed on 6 October. Tomorrow now inherits the ex...kend Happy Hour and Power Down presentation. All prior Alpha9 safety, reporting and control contracts remain retained.'.startswith
 
 tests/test_alpha945_happy_hour_normalisation.py:142: AssertionError
 ___________________ test_alpha949_release_identity_and_scope ___________________
@@ -71,8 +71,8 @@ ___________________ test_alpha949_release_identity_and_scope ___________________
         assert manifest["version"] == "0.9.0-alpha9.82"
 >       assert reason.startswith("Alpha9.81")
 E       AssertionError: assert False
-E        +  where False = <built-in method startswith of str object at 0x56437c847600>('Alpha9.81')
-E        +    where <built-in method startswith of str object at 0x56437c847600> = 'Alpha9.82 closes the Today-to-Tomorrow Agile SOC continuity defect exposed on 6 October. Tomorrow now inherits the ex...kend Happy Hour and Power Down presentation. All prior Alpha9 safety, reporting and control contracts remain retained.'.startswith
+E        +  where False = <built-in method startswith of str object at 0x558b7a4047d0>('Alpha9.81')
+E        +    where <built-in method startswith of str object at 0x558b7a4047d0> = 'Alpha9.82 closes the Today-to-Tomorrow Agile SOC continuity defect exposed on 6 October. Tomorrow now inherits the ex...kend Happy Hour and Power Down presentation. All prior Alpha9 safety, reporting and control contracts remain retained.'.startswith
 
 tests/test_alpha949_power_down_dashboard_observability.py:76: AssertionError
 ___________________ test_alpha950_release_identity_and_scope ___________________
@@ -85,8 +85,8 @@ ___________________ test_alpha950_release_identity_and_scope ___________________
         assert manifest["version"] == "0.9.0-alpha9.82"
 >       assert reason.startswith("Alpha9.81")
 E       AssertionError: assert False
-E        +  where False = <built-in method startswith of str object at 0x56437c85f8e0>('Alpha9.81')
-E        +    where <built-in method startswith of str object at 0x56437c85f8e0> = 'Alpha9.82 closes the Today-to-Tomorrow Agile SOC continuity defect exposed on 6 October. Tomorrow now inherits the ex...kend Happy Hour and Power Down presentation. All prior Alpha9 safety, reporting and control contracts remain retained.'.startswith
+E        +  where False = <built-in method startswith of str object at 0x558b7a41cab0>('Alpha9.81')
+E        +    where <built-in method startswith of str object at 0x558b7a41cab0> = 'Alpha9.82 closes the Today-to-Tomorrow Agile SOC continuity defect exposed on 6 October. Tomorrow now inherits the ex...kend Happy Hour and Power Down presentation. All prior Alpha9 safety, reporting and control contracts remain retained.'.startswith
 
 tests/test_alpha950_dashboard_event_card_pipeline.py:78: AssertionError
 ___________________ test_current_release_identity_and_scope ____________________
@@ -99,8 +99,8 @@ ___________________ test_current_release_identity_and_scope ____________________
         assert manifest["version"] == "0.9.0-alpha9.82"
 >       assert reason.startswith("Alpha9.81")
 E       AssertionError: assert False
-E        +  where False = <built-in method startswith of str object at 0x56437c7a6820>('Alpha9.81')
-E        +    where <built-in method startswith of str object at 0x56437c7a6820> = 'Alpha9.82 closes the Today-to-Tomorrow Agile SOC continuity defect exposed on 6 October. Tomorrow now inherits the ex...kend Happy Hour and Power Down presentation. All prior Alpha9 safety, reporting and control contracts remain retained.'.startswith
+E        +  where False = <built-in method startswith of str object at 0x558b7a3424f0>('Alpha9.81')
+E        +    where <built-in method startswith of str object at 0x558b7a3424f0> = 'Alpha9.82 closes the Today-to-Tomorrow Agile SOC continuity defect exposed on 6 October. Tomorrow now inherits the ex...kend Happy Hour and Power Down presentation. All prior Alpha9 safety, reporting and control contracts remain retained.'.startswith
 
 tests/test_alpha956_non_agile_foxess_control.py:283: AssertionError
 _______________ test_alpha959_release_identity_and_safety_scope ________________
@@ -113,8 +113,8 @@ _______________ test_alpha959_release_identity_and_safety_scope ________________
         assert manifest["version"] == "0.9.0-alpha9.82"
 >       assert reason.startswith("Alpha9.81")
 E       AssertionError: assert False
-E        +  where False = <built-in method startswith of str object at 0x56437c847600>('Alpha9.81')
-E        +    where <built-in method startswith of str object at 0x56437c847600> = 'Alpha9.82 closes the Today-to-Tomorrow Agile SOC continuity defect exposed on 6 October. Tomorrow now inherits the ex...kend Happy Hour and Power Down presentation. All prior Alpha9 safety, reporting and control contracts remain retained.'.startswith
+E        +  where False = <built-in method startswith of str object at 0x558b7a495050>('Alpha9.81')
+E        +    where <built-in method startswith of str object at 0x558b7a495050> = 'Alpha9.82 closes the Today-to-Tomorrow Agile SOC continuity defect exposed on 6 October. Tomorrow now inherits the ex...kend Happy Hour and Power Down presentation. All prior Alpha9 safety, reporting and control contracts remain retained.'.startswith
 
 tests/test_alpha959_control_gate_session.py:68: AssertionError
 ___________________ test_alpha961_release_identity_and_scope ___________________
@@ -127,8 +127,8 @@ ___________________ test_alpha961_release_identity_and_scope ___________________
         assert manifest["version"] == "0.9.0-alpha9.82"
 >       assert reason.startswith("Alpha9.81")
 E       AssertionError: assert False
-E        +  where False = <built-in method startswith of str object at 0x56437c817040>('Alpha9.81')
-E        +    where <built-in method startswith of str object at 0x56437c817040> = 'Alpha9.82 closes the Today-to-Tomorrow Agile SOC continuity defect exposed on 6 October. Tomorrow now inherits the ex...kend Happy Hour and Power Down presentation. All prior Alpha9 safety, reporting and control contracts remain retained.'.startswith
+E        +  where False = <built-in method startswith of str object at 0x558b7a3bbf30>('Alpha9.81')
+E        +    where <built-in method startswith of str object at 0x558b7a3bbf30> = 'Alpha9.82 closes the Today-to-Tomorrow Agile SOC continuity defect exposed on 6 October. Tomorrow now inherits the ex...kend Happy Hour and Power Down presentation. All prior Alpha9 safety, reporting and control contracts remain retained.'.startswith
 
 tests/test_alpha961_intelligent_slot_demand_gate.py:104: AssertionError
 _______________________ test_release_identity_and_scope ________________________
@@ -141,8 +141,8 @@ _______________________ test_release_identity_and_scope ________________________
         assert manifest["version"] == "0.9.0-alpha9.82"
 >       assert reason.startswith("Alpha9.81")
 E       AssertionError: assert False
-E        +  where False = <built-in method startswith of str object at 0x56437c847600>('Alpha9.81')
-E        +    where <built-in method startswith of str object at 0x56437c847600> = 'Alpha9.82 closes the Today-to-Tomorrow Agile SOC continuity defect exposed on 6 October. Tomorrow now inherits the ex...kend Happy Hour and Power Down presentation. All prior Alpha9 safety, reporting and control contracts remain retained.'.startswith
+E        +  where False = <built-in method startswith of str object at 0x558b7a495050>('Alpha9.81')
+E        +    where <built-in method startswith of str object at 0x558b7a495050> = 'Alpha9.82 closes the Today-to-Tomorrow Agile SOC continuity defect exposed on 6 October. Tomorrow now inherits the ex...kend Happy Hour and Power Down presentation. All prior Alpha9 safety, reporting and control contracts remain retained.'.startswith
 
 tests/test_alpha966_remove_anti_import.py:122: AssertionError
 ___________________ test_alpha967_release_identity_and_scope ___________________
@@ -155,8 +155,8 @@ ___________________ test_alpha967_release_identity_and_scope ___________________
         assert manifest["version"] == "0.9.0-alpha9.82"
 >       assert reason.startswith("Alpha9.81")
 E       AssertionError: assert False
-E        +  where False = <built-in method startswith of str object at 0x56437c70c480>('Alpha9.81')
-E        +    where <built-in method startswith of str object at 0x56437c70c480> = 'Alpha9.82 closes the Today-to-Tomorrow Agile SOC continuity defect exposed on 6 October. Tomorrow now inherits the ex...kend Happy Hour and Power Down presentation. All prior Alpha9 safety, reporting and control contracts remain retained.'.startswith
+E        +  where False = <built-in method startswith of str object at 0x558b7a4047d0>('Alpha9.81')
+E        +    where <built-in method startswith of str object at 0x558b7a4047d0> = 'Alpha9.82 closes the Today-to-Tomorrow Agile SOC continuity defect exposed on 6 October. Tomorrow now inherits the ex...kend Happy Hour and Power Down presentation. All prior Alpha9 safety, reporting and control contracts remain retained.'.startswith
 
 tests/test_alpha967_physical_cheap_charge_authority.py:142: AssertionError
 ___________________ test_alpha968_release_identity_and_scope ___________________
@@ -169,8 +169,8 @@ ___________________ test_alpha968_release_identity_and_scope ___________________
         assert manifest["version"] == "0.9.0-alpha9.82"
 >       assert reason.startswith("Alpha9.81")
 E       AssertionError: assert False
-E        +  where False = <built-in method startswith of str object at 0x56437c82f320>('Alpha9.81')
-E        +    where <built-in method startswith of str object at 0x56437c82f320> = 'Alpha9.82 closes the Today-to-Tomorrow Agile SOC continuity defect exposed on 6 October. Tomorrow now inherits the ex...kend Happy Hour and Power Down presentation. All prior Alpha9 safety, reporting and control contracts remain retained.'.startswith
+E        +  where False = <built-in method startswith of str object at 0x558b7a38b970>('Alpha9.81')
+E        +    where <built-in method startswith of str object at 0x558b7a38b970> = 'Alpha9.82 closes the Today-to-Tomorrow Agile SOC continuity defect exposed on 6 October. Tomorrow now inherits the ex...kend Happy Hour and Power Down presentation. All prior Alpha9 safety, reporting and control contracts remain retained.'.startswith
 
 tests/test_alpha968_scheduled_tariff_renewal.py:74: AssertionError
 ___________ test_alpha969_release_identity_is_explicitly_shadow_only ___________
@@ -189,8 +189,8 @@ ___________ test_alpha969_release_identity_is_explicitly_shadow_only ___________
         assert manifest["version"] == "0.9.0-alpha9.82"
 >       assert reason.startswith("Alpha9.81")
 E       AssertionError: assert False
-E        +  where False = <built-in method startswith of str object at 0x56437c85f8e0>('Alpha9.81')
-E        +    where <built-in method startswith of str object at 0x56437c85f8e0> = 'Alpha9.82 closes the Today-to-Tomorrow Agile SOC continuity defect exposed on 6 October. Tomorrow now inherits the ex...kend Happy Hour and Power Down presentation. All prior Alpha9 safety, reporting and control contracts remain retained.'.startswith
+E        +  where False = <built-in method startswith of str object at 0x558b7a465350>('Alpha9.81')
+E        +    where <built-in method startswith of str object at 0x558b7a465350> = 'Alpha9.82 closes the Today-to-Tomorrow Agile SOC continuity defect exposed on 6 October. Tomorrow now inherits the ex...kend Happy Hour and Power Down presentation. All prior Alpha9 safety, reporting and control contracts remain retained.'.startswith
 
 tests/test_alpha969_no_export_cheap_routing.py:710: AssertionError
 ___________________ test_alpha973_release_identity_and_scope ___________________
@@ -207,8 +207,8 @@ ___________________ test_alpha973_release_identity_and_scope ___________________
         assert manifest["version"] == "0.9.0-alpha9.82"
 >       assert reason.startswith("Alpha9.81")
 E       AssertionError: assert False
-E        +  where False = <built-in method startswith of str object at 0x56437c7d6de0>('Alpha9.81')
-E        +    where <built-in method startswith of str object at 0x56437c7d6de0> = 'Alpha9.82 closes the Today-to-Tomorrow Agile SOC continuity defect exposed on 6 October. Tomorrow now inherits the ex...kend Happy Hour and Power Down presentation. All prior Alpha9 safety, reporting and control contracts remain retained.'.startswith
+E        +  where False = <built-in method startswith of str object at 0x558b7a41cab0>('Alpha9.81')
+E        +    where <built-in method startswith of str object at 0x558b7a41cab0> = 'Alpha9.82 closes the Today-to-Tomorrow Agile SOC continuity defect exposed on 6 October. Tomorrow now inherits the ex...kend Happy Hour and Power Down presentation. All prior Alpha9 safety, reporting and control contracts remain retained.'.startswith
 
 tests/test_alpha973_fast_control_refresh.py:53: AssertionError
 ___________________ test_alpha974_release_identity_and_scope ___________________
@@ -221,8 +221,8 @@ ___________________ test_alpha974_release_identity_and_scope ___________________
         assert manifest["version"] == "0.9.0-alpha9.82"
 >       assert reason.startswith("Alpha9.81")
 E       AssertionError: assert False
-E        +  where False = <built-in method startswith of str object at 0x56437c817040>('Alpha9.81')
-E        +    where <built-in method startswith of str object at 0x56437c817040> = 'Alpha9.82 closes the Today-to-Tomorrow Agile SOC continuity defect exposed on 6 October. Tomorrow now inherits the ex...kend Happy Hour and Power Down presentation. All prior Alpha9 safety, reporting and control contracts remain retained.'.startswith
+E        +  where False = <built-in method startswith of str object at 0x558b7a3bbf30>('Alpha9.81')
+E        +    where <built-in method startswith of str object at 0x558b7a3bbf30> = 'Alpha9.82 closes the Today-to-Tomorrow Agile SOC continuity defect exposed on 6 October. Tomorrow now inherits the ex...kend Happy Hour and Power Down presentation. All prior Alpha9 safety, reporting and control contracts remain retained.'.startswith
 
 tests/test_alpha974_ev_hold_freeze.py:96: AssertionError
 ___________________ test_alpha975_release_identity_and_scope ___________________
@@ -235,8 +235,8 @@ ___________________ test_alpha975_release_identity_and_scope ___________________
         assert manifest["version"] == "0.9.0-alpha9.82"
 >       assert reason.startswith("Alpha9.81")
 E       AssertionError: assert False
-E        +  where False = <built-in method startswith of str object at 0x56437c847600>('Alpha9.81')
-E        +    where <built-in method startswith of str object at 0x56437c847600> = 'Alpha9.82 closes the Today-to-Tomorrow Agile SOC continuity defect exposed on 6 October. Tomorrow now inherits the ex...kend Happy Hour and Power Down presentation. All prior Alpha9 safety, reporting and control contracts remain retained.'.startswith
+E        +  where False = <built-in method startswith of str object at 0x558b7a495050>('Alpha9.81')
+E        +    where <built-in method startswith of str object at 0x558b7a495050> = 'Alpha9.82 closes the Today-to-Tomorrow Agile SOC continuity defect exposed on 6 October. Tomorrow now inherits the ex...kend Happy Hour and Power Down presentation. All prior Alpha9 safety, reporting and control contracts remain retained.'.startswith
 
 tests/test_alpha975_verified_ev_hold_grace.py:337: AssertionError
 ___________________ test_alpha976_release_identity_and_scope ___________________
@@ -249,8 +249,8 @@ ___________________ test_alpha976_release_identity_and_scope ___________________
         assert manifest["version"] == "0.9.0-alpha9.82"
 >       assert reason.startswith("Alpha9.81")
 E       AssertionError: assert False
-E        +  where False = <built-in method startswith of str object at 0x56437c877bc0>('Alpha9.81')
-E        +    where <built-in method startswith of str object at 0x56437c877bc0> = 'Alpha9.82 closes the Today-to-Tomorrow Agile SOC continuity defect exposed on 6 October. Tomorrow now inherits the ex...kend Happy Hour and Power Down presentation. All prior Alpha9 safety, reporting and control contracts remain retained.'.startswith
+E        +  where False = <built-in method startswith of str object at 0x558b7a3424f0>('Alpha9.81')
+E        +    where <built-in method startswith of str object at 0x558b7a3424f0> = 'Alpha9.82 closes the Today-to-Tomorrow Agile SOC continuity defect exposed on 6 October. Tomorrow now inherits the ex...kend Happy Hour and Power Down presentation. All prior Alpha9 safety, reporting and control contracts remain retained.'.startswith
 
 tests/test_alpha976_pending_intelligent_ev_hold.py:298: AssertionError
 ___________________ test_alpha977_release_identity_and_scope ___________________
@@ -263,8 +263,8 @@ ___________________ test_alpha977_release_identity_and_scope ___________________
         assert manifest["version"] == "0.9.0-alpha9.82"
 >       assert reason.startswith("Alpha9.81")
 E       AssertionError: assert False
-E        +  where False = <built-in method startswith of str object at 0x56437c7ef0c0>('Alpha9.81')
-E        +    where <built-in method startswith of str object at 0x56437c7ef0c0> = 'Alpha9.82 closes the Today-to-Tomorrow Agile SOC continuity defect exposed on 6 October. Tomorrow now inherits the ex...kend Happy Hour and Power Down presentation. All prior Alpha9 safety, reporting and control contracts remain retained.'.startswith
+E        +  where False = <built-in method startswith of str object at 0x558b7a3bbf30>('Alpha9.81')
+E        +    where <built-in method startswith of str object at 0x558b7a3bbf30> = 'Alpha9.82 closes the Today-to-Tomorrow Agile SOC continuity defect exposed on 6 October. Tomorrow now inherits the ex...kend Happy Hour and Power Down presentation. All prior Alpha9 safety, reporting and control contracts remain retained.'.startswith
 
 tests/test_alpha977_restart_commissioning_proof.py:111: AssertionError
 ___________________ test_alpha981_release_identity_and_scope ___________________
@@ -277,61 +277,61 @@ ___________________ test_alpha981_release_identity_and_scope ___________________
         assert manifest["version"] == "0.9.0-alpha9.82"
 >       assert reason.startswith("Alpha9.81")
 E       AssertionError: assert False
-E        +  where False = <built-in method startswith of str object at 0x56437c7d6de0>('Alpha9.81')
-E        +    where <built-in method startswith of str object at 0x56437c7d6de0> = 'Alpha9.82 closes the Today-to-Tomorrow Agile SOC continuity defect exposed on 6 October. Tomorrow now inherits the ex...kend Happy Hour and Power Down presentation. All prior Alpha9 safety, reporting and control contracts remain retained.'.startswith
+E        +  where False = <built-in method startswith of str object at 0x558b7a38b970>('Alpha9.81')
+E        +    where <built-in method startswith of str object at 0x558b7a38b970> = 'Alpha9.82 closes the Today-to-Tomorrow Agile SOC continuity defect exposed on 6 October. Tomorrow now inherits the ex...kend Happy Hour and Power Down presentation. All prior Alpha9 safety, reporting and control contracts remain retained.'.startswith
 
 tests/test_alpha981_restart_minsoc_baseline.py:116: AssertionError
 =========================== short test summary info ============================
 FAILED tests/test_alpha937_dashboard_contract.py::test_alpha937_release_identity_and_scope - AssertionError: assert False
- +  where False = <built-in method startswith of str object at 0x56437c70c480>('Alpha9.81')
- +    where <built-in method startswith of str object at 0x56437c70c480> = 'Alpha9.82 closes the Today-to-Tomorrow Agile SOC continuity defect exposed on 6 October. Tomorrow now inherits the ex...kend Happy Hour and Power Down presentation. All prior Alpha9 safety, reporting and control contracts remain retained.'.startswith
+ +  where False = <built-in method startswith of str object at 0x558b7a495050>('Alpha9.81')
+ +    where <built-in method startswith of str object at 0x558b7a495050> = 'Alpha9.82 closes the Today-to-Tomorrow Agile SOC continuity defect exposed on 6 October. Tomorrow now inherits the ex...kend Happy Hour and Power Down presentation. All prior Alpha9 safety, reporting and control contracts remain retained.'.startswith
 FAILED tests/test_alpha945_happy_hour_normalisation.py::test_alpha945_release_identity_and_scope - AssertionError: assert False
- +  where False = <built-in method startswith of str object at 0x56437c877bc0>('Alpha9.81')
- +    where <built-in method startswith of str object at 0x56437c877bc0> = 'Alpha9.82 closes the Today-to-Tomorrow Agile SOC continuity defect exposed on 6 October. Tomorrow now inherits the ex...kend Happy Hour and Power Down presentation. All prior Alpha9 safety, reporting and control contracts remain retained.'.startswith
+ +  where False = <built-in method startswith of str object at 0x558b7a3ec4f0>('Alpha9.81')
+ +    where <built-in method startswith of str object at 0x558b7a3ec4f0> = 'Alpha9.82 closes the Today-to-Tomorrow Agile SOC continuity defect exposed on 6 October. Tomorrow now inherits the ex...kend Happy Hour and Power Down presentation. All prior Alpha9 safety, reporting and control contracts remain retained.'.startswith
 FAILED tests/test_alpha949_power_down_dashboard_observability.py::test_alpha949_release_identity_and_scope - AssertionError: assert False
- +  where False = <built-in method startswith of str object at 0x56437c847600>('Alpha9.81')
- +    where <built-in method startswith of str object at 0x56437c847600> = 'Alpha9.82 closes the Today-to-Tomorrow Agile SOC continuity defect exposed on 6 October. Tomorrow now inherits the ex...kend Happy Hour and Power Down presentation. All prior Alpha9 safety, reporting and control contracts remain retained.'.startswith
+ +  where False = <built-in method startswith of str object at 0x558b7a4047d0>('Alpha9.81')
+ +    where <built-in method startswith of str object at 0x558b7a4047d0> = 'Alpha9.82 closes the Today-to-Tomorrow Agile SOC continuity defect exposed on 6 October. Tomorrow now inherits the ex...kend Happy Hour and Power Down presentation. All prior Alpha9 safety, reporting and control contracts remain retained.'.startswith
 FAILED tests/test_alpha950_dashboard_event_card_pipeline.py::test_alpha950_release_identity_and_scope - AssertionError: assert False
- +  where False = <built-in method startswith of str object at 0x56437c85f8e0>('Alpha9.81')
- +    where <built-in method startswith of str object at 0x56437c85f8e0> = 'Alpha9.82 closes the Today-to-Tomorrow Agile SOC continuity defect exposed on 6 October. Tomorrow now inherits the ex...kend Happy Hour and Power Down presentation. All prior Alpha9 safety, reporting and control contracts remain retained.'.startswith
+ +  where False = <built-in method startswith of str object at 0x558b7a41cab0>('Alpha9.81')
+ +    where <built-in method startswith of str object at 0x558b7a41cab0> = 'Alpha9.82 closes the Today-to-Tomorrow Agile SOC continuity defect exposed on 6 October. Tomorrow now inherits the ex...kend Happy Hour and Power Down presentation. All prior Alpha9 safety, reporting and control contracts remain retained.'.startswith
 FAILED tests/test_alpha956_non_agile_foxess_control.py::test_current_release_identity_and_scope - AssertionError: assert False
- +  where False = <built-in method startswith of str object at 0x56437c7a6820>('Alpha9.81')
- +    where <built-in method startswith of str object at 0x56437c7a6820> = 'Alpha9.82 closes the Today-to-Tomorrow Agile SOC continuity defect exposed on 6 October. Tomorrow now inherits the ex...kend Happy Hour and Power Down presentation. All prior Alpha9 safety, reporting and control contracts remain retained.'.startswith
+ +  where False = <built-in method startswith of str object at 0x558b7a3424f0>('Alpha9.81')
+ +    where <built-in method startswith of str object at 0x558b7a3424f0> = 'Alpha9.82 closes the Today-to-Tomorrow Agile SOC continuity defect exposed on 6 October. Tomorrow now inherits the ex...kend Happy Hour and Power Down presentation. All prior Alpha9 safety, reporting and control contracts remain retained.'.startswith
 FAILED tests/test_alpha959_control_gate_session.py::test_alpha959_release_identity_and_safety_scope - AssertionError: assert False
- +  where False = <built-in method startswith of str object at 0x56437c847600>('Alpha9.81')
- +    where <built-in method startswith of str object at 0x56437c847600> = 'Alpha9.82 closes the Today-to-Tomorrow Agile SOC continuity defect exposed on 6 October. Tomorrow now inherits the ex...kend Happy Hour and Power Down presentation. All prior Alpha9 safety, reporting and control contracts remain retained.'.startswith
+ +  where False = <built-in method startswith of str object at 0x558b7a495050>('Alpha9.81')
+ +    where <built-in method startswith of str object at 0x558b7a495050> = 'Alpha9.82 closes the Today-to-Tomorrow Agile SOC continuity defect exposed on 6 October. Tomorrow now inherits the ex...kend Happy Hour and Power Down presentation. All prior Alpha9 safety, reporting and control contracts remain retained.'.startswith
 FAILED tests/test_alpha961_intelligent_slot_demand_gate.py::test_alpha961_release_identity_and_scope - AssertionError: assert False
- +  where False = <built-in method startswith of str object at 0x56437c817040>('Alpha9.81')
- +    where <built-in method startswith of str object at 0x56437c817040> = 'Alpha9.82 closes the Today-to-Tomorrow Agile SOC continuity defect exposed on 6 October. Tomorrow now inherits the ex...kend Happy Hour and Power Down presentation. All prior Alpha9 safety, reporting and control contracts remain retained.'.startswith
+ +  where False = <built-in method startswith of str object at 0x558b7a3bbf30>('Alpha9.81')
+ +    where <built-in method startswith of str object at 0x558b7a3bbf30> = 'Alpha9.82 closes the Today-to-Tomorrow Agile SOC continuity defect exposed on 6 October. Tomorrow now inherits the ex...kend Happy Hour and Power Down presentation. All prior Alpha9 safety, reporting and control contracts remain retained.'.startswith
 FAILED tests/test_alpha966_remove_anti_import.py::test_release_identity_and_scope - AssertionError: assert False
- +  where False = <built-in method startswith of str object at 0x56437c847600>('Alpha9.81')
- +    where <built-in method startswith of str object at 0x56437c847600> = 'Alpha9.82 closes the Today-to-Tomorrow Agile SOC continuity defect exposed on 6 October. Tomorrow now inherits the ex...kend Happy Hour and Power Down presentation. All prior Alpha9 safety, reporting and control contracts remain retained.'.startswith
+ +  where False = <built-in method startswith of str object at 0x558b7a495050>('Alpha9.81')
+ +    where <built-in method startswith of str object at 0x558b7a495050> = 'Alpha9.82 closes the Today-to-Tomorrow Agile SOC continuity defect exposed on 6 October. Tomorrow now inherits the ex...kend Happy Hour and Power Down presentation. All prior Alpha9 safety, reporting and control contracts remain retained.'.startswith
 FAILED tests/test_alpha967_physical_cheap_charge_authority.py::test_alpha967_release_identity_and_scope - AssertionError: assert False
- +  where False = <built-in method startswith of str object at 0x56437c70c480>('Alpha9.81')
- +    where <built-in method startswith of str object at 0x56437c70c480> = 'Alpha9.82 closes the Today-to-Tomorrow Agile SOC continuity defect exposed on 6 October. Tomorrow now inherits the ex...kend Happy Hour and Power Down presentation. All prior Alpha9 safety, reporting and control contracts remain retained.'.startswith
+ +  where False = <built-in method startswith of str object at 0x558b7a4047d0>('Alpha9.81')
+ +    where <built-in method startswith of str object at 0x558b7a4047d0> = 'Alpha9.82 closes the Today-to-Tomorrow Agile SOC continuity defect exposed on 6 October. Tomorrow now inherits the ex...kend Happy Hour and Power Down presentation. All prior Alpha9 safety, reporting and control contracts remain retained.'.startswith
 FAILED tests/test_alpha968_scheduled_tariff_renewal.py::test_alpha968_release_identity_and_scope - AssertionError: assert False
- +  where False = <built-in method startswith of str object at 0x56437c82f320>('Alpha9.81')
- +    where <built-in method startswith of str object at 0x56437c82f320> = 'Alpha9.82 closes the Today-to-Tomorrow Agile SOC continuity defect exposed on 6 October. Tomorrow now inherits the ex...kend Happy Hour and Power Down presentation. All prior Alpha9 safety, reporting and control contracts remain retained.'.startswith
+ +  where False = <built-in method startswith of str object at 0x558b7a38b970>('Alpha9.81')
+ +    where <built-in method startswith of str object at 0x558b7a38b970> = 'Alpha9.82 closes the Today-to-Tomorrow Agile SOC continuity defect exposed on 6 October. Tomorrow now inherits the ex...kend Happy Hour and Power Down presentation. All prior Alpha9 safety, reporting and control contracts remain retained.'.startswith
 FAILED tests/test_alpha969_no_export_cheap_routing.py::test_alpha969_release_identity_is_explicitly_shadow_only - AssertionError: assert False
- +  where False = <built-in method startswith of str object at 0x56437c85f8e0>('Alpha9.81')
- +    where <built-in method startswith of str object at 0x56437c85f8e0> = 'Alpha9.82 closes the Today-to-Tomorrow Agile SOC continuity defect exposed on 6 October. Tomorrow now inherits the ex...kend Happy Hour and Power Down presentation. All prior Alpha9 safety, reporting and control contracts remain retained.'.startswith
+ +  where False = <built-in method startswith of str object at 0x558b7a465350>('Alpha9.81')
+ +    where <built-in method startswith of str object at 0x558b7a465350> = 'Alpha9.82 closes the Today-to-Tomorrow Agile SOC continuity defect exposed on 6 October. Tomorrow now inherits the ex...kend Happy Hour and Power Down presentation. All prior Alpha9 safety, reporting and control contracts remain retained.'.startswith
 FAILED tests/test_alpha973_fast_control_refresh.py::test_alpha973_release_identity_and_scope - AssertionError: assert False
- +  where False = <built-in method startswith of str object at 0x56437c7d6de0>('Alpha9.81')
- +    where <built-in method startswith of str object at 0x56437c7d6de0> = 'Alpha9.82 closes the Today-to-Tomorrow Agile SOC continuity defect exposed on 6 October. Tomorrow now inherits the ex...kend Happy Hour and Power Down presentation. All prior Alpha9 safety, reporting and control contracts remain retained.'.startswith
+ +  where False = <built-in method startswith of str object at 0x558b7a41cab0>('Alpha9.81')
+ +    where <built-in method startswith of str object at 0x558b7a41cab0> = 'Alpha9.82 closes the Today-to-Tomorrow Agile SOC continuity defect exposed on 6 October. Tomorrow now inherits the ex...kend Happy Hour and Power Down presentation. All prior Alpha9 safety, reporting and control contracts remain retained.'.startswith
 FAILED tests/test_alpha974_ev_hold_freeze.py::test_alpha974_release_identity_and_scope - AssertionError: assert False
- +  where False = <built-in method startswith of str object at 0x56437c817040>('Alpha9.81')
- +    where <built-in method startswith of str object at 0x56437c817040> = 'Alpha9.82 closes the Today-to-Tomorrow Agile SOC continuity defect exposed on 6 October. Tomorrow now inherits the ex...kend Happy Hour and Power Down presentation. All prior Alpha9 safety, reporting and control contracts remain retained.'.startswith
+ +  where False = <built-in method startswith of str object at 0x558b7a3bbf30>('Alpha9.81')
+ +    where <built-in method startswith of str object at 0x558b7a3bbf30> = 'Alpha9.82 closes the Today-to-Tomorrow Agile SOC continuity defect exposed on 6 October. Tomorrow now inherits the ex...kend Happy Hour and Power Down presentation. All prior Alpha9 safety, reporting and control contracts remain retained.'.startswith
 FAILED tests/test_alpha975_verified_ev_hold_grace.py::test_alpha975_release_identity_and_scope - AssertionError: assert False
- +  where False = <built-in method startswith of str object at 0x56437c847600>('Alpha9.81')
- +    where <built-in method startswith of str object at 0x56437c847600> = 'Alpha9.82 closes the Today-to-Tomorrow Agile SOC continuity defect exposed on 6 October. Tomorrow now inherits the ex...kend Happy Hour and Power Down presentation. All prior Alpha9 safety, reporting and control contracts remain retained.'.startswith
+ +  where False = <built-in method startswith of str object at 0x558b7a495050>('Alpha9.81')
+ +    where <built-in method startswith of str object at 0x558b7a495050> = 'Alpha9.82 closes the Today-to-Tomorrow Agile SOC continuity defect exposed on 6 October. Tomorrow now inherits the ex...kend Happy Hour and Power Down presentation. All prior Alpha9 safety, reporting and control contracts remain retained.'.startswith
 FAILED tests/test_alpha976_pending_intelligent_ev_hold.py::test_alpha976_release_identity_and_scope - AssertionError: assert False
- +  where False = <built-in method startswith of str object at 0x56437c877bc0>('Alpha9.81')
- +    where <built-in method startswith of str object at 0x56437c877bc0> = 'Alpha9.82 closes the Today-to-Tomorrow Agile SOC continuity defect exposed on 6 October. Tomorrow now inherits the ex...kend Happy Hour and Power Down presentation. All prior Alpha9 safety, reporting and control contracts remain retained.'.startswith
+ +  where False = <built-in method startswith of str object at 0x558b7a3424f0>('Alpha9.81')
+ +    where <built-in method startswith of str object at 0x558b7a3424f0> = 'Alpha9.82 closes the Today-to-Tomorrow Agile SOC continuity defect exposed on 6 October. Tomorrow now inherits the ex...kend Happy Hour and Power Down presentation. All prior Alpha9 safety, reporting and control contracts remain retained.'.startswith
 FAILED tests/test_alpha977_restart_commissioning_proof.py::test_alpha977_release_identity_and_scope - AssertionError: assert False
- +  where False = <built-in method startswith of str object at 0x56437c7ef0c0>('Alpha9.81')
- +    where <built-in method startswith of str object at 0x56437c7ef0c0> = 'Alpha9.82 closes the Today-to-Tomorrow Agile SOC continuity defect exposed on 6 October. Tomorrow now inherits the ex...kend Happy Hour and Power Down presentation. All prior Alpha9 safety, reporting and control contracts remain retained.'.startswith
+ +  where False = <built-in method startswith of str object at 0x558b7a3bbf30>('Alpha9.81')
+ +    where <built-in method startswith of str object at 0x558b7a3bbf30> = 'Alpha9.82 closes the Today-to-Tomorrow Agile SOC continuity defect exposed on 6 October. Tomorrow now inherits the ex...kend Happy Hour and Power Down presentation. All prior Alpha9 safety, reporting and control contracts remain retained.'.startswith
 FAILED tests/test_alpha981_restart_minsoc_baseline.py::test_alpha981_release_identity_and_scope - AssertionError: assert False
- +  where False = <built-in method startswith of str object at 0x56437c7d6de0>('Alpha9.81')
- +    where <built-in method startswith of str object at 0x56437c7d6de0> = 'Alpha9.82 closes the Today-to-Tomorrow Agile SOC continuity defect exposed on 6 October. Tomorrow now inherits the ex...kend Happy Hour and Power Down presentation. All prior Alpha9 safety, reporting and control contracts remain retained.'.startswith
-17 failed, 1628 passed in 10.26s
+ +  where False = <built-in method startswith of str object at 0x558b7a38b970>('Alpha9.81')
+ +    where <built-in method startswith of str object at 0x558b7a38b970> = 'Alpha9.82 closes the Today-to-Tomorrow Agile SOC continuity defect exposed on 6 October. Tomorrow now inherits the ex...kend Happy Hour and Power Down presentation. All prior Alpha9 safety, reporting and control contracts remain retained.'.startswith
+17 failed, 1628 passed in 10.18s
 exit_code=1
