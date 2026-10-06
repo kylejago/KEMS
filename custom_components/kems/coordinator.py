@@ -67,6 +67,7 @@ from .lifetime import LifetimeLedgerRecorder
 from .power_down import PowerDownHistoryRecorder
 from .product_types import (
     EXPORT_TARIFF_TYPE_AGILE,
+    EXPORT_TARIFF_TYPE_FIXED,
     EXPORT_TARIFF_TYPE_NONE,
     export_tariff_type_from_options,
 )
@@ -547,9 +548,17 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                     simulation,
                     agile_state,
                 )
-            else:
+            elif tariff_type == EXPORT_TARIFF_TYPE_AGILE:
                 control_simulation, shadow_simulation, _alignment = (
                     aligned_agile_control_views(simulation, agile_state)
+                )
+            else:
+                # Fixed export has its own paced-export physical target. Keep the
+                # Agile digital twin as comparison/shadow evidence only.
+                control_simulation = base_simulation
+                _, shadow_simulation, _alignment = aligned_agile_control_views(
+                    simulation,
+                    agile_state,
                 )
             control = self._control.plan(
                 snapshot,
@@ -594,7 +603,7 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                     "next_action": proposal.next_action,
                     "hardware_write_authorised": False,
                 }
-            if not base_simulation.no_export_mode_active:
+            if tariff_type == EXPORT_TARIFF_TYPE_AGILE:
                 control = align_agile_control_state(
                     control,
                     control_simulation,
@@ -713,9 +722,25 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
             foxess_control = await self._foxess_control.async_update(
                 coordinator=self,
                 control=control,
+                snapshot=snapshot,
                 technical_ready=bool(commissioning.get("ready_for_control")),
                 no_paid_export_mode=bool(simulation.no_export_mode_active),
                 cheap_period_confirmed=bool(snapshot.cheap_period_confirmed),
+                export_tariff_ready=bool(
+                    tariff_type == EXPORT_TARIFF_TYPE_NONE
+                    or (
+                        snapshot.current_export_rate is not None
+                        and snapshot.current_export_rate > 0.0
+                        and (
+                            tariff_type == EXPORT_TARIFF_TYPE_FIXED
+                            or bool(agile_state.get("ready"))
+                        )
+                    )
+                ),
+                export_tariff_type=tariff_type,
+                battery_power_positive_is_discharge=(
+                    self.settings.simulation.battery_power_positive_is_discharge
+                ),
                 ev_hold_floor_percent=ev_hold_state.get("latched_min_soc_percent"),
                 ev_connected=snapshot.ev_connected,
                 ev_hold_source_grace_active=bool(
