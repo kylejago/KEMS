@@ -1,0 +1,882 @@
+........................................................................ [  4%]
+........................................................................ [  8%]
+........................................................................ [ 13%]
+........................................................................ [ 17%]
+........................................................................ [ 21%]
+........................................................................ [ 26%]
+........................................................................ [ 30%]
+........................................................................ [ 35%]
+........................................................................ [ 39%]
+.....F.................................................................. [ 43%]
+........................................................................ [ 48%]
+........................................................................ [ 52%]
+.....................F..........................F....F.....F..F...F...F. [ 56%]
+..F..F.F.F.....F...............................F...................F..F. [ 61%]
+...........F........F.......................................F.F........F [ 65%]
+.................F..F......F...F....F..................................F [ 70%]
+..................................F.....F........F........F....F........ [ 74%]
+...F...............................F.................................... [ 78%]
+........................................................................ [ 83%]
+........................................................................ [ 87%]
+........................................................................ [ 91%]
+........................................................................ [ 96%]
+.................................F...........................            [100%]
+=================================== FAILURES ===================================
+__________________ test_current_release_family_is_coordinated __________________
+
+    def test_current_release_family_is_coordinated() -> None:
+        manifest = json.loads((KEMS / "manifest.json").read_text(encoding="utf-8"))
+        bundle = json.loads(
+            (ROOT / "release/kems-bundle.template.json").read_text(encoding="utf-8")
+        )
+        panel_manager = (KEMS / "panel.py").read_text(encoding="utf-8")
+        panel_yaml = (KEMS / "kems16x16.yaml").read_text(encoding="utf-8")
+    
+>       assert manifest["version"] == "0.9.0-alpha9.81"
+E       AssertionError: assert '0.9.0-alpha9.82' == '0.9.0-alpha9.81'
+E         
+E         - 0.9.0-alpha9.81
+E         ?               ^
+E         + 0.9.0-alpha9.82
+E         ?               ^
+
+tests/test_alpha8_consolidation.py:43: AssertionError
+___________________ test_alpha913_version_and_release_scope ____________________
+
+    def test_alpha913_version_and_release_scope() -> None:
+        manifest = json.loads(
+            (ROOT / "custom_components" / "kems" / "manifest.json").read_text()
+        )
+        bundle = json.loads((ROOT / "release" / "kems-bundle.template.json").read_text())
+    
+>       assert manifest["version"] == "0.9.0-alpha9.81"
+E       AssertionError: assert '0.9.0-alpha9.82' == '0.9.0-alpha9.81'
+E         
+E         - 0.9.0-alpha9.81
+E         ?               ^
+E         + 0.9.0-alpha9.82
+E         ?               ^
+
+tests/test_alpha913_forecast_path_scheduler.py:157: AssertionError
+_________________ test_alpha919_release_scope_is_recorder_only _________________
+
+    def test_alpha919_release_scope_is_recorder_only() -> None:
+        """Keep successor releases outside optimiser, tariff and FoxESS authority."""
+        manifest = json.loads((KEMS / "manifest.json").read_text(encoding="utf-8"))
+        bundle = json.loads(
+            (ROOT / "release" / "kems-bundle.template.json").read_text(encoding="utf-8")
+        )
+        hygiene = HYGIENE.read_text(encoding="utf-8")
+    
+>       assert manifest["version"] == "0.9.0-alpha9.81"
+E       AssertionError: assert '0.9.0-alpha9.82' == '0.9.0-alpha9.81'
+E         
+E         - 0.9.0-alpha9.81
+E         ?               ^
+E         + 0.9.0-alpha9.82
+E         ?               ^
+
+tests/test_alpha919_runtime_recorder_owner.py:192: AssertionError
+_________________ test_alpha920_release_scope_is_recorder_only _________________
+
+    def test_alpha920_release_scope_is_recorder_only() -> None:
+        """Keep the live hotfix outside optimiser, tariff and FoxESS authority."""
+        manifest = json.loads((KEMS / "manifest.json").read_text(encoding="utf-8"))
+        bundle = json.loads(
+            (ROOT / "release" / "kems-bundle.template.json").read_text(encoding="utf-8")
+        )
+        hygiene = HYGIENE.read_text(encoding="utf-8")
+    
+>       assert manifest["version"] == "0.9.0-alpha9.81"
+E       AssertionError: assert '0.9.0-alpha9.82' == '0.9.0-alpha9.81'
+E         
+E         - 0.9.0-alpha9.81
+E         ?               ^
+E         + 0.9.0-alpha9.82
+E         ?               ^
+
+tests/test_alpha920_shadow_recorder_owner.py:215: AssertionError
+________________ test_alpha923_release_scope_is_projection_only ________________
+
+    def test_alpha923_release_scope_is_projection_only() -> None:
+        manifest = json.loads((INTEGRATION / "manifest.json").read_text(encoding="utf-8"))
+        bundle = json.loads(
+            (ROOT / "release" / "kems-bundle.template.json").read_text(encoding="utf-8")
+        )
+        source = (INTEGRATION / "agile_flow_reserve_policy.py").read_text(encoding="utf-8")
+    
+>       assert manifest["version"] == "0.9.0-alpha9.81"
+E       AssertionError: assert '0.9.0-alpha9.82' == '0.9.0-alpha9.81'
+E         
+E         - 0.9.0-alpha9.81
+E         ?               ^
+E         + 0.9.0-alpha9.82
+E         ?               ^
+
+tests/test_alpha921_planning_target_house_floor.py:253: AssertionError
+___________ test_alpha922_release_scope_is_startup_presentation_only ___________
+
+    def test_alpha922_release_scope_is_startup_presentation_only() -> None:
+        manifest = json.loads((INTEGRATION / "manifest.json").read_text(encoding="utf-8"))
+        bundle = json.loads(
+            (ROOT / "release" / "kems-bundle.template.json").read_text(encoding="utf-8")
+        )
+        source = (INTEGRATION / "agile_flow_reserve_policy.py").read_text(encoding="utf-8")
+    
+>       assert manifest["version"] == "0.9.0-alpha9.81"
+E       AssertionError: assert '0.9.0-alpha9.82' == '0.9.0-alpha9.81'
+E         
+E         - 0.9.0-alpha9.81
+E         ?               ^
+E         + 0.9.0-alpha9.82
+E         ?               ^
+
+tests/test_alpha922_flow_contract_startup.py:187: AssertionError
+______________ test_alpha924_release_scope_remains_reporting_only ______________
+
+    def test_alpha924_release_scope_remains_reporting_only() -> None:
+        manifest = json.loads((KEMS / "manifest.json").read_text(encoding="utf-8"))
+        bundle = json.loads(
+            (ROOT / "release" / "kems-bundle.template.json").read_text(encoding="utf-8")
+        )
+        source = POLICY_PARITY.read_text(encoding="utf-8")
+    
+>       assert manifest["version"] == "0.9.0-alpha9.81"
+E       AssertionError: assert '0.9.0-alpha9.82' == '0.9.0-alpha9.81'
+E         
+E         - 0.9.0-alpha9.81
+E         ?               ^
+E         + 0.9.0-alpha9.82
+E         ?               ^
+
+tests/test_alpha924_flow_parity_export_floor.py:264: AssertionError
+________ test_alpha925_scope_is_observability_only_and_hardware_blocked ________
+
+    def test_alpha925_scope_is_observability_only_and_hardware_blocked() -> None:
+        manifest = json.loads((KEMS / "manifest.json").read_text(encoding="utf-8"))
+        bundle = json.loads((ROOT / "release" / "kems-bundle.template.json").read_text())
+        clarity = (KEMS / "agile_observability_clarity.py").read_text(encoding="utf-8")
+        handoff = (KEMS / "kems_core" / "tomorrow_soc_handoff.py").read_text(
+            encoding="utf-8"
+        )
+    
+>       assert manifest["version"] == "0.9.0-alpha9.81"
+E       AssertionError: assert '0.9.0-alpha9.82' == '0.9.0-alpha9.81'
+E         
+E         - 0.9.0-alpha9.81
+E         ?               ^
+E         + 0.9.0-alpha9.82
+E         ?               ^
+
+tests/test_alpha925_observability_clarity.py:72: AssertionError
+______________ test_alpha926_versions_and_bundle_are_coordinated _______________
+
+    def test_alpha926_versions_and_bundle_are_coordinated() -> None:
+        """Core, managed panel and coordinated bundle must advertise the new targets."""
+        manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
+        bundle = json.loads(BUNDLE.read_text(encoding="utf-8"))
+        panel = PANEL.read_text(encoding="utf-8")
+        panel_health = PANEL_HEALTH.read_text(encoding="utf-8")
+    
+>       assert manifest["version"] == "0.9.0-alpha9.81"
+E       AssertionError: assert '0.9.0-alpha9.82' == '0.9.0-alpha9.81'
+E         
+E         - 0.9.0-alpha9.81
+E         ?               ^
+E         + 0.9.0-alpha9.82
+E         ?               ^
+
+tests/test_alpha926_panel_layout_profiles.py:82: AssertionError
+_______ test_alpha927_is_reporting_only_and_keeps_panel_profile_release ________
+
+    def test_alpha927_is_reporting_only_and_keeps_panel_profile_release() -> None:
+        manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
+        bundle = json.loads(RELEASE_TEMPLATE.read_text(encoding="utf-8"))
+        maintenance = bundle["maintenance"]
+        reason = maintenance["reason"]
+    
+>       assert manifest["version"] == "0.9.0-alpha9.81"
+E       AssertionError: assert '0.9.0-alpha9.82' == '0.9.0-alpha9.81'
+E         
+E         - 0.9.0-alpha9.81
+E         ?               ^
+E         + 0.9.0-alpha9.82
+E         ?               ^
+
+tests/test_alpha927_policy_label_publication.py:37: AssertionError
+______________ test_alpha928_versions_coordinate_core_and_panel2 _______________
+
+    def test_alpha928_versions_coordinate_core_and_panel2() -> None:
+        """A firmware-behaviour change advances both core and panel identities."""
+        manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
+        bundle = json.loads(BUNDLE.read_text(encoding="utf-8"))
+        panel = PANEL.read_text(encoding="utf-8")
+        panel_health = PANEL_HEALTH.read_text(encoding="utf-8")
+        reason = str(bundle["maintenance"]["reason"]).lower()
+    
+>       assert manifest["version"] == "0.9.0-alpha9.81"
+E       AssertionError: assert '0.9.0-alpha9.82' == '0.9.0-alpha9.81'
+E         
+E         - 0.9.0-alpha9.81
+E         ?               ^
+E         + 0.9.0-alpha9.82
+E         ?               ^
+
+tests/test_alpha928_panel_v2_staggered_flow.py:45: AssertionError
+______________ test_alpha929_versions_coordinate_core_and_panel3 _______________
+
+    def test_alpha929_versions_coordinate_core_and_panel3() -> None:
+        """A firmware-behaviour change advances both core and panel identities."""
+        manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
+        bundle = json.loads(BUNDLE.read_text(encoding="utf-8"))
+        panel = PANEL.read_text(encoding="utf-8")
+        panel_health = PANEL_HEALTH.read_text(encoding="utf-8")
+        reason = str(bundle["maintenance"]["reason"]).lower()
+    
+>       assert manifest["version"] == "0.9.0-alpha9.81"
+E       AssertionError: assert '0.9.0-alpha9.82' == '0.9.0-alpha9.81'
+E         
+E         - 0.9.0-alpha9.81
+E         ?               ^
+E         + 0.9.0-alpha9.82
+E         ?               ^
+
+tests/test_alpha929_panel_v2_extra_gap.py:46: AssertionError
+_________ test_alpha930_versions_core_only_panel_remains_alpha9_panel3 _________
+
+    def test_alpha930_versions_core_only_panel_remains_alpha9_panel3() -> None:
+        """Alpha9.30 advances core while retaining the live-proven panel firmware."""
+        manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
+        bundle = json.loads(BUNDLE.read_text(encoding="utf-8"))
+        panel = PANEL.read_text(encoding="utf-8")
+    
+>       assert manifest["version"] == "0.9.0-alpha9.81"
+E       AssertionError: assert '0.9.0-alpha9.82' == '0.9.0-alpha9.81'
+E         
+E         - 0.9.0-alpha9.81
+E         ?               ^
+E         + 0.9.0-alpha9.82
+E         ?               ^
+
+tests/test_alpha930_live_foxess_solar_commissioning.py:210: AssertionError
+___________________ test_alpha937_release_identity_and_scope ___________________
+
+    def test_alpha937_release_identity_and_scope() -> None:
+        manifest = json.loads(
+            (ROOT / "custom_components" / "kems" / "manifest.json").read_text()
+        )
+        bundle = json.loads((ROOT / "release" / "kems-bundle.template.json").read_text())
+        reason = str(bundle["maintenance"]["reason"])
+    
+>       assert manifest["version"] == "0.9.0-alpha9.81"
+E       AssertionError: assert '0.9.0-alpha9.82' == '0.9.0-alpha9.81'
+E         
+E         - 0.9.0-alpha9.81
+E         ?               ^
+E         + 0.9.0-alpha9.82
+E         ?               ^
+
+tests/test_alpha937_dashboard_contract.py:147: AssertionError
+___________________ test_alpha945_release_identity_and_scope ___________________
+
+    def test_alpha945_release_identity_and_scope() -> None:
+        import json
+        from pathlib import Path
+    
+        root = Path(__file__).parents[1]
+        manifest = json.loads(
+            (root / "custom_components" / "kems" / "manifest.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        bundle = json.loads(
+            (root / "release" / "kems-bundle.template.json").read_text(encoding="utf-8")
+        )
+        reason = str(bundle["maintenance"]["reason"])
+>       assert manifest["version"] == "0.9.0-alpha9.81"
+E       AssertionError: assert '0.9.0-alpha9.82' == '0.9.0-alpha9.81'
+E         
+E         - 0.9.0-alpha9.81
+E         ?               ^
+E         + 0.9.0-alpha9.82
+E         ?               ^
+
+tests/test_alpha945_happy_hour_normalisation.py:141: AssertionError
+___ test_alpha946_installs_before_history_refresh_and_remains_reporting_only ___
+
+    def test_alpha946_installs_before_history_refresh_and_remains_reporting_only() -> None:
+        source = SOURCE.read_text(encoding="utf-8")
+        entrypoint = ENTRYPOINT.read_text(encoding="utf-8")
+        manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
+        bundle = json.loads(BUNDLE.read_text(encoding="utf-8"))
+        reason = str(bundle["maintenance"]["reason"])
+    
+>       assert manifest["version"] == "0.9.0-alpha9.81"
+E       AssertionError: assert '0.9.0-alpha9.82' == '0.9.0-alpha9.81'
+E         
+E         - 0.9.0-alpha9.81
+E         ?               ^
+E         + 0.9.0-alpha9.82
+E         ?               ^
+
+tests/test_alpha946_solar_actual_authority.py:50: AssertionError
+___________________ test_alpha949_release_identity_and_scope ___________________
+
+    def test_alpha949_release_identity_and_scope() -> None:
+        manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
+        bundle = json.loads(BUNDLE.read_text(encoding="utf-8"))
+        reason = str(bundle["maintenance"]["reason"])
+    
+>       assert manifest["version"] == "0.9.0-alpha9.81"
+E       AssertionError: assert '0.9.0-alpha9.82' == '0.9.0-alpha9.81'
+E         
+E         - 0.9.0-alpha9.81
+E         ?               ^
+E         + 0.9.0-alpha9.82
+E         ?               ^
+
+tests/test_alpha949_power_down_dashboard_observability.py:75: AssertionError
+___________________ test_alpha950_release_identity_and_scope ___________________
+
+    def test_alpha950_release_identity_and_scope() -> None:
+        manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
+        bundle = json.loads(BUNDLE.read_text(encoding="utf-8"))
+        reason = str(bundle["maintenance"]["reason"])
+    
+>       assert manifest["version"] == "0.9.0-alpha9.81"
+E       AssertionError: assert '0.9.0-alpha9.82' == '0.9.0-alpha9.81'
+E         
+E         - 0.9.0-alpha9.81
+E         ?               ^
+E         + 0.9.0-alpha9.82
+E         ?               ^
+
+tests/test_alpha950_dashboard_event_card_pipeline.py:77: AssertionError
+___________________ test_current_release_identity_and_scope ____________________
+
+    def test_current_release_identity_and_scope() -> None:
+        manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
+        bundle = json.loads(BUNDLE.read_text(encoding="utf-8"))
+        reason = str(bundle["maintenance"]["reason"])
+    
+>       assert manifest["version"] == "0.9.0-alpha9.81"
+E       AssertionError: assert '0.9.0-alpha9.82' == '0.9.0-alpha9.81'
+E         
+E         - 0.9.0-alpha9.81
+E         ?               ^
+E         + 0.9.0-alpha9.82
+E         ?               ^
+
+tests/test_alpha956_non_agile_foxess_control.py:282: AssertionError
+___________________ test_alpha957_release_identity_and_scope ___________________
+
+    def test_alpha957_release_identity_and_scope() -> None:
+        manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
+        bundle = json.loads(BUNDLE.read_text(encoding="utf-8"))
+        reason = str(bundle["maintenance"]["reason"])
+    
+>       assert manifest["version"] == "0.9.0-alpha9.81"
+E       AssertionError: assert '0.9.0-alpha9.82' == '0.9.0-alpha9.81'
+E         
+E         - 0.9.0-alpha9.81
+E         ?               ^
+E         + 0.9.0-alpha9.82
+E         ?               ^
+
+tests/test_alpha957_commissioning_startup.py:36: AssertionError
+_______________ test_alpha959_release_identity_and_safety_scope ________________
+
+    def test_alpha959_release_identity_and_safety_scope() -> None:
+        manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
+        bundle = json.loads(BUNDLE.read_text(encoding="utf-8"))
+        reason = str(bundle["maintenance"]["reason"])
+    
+>       assert manifest["version"] == "0.9.0-alpha9.81"
+E       AssertionError: assert '0.9.0-alpha9.82' == '0.9.0-alpha9.81'
+E         
+E         - 0.9.0-alpha9.81
+E         ?               ^
+E         + 0.9.0-alpha9.82
+E         ?               ^
+
+tests/test_alpha959_control_gate_session.py:67: AssertionError
+___________________ test_alpha960_release_identity_and_scope ___________________
+
+    def test_alpha960_release_identity_and_scope() -> None:
+        manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
+        bundle = json.loads(BUNDLE.read_text(encoding="utf-8"))
+        reason = str(bundle["maintenance"]["reason"])
+    
+>       assert manifest["version"] == "0.9.0-alpha9.81"
+E       AssertionError: assert '0.9.0-alpha9.82' == '0.9.0-alpha9.81'
+E         
+E         - 0.9.0-alpha9.81
+E         ?               ^
+E         + 0.9.0-alpha9.82
+E         ?               ^
+
+tests/test_alpha960_no_export_live_charge_target.py:235: AssertionError
+___________________ test_alpha961_release_identity_and_scope ___________________
+
+    def test_alpha961_release_identity_and_scope() -> None:
+        manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
+        bundle = json.loads(BUNDLE.read_text(encoding="utf-8"))
+        reason = str(bundle["maintenance"]["reason"])
+    
+>       assert manifest["version"] == "0.9.0-alpha9.81"
+E       AssertionError: assert '0.9.0-alpha9.82' == '0.9.0-alpha9.81'
+E         
+E         - 0.9.0-alpha9.81
+E         ?               ^
+E         + 0.9.0-alpha9.82
+E         ?               ^
+
+tests/test_alpha961_intelligent_slot_demand_gate.py:103: AssertionError
+_______________________ test_release_identity_and_scope ________________________
+
+    def test_release_identity_and_scope() -> None:
+        manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
+        bundle = json.loads(BUNDLE.read_text(encoding="utf-8"))
+        reason = str(bundle["maintenance"]["reason"])
+    
+>       assert manifest["version"] == "0.9.0-alpha9.81"
+E       AssertionError: assert '0.9.0-alpha9.82' == '0.9.0-alpha9.81'
+E         
+E         - 0.9.0-alpha9.81
+E         ?               ^
+E         + 0.9.0-alpha9.82
+E         ?               ^
+
+tests/test_alpha966_remove_anti_import.py:121: AssertionError
+___________________ test_alpha967_release_identity_and_scope ___________________
+
+    def test_alpha967_release_identity_and_scope() -> None:
+        manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
+        bundle = json.loads(BUNDLE.read_text(encoding="utf-8"))
+        reason = str(bundle["maintenance"]["reason"])
+    
+>       assert manifest["version"] == "0.9.0-alpha9.81"
+E       AssertionError: assert '0.9.0-alpha9.82' == '0.9.0-alpha9.81'
+E         
+E         - 0.9.0-alpha9.81
+E         ?               ^
+E         + 0.9.0-alpha9.82
+E         ?               ^
+
+tests/test_alpha967_physical_cheap_charge_authority.py:141: AssertionError
+___________________ test_alpha968_release_identity_and_scope ___________________
+
+    def test_alpha968_release_identity_and_scope() -> None:
+        manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
+        bundle = json.loads(BUNDLE.read_text(encoding="utf-8"))
+        reason = str(bundle["maintenance"]["reason"])
+    
+>       assert manifest["version"] == "0.9.0-alpha9.81"
+E       AssertionError: assert '0.9.0-alpha9.82' == '0.9.0-alpha9.81'
+E         
+E         - 0.9.0-alpha9.81
+E         ?               ^
+E         + 0.9.0-alpha9.82
+E         ?               ^
+
+tests/test_alpha968_scheduled_tariff_renewal.py:73: AssertionError
+___________ test_alpha969_release_identity_is_explicitly_shadow_only ___________
+
+    def test_alpha969_release_identity_is_explicitly_shadow_only() -> None:
+        root = Path(__file__).parents[1]
+        manifest = json.loads(
+            (root / "custom_components" / "kems" / "manifest.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        bundle = json.loads(
+            (root / "release" / "kems-bundle.template.json").read_text(encoding="utf-8")
+        )
+        reason = bundle["maintenance"]["reason"]
+>       assert manifest["version"] == "0.9.0-alpha9.81"
+E       AssertionError: assert '0.9.0-alpha9.82' == '0.9.0-alpha9.81'
+E         
+E         - 0.9.0-alpha9.81
+E         ?               ^
+E         + 0.9.0-alpha9.82
+E         ?               ^
+
+tests/test_alpha969_no_export_cheap_routing.py:709: AssertionError
+___________________ test_alpha973_release_identity_and_scope ___________________
+
+    def test_alpha973_release_identity_and_scope() -> None:
+        manifest = json.loads(
+            (ROOT / "custom_components/kems/manifest.json").read_text(encoding="utf-8")
+        )
+        bundle = json.loads(
+            (ROOT / "release/kems-bundle.template.json").read_text(encoding="utf-8")
+        )
+        reason = str(bundle["maintenance"]["reason"])
+    
+>       assert manifest["version"] == "0.9.0-alpha9.81"
+E       AssertionError: assert '0.9.0-alpha9.82' == '0.9.0-alpha9.81'
+E         
+E         - 0.9.0-alpha9.81
+E         ?               ^
+E         + 0.9.0-alpha9.82
+E         ?               ^
+
+tests/test_alpha973_fast_control_refresh.py:52: AssertionError
+___________________ test_alpha974_release_identity_and_scope ___________________
+
+    def test_alpha974_release_identity_and_scope() -> None:
+        manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
+        bundle = json.loads(BUNDLE.read_text(encoding="utf-8"))
+        reason = str(bundle["maintenance"]["reason"])
+    
+>       assert manifest["version"] == "0.9.0-alpha9.81"
+E       AssertionError: assert '0.9.0-alpha9.82' == '0.9.0-alpha9.81'
+E         
+E         - 0.9.0-alpha9.81
+E         ?               ^
+E         + 0.9.0-alpha9.82
+E         ?               ^
+
+tests/test_alpha974_ev_hold_freeze.py:95: AssertionError
+___________________ test_alpha975_release_identity_and_scope ___________________
+
+    def test_alpha975_release_identity_and_scope() -> None:
+        manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
+        bundle = json.loads(BUNDLE.read_text(encoding="utf-8"))
+        reason = str(bundle["maintenance"]["reason"])
+    
+>       assert manifest["version"] == "0.9.0-alpha9.81"
+E       AssertionError: assert '0.9.0-alpha9.82' == '0.9.0-alpha9.81'
+E         
+E         - 0.9.0-alpha9.81
+E         ?               ^
+E         + 0.9.0-alpha9.82
+E         ?               ^
+
+tests/test_alpha975_verified_ev_hold_grace.py:336: AssertionError
+___________________ test_alpha976_release_identity_and_scope ___________________
+
+    def test_alpha976_release_identity_and_scope() -> None:
+        manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
+        bundle = json.loads(BUNDLE.read_text(encoding="utf-8"))
+        reason = str(bundle["maintenance"]["reason"])
+    
+>       assert manifest["version"] == "0.9.0-alpha9.81"
+E       AssertionError: assert '0.9.0-alpha9.82' == '0.9.0-alpha9.81'
+E         
+E         - 0.9.0-alpha9.81
+E         ?               ^
+E         + 0.9.0-alpha9.82
+E         ?               ^
+
+tests/test_alpha976_pending_intelligent_ev_hold.py:297: AssertionError
+___________________ test_alpha977_release_identity_and_scope ___________________
+
+    def test_alpha977_release_identity_and_scope() -> None:
+        manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
+        bundle = json.loads(BUNDLE.read_text(encoding="utf-8"))
+        reason = str(bundle["maintenance"]["reason"])
+    
+>       assert manifest["version"] == "0.9.0-alpha9.81"
+E       AssertionError: assert '0.9.0-alpha9.82' == '0.9.0-alpha9.81'
+E         
+E         - 0.9.0-alpha9.81
+E         ?               ^
+E         + 0.9.0-alpha9.82
+E         ?               ^
+
+tests/test_alpha977_restart_commissioning_proof.py:110: AssertionError
+___________________ test_alpha981_release_identity_and_scope ___________________
+
+    def test_alpha981_release_identity_and_scope() -> None:
+        manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
+        bundle = json.loads(BUNDLE.read_text(encoding="utf-8"))
+        reason = str(bundle["maintenance"]["reason"])
+    
+>       assert manifest["version"] == "0.9.0-alpha9.81"
+E       AssertionError: assert '0.9.0-alpha9.82' == '0.9.0-alpha9.81'
+E         
+E         - 0.9.0-alpha9.81
+E         ?               ^
+E         + 0.9.0-alpha9.82
+E         ?               ^
+
+tests/test_alpha981_restart_minsoc_baseline.py:115: AssertionError
+_________________ test_alpha9_four_track_versions_are_explicit _________________
+
+    def test_alpha9_four_track_versions_are_explicit() -> None:
+        manifest = json.loads((KEMS / "manifest.json").read_text(encoding="utf-8"))
+        bundle = json.loads(
+            (ROOT / "release/kems-bundle.template.json").read_text(encoding="utf-8")
+        )
+    
+>       assert manifest["version"] == "0.9.0-alpha9.81"
+E       AssertionError: assert '0.9.0-alpha9.82' == '0.9.0-alpha9.81'
+E         
+E         - 0.9.0-alpha9.81
+E         ?               ^
+E         + 0.9.0-alpha9.82
+E         ?               ^
+
+tests/test_alpha9_baseline.py:18: AssertionError
+_________ test_release_bundle_renders_exact_coordinated_alpha9_targets _________
+
+    def test_release_bundle_renders_exact_coordinated_alpha9_targets() -> None:
+        """The current template must render the exact four-track Alpha9 baseline."""
+        bundle = module.render_bundle(TEMPLATE, "v0.9.0-alpha9.0")
+        assert bundle["bundle"] == "0.9.0-alpha9.0"
+        assert bundle["components"]["kems_core"]["version"] == "0.9.0-alpha9.0"
+        assert bundle["components"]["dashboard"]["version"] == "0.9.0-alpha9.0"
+        assert bundle["components"]["panel"]["version"] == "0.9.0-alpha9-panel.3"
+        assert bundle["components"]["property_web"]["version"] == "0.9.0-alpha9-web.0"
+        assert bundle["components"]["pi_agent"]["version"] == "0.9.0-alpha9-web.0"
+        assert bundle["components"]["public_web"]["version"] == "0.9.0-alpha9-public.0"
+        assert bundle["components"]["property_web"]["required"] is True
+        assert bundle["components"]["pi_agent"]["required"] is True
+        assert bundle["components"]["public_web"]["required"] is False
+        assert bundle["components"]["public_web"]["delivery"] == "ionos-sftp"
+    
+        affected = bundle["maintenance"]["affected_components"]
+>       assert affected == [
+            "kems_core",
+            "dashboard",
+            "panel",
+            "property_web",
+            "pi_agent",
+            "public_web",
+        ]
+E       AssertionError: assert ['kems_core', 'dashboard'] == ['kems_core',... 'public_web']
+E         
+E         Right contains 4 more items, first extra item: 'panel'
+E         
+E         Full diff:
+E           [
+E               'kems_core',
+E               'dashboard',
+E         -     'panel',
+E         -     'property_web',
+E         -     'pi_agent',
+E         -     'public_web',
+E           ]
+
+tests/test_update_bundle.py:35: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_alpha8_consolidation.py::test_current_release_family_is_coordinated - AssertionError: assert '0.9.0-alpha9.82' == '0.9.0-alpha9.81'
+  
+  - 0.9.0-alpha9.81
+  ?               ^
+  + 0.9.0-alpha9.82
+  ?               ^
+FAILED tests/test_alpha913_forecast_path_scheduler.py::test_alpha913_version_and_release_scope - AssertionError: assert '0.9.0-alpha9.82' == '0.9.0-alpha9.81'
+  
+  - 0.9.0-alpha9.81
+  ?               ^
+  + 0.9.0-alpha9.82
+  ?               ^
+FAILED tests/test_alpha919_runtime_recorder_owner.py::test_alpha919_release_scope_is_recorder_only - AssertionError: assert '0.9.0-alpha9.82' == '0.9.0-alpha9.81'
+  
+  - 0.9.0-alpha9.81
+  ?               ^
+  + 0.9.0-alpha9.82
+  ?               ^
+FAILED tests/test_alpha920_shadow_recorder_owner.py::test_alpha920_release_scope_is_recorder_only - AssertionError: assert '0.9.0-alpha9.82' == '0.9.0-alpha9.81'
+  
+  - 0.9.0-alpha9.81
+  ?               ^
+  + 0.9.0-alpha9.82
+  ?               ^
+FAILED tests/test_alpha921_planning_target_house_floor.py::test_alpha923_release_scope_is_projection_only - AssertionError: assert '0.9.0-alpha9.82' == '0.9.0-alpha9.81'
+  
+  - 0.9.0-alpha9.81
+  ?               ^
+  + 0.9.0-alpha9.82
+  ?               ^
+FAILED tests/test_alpha922_flow_contract_startup.py::test_alpha922_release_scope_is_startup_presentation_only - AssertionError: assert '0.9.0-alpha9.82' == '0.9.0-alpha9.81'
+  
+  - 0.9.0-alpha9.81
+  ?               ^
+  + 0.9.0-alpha9.82
+  ?               ^
+FAILED tests/test_alpha924_flow_parity_export_floor.py::test_alpha924_release_scope_remains_reporting_only - AssertionError: assert '0.9.0-alpha9.82' == '0.9.0-alpha9.81'
+  
+  - 0.9.0-alpha9.81
+  ?               ^
+  + 0.9.0-alpha9.82
+  ?               ^
+FAILED tests/test_alpha925_observability_clarity.py::test_alpha925_scope_is_observability_only_and_hardware_blocked - AssertionError: assert '0.9.0-alpha9.82' == '0.9.0-alpha9.81'
+  
+  - 0.9.0-alpha9.81
+  ?               ^
+  + 0.9.0-alpha9.82
+  ?               ^
+FAILED tests/test_alpha926_panel_layout_profiles.py::test_alpha926_versions_and_bundle_are_coordinated - AssertionError: assert '0.9.0-alpha9.82' == '0.9.0-alpha9.81'
+  
+  - 0.9.0-alpha9.81
+  ?               ^
+  + 0.9.0-alpha9.82
+  ?               ^
+FAILED tests/test_alpha927_policy_label_publication.py::test_alpha927_is_reporting_only_and_keeps_panel_profile_release - AssertionError: assert '0.9.0-alpha9.82' == '0.9.0-alpha9.81'
+  
+  - 0.9.0-alpha9.81
+  ?               ^
+  + 0.9.0-alpha9.82
+  ?               ^
+FAILED tests/test_alpha928_panel_v2_staggered_flow.py::test_alpha928_versions_coordinate_core_and_panel2 - AssertionError: assert '0.9.0-alpha9.82' == '0.9.0-alpha9.81'
+  
+  - 0.9.0-alpha9.81
+  ?               ^
+  + 0.9.0-alpha9.82
+  ?               ^
+FAILED tests/test_alpha929_panel_v2_extra_gap.py::test_alpha929_versions_coordinate_core_and_panel3 - AssertionError: assert '0.9.0-alpha9.82' == '0.9.0-alpha9.81'
+  
+  - 0.9.0-alpha9.81
+  ?               ^
+  + 0.9.0-alpha9.82
+  ?               ^
+FAILED tests/test_alpha930_live_foxess_solar_commissioning.py::test_alpha930_versions_core_only_panel_remains_alpha9_panel3 - AssertionError: assert '0.9.0-alpha9.82' == '0.9.0-alpha9.81'
+  
+  - 0.9.0-alpha9.81
+  ?               ^
+  + 0.9.0-alpha9.82
+  ?               ^
+FAILED tests/test_alpha937_dashboard_contract.py::test_alpha937_release_identity_and_scope - AssertionError: assert '0.9.0-alpha9.82' == '0.9.0-alpha9.81'
+  
+  - 0.9.0-alpha9.81
+  ?               ^
+  + 0.9.0-alpha9.82
+  ?               ^
+FAILED tests/test_alpha945_happy_hour_normalisation.py::test_alpha945_release_identity_and_scope - AssertionError: assert '0.9.0-alpha9.82' == '0.9.0-alpha9.81'
+  
+  - 0.9.0-alpha9.81
+  ?               ^
+  + 0.9.0-alpha9.82
+  ?               ^
+FAILED tests/test_alpha946_solar_actual_authority.py::test_alpha946_installs_before_history_refresh_and_remains_reporting_only - AssertionError: assert '0.9.0-alpha9.82' == '0.9.0-alpha9.81'
+  
+  - 0.9.0-alpha9.81
+  ?               ^
+  + 0.9.0-alpha9.82
+  ?               ^
+FAILED tests/test_alpha949_power_down_dashboard_observability.py::test_alpha949_release_identity_and_scope - AssertionError: assert '0.9.0-alpha9.82' == '0.9.0-alpha9.81'
+  
+  - 0.9.0-alpha9.81
+  ?               ^
+  + 0.9.0-alpha9.82
+  ?               ^
+FAILED tests/test_alpha950_dashboard_event_card_pipeline.py::test_alpha950_release_identity_and_scope - AssertionError: assert '0.9.0-alpha9.82' == '0.9.0-alpha9.81'
+  
+  - 0.9.0-alpha9.81
+  ?               ^
+  + 0.9.0-alpha9.82
+  ?               ^
+FAILED tests/test_alpha956_non_agile_foxess_control.py::test_current_release_identity_and_scope - AssertionError: assert '0.9.0-alpha9.82' == '0.9.0-alpha9.81'
+  
+  - 0.9.0-alpha9.81
+  ?               ^
+  + 0.9.0-alpha9.82
+  ?               ^
+FAILED tests/test_alpha957_commissioning_startup.py::test_alpha957_release_identity_and_scope - AssertionError: assert '0.9.0-alpha9.82' == '0.9.0-alpha9.81'
+  
+  - 0.9.0-alpha9.81
+  ?               ^
+  + 0.9.0-alpha9.82
+  ?               ^
+FAILED tests/test_alpha959_control_gate_session.py::test_alpha959_release_identity_and_safety_scope - AssertionError: assert '0.9.0-alpha9.82' == '0.9.0-alpha9.81'
+  
+  - 0.9.0-alpha9.81
+  ?               ^
+  + 0.9.0-alpha9.82
+  ?               ^
+FAILED tests/test_alpha960_no_export_live_charge_target.py::test_alpha960_release_identity_and_scope - AssertionError: assert '0.9.0-alpha9.82' == '0.9.0-alpha9.81'
+  
+  - 0.9.0-alpha9.81
+  ?               ^
+  + 0.9.0-alpha9.82
+  ?               ^
+FAILED tests/test_alpha961_intelligent_slot_demand_gate.py::test_alpha961_release_identity_and_scope - AssertionError: assert '0.9.0-alpha9.82' == '0.9.0-alpha9.81'
+  
+  - 0.9.0-alpha9.81
+  ?               ^
+  + 0.9.0-alpha9.82
+  ?               ^
+FAILED tests/test_alpha966_remove_anti_import.py::test_release_identity_and_scope - AssertionError: assert '0.9.0-alpha9.82' == '0.9.0-alpha9.81'
+  
+  - 0.9.0-alpha9.81
+  ?               ^
+  + 0.9.0-alpha9.82
+  ?               ^
+FAILED tests/test_alpha967_physical_cheap_charge_authority.py::test_alpha967_release_identity_and_scope - AssertionError: assert '0.9.0-alpha9.82' == '0.9.0-alpha9.81'
+  
+  - 0.9.0-alpha9.81
+  ?               ^
+  + 0.9.0-alpha9.82
+  ?               ^
+FAILED tests/test_alpha968_scheduled_tariff_renewal.py::test_alpha968_release_identity_and_scope - AssertionError: assert '0.9.0-alpha9.82' == '0.9.0-alpha9.81'
+  
+  - 0.9.0-alpha9.81
+  ?               ^
+  + 0.9.0-alpha9.82
+  ?               ^
+FAILED tests/test_alpha969_no_export_cheap_routing.py::test_alpha969_release_identity_is_explicitly_shadow_only - AssertionError: assert '0.9.0-alpha9.82' == '0.9.0-alpha9.81'
+  
+  - 0.9.0-alpha9.81
+  ?               ^
+  + 0.9.0-alpha9.82
+  ?               ^
+FAILED tests/test_alpha973_fast_control_refresh.py::test_alpha973_release_identity_and_scope - AssertionError: assert '0.9.0-alpha9.82' == '0.9.0-alpha9.81'
+  
+  - 0.9.0-alpha9.81
+  ?               ^
+  + 0.9.0-alpha9.82
+  ?               ^
+FAILED tests/test_alpha974_ev_hold_freeze.py::test_alpha974_release_identity_and_scope - AssertionError: assert '0.9.0-alpha9.82' == '0.9.0-alpha9.81'
+  
+  - 0.9.0-alpha9.81
+  ?               ^
+  + 0.9.0-alpha9.82
+  ?               ^
+FAILED tests/test_alpha975_verified_ev_hold_grace.py::test_alpha975_release_identity_and_scope - AssertionError: assert '0.9.0-alpha9.82' == '0.9.0-alpha9.81'
+  
+  - 0.9.0-alpha9.81
+  ?               ^
+  + 0.9.0-alpha9.82
+  ?               ^
+FAILED tests/test_alpha976_pending_intelligent_ev_hold.py::test_alpha976_release_identity_and_scope - AssertionError: assert '0.9.0-alpha9.82' == '0.9.0-alpha9.81'
+  
+  - 0.9.0-alpha9.81
+  ?               ^
+  + 0.9.0-alpha9.82
+  ?               ^
+FAILED tests/test_alpha977_restart_commissioning_proof.py::test_alpha977_release_identity_and_scope - AssertionError: assert '0.9.0-alpha9.82' == '0.9.0-alpha9.81'
+  
+  - 0.9.0-alpha9.81
+  ?               ^
+  + 0.9.0-alpha9.82
+  ?               ^
+FAILED tests/test_alpha981_restart_minsoc_baseline.py::test_alpha981_release_identity_and_scope - AssertionError: assert '0.9.0-alpha9.82' == '0.9.0-alpha9.81'
+  
+  - 0.9.0-alpha9.81
+  ?               ^
+  + 0.9.0-alpha9.82
+  ?               ^
+FAILED tests/test_alpha9_baseline.py::test_alpha9_four_track_versions_are_explicit - AssertionError: assert '0.9.0-alpha9.82' == '0.9.0-alpha9.81'
+  
+  - 0.9.0-alpha9.81
+  ?               ^
+  + 0.9.0-alpha9.82
+  ?               ^
+FAILED tests/test_update_bundle.py::test_release_bundle_renders_exact_coordinated_alpha9_targets - AssertionError: assert ['kems_core', 'dashboard'] == ['kems_core',... 'public_web']
+  
+  Right contains 4 more items, first extra item: 'panel'
+  
+  Full diff:
+    [
+        'kems_core',
+        'dashboard',
+  -     'panel',
+  -     'property_web',
+  -     'pi_agent',
+  -     'public_web',
+    ]
+35 failed, 1610 passed in 17.99s
+exit_code=1
