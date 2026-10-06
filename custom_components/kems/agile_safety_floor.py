@@ -21,7 +21,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import replace
-from datetime import datetime
+from datetime import datetime, time
 from typing import Any
 
 from homeassistant.helpers.storage import Store
