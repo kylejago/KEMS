@@ -21,6 +21,7 @@ def _function():
         "_number",
         "_dt",
         "_component",
+        "_required_battery_component",
         "_reconcile_tomorrow_display_continuity",
     }
     nodes = [
@@ -160,7 +161,8 @@ def test_boundary_mismatch_fails_closed_without_rewriting_tomorrow() -> None:
 def test_unknown_battery_energy_stops_without_inventing_flow() -> None:
     state = _state()
     state["tomorrow_slots"][1]["battery_export_kwh"] = None
-    state["tomorrow_slots"][1]["flow_battery_export_kwh"] = None
+    # Presentation zero must never turn an unknown authoritative value into zero.
+    state["tomorrow_slots"][1]["flow_battery_export_kwh"] = 0.0
     old_second = state["tomorrow_slots"][1]["flow_estimated_soc_percent"]
 
     assert _function()(state, config=_config()) == 1
