@@ -547,10 +547,22 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                     simulation,
                     agile_state,
                 )
-            else:
+            elif tariff_type == EXPORT_TARIFF_TYPE_AGILE:
+                # Agile Outgoing alone inherits the exact rolling Agile target.
                 control_simulation, shadow_simulation, _alignment = (
                     aligned_agile_control_views(simulation, agile_state)
                 )
+            else:
+                # Fixed export uses the normal fixed-rate KEMS simulation.
+                # Never let the Agile comparison replay become physical intent
+                # merely because any paid export tariff is active.
+                control_simulation = simulation
+                shadow_simulation = simulation
+                _alignment = {
+                    "active": False,
+                    "basis": "fixed export uses fixed-rate KEMS simulation",
+                    "hardware_writes": "separate bounded backend authority",
+                }
             control = self._control.plan(
                 snapshot,
                 control_simulation,
@@ -594,7 +606,7 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                     "next_action": proposal.next_action,
                     "hardware_write_authorised": False,
                 }
-            if not base_simulation.no_export_mode_active:
+            if tariff_type == EXPORT_TARIFF_TYPE_AGILE:
                 control = align_agile_control_state(
                     control,
                     control_simulation,
@@ -713,6 +725,7 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
             foxess_control = await self._foxess_control.async_update(
                 coordinator=self,
                 control=control,
+                snapshot=snapshot,
                 technical_ready=bool(commissioning.get("ready_for_control")),
                 no_paid_export_mode=bool(simulation.no_export_mode_active),
                 cheap_period_confirmed=bool(snapshot.cheap_period_confirmed),
