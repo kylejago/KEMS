@@ -108,7 +108,7 @@ from .agile_safety_floor import (  # noqa: E402
     build_safety_floor_manager,
     install_agile_safety_floor,
 )
-from .agile_smart_export_runtime_base import *  # noqa: E402,F403
+from .agile_smart_export_runtime_base import *  # noqa: E402,F403\nfrom .agile_midnight_plan_continuity import (  # noqa: E402\n    build_midnight_plan_continuity_manager,\n)
 from .agile_tomorrow_display_continuity import (  # noqa: E402
     build_tomorrow_display_continuity_manager,
 )
