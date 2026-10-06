@@ -108,13 +108,19 @@ from .agile_safety_floor import (  # noqa: E402
     install_agile_safety_floor,
 )
 from .agile_smart_export_runtime_base import *  # noqa: E402,F403
+from .agile_tomorrow_display_continuity import (  # noqa: E402
+    build_tomorrow_display_continuity_manager,
+)
 
 install_intelligent_dispatch_replan()
 install_agile_safety_floor()
 install_observability_clarity()
 
-EfficientAgileSmartExportManager = build_safety_floor_manager(
+_safety_floor_manager = build_safety_floor_manager(
     RestartSocAnchorAgileSmartExportManager
+)
+EfficientAgileSmartExportManager = build_tomorrow_display_continuity_manager(
+    _safety_floor_manager
 )
 
 
