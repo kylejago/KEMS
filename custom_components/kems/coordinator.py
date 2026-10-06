@@ -606,7 +606,13 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                     "next_action": proposal.next_action,
                     "hardware_write_authorised": False,
                 }
-            if tariff_type == EXPORT_TARIFF_TYPE_AGILE:
+            if (
+                tariff_type == EXPORT_TARIFF_TYPE_AGILE
+                and not snapshot.saving_session_active
+            ):
+                # Power Down remains outside Alpha9.82's new export authority.
+                # Do not let the Agile overlay erase the ControlEngine's explicit
+                # power_down_session reason before the backend can fail closed.
                 control = align_agile_control_state(
                     control,
                     control_simulation,

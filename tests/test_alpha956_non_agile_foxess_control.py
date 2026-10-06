@@ -181,7 +181,7 @@ def test_force_charge_without_confirmed_cheap_period_fails_closed() -> None:
     assert "confirmed cheap period" in result.reason
 
 
-def test_deliberate_export_is_never_live() -> None:
+def test_no_paid_export_still_blocks_deliberate_export() -> None:
     result = _decision(
         _control(
             desired_work_mode="Feed-in First",
@@ -192,15 +192,19 @@ def test_deliberate_export_is_never_live() -> None:
 
     assert result.commands_permitted is False
     assert result.action == "release"
-    assert "outside the current live scope" in result.reason
+    assert "No-paid-export policy" in result.reason
 
 
-def test_paid_or_agile_export_mode_is_never_live() -> None:
-    result = _decision(_control(), no_paid_export_mode=False)
+def test_paid_export_idle_self_use_is_live_after_existing_gates() -> None:
+    result = _decision(
+        _control(desired_grid_export_allowed=True),
+        no_paid_export_mode=False,
+        effective_export_limit_kw=6.4,
+    )
 
-    assert result.commands_permitted is False
-    assert result.action == "release"
-    assert "Paid/Agile export control" in result.reason
+    assert result.commands_permitted is True
+    assert result.action == "self_use"
+    assert "Paid-export idle Self Use" in result.reason
 
 
 def test_island_and_emergency_states_release_control() -> None:
@@ -228,19 +232,18 @@ def test_every_explicit_control_gate_is_required() -> None:
     assert _decision(_control(plan_safe=False)).commands_permitted is False
 
 
-def test_backend_live_write_surface_has_no_force_discharge_path() -> None:
+def test_backend_paid_export_surface_is_bounded_and_import_limit_stays_absent() -> None:
     source = BACKEND.read_text(encoding="utf-8")
     live = source.split("async def async_update", 1)[1]
 
-    assert (
-        'required_keys = ("work_mode", "force_charge_power", "min_soc_on_grid")'
-        in source
-    )
-    assert '_entity_id(entities, "force_discharge_power")' not in live
-    assert 'decision.action == "grid_bias_force_discharge"' not in live
+    assert 'required_keys = ["work_mode", "force_charge_power", "min_soc_on_grid"]' in source
+    assert 'required_keys.extend(("force_discharge_power", "export_power_limit"))' in source
+    assert '_entity_id(entities, "force_discharge_power")' in live
+    assert '_entity_id(entities, "export_power_limit")' in live
+    assert 'decision.action == "force_discharge"' in live
+    assert "_PAID_EXPORT_STAGE_KW = 1.0" in source
     assert '"import_power_limit"' not in live.split("payload = {", 1)[0]
-    assert '"export_power_limit"' not in live.split("payload = {", 1)[0]
-    assert '"deliberate_force_discharge": "blocked_in_current_release"' in source
+    assert '"import_power_limit_write": "never_written_by_alpha9.82"' in source
 
 
 def test_commissioning_still_exposes_explicit_opt_in_control() -> None:
@@ -269,8 +272,9 @@ def test_static_contract_is_bounded_not_general_write_authority() -> None:
     assert "Self Use" in source
     assert "confirmed-cheap" in source
     assert "Min SoC-on-grid" in source
-    assert "deliberate Force Discharge in the current release" in source
-    assert '"export-power-limit writes"' in source
+    assert "explicitly selected paid-export Force Discharge" in source
+    assert "verified Export Power Limit" in source
+    assert '"Power Down deliberate export in Alpha9.82"' in source
     assert '"import-power-limit writes"' in source
 
 
