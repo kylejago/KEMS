@@ -242,9 +242,7 @@ def assess_foxess_control_write_authority(
     if no_paid_export_mode and (
         control.desired_grid_export_allowed or desired_export > _EPSILON_KW
     ):
-        return blocked(
-            "No-paid-export policy forbids deliberate battery/grid export"
-        )
+        return blocked("No-paid-export policy forbids deliberate battery/grid export")
     if (
         not no_paid_export_mode
         and desired_export > _EPSILON_KW
@@ -258,9 +256,7 @@ def assess_foxess_control_write_authority(
         and control.operating_reason == "power_down_session"
         and desired_export > _EPSILON_KW
     ):
-        return blocked(
-            "Power Down deliberate export is not promoted by Alpha9.82"
-        )
+        return blocked("Power Down deliberate export is not promoted by Alpha9.82")
 
     # Alpha9.69 introduces new SOC-floor and EV/load routing semantics. The
     # old Alpha9.67 live contract never validated their physical KH7 behaviour.

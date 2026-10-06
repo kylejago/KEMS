@@ -105,9 +105,7 @@ class FoxESSControlBackend:
                 data.get("paid_export_stage_blocked", False)
             )
             stage_reason = data.get("paid_export_stage_reason")
-            self._paid_export_stage_reason = (
-                str(stage_reason) if stage_reason else None
-            )
+            self._paid_export_stage_reason = str(stage_reason) if stage_reason else None
             last_action = data.get("last_applied_action")
             self._last_applied_action = (
                 str(last_action)
@@ -344,7 +342,10 @@ class FoxESSControlBackend:
         force_value = _number(force_discharge.get("normalised_observation"))
         export_value = _number(export_limit.get("normalised_observation"))
         if force_value is None or export_value is None:
-            return False, "Paid-export Force Discharge/export-limit readback unavailable"
+            return (
+                False,
+                "Paid-export Force Discharge/export-limit readback unavailable",
+            )
 
         self._previous_force_discharge_power_kw = force_value
         self._previous_export_power_limit_w = export_value
@@ -516,13 +517,7 @@ class FoxESSControlBackend:
             entities,
             writes,
         )
-        if (
-            mode_ok
-            and soc_ok
-            and mode_verified
-            and soc_verified
-            and paid_settings_ok
-        ):
+        if mode_ok and soc_ok and mode_verified and soc_verified and paid_settings_ok:
             self._owned = False
             self._last_applied_action = None
             self._last_verified_min_soc_on_grid = None
@@ -776,8 +771,8 @@ class FoxESSControlBackend:
         else:
             owned, ownership_reason = await self._async_take_ownership(entities)
             if owned and not no_paid_export_mode:
-                owned, ownership_reason = await self._async_complete_paid_export_baseline(
-                    entities
+                owned, ownership_reason = (
+                    await self._async_complete_paid_export_baseline(entities)
                 )
             if not owned:
                 decision = FoxESSControlDecision(
@@ -805,10 +800,7 @@ class FoxESSControlBackend:
                 )
                 paid_entities_missing = bool(
                     not no_paid_export_mode
-                    and (
-                        force_discharge_entity is None
-                        or export_limit_entity is None
-                    )
+                    and (force_discharge_entity is None or export_limit_entity is None)
                 )
                 if (
                     work_mode_entity is None
@@ -877,17 +869,13 @@ class FoxESSControlBackend:
                         and force_discharge_entity is not None
                         and export_limit_entity is not None
                     ):
-                        requested_discharge = float(
-                            decision.force_discharge_power_kw
-                        )
+                        requested_discharge = float(decision.force_discharge_power_kw)
                         if not self._paid_export_live_proven:
                             requested_discharge = min(
                                 requested_discharge,
                                 _PAID_EXPORT_STAGE_KW,
                             )
-                        export_limit_w = (
-                            float(decision.export_power_limit_kw) * 1000.0
-                        )
+                        export_limit_w = float(decision.export_power_limit_kw) * 1000.0
                         export_limit_ok = await self._async_number(
                             export_limit_entity,
                             export_limit_w,
@@ -933,10 +921,16 @@ class FoxESSControlBackend:
                                 "low-solar physical direction samples"
                             )
                     applied = bool(min_soc_ok and action_ok)
-                    if applied and no_paid_export_mode and decision.action == "self_use":
-                        paid_restore_ok = await self._async_restore_paid_export_settings(
-                            entities,
-                            writes,
+                    if (
+                        applied
+                        and no_paid_export_mode
+                        and decision.action == "self_use"
+                    ):
+                        paid_restore_ok = (
+                            await self._async_restore_paid_export_settings(
+                                entities,
+                                writes,
+                            )
                         )
                         applied = bool(applied and paid_restore_ok)
                     if applied:

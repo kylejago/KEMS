@@ -111,15 +111,18 @@ def test_non_midnight_slot_cannot_seed_tomorrow() -> None:
         ]
     }
 
-    assert handoff._today_display_midnight_soc(
-        state,
-        now=datetime(2026, 10, 6, 22, 51, tzinfo=LONDON),
-    ) is None
+    assert (
+        handoff._today_display_midnight_soc(
+            state,
+            now=datetime(2026, 10, 6, 22, 51, tzinfo=LONDON),
+        )
+        is None
+    )
 
 
 def test_settlement_flow_refreshes_routing_before_flow_contract() -> None:
     source = (INTEGRATION / "agile_flow_presentation.py").read_text()
-    reconcile = source[source.index("def reconcile_current_day_settlements"):]
+    reconcile = source[source.index("def reconcile_current_day_settlements") :]
 
     enrich = reconcile.index("_enrich_slot_routing(")
     attach = reconcile.index("_attach_flow_contract(")

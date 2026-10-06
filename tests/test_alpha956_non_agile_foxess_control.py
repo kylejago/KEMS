@@ -236,8 +236,14 @@ def test_backend_paid_export_surface_is_bounded_and_import_limit_stays_absent() 
     source = BACKEND.read_text(encoding="utf-8")
     live = source.split("async def async_update", 1)[1]
 
-    assert 'required_keys = ["work_mode", "force_charge_power", "min_soc_on_grid"]' in source
-    assert 'required_keys.extend(("force_discharge_power", "export_power_limit"))' in source
+    assert (
+        'required_keys = ["work_mode", "force_charge_power", "min_soc_on_grid"]'
+        in source
+    )
+    assert (
+        'required_keys.extend(("force_discharge_power", "export_power_limit"))'
+        in source
+    )
     assert '_entity_id(entities, "force_discharge_power")' in live
     assert '_entity_id(entities, "export_power_limit")' in live
     assert 'decision.action == "force_discharge"' in live

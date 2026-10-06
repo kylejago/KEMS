@@ -108,7 +108,9 @@ def test_power_down_deliberate_export_remains_blocked_in_alpha982() -> None:
     assert "Power Down deliberate export" in result.reason
 
 
-def test_export_uses_15_percent_target_but_idle_self_use_returns_to_10_percent() -> None:
+def test_export_uses_15_percent_target_but_idle_self_use_returns_to_10_percent() -> (
+    None
+):
     export = _decision(_control(desired_min_soc_percent=15.0))
     assert export.action == "force_discharge"
     assert (
@@ -153,7 +155,9 @@ def test_first_physical_export_is_staged_and_limit_is_verified_first() -> None:
         'self._async_wait_number(\n                                entities,\n                                "export_power_limit"'
     )
     discharge_write = live.index("discharge_ok = await self._async_number(")
-    mode_write = live.index('"Force Discharge",\n                                writes,')
+    mode_write = live.index(
+        '"Force Discharge",\n                                writes,'
+    )
 
     assert export_write < export_verify < discharge_write < mode_write
     assert "battery-discharge and grid-export directions proven" in source
@@ -186,6 +190,9 @@ def test_paid_tariff_requires_force_discharge_and_export_limit_bindings() -> Non
     source = COMMISSIONING.read_text(encoding="utf-8")
 
     assert "export_tariff_type_from_options(coordinator.entry.options)" in source
-    assert 'control_command_keys.extend(("force_discharge_power", "export_power_limit"))' in source
+    assert (
+        'control_command_keys.extend(("force_discharge_power", "export_power_limit"))'
+        in source
+    )
     assert "Force Discharge" in source
     assert "Export Power Limit" in source
