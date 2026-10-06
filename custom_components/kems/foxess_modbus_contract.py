@@ -8,30 +8,16 @@ FOXESS_MODBUS_REVIEWED_VERSION: Final = "1.15.0"
 FOXESS_MODBUS_PLATFORM: Final = "foxess_modbus"
 FOXESS_MODBUS_KH_FAMILIES: Final = ("KH_PRE119", "KH_PRE133", "KH_133")
 
-# Stable upstream telemetry keys reviewed against foxess_modbus v1.15.0.
-# These are the preferred sources KEMS needs to leave pre-installation fallback mode.
 FOXESS_MODBUS_REQUIRED_TELEMETRY: Final = {
-    "battery_soc": {
-        "key": "battery_soc",
-        "name": "Battery SoC",
-        "unit": "%",
-    },
+    "battery_soc": {"key": "battery_soc", "name": "Battery SoC", "unit": "%"},
     "battery_power_kw": {
         "key": "invbatpower",
         "name": "Inverter Battery Power",
         "unit": "kW",
         "sign": "positive discharge; negative charge",
     },
-    "solar_power_kw": {
-        "key": "pv_power_now",
-        "name": "PV Power",
-        "unit": "kW",
-    },
-    "house_load_kw": {
-        "key": "load_power",
-        "name": "Load Power",
-        "unit": "kW",
-    },
+    "solar_power_kw": {"key": "pv_power_now", "name": "PV Power", "unit": "kW"},
+    "house_load_kw": {"key": "load_power", "name": "Load Power", "unit": "kW"},
     "grid_import_kw": {
         "key": "grid_consumption",
         "name": "Grid Consumption",
@@ -46,23 +32,11 @@ FOXESS_MODBUS_REQUIRED_TELEMETRY: Final = {
     },
 }
 
-# KH exposes inverter-side battery voltage/current across the reviewed families.
-# KEMS may derive battery power from this pair only when direct invbatpower is absent.
 FOXESS_MODBUS_BATTERY_POWER_FALLBACK: Final = {
-    "battery_voltage": {
-        "key": "invbatvolt",
-        "name": "Inverter Battery Voltage",
-        "unit": "V",
-    },
-    "battery_current": {
-        "key": "invbatcurrent",
-        "name": "Inverter Battery Current",
-        "unit": "A",
-    },
+    "battery_voltage": {"key": "invbatvolt", "name": "Inverter Battery Voltage", "unit": "V"},
+    "battery_current": {"key": "invbatcurrent", "name": "Inverter Battery Current", "unit": "A"},
 }
 
-# Useful read-only evidence for installation-day reconciliation. Some entries are
-# model-dependent and are deliberately not commissioning requirements.
 FOXESS_MODBUS_OPTIONAL_DIAGNOSTICS: Final = {
     "raw_grid_power": {"key": "grid_ct", "name": "Grid CT"},
     "inverter_power": {"key": "rpower", "name": "Inverter Power"},
@@ -77,10 +51,6 @@ FOXESS_MODBUS_OPTIONAL_DIAGNOSTICS: Final = {
     "pv4_power": {"key": "pv4_power", "name": "PV4 Power"},
 }
 
-# Writable entities reviewed from upstream v1.15.0. The live KEMS backend is
-# intentionally narrower than the available FoxESS surface: Self Use,
-# confirmed-cheap Force Charge and Min SoC-on-grid only. Deliberate/economic
-# Force Discharge and import/export power-limit writes remain outside scope.
 FOXESS_MODBUS_KNOWN_WRITABLE_CAPABILITIES: Final = {
     "work_mode": "Work Mode",
     "force_charge_power": "Force Charge Power (remote control, kW)",
@@ -117,14 +87,9 @@ def foxess_modbus_contract_snapshot() -> dict[str, Any]:
         "hardware_writes": "conditional_bounded_control",
         "maximum_allowed_stage": "control",
         "control_scope": (
-            "Alpha9.67 bounded non-Agile control: Self Use, confirmed-cheap "
-            "Force Charge and Min SoC-on-grid"
+            "Alpha9.82 bounded control: Self Use, confirmed-cheap Force Charge, "
+            "Min SoC-on-grid, bounded paid-export Force Discharge and verified "
+            "Export Power Limit"
         ),
-        "blocked_live_capabilities": [
-            "deliberate Force Discharge in the current release",
-            "deliberate economic export in the current release",
-            "Agile/paid-export control in the current release",
-            "export-power-limit writes",
-            "import-power-limit writes",
-        ],
+        "blocked_live_capabilities": ["import-power-limit writes"],
     }
