@@ -52,10 +52,19 @@ def _component(
     primary: str,
     flow_fallback: str,
 ) -> float | None:
-    """Return a non-negative authoritative slot component when available."""
+    """Return a non-negative presentation component when available."""
     value = _number(slot.get(primary))
     if value is None:
         value = _number(slot.get(flow_fallback))
+    return max(value, 0.0) if value is not None else None
+
+
+def _required_battery_component(
+    slot: dict[str, Any],
+    primary: str,
+) -> float | None:
+    """Return one authoritative battery component without zero-coercion fallback."""
+    value = _number(slot.get(primary))
     return max(value, 0.0) if value is not None else None
 
 
@@ -81,13 +90,20 @@ def _reconcile_tomorrow_display_continuity(
         diagnostic["reason"] = "Today or Tomorrow slot feed is unavailable"
         return 0
 
-    ordered_tomorrow = sorted(
-        tomorrow,
-        key=lambda item: _dt(item.get("valid_from"))
-        or datetime.max.replace(tzinfo=_dt(tomorrow[0].get("valid_from")).tzinfo)
-        if _dt(tomorrow[0].get("valid_from")) is not None
-        else datetime.max,
-    )
+    parsed_tomorrow = [
+        (_dt(item.get("valid_from")), item)
+        for item in tomorrow
+    ]
+    if any(start is None for start, _item in parsed_tomorrow):
+        diagnostic["reason"] = "Tomorrow slot boundary timestamp is unavailable"
+        return 0
+    ordered_tomorrow = [
+        item
+        for _start, item in sorted(
+            parsed_tomorrow,
+            key=lambda pair: pair[0],
+        )
+    ]
     first_start = _dt(ordered_tomorrow[0].get("valid_from"))
     if first_start is None:
         diagnostic["reason"] = "Tomorrow first-slot boundary timestamp is unavailable"
@@ -135,25 +151,21 @@ def _reconcile_tomorrow_display_continuity(
     stopped_reason: str | None = None
 
     for slot in ordered_tomorrow:
-        grid_charge = _component(
+        grid_charge = _required_battery_component(
             slot,
             "grid_to_battery_kwh",
-            "flow_grid_to_battery_kwh",
         )
-        solar_charge = _component(
+        solar_charge = _required_battery_component(
             slot,
             "solar_to_battery_kwh",
-            "flow_solar_to_battery_kwh",
         )
-        battery_home = _component(
+        battery_home = _required_battery_component(
             slot,
             "battery_to_home_kwh",
-            "flow_battery_to_home_kwh",
         )
-        battery_export = _component(
+        battery_export = _required_battery_component(
             slot,
             "battery_export_kwh",
-            "flow_battery_export_kwh",
         )
         if None in (grid_charge, solar_charge, battery_home, battery_export):
             stopped_reason = (
