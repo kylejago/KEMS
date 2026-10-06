@@ -213,8 +213,7 @@ def align_agile_control_state(
     ControlEngine supplies the physical policy/safety envelope. The Full-KEMS
     rolling plan remains the counterfactual simulation authority, but its
     deliberate export target must not override a physical no-export or island
-    decision. Hardware permission remains the responsibility of the bounded
-    FoxESS backend and its independent commissioning/write-authority gates.
+    decision. Hardware permissions are explicitly forced closed.
     """
     rolling = _rolling_target(simulation, agile_state)
     if rolling is None:
@@ -285,6 +284,8 @@ def align_agile_control_state(
             max(config.inverter_limit_kw - total_output, 0.0), 3
         ),
         plan_safe=bool(control.plan_safe and target_within_limits),
+        real_backend_available=False,
+        commands_permitted=False,
         blocked_reason=(
             control.blocked_reason
             if target_within_limits
