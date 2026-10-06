@@ -161,7 +161,8 @@ def _reconcile_tomorrow_display_continuity(
             "battery_export_kwh",
         )
         if None in (grid_charge, solar_charge, battery_home, battery_export):
-            stopped_reason = f"battery energy components unavailable at {slot.get('label') or slot.get('valid_from')}"
+            slot_label = slot.get("label") or slot.get("valid_from")
+            stopped_reason = f"battery energy components unavailable at {slot_label}"
             break
 
         pre_flow_soc = _number(slot.get("flow_estimated_soc_percent"))
