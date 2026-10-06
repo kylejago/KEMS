@@ -98,9 +98,9 @@ class FoxESSControlBackend:
             self._previous_export_power_limit_w = _number(
                 data.get("previous_export_power_limit_w")
             )
-            self._paid_export_live_proven = bool(
-                data.get("paid_export_live_proven", False)
-            )
+            # Physical paid-export proof is session-scoped.  A restart must
+            # re-stage at 1 kW before full Force Discharge is allowed.
+            self._paid_export_live_proven = False
             self._paid_export_stage_blocked = bool(
                 data.get("paid_export_stage_blocked", False)
             )
@@ -128,7 +128,6 @@ class FoxESSControlBackend:
                     self._previous_force_discharge_power_kw
                 ),
                 "previous_export_power_limit_w": self._previous_export_power_limit_w,
-                "paid_export_live_proven": self._paid_export_live_proven,
                 "paid_export_stage_blocked": self._paid_export_stage_blocked,
                 "paid_export_stage_reason": self._paid_export_stage_reason,
                 "last_applied_action": self._last_applied_action,
@@ -520,6 +519,11 @@ class FoxESSControlBackend:
         if mode_ok and soc_ok and mode_verified and soc_verified and paid_settings_ok:
             self._owned = False
             self._last_applied_action = None
+            self._paid_export_live_proven = False
+            self._paid_export_stage_samples = 0
+            self._paid_export_stage_failures = 0
+            if not self._paid_export_stage_blocked:
+                self._paid_export_stage_reason = None
             self._last_verified_min_soc_on_grid = None
             self._last_verified_min_soc_at = None
             self._last_write_result = "KEMS FoxESS ownership released safely"
@@ -606,10 +610,12 @@ class FoxESSControlBackend:
 
         if no_paid_export_mode:
             reset_needed = bool(
-                self._paid_export_stage_samples
+                self._paid_export_live_proven
+                or self._paid_export_stage_samples
                 or self._paid_export_stage_failures
                 or self._paid_export_stage_blocked
             )
+            self._paid_export_live_proven = False
             self._paid_export_stage_samples = 0
             self._paid_export_stage_failures = 0
             self._paid_export_stage_blocked = False

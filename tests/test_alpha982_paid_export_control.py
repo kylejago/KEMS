@@ -200,3 +200,18 @@ def test_paid_tariff_requires_force_discharge_and_export_limit_bindings() -> Non
     )
     assert "Force Discharge" in source
     assert "Export Power Limit" in source\n
+
+def test_paid_export_physical_proof_is_session_scoped() -> None:
+    source = BACKEND.read_text(encoding="utf-8")
+
+    setup = source.split("async def async_setup", 1)[1].split(
+        "async def _async_save", 1
+    )[0]
+    save = source.split("async def _async_save", 1)[1].split(
+        "async def _foxess_version", 1
+    )[0]
+    assert "self._paid_export_live_proven = False" in setup
+    assert 'data.get("paid_export_live_proven"' not in setup
+    assert '"paid_export_live_proven"' not in save
+    assert "if no_paid_export_mode:" in source
+    assert "self._paid_export_live_proven = False" in source
