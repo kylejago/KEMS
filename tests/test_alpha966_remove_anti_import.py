@@ -118,7 +118,7 @@ def test_release_identity_and_scope() -> None:
     bundle = json.loads(BUNDLE.read_text(encoding="utf-8"))
     reason = str(bundle["maintenance"]["reason"])
 
-    assert manifest["version"] == "0.9.0-alpha9.81"
+    assert manifest["version"] == "0.9.0-alpha9.82"
     assert reason.startswith("Alpha9.81")
     assert "Alpha9.68 adds date-aware electricity tariff fallbacks" in reason
     assert "Self Use outside confirmed cheap periods" in reason
