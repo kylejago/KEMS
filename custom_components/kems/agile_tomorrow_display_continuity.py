@@ -90,10 +90,7 @@ def _reconcile_tomorrow_display_continuity(
         diagnostic["reason"] = "Today or Tomorrow slot feed is unavailable"
         return 0
 
-    parsed_tomorrow = [
-        (_dt(item.get("valid_from")), item)
-        for item in tomorrow
-    ]
+    parsed_tomorrow = [(_dt(item.get("valid_from")), item) for item in tomorrow]
     if any(start is None for start, _item in parsed_tomorrow):
         diagnostic["reason"] = "Tomorrow slot boundary timestamp is unavailable"
         return 0
@@ -110,9 +107,7 @@ def _reconcile_tomorrow_display_continuity(
         return 0
 
     boundary_candidates = [
-        item
-        for item in today
-        if _dt(item.get("valid_to")) == first_start
+        item for item in today if _dt(item.get("valid_to")) == first_start
     ]
     if not boundary_candidates:
         diagnostic["reason"] = "No exact Today slot ends at Tomorrow's first boundary"
@@ -145,9 +140,7 @@ def _reconcile_tomorrow_display_continuity(
 
     battery_kwh = capacity * min(max(handoff_soc, 0.0), 100.0) / 100.0
     corrected = 0
-    first_pre_rebase = _number(
-        ordered_tomorrow[0].get("flow_estimated_soc_percent")
-    )
+    first_pre_rebase = _number(ordered_tomorrow[0].get("flow_estimated_soc_percent"))
     stopped_reason: str | None = None
 
     for slot in ordered_tomorrow:
@@ -168,9 +161,7 @@ def _reconcile_tomorrow_display_continuity(
             "battery_export_kwh",
         )
         if None in (grid_charge, solar_charge, battery_home, battery_export):
-            stopped_reason = (
-                f"battery energy components unavailable at {slot.get('label') or slot.get('valid_from')}"
-            )
+            stopped_reason = f"battery energy components unavailable at {slot.get('label') or slot.get('valid_from')}"
             break
 
         pre_flow_soc = _number(slot.get("flow_estimated_soc_percent"))
