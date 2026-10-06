@@ -199,7 +199,8 @@ def test_paid_tariff_requires_force_discharge_and_export_limit_bindings() -> Non
         in source
     )
     assert "Force Discharge" in source
-    assert "Export Power Limit" in source\n
+    assert "Export Power Limit" in source
+
 
 def test_paid_export_physical_proof_is_session_scoped() -> None:
     source = BACKEND.read_text(encoding="utf-8")

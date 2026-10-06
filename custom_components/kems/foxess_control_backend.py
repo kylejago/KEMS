@@ -1116,4 +1116,4 @@ class FoxESSControlBackend:
             ),
         }
         self._status = payload
-        return dict(payload)\n
+        return dict(payload)

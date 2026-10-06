@@ -140,4 +140,4 @@ def test_midnight_handoff_remains_reporting_only() -> None:
     assert "today_to_tomorrow_continuity_applied" in source
     assert '"hardware_writes": "blocked"' in source
     assert ".services.async_call(" not in source
-    assert "safe_to_write_hardware = True" not in source\n
+    assert "safe_to_write_hardware = True" not in source
