@@ -77,10 +77,10 @@ FOXESS_MODBUS_OPTIONAL_DIAGNOSTICS: Final = {
     "pv4_power": {"key": "pv4_power", "name": "PV4 Power"},
 }
 
-# Writable entities reviewed from upstream v1.15.0. The live KEMS backend is
-# intentionally narrower than the available FoxESS surface: Self Use,
-# confirmed-cheap Force Charge and Min SoC-on-grid only. Deliberate/economic
-# Force Discharge and import/export power-limit writes remain outside scope.
+# Writable entities reviewed from upstream v1.15.0. Alpha9.82 keeps the live
+# surface bounded: Self Use, confirmed-cheap Force Charge, Min SoC-on-grid and,
+# only after explicit paid-export selection, Force Discharge plus the lower
+# verified KEMS/FoxESS Export Power Limit. Import Power Limit remains blocked.
 FOXESS_MODBUS_KNOWN_WRITABLE_CAPABILITIES: Final = {
     "work_mode": "Work Mode",
     "force_charge_power": "Force Charge Power (remote control, kW)",
@@ -117,14 +117,13 @@ def foxess_modbus_contract_snapshot() -> dict[str, Any]:
         "hardware_writes": "conditional_bounded_control",
         "maximum_allowed_stage": "control",
         "control_scope": (
-            "Alpha9.67 bounded non-Agile control: Self Use, confirmed-cheap "
-            "Force Charge and Min SoC-on-grid"
+            "Alpha9.82 bounded control: Self Use, confirmed-cheap Force Charge, "
+            "Min SoC-on-grid and explicitly selected paid-export Force Discharge "
+            "behind a verified Export Power Limit"
         ),
         "blocked_live_capabilities": [
-            "deliberate Force Discharge in the current release",
-            "deliberate economic export in the current release",
-            "Agile/paid-export control in the current release",
-            "export-power-limit writes",
+            "paid export before explicit tariff selection",
+            "Power Down deliberate export in Alpha9.82",
             "import-power-limit writes",
         ],
     }

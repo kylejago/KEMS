@@ -37,6 +37,7 @@ from .kems_core.commissioning_evidence import (
     assess_foxess_unit_contract,
 )
 from .panel import PANEL_CONFIG_VERSION, panel_health_snapshot
+from .product_types import EXPORT_TARIFF_TYPE_NONE, export_tariff_type_from_options
 from .source_authority import PHYSICAL_SOURCE_KEYS, duplicate_physical_sources
 
 PASS = "PASS"
@@ -958,7 +959,10 @@ def build_commissioning_snapshot(
     )
     binding = command_shadow.get("entity_binding") or {}
     binding_entities = binding.get("entities") or {}
-    control_command_keys = ("work_mode", "force_charge_power", "min_soc_on_grid")
+    export_tariff_type = export_tariff_type_from_options(coordinator.entry.options)
+    control_command_keys = ["work_mode", "force_charge_power", "min_soc_on_grid"]
+    if export_tariff_type != EXPORT_TARIFF_TYPE_NONE:
+        control_command_keys.extend(("force_discharge_power", "export_power_limit"))
     command_surface_ready = bool(
         binding.get("status") == PASS
         and all(
@@ -969,15 +973,24 @@ def build_commissioning_snapshot(
     checks.append(
         _check(
             "foxess_control_command_surface",
-            "FoxESS non-Agile control command surface",
+            "FoxESS bounded control command surface",
             PASS if command_surface_ready else WAIT,
             (
-                "Unique work-mode, force-charge-power and Min SoC-on-grid "
-                "entities are bound to the authoritative FoxESS device"
+                (
+                    "Unique work-mode, force-charge-power, Force Discharge, "
+                    "Min SoC-on-grid and Export Power Limit entities are bound "
+                    "to the authoritative FoxESS device"
+                )
                 if command_surface_ready
-                else str(
-                    binding.get("reason")
-                    or "Waiting for reviewed FoxESS control command entities"
+                and export_tariff_type != EXPORT_TARIFF_TYPE_NONE
+                else (
+                    "Unique work-mode, force-charge-power and Min SoC-on-grid "
+                    "entities are bound to the authoritative FoxESS device"
+                    if command_surface_ready
+                    else str(
+                        binding.get("reason")
+                        or "Waiting for reviewed FoxESS control command entities"
+                    )
                 )
             ),
         )

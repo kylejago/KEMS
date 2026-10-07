@@ -684,8 +684,18 @@ def test_live_plan_and_independent_shadow_preview_are_not_cross_wired() -> None:
         "control = apply_happy_hour_control(control, snapshot, happy_hour_plan)"
         in coordinator
     )
-    assert "control=control,\n                technical_ready=" in coordinator
-    assert "control=proposal,\n                technical_ready=" not in coordinator
+    live_backend_call = (
+        "control=control,\n"
+        "                snapshot=snapshot,\n"
+        "                technical_ready="
+    )
+    shadow_backend_call = (
+        "control=proposal,\n"
+        "                snapshot=snapshot,\n"
+        "                technical_ready="
+    )
+    assert live_backend_call in coordinator
+    assert shadow_backend_call not in coordinator
     assert "alpha969_shadow_plan: dict[str, Any]" in data
     assert 'key="alpha969_shadow_proposal"' in (root / "sensor.py").read_text(
         encoding="utf-8"
@@ -706,8 +716,8 @@ def test_alpha969_release_identity_is_explicitly_shadow_only() -> None:
         (root / "release" / "kems-bundle.template.json").read_text(encoding="utf-8")
     )
     reason = bundle["maintenance"]["reason"]
-    assert manifest["version"] == "0.9.0-alpha9.81"
-    assert reason.startswith("Alpha9.81")
+    assert manifest["version"] == "0.9.0-alpha9.82"
+    assert reason.startswith("Alpha9.82")
     assert "Alpha9.68 Control-mode cheap-period planner" in reason
     assert "No new KH7 output control" in reason
     assert bundle["components"]["property_web"]["version"] == "0.9.0-alpha9-web.0"

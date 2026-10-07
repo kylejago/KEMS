@@ -91,10 +91,17 @@ def test_v115_kh_contract_uses_direct_battery_power_and_bounded_control() -> Non
     assert snapshot["hardware_writes"] == "conditional_bounded_control"
     assert snapshot["maximum_allowed_stage"] == "control"
     assert (
-        "deliberate Force Discharge in the current release"
+        "explicitly selected paid-export Force Discharge" in snapshot["control_scope"]
+    )
+    assert "verified Export Power Limit" in snapshot["control_scope"]
+    assert (
+        "paid export before explicit tariff selection"
         in snapshot["blocked_live_capabilities"]
     )
-    assert "export-power-limit writes" in snapshot["blocked_live_capabilities"]
+    assert (
+        "Power Down deliberate export in Alpha9.82"
+        in snapshot["blocked_live_capabilities"]
+    )
     assert "import-power-limit writes" in snapshot["blocked_live_capabilities"]
 
 

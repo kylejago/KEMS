@@ -17,6 +17,7 @@ from typing import Any
 from . import agile_smart_export as agile
 from .agile_current_day_settlement import _reconcile_comparison
 from .agile_midnight_rollover import MidnightRolloverAgileSmartExportManager
+from .agile_smart_export_runtime_base import _enrich_slot_routing
 from .kems_core import (
     ForecastPlanState,
     LearnedState,
@@ -677,6 +678,24 @@ class FlowPresentationAgileSmartExportManager(MidnightRolloverAgileSmartExportMa
                 forecast=forecast,
                 forecast_plan=forecast_plan,
                 tariff=tariff,
+            )
+        # Alpha9.82: settlement can rebuild Tomorrow after the earlier publish.
+        # Refresh the panel-derived raw routing before rebuilding flow_* fields,
+        # otherwise a cheap slot may gain grid_to_battery_kwh only after its
+        # Battery action was already frozen as IDLE.
+        panel_config = getattr(self, "_panel_config", None)
+        if isinstance(panel_config, SimulationConfig):
+            _enrich_slot_routing(
+                self._state.get("today_slots"),
+                getattr(self, "_panel_today_records", []),
+                panel_config,
+                self._simulation,
+            )
+            _enrich_slot_routing(
+                self._state.get("tomorrow_slots"),
+                getattr(self, "_panel_tomorrow_records", []),
+                panel_config,
+                self._simulation,
             )
         _attach_flow_contract(self._state, now=now, future_today=future)
         self._publish(self._state)

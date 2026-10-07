@@ -11,7 +11,7 @@ blocked.
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, time, timedelta
 from typing import Any
 
 from . import agile_smart_export as agile
@@ -37,6 +37,44 @@ def _number(value: Any) -> float | None:
     if number != number or number in (float("inf"), float("-inf")):
         return None
     return number
+
+
+def _today_display_midnight_soc(
+    state: dict[str, Any],
+    *,
+    now: datetime,
+) -> tuple[float, str] | None:
+    """Return Today's final displayed SOC at the exact local-midnight boundary.
+
+    The customer-facing Today slot chain is the final reconciled projection after
+    settlement, rolling-dispatch and flow-continuity overlays.  Tomorrow must
+    inherit that same endpoint rather than re-seeding from an older daily replay.
+    """
+    slots = state.get("today_slots")
+    if not isinstance(slots, list):
+        return None
+
+    local_now = now.astimezone(agile.LONDON)
+    midnight = datetime.combine(
+        local_now.date() + timedelta(days=1),
+        time.min,
+        tzinfo=agile.LONDON,
+    ).astimezone(UTC)
+
+    for slot in reversed(slots):
+        if not isinstance(slot, dict):
+            continue
+        try:
+            end = datetime.fromisoformat(str(slot.get("valid_to"))).astimezone(UTC)
+        except (TypeError, ValueError):
+            continue
+        if abs((end - midnight).total_seconds()) > 1.0:
+            continue
+        for key in ("flow_estimated_soc_percent", "ending_soc_percent"):
+            value = _number(slot.get(key))
+            if value is not None:
+                return min(max(value, 0.0), 100.0), key
+    return None
 
 
 def refresh_tomorrow_handoff_from_settled_soc(
@@ -158,6 +196,30 @@ def refresh_tomorrow_handoff_from_settled_soc(
     agile_handoff["precheap_projection_reconciliation"] = dict(precheap_reconciliation)
     full_handoff["precheap_projection_reconciliation"] = dict(precheap_reconciliation)
 
+    # Alpha9.82: once Today has been reconciled into the customer-facing flow
+    # timeline, that exact local-midnight endpoint is the authoritative Agile
+    # seed for Tomorrow.  Do not splice a separate daily replay back in here.
+    display_midnight = _today_display_midnight_soc(state, now=now)
+    if display_midnight is not None:
+        displayed_soc, displayed_source = display_midnight
+        projected_before_display_handoff = agile_midnight
+        agile_midnight = displayed_soc
+        agile_handoff.update(
+            {
+                "active": True,
+                "basis": "final Today displayed SOC at local midnight",
+                "midnight_soc_percent": round(displayed_soc, 3),
+                "today_display_source": displayed_source,
+                "projected_midnight_soc_before_display_handoff": round(
+                    projected_before_display_handoff,
+                    3,
+                ),
+                "today_to_tomorrow_continuity_applied": True,
+            }
+        )
+    else:
+        agile_handoff["today_to_tomorrow_continuity_applied"] = False
+
     tomorrow = manager._compare_day(
         tomorrow_records,
         config,
@@ -227,6 +289,12 @@ def refresh_tomorrow_handoff_from_settled_soc(
         "projected_precheap_soc_percent": projected_precheap,
         "agile_midnight_soc_percent": agile_midnight,
         "full_kems_midnight_soc_percent": full_midnight,
+        "today_display_midnight_soc_percent": (
+            display_midnight[0] if display_midnight is not None else None
+        ),
+        "today_display_midnight_soc_source": (
+            display_midnight[1] if display_midnight is not None else None
+        ),
         "hardware_writes": "blocked",
     }
     state["settled_soc_handoff_reconciliation"] = diagnostic

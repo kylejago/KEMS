@@ -219,7 +219,13 @@ def test_coordinator_keeps_live_no_export_control_separate_from_customer_twin() 
     assert "self._simulation.legacy_no_export_control_view(" in source
     assert "else base_simulation" in source
     assert "aligned_agile_control_views(simulation, agile_state)" in source
-    assert "if not base_simulation.no_export_mode_active:" in source
+    assert "elif tariff_type == EXPORT_TARIFF_TYPE_AGILE:" in source
+    assert "Fixed export uses the normal fixed-rate KEMS simulation." in source
+    assert "control_simulation = simulation" in source
+    assert (
+        "tariff_type == EXPORT_TARIFF_TYPE_AGILE\n"
+        "                and not snapshot.saving_session_active"
+    ) in source
     assert (
         "align_agile_control_state(\n"
         "                    control,\n"
@@ -232,7 +238,7 @@ def test_alpha960_release_identity_and_scope() -> None:
     bundle = json.loads(BUNDLE.read_text(encoding="utf-8"))
     reason = str(bundle["maintenance"]["reason"])
 
-    assert manifest["version"] == "0.9.0-alpha9.81"
+    assert manifest["version"] == "0.9.0-alpha9.82"
     assert "Alpha9.60 fixes no-paid-export cheap-period target authority" in reason
     assert "Full KEMS" in reason
     assert "solar-aware overnight target" in reason

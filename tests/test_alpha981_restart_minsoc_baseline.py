@@ -81,16 +81,22 @@ def test_baseline_repair_requires_specific_ev_hold_contamination_evidence() -> N
 
 def test_restore_keeps_ownership_until_work_mode_and_minsoc_read_back() -> None:
     source = BACKEND.read_text(encoding="utf-8")
-    restore = source.split("async def _async_restore", 1)[1].split(
+    restore = source.split("async def _async_restore(\n", 1)[1].split(
         "async def async_shutdown", 1
     )[0]
 
     assert "mode_verified = bool(" in restore
     assert "soc_verified = bool(" in restore
-    assert "if mode_ok and soc_ok and mode_verified and soc_verified:" in restore
+    assert (
+        "paid_settings_ok = await self._async_restore_paid_export_settings(" in restore
+    )
+    assert (
+        "if mode_ok and soc_ok and mode_verified and soc_verified and paid_settings_ok:"
+        in restore
+    )
     assert "self._owned = False" in restore
-    assert "awaiting verified work mode / " in restore
-    assert '"MinSOC readback"' in restore
+    assert "awaiting verified work mode, " in restore
+    assert '"MinSOC or paid-export setting readback"' in restore
 
 
 def test_live_repair_is_blocked_until_every_temporary_hold_path_has_ended() -> None:
@@ -112,8 +118,8 @@ def test_alpha981_release_identity_and_scope() -> None:
     bundle = json.loads(BUNDLE.read_text(encoding="utf-8"))
     reason = str(bundle["maintenance"]["reason"])
 
-    assert manifest["version"] == "0.9.0-alpha9.81"
-    assert reason.startswith("Alpha9.81")
+    assert manifest["version"] == "0.9.0-alpha9.82"
+    assert reason.startswith("Alpha9.82")
     assert "4–5 October" in reason
     assert "10%" in reason
     assert "read back" in reason

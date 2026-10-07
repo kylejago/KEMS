@@ -1,4 +1,4 @@
-"""Pure authority gate for bounded non-Agile FoxESS control."""
+"""Pure authority gate for bounded FoxESS control, including paid export."""
 
 from __future__ import annotations
 
@@ -19,6 +19,8 @@ class FoxESSControlDecision:
     action: str
     reason: str
     force_charge_power_kw: float | None = None
+    force_discharge_power_kw: float | None = None
+    export_power_limit_kw: float | None = None
     min_soc_on_grid_percent: float | None = None
 
 
@@ -190,13 +192,15 @@ def assess_foxess_control_write_authority(
     user_commissioned: bool,
     master_control_enabled: bool,
     emergency_stop: bool,
+    effective_export_limit_kw: float | None = None,
 ) -> FoxESSControlDecision:
-    """Return the narrow non-Agile hardware action.
+    """Return the bounded hardware action for the current physical policy.
 
-    Outside a confirmed cheap period the only normal grid-connected action is
-    Self Use. Confirmed cheap periods may use Force Charge. Deliberate/economic
-    Force Discharge, Agile/paid-export control and import/export power-limit
-    writes remain outside this authority.
+    No-paid-export keeps the proven Self Use / confirmed-cheap Force Charge
+    contract.  Once a paid export tariff is explicitly selected, deliberate
+    export may use Force Discharge only inside the same commissioning/safety
+    envelope and only below the independently proven effective export ceiling.
+    Import Power Limit remains outside KEMS authority.
     """
     backend_available = bool(binding_ready and reviewed_version_matches)
 
@@ -234,15 +238,25 @@ def assess_foxess_control_write_authority(
         return blocked(
             "Grid unavailable/island mode is owned by local inverter protection"
         )
-    if not no_paid_export_mode:
-        return blocked("Paid/Agile export control is outside the current live scope")
+    desired_export = max(float(control.desired_battery_export_power_kw), 0.0)
+    if no_paid_export_mode and (
+        control.desired_grid_export_allowed or desired_export > _EPSILON_KW
+    ):
+        return blocked("No-paid-export policy forbids deliberate battery/grid export")
     if (
-        control.desired_grid_export_allowed
-        or control.desired_battery_export_power_kw > _EPSILON_KW
+        not no_paid_export_mode
+        and desired_export > _EPSILON_KW
+        and not control.desired_grid_export_allowed
     ):
         return blocked(
-            "Deliberate battery/grid export is outside the current live scope"
+            "Paid export target is contradictory because grid export is disabled"
         )
+    if (
+        not no_paid_export_mode
+        and control.operating_reason == "power_down_session"
+        and desired_export > _EPSILON_KW
+    ):
+        return blocked("Power Down deliberate export is not promoted by Alpha9.82")
 
     # Alpha9.69 introduces new SOC-floor and EV/load routing semantics. The
     # old Alpha9.67 live contract never validated their physical KH7 behaviour.
@@ -277,12 +291,41 @@ def assess_foxess_control_write_authority(
             min_soc_on_grid_percent=min_soc,
         )
 
+    if not no_paid_export_mode and desired_export > _EPSILON_KW:
+        try:
+            export_ceiling = float(effective_export_limit_kw)
+        except (TypeError, ValueError):
+            export_ceiling = 0.0
+        if not isfinite(export_ceiling) or export_ceiling <= _EPSILON_KW:
+            return blocked(
+                "Paid export requires a positive proven FoxESS/KEMS export ceiling"
+            )
+        force_discharge = min(desired_export, export_ceiling)
+        if force_discharge <= _EPSILON_KW:
+            return blocked("Paid export target is below the usable control threshold")
+        return FoxESSControlDecision(
+            backend_available=True,
+            commands_permitted=True,
+            action="force_discharge",
+            reason=(
+                "Paid export Force Discharge is inside the Alpha9.82 bounded "
+                "live scope"
+            ),
+            force_discharge_power_kw=round(force_discharge, 3),
+            export_power_limit_kw=round(export_ceiling, 3),
+            min_soc_on_grid_percent=min_soc,
+        )
+
     if control.desired_work_mode in {"Self Use", "Feed-in First"}:
         return FoxESSControlDecision(
             backend_available=True,
             commands_permitted=True,
             action="self_use",
-            reason="No-paid-export Self Use is inside the bounded live scope",
+            reason=(
+                "No-paid-export Self Use is inside the bounded live scope"
+                if no_paid_export_mode
+                else "Paid-export idle Self Use is inside the bounded live scope"
+            ),
             min_soc_on_grid_percent=min_soc,
         )
 

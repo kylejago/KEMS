@@ -1,13 +1,12 @@
-"""Bounded non-Agile FoxESS control backend.
+"""Bounded FoxESS control backend with staged paid-export commissioning.
 
-Live KEMS writes are intentionally limited to:
-- local Self Use ownership,
-- confirmed-cheap-period Force Charge,
-- Min SoC-on-grid enforcement,
-- fail-safe release back to the pre-KEMS local mode.
+The proven no-paid-export Self Use / confirmed-cheap Force Charge / MinSOC path
+is retained unchanged.  Alpha9.82 additionally permits explicitly selected paid
+export through Force Discharge only after the KEMS export ceiling is written and
+verified, with a 1 kW first-export stage proving physical battery/grid direction
+before the optimiser may request the full bounded target.
 
-Deliberate/economic Force Discharge, Agile/paid-export control and Import/Export
-Power Limit writes remain blocked.
+Import Power Limit is never written.
 """
 
 from __future__ import annotations
@@ -31,6 +30,12 @@ from .kems_core.control_write_authority import (
 )
 
 _STORAGE_VERSION = 1
+_PAID_EXPORT_STAGE_KW = 1.0
+_PAID_EXPORT_PROOF_SAMPLES = 2
+_PAID_EXPORT_FAILURE_SAMPLES = 3
+_PAID_EXPORT_MAX_SOLAR_KW = 0.5
+_PAID_EXPORT_MIN_GRID_EXPORT_KW = 0.2
+_PAID_EXPORT_MIN_BATTERY_DISCHARGE_KW = 0.25
 _LOCAL_WORK_MODES = {"Self Use", "Feed-in First", "Back-up"}
 _REMOTE_WORK_MODES = {"Force Charge", "Force Discharge"}
 
@@ -58,6 +63,13 @@ class FoxESSControlBackend:
         self._owned = False
         self._previous_work_mode: str | None = None
         self._previous_min_soc_on_grid: float | None = None
+        self._previous_force_discharge_power_kw: float | None = None
+        self._previous_export_power_limit_w: float | None = None
+        self._paid_export_live_proven = False
+        self._paid_export_stage_samples = 0
+        self._paid_export_stage_failures = 0
+        self._paid_export_stage_blocked = False
+        self._paid_export_stage_reason: str | None = None
         self._last_applied_action: str | None = None
         self._last_verified_min_soc_on_grid: float | None = None
         self._last_verified_min_soc_at: str | None = None
@@ -80,10 +92,24 @@ class FoxESSControlBackend:
             self._previous_min_soc_on_grid = _number(
                 data.get("previous_min_soc_on_grid")
             )
+            self._previous_force_discharge_power_kw = _number(
+                data.get("previous_force_discharge_power_kw")
+            )
+            self._previous_export_power_limit_w = _number(
+                data.get("previous_export_power_limit_w")
+            )
+            # Physical paid-export proof is session-scoped.  A restart must
+            # re-stage at 1 kW before full Force Discharge is allowed.
+            self._paid_export_live_proven = False
+            self._paid_export_stage_blocked = bool(
+                data.get("paid_export_stage_blocked", False)
+            )
+            stage_reason = data.get("paid_export_stage_reason")
+            self._paid_export_stage_reason = str(stage_reason) if stage_reason else None
             last_action = data.get("last_applied_action")
             self._last_applied_action = (
                 str(last_action)
-                if last_action in {"self_use", "force_charge"}
+                if last_action in {"self_use", "force_charge", "force_discharge"}
                 else None
             )
             self._last_verified_min_soc_on_grid = _number(
@@ -98,6 +124,12 @@ class FoxESSControlBackend:
                 "owned": self._owned,
                 "previous_work_mode": self._previous_work_mode,
                 "previous_min_soc_on_grid": self._previous_min_soc_on_grid,
+                "previous_force_discharge_power_kw": (
+                    self._previous_force_discharge_power_kw
+                ),
+                "previous_export_power_limit_w": self._previous_export_power_limit_w,
+                "paid_export_stage_blocked": self._paid_export_stage_blocked,
+                "paid_export_stage_reason": self._paid_export_stage_reason,
                 "last_applied_action": self._last_applied_action,
                 "last_verified_min_soc_on_grid": (self._last_verified_min_soc_on_grid),
                 "last_verified_min_soc_at": self._last_verified_min_soc_at,
@@ -129,6 +161,51 @@ class FoxESSControlBackend:
             return None
         entity_id = item.get("entity_id")
         return str(entity_id) if entity_id else None
+
+    @staticmethod
+    def _observation_entity_id(
+        entities: dict[str, Any],
+        key: str,
+    ) -> str | None:
+        item = entities.get(key)
+        if not isinstance(item, dict) or item.get("status") != "PASS":
+            return None
+        observed = item.get("readback_entity_id") or item.get("entity_id")
+        return str(observed) if observed else None
+
+    async def _async_wait_number(
+        self,
+        entities: dict[str, Any],
+        key: str,
+        expected: float,
+        *,
+        tolerance: float,
+        attempts: int = 12,
+    ) -> bool:
+        entity_id = self._observation_entity_id(entities, key)
+        if entity_id is None:
+            return False
+        for _ in range(attempts):
+            state = self._hass.states.get(entity_id)
+            value = _number(state.state if state is not None else None)
+            if value is not None and abs(value - expected) <= tolerance:
+                return True
+            await asyncio.sleep(0.25)
+        return False
+
+    async def _async_wait_state(
+        self,
+        entity_id: str,
+        expected: str,
+        *,
+        attempts: int = 12,
+    ) -> bool:
+        for _ in range(attempts):
+            state = self._hass.states.get(entity_id)
+            if state is not None and str(state.state) == expected:
+                return True
+            await asyncio.sleep(0.25)
+        return False
 
     async def _async_select(
         self,
@@ -212,8 +289,12 @@ class FoxESSControlBackend:
 
         work = entities.get("work_mode") or {}
         min_soc = entities.get("min_soc_on_grid") or {}
+        force_discharge = entities.get("force_discharge_power") or {}
+        export_limit = entities.get("export_power_limit") or {}
         work_mode = work.get("normalised_observation")
         min_soc_value = _number(min_soc.get("normalised_observation"))
+        force_discharge_value = _number(force_discharge.get("normalised_observation"))
+        export_limit_value = _number(export_limit.get("normalised_observation"))
 
         if work_mode in _REMOTE_WORK_MODES:
             return (
@@ -227,11 +308,168 @@ class FoxESSControlBackend:
 
         self._previous_work_mode = str(work_mode)
         self._previous_min_soc_on_grid = min_soc_value
+        self._previous_force_discharge_power_kw = force_discharge_value
+        self._previous_export_power_limit_w = export_limit_value
         self._last_verified_min_soc_on_grid = None
         self._last_verified_min_soc_at = None
         self._owned = True
         await self._async_save()
         return True, "KEMS ownership captured with restorable local settings"
+
+    async def _async_complete_paid_export_baseline(
+        self,
+        entities: dict[str, Any],
+    ) -> tuple[bool, str]:
+        """Capture paid-export settings for owners created before Alpha9.82."""
+        if not self._owned:
+            return False, "KEMS does not own FoxESS"
+        if (
+            self._previous_force_discharge_power_kw is not None
+            and self._previous_export_power_limit_w is not None
+        ):
+            return True, "Paid-export restore baseline is already complete"
+
+        work = entities.get("work_mode") or {}
+        work_mode = work.get("normalised_observation")
+        if work_mode in _REMOTE_WORK_MODES:
+            return False, (
+                "Cannot capture paid-export baseline while FoxESS remote control "
+                f"is already active: {work_mode!r}"
+            )
+        force_discharge = entities.get("force_discharge_power") or {}
+        export_limit = entities.get("export_power_limit") or {}
+        force_value = _number(force_discharge.get("normalised_observation"))
+        export_value = _number(export_limit.get("normalised_observation"))
+        if force_value is None or export_value is None:
+            return (
+                False,
+                "Paid-export Force Discharge/export-limit readback unavailable",
+            )
+
+        self._previous_force_discharge_power_kw = force_value
+        self._previous_export_power_limit_w = export_value
+        await self._async_save()
+        return True, "Paid-export restore baseline captured"
+
+    async def _async_restore_paid_export_settings(
+        self,
+        entities: dict[str, Any],
+        writes: list[str],
+    ) -> bool:
+        """Restore settings changed only by the paid-export path."""
+        ok = True
+        force_entity = self._entity_id(entities, "force_discharge_power")
+        export_entity = self._entity_id(entities, "export_power_limit")
+        if self._previous_force_discharge_power_kw is not None:
+            if force_entity is None:
+                ok = False
+            else:
+                ok = bool(
+                    await self._async_number(
+                        force_entity,
+                        self._previous_force_discharge_power_kw,
+                        writes,
+                        tolerance=0.05,
+                    )
+                    and await self._async_wait_number(
+                        entities,
+                        "force_discharge_power",
+                        self._previous_force_discharge_power_kw,
+                        tolerance=0.05,
+                    )
+                    and ok
+                )
+        if self._previous_export_power_limit_w is not None:
+            if export_entity is None:
+                ok = False
+            else:
+                ok = bool(
+                    await self._async_number(
+                        export_entity,
+                        self._previous_export_power_limit_w,
+                        writes,
+                        tolerance=1.0,
+                    )
+                    and await self._async_wait_number(
+                        entities,
+                        "export_power_limit",
+                        self._previous_export_power_limit_w,
+                        tolerance=1.0,
+                    )
+                    and ok
+                )
+        return ok
+
+    async def _async_observe_paid_export_stage(
+        self,
+        *,
+        snapshot: Any,
+        entities: dict[str, Any],
+        config: Any,
+    ) -> None:
+        """Promote the 1 kW first-export stage only after physical direction proof."""
+        if (
+            self._paid_export_live_proven
+            or self._paid_export_stage_blocked
+            or self._last_applied_action != "force_discharge"
+        ):
+            return
+
+        work = entities.get("work_mode") or {}
+        mode = str(work.get("normalised_observation") or "")
+        if mode != "Force Discharge":
+            return
+
+        stale = set(getattr(snapshot, "stale_fields", ()) or ())
+        if {"battery_power_kw", "grid_export_kw", "solar_power_kw"} & stale:
+            return
+        solar = _number(getattr(snapshot, "solar_power_kw", None))
+        battery = _number(getattr(snapshot, "battery_power_kw", None))
+        grid_export = _number(getattr(snapshot, "grid_export_kw", None))
+        export_limit = _number(
+            (entities.get("export_power_limit") or {}).get("normalised_observation")
+        )
+        if None in (solar, battery, grid_export, export_limit):
+            return
+        if solar > _PAID_EXPORT_MAX_SOLAR_KW:
+            return
+
+        if not bool(getattr(config, "battery_power_positive_is_discharge", True)):
+            battery = -battery
+
+        expected_limit_w = float(getattr(config, "export_limit_kw", 0.0)) * 1000.0
+        limit_verified = abs(export_limit - expected_limit_w) <= 1.0
+        direction_verified = bool(
+            battery >= _PAID_EXPORT_MIN_BATTERY_DISCHARGE_KW
+            and grid_export >= _PAID_EXPORT_MIN_GRID_EXPORT_KW
+        )
+        if limit_verified and direction_verified:
+            self._paid_export_stage_samples += 1
+            self._paid_export_stage_failures = 0
+            self._paid_export_stage_reason = (
+                f"Physical paid-export proof sample "
+                f"{self._paid_export_stage_samples}/{_PAID_EXPORT_PROOF_SAMPLES}"
+            )
+            if self._paid_export_stage_samples >= _PAID_EXPORT_PROOF_SAMPLES:
+                self._paid_export_live_proven = True
+                self._paid_export_stage_reason = (
+                    "Physical battery-discharge and grid-export directions proven"
+                )
+                await self._async_save()
+            return
+
+        self._paid_export_stage_samples = 0
+        self._paid_export_stage_failures += 1
+        self._paid_export_stage_reason = (
+            "Staged Force Discharge did not prove battery discharge + grid export "
+            f"({self._paid_export_stage_failures}/{_PAID_EXPORT_FAILURE_SAMPLES})"
+        )
+        if self._paid_export_stage_failures >= _PAID_EXPORT_FAILURE_SAMPLES:
+            self._paid_export_stage_blocked = True
+            self._paid_export_stage_reason = (
+                "Paid export blocked after repeated failed 1 kW physical proof"
+            )
+            await self._async_save()
 
     async def _async_restore(
         self,
@@ -274,9 +512,18 @@ class FoxESSControlBackend:
                 and abs(restored_soc - self._previous_min_soc_on_grid) <= 0.05
             )
 
-        if mode_ok and soc_ok and mode_verified and soc_verified:
+        paid_settings_ok = await self._async_restore_paid_export_settings(
+            entities,
+            writes,
+        )
+        if mode_ok and soc_ok and mode_verified and soc_verified and paid_settings_ok:
             self._owned = False
             self._last_applied_action = None
+            self._paid_export_live_proven = False
+            self._paid_export_stage_samples = 0
+            self._paid_export_stage_failures = 0
+            if not self._paid_export_stage_blocked:
+                self._paid_export_stage_reason = None
             self._last_verified_min_soc_on_grid = None
             self._last_verified_min_soc_at = None
             self._last_write_result = "KEMS FoxESS ownership released safely"
@@ -284,8 +531,8 @@ class FoxESSControlBackend:
             return True
         if mode_ok and soc_ok:
             self._last_write_result = (
-                "FoxESS restore command accepted; awaiting verified work mode / "
-                "MinSOC readback"
+                "FoxESS restore command accepted; awaiting verified work mode, "
+                "MinSOC or paid-export setting readback"
             )
             await self._async_save()
         return False
@@ -328,6 +575,7 @@ class FoxESSControlBackend:
         *,
         coordinator: Any,
         control: Any,
+        snapshot: Any,
         technical_ready: bool,
         no_paid_export_mode: bool,
         cheap_period_confirmed: bool,
@@ -345,7 +593,9 @@ class FoxESSControlBackend:
         binding = shadow.get("entity_binding")
         binding_root = dict(binding) if isinstance(binding, dict) else {}
         entities = self._binding_entities(shadow)
-        required_keys = ("work_mode", "force_charge_power", "min_soc_on_grid")
+        required_keys = ["work_mode", "force_charge_power", "min_soc_on_grid"]
+        if not no_paid_export_mode:
+            required_keys.extend(("force_discharge_power", "export_power_limit"))
         binding_ready = bool(
             binding_root.get("status") == "PASS"
             and all(
@@ -356,6 +606,28 @@ class FoxESSControlBackend:
         )
         observed_version = await self._foxess_version()
         version_matches = observed_version == FOXESS_MODBUS_REVIEWED_VERSION
+        effective_export_limit_kw = _number(shadow.get("effective_export_limit_kw"))
+
+        if no_paid_export_mode:
+            reset_needed = bool(
+                self._paid_export_live_proven
+                or self._paid_export_stage_samples
+                or self._paid_export_stage_failures
+                or self._paid_export_stage_blocked
+            )
+            self._paid_export_live_proven = False
+            self._paid_export_stage_samples = 0
+            self._paid_export_stage_failures = 0
+            self._paid_export_stage_blocked = False
+            self._paid_export_stage_reason = None
+            if reset_needed:
+                await self._async_save()
+        else:
+            await self._async_observe_paid_export_stage(
+                snapshot=snapshot,
+                entities=entities,
+                config=coordinator.settings.control,
+            )
 
         min_soc_item = entities.get("min_soc_on_grid")
         observed_min_soc = _number(
@@ -421,7 +693,22 @@ class FoxESSControlBackend:
             user_commissioned=bool(coordinator.settings.control.commissioned),
             master_control_enabled=bool(coordinator.settings.control.control_enabled),
             emergency_stop=bool(coordinator.settings.control.emergency_stop),
+            effective_export_limit_kw=effective_export_limit_kw,
         )
+
+        if (
+            not no_paid_export_mode
+            and decision.action == "force_discharge"
+            and self._paid_export_stage_blocked
+        ):
+            decision = FoxESSControlDecision(
+                backend_available=decision.backend_available,
+                commands_permitted=False,
+                action="release",
+                reason=self._paid_export_stage_reason
+                or "Paid export physical proof is blocked",
+                min_soc_on_grid_percent=decision.min_soc_on_grid_percent,
+            )
 
         writes: list[str] = []
         applied = False
@@ -489,6 +776,10 @@ class FoxESSControlBackend:
                     reason = f"{reason}; KEMS-owned state restore is pending"
         else:
             owned, ownership_reason = await self._async_take_ownership(entities)
+            if owned and not no_paid_export_mode:
+                owned, ownership_reason = (
+                    await self._async_complete_paid_export_baseline(entities)
+                )
             if not owned:
                 decision = FoxESSControlDecision(
                     backend_available=decision.backend_available,
@@ -498,6 +789,8 @@ class FoxESSControlBackend:
                     min_soc_on_grid_percent=decision.min_soc_on_grid_percent,
                 )
                 reason = ownership_reason
+                if self._owned:
+                    await self._async_restore(entities, writes)
             else:
                 work_mode_entity = self._entity_id(entities, "work_mode")
                 charge_power_entity = self._entity_id(
@@ -505,10 +798,23 @@ class FoxESSControlBackend:
                     "force_charge_power",
                 )
                 min_soc_entity = self._entity_id(entities, "min_soc_on_grid")
+                force_discharge_entity = self._entity_id(
+                    entities,
+                    "force_discharge_power",
+                )
+                export_limit_entity = self._entity_id(
+                    entities,
+                    "export_power_limit",
+                )
+                paid_entities_missing = bool(
+                    not no_paid_export_mode
+                    and (force_discharge_entity is None or export_limit_entity is None)
+                )
                 if (
                     work_mode_entity is None
                     or charge_power_entity is None
                     or min_soc_entity is None
+                    or paid_entities_missing
                 ):
                     reason = "Reviewed FoxESS write entities disappeared before write"
                     decision = FoxESSControlDecision(
@@ -563,7 +869,78 @@ class FoxESSControlBackend:
                                 "Force Charge",
                                 writes,
                             )
+                    elif (
+                        min_soc_ok
+                        and decision.action == "force_discharge"
+                        and decision.force_discharge_power_kw is not None
+                        and decision.export_power_limit_kw is not None
+                        and force_discharge_entity is not None
+                        and export_limit_entity is not None
+                    ):
+                        requested_discharge = float(decision.force_discharge_power_kw)
+                        if not self._paid_export_live_proven:
+                            requested_discharge = min(
+                                requested_discharge,
+                                _PAID_EXPORT_STAGE_KW,
+                            )
+                        export_limit_w = float(decision.export_power_limit_kw) * 1000.0
+                        export_limit_ok = await self._async_number(
+                            export_limit_entity,
+                            export_limit_w,
+                            writes,
+                            tolerance=1.0,
+                        )
+                        if export_limit_ok:
+                            export_limit_ok = await self._async_wait_number(
+                                entities,
+                                "export_power_limit",
+                                export_limit_w,
+                                tolerance=1.0,
+                            )
+                        discharge_ok = False
+                        if export_limit_ok:
+                            discharge_ok = await self._async_number(
+                                force_discharge_entity,
+                                requested_discharge,
+                                writes,
+                                tolerance=0.05,
+                            )
+                        if discharge_ok:
+                            discharge_ok = await self._async_wait_number(
+                                entities,
+                                "force_discharge_power",
+                                requested_discharge,
+                                tolerance=0.05,
+                            )
+                        if discharge_ok:
+                            mode_ok = await self._async_select(
+                                work_mode_entity,
+                                "Force Discharge",
+                                writes,
+                            )
+                            if mode_ok:
+                                action_ok = await self._async_wait_state(
+                                    work_mode_entity,
+                                    "Force Discharge",
+                                )
+                        if action_ok and not self._paid_export_live_proven:
+                            self._paid_export_stage_reason = (
+                                "1.0 kW first-export stage applied; awaiting two "
+                                "low-solar physical direction samples"
+                            )
                     applied = bool(min_soc_ok and action_ok)
+                    if (
+                        applied
+                        and no_paid_export_mode
+                        and decision.action == "self_use"
+                    ):
+                        paid_restore_ok = (
+                            await self._async_restore_paid_export_settings(
+                                entities,
+                                writes,
+                            )
+                        )
+                        applied = bool(applied and paid_restore_ok)
                     if applied:
                         if self._last_applied_action != decision.action:
                             self._last_applied_action = decision.action
@@ -599,9 +976,23 @@ class FoxESSControlBackend:
                             )
                         else:
                             self._last_write_result = (
-                                "Alpha9.67 bounded FoxESS command applied"
+                                (
+                                    "Alpha9.82 bounded paid-export command applied"
+                                    if decision.action == "force_discharge"
+                                    else "Alpha9.67 bounded FoxESS command applied"
+                                )
                                 if writes
-                                else "Alpha9.67 bounded FoxESS command already matched"
+                                else (
+                                    (
+                                        "Alpha9.82 bounded paid-export command "
+                                        "already matched"
+                                    )
+                                    if decision.action == "force_discharge"
+                                    else (
+                                        "Alpha9.67 bounded FoxESS command "
+                                        "already matched"
+                                    )
+                                )
                             )
                     else:
                         decision = FoxESSControlDecision(
@@ -614,7 +1005,7 @@ class FoxESSControlBackend:
                         await self._async_restore(entities, writes)
 
         payload = {
-            "scope": "alpha9.67_self_use_cheap_charge",
+            "scope": "alpha9.82_bounded_control_with_paid_export",
             "reviewed_foxess_modbus_version": FOXESS_MODBUS_REVIEWED_VERSION,
             "observed_foxess_modbus_version": observed_version,
             "reviewed_version_matches": version_matches,
@@ -689,14 +1080,39 @@ class FoxESSControlBackend:
             "last_write_at": self._last_write_at,
             "last_write_result": self._last_write_result,
             "normal_non_cheap_mode": "Self Use",
-            "deliberate_force_discharge": "blocked_in_current_release",
-            "paid_or_agile_export_control": "blocked_in_current_release",
-            "export_power_limit_write": "never_written_by_alpha9.67",
-            "import_power_limit_write": "never_written_by_alpha9.67",
+            "deliberate_force_discharge": (
+                "bounded_live_when_paid_export_selected"
+                if not no_paid_export_mode
+                else "blocked_by_no_paid_export"
+            ),
+            "paid_or_agile_export_control": (
+                "bounded_live"
+                if not no_paid_export_mode
+                else "blocked_by_no_paid_export"
+            ),
+            "effective_export_limit_kw": effective_export_limit_kw,
+            "paid_export_live_proven": self._paid_export_live_proven,
+            "paid_export_stage_kw": _PAID_EXPORT_STAGE_KW,
+            "paid_export_stage_samples": self._paid_export_stage_samples,
+            "paid_export_stage_required_samples": _PAID_EXPORT_PROOF_SAMPLES,
+            "paid_export_stage_failures": self._paid_export_stage_failures,
+            "paid_export_stage_blocked": self._paid_export_stage_blocked,
+            "paid_export_stage_reason": self._paid_export_stage_reason,
+            "previous_force_discharge_power_kw": (
+                self._previous_force_discharge_power_kw
+            ),
+            "previous_export_power_limit_w": self._previous_export_power_limit_w,
+            "export_power_limit_write": (
+                "bounded_to_effective_ceiling_when_paid_export_is_active"
+                if not no_paid_export_mode
+                else "restored_or_untouched"
+            ),
+            "import_power_limit_write": "never_written_by_alpha9.82",
             "safety_release": (
-                "restore pre-KEMS local mode and Min SoC-on-grid when owned; "
-                "an already-applied confirmed-cheap Self Use EV hold is frozen "
-                "without writes across transient telemetry/readiness loss"
+                "restore pre-KEMS local mode, Min SoC-on-grid, Force Discharge "
+                "setpoint and Export Power Limit when owned; an already-applied "
+                "confirmed-cheap Self Use EV hold is frozen without writes "
+                "across transient telemetry/readiness loss"
             ),
         }
         self._status = payload
