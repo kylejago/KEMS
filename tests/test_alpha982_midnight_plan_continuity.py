@@ -37,12 +37,11 @@ def _load_handoff():
     core.__path__ = []
     sys.modules[core.__name__] = core
 
-    handoff_helpers = types.ModuleType(
-        f"{package_name}.kems_core.tomorrow_soc_handoff"
-    )
+    handoff_helpers = types.ModuleType(f"{package_name}.kems_core.tomorrow_soc_handoff")
     handoff_helpers.project_tomorrow_midnight_soc = lambda *args, **kwargs: (0.0, {})
-    handoff_helpers.reconcile_precheap_projection = (
-        lambda **kwargs: (kwargs.get("projected_precheap_soc_percent"), {})
+    handoff_helpers.reconcile_precheap_projection = lambda **kwargs: (
+        kwargs.get("projected_precheap_soc_percent"),
+        {},
     )
     sys.modules[handoff_helpers.__name__] = handoff_helpers
 

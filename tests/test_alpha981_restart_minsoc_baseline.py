@@ -87,7 +87,9 @@ def test_restore_keeps_ownership_until_work_mode_and_minsoc_read_back() -> None:
 
     assert "mode_verified = bool(" in restore
     assert "soc_verified = bool(" in restore
-    assert "paid_settings_ok = await self._async_restore_paid_export_settings(" in restore
+    assert (
+        "paid_settings_ok = await self._async_restore_paid_export_settings(" in restore
+    )
     assert (
         "if mode_ok and soc_ok and mode_verified and soc_verified and paid_settings_ok:"
         in restore
