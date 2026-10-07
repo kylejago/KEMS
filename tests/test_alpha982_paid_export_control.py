@@ -152,11 +152,9 @@ def test_first_physical_export_is_staged_and_limit_is_verified_first() -> None:
     assert "requested_discharge," in live
     export_write = live.index("export_limit_ok = await self._async_number(")
     export_verify = live.index(
-        (
-            "self._async_wait_number(\n"
-            "                                entities,\n"
-            '                                "export_power_limit"'
-        )
+        "self._async_wait_number(\n"
+        "                                entities,\n"
+        '                                "export_power_limit"'
     )
     discharge_write = live.index("discharge_ok = await self._async_number(")
     mode_write = live.index(
