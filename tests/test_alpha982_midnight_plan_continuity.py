@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import importlib
 import importlib.util
 import sys
 import types
@@ -16,48 +15,51 @@ LONDON = ZoneInfo("Europe/London")
 
 
 def _load_handoff():
-    aiohttp = types.ModuleType("aiohttp")
-    aiohttp.ClientError = type("ClientError", (Exception,), {})
-    sys.modules.setdefault("aiohttp", aiohttp)
-
-    homeassistant = types.ModuleType("homeassistant")
-    homeassistant.__path__ = []
-    core = types.ModuleType("homeassistant.core")
-    core.HomeAssistant = object
-    helpers = types.ModuleType("homeassistant.helpers")
-    helpers.__path__ = []
-    aiohttp_client = types.ModuleType("homeassistant.helpers.aiohttp_client")
-    aiohttp_client.async_get_clientsession = lambda hass: None
-    storage = types.ModuleType("homeassistant.helpers.storage")
-
-    class Store:
-        def __class_getitem__(cls, item):
-            return cls
-
-    storage.Store = Store
-    sys.modules.setdefault("homeassistant", homeassistant)
-    sys.modules.setdefault("homeassistant.core", core)
-    sys.modules.setdefault("homeassistant.helpers", helpers)
-    sys.modules.setdefault("homeassistant.helpers.aiohttp_client", aiohttp_client)
-    sys.modules.setdefault("homeassistant.helpers.storage", storage)
-
-    custom_components = types.ModuleType("custom_components")
-    custom_components.__path__ = [str(ROOT / "custom_components")]
-    package = types.ModuleType("custom_components.kems")
+    package_name = "alpha982_midnight_test"
+    package = types.ModuleType(package_name)
     package.__path__ = [str(INTEGRATION)]
-    sys.modules.setdefault("custom_components", custom_components)
-    sys.modules.setdefault("custom_components.kems", package)
+    sys.modules[package_name] = package
 
-    agile_name = "custom_components.kems.agile_smart_export"
+    agile = types.ModuleType(f"{package_name}.agile_smart_export")
+    agile.LONDON = LONDON
+    agile._aggregate = lambda *args, **kwargs: {}
+    agile._quality = lambda *args, **kwargs: {}
+    sys.modules[agile.__name__] = agile
+
+    core = types.ModuleType(f"{package_name}.kems_core")
+    for name in (
+        "ForecastPlanState",
+        "LearnedState",
+        "SimulationConfig",
+        "SolarForecastState",
+    ):
+        setattr(core, name, type(name, (), {}))
+    core.__path__ = []
+    sys.modules[core.__name__] = core
+
+    handoff_helpers = types.ModuleType(
+        f"{package_name}.kems_core.tomorrow_soc_handoff"
+    )
+    handoff_helpers.project_tomorrow_midnight_soc = lambda *args, **kwargs: (0.0, {})
+    handoff_helpers.reconcile_precheap_projection = (
+        lambda **kwargs: (kwargs.get("projected_precheap_soc_percent"), {})
+    )
+    sys.modules[handoff_helpers.__name__] = handoff_helpers
+
+    tariff = types.ModuleType(f"{package_name}.tariff")
+    tariff.TariffSettings = type("TariffSettings", (), {})
+    sys.modules[tariff.__name__] = tariff
+
+    module_name = f"{package_name}.agile_settled_soc_handoff"
     spec = importlib.util.spec_from_file_location(
-        agile_name,
-        INTEGRATION / "agile_smart_export.py",
+        module_name,
+        INTEGRATION / "agile_settled_soc_handoff.py",
     )
     assert spec is not None and spec.loader is not None
-    agile = importlib.util.module_from_spec(spec)
-    sys.modules[agile_name] = agile
-    spec.loader.exec_module(agile)
-    return importlib.import_module("custom_components.kems.agile_settled_soc_handoff")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[module_name] = module
+    spec.loader.exec_module(module)
+    return module
 
 
 def test_today_final_display_soc_is_exact_tomorrow_boundary_authority() -> None:

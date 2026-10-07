@@ -244,8 +244,10 @@ def test_backend_paid_export_surface_is_bounded_and_import_limit_stays_absent() 
         'required_keys.extend(("force_discharge_power", "export_power_limit"))'
         in source
     )
-    assert '_entity_id(entities, "force_discharge_power")' in live
-    assert '_entity_id(entities, "export_power_limit")' in live
+    assert "force_discharge_entity = self._entity_id(" in live
+    assert '"force_discharge_power"' in live
+    assert "export_limit_entity = self._entity_id(" in live
+    assert '"export_power_limit"' in live
     assert 'decision.action == "force_discharge"' in live
     assert "_PAID_EXPORT_STAGE_KW = 1.0" in source
     assert '"import_power_limit"' not in live.split("payload = {", 1)[0]

@@ -684,8 +684,8 @@ def test_live_plan_and_independent_shadow_preview_are_not_cross_wired() -> None:
         "control = apply_happy_hour_control(control, snapshot, happy_hour_plan)"
         in coordinator
     )
-    assert "control=control,\n                technical_ready=" in coordinator
-    assert "control=proposal,\n                technical_ready=" not in coordinator
+    assert "control=control,\n                snapshot=snapshot,\n                technical_ready=" in coordinator
+    assert "control=proposal,\n                snapshot=snapshot,\n                technical_ready=" not in coordinator
     assert "alpha969_shadow_plan: dict[str, Any]" in data
     assert 'key="alpha969_shadow_proposal"' in (root / "sensor.py").read_text(
         encoding="utf-8"
