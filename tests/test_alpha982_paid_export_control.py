@@ -215,6 +215,7 @@ def test_paid_export_physical_proof_is_session_scoped() -> None:
     assert "if no_paid_export_mode:" in source
     assert "self._paid_export_live_proven = False" in source
 
+
 def test_alpha982_release_identity_and_dormant_no_export_contract() -> None:
     import json
 
