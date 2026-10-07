@@ -133,5 +133,6 @@ def test_commissioning_uses_only_fresh_foxess_proof_before_control_eligibility()
     assert (
         "user_commissioned=bool(coordinator.settings.control.commissioned)" in backend
     )
-    bounded_scope = '"deliberate_force_discharge": "blocked_in_current_release"'
-    assert bounded_scope in backend
+    assert '"deliberate_force_discharge": (' in backend
+    assert '"bounded_live_when_paid_export_selected"' in backend
+    assert '"blocked_by_no_paid_export"' in backend
