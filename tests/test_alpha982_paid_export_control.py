@@ -214,3 +214,24 @@ def test_paid_export_physical_proof_is_session_scoped() -> None:
     assert '"paid_export_live_proven"' not in save
     assert "if no_paid_export_mode:" in source
     assert "self._paid_export_live_proven = False" in source
+
+def test_alpha982_release_identity_and_dormant_no_export_contract() -> None:
+    import json
+
+    manifest = json.loads((KEMS / "manifest.json").read_text(encoding="utf-8"))
+    bundle = json.loads(
+        (ROOT / "release" / "kems-bundle.template.json").read_text(encoding="utf-8")
+    )
+    reason = str(bundle["maintenance"]["reason"])
+
+    assert manifest["version"] == "0.9.0-alpha9.82"
+    assert reason.startswith("Alpha9.82")
+    assert "1.0 kW" in reason
+    assert "two low-solar samples" in reason
+    assert "15% planning/export target" in reason
+    assert "10% on the commissioned KH7" in reason
+    assert "Power Down deliberate export is deliberately not promoted" in reason
+    assert "Import Power Limit is never written" in reason
+    assert "No paid export still hard-blocks deliberate Force Discharge" in reason
+    assert "Today-to-Tomorrow plan discontinuity" in reason
+    assert "new export writes remain dormant" in reason
