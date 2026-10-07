@@ -268,14 +268,18 @@ def test_coordinator_routes_guard_only_into_reviewed_existing_backend():
         in coordinator
     )
     assert "control = await self._ev_grid_hold.async_apply(" in coordinator
-    assert (
-        "control=control,\n                snapshot=snapshot,\n                technical_ready="
-        in coordinator
+    live_backend_call = (
+        "control=control,\n"
+        "                snapshot=snapshot,\n"
+        "                technical_ready="
     )
-    assert (
-        "control=proposal,\n                snapshot=snapshot,\n                technical_ready="
-        not in coordinator
+    shadow_backend_call = (
+        "control=proposal,\n"
+        "                snapshot=snapshot,\n"
+        "                technical_ready="
     )
+    assert live_backend_call in coordinator
+    assert shadow_backend_call not in coordinator
     backend = (root / "foxess_control_backend.py").read_text(encoding="utf-8")
     live = backend.split("async def async_update(", 1)[1].split("payload =", 1)[0]
     assert 'decision.action == "force_discharge"' in live
