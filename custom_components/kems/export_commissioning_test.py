@@ -75,6 +75,7 @@ class ExportCommissioningTestController:
         self._completed_at: datetime | None = None
         self._stop_reason: str | None = None
         self._latest_agile_target_kw: float | None = None
+        self._physical_only_commissioning = False
         self._command_target_kw = 0.0
         self._peak_grid_export_kw = 0.0
         self._exported_kwh = 0.0
@@ -303,6 +304,10 @@ class ExportCommissioningTestController:
         self._completed_at = None
         self._stop_reason = None
         self._latest_agile_target_kw = agile_export_target_kw(agile_state)
+        self._physical_only_commissioning = (
+            self._latest_agile_target_kw is not None
+            and self._latest_agile_target_kw <= 0.01
+        )
         self._command_target_kw = _PROOF_TARGET_KW
         self._peak_grid_export_kw = 0.0
         self._exported_kwh = 0.0
@@ -439,11 +444,15 @@ class ExportCommissioningTestController:
             # Simulated SOC can reach its reserve even when physical SOC is
             # healthy. A zero *available* plan permits only a bounded 1 kW
             # physical commissioning exercise, not strategy-driven export.
-            target = (
-                agile_target
-                if agile_target > 0.01
-                else _ZERO_PLAN_COMMISSIONING_TARGET_KW
-            )
+            if self._physical_only_commissioning:
+                target = _ZERO_PLAN_COMMISSIONING_TARGET_KW
+            elif agile_target <= 0.01:
+                await self.async_request_stop(
+                    "Live Agile export target fell to zero during stress"
+                )
+                return control, False
+            else:
+                target = agile_target
 
         house_battery = max(control.desired_battery_to_home_power_kw, 0.0)
         solar = max(_number(getattr(snapshot, "solar_power_kw", None)) or 0.0, 0.0)
@@ -513,8 +522,7 @@ class ExportCommissioningTestController:
                     if self._stage == "proof"
                     else "Verify bounded physical export for at most 60 seconds"
                     if self._stage == "agile_stress"
-                    and self._latest_agile_target_kw is not None
-                    and self._latest_agile_target_kw <= 0.01
+                    and self._physical_only_commissioning
                     else "Follow the live Agile export target for at most 60 seconds"
                 ),
             ),
