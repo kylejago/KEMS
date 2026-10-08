@@ -486,13 +486,26 @@ def test_live_agile_target_zero_during_stress_requests_safe_restore() -> None:
             agile_state=_agile(5.6),
             config=config,
             backend_status={"paid_export_live_proven": True},
+            no_paid_export_mode=True,
+            emergency_stop=False,
+            ev_hold_active=False,
+            now=now,
+        )
+    )
     assert promoted
-    result, _ = asyncio.run(controller.async_control_override(
-        control=control, snapshot=snapshot, agile_state=_agile(0.0),
-        config=config, backend_status={"paid_export_live_proven": True},
-        no_paid_export_mode=True, emergency_stop=False,
-        ev_hold_active=False, now=now,
-    ))
+    result, _ = asyncio.run(
+        controller.async_control_override(
+            control=control,
+            snapshot=snapshot,
+            agile_state=_agile(0.0),
+            config=config,
+            backend_status={"paid_export_live_proven": True},
+            no_paid_export_mode=True,
+            emergency_stop=False,
+            ev_hold_active=False,
+            now=now,
+        )
+    )
     assert result is control
     assert controller._restore_requested is True
     assert controller._command_target_kw == 0.0
