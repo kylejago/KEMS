@@ -298,3 +298,49 @@ def test_financial_contract_is_zero_income_and_recharge_cost_only() -> None:
     )
     assert "actual_avoided_import_value_pence" in source
     assert "actual_system_value_pence" in source
+
+def test_solar_repayment_clears_debt_without_financial_exclusion() -> None:
+    module = _load_module()
+    controller = module.ExportCommissioningTestController(object(), "entry")
+    start = datetime(2026, 10, 9, 10, 0, tzinfo=UTC)
+    controller._recharge_debt_stored_kwh = 0.1
+    controller._last_recharge_observation_at = start
+    snapshot = _snapshot(
+        start.replace(minute=1),
+        cheap_period_confirmed=False,
+        battery_power_kw=-1.0,
+        grid_import_kw=0.0,
+    )
+    config = types.SimpleNamespace(
+        battery_power_positive_is_discharge=True,
+        charge_efficiency=0.95,
+    )
+
+    asyncio.run(controller.async_observe_snapshot(snapshot, snapshot.timestamp, config))
+
+    assert controller._recharge_debt_stored_kwh < 0.1
+    assert controller._roi_excluded_recharge_cost_pence_by_date == {}
+
+
+def test_cheap_grid_repayment_creates_only_roi_recharge_exclusion() -> None:
+    module = _load_module()
+    controller = module.ExportCommissioningTestController(object(), "entry")
+    start = datetime(2026, 10, 9, 23, 30, tzinfo=UTC)
+    controller._recharge_debt_stored_kwh = 0.1
+    controller._last_recharge_observation_at = start
+    snapshot = _snapshot(
+        start.replace(minute=31),
+        cheap_period_confirmed=True,
+        battery_power_kw=-1.0,
+        grid_import_kw=2.0,
+        current_import_rate=8.0,
+    )
+    config = types.SimpleNamespace(
+        battery_power_positive_is_discharge=True,
+        charge_efficiency=0.95,
+    )
+
+    asyncio.run(controller.async_observe_snapshot(snapshot, snapshot.timestamp, config))
+
+    assert controller._recharge_debt_stored_kwh < 0.1
+    assert controller._roi_excluded_recharge_cost_pence_by_date["2026-10-09"] > 0

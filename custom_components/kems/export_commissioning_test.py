@@ -542,23 +542,16 @@ class ExportCommissioningTestController:
 
         self._last_observation_at = timestamp
 
-        if (
-            not self.active
-            and self._recharge_debt_stored_kwh > 1e-6
-            and bool(getattr(snapshot, "cheap_period_confirmed", False))
-        ):
+        if not self.active and self._recharge_debt_stored_kwh > 1e-6:
             rate = _number(getattr(snapshot, "current_import_rate", None))
             battery_power = _number(getattr(snapshot, "battery_power_kw", None))
             grid_import = max(
                 _number(getattr(snapshot, "grid_import_kw", None)) or 0.0,
                 0.0,
             )
-            if (
-                rate is not None
-                and battery_power is not None
-                and grid_import > 0.1
-                and self._last_observation_at is not None
-            ):
+            cheap = bool(getattr(snapshot, "cheap_period_confirmed", False))
+            prior = getattr(self, "_last_recharge_observation_at", None)
+            if battery_power is not None and prior is not None:
                 positive_is_discharge = bool(
                     getattr(config, "battery_power_positive_is_discharge", True)
                 )
@@ -566,32 +559,40 @@ class ExportCommissioningTestController:
                     -battery_power if positive_is_discharge else battery_power,
                     0.0,
                 )
-                # The normal scan-to-scan delta is used; the 90 s cap prevents
-                # an HA outage from fabricating a large financial exclusion.
-                prior = getattr(self, "_last_recharge_observation_at", None)
-                if prior is not None and battery_charge_kw > 0.1:
+                if battery_charge_kw > 0.1:
                     seconds = max(
                         min((timestamp - prior).total_seconds(), 90.0),
                         0.0,
                     )
                     stored_charge = battery_charge_kw * seconds / 3600.0
                     repaid = min(stored_charge, self._recharge_debt_stored_kwh)
-                    if repaid > 0:
+
+                    # Only cheap-grid replacement creates an ROI cost exclusion.
+                    # Solar/local replacement clears the physical debt at zero
+                    # financial value.  Unexpected daytime grid charging is left
+                    # unresolved rather than guessed.
+                    solar_or_local_replacement = not cheap and grid_import <= 0.1
+                    priced_grid_replacement = cheap and grid_import > 0.1 and rate is not None
+                    if repaid > 0 and (
+                        solar_or_local_replacement or priced_grid_replacement
+                    ):
                         self._recharge_debt_stored_kwh -= repaid
-                        grid_input = repaid / max(
-                            float(getattr(config, "charge_efficiency", 0.95)),
-                            0.01,
-                        )
-                        excluded_cost = grid_input * rate
-                        day = timestamp.date().isoformat()
-                        self._roi_excluded_recharge_cost_pence_by_date[day] = (
-                            self._roi_excluded_recharge_cost_pence_by_date.get(day, 0.0)
-                            + excluded_cost
-                        )
+                        if priced_grid_replacement:
+                            grid_input = repaid / max(
+                                float(getattr(config, "charge_efficiency", 0.95)),
+                                0.01,
+                            )
+                            excluded_cost = grid_input * float(rate)
+                            day = timestamp.date().isoformat()
+                            self._roi_excluded_recharge_cost_pence_by_date[day] = (
+                                self._roi_excluded_recharge_cost_pence_by_date.get(
+                                    day,
+                                    0.0,
+                                )
+                                + excluded_cost
+                            )
                         changed = True
-                self._last_recharge_observation_at = timestamp
-            else:
-                self._last_recharge_observation_at = timestamp
+            self._last_recharge_observation_at = timestamp
         else:
             self._last_recharge_observation_at = timestamp
 
