@@ -419,3 +419,42 @@ def test_missing_agile_plan_still_fails_closed() -> None:
     ))
     assert started is False
     assert "unavailable" in reason
+
+def test_live_agile_target_zero_during_stress_requests_safe_restore() -> None:
+    """A previously positive plan must not silently become physical-only."""
+    module = _load_module()
+    now = datetime(2026, 10, 8, 20, 0, tzinfo=UTC)
+    controller = module.ExportCommissioningTestController(object(), "entry")
+    snapshot = _snapshot(now)
+    control = _control()
+    config = ControlConfig(
+        operating_mode="control",
+        control_enabled=True,
+        commissioned=True,
+        normal_reserve_percent=10.0,
+        max_discharge_kw=7.0,
+        export_limit_kw=6.4,
+        inverter_limit_kw=7.0,
+    )
+    started, _ = asyncio.run(controller.async_start(
+        snapshot=snapshot, control=control, agile_state=_agile(5.6),
+        no_paid_export_mode=True, technical_ready=True,
+        emergency_stop=False, ev_hold_active=False, now=now,
+    ))
+    assert started
+    _, promoted = asyncio.run(controller.async_control_override(
+        control=control, snapshot=snapshot, agile_state=_agile(5.6),
+        config=config, backend_status={"paid_export_live_proven": True},
+        no_paid_export_mode=True, emergency_stop=False,
+        ev_hold_active=False, now=now,
+    ))
+    assert promoted
+    result, _ = asyncio.run(controller.async_control_override(
+        control=control, snapshot=snapshot, agile_state=_agile(0.0),
+        config=config, backend_status={"paid_export_live_proven": True},
+        no_paid_export_mode=True, emergency_stop=False,
+        ev_hold_active=False, now=now,
+    ))
+    assert result is control
+    assert controller._restore_requested is True
+    assert controller._command_target_kw == 0.0
