@@ -520,10 +520,12 @@ class ExportCommissioningTestController:
                 next_action=(
                     "Prove 1 kW battery discharge and physical grid export"
                     if self._stage == "proof"
-                    else "Verify bounded physical export for at most 60 seconds"
-                    if self._stage == "agile_stress"
-                    and self._physical_only_commissioning
-                    else "Follow the live Agile export target for at most 60 seconds"
+                    else (
+                        "Verify bounded physical export for at most 60 seconds"
+                        if self._stage == "agile_stress"
+                        and self._physical_only_commissioning
+                        else "Follow the live Agile export target for at most 60 seconds"
+                    )
                 ),
             ),
             stress_started,
