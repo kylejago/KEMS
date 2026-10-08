@@ -717,7 +717,7 @@ def test_alpha969_release_identity_is_explicitly_shadow_only() -> None:
     )
     reason = bundle["maintenance"]["reason"]
     assert manifest["version"] == "0.9.0-alpha9.83"
-    assert reason.startswith("Alpha9.82")
+    assert reason.startswith("Alpha9.83")
     assert "Alpha9.68 Control-mode cheap-period planner" in reason
     assert "No new KH7 output control" in reason
     assert bundle["components"]["property_web"]["version"] == "0.9.0-alpha9-web.0"
