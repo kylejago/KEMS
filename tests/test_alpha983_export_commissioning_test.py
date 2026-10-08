@@ -367,3 +367,55 @@ def test_cheap_grid_repayment_creates_only_roi_recharge_exclusion() -> None:
 
     assert controller._recharge_debt_stored_kwh < 0.1
     assert controller._roi_excluded_recharge_cost_pence_by_date["2026-10-09"] > 0
+
+def test_zero_simulated_agile_target_uses_bounded_physical_commissioning() -> None:
+    """A depleted simulation must not impersonate the healthy physical battery."""
+    module = _load_module()
+    now = datetime(2026, 10, 8, 20, 0, tzinfo=UTC)
+    controller = module.ExportCommissioningTestController(object(), "entry")
+    snapshot = _snapshot(now, battery_soc=82.0)
+    control = _control()
+    config = ControlConfig(
+        operating_mode="control",
+        control_enabled=True,
+        commissioned=True,
+        normal_reserve_percent=10.0,
+        max_discharge_kw=7.0,
+        export_limit_kw=6.4,
+        inverter_limit_kw=7.0,
+    )
+    started, _ = asyncio.run(controller.async_start(
+        snapshot=snapshot, control=control, agile_state=_agile(0.0),
+        no_paid_export_mode=True, technical_ready=True,
+        emergency_stop=False, ev_hold_active=False, now=now,
+    ))
+    assert started is True
+    proof, _ = asyncio.run(controller.async_control_override(
+        control=control, snapshot=snapshot, agile_state=_agile(0.0),
+        config=config, backend_status={"paid_export_live_proven": False},
+        no_paid_export_mode=True, emergency_stop=False,
+        ev_hold_active=False, now=now,
+    ))
+    assert proof.desired_battery_export_power_kw == 1.0
+    stress, promoted = asyncio.run(controller.async_control_override(
+        control=control, snapshot=snapshot, agile_state=_agile(0.0),
+        config=config, backend_status={"paid_export_live_proven": True},
+        no_paid_export_mode=True, emergency_stop=False,
+        ev_hold_active=False, now=now,
+    ))
+    assert promoted is True
+    assert stress.desired_battery_export_power_kw == 1.0
+    assert "bounded physical export" in stress.next_action
+
+
+def test_missing_agile_plan_still_fails_closed() -> None:
+    module = _load_module()
+    now = datetime(2026, 10, 8, 20, 0, tzinfo=UTC)
+    controller = module.ExportCommissioningTestController(object(), "entry")
+    started, reason = asyncio.run(controller.async_start(
+        snapshot=_snapshot(now), control=_control(), agile_state={},
+        no_paid_export_mode=True, technical_ready=True,
+        emergency_stop=False, ev_hold_active=False, now=now,
+    ))
+    assert started is False
+    assert "unavailable" in reason
