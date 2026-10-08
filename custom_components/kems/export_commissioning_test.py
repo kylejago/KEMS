@@ -13,6 +13,8 @@ from .kems_core import ControlConfig, ControlState, SimulationState
 
 _STORAGE_VERSION = 1
 _PROOF_TARGET_KW = 1.0
+# A physical-only commissioning fallback, never an Agile dispatch decision.
+_ZERO_PLAN_COMMISSIONING_TARGET_KW = 1.0
 _STRESS_SECONDS = 60
 _MIN_EXPORT_SOC_PERCENT = 15.0
 _MIN_START_SOC_PERCENT = 20.0
@@ -261,8 +263,8 @@ class ExportCommissioningTestController:
                 f"{_MAX_PROOF_SOLAR_KW:.2f} kW"
             )
         agile_target = agile_export_target_kw(agile_state)
-        if agile_target is None or agile_target <= 0.01:
-            return "The current Agile rolling plan has no positive export target"
+        if agile_target is None:
+            return "The current Agile rolling plan is unavailable or invalid"
         return None
 
     async def async_start(
@@ -434,7 +436,14 @@ class ExportCommissioningTestController:
                 )
                 return control, False
             self._latest_agile_target_kw = agile_target
-            target = agile_target
+            # Simulated SOC can reach its reserve even when physical SOC is
+            # healthy. A zero *available* plan permits only a bounded 1 kW
+            # physical commissioning exercise, not strategy-driven export.
+            target = (
+                agile_target
+                if agile_target > 0.01
+                else _ZERO_PLAN_COMMISSIONING_TARGET_KW
+            )
 
         house_battery = max(control.desired_battery_to_home_power_kw, 0.0)
         solar = max(_number(getattr(snapshot, "solar_power_kw", None)) or 0.0, 0.0)
@@ -502,6 +511,10 @@ class ExportCommissioningTestController:
                 next_action=(
                     "Prove 1 kW battery discharge and physical grid export"
                     if self._stage == "proof"
+                    else "Verify bounded physical export for at most 60 seconds"
+                    if self._stage == "agile_stress"
+                    and self._latest_agile_target_kw is not None
+                    and self._latest_agile_target_kw <= 0.01
                     else "Follow the live Agile export target for at most 60 seconds"
                 ),
             ),
