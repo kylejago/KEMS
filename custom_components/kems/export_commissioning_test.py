@@ -258,7 +258,7 @@ class ExportCommissioningTestController:
         if solar is None or solar > _MAX_PROOF_SOLAR_KW:
             return (
                 "The 1 kW direction proof requires fresh solar telemetry at or below "
-                f"{_MAX_PROOF_SOLAR_KW:.1f} kW"
+                f"{_MAX_PROOF_SOLAR_KW:.2f} kW"
             )
         agile_target = agile_export_target_kw(agile_state)
         if agile_target is None or agile_target <= 0.01:
