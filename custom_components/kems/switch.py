@@ -425,6 +425,7 @@ class KEMSEVSOCSyncSwitch(KEMSEntity, SwitchEntity):
             False,
         )
 
+
 class KEMSExportCommissioningTestSwitch(KEMSEntity, SwitchEntity):
     """Manually run the bounded Alpha9.83 physical export commissioning test."""
 
@@ -454,9 +455,7 @@ class KEMSExportCommissioningTestSwitch(KEMSEntity, SwitchEntity):
         }
 
     async def async_turn_on(self, **kwargs) -> None:
-        started, reason = (
-            await self.coordinator.async_start_export_commissioning_test()
-        )
+        started, reason = await self.coordinator.async_start_export_commissioning_test()
         if not started:
             raise HomeAssistantError(reason)
 

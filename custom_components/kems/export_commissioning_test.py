@@ -221,7 +221,9 @@ class ExportCommissioningTestController:
     ) -> str | None:
         """Return a fail-closed reason or None when a test may begin."""
         if not no_paid_export_mode:
-            return "Export commissioning requires the real tariff to remain No paid export"
+            return (
+                "Export commissioning requires the real tariff to remain No paid export"
+            )
         if control.operating_mode != "control":
             return "KEMS Mode must be Control"
         if not control.control_enabled:
@@ -661,9 +663,7 @@ class ExportCommissioningTestController:
         self._active = False
         self._restore_requested = False
         self._stage = (
-            "completed"
-            if self._successful_completion_requested
-            else "aborted"
+            "completed" if self._successful_completion_requested else "aborted"
         )
         self._completed_at = now
         self._command_target_kw = 0.0

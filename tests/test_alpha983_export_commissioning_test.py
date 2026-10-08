@@ -224,9 +224,7 @@ def test_roi_exclusion_does_not_hide_physical_energy_or_import_cost() -> None:
     module = _load_module()
     now = datetime(2026, 10, 8, 20, 0, tzinfo=UTC)
     controller = module.ExportCommissioningTestController(object(), "entry")
-    controller._roi_excluded_recharge_cost_pence_by_date = {
-        "2026-10-08": 4.2
-    }
+    controller._roi_excluded_recharge_cost_pence_by_date = {"2026-10-08": 4.2}
     simulation = SimulationState(
         ready=True,
         actual_grid_import_kwh=12.3,
@@ -252,11 +250,11 @@ def test_backend_keeps_real_tariff_no_paid_but_opens_only_test_surface() -> None
 
     assert "commissioning_export_test: bool = False" in source
     assert "commissioning_export_test or not no_paid_export_mode" in source
+    assert "no_paid_export_mode and not commissioning_export_test" in source
     assert (
-        "no_paid_export_mode and not commissioning_export_test"
+        'required_keys.extend(("force_discharge_power", "export_power_limit"))'
         in source
     )
-    assert 'required_keys.extend(("force_discharge_power", "export_power_limit"))' in source
     assert "if force_restore:" in source
     assert "Export commissioning requested verified FoxESS restoration" in source
     assert '"import_power_limit_write": "never_written_by_alpha9.83"' in source
@@ -272,12 +270,20 @@ def test_coordinator_uses_manual_switch_timeout_and_roi_only_adjustment() -> Non
     assert "_schedule_export_commissioning_timeout" in coordinator
     assert "stress_seconds" in coordinator
     assert "commissioning_export_test=(" in coordinator
-    assert "force_restore=self._export_commissioning_test.restore_requested" in coordinator
+    assert (
+        "force_restore=self._export_commissioning_test.restore_requested" in coordinator
+    )
     assert "roi_adjusted_simulation" in coordinator
-    assert "whole_home = self._whole_home.summarise(snapshot, simulation, gas)" in coordinator
+    assert (
+        "whole_home = self._whole_home.summarise(snapshot, simulation, gas)"
+        in coordinator
+    )
     assert "KEMSExportCommissioningTestSwitch" in switch
     assert '_attr_name = "Export commissioning test"' in switch
-    assert '"export_commissioning_test": coordinator.export_commissioning_test_state' in diagnostics
+    assert (
+        '"export_commissioning_test": coordinator.export_commissioning_test_state'
+        in diagnostics
+    )
 
 
 def test_financial_contract_is_zero_income_and_recharge_cost_only() -> None:
@@ -286,8 +292,9 @@ def test_financial_contract_is_zero_income_and_recharge_cost_only() -> None:
     assert '"export_income_policy": "zero_no_paid_export"' in source
     assert '"physical_energy_history": "retained"' in source
     assert '"actual_roi_policy": "exclude_test_recharge_cost"' in source
-    assert "actual_import_cost_pence" not in source.split(
-        "def roi_adjusted_simulation", 1
-    )[1]
+    assert (
+        "actual_import_cost_pence"
+        not in source.split("def roi_adjusted_simulation", 1)[1]
+    )
     assert "actual_avoided_import_value_pence" in source
     assert "actual_system_value_pence" in source
