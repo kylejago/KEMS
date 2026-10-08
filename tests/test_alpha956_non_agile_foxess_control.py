@@ -251,7 +251,7 @@ def test_backend_paid_export_surface_is_bounded_and_import_limit_stays_absent() 
     assert 'decision.action == "force_discharge"' in live
     assert "_PAID_EXPORT_STAGE_KW = 1.0" in source
     assert '"import_power_limit"' not in live.split("payload = {", 1)[0]
-    assert '"import_power_limit_write": "never_written_by_alpha9.82"' in source
+    assert '"import_power_limit_write": "never_written_by_alpha9.83"' in source
 
 
 def test_commissioning_still_exposes_explicit_opt_in_control() -> None:
