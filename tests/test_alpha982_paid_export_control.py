@@ -173,7 +173,7 @@ def test_paid_export_baseline_and_shutdown_restore_are_explicit() -> None:
     assert "_async_complete_paid_export_baseline" in source
     assert "_async_restore_paid_export_settings" in source
     assert "restore pre-KEMS local mode, Min SoC-on-grid, Force Discharge" in source
-    assert '"import_power_limit_write": "never_written_by_alpha9.82"' in source
+    assert '"import_power_limit_write": "never_written_by_alpha9.83"' in source
 
 
 def test_fixed_and_agile_export_use_separate_planning_authorities() -> None:
@@ -212,7 +212,7 @@ def test_paid_export_physical_proof_is_session_scoped() -> None:
     assert "self._paid_export_live_proven = False" in setup
     assert 'data.get("paid_export_live_proven"' not in setup
     assert '"paid_export_live_proven"' not in save
-    assert "if no_paid_export_mode:" in source
+    assert "if no_paid_export_mode and not commissioning_export_test:" in source
     assert "self._paid_export_live_proven = False" in source
 
 
@@ -225,8 +225,8 @@ def test_alpha982_release_identity_and_dormant_no_export_contract() -> None:
     )
     reason = str(bundle["maintenance"]["reason"])
 
-    assert manifest["version"] == "0.9.0-alpha9.82"
-    assert reason.startswith("Alpha9.82")
+    assert manifest["version"] == "0.9.0-alpha9.83"
+    assert reason.startswith("Alpha9.83")
     assert "1.0 kW" in reason
     assert "two low-solar samples" in reason
     assert "15% planning/export target" in reason

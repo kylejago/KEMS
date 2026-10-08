@@ -33,6 +33,7 @@ from .export_accounting import (
     current_export_rate_pence,
     revalue_actual_export_income,
 )
+from .export_commissioning_test import ExportCommissioningTestController
 from .forecast_validation import ForecastValidationRecorder
 from .forecasting import SolarForecastCoordinator
 from .foxess_command_shadow import build_foxess_command_shadow_snapshot
@@ -133,6 +134,10 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
         self._whole_home = WholeHomeEngine()
         self._control = ControlEngine()
         self._foxess_control = FoxESSControlBackend(hass, entry)
+        self._export_commissioning_test = ExportCommissioningTestController(
+            hass,
+            entry.entry_id,
+        )
         self._happy_hour_ohme = OhmeHappyHourController(
             hass, entry, ev_status_entity=entities.ev_status
         )
@@ -169,6 +174,7 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
         )
         self._last_critical_refresh_event: dict[str, str] | None = None
         self._critical_refresh_retry_cancel: object | None = None
+        self._export_commissioning_timeout_cancel: object | None = None
         if self._critical_refresh_entities:
             entry.async_on_unload(
                 async_track_state_change_event(
@@ -356,12 +362,87 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
         """Return Home Assistant statistics backfill diagnostics."""
         return self._agile_history_backfill.state
 
+    @property
+    def export_commissioning_test_state(self) -> dict[str, object]:
+        """Return the manual export commissioning/ROI audit state."""
+        return self._export_commissioning_test.status
+
+    def _export_commissioning_ev_hold_active(self) -> bool:
+        state = self._ev_grid_hold.status
+        return bool(
+            state.get("latched_min_soc_percent") is not None
+            or state.get("source_uncertainty_grace_active")
+            or state.get("pending_intelligent_ev_hold_active")
+        )
+
+    async def async_start_export_commissioning_test(self) -> tuple[bool, str]:
+        """Start the manual 1 kW -> Agile physical export test."""
+        data = self.data
+        if data is None:
+            return False, "KEMS has no current coordinator data yet"
+        readiness = build_commissioning_snapshot(self.hass, self)
+        started, reason = await self._export_commissioning_test.async_start(
+            snapshot=data.snapshot,
+            control=data.control,
+            agile_state=self._agile_smart_export.state,
+            no_paid_export_mode=(
+                export_tariff_type_from_options(self.entry.options)
+                == EXPORT_TARIFF_TYPE_NONE
+            ),
+            technical_ready=bool(readiness.get("ready_for_control")),
+            emergency_stop=bool(self.settings.control.emergency_stop),
+            ev_hold_active=self._export_commissioning_ev_hold_active(),
+            now=dt_util.now(),
+        )
+        if started:
+            self.hass.async_create_task(self.async_request_refresh())
+        return started, reason
+
+    async def async_stop_export_commissioning_test(
+        self,
+        reason: str = "User cancelled export commissioning",
+    ) -> None:
+        """Withdraw commissioning authority and restore FoxESS."""
+        cancel = self._export_commissioning_timeout_cancel
+        if callable(cancel):
+            cancel()
+            self._export_commissioning_timeout_cancel = None
+        await self._export_commissioning_test.async_request_stop(reason)
+        self.hass.async_create_task(self.async_request_refresh())
+
+    def _schedule_export_commissioning_timeout(self) -> None:
+        """Schedule the exact end of the 60 second Agile stress phase."""
+        cancel = self._export_commissioning_timeout_cancel
+        if callable(cancel):
+            cancel()
+
+        @callback
+        def _timeout(_now: object) -> None:
+            self._export_commissioning_timeout_cancel = None
+            self.hass.async_create_task(
+                self._async_finish_export_commissioning_stress()
+            )
+
+        self._export_commissioning_timeout_cancel = async_call_later(
+            self.hass,
+            self._export_commissioning_test.stress_seconds,
+            _timeout,
+        )
+
+    async def _async_finish_export_commissioning_stress(self) -> None:
+        await self._export_commissioning_test.async_request_stop(
+            "Completed 60 second Agile-following export stress test",
+            successful=True,
+        )
+        await self.async_request_refresh()
+
     async def _async_setup(self) -> None:
         """Load retained learning history and permanent supporting ledgers."""
         await self._commissioning_restart_proof.async_load()
         await self._ev_soc_sync.async_setup()
         await self._happy_hour_ohme.async_setup()
         await self._foxess_control.async_setup()
+        await self._export_commissioning_test.async_load()
         await self._history.async_load()
         await self._ev_charge_trace.async_load()
         await self._ev_grid_hold.async_load()
@@ -410,6 +491,11 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
             )
             self._last_ev_soc_sync_event = None
             now = dt_util.now()
+            await self._export_commissioning_test.async_observe_snapshot(
+                snapshot,
+                now,
+                self.settings.simulation,
+            )
 
             # Forecast planning is calculated before history recording so the
             # exact decision that KEMS made at this point in time is retained
@@ -637,6 +723,22 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                 source_uncertain=ev_hold_source_uncertain,
                 source_grace_seconds=_ALPHA975_EV_HOLD_SOURCE_GRACE_SECONDS,
             )
+            ev_hold_state = self._ev_grid_hold.status
+            control, stress_started = (
+                await self._export_commissioning_test.async_control_override(
+                    control=control,
+                    snapshot=snapshot,
+                    agile_state=agile_state,
+                    config=self.settings.control,
+                    backend_status=self._foxess_control.status,
+                    no_paid_export_mode=base_simulation.no_export_mode_active,
+                    emergency_stop=bool(self.settings.control.emergency_stop),
+                    ev_hold_active=self._export_commissioning_ev_hold_active(),
+                    now=now,
+                )
+            )
+            if stress_started:
+                self._schedule_export_commissioning_timeout()
             await self._shadow_validation.async_update(
                 snapshot=snapshot,
                 simulation=shadow_simulation,
@@ -675,8 +777,12 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                 gas,
             )
             whole_home = self._whole_home.summarise(snapshot, simulation, gas)
-            stored_lifetime = await self._lifetime.async_update(
+            roi_simulation = self._export_commissioning_test.roi_adjusted_simulation(
                 simulation,
+                now,
+            )
+            stored_lifetime = await self._lifetime.async_update(
+                roi_simulation,
                 gas,
                 now,
                 self.settings.roi,
@@ -685,7 +791,7 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
             periods = self._lifetime.period_summaries(now)
             roi = self._roi.evaluate(
                 lifetime,
-                simulation,
+                roi_simulation,
                 now,
                 self.settings.roi,
             )
@@ -727,7 +833,6 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                 data_override=provisional,
             )
             await self._commissioning_restart_proof.async_capture(commissioning)
-            ev_hold_state = self._ev_grid_hold.status
             foxess_control = await self._foxess_control.async_update(
                 coordinator=self,
                 control=control,
@@ -743,7 +848,21 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                 pending_intelligent_ev_hold_active=bool(
                     ev_hold_state.get("pending_intelligent_ev_hold_active")
                 ),
+                commissioning_export_test=(
+                    self._export_commissioning_test.hardware_authority_active
+                ),
+                force_restore=self._export_commissioning_test.restore_requested,
             )
+            promoted_to_stress = (
+                await self._export_commissioning_test.async_after_backend(
+                    foxess_control,
+                    now=now,
+                    config=self.settings.control,
+                )
+            )
+            if promoted_to_stress:
+                self._schedule_export_commissioning_timeout()
+                self.hass.async_create_task(self.async_request_refresh())
             technical_commissioned = bool(
                 commissioning.get("ready_for_control")
                 and self.settings.control.commissioned
@@ -825,6 +944,11 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
         if callable(cancel):
             cancel()
             self._critical_refresh_retry_cancel = None
+        export_cancel = self._export_commissioning_timeout_cancel
+        if callable(export_cancel):
+            export_cancel()
+            self._export_commissioning_timeout_cancel = None
+        await self._export_commissioning_test.async_shutdown()
         await self._foxess_control.async_shutdown(self)
         await self._ev_soc_sync.async_shutdown()
         await self._happy_hour_ohme.async_shutdown()

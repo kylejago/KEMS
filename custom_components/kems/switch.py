@@ -53,6 +53,7 @@ async def async_setup_entry(
         KEMSWeekendHappyHourAutoJoinSwitch(coordinator),
         KEMSHappyHourOhmeControlSwitch(coordinator),
         KEMSEVSOCSyncSwitch(coordinator),
+        KEMSExportCommissioningTestSwitch(coordinator),
     ]
     entities.extend(build_update_switch_entities(hass, coordinator, entry))
     async_add_entities(entities)
@@ -423,3 +424,40 @@ class KEMSEVSOCSyncSwitch(KEMSEntity, SwitchEntity):
             CONF_EV_SOC_SYNC_ENABLED,
             False,
         )
+
+
+class KEMSExportCommissioningTestSwitch(KEMSEntity, SwitchEntity):
+    """Manually run the bounded Alpha9.83 physical export commissioning test."""
+
+    _attr_name = "Export commissioning test"
+    _attr_icon = "mdi:transmission-tower-export"
+
+    def __init__(self, coordinator) -> None:
+        super().__init__(coordinator, "export_commissioning_test")
+
+    @property
+    def is_on(self) -> bool:
+        return bool(self.coordinator.export_commissioning_test_state.get("active"))
+
+    @property
+    def extra_state_attributes(self):
+        state = self.coordinator.export_commissioning_test_state
+        return {
+            **state,
+            "manual_start_only": True,
+            "real_export_tariff_required": False,
+            "real_export_tariff_must_remain": "No paid export",
+            "control_authority": (
+                "Temporary commissioning only: 1 kW direction proof, then at most "
+                "60 seconds following the live Agile export target. The test "
+                "restores the captured FoxESS baseline afterwards."
+            ),
+        }
+
+    async def async_turn_on(self, **kwargs) -> None:
+        started, reason = await self.coordinator.async_start_export_commissioning_test()
+        if not started:
+            raise HomeAssistantError(reason)
+
+    async def async_turn_off(self, **kwargs) -> None:
+        await self.coordinator.async_stop_export_commissioning_test()

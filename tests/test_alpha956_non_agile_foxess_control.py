@@ -251,7 +251,7 @@ def test_backend_paid_export_surface_is_bounded_and_import_limit_stays_absent() 
     assert 'decision.action == "force_discharge"' in live
     assert "_PAID_EXPORT_STAGE_KW = 1.0" in source
     assert '"import_power_limit"' not in live.split("payload = {", 1)[0]
-    assert '"import_power_limit_write": "never_written_by_alpha9.82"' in source
+    assert '"import_power_limit_write": "never_written_by_alpha9.83"' in source
 
 
 def test_commissioning_still_exposes_explicit_opt_in_control() -> None:
@@ -291,8 +291,8 @@ def test_current_release_identity_and_scope() -> None:
     bundle = json.loads(BUNDLE.read_text(encoding="utf-8"))
     reason = str(bundle["maintenance"]["reason"])
 
-    assert manifest["version"] == "0.9.0-alpha9.82"
-    assert reason.startswith("Alpha9.82")
+    assert manifest["version"] == "0.9.0-alpha9.83"
+    assert reason.startswith("Alpha9.83")
     assert "Self Use" in reason
     assert "confirmed-cheap Force Charge" in reason
     assert "Min SoC-on-grid" in reason

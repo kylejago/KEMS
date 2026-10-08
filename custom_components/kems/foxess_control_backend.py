@@ -583,8 +583,10 @@ class FoxESSControlBackend:
         ev_connected: bool | None = None,
         ev_hold_source_grace_active: bool = False,
         pending_intelligent_ev_hold_active: bool = False,
+        commissioning_export_test: bool = False,
+        force_restore: bool = False,
     ) -> dict[str, Any]:
-        """Apply the authoritative bounded non-Agile command for this scan."""
+        """Apply the authoritative bounded command for this scan."""
         shadow = build_foxess_command_shadow_snapshot(
             self._hass,
             coordinator,
@@ -593,8 +595,11 @@ class FoxESSControlBackend:
         binding = shadow.get("entity_binding")
         binding_root = dict(binding) if isinstance(binding, dict) else {}
         entities = self._binding_entities(shadow)
+        export_authority_active = bool(
+            commissioning_export_test or not no_paid_export_mode
+        )
         required_keys = ["work_mode", "force_charge_power", "min_soc_on_grid"]
-        if not no_paid_export_mode:
+        if export_authority_active:
             required_keys.extend(("force_discharge_power", "export_power_limit"))
         binding_ready = bool(
             binding_root.get("status") == "PASS"
@@ -608,7 +613,7 @@ class FoxESSControlBackend:
         version_matches = observed_version == FOXESS_MODBUS_REVIEWED_VERSION
         effective_export_limit_kw = _number(shadow.get("effective_export_limit_kw"))
 
-        if no_paid_export_mode:
+        if no_paid_export_mode and not commissioning_export_test:
             reset_needed = bool(
                 self._paid_export_live_proven
                 or self._paid_export_stage_samples
@@ -622,7 +627,7 @@ class FoxESSControlBackend:
             self._paid_export_stage_reason = None
             if reset_needed:
                 await self._async_save()
-        else:
+        elif export_authority_active:
             await self._async_observe_paid_export_stage(
                 snapshot=snapshot,
                 entities=entities,
@@ -650,6 +655,7 @@ class FoxESSControlBackend:
             and not ev_hold_source_grace_active
             and not pending_intelligent_ev_hold_active
             and no_paid_export_mode
+            and not commissioning_export_test
             and control.operating_mode == "control"
             and bool(coordinator.settings.control.control_enabled)
             and bool(coordinator.settings.control.commissioned)
@@ -688,7 +694,9 @@ class FoxESSControlBackend:
             technical_ready=technical_ready,
             binding_ready=binding_ready,
             reviewed_version_matches=version_matches,
-            no_paid_export_mode=no_paid_export_mode,
+            no_paid_export_mode=bool(
+                no_paid_export_mode and not commissioning_export_test
+            ),
             cheap_period_confirmed=cheap_period_confirmed,
             user_commissioned=bool(coordinator.settings.control.commissioned),
             master_control_enabled=bool(coordinator.settings.control.control_enabled),
@@ -697,7 +705,7 @@ class FoxESSControlBackend:
         )
 
         if (
-            not no_paid_export_mode
+            export_authority_active
             and decision.action == "force_discharge"
             and self._paid_export_stage_blocked
         ):
@@ -707,6 +715,15 @@ class FoxESSControlBackend:
                 action="release",
                 reason=self._paid_export_stage_reason
                 or "Paid export physical proof is blocked",
+                min_soc_on_grid_percent=decision.min_soc_on_grid_percent,
+            )
+
+        if force_restore:
+            decision = FoxESSControlDecision(
+                backend_available=decision.backend_available,
+                commands_permitted=False,
+                action="release",
+                reason="Export commissioning requested verified FoxESS restoration",
                 min_soc_on_grid_percent=decision.min_soc_on_grid_percent,
             )
 
@@ -776,7 +793,7 @@ class FoxESSControlBackend:
                     reason = f"{reason}; KEMS-owned state restore is pending"
         else:
             owned, ownership_reason = await self._async_take_ownership(entities)
-            if owned and not no_paid_export_mode:
+            if owned and export_authority_active:
                 owned, ownership_reason = (
                     await self._async_complete_paid_export_baseline(entities)
                 )
@@ -807,7 +824,7 @@ class FoxESSControlBackend:
                     "export_power_limit",
                 )
                 paid_entities_missing = bool(
-                    not no_paid_export_mode
+                    export_authority_active
                     and (force_discharge_entity is None or export_limit_entity is None)
                 )
                 if (
@@ -932,6 +949,7 @@ class FoxESSControlBackend:
                     if (
                         applied
                         and no_paid_export_mode
+                        and not commissioning_export_test
                         and decision.action == "self_use"
                     ):
                         paid_restore_ok = (
@@ -1005,7 +1023,7 @@ class FoxESSControlBackend:
                         await self._async_restore(entities, writes)
 
         payload = {
-            "scope": "alpha9.82_bounded_control_with_paid_export",
+            "scope": "alpha9.83_bounded_control_with_export_commissioning",
             "reviewed_foxess_modbus_version": FOXESS_MODBUS_REVIEWED_VERSION,
             "observed_foxess_modbus_version": observed_version,
             "reviewed_version_matches": version_matches,
@@ -1017,6 +1035,9 @@ class FoxESSControlBackend:
             ),
             "user_commissioned": bool(coordinator.settings.control.commissioned),
             "no_paid_export_mode": bool(no_paid_export_mode),
+            "commissioning_export_test": bool(commissioning_export_test),
+            "force_restore_requested": bool(force_restore),
+            "export_authority_active": export_authority_active,
             "cheap_period_confirmed": bool(cheap_period_confirmed),
             "backend_available": bool(decision.backend_available),
             "commands_permitted": bool(decision.commands_permitted and applied),
@@ -1081,14 +1102,22 @@ class FoxESSControlBackend:
             "last_write_result": self._last_write_result,
             "normal_non_cheap_mode": "Self Use",
             "deliberate_force_discharge": (
-                "bounded_live_when_paid_export_selected"
-                if not no_paid_export_mode
-                else "blocked_by_no_paid_export"
+                "manual_export_commissioning"
+                if commissioning_export_test
+                else (
+                    "bounded_live_when_paid_export_selected"
+                    if not no_paid_export_mode
+                    else "blocked_by_no_paid_export"
+                )
             ),
             "paid_or_agile_export_control": (
-                "bounded_live"
-                if not no_paid_export_mode
-                else "blocked_by_no_paid_export"
+                "commissioning_test_only_real_tariff_still_no_paid_export"
+                if commissioning_export_test
+                else (
+                    "bounded_live"
+                    if not no_paid_export_mode
+                    else "blocked_by_no_paid_export"
+                )
             ),
             "effective_export_limit_kw": effective_export_limit_kw,
             "paid_export_live_proven": self._paid_export_live_proven,
@@ -1103,11 +1132,15 @@ class FoxESSControlBackend:
             ),
             "previous_export_power_limit_w": self._previous_export_power_limit_w,
             "export_power_limit_write": (
-                "bounded_to_effective_ceiling_when_paid_export_is_active"
-                if not no_paid_export_mode
-                else "restored_or_untouched"
+                "temporary_bounded_commissioning_ceiling"
+                if commissioning_export_test
+                else (
+                    "bounded_to_effective_ceiling_when_paid_export_is_active"
+                    if not no_paid_export_mode
+                    else "restored_or_untouched"
+                )
             ),
-            "import_power_limit_write": "never_written_by_alpha9.82",
+            "import_power_limit_write": "never_written_by_alpha9.83",
             "safety_release": (
                 "restore pre-KEMS local mode, Min SoC-on-grid, Force Discharge "
                 "setpoint and Export Power Limit when owned; an already-applied "
