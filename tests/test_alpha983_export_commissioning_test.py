@@ -299,6 +299,7 @@ def test_financial_contract_is_zero_income_and_recharge_cost_only() -> None:
     assert "actual_avoided_import_value_pence" in source
     assert "actual_system_value_pence" in source
 
+
 def test_solar_repayment_clears_debt_without_financial_exclusion() -> None:
     module = _load_module()
     controller = module.ExportCommissioningTestController(object(), "entry")

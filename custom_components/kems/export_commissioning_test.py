@@ -572,7 +572,9 @@ class ExportCommissioningTestController:
                     # financial value.  Unexpected daytime grid charging is left
                     # unresolved rather than guessed.
                     solar_or_local_replacement = not cheap and grid_import <= 0.1
-                    priced_grid_replacement = cheap and grid_import > 0.1 and rate is not None
+                    priced_grid_replacement = (
+                        cheap and grid_import > 0.1 and rate is not None
+                    )
                     if repaid > 0 and (
                         solar_or_local_replacement or priced_grid_replacement
                     ):
