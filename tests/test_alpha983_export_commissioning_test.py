@@ -170,7 +170,7 @@ def test_commissioning_rejects_solar_above_near_zero_debt_envelope() -> None:
         )
     )
     assert started is False
-    assert "0.0 kW" in reason
+    assert "0.01 kW" in reason
     assert module._MAX_PROOF_SOLAR_KW == 0.01
 
 
