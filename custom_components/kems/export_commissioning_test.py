@@ -510,7 +510,7 @@ class ExportCommissioningTestController:
         self,
         snapshot: Any,
         now: datetime,
-        config: ControlConfig,
+        config: Any,
     ) -> None:
         """Integrate test export and exact later cheap-grid recharge exclusion."""
         timestamp = getattr(snapshot, "timestamp", now)
