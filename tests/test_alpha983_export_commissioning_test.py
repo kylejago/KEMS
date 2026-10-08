@@ -152,6 +152,28 @@ def test_manual_test_requires_no_paid_export_and_positive_agile_target() -> None
     assert "No paid export" in reason
 
 
+def test_commissioning_rejects_solar_above_near_zero_debt_envelope() -> None:
+    """Avoid treating solar-attributable grid export as battery recharge debt."""
+    module = _load_module()
+    now = datetime(2026, 10, 8, 19, 30, tzinfo=UTC)
+    controller = module.ExportCommissioningTestController(object(), "entry")
+    started, reason = asyncio.run(
+        controller.async_start(
+            snapshot=_snapshot(now, solar_power_kw=0.05),
+            control=_control(),
+            agile_state=_agile(),
+            no_paid_export_mode=True,
+            technical_ready=True,
+            emergency_stop=False,
+            ev_hold_active=False,
+            now=now,
+        )
+    )
+    assert started is False
+    assert "0.0 kW" in reason
+    assert module._MAX_PROOF_SOLAR_KW == 0.01
+
+
 def test_proof_is_exactly_1kw_then_stress_follows_live_agile_target() -> None:
     module = _load_module()
     now = datetime(2026, 10, 8, 19, 30, tzinfo=UTC)
