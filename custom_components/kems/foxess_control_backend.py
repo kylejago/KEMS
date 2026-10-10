@@ -732,7 +732,16 @@ class FoxESSControlBackend:
         reason = decision.reason
         frozen_ev_hold = False
 
-        frozen_ev_hold = should_freeze_owned_ev_hold(
+        # A verified EV floor is a fail-closed fallback, not a permanent
+        # operating mode. Resume the reviewed charge/Self Use decision when
+        # control authority and EV telemetry have recovered. Preserve the
+        # existing no-write freeze while authority or EV state is uncertain.
+        hold_recovery_blocked = bool(
+            not decision.commands_permitted
+            or ev_hold_source_grace_active
+            or ev_connected is None
+        )
+        frozen_ev_hold = hold_recovery_blocked and should_freeze_owned_ev_hold(
             owned_by_kems=self._owned,
             latched_min_soc_percent=ev_hold_floor_percent,
             last_applied_action=self._last_applied_action,
