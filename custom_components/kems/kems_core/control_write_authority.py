@@ -122,6 +122,7 @@ def should_freeze_owned_ev_hold(
     island_mode_active: bool,
     grid_available: bool,
     pending_intelligent_ev_hold_active: bool = False,
+    write_authority_recovered: bool = False,
 ) -> bool:
     """Return whether an already-applied cheap-window EV hold must be frozen.
 
@@ -134,6 +135,8 @@ def should_freeze_owned_ev_hold(
     bounded source-uncertainty grace may retain an already-verified confirmed
     hold without becoming new cheap-period authority.
     """
+    if write_authority_recovered:
+        return False
     if latched_min_soc_percent is None:
         return False
     try:
