@@ -736,12 +736,13 @@ class FoxESSControlBackend:
         # operating mode. Resume the reviewed charge/Self Use decision when
         # control authority and EV telemetry have recovered. Preserve the
         # existing no-write freeze while authority or EV state is uncertain.
-        hold_recovery_blocked = bool(
-            not decision.commands_permitted
-            or ev_hold_source_grace_active
-            or ev_connected is None
+        write_authority_recovered = bool(
+            decision.commands_permitted
+            and not ev_hold_source_grace_active
+            and ev_connected is not None
+            and not pending_intelligent_ev_hold_active
         )
-        frozen_ev_hold = hold_recovery_blocked and should_freeze_owned_ev_hold(
+        frozen_ev_hold = should_freeze_owned_ev_hold(
             owned_by_kems=self._owned,
             latched_min_soc_percent=ev_hold_floor_percent,
             last_applied_action=self._last_applied_action,
@@ -758,6 +759,7 @@ class FoxESSControlBackend:
             island_mode_active=bool(control.island_mode_active),
             grid_available=bool(control.grid_available),
             pending_intelligent_ev_hold_active=pending_intelligent_ev_hold_active,
+            write_authority_recovered=write_authority_recovered,
         )
         hold_grace_unverified = bool(
             ev_hold_source_grace_active
