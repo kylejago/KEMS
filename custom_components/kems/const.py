@@ -99,6 +99,10 @@ CONF_TARIFF_CHANGE_2_DATE = "tariff_change_2_effective_date"
 CONF_TARIFF_CHANGE_2_DAY_RATE = "tariff_change_2_day_rate_pence"
 CONF_TARIFF_CHANGE_2_OFFPEAK_RATE = "tariff_change_2_offpeak_rate_pence"
 CONF_TARIFF_CHANGE_2_STANDING_CHARGE = "tariff_change_2_standing_charge_pence"
+CONF_TARIFF_CHANGE_3_DATE = "tariff_change_3_effective_date"
+CONF_TARIFF_CHANGE_3_DAY_RATE = "tariff_change_3_day_rate_pence"
+CONF_TARIFF_CHANGE_3_OFFPEAK_RATE = "tariff_change_3_offpeak_rate_pence"
+CONF_TARIFF_CHANGE_3_STANDING_CHARGE = "tariff_change_3_standing_charge_pence"
 # Opt-in Intelligent extra-slot authority; omitted legacy entries remain disabled.
 CONF_INTELLIGENT_SLOTS_ENABLED = "intelligent_slots_enabled"
 
@@ -187,6 +191,12 @@ DEFAULT_OPTIONS = {
     CONF_TARIFF_CHANGE_2_DAY_RATE: 37.17,
     CONF_TARIFF_CHANGE_2_OFFPEAK_RATE: 8.0,
     CONF_TARIFF_CHANGE_2_STANDING_CHARGE: 55.52,
+    # 12 Oct 2026: Intelligent Octopus Go 12M Loyal Fixed October 2026 v1.
+    # Live Octopus rate entities remain authoritative in automatic mode.
+    CONF_TARIFF_CHANGE_3_DATE: "2026-10-12",
+    CONF_TARIFF_CHANGE_3_DAY_RATE: 35.88,
+    CONF_TARIFF_CHANGE_3_OFFPEAK_RATE: 6.60,
+    CONF_TARIFF_CHANGE_3_STANDING_CHARGE: 55.52,
     CONF_INTELLIGENT_SLOTS_ENABLED: False,
     CONF_HAPPY_HOUR_OHME_CONTROL_ENABLED: False,
     CONF_EV_SOC_SYNC_ENABLED: False,
