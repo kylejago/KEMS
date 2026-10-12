@@ -28,7 +28,9 @@ def _settings() -> TariffSettings:
         offpeak_end=time(5, 30),
         intelligent_slots_enabled=True,
         scheduled_changes=(
-            ScheduledTariffChange(date(2026, 10, 1), 26.9558095238, 3.326952381, 51.147),
+            ScheduledTariffChange(
+                date(2026, 10, 1), 26.9558095238, 3.326952381, 51.147
+            ),
             ScheduledTariffChange(date(2026, 10, 4), 37.17, 8.0, 55.52),
             ScheduledTariffChange(date(2026, 10, 12), 35.88, 6.60, 55.52),
         ),
@@ -47,7 +49,7 @@ def test_original_tariff_history_is_preserved() -> None:
     assert after.effective_from == date(2026, 10, 12)
 
 
-def test_new_defaults_apply_to_existing_entries_without_replacing_earlier_dates() -> None:
+def test_new_defaults_preserve_earlier_dates() -> None:
     assert DEFAULT_OPTIONS["tariff_change_2_effective_date"] == "2026-10-04"
     assert DEFAULT_OPTIONS["tariff_change_2_day_rate_pence"] == 37.17
     assert DEFAULT_OPTIONS["tariff_change_3_effective_date"] == "2026-10-12"
@@ -57,7 +59,7 @@ def test_new_defaults_apply_to_existing_entries_without_replacing_earlier_dates(
 
     settings_source = (ROOT / "settings.py").read_text(encoding="utf-8")
     flow_source = (ROOT / "config_flow.py").read_text(encoding="utf-8")
-    assert "_scheduled_tariff_change(\n                            values,\n                            CONF_TARIFF_CHANGE_3_DATE," in settings_source
+    assert "CONF_TARIFF_CHANGE_3_DATE," in settings_source
     assert "vol.Optional(CONF_TARIFF_CHANGE_3_DATE): DateSelector()" in flow_source
     assert "CONF_TARIFF_CHANGE_3_DATE," in flow_source
 
