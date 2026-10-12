@@ -71,6 +71,10 @@ from .const import (
     CONF_TARIFF_CHANGE_2_DAY_RATE,
     CONF_TARIFF_CHANGE_2_OFFPEAK_RATE,
     CONF_TARIFF_CHANGE_2_STANDING_CHARGE,
+    CONF_TARIFF_CHANGE_3_DATE,
+    CONF_TARIFF_CHANGE_3_DAY_RATE,
+    CONF_TARIFF_CHANGE_3_OFFPEAK_RATE,
+    CONF_TARIFF_CHANGE_3_STANDING_CHARGE,
     CONF_TARIFF_MODE,
     CONF_VIRTUAL_SCENARIO,
     DEFAULT_OPTIONS,
@@ -146,6 +150,13 @@ class KEMSSettings:
                             CONF_TARIFF_CHANGE_2_DAY_RATE,
                             CONF_TARIFF_CHANGE_2_OFFPEAK_RATE,
                             CONF_TARIFF_CHANGE_2_STANDING_CHARGE,
+                        ),
+                        _scheduled_tariff_change(
+                            values,
+                            CONF_TARIFF_CHANGE_3_DATE,
+                            CONF_TARIFF_CHANGE_3_DAY_RATE,
+                            CONF_TARIFF_CHANGE_3_OFFPEAK_RATE,
+                            CONF_TARIFF_CHANGE_3_STANDING_CHARGE,
                         ),
                     )
                     if change is not None

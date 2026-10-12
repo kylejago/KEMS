@@ -108,6 +108,10 @@ from .const import (
     CONF_TARIFF_CHANGE_2_DAY_RATE,
     CONF_TARIFF_CHANGE_2_OFFPEAK_RATE,
     CONF_TARIFF_CHANGE_2_STANDING_CHARGE,
+    CONF_TARIFF_CHANGE_3_DATE,
+    CONF_TARIFF_CHANGE_3_DAY_RATE,
+    CONF_TARIFF_CHANGE_3_OFFPEAK_RATE,
+    CONF_TARIFF_CHANGE_3_STANDING_CHARGE,
     CONF_TARIFF_MODE,
     DEFAULT_OPTIONS,
     DOMAIN,
@@ -253,6 +257,10 @@ SCHEDULED_TARIFF_FIELDS = {
     vol.Required(CONF_TARIFF_CHANGE_2_DAY_RATE): _number(0, 200, "any", "p/kWh"),
     vol.Required(CONF_TARIFF_CHANGE_2_OFFPEAK_RATE): _number(0, 200, "any", "p/kWh"),
     vol.Required(CONF_TARIFF_CHANGE_2_STANDING_CHARGE): _number(0, 500, "any", "p/day"),
+    vol.Optional(CONF_TARIFF_CHANGE_3_DATE): DateSelector(),
+    vol.Required(CONF_TARIFF_CHANGE_3_DAY_RATE): _number(0, 200, "any", "p/kWh"),
+    vol.Required(CONF_TARIFF_CHANGE_3_OFFPEAK_RATE): _number(0, 200, "any", "p/kWh"),
+    vol.Required(CONF_TARIFF_CHANGE_3_STANDING_CHARGE): _number(0, 500, "any", "p/day"),
 }
 
 TARIFF_SCHEMA = vol.Schema(
@@ -644,7 +652,11 @@ class KEMSOptionsFlow(OptionsFlowWithReload):
         values = {**DEFAULT_OPTIONS, **dict(self.config_entry.options)}
         if not values.get(CONF_COMMISSIONING_DATE):
             values.pop(CONF_COMMISSIONING_DATE, None)
-        for key in (CONF_TARIFF_CHANGE_1_DATE, CONF_TARIFF_CHANGE_2_DATE):
+        for key in (
+            CONF_TARIFF_CHANGE_1_DATE,
+            CONF_TARIFF_CHANGE_2_DATE,
+            CONF_TARIFF_CHANGE_3_DATE,
+        ):
             if not values.get(key):
                 values.pop(key, None)
         # Shadow remains an engineering mode but is intentionally not a user
@@ -680,7 +692,11 @@ class KEMSOptionsFlow(OptionsFlowWithReload):
         """Configure import/export prices, cheap-period times and dated changes."""
         if user_input is not None:
             cleaned = dict(user_input)
-            for key in (CONF_TARIFF_CHANGE_1_DATE, CONF_TARIFF_CHANGE_2_DATE):
+            for key in (
+                CONF_TARIFF_CHANGE_1_DATE,
+                CONF_TARIFF_CHANGE_2_DATE,
+                CONF_TARIFF_CHANGE_3_DATE,
+            ):
                 if key not in cleaned:
                     cleaned[key] = ""
             return self._save_options(cleaned)
