@@ -13,7 +13,12 @@ from datetime import date, timedelta
 from math import isfinite
 from typing import Any
 
-from .kems_core import SimulationConfig, SimulationEngine, Snapshot
+from .kems_core import (
+    PERIOD_DATA_COMPLETE_KEY,
+    SimulationConfig,
+    SimulationEngine,
+    Snapshot,
+)
 
 START = date(2026, 10, 6)
 END = date(2026, 10, 11)
@@ -81,7 +86,6 @@ def calculate_2026_tariff_financial_deltas(
 
     proposal: dict[str, dict[str, Any]] = {}
     skipped: dict[str, str] = {}
-    previous = date(2026, 10, 5)
     engine_before = SimulationEngine()
     engine_after = SimulationEngine()
     for offset in range((END - START).days + 1):
@@ -112,7 +116,7 @@ def calculate_2026_tariff_financial_deltas(
         ):
             skipped[label] = "missing interval longer than 30 minutes"
             continue
-        if stored.get("_period_data_complete", 1.0) < 0.5:
+        if stored.get(PERIOD_DATA_COMPLETE_KEY, 1.0) < 0.5:
             skipped[label] = "daily ledger explicitly incomplete"
             continue
         changed = sum(a is not b for a, b in zip(source, revised_groups[day], strict=True))
@@ -183,5 +187,4 @@ def calculate_2026_tariff_financial_deltas(
             "native_samples": len(source),
             "audit": MIGRATION_ID,
         }
-        previous = day
     return proposal, skipped
