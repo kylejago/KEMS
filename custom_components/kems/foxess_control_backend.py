@@ -103,6 +103,7 @@ class FoxESSControlBackend:
         self._previous_min_soc_on_grid: float | None = None
         self._previous_force_discharge_power_kw: float | None = None
         self._previous_export_power_limit_w: float | None = None
+        self._commissioning_restore_pending = False
         self._paid_export_live_proven = False
         self._paid_export_stage_samples = 0
         self._paid_export_stage_failures = 0
@@ -344,6 +345,7 @@ class FoxESSControlBackend:
         if min_soc_value is None:
             return False, "Cannot preserve pre-KEMS Min SoC-on-grid readback"
 
+        self._commissioning_restore_pending = False
         self._previous_work_mode = str(work_mode)
         self._previous_min_soc_on_grid = min_soc_value
         self._previous_force_discharge_power_kw = force_discharge_value
@@ -557,6 +559,16 @@ class FoxESSControlBackend:
             writes,
         )
         if mode_ok and soc_ok and mode_verified and soc_verified and paid_settings_ok:
+            if verify_physical_baseline and not self._commissioning_restore_pending:
+                # This scan may only have optimistic HA service-call readbacks.
+                # Require a distinct coordinator scan after restoration writes.
+                self._commissioning_restore_pending = True
+                self._last_write_result = (
+                    "Export commissioning restore awaiting a separate "
+                    "FoxESS physical readback scan"
+                )
+                await self._async_save()
+                return False
             if (
                 verify_physical_baseline
                 and not _commissioning_restore_readback_matches(
@@ -576,6 +588,7 @@ class FoxESSControlBackend:
                 )
                 await self._async_save()
                 return False
+            self._commissioning_restore_pending = False
             self._owned = False
             self._last_applied_action = None
             self._paid_export_live_proven = False
@@ -608,7 +621,14 @@ class FoxESSControlBackend:
                 control_override=coordinator.data.control,
             )
             entities = self._binding_entities(shadow)
-            restored = await self._async_restore(entities, writes)
+            restored = await self._async_restore(
+                entities,
+                writes,
+                verify_physical_baseline=bool(
+                    self._commissioning_restore_pending
+                    or self._last_applied_action == "force_discharge"
+                ),
+            )
             self._status = {
                 **self._status,
                 "shutdown_release_attempted": True,
@@ -1186,6 +1206,7 @@ class FoxESSControlBackend:
             "last_verified_min_soc_on_grid": self._last_verified_min_soc_on_grid,
             "last_verified_min_soc_at": self._last_verified_min_soc_at,
             "owned_by_kems": self._owned,
+            "commissioning_restore_pending": self._commissioning_restore_pending,
             "previous_work_mode": self._previous_work_mode,
             "previous_min_soc_on_grid": self._previous_min_soc_on_grid,
             "baseline_repair_applied": baseline_repair_applied,
