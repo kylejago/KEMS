@@ -218,9 +218,7 @@ def guard_paid_agile_physical_export(
     pessimistic_discharge_kwh = (
         possible_discharge_kw * physical_age / (3600.0 * efficiency)
     )
-    soc_lower_bound = max(
-        observed - 100.0 * pessimistic_discharge_kwh / capacity, 0.0
-    )
+    soc_lower_bound = max(observed - 100.0 * pessimistic_discharge_kwh / capacity, 0.0)
     measured_energy_kwh = capacity * soc_lower_bound / 100.0
     protected_home_kwh = net_home / efficiency + buffer_kwh
     surplus_kwh = max(measured_energy_kwh - reserve_kwh - protected_home_kwh, 0.0)
@@ -229,9 +227,7 @@ def guard_paid_agile_physical_export(
         {
             "physical_battery_energy_kwh": round(measured_energy_kwh, 3),
             "physical_soc_lower_bound_percent": round(soc_lower_bound, 3),
-            "pessimistic_soc_aging_discharge_kwh": round(
-                pessimistic_discharge_kwh, 3
-            ),
+            "pessimistic_soc_aging_discharge_kwh": round(pessimistic_discharge_kwh, 3),
             "minimum_battery_reserve_kwh": round(reserve_kwh, 3),
             "forecast_house_energy_kwh": round(expected_house, 3),
             "conservative_solar_credit_kwh": round(solar_credit, 3),
