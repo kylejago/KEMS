@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import replace
-from datetime import date, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from typing import Any
 from zoneinfo import ZoneInfo
 
@@ -90,6 +90,7 @@ def actual_export_income_pence(
     tariff_type: str,
     fixed_rate_pence: float,
     agile_state: dict[str, Any],
+    activation_cutoff: datetime | None = None,
 ) -> float | None:
     """Value measured current-day export using the tariff actually selected.
 
@@ -101,6 +102,8 @@ def actual_export_income_pence(
     """
     if tariff_type == EXPORT_TARIFF_TYPE_NONE:
         return 0.0
+    if activation_cutoff is not None and activation_cutoff.tzinfo is None:
+        return None
 
     today = now.astimezone(LONDON).date()
     day_records = sorted(
@@ -119,6 +122,11 @@ def actual_export_income_pence(
             MAX_INTERVAL_HOURS,
         )
         if hours <= 0 or "grid_export_kw" in current.stale_fields:
+            continue
+        if activation_cutoff is not None and current.timestamp.astimezone(
+            UTC
+        ) < activation_cutoff.astimezone(UTC):
+            # Fail closed at the boundary; no unmeasured proration.
             continue
         export_kw = _number(current.grid_export_kw)
         if export_kw is None or export_kw <= 0:

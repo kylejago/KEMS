@@ -233,3 +233,50 @@ def test_no_paid_export_repair_zeroes_latest_two_days_only() -> None:
     recorder.saved = False
     assert asyncio.run(async_repair_no_paid_export_income(recorder)) is False
     assert recorder.saved is False
+
+
+def test_paid_export_ignores_all_measurements_before_verified_cutover() -> None:
+    records = _records(2.0, 4.0, 0.0)
+    cutoff = records[1].timestamp
+    assert (
+        actual_export_income_pence(
+            records,
+            records[-1].timestamp,
+            tariff_type="agile",
+            fixed_rate_pence=12.0,
+            agile_state=_agile_state(),
+            activation_cutoff=cutoff,
+        )
+        == 40.0
+    )
+
+
+def test_paid_export_cutover_mid_interval_does_not_invent_energy() -> None:
+    records = _records(2.0, 4.0, 0.0)
+    cutoff = records[0].timestamp + timedelta(minutes=10)
+    assert (
+        actual_export_income_pence(
+            records,
+            records[-1].timestamp,
+            tariff_type="agile",
+            fixed_rate_pence=12.0,
+            agile_state=_agile_state(),
+            activation_cutoff=cutoff,
+        )
+        == 40.0
+    )
+
+
+def test_paid_export_rejects_naive_activation_cutoff() -> None:
+    records = _records(2.0, 0.0)
+    assert (
+        actual_export_income_pence(
+            records,
+            records[-1].timestamp,
+            tariff_type="agile",
+            fixed_rate_pence=12.0,
+            agile_state=_agile_state(),
+            activation_cutoff=datetime(2026, 9, 13, 11, 0),
+        )
+        is None
+    )

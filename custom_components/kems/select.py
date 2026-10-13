@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
+
 from homeassistant.components.select import SelectEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import EntityCategory
@@ -136,17 +138,19 @@ class KEMSExportTariffSelect(KEMSEntity, SelectEntity):
         )
         if selected is None:
             raise HomeAssistantError(f"Unsupported KEMS export tariff: {option}")
+        previous = export_tariff_type_from_options(self.coordinator.entry.options)
+        changes = {
+            "export_tariff_type": selected,
+            CONF_EXPORT_TARIFF_STATUS: (
+                "awaiting" if selected == EXPORT_TARIFF_TYPE_NONE else "active"
+            ),
+        }
+        if selected != EXPORT_TARIFF_TYPE_NONE and previous == EXPORT_TARIFF_TYPE_NONE:
+            # Persist the first operator-confirmed paid settlement boundary.
+            # Never monetise prior unverified grid export after a tariff switch.
+            changes["paid_export_accounting_started_at"] = datetime.now(UTC).isoformat()
         await async_set_runtime_options(
-            self.hass,
-            self.coordinator.entry,
-            {
-                "export_tariff_type": selected,
-                # The existing simulation engine already has the correct
-                # no-export safety path behind this established option.
-                CONF_EXPORT_TARIFF_STATUS: (
-                    "awaiting" if selected == EXPORT_TARIFF_TYPE_NONE else "active"
-                ),
-            },
+            self.hass, self.coordinator.entry, changes
         )
 
 
