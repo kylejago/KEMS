@@ -343,6 +343,8 @@ def test_paid_baseline_repair_rejects_partial_or_different_evidence() -> None:
 def test_paid_baseline_repair_does_not_alter_no_paid_export_policy() -> None:
     backend = BACKEND.read_text(encoding="utf-8")
     assert "not no_paid_export_mode" in backend
+    assert "export_tariff_type_from_options(coordinator.entry.options)" in backend
+    assert "== EXPORT_TARIFF_TYPE_AGILE" in backend
     assert "and not commissioning_export_test" in backend
     assert "paid_activation_baseline_blocked" in backend
     assert "self._previous_work_mode = \"Self Use\"" in backend
