@@ -32,6 +32,7 @@ def _snapshot(**changes: object) -> Snapshot:
         ev_connected=False,
         ev_charging=False,
         source_data_age_seconds=10.0,
+        source_age_seconds={"battery_soc": 10.0},
         next_offpeak_start=NOW + timedelta(hours=12),
     )
     state.update(changes)
