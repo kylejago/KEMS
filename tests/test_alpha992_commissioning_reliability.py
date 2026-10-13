@@ -22,8 +22,7 @@ def _function(path: Path, function: str):
     selected = [
         node
         for node in tree.body
-        if isinstance(node, ast.FunctionDef)
-        and node.name in {"_number", function}
+        if isinstance(node, ast.FunctionDef) and node.name in {"_number", function}
     ]
     assert any(node.name == function for node in selected)
     namespace: dict[str, Any] = {"Any": Any}
@@ -94,7 +93,12 @@ def test_optimistic_number_state_cannot_replace_physical_sensor_readback() -> No
 
 
 def test_partial_missing_or_failed_restore_bindings_never_release() -> None:
-    for field in ("work_mode", "min_soc_on_grid", "force_discharge_power", "export_power_limit"):
+    for field in (
+        "work_mode",
+        "min_soc_on_grid",
+        "force_discharge_power",
+        "export_power_limit",
+    ):
         entities = _baseline_entities()
         del entities[field]
         assert not _matches(entities)
