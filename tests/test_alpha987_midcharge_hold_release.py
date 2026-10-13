@@ -40,6 +40,7 @@ def _midcharge_hold(
         pending_intelligent_ev_hold_active=pending,
         write_authority_recovered=authority_recovered,
         ev_hold_guard_active=guard_active,
+        force_charge_hold_authorised=True,
         site_import_limit_exceeded=import_exceeded,
         eps_critical=eps_critical,
     )
