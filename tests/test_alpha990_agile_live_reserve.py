@@ -218,3 +218,95 @@ def test_paid_hold_stays_fail_closed_on_unconfirmed_cheap() -> None:
         no_paid_export_mode=True,
     )
     assert unchanged is control
+
+
+def test_unchanged_soc_can_use_recent_same_device_modbus_cohort() -> None:
+    # The October 13 diagnostic had ~305 seconds of raw SOC age, but subsecond
+    # battery power and solar reports. The provider had already verified
+    # those readings belong to the same FoxESS device.
+    observed = _snapshot(
+        battery_soc=100.0,
+        source_age_seconds={
+            "battery_soc": 305.5,
+            "battery_power_kw": 0.3,
+            "solar_power_kw": 0.2,
+        },
+    )
+    guarded, detail = _guard(snapshot=observed)
+    assert guarded.desired_battery_export_power_kw > 0.0
+    assert detail["soc_freshness_basis"] == (
+        "same_device_cohort_with_worst_case_discharge"
+    )
+    assert detail["raw_physical_soc_age_seconds"] == 305.5
+    assert detail["physical_soc_lower_bound_percent"] < 100.0
+    assert detail["pessimistic_soc_aging_discharge_kwh"] > 0.8
+    assert detail["physical_battery_energy_kwh"] < 56.42
+
+
+def test_old_soc_never_inflates_exportable_energy() -> None:
+    fresh, fresh_detail = _guard(snapshot=_snapshot(battery_soc=75.0))
+    old, old_detail = _guard(
+        snapshot=_snapshot(
+            battery_soc=75.0,
+            source_age_seconds={
+                "battery_soc": 600.0,
+                "battery_power_kw": 1.0,
+            },
+        )
+    )
+    assert old_detail["exportable_physical_energy_kwh"] < (
+        fresh_detail["exportable_physical_energy_kwh"]
+    )
+    assert old.desired_battery_export_power_kw <= (
+        fresh.desired_battery_export_power_kw
+    )
+    assert old_detail["physical_soc_lower_bound_percent"] < 75.0
+
+
+def test_old_soc_without_live_cohort_fails_closed() -> None:
+    missing_live = _snapshot(
+        battery_soc=90.0, source_age_seconds={"battery_soc": 305.5}
+    )
+    guarded, detail = _guard(snapshot=missing_live)
+    assert guarded.desired_battery_export_power_kw == 0.0
+    assert "cohort" in detail["reason"]
+    # Even a live sibling cannot authorise an indefinitely frozen SOC.
+    beyond_window = _snapshot(
+        battery_soc=90.0,
+        source_age_seconds={
+            "battery_soc": 901.0,
+            "battery_power_kw": 0.1,
+        },
+    )
+    blocked, detail = _guard(snapshot=beyond_window)
+    assert blocked.desired_battery_export_power_kw == 0.0
+    assert detail["status"] == "blocked"
+
+
+def test_unverified_inverter_cohort_still_blocks_export() -> None:
+    observed = _snapshot(
+        battery_soc=95.0,
+        source_age_seconds={
+            "battery_soc": 305.5,
+            "battery_power_kw": 0.1,
+        },
+        stale_fields=("battery_soc",),
+    )
+    guarded, detail = _guard(snapshot=observed)
+    assert guarded.desired_battery_export_power_kw == 0.0
+    assert detail["status"] == "blocked"
+
+
+def test_ohme_unavailable_prevents_export_regardless_of_soc_confidence() -> None:
+    observed = _snapshot(
+        battery_soc=100.0,
+        ev_connected=None,
+        ev_charging=None,
+        source_age_seconds={
+            "battery_soc": 305.5,
+            "battery_power_kw": 0.1,
+        },
+    )
+    guarded, detail = _guard(snapshot=observed)
+    assert guarded.desired_battery_export_power_kw == 0.0
+    assert "EV connected/uncertain" in detail["reason"]
