@@ -68,8 +68,10 @@ def assess_paid_agile_ev_continuity(
     charging = snapshot.ev_charging
     power_kw = _finite(snapshot.ev_power_kw)
     power_age = _finite(snapshot.ev_power_age_seconds)
-    if connected is True or charging is True or (
-        power_kw is not None and power_kw > _AGILE_EV_IDLE_POWER_KW
+    if (
+        connected is True
+        or charging is True
+        or (power_kw is not None and power_kw > _AGILE_EV_IDLE_POWER_KW)
     ):
         return False, None, "EV connected/charging/power observed"
 
@@ -86,17 +88,22 @@ def assess_paid_agile_ev_continuity(
     if connected is False:
         # Confirmed unplugged is stronger than a transient unavailable
         # charging flag; refresh the brief grace anchor from the live status.
-        return True, now, (
-            "confirmed_unplugged"
-            if charging is False
-            else "unplugged_with_fresh_zero_ev_power"
+        return (
+            True,
+            now,
+            (
+                "confirmed_unplugged"
+                if charging is False
+                else "unplugged_with_fresh_zero_ev_power"
+            ),
         )
 
     if (
         last_confirmed_unplugged_at is not None
         and now.tzinfo is not None
         and last_confirmed_unplugged_at.tzinfo is not None
-        and timedelta(0) <= now - last_confirmed_unplugged_at
+        and timedelta(0)
+        <= now - last_confirmed_unplugged_at
         <= timedelta(seconds=_AGILE_EV_UNPLUGGED_GRACE_SECONDS)
     ):
         return True, last_confirmed_unplugged_at, "bounded_unplugged_source_grace"
