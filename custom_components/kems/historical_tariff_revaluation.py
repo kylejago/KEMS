@@ -53,9 +53,9 @@ def corrected_2026_import_snapshot(record: Snapshot) -> Snapshot:
     rate = record.current_import_rate
     if rate is None or "current_import_rate" in record.tariff_stale_fields:
         return record
-    if abs(rate - OLD_DAY_PENCE) < 0.001:
+    if abs(rate - OLD_DAY_PENCE) < 0.05:
         return replace(record, current_import_rate=NEW_DAY_PENCE)
-    if abs(rate - OLD_CHEAP_PENCE) < 0.001:
+    if abs(rate - OLD_CHEAP_PENCE) < 0.05:
         return replace(record, current_import_rate=NEW_CHEAP_PENCE)
     return record
 
