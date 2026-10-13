@@ -75,7 +75,7 @@ def test_replans_using_actual_soc_and_house_forecast() -> None:
 
 def test_small_remaining_surplus_caps_physical_kw() -> None:
     actual, report = _guard(
-        snapshot=_snapshot(battery_soc=75.0),
+        snapshot=_snapshot(battery_soc=60.0),
         forecast=_forecast(expected_house_remaining_today_kwh=20.0),
     )
     assert 0.0 < actual.desired_battery_export_power_kw < 6.4
@@ -127,3 +127,20 @@ def test_no_export_plan_and_confirmed_cheap_unchanged() -> None:
     untouched, report = _guard(snapshot=cheap)
     assert untouched is not None
     assert report["status"] == "higher_priority_cheap_or_event"
+
+
+def test_paid_ev_hold_gate_is_invoked_before_physical_backend() -> None:
+    from pathlib import Path
+
+    root = Path(__file__).parents[1] / "custom_components" / "kems"
+    coordinator = (root / "coordinator.py").read_text(encoding="utf-8")
+    backend = (root / "foxess_control_backend.py").read_text(encoding="utf-8")
+    source = coordinator.split("control = apply_happy_hour_control(", 1)[1]
+    assert source.index("guard_paid_agile_physical_export(") < source.index(
+        "self._ev_grid_hold.async_apply("
+    )
+    assert source.index("self._ev_grid_hold.async_apply(") < source.index(
+        "self._foxess_control.async_update("
+    )
+    assert "paid_agile_ev_hold_eligible=paid_agile_ev_hold_eligible" in coordinator
+    assert "paid_agile_ev_hold_eligible" in backend

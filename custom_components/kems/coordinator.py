@@ -18,6 +18,7 @@ from .agile_control_alignment import (
 )
 from .agile_current_day_presentation import reconciled_current_day_simulation
 from .agile_history_backfill import AgileHistoryBackfill
+from .kems_core.agile_live_reserve import guard_paid_agile_physical_export
 from .agile_smart_export_runtime import EfficientAgileSmartExportManager
 from .collector import Collector
 from .commissioning import build_commissioning_snapshot
@@ -754,14 +755,49 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
             if not isinstance(power_down_plan, dict):
                 power_down_plan = {}
             control = apply_happy_hour_control(control, snapshot, happy_hour_plan)
-            # Existing reviewed MinSOC/Force Charge scope only. Higher-priority
-            # Happy Hour, Power Down, island and emergency paths are untouched.
+            # Physically constrain paid Agile before any FoxESS writes. The
+            # simulation / financial / shadow plan remains unchanged.
+            if tariff_type == EXPORT_TARIFF_TYPE_AGILE:
+                control, self._agile_live_reserve_status = (
+                    guard_paid_agile_physical_export(
+                        control,
+                        snapshot,
+                        forecast_plan,
+                        self.settings.simulation,
+                        self.settings.control,
+                        now=now,
+                    )
+                )
+            else:
+                self._agile_live_reserve_status = {
+                    "status": "not_agile", "permitted_export_kw": 0.0
+                }
+
+            # Paid Agile's confirmed-cheap Force Charge may need the same
+            # already-reviewed EV/MinSOC hold as No paid export. This never
+            # grants Force Charge on an unconfirmed Intelligent slot.
             ev_hold_source_uncertain = self._ev_hold_source_uncertain()
+            previous_ev_floor = self._ev_grid_hold.status.get(
+                "latched_min_soc_percent"
+            )
+            paid_agile_ev_hold_eligible = bool(
+                tariff_type == EXPORT_TARIFF_TYPE_AGILE
+                and not snapshot.saving_session_active
+                and control.desired_battery_export_power_kw <= 0.001
+                and control.desired_work_mode in {"Force Charge", "Self Use"}
+                and (
+                    snapshot.cheap_period_confirmed
+                    or (previous_ev_floor is not None and ev_hold_source_uncertain)
+                )
+            )
             control = await self._ev_grid_hold.async_apply(
                 snapshot,
                 control,
                 self.settings.control,
-                no_paid_export_mode=base_simulation.no_export_mode_active,
+                no_paid_export_mode=(
+                    base_simulation.no_export_mode_active
+                    or paid_agile_ev_hold_eligible
+                ),
                 source_uncertain=ev_hold_source_uncertain,
                 source_grace_seconds=_ALPHA975_EV_HOLD_SOURCE_GRACE_SECONDS,
             )
@@ -884,6 +920,7 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                 cheap_period_confirmed=bool(snapshot.cheap_period_confirmed),
                 ev_hold_floor_percent=ev_hold_state.get("latched_min_soc_percent"),
                 ev_connected=snapshot.ev_connected,
+                paid_agile_ev_hold_eligible=paid_agile_ev_hold_eligible,
                 ev_hold_source_grace_active=bool(
                     ev_hold_state.get("source_uncertainty_grace_active")
                 ),
