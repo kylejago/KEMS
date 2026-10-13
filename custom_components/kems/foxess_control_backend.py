@@ -909,7 +909,10 @@ class FoxESSControlBackend:
                     entities,
                     writes,
                     verify_physical_baseline=bool(
-                        commissioning_export_test or force_restore
+                        commissioning_export_test
+                        or force_restore
+                        or self._commissioning_restore_pending
+                        or self._last_applied_action == "force_discharge"
                     ),
                 )
                 if not applied:
@@ -934,7 +937,10 @@ class FoxESSControlBackend:
                         entities,
                         writes,
                         verify_physical_baseline=bool(
-                            commissioning_export_test or force_restore
+                            commissioning_export_test
+                            or force_restore
+                            or self._commissioning_restore_pending
+                            or self._last_applied_action == "force_discharge"
                         ),
                     )
             else:
@@ -973,7 +979,10 @@ class FoxESSControlBackend:
                         entities,
                         writes,
                         verify_physical_baseline=bool(
-                            commissioning_export_test or force_restore
+                            commissioning_export_test
+                            or force_restore
+                            or self._commissioning_restore_pending
+                            or self._last_applied_action == "force_discharge"
                         ),
                     )
                 else:
@@ -1159,7 +1168,10 @@ class FoxESSControlBackend:
                             entities,
                             writes,
                             verify_physical_baseline=bool(
-                                commissioning_export_test or force_restore
+                                commissioning_export_test
+                                or force_restore
+                                or self._commissioning_restore_pending
+                                or self._last_applied_action == "force_discharge"
                             ),
                         )
 
