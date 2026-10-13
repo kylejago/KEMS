@@ -177,6 +177,7 @@ def test_restoration_does_not_release_on_optimistic_ha_state_alone() -> None:
     )
     scope: dict[str, Any] = {
         "Any": Any,
+        "_LOCAL_WORK_MODES": {"Self Use", "Feed-in First", "Back-up"},
         "_number": _function(BACKEND, "_number"),
         "_commissioning_restore_readback_matches": _function(
             BACKEND, "_commissioning_restore_readback_matches"
@@ -199,6 +200,7 @@ def test_restoration_does_not_release_on_optimistic_ha_state_alone() -> None:
         _paid_export_live_proven = True
         _paid_export_stage_samples = 2
         _paid_export_stage_failures = 0
+        _paid_export_stage_reason = None
         _last_applied_action = "force_discharge"
         _last_verified_min_soc_on_grid = None
         _last_verified_min_soc_at = None
