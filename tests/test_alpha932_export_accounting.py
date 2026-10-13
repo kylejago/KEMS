@@ -233,3 +233,67 @@ def test_no_paid_export_repair_zeroes_latest_two_days_only() -> None:
     recorder.saved = False
     assert asyncio.run(async_repair_no_paid_export_income(recorder)) is False
     assert recorder.saved is False
+
+
+def test_paid_export_ignores_all_measurements_before_verified_cutover() -> None:
+    records = _records(2.0, 4.0, 0.0)
+    cutoff = records[1].timestamp
+    assert (
+        actual_export_income_pence(
+            records,
+            records[-1].timestamp,
+            tariff_type="agile",
+            fixed_rate_pence=12.0,
+            agile_state=_agile_state(),
+            activation_cutoff=cutoff,
+        )
+        == 40.0
+    )
+
+
+def test_paid_export_cutover_mid_interval_does_not_invent_energy() -> None:
+    records = _records(2.0, 4.0, 0.0)
+    cutoff = records[0].timestamp + timedelta(minutes=10)
+    assert (
+        actual_export_income_pence(
+            records,
+            records[-1].timestamp,
+            tariff_type="agile",
+            fixed_rate_pence=12.0,
+            agile_state=_agile_state(),
+            activation_cutoff=cutoff,
+        )
+        == 40.0
+    )
+
+
+def test_paid_export_rejects_naive_activation_cutoff() -> None:
+    records = _records(2.0, 0.0)
+    assert (
+        actual_export_income_pence(
+            records,
+            records[-1].timestamp,
+            tariff_type="agile",
+            fixed_rate_pence=12.0,
+            agile_state=_agile_state(),
+            activation_cutoff=datetime(2026, 9, 13, 11, 0),
+        )
+        is None
+    )
+
+
+def test_unknown_agile_price_never_falls_back_to_fixed_benchmark() -> None:
+    prior = SimulationState(
+        actual_import_cost_pence=170.0,
+        actual_export_income_pence=88.0,
+        actual_cost_pence=82.0,
+        actual_avoided_import_value_pence=20.0,
+        actual_system_value_pence=108.0,
+        simulated_cost_pence=50.0,
+        saving_pence=32.0,
+    )
+    result = revalue_actual_export_income(prior, None)
+    assert result.actual_export_income_pence == 0.0
+    assert result.actual_cost_pence == 170.0
+    assert result.actual_system_value_pence == 20.0
+    assert result.saving_pence is None

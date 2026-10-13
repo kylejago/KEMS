@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import replace
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import Event, HomeAssistant, callback
@@ -604,12 +604,26 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
             # the configured fixed export rate.
             tariff_type = export_tariff_type_from_options(self.entry.options)
             agile_state = self._agile_smart_export.state
-            actual_export_income = actual_export_income_pence(
-                records,
-                now,
-                tariff_type=tariff_type,
-                fixed_rate_pence=self.settings.simulation.export_rate_pence,
-                agile_state=agile_state,
+            paid_start_raw = self.entry.options.get("paid_export_accounting_started_at")
+            paid_start = None
+            if tariff_type != EXPORT_TARIFF_TYPE_NONE:
+                try:
+                    paid_start = datetime.fromisoformat(str(paid_start_raw))
+                    if paid_start.tzinfo is None:
+                        paid_start = None
+                except (TypeError, ValueError):
+                    paid_start = None
+            actual_export_income = (
+                actual_export_income_pence(
+                    records,
+                    now,
+                    tariff_type=tariff_type,
+                    fixed_rate_pence=self.settings.simulation.export_rate_pence,
+                    agile_state=agile_state,
+                    activation_cutoff=paid_start,
+                )
+                if tariff_type == EXPORT_TARIFF_TYPE_NONE or paid_start is not None
+                else 0.0  # No verified cutoff: book no speculative income.
             )
             base_simulation = revalue_actual_export_income(
                 base_simulation,
