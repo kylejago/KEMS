@@ -20,6 +20,19 @@ _HOUSE_BUFFER_FRACTION = 0.20
 _EXPORT_PROOF_HORIZON_HOURS = 0.5
 _MAX_FORECAST_SOLAR_CREDIT_FRACTION = 0.25
 _SOLAR_CREDIT_MIN_CONFIDENCE = 80.0
+# FoxESS may report an unchanged integer SOC less frequently than power/CT.
+# Only extend eligibility within a short, pessimistically debited window when
+# another *same-device* Modbus source is reporting. The FoxESS provider already
+# validates device IDs before accepting an old SOC via its cohort policy.
+_MAX_COHORT_SOC_AGE_SECONDS = 900.0
+_MIN_CONSERVATIVE_DISCHARGE_KW = 10.0
+_COHORT_POWER_FIELDS = (
+    "battery_power_kw",
+    "house_load_kw",
+    "solar_power_kw",
+    "grid_import_kw",
+    "grid_export_kw",
+)
 
 
 def _finite(value: Any) -> float | None:
@@ -118,9 +131,28 @@ def guard_paid_agile_physical_export(
         or age > control_config.stale_data_seconds
         or physical_age is None
         or physical_age < 0.0
-        or physical_age > control_config.stale_data_seconds
+        or physical_age > _MAX_COHORT_SOC_AGE_SECONDS
     ):
-        return reduce("fresh physical battery SOC unavailable")
+        return reduce("physical battery SOC missing, stale or too old to bound")
+
+    if physical_age > control_config.stale_data_seconds:
+        # The raw SOC age alone cannot justify export. Require a *current*
+        # independent FoxESS Modbus value as well as the provider's earlier
+        # same-device cohort validation (stale_fields is clear and overall
+        # effective device freshness is within the normal deadline).
+        sibling_fresh = any(
+            (field not in snapshot.stale_fields)
+            and (sibling_age := _finite(snapshot.source_age_seconds.get(field)))
+            is not None
+            and 0.0 <= sibling_age <= control_config.stale_data_seconds
+            for field in _COHORT_POWER_FIELDS
+        )
+        if not sibling_fresh:
+            return reduce("no fresh same-device FoxESS cohort corroboration")
+        report["soc_freshness_basis"] = "same_device_cohort_with_worst_case_discharge"
+    else:
+        report["soc_freshness_basis"] = "physical_soc_report_with_worst_case_discharge"
+    report["raw_physical_soc_age_seconds"] = round(physical_age, 1)
 
     deadline = snapshot.next_offpeak_start
     if (
@@ -173,13 +205,33 @@ def guard_paid_agile_physical_export(
         _finite(simulation_config.battery_reserve_percent) or 0.0,
     )
     reserve_kwh = capacity * reserve_percent / 100.0
-    measured_energy_kwh = capacity * observed / 100.0
+    # An old SOC cannot be treated as current merely because the inverter is
+    # alive. Assume uninterrupted maximum physical discharge since that
+    # particular SOC sample, including discharge-efficiency losses. Never
+    # credit unknown charging or optimistic forecast production.
+    possible_discharge_kw = max(
+        _MIN_CONSERVATIVE_DISCHARGE_KW,
+        _finite(simulation_config.max_discharge_kw) or 0.0,
+        _finite(control_config.max_discharge_kw) or 0.0,
+        _finite(control_config.inverter_limit_kw) or 0.0,
+    )
+    pessimistic_discharge_kwh = (
+        possible_discharge_kw * physical_age / (3600.0 * efficiency)
+    )
+    soc_lower_bound = max(
+        observed - 100.0 * pessimistic_discharge_kwh / capacity, 0.0
+    )
+    measured_energy_kwh = capacity * soc_lower_bound / 100.0
     protected_home_kwh = net_home / efficiency + buffer_kwh
     surplus_kwh = max(measured_energy_kwh - reserve_kwh - protected_home_kwh, 0.0)
     max_export_kw = surplus_kwh / _EXPORT_PROOF_HORIZON_HOURS
     report.update(
         {
             "physical_battery_energy_kwh": round(measured_energy_kwh, 3),
+            "physical_soc_lower_bound_percent": round(soc_lower_bound, 3),
+            "pessimistic_soc_aging_discharge_kwh": round(
+                pessimistic_discharge_kwh, 3
+            ),
             "minimum_battery_reserve_kwh": round(reserve_kwh, 3),
             "forecast_house_energy_kwh": round(expected_house, 3),
             "conservative_solar_credit_kwh": round(solar_credit, 3),
