@@ -764,7 +764,8 @@ class FoxESSControlBackend:
             pending_intelligent_ev_hold_active=pending_intelligent_ev_hold_active,
             write_authority_recovered=write_authority_recovered,
             ev_hold_guard_active=(
-                control.ev_grid_guard_status in {
+                control.ev_grid_guard_status
+                in {
                     "ev_battery_hold_prearmed",
                     "ev_battery_hold",
                     "ev_battery_hold_conservative_scope",
