@@ -60,9 +60,7 @@ def _control() -> ControlState:
     )
 
 
-def _dispatch(
-    snap: Snapshot, allowed: bool
-) -> tuple[ControlState, dict[str, object]]:
+def _dispatch(snap: Snapshot, allowed: bool) -> tuple[ControlState, dict[str, object]]:
     return guard_paid_agile_physical_export(
         _control(),
         snap,
@@ -92,9 +90,7 @@ def test_ev_unavailable_for_40_seconds_preserves_agile_export() -> None:
     _, anchor, _ = _assess(_snapshot())
     during_dropout = NOW + timedelta(seconds=40)
     unavailable = _snapshot(ev_connected=None, ev_charging=None)
-    ok, retained, reason = _assess(
-        unavailable, now=during_dropout, previous=anchor
-    )
+    ok, retained, reason = _assess(unavailable, now=during_dropout, previous=anchor)
     assert ok and retained == anchor
     assert reason == "bounded_unplugged_source_grace"
     controlled, detail = _dispatch(unavailable, allowed=ok)
@@ -121,9 +117,7 @@ def test_ev_becomes_connected_or_draws_current_clears_grace_immediately() -> Non
 def test_90_second_limit_and_restart_without_anchor_fail_closed() -> None:
     lost = _snapshot(ev_connected=None, ev_charging=None)
     for seconds in (1, 40, 90):
-        ok, _, _ = _assess(
-            lost, now=NOW + timedelta(seconds=seconds), previous=NOW
-        )
+        ok, _, _ = _assess(lost, now=NOW + timedelta(seconds=seconds), previous=NOW)
         assert ok
     for previous, seconds in ((None, 40), (NOW, 91)):
         ok, anchor, _ = _assess(
@@ -156,8 +150,7 @@ def test_unplugged_proof_must_be_recent_and_cannot_arrive_from_future() -> None:
 
 def test_cheap_and_no_paid_export_software_routes_are_untouched() -> None:
     code = (
-        Path(__file__).parents[1] / "custom_components" / "kems"
-        / "coordinator.py"
+        Path(__file__).parents[1] / "custom_components" / "kems" / "coordinator.py"
     ).read_text(encoding="utf-8")
     assert "if tariff_type == EXPORT_TARIFF_TYPE_AGILE:" in code
     assert "self._paid_agile_last_unplugged_at = None" in code
