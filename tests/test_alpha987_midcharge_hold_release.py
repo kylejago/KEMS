@@ -62,9 +62,7 @@ def test_ev_temporarily_unknown_retains_previous_verified_floor() -> None:
 def test_unverified_min_soc_never_claims_a_protective_hold() -> None:
     assert not _midcharge_hold(min_soc_readback=10.0)
     assert not _midcharge_hold(min_soc_readback=None, last_verified=None)
-    assert not _midcharge_hold(
-        min_soc_readback=None, last_verified=46.0, pending=True
-    )
+    assert not _midcharge_hold(min_soc_readback=None, last_verified=46.0, pending=True)
 
 
 def test_no_ev_guard_or_confirmed_cheap_window_cannot_freeze() -> None:
