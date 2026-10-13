@@ -32,27 +32,27 @@ def _settings() -> TariffSettings:
                 date(2026, 10, 1), 26.9558095238, 3.326952381, 51.147
             ),
             ScheduledTariffChange(date(2026, 10, 4), 37.17, 8.0, 55.52),
-            ScheduledTariffChange(date(2026, 10, 12), 35.88, 6.60, 55.52),
+            ScheduledTariffChange(date(2026, 10, 6), 35.88, 6.60, 55.52),
         ),
     )
 
 
 def test_original_tariff_history_is_preserved() -> None:
     s = _settings()
-    before = effective_tariff_rates(s, date(2026, 10, 11))
-    after = effective_tariff_rates(s, date(2026, 10, 12))
+    before = effective_tariff_rates(s, date(2026, 10, 5))
+    after = effective_tariff_rates(s, date(2026, 10, 6))
     assert (before.day_rate_pence, before.offpeak_rate_pence) == (37.17, 8.0)
     assert before.next_change is not None
-    assert before.next_change.effective_from == date(2026, 10, 12)
+    assert before.next_change.effective_from == date(2026, 10, 6)
     assert (after.day_rate_pence, after.offpeak_rate_pence) == (35.88, 6.60)
     assert after.standing_charge_pence == 55.52
-    assert after.effective_from == date(2026, 10, 12)
+    assert after.effective_from == date(2026, 10, 6)
 
 
 def test_new_defaults_preserve_earlier_dates() -> None:
     assert DEFAULT_OPTIONS["tariff_change_2_effective_date"] == "2026-10-04"
     assert DEFAULT_OPTIONS["tariff_change_2_day_rate_pence"] == 37.17
-    assert DEFAULT_OPTIONS["tariff_change_3_effective_date"] == "2026-10-12"
+    assert DEFAULT_OPTIONS["tariff_change_3_effective_date"] == "2026-10-06"
     assert DEFAULT_OPTIONS["tariff_change_3_day_rate_pence"] == 35.88
     assert DEFAULT_OPTIONS["tariff_change_3_offpeak_rate_pence"] == 6.60
     assert DEFAULT_OPTIONS["tariff_change_3_standing_charge_pence"] == 55.52

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import replace
-from datetime import timedelta
+from datetime import date, timedelta
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import Event, HomeAssistant, callback
@@ -40,6 +40,7 @@ from .foxess_command_shadow import build_foxess_command_shadow_snapshot
 from .foxess_control_backend import FoxESSControlBackend
 from .happy_hour_budget import apply_happy_hour_control
 from .happy_hour_ohme_control import OhmeHappyHourController
+from .historical_tariff_revaluation import financial_replay_records
 from .history import HistoryRecorder
 from .kems_core import (
     AdviceEngine,
@@ -467,6 +468,33 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
             self.settings.simulation,
             self.settings.roi,
         )
+        loyal_oct6_confirmed = any(
+            change.effective_from == date(2026, 10, 6)
+            and abs(change.day_rate_pence - 35.88) < 0.001
+            and abs(change.offpeak_rate_pence - 6.60) < 0.001
+            for change in self.settings.tariff.scheduled_changes
+        )
+        if (
+            loyal_oct6_confirmed
+            and export_tariff_type_from_options(self.entry.options)
+            == EXPORT_TARIFF_TYPE_NONE
+        ):
+            try:
+                corrected = (
+                    await self._lifetime.async_revalue_october_2026_financial_history(
+                        self._history.records,
+                        self.settings.simulation,
+                    )
+                )
+                if corrected:
+                    await async_reconcile_financial_commissioning(
+                        self._lifetime,
+                        self.settings.roi.commissioning_date,
+                    )
+            except (TypeError, ValueError, ArithmeticError) as err:
+                # Historical finance must never prevent live KEMS startup or
+                # grant/revoke inverter control. Leave uncertain days untouched.
+                LOGGER.warning("Historical Loyal tariff replay skipped: %s", err)
 
     async def _async_update_data(self) -> KEMSData:
         """Run the complete read-only KEMS analysis pipeline."""
@@ -501,7 +529,7 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
             # exact decision that KEMS made at this point in time is retained
             # with the observation. That lets Full KEMS Forecast be replayed
             # historically without applying today's forecast to yesterday.
-            planning_records = self._history.records
+            planning_records = financial_replay_records(self._history.records)
             if (
                 not planning_records
                 or snapshot.timestamp > planning_records[-1].timestamp
@@ -535,7 +563,7 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                 await self._forecast_validation.async_save()
 
             await self._history.async_record(snapshot)
-            records = self._history.records
+            records = financial_replay_records(self._history.records)
             self._forecast_validation.analyse(records, now)
             learned = self._learning.analyse(records, now)
             gas = self._gas.summarise(records, now)
