@@ -102,6 +102,7 @@ def test_missing_stale_forecast_or_deadline_fails_closed() -> None:
         (_snapshot(source_age_seconds={}), _forecast()),
         (_snapshot(stale_fields=("battery_soc",)), _forecast()),
         (_snapshot(next_offpeak_start=None), _forecast()),
+        (_snapshot(tariff_stale_fields=("next_offpeak_start",)), _forecast()),
         (_snapshot(next_offpeak_start=NOW - timedelta(minutes=1)), _forecast()),
         (_snapshot(), _forecast(ready=False)),
         (_snapshot(), _forecast(expected_house_remaining_today_kwh=None)),

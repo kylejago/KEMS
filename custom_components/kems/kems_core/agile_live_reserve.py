@@ -123,8 +123,13 @@ def guard_paid_agile_physical_export(
         return reduce("fresh physical battery SOC unavailable")
 
     deadline = snapshot.next_offpeak_start
-    if deadline is None or deadline.tzinfo is None or now.tzinfo is None:
-        return reduce("no verified future cheap-period deadline")
+    if (
+        deadline is None
+        or deadline.tzinfo is None
+        or now.tzinfo is None
+        or "next_offpeak_start" in snapshot.tariff_stale_fields
+    ):
+        return reduce("no fresh verified future cheap-period deadline")
     until_cheap = (deadline - now).total_seconds() / 3600.0
     if not 0.0 < until_cheap <= 24.0:
         return reduce("cheap-period deadline is not ahead within 24 hours")
