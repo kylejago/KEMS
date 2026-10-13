@@ -49,6 +49,45 @@ def _number(value: object) -> float | None:
         return None
 
 
+
+def _commissioning_restore_readback_matches(
+    entities: dict[str, Any],
+    *,
+    work_mode: str | None,
+    min_soc_on_grid: float | None,
+    force_discharge_power_kw: float | None,
+    export_power_limit_w: float | None,
+) -> bool:
+    """Require the *pre-write* FoxESS binding snapshot to match the true baseline.
+
+    Command acceptance and optimistic HA state changes are not proof that a
+    physical restoration finished. In particular, MinSOC and export-limit
+    must be corroborated by their dedicated FoxESS sensor readbacks before
+    the manual export test may relinquish ownership.
+    """
+    expected = (
+        ("work_mode", work_mode, None, None),
+        ("min_soc_on_grid", min_soc_on_grid, 0.05, "sensor_readback"),
+        ("force_discharge_power", force_discharge_power_kw, 0.05, None),
+        ("export_power_limit", export_power_limit_w, 1.0, "sensor_readback"),
+    )
+    for key, target, tolerance, required_source in expected:
+        if target is None:
+            return False
+        binding = entities.get(key)
+        if not isinstance(binding, dict) or binding.get("status") != "PASS":
+            return False
+        if required_source and binding.get("observation_source") != required_source:
+            return False
+        observed = binding.get("normalised_observation")
+        if tolerance is None:
+            if observed != target:
+                return False
+        elif (value := _number(observed)) is None or abs(value - target) > tolerance:
+            return False
+    return True
+
+
 class FoxESSControlBackend:
     """Own only the reviewed non-Agile FoxESS command surface."""
 
@@ -475,6 +514,8 @@ class FoxESSControlBackend:
         self,
         entities: dict[str, Any],
         writes: list[str],
+        *,
+        verify_physical_baseline: bool = False,
     ) -> bool:
         if not self._owned:
             return True
@@ -517,6 +558,22 @@ class FoxESSControlBackend:
             writes,
         )
         if mode_ok and soc_ok and mode_verified and soc_verified and paid_settings_ok:
+            if verify_physical_baseline and not _commissioning_restore_readback_matches(
+                entities,
+                work_mode=self._previous_work_mode,
+                min_soc_on_grid=self._previous_min_soc_on_grid,
+                force_discharge_power_kw=self._previous_force_discharge_power_kw,
+                export_power_limit_w=self._previous_export_power_limit_w,
+            ):
+                # Keep the original persisted baseline and hardware ownership
+                # across the next scan; never capture the temporary 15%/6.4 kW
+                # export-test settings as a fresh no-export baseline.
+                self._last_write_result = (
+                    "Export commissioning restore awaiting physical FoxESS "
+                    "mode/MinSOC/Force Discharge/export-limit baseline readback"
+                )
+                await self._async_save()
+                return False
             self._owned = False
             self._last_applied_action = None
             self._paid_export_live_proven = False
@@ -826,7 +883,10 @@ class FoxESSControlBackend:
             )
         elif not decision.commands_permitted:
             if self._owned:
-                applied = await self._async_restore(entities, writes)
+                applied = await self._async_restore(
+                        entities, writes,
+                        verify_physical_baseline=bool(commissioning_export_test or force_restore),
+                    )
                 if not applied:
                     reason = f"{reason}; KEMS-owned state restore is pending"
         else:
@@ -845,7 +905,10 @@ class FoxESSControlBackend:
                 )
                 reason = ownership_reason
                 if self._owned:
-                    await self._async_restore(entities, writes)
+                    await self._async_restore(
+                        entities, writes,
+                        verify_physical_baseline=bool(commissioning_export_test or force_restore),
+                    )
             else:
                 work_mode_entity = self._entity_id(entities, "work_mode")
                 charge_power_entity = self._entity_id(
@@ -878,7 +941,10 @@ class FoxESSControlBackend:
                         action="none",
                         reason=reason,
                     )
-                    await self._async_restore(entities, writes)
+                    await self._async_restore(
+                        entities, writes,
+                        verify_physical_baseline=bool(commissioning_export_test or force_restore),
+                    )
                 else:
                     effective_min_soc = resolve_live_min_soc_on_grid(
                         decision,
@@ -1058,7 +1124,10 @@ class FoxESSControlBackend:
                             reason=self._last_write_result,
                         )
                         reason = self._last_write_result
-                        await self._async_restore(entities, writes)
+                        await self._async_restore(
+                        entities, writes,
+                        verify_physical_baseline=bool(commissioning_export_test or force_restore),
+                    )
 
         payload = {
             "scope": "alpha9.83_bounded_control_with_export_commissioning",
