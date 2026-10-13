@@ -8,7 +8,7 @@ export; never alter the accounting, history or no-paid-export control path.
 from __future__ import annotations
 
 from dataclasses import replace
-from datetime import datetime
+from datetime import datetime, timedelta
 from math import isfinite
 from typing import Any
 
@@ -26,6 +26,12 @@ _SOLAR_CREDIT_MIN_CONFIDENCE = 80.0
 # validates device IDs before accepting an old SOC via its cohort policy.
 _MAX_COHORT_SOC_AGE_SECONDS = 900.0
 _MIN_CONSERVATIVE_DISCHARGE_KW = 10.0
+# Grace applies only to a *previously verified unplugged* EV with live zero
+# charging power. Never carry this across restart or a positive EV observation.
+_AGILE_EV_UNPLUGGED_GRACE_SECONDS = 90.0
+_AGILE_EV_MAX_POWER_REPORT_AGE_SECONDS = 180.0
+_AGILE_EV_IDLE_POWER_KW = 0.1
+
 _COHORT_POWER_FIELDS = (
     "battery_power_kw",
     "house_load_kw",
@@ -45,6 +51,66 @@ def _finite(value: Any) -> float | None:
     return number if isfinite(number) else None
 
 
+def assess_paid_agile_ev_continuity(
+    snapshot: Snapshot,
+    *,
+    now: datetime,
+    last_confirmed_unplugged_at: datetime | None,
+) -> tuple[bool, datetime | None, str]:
+    """Accept short Ohme dropouts ONLY after recent physical unplugged evidence.
+
+    An EV signal indicating connected, charging, or measured draw immediately
+    cancels the allowance. Missing power or expired evidence blocks export;
+    neither missing data nor a previous *connected* state can create grace.
+    This state is session-only and affects paid Agile deliberate export alone.
+    """
+    connected = snapshot.ev_connected
+    charging = snapshot.ev_charging
+    power_kw = _finite(snapshot.ev_power_kw)
+    power_age = _finite(snapshot.ev_power_age_seconds)
+    if (
+        connected is True
+        or charging is True
+        or (power_kw is not None and power_kw > _AGILE_EV_IDLE_POWER_KW)
+    ):
+        return False, None, "EV connected/charging/power observed"
+
+    zero_power_fresh = bool(
+        power_kw is not None
+        and 0.0 <= power_kw <= _AGILE_EV_IDLE_POWER_KW
+        and power_age is not None
+        and 0.0 <= power_age <= _AGILE_EV_MAX_POWER_REPORT_AGE_SECONDS
+        and "ev_power_kw" not in snapshot.stale_fields
+    )
+    if not zero_power_fresh:
+        return False, None, "EV zero-power observation missing/stale"
+
+    if connected is False:
+        # Confirmed unplugged is stronger than a transient unavailable
+        # charging flag; refresh the brief grace anchor from the live status.
+        return (
+            True,
+            now,
+            (
+                "confirmed_unplugged"
+                if charging is False
+                else "unplugged_with_fresh_zero_ev_power"
+            ),
+        )
+
+    if (
+        last_confirmed_unplugged_at is not None
+        and now.tzinfo is not None
+        and last_confirmed_unplugged_at.tzinfo is not None
+        and timedelta(0)
+        <= now - last_confirmed_unplugged_at
+        <= timedelta(seconds=_AGILE_EV_UNPLUGGED_GRACE_SECONDS)
+    ):
+        return True, last_confirmed_unplugged_at, "bounded_unplugged_source_grace"
+
+    return False, None, "EV connection uncertain without recent unplugged proof"
+
+
 def guard_paid_agile_physical_export(
     control: ControlState,
     snapshot: Snapshot,
@@ -53,6 +119,8 @@ def guard_paid_agile_physical_export(
     control_config: ControlConfig,
     *,
     now: datetime,
+    ev_export_safe: bool | None = None,
+    ev_export_evidence: str = "no verified disconnected EV evidence",
 ) -> tuple[ControlState, dict[str, Any]]:
     """Cap deliberate export by *measured* SOC minus future house reserve.
 
@@ -67,6 +135,7 @@ def guard_paid_agile_physical_export(
         "physical_soc_percent": _finite(snapshot.battery_soc),
         "status": "not_applicable",
         "basis": "physical FoxESS SOC + forecast house demand; simulated SOC excluded",
+        "ev_export_evidence": ev_export_evidence,
     }
     if snapshot.cheap_period_confirmed or snapshot.saving_session_active:
         report["status"] = "higher_priority_cheap_or_event"
@@ -111,7 +180,36 @@ def guard_paid_agile_physical_export(
             report,
         )
 
-    if snapshot.ev_connected is not False or snapshot.ev_charging is not False:
+    # Defence in depth: when continuity was explicitly supplied by the
+    # coordinator, require a live zero-power measurement in this final guard
+    # too. Older callers with no continuity argument retain their old gate.
+    if ev_export_safe is not None:
+        ev_power = _finite(snapshot.ev_power_kw)
+        ev_age = _finite(snapshot.ev_power_age_seconds)
+        if (
+            ev_power is None
+            or not 0.0 <= ev_power <= _AGILE_EV_IDLE_POWER_KW
+            or ev_age is None
+            or not 0.0 <= ev_age <= _AGILE_EV_MAX_POWER_REPORT_AGE_SECONDS
+            or "ev_power_kw" in snapshot.stale_fields
+        ):
+            return reduce("EV zero-power observation missing/stale")
+
+    # A bounded previously-verified unplugged grace may bridge unavailable
+    # Ohme status, but live positive EV signals must *always* veto export.
+    if (
+        not (
+            ev_export_safe
+            if ev_export_safe is not None
+            else snapshot.ev_connected is False and snapshot.ev_charging is False
+        )
+        or snapshot.ev_connected is True
+        or snapshot.ev_charging is True
+        or (
+            (live_ev_power := _finite(snapshot.ev_power_kw)) is not None
+            and live_ev_power > _AGILE_EV_IDLE_POWER_KW
+        )
+    ):
         return reduce("EV connected/uncertain; protect shared-bus battery")
     age = _finite(snapshot.source_data_age_seconds)
     # Overall dynamic freshness can be healthy while the SOC field is old.
