@@ -49,7 +49,6 @@ def _number(value: object) -> float | None:
         return None
 
 
-
 def _commissioning_restore_readback_matches(
     entities: dict[str, Any],
     *,
@@ -558,12 +557,15 @@ class FoxESSControlBackend:
             writes,
         )
         if mode_ok and soc_ok and mode_verified and soc_verified and paid_settings_ok:
-            if verify_physical_baseline and not _commissioning_restore_readback_matches(
-                entities,
-                work_mode=self._previous_work_mode,
-                min_soc_on_grid=self._previous_min_soc_on_grid,
-                force_discharge_power_kw=self._previous_force_discharge_power_kw,
-                export_power_limit_w=self._previous_export_power_limit_w,
+            if (
+                verify_physical_baseline
+                and not _commissioning_restore_readback_matches(
+                    entities,
+                    work_mode=self._previous_work_mode,
+                    min_soc_on_grid=self._previous_min_soc_on_grid,
+                    force_discharge_power_kw=self._previous_force_discharge_power_kw,
+                    export_power_limit_w=self._previous_export_power_limit_w,
+                )
             ):
                 # Keep the original persisted baseline and hardware ownership
                 # across the next scan; never capture the temporary 15%/6.4 kW
