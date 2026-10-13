@@ -149,9 +149,7 @@ class KEMSExportTariffSelect(KEMSEntity, SelectEntity):
             # Persist the first operator-confirmed paid settlement boundary.
             # Never monetise prior unverified grid export after a tariff switch.
             changes["paid_export_accounting_started_at"] = datetime.now(UTC).isoformat()
-        await async_set_runtime_options(
-            self.hass, self.coordinator.entry, changes
-        )
+        await async_set_runtime_options(self.hass, self.coordinator.entry, changes)
 
 
 class KEMSOperatingModeSelect(KEMSEntity, SelectEntity):
