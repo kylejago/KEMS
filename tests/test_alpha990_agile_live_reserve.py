@@ -98,6 +98,8 @@ def test_missing_stale_forecast_or_deadline_fails_closed() -> None:
     examples = (
         (_snapshot(battery_soc=None), _forecast()),
         (_snapshot(source_data_age_seconds=300), _forecast()),
+        (_snapshot(source_age_seconds={"battery_soc": 224.4}), _forecast()),
+        (_snapshot(source_age_seconds={}), _forecast()),
         (_snapshot(stale_fields=("battery_soc",)), _forecast()),
         (_snapshot(next_offpeak_start=None), _forecast()),
         (_snapshot(next_offpeak_start=NOW - timedelta(minutes=1)), _forecast()),
