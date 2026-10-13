@@ -7,6 +7,7 @@ the actual code while keeping Home Assistant hardware dependencies isolated.
 from __future__ import annotations
 
 import ast
+import asyncio
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
@@ -159,3 +160,93 @@ def test_manual_test_requires_a_postwrite_physical_restoration_snapshot() -> Non
     assert "verify_physical_baseline=bool(" in backend
     assert backend.count("commissioning_export_test or force_restore") >= 4
     assert source.count("if not _ev_confirmed_safe_for_export(snapshot):") == 2
+
+
+def test_restoration_does_not_release_on_optimistic_ha_state_alone() -> None:
+    """Regression for 13 Oct: sensor still 15%/6.4kW, HA mode already Self Use."""
+    tree = ast.parse(BACKEND.read_text(encoding="utf-8"), filename=str(BACKEND))
+    backend_class = next(
+        node
+        for node in tree.body
+        if isinstance(node, ast.ClassDef) and node.name == "FoxESSControlBackend"
+    )
+    method = next(
+        node
+        for node in backend_class.body
+        if isinstance(node, ast.AsyncFunctionDef) and node.name == "_async_restore"
+    )
+    scope: dict[str, Any] = {
+        "Any": Any,
+        "_number": _function(BACKEND, "_number"),
+        "_commissioning_restore_readback_matches": _function(
+            BACKEND, "_commissioning_restore_readback_matches"
+        ),
+    }
+    exec(
+        compile(ast.Module(body=[method], type_ignores=[]), str(BACKEND), "exec"),
+        scope,
+    )
+    restore = scope["_async_restore"]
+
+    class Backend:
+        _owned = True
+        _previous_work_mode = "Self Use"
+        _previous_min_soc_on_grid = 10.0
+        _previous_force_discharge_power_kw = 0.666
+        _previous_export_power_limit_w = 14500.0
+        _paid_export_stage_blocked = False
+        _paid_export_live_proven = True
+        _paid_export_stage_samples = 2
+        _paid_export_stage_failures = 0
+        _last_applied_action = "force_discharge"
+        _last_verified_min_soc_on_grid = None
+        _last_verified_min_soc_at = None
+        _last_write_result = ""
+        saves = 0
+
+        def __init__(self) -> None:
+            self._hass = SimpleNamespace(
+                states=SimpleNamespace(
+                    get=lambda entity: SimpleNamespace(
+                        state="Self Use" if entity == "work_mode" else "10"
+                    )
+                )
+            )
+
+        @staticmethod
+        def _entity_id(_entities, name):
+            return name
+
+        async def _async_select(self, *args, **kwargs):
+            return True
+
+        async def _async_number(self, *args, **kwargs):
+            return True
+
+        async def _async_restore_paid_export_settings(self, *args, **kwargs):
+            return True
+
+        async def _async_save(self):
+            self.saves += 1
+
+    backend = Backend()
+    contaminated = _baseline_entities()
+    contaminated["work_mode"]["normalised_observation"] = "Feed-in First"
+    contaminated["min_soc_on_grid"]["normalised_observation"] = 15.0
+    contaminated["export_power_limit"]["normalised_observation"] = 6400.0
+    writes: list[str] = []
+    confirmed = asyncio.run(
+        restore(backend, contaminated, writes, verify_physical_baseline=True)
+    )
+    assert confirmed is False
+    assert backend._owned is True
+    assert backend._previous_min_soc_on_grid == 10.0
+    assert backend._previous_export_power_limit_w == 14500.0
+    assert "awaiting physical FoxESS" in backend._last_write_result
+
+    confirmed = asyncio.run(
+        restore(backend, _baseline_entities(), writes, verify_physical_baseline=True)
+    )
+    assert confirmed is True
+    assert backend._owned is False
+    assert backend._last_applied_action is None
