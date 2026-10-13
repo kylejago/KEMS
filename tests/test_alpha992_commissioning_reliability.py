@@ -272,3 +272,80 @@ def test_restoration_does_not_release_on_optimistic_ha_state_alone() -> None:
     )
     assert second_scan is True
     assert another._owned is False
+
+
+def _paid_baseline_entities() -> dict[str, dict[str, Any]]:
+    items = _baseline_entities()
+    for item in items.values():
+        item["device_id"] = "same-reviewed-foxess-device"
+    items["min_soc_on_grid"]["normalised_observation"] = 15.0
+    items["export_power_limit"]["normalised_observation"] = 6400.0
+    return items
+
+
+def _paid_baseline_eligible(entities=None, **overrides: Any) -> bool:
+    predicate = _function(BACKEND, "_paid_agile_contaminated_baseline_verified")
+    values = {
+        "original_mode": "Feed-in First",
+        "original_min_soc": 15.0,
+        "original_discharge_power": 0.666,
+        "original_export_limit_w": 6400.0,
+        "last_action": "self_use",
+        "minimum_min_soc": 10.0,
+        "normal_export_reserve": 15.0,
+        "ev_connected": False,
+        "ev_charging": False,
+        "ev_power_kw": 0.0,
+    }
+    values.update(overrides)
+    return predicate(_paid_baseline_entities() if entities is None else entities, **values)
+
+
+def test_paid_agile_can_repair_only_exact_13_october_rollback_signature() -> None:
+    assert _paid_baseline_eligible()
+
+
+def test_paid_baseline_repair_rejects_partial_or_different_evidence() -> None:
+    for changes in (
+        {"original_mode": "Self Use"},
+        {"original_min_soc": 10.0},
+        {"original_discharge_power": 2.0},
+        {"original_export_limit_w": 14500.0},
+        {"last_action": "force_discharge"},
+        {"minimum_min_soc": 15.0},
+        {"normal_export_reserve": 10.0},
+        {"ev_connected": None},
+        {"ev_connected": True},
+        {"ev_charging": None},
+        {"ev_charging": True},
+        {"ev_power_kw": None},
+        {"ev_power_kw": 3.0},
+    ):
+        assert not _paid_baseline_eligible(**changes)
+    for field in (
+        "work_mode",
+        "min_soc_on_grid",
+        "force_discharge_power",
+        "export_power_limit",
+    ):
+        entities = _paid_baseline_entities()
+        entities[field]["status"] = "WAIT"
+        assert not _paid_baseline_eligible(entities)
+        entities = _paid_baseline_entities()
+        entities[field]["device_id"] = "different-foxess-device"
+        assert not _paid_baseline_eligible(entities)
+    for field in ("min_soc_on_grid", "export_power_limit"):
+        entities = _paid_baseline_entities()
+        entities[field]["observation_source"] = "command_entity"
+        assert not _paid_baseline_eligible(entities)
+
+
+def test_paid_baseline_repair_does_not_alter_no_paid_export_policy() -> None:
+    backend = BACKEND.read_text(encoding="utf-8")
+    assert "not no_paid_export_mode" in backend
+    assert "and not commissioning_export_test" in backend
+    assert "paid_activation_baseline_blocked" in backend
+    assert "self._previous_work_mode = \"Self Use\"" in backend
+    assert "self._previous_min_soc_on_grid = 10.0" in backend
+    assert "self._previous_export_limit_w = 14500.0" not in backend
+    assert "no_paid_export_mode and not commissioning_export_test" in backend
