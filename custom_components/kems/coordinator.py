@@ -18,7 +18,6 @@ from .agile_control_alignment import (
 )
 from .agile_current_day_presentation import reconciled_current_day_simulation
 from .agile_history_backfill import AgileHistoryBackfill
-from .kems_core.agile_live_reserve import guard_paid_agile_physical_export
 from .agile_smart_export_runtime import EfficientAgileSmartExportManager
 from .collector import Collector
 from .commissioning import build_commissioning_snapshot
@@ -61,6 +60,7 @@ from .kems_core import (
     critical_control_refresh_entity_ids,
     meaningful_control_state_transition,
 )
+from .kems_core.agile_live_reserve import guard_paid_agile_physical_export
 from .kems_core.control_event_refresh import control_source_state_uncertain
 from .kems_core.shared_bus_balance import (
     assess_shared_bus_balance,
