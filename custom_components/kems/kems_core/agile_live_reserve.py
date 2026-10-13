@@ -101,6 +101,13 @@ def guard_paid_agile_physical_export(
     if snapshot.ev_connected is not False or snapshot.ev_charging is not False:
         return reduce("EV connected/uncertain; protect shared-bus battery")
     age = _finite(snapshot.source_data_age_seconds)
+    # Overall dynamic freshness can be healthy while the SOC field is old.
+    # Physical export must use the SOC field's own observed age.
+    physical_age = _finite(
+        snapshot.source_age_seconds.get("battery_soc")
+        if isinstance(snapshot.source_age_seconds, dict)
+        else None
+    )
     observed = _finite(snapshot.battery_soc)
     if (
         observed is None
