@@ -779,6 +779,7 @@ class FoxESSControlBackend:
             force_charge_hold_authorised=True,
             site_import_limit_exceeded=bool(control.site_import_limit_exceeded),
             eps_critical=bool(control.eps_critical),
+            force_restore_requested=force_restore,
         )
         hold_grace_unverified = bool(
             ev_hold_source_grace_active
