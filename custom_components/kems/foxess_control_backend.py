@@ -87,6 +87,75 @@ def _commissioning_restore_readback_matches(
     return True
 
 
+def _paid_agile_contaminated_baseline_verified(
+    entities: dict[str, Any],
+    *,
+    original_mode: str | None,
+    original_min_soc: float | None,
+    original_discharge_power: float | None,
+    original_export_limit_w: float | None,
+    last_action: str | None,
+    minimum_min_soc: float | None,
+    normal_export_reserve: float | None,
+    ev_connected: bool | None,
+    ev_charging: bool | None,
+    ev_power_kw: float | None,
+) -> bool:
+    """Identify only the KH7 baseline accidentally recaptured on 13 October.
+
+    This is not a generic baseline inference. The already proven local Self
+    Use / 10% hardware floor is recovered only if every stored/read-back
+    signature of the aborted commissioning session matches. No FoxESS write
+    and no No Paid Export behaviour are changed by this predicate.
+    """
+    if (
+        original_mode != "Feed-in First"
+        or original_min_soc is None
+        or abs(original_min_soc - 15.0) > 0.05
+        or last_action != "self_use"
+        or minimum_min_soc is None
+        or abs(minimum_min_soc - 10.0) > 0.05
+        or normal_export_reserve is None
+        or abs(normal_export_reserve - 15.0) > 0.05
+        or ev_connected is not False
+        or ev_charging is not False
+        or ev_power_kw is None
+        or not 0.0 <= ev_power_kw <= 0.1
+    ):
+        return False
+    expected = {
+        "work_mode": ("Self Use", None, None),
+        "min_soc_on_grid": (15.0, 0.05, "sensor_readback"),
+        "force_discharge_power": (original_discharge_power, 0.05, None),
+        "export_power_limit": (original_export_limit_w, 1.0, "sensor_readback"),
+    }
+    if (
+        original_discharge_power is None
+        or original_export_limit_w is None
+        or abs(original_discharge_power - 0.666) > 0.05
+        or abs(original_export_limit_w - 6400.0) > 1.0
+    ):
+        return False
+    selected_devices: set[str] = set()
+    for key, (value, tolerance, source) in expected.items():
+        item = entities.get(key)
+        if not isinstance(item, dict) or item.get("status") != "PASS":
+            return False
+        device = item.get("device_id")
+        if not isinstance(device, str) or not device:
+            return False
+        selected_devices.add(device)
+        if source is not None and item.get("observation_source") != source:
+            return False
+        observed = item.get("normalised_observation")
+        if tolerance is None:
+            if observed != value:
+                return False
+        elif (numeric := _number(observed)) is None or abs(numeric - value) > tolerance:
+            return False
+    return len(selected_devices) == 1
+
+
 class FoxESSControlBackend:
     """Own only the reviewed non-Agile FoxESS command surface."""
 
@@ -104,6 +173,7 @@ class FoxESSControlBackend:
         self._previous_force_discharge_power_kw: float | None = None
         self._previous_export_power_limit_w: float | None = None
         self._commissioning_restore_pending = False
+        self._paid_activation_baseline_repair_at: str | None = None
         self._paid_export_live_proven = False
         self._paid_export_stage_samples = 0
         self._paid_export_stage_failures = 0
@@ -769,6 +839,66 @@ class FoxESSControlBackend:
             self._last_verified_min_soc_at = datetime.now(UTC).isoformat()
             await self._async_save()
 
+        # Alpha9.92: repair only the uniquely corroborated *already stored*
+        # 13 October commissioning rollback signature, and only after the
+        # customer explicitly selects paid Agile. Do not change the No Paid
+        # Export control route or the 15% export reserve/10% protection floor.
+        paid_activation_baseline_repair_applied = False
+        paid_activation_baseline_blocked = False
+        if (
+            not no_paid_export_mode
+            and not commissioning_export_test
+            and not force_restore
+            and self._owned
+            and self._previous_work_mode == "Feed-in First"
+            and self._last_applied_action == "self_use"
+        ):
+            eligible = bool(
+                not cheap_period_confirmed
+                and ev_hold_floor_percent is None
+                and not ev_hold_source_grace_active
+                and not pending_intelligent_ev_hold_active
+                and not self._commissioning_restore_pending
+                and binding_ready
+                and technical_ready
+                and version_matches
+                and control.operating_mode == "control"
+                and bool(coordinator.settings.control.control_enabled)
+                and bool(coordinator.settings.control.commissioned)
+                and not bool(coordinator.settings.control.emergency_stop)
+                and bool(control.grid_available)
+                and not bool(control.island_mode_active)
+                and _paid_agile_contaminated_baseline_verified(
+                    entities,
+                    original_mode=self._previous_work_mode,
+                    original_min_soc=self._previous_min_soc_on_grid,
+                    original_discharge_power=self._previous_force_discharge_power_kw,
+                    original_export_limit_w=self._previous_export_power_limit_w,
+                    last_action=self._last_applied_action,
+                    minimum_min_soc=minimum_min_soc_on_grid,
+                    normal_export_reserve=_number(
+                        coordinator.settings.control.normal_reserve_percent
+                    ),
+                    ev_connected=ev_connected,
+                    ev_charging=getattr(snapshot, "ev_charging", None),
+                    ev_power_kw=_number(getattr(snapshot, "ev_power_kw", None)),
+                )
+            )
+            if eligible:
+                # Metadata only. Keep 6.4 kW as the safe restored export cap;
+                # never restore the old observed 14.5 kW value into FoxESS.
+                self._previous_work_mode = "Self Use"
+                self._previous_min_soc_on_grid = 10.0
+                self._last_verified_min_soc_on_grid = None
+                self._last_verified_min_soc_at = None
+                self._paid_activation_baseline_repair_at = datetime.now(UTC).isoformat()
+                paid_activation_baseline_repair_applied = True
+                await self._async_save()
+            else:
+                # No release into the corrupt Feed-in First baseline and no
+                # deliberate export unless the physical recovery is proven.
+                paid_activation_baseline_blocked = True
+
         decision = assess_foxess_control_write_authority(
             control,
             technical_ready=technical_ready,
@@ -883,7 +1013,19 @@ class FoxESSControlBackend:
             and bool(control.grid_available)
         )
 
-        if frozen_ev_hold:
+        if paid_activation_baseline_blocked:
+            self._last_write_result = (
+                "Paid Agile blocked: stored Feed-in First rollback baseline "
+                "cannot be safely verified against the live KH7"
+            )
+            reason = self._last_write_result
+            decision = FoxESSControlDecision(
+                backend_available=decision.backend_available,
+                commands_permitted=False,
+                action="none",
+                reason=reason,
+            )
+        elif frozen_ev_hold:
             self._last_write_result = (
                 "Alpha9.75 transient readiness loss: preserving only a "
                 "physically verified EV MinSOC hold without new writes"
@@ -1219,6 +1361,13 @@ class FoxESSControlBackend:
             "last_verified_min_soc_at": self._last_verified_min_soc_at,
             "owned_by_kems": self._owned,
             "commissioning_restore_pending": self._commissioning_restore_pending,
+            "paid_activation_baseline_repair_applied": (
+                paid_activation_baseline_repair_applied
+            ),
+            "paid_activation_baseline_repair_at": (
+                self._paid_activation_baseline_repair_at
+            ),
+            "paid_activation_baseline_blocked": paid_activation_baseline_blocked,
             "previous_work_mode": self._previous_work_mode,
             "previous_min_soc_on_grid": self._previous_min_soc_on_grid,
             "baseline_repair_applied": baseline_repair_applied,
