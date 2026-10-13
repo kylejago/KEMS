@@ -770,16 +770,15 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                 )
             else:
                 self._agile_live_reserve_status = {
-                    "status": "not_agile", "permitted_export_kw": 0.0
+                    "status": "not_agile",
+                    "permitted_export_kw": 0.0,
                 }
 
             # Paid Agile's confirmed-cheap Force Charge may need the same
             # already-reviewed EV/MinSOC hold as No paid export. This never
             # grants Force Charge on an unconfirmed Intelligent slot.
             ev_hold_source_uncertain = self._ev_hold_source_uncertain()
-            previous_ev_floor = self._ev_grid_hold.status.get(
-                "latched_min_soc_percent"
-            )
+            previous_ev_floor = self._ev_grid_hold.status.get("latched_min_soc_percent")
             paid_agile_ev_hold_eligible = bool(
                 tariff_type == EXPORT_TARIFF_TYPE_AGILE
                 and not snapshot.saving_session_active
@@ -795,8 +794,7 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                 control,
                 self.settings.control,
                 no_paid_export_mode=(
-                    base_simulation.no_export_mode_active
-                    or paid_agile_ev_hold_eligible
+                    base_simulation.no_export_mode_active or paid_agile_ev_hold_eligible
                 ),
                 source_uncertain=ev_hold_source_uncertain,
                 source_grace_seconds=_ALPHA975_EV_HOLD_SOURCE_GRACE_SECONDS,

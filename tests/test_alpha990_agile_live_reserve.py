@@ -27,8 +27,11 @@ def _control() -> ControlState:
 
 def _snapshot(**changes: object) -> Snapshot:
     state = dict(
-        timestamp=NOW, battery_soc=44.0, ev_connected=False,
-        ev_charging=False, source_data_age_seconds=10.0,
+        timestamp=NOW,
+        battery_soc=44.0,
+        ev_connected=False,
+        ev_charging=False,
+        source_data_age_seconds=10.0,
         next_offpeak_start=NOW + timedelta(hours=12),
     )
     state.update(changes)
@@ -37,8 +40,10 @@ def _snapshot(**changes: object) -> Snapshot:
 
 def _forecast(**changes: object) -> SimpleNamespace:
     state = dict(
-        ready=True, expected_house_remaining_today_kwh=16.974,
-        expected_solar_remaining_today_kwh=19.09, confidence_percent=60.0
+        ready=True,
+        expected_house_remaining_today_kwh=16.974,
+        expected_solar_remaining_today_kwh=19.09,
+        confidence_percent=60.0,
     )
     state.update(changes)
     return SimpleNamespace(**state)
@@ -46,8 +51,11 @@ def _forecast(**changes: object) -> SimpleNamespace:
 
 def _guard(snapshot=None, forecast=None, control=None):
     return guard_paid_agile_physical_export(
-        control or _control(), snapshot or _snapshot(), forecast or _forecast(),
-        SimulationConfig(), ControlConfig(stale_data_seconds=180),
+        control or _control(),
+        snapshot or _snapshot(),
+        forecast or _forecast(),
+        SimulationConfig(),
+        ControlConfig(stale_data_seconds=180),
         now=NOW,
     )
 
@@ -104,9 +112,7 @@ def test_missing_stale_forecast_or_deadline_fails_closed() -> None:
 def test_weak_solar_confidence_never_reduces_house_reserve() -> None:
     _, report = _guard()
     assert report["conservative_solar_credit_kwh"] == 0.0
-    _, confident = _guard(
-        forecast=_forecast(confidence_percent=95.0)
-    )
+    _, confident = _guard(forecast=_forecast(confidence_percent=95.0))
     assert confident["conservative_solar_credit_kwh"] > 0.0
 
 
@@ -119,6 +125,7 @@ def test_ev_connected_or_unknown_blocks_paid_export() -> None:
 
 def test_no_export_plan_and_confirmed_cheap_unchanged() -> None:
     from dataclasses import replace
+
     current = _control()
     idle = replace(current, desired_battery_export_power_kw=0.0)
     same, _ = _guard(control=idle)

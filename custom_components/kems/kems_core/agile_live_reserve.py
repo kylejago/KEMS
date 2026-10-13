@@ -62,7 +62,9 @@ def guard_paid_agile_physical_export(
         report["status"] = "no_deliberate_export_requested"
         return control, report
 
-    def reduce(reason: str, limit_kw: float = 0.0) -> tuple[ControlState, dict[str, Any]]:
+    def reduce(
+        reason: str, limit_kw: float = 0.0
+    ) -> tuple[ControlState, dict[str, Any]]:
         allowed = round(min(max(limit_kw, 0.0), request), 3)
         report.update(
             {
@@ -111,11 +113,7 @@ def guard_paid_agile_physical_export(
         return reduce("fresh physical battery SOC unavailable")
 
     deadline = snapshot.next_offpeak_start
-    if (
-        deadline is None
-        or deadline.tzinfo is None
-        or now.tzinfo is None
-    ):
+    if deadline is None or deadline.tzinfo is None or now.tzinfo is None:
         return reduce("no verified future cheap-period deadline")
     until_cheap = (deadline - now).total_seconds() / 3600.0
     if not 0.0 < until_cheap <= 24.0:
@@ -162,9 +160,7 @@ def guard_paid_agile_physical_export(
     reserve_kwh = capacity * reserve_percent / 100.0
     measured_energy_kwh = capacity * observed / 100.0
     protected_home_kwh = net_home / efficiency + buffer_kwh
-    surplus_kwh = max(
-        measured_energy_kwh - reserve_kwh - protected_home_kwh, 0.0
-    )
+    surplus_kwh = max(measured_energy_kwh - reserve_kwh - protected_home_kwh, 0.0)
     max_export_kw = surplus_kwh / _EXPORT_PROOF_HORIZON_HOURS
     report.update(
         {
