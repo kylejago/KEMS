@@ -190,6 +190,7 @@ def test_restoration_does_not_release_on_optimistic_ha_state_alone() -> None:
 
     class Backend:
         _owned = True
+        _commissioning_restore_pending = False
         _previous_work_mode = "Self Use"
         _previous_min_soc_on_grid = 10.0
         _previous_force_discharge_power_kw = 0.666
@@ -250,3 +251,18 @@ def test_restoration_does_not_release_on_optimistic_ha_state_alone() -> None:
     assert confirmed is True
     assert backend._owned is False
     assert backend._last_applied_action is None
+
+    # Even when the *first* snapshot looks restored, a second scan is mandatory
+    # before the controller may finalize the test and reacquire FoxESS ownership.
+    another = Backend()
+    first_scan = asyncio.run(
+        restore(another, _baseline_entities(), [], verify_physical_baseline=True)
+    )
+    assert first_scan is False
+    assert another._owned is True
+    assert another._commissioning_restore_pending is True
+    second_scan = asyncio.run(
+        restore(another, _baseline_entities(), [], verify_physical_baseline=True)
+    )
+    assert second_scan is True
+    assert another._owned is False
