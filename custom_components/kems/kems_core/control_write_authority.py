@@ -123,6 +123,9 @@ def should_freeze_owned_ev_hold(
     grid_available: bool,
     pending_intelligent_ev_hold_active: bool = False,
     write_authority_recovered: bool = False,
+    ev_hold_guard_active: bool = True,
+    site_import_limit_exceeded: bool = False,
+    eps_critical: bool = False,
 ) -> bool:
     """Return whether an already-applied cheap-window EV hold must be frozen.
 
@@ -135,7 +138,9 @@ def should_freeze_owned_ev_hold(
     bounded source-uncertainty grace may retain an already-verified confirmed
     hold without becoming new cheap-period authority.
     """
-    if write_authority_recovered:
+    if write_authority_recovered or not ev_hold_guard_active:
+        return False
+    if site_import_limit_exceeded or eps_critical:
         return False
     if latched_min_soc_percent is None:
         return False
@@ -166,7 +171,9 @@ def should_freeze_owned_ev_hold(
     )
     return bool(
         owned_by_kems
-        and last_applied_action == "self_use"
+        # A physically verified MinSOC remains effective in Force Charge too.
+        # Releasing to baseline Self Use mid-EV session can drain the battery.
+        and last_applied_action in {"self_use", "force_charge"}
         and physical_hold_verified
         and (
             cheap_period_confirmed

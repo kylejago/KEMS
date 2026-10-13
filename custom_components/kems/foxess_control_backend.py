@@ -732,6 +732,9 @@ class FoxESSControlBackend:
         reason = decision.reason
         frozen_ev_hold = False
 
+        # Preserve a verified EV reserve in owned Self Use or Force Charge
+        # across transient EV data/readiness loss, without new hardware writes.
+        # Genuine emergency, grid/island, site import and EPS faults still release.
         # A verified EV floor is a fail-closed fallback, not a permanent
         # operating mode. Resume the reviewed charge/Self Use decision when
         # control authority and EV telemetry have recovered. Preserve the
@@ -760,6 +763,20 @@ class FoxESSControlBackend:
             grid_available=bool(control.grid_available),
             pending_intelligent_ev_hold_active=pending_intelligent_ev_hold_active,
             write_authority_recovered=write_authority_recovered,
+            ev_hold_guard_active=(
+                control.ev_grid_guard_status in {
+                    "ev_battery_hold_prearmed",
+                    "ev_battery_hold",
+                    "ev_battery_hold_conservative_scope",
+                    "ev_battery_hold_with_cheap_charge",
+                    "ev_battery_hold_with_cheap_charge_conservative_scope",
+                    "battery_hold_ev_or_site_unverified",
+                    "ev_battery_hold_source_grace",
+                    "ev_battery_hold_pending_intelligent_window",
+                }
+            ),
+            site_import_limit_exceeded=bool(control.site_import_limit_exceeded),
+            eps_critical=bool(control.eps_critical),
         )
         hold_grace_unverified = bool(
             ev_hold_source_grace_active
