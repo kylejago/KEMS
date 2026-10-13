@@ -89,6 +89,12 @@ def test_reprice_readonly_preserves_energy_and_native_provenance() -> None:
     assert adjusted[0].battery_power_kw == records[0].battery_power_kw
 
 
+def test_precision_difference_in_octopus_historical_live_rate_is_supported() -> None:
+    old = _source(date(2026, 10, 8), rate=37.172)
+    assert mod.financial_replay_records(old)[0].current_import_rate == 35.88
+    assert old[0].current_import_rate == 37.172
+
+
 def test_rates_outside_backdate_window_remain_unchanged() -> None:
     assert (
         mod.corrected_2026_import_snapshot(
