@@ -184,6 +184,9 @@ async def async_get_config_entry_diagnostics(
         "scenarios": data.scenarios.to_dict(),
         "whole_home": asdict(data.whole_home),
         "lifetime": data.lifetime.to_dict(),
+        "historical_tariff_revaluation": (
+            coordinator._lifetime.historical_tariff_revaluation_status
+        ),
         "periods": {
             period_name: totals.to_dict()
             for period_name, totals in data.periods.items()
