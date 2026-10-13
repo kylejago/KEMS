@@ -86,5 +86,6 @@ def test_self_use_hold_and_unknown_action() -> None:
     assert _midcharge_hold(last_action="self_use")
     assert not _midcharge_hold(last_action=None)
 
+
 def test_explicit_restoration_request_overrides_transient_ev_freeze() -> None:
     assert not _midcharge_hold(force_restore=True)
