@@ -60,7 +60,10 @@ from .kems_core import (
     critical_control_refresh_entity_ids,
     meaningful_control_state_transition,
 )
-from .kems_core.agile_live_reserve import guard_paid_agile_physical_export
+from .kems_core.agile_live_reserve import (
+    assess_paid_agile_ev_continuity,
+    guard_paid_agile_physical_export,
+)
 from .kems_core.control_event_refresh import control_source_state_uncertain
 from .kems_core.shared_bus_balance import (
     assess_shared_bus_balance,
@@ -119,6 +122,8 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
             hass, entry.entry_id
         )
         self._ev_grid_hold = EVGridHoldSession(hass, entry.entry_id)
+        # Short-lived, non-persistent proof; cannot survive KEMS restart.
+        self._paid_agile_last_unplugged_at: datetime | None = None
         self._learning = LearningEngine()
         self._forecast = SolarForecastCoordinator(hass, settings.forecast)
         self._forecast_planning = ForecastPlanningEngine()
@@ -758,6 +763,15 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
             # Physically constrain paid Agile before any FoxESS writes. The
             # simulation / financial / shadow plan remains unchanged.
             if tariff_type == EXPORT_TARIFF_TYPE_AGILE:
+                (
+                    ev_export_safe,
+                    self._paid_agile_last_unplugged_at,
+                    ev_export_evidence,
+                ) = assess_paid_agile_ev_continuity(
+                    snapshot,
+                    now=now,
+                    last_confirmed_unplugged_at=self._paid_agile_last_unplugged_at,
+                )
                 control, self._agile_live_reserve_status = (
                     guard_paid_agile_physical_export(
                         control,
@@ -766,9 +780,12 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                         self.settings.simulation,
                         self.settings.control,
                         now=now,
+                        ev_export_safe=ev_export_safe,
+                        ev_export_evidence=ev_export_evidence,
                     )
                 )
             else:
+                self._paid_agile_last_unplugged_at = None
                 self._agile_live_reserve_status = {
                     "status": "not_agile",
                     "permitted_export_kw": 0.0,
