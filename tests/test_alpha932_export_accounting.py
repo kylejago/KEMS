@@ -280,3 +280,20 @@ def test_paid_export_rejects_naive_activation_cutoff() -> None:
         )
         is None
     )
+
+
+def test_unknown_agile_price_never_falls_back_to_fixed_benchmark() -> None:
+    prior = SimulationState(
+        actual_import_cost_pence=170.0,
+        actual_export_income_pence=88.0,
+        actual_cost_pence=82.0,
+        actual_avoided_import_value_pence=20.0,
+        actual_system_value_pence=108.0,
+        simulated_cost_pence=50.0,
+        saving_pence=32.0,
+    )
+    result = revalue_actual_export_income(prior, None)
+    assert result.actual_export_income_pence == 0.0
+    assert result.actual_cost_pence == 170.0
+    assert result.actual_system_value_pence == 20.0
+    assert result.saving_pence is None
