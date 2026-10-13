@@ -884,9 +884,12 @@ class FoxESSControlBackend:
         elif not decision.commands_permitted:
             if self._owned:
                 applied = await self._async_restore(
-                        entities, writes,
-                        verify_physical_baseline=bool(commissioning_export_test or force_restore),
-                    )
+                    entities,
+                    writes,
+                    verify_physical_baseline=bool(
+                        commissioning_export_test or force_restore
+                    ),
+                )
                 if not applied:
                     reason = f"{reason}; KEMS-owned state restore is pending"
         else:
@@ -906,8 +909,11 @@ class FoxESSControlBackend:
                 reason = ownership_reason
                 if self._owned:
                     await self._async_restore(
-                        entities, writes,
-                        verify_physical_baseline=bool(commissioning_export_test or force_restore),
+                        entities,
+                        writes,
+                        verify_physical_baseline=bool(
+                            commissioning_export_test or force_restore
+                        ),
                     )
             else:
                 work_mode_entity = self._entity_id(entities, "work_mode")
@@ -942,8 +948,11 @@ class FoxESSControlBackend:
                         reason=reason,
                     )
                     await self._async_restore(
-                        entities, writes,
-                        verify_physical_baseline=bool(commissioning_export_test or force_restore),
+                        entities,
+                        writes,
+                        verify_physical_baseline=bool(
+                            commissioning_export_test or force_restore
+                        ),
                     )
                 else:
                     effective_min_soc = resolve_live_min_soc_on_grid(
@@ -1125,9 +1134,12 @@ class FoxESSControlBackend:
                         )
                         reason = self._last_write_result
                         await self._async_restore(
-                        entities, writes,
-                        verify_physical_baseline=bool(commissioning_export_test or force_restore),
-                    )
+                            entities,
+                            writes,
+                            verify_physical_baseline=bool(
+                                commissioning_export_test or force_restore
+                            ),
+                        )
 
         payload = {
             "scope": "alpha9.83_bounded_control_with_export_commissioning",
