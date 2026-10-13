@@ -20,6 +20,7 @@ def _midcharge_hold(
     island: bool = False,
     grid: bool = True,
     pending: bool = False,
+    force_restore: bool = False,
 ) -> bool:
     return should_freeze_owned_ev_hold(
         owned_by_kems=True,
@@ -43,6 +44,7 @@ def _midcharge_hold(
         force_charge_hold_authorised=True,
         site_import_limit_exceeded=import_exceeded,
         eps_critical=eps_critical,
+        force_restore_requested=force_restore,
     )
 
 
@@ -83,3 +85,6 @@ def test_site_import_and_eps_emergency_take_precedence() -> None:
 def test_self_use_hold_and_unknown_action() -> None:
     assert _midcharge_hold(last_action="self_use")
     assert not _midcharge_hold(last_action=None)
+
+def test_explicit_restoration_request_overrides_transient_ev_freeze() -> None:
+    assert not _midcharge_hold(force_restore=True)
