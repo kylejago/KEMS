@@ -15,6 +15,8 @@ from homeassistant.helpers.selector import (
     selector,
 )
 
+from .tariff import normalise_october_2026_loyal_options
+
 from .const import (
     CONF_ADDITIONAL_COSTS,
     CONF_ANNUAL_MAINTENANCE,
@@ -649,7 +651,9 @@ class KEMSOptionsFlow(OptionsFlowWithReload):
 
     def _suggested_options(self) -> dict[str, Any]:
         """Return complete options with safe defaults."""
-        values = {**DEFAULT_OPTIONS, **dict(self.config_entry.options)}
+        values = normalise_october_2026_loyal_options(
+            {**DEFAULT_OPTIONS, **dict(self.config_entry.options)}
+        )
         if not values.get(CONF_COMMISSIONING_DATE):
             values.pop(CONF_COMMISSIONING_DATE, None)
         for key in (

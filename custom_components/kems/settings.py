@@ -81,7 +81,12 @@ from .const import (
 )
 from .kems_core import ControlConfig, ForecastConfig, ROIConfig, SimulationConfig
 from .product_types import effective_operating_mode, normalise_system_type
-from .tariff import ScheduledTariffChange, TariffSettings, parse_time
+from .tariff import (
+    ScheduledTariffChange,
+    TariffSettings,
+    normalise_october_2026_loyal_options,
+    parse_time,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -101,7 +106,9 @@ class KEMSSettings:
     @classmethod
     def from_options(cls, options: Mapping[str, Any]) -> KEMSSettings:
         """Build settings using defaults for omitted options."""
-        values = {**DEFAULT_OPTIONS, **dict(options)}
+        values = normalise_october_2026_loyal_options(
+            {**DEFAULT_OPTIONS, **dict(options)}
+        )
         commissioning_date = _parse_date(values.get(CONF_COMMISSIONING_DATE))
         system_type = normalise_system_type(values.get(CONF_SYSTEM_TYPE))
         return cls(

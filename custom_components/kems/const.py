@@ -191,9 +191,10 @@ DEFAULT_OPTIONS = {
     CONF_TARIFF_CHANGE_2_DAY_RATE: 37.17,
     CONF_TARIFF_CHANGE_2_OFFPEAK_RATE: 8.0,
     CONF_TARIFF_CHANGE_2_STANDING_CHARGE: 55.52,
-    # 12 Oct 2026: Intelligent Octopus Go 12M Loyal Fixed October 2026 v1.
+    # 6 Oct 2026: confirmed retrospectively by Octopus on 12 Oct.
+    # Intelligent Octopus Go 12M Loyal Fixed October 2026 v1.
     # Live Octopus rate entities remain authoritative in automatic mode.
-    CONF_TARIFF_CHANGE_3_DATE: "2026-10-12",
+    CONF_TARIFF_CHANGE_3_DATE: "2026-10-06",
     CONF_TARIFF_CHANGE_3_DAY_RATE: 35.88,
     CONF_TARIFF_CHANGE_3_OFFPEAK_RATE: 6.60,
     CONF_TARIFF_CHANGE_3_STANDING_CHARGE: 55.52,
