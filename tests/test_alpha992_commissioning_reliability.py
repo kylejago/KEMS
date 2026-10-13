@@ -158,7 +158,7 @@ def test_manual_test_requires_a_postwrite_physical_restoration_snapshot() -> Non
         "self._owned = False"
     )
     assert "verify_physical_baseline=bool(" in backend
-    assert backend.count('or self._last_applied_action == "force_discharge"') == 4
+    assert backend.count('or self._last_applied_action == "force_discharge"') == 5
     assert backend.count("or self._commissioning_restore_pending") >= 4
     assert source.count("if not _ev_confirmed_safe_for_export(snapshot):") == 2
 
