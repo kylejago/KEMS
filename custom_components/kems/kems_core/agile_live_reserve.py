@@ -173,6 +173,21 @@ def guard_paid_agile_physical_export(
             report,
         )
 
+    # Defence in depth: when continuity was explicitly supplied by the
+    # coordinator, require a live zero-power measurement in this final guard
+    # too. Older callers with no continuity argument retain their old gate.
+    if ev_export_safe is not None:
+        ev_power = _finite(snapshot.ev_power_kw)
+        ev_age = _finite(snapshot.ev_power_age_seconds)
+        if (
+            ev_power is None
+            or not 0.0 <= ev_power <= _AGILE_EV_IDLE_POWER_KW
+            or ev_age is None
+            or not 0.0 <= ev_age <= _AGILE_EV_MAX_POWER_REPORT_AGE_SECONDS
+            or "ev_power_kw" in snapshot.stale_fields
+        ):
+            return reduce("EV zero-power observation missing/stale")
+
     # A bounded previously-verified unplugged grace may bridge unavailable
     # Ohme status, but live positive EV signals must *always* veto export.
     if (
