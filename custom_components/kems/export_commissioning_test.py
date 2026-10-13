@@ -49,6 +49,35 @@ def agile_export_target_kw(agile_state: dict[str, Any]) -> float | None:
     return max(target, 0.0) if target is not None else None
 
 
+
+def _ev_confirmed_safe_for_export(snapshot: Any) -> bool:
+    """Allow known-unplugged Ohme without mistaking transient fields for charging.
+
+    A positive disconnected state is required. A missing charging flag is
+    acceptable only with fresh independently reported zero Ohme power; a
+    truly unknown connection, stale power or contradictory load fails closed.
+    """
+    connected = getattr(snapshot, "ev_connected", None)
+    charging = getattr(snapshot, "ev_charging", None)
+    if connected is not False or charging is True:
+        return False
+    power = _number(getattr(snapshot, "ev_power_kw", None))
+    stale = set(getattr(snapshot, "stale_fields", ()) or ())
+    if power is not None and power > 0.1:
+        return False
+    if charging is False:
+        return True
+    power_age = _number(getattr(snapshot, "ev_power_age_seconds", None))
+    return bool(
+        charging is None
+        and power is not None
+        and 0.0 <= power <= 0.1
+        and power_age is not None
+        and 0.0 <= power_age <= 180.0
+        and "ev_power_kw" not in stale
+    )
+
+
 class ExportCommissioningTestController:
     """Own one manually requested physical export commissioning session.
 
@@ -247,8 +276,8 @@ class ExportCommissioningTestController:
             return "Export commissioning is blocked during a confirmed cheap period"
         if bool(getattr(snapshot, "saving_session_active", False)):
             return "Export commissioning is blocked during Power Down"
-        if getattr(snapshot, "ev_charging", None) is not False:
-            return "Ohme must be available and the EV must not be charging"
+        if not _ev_confirmed_safe_for_export(snapshot):
+            return "Ohme must positively confirm the EV is unplugged and not charging"
         if ev_hold_active:
             return "An EV battery hold is active or pending"
         soc = _number(getattr(snapshot, "battery_soc", None))
@@ -364,8 +393,11 @@ class ExportCommissioningTestController:
             return "A confirmed cheap period started"
         if bool(getattr(snapshot, "saving_session_active", False)):
             return "Power Down became active"
-        if getattr(snapshot, "ev_charging", None) is not False:
-            return "EV charging/Ohme state no longer permits commissioning"
+        if not _ev_confirmed_safe_for_export(snapshot):
+            return (
+                "EV charging/Ohme connection is no longer confirmed safe; "
+                "restore FoxESS before any further export"
+            )
         if ev_hold_active:
             return "An EV battery hold became active or pending"
         soc = _number(getattr(snapshot, "battery_soc", None))
