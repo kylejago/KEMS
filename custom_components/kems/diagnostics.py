@@ -173,6 +173,9 @@ async def async_get_config_entry_diagnostics(
         },
         "simulation": asdict(data.simulation),
         "agile_smart_export": coordinator.agile_smart_export_state,
+        "agile_physical_export_reserve": getattr(
+            coordinator, "_agile_live_reserve_status", {"status": "not_yet_evaluated"}
+        ),
         "happy_hour_ohme_control": coordinator.happy_hour_ohme_control_state,
         "agile_history_backfill": coordinator.agile_history_backfill_state,
         "forecast": data.forecast.to_dict(),
