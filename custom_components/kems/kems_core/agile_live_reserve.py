@@ -112,7 +112,7 @@ def guard_paid_agile_physical_export(
     control_config: ControlConfig,
     *,
     now: datetime,
-    ev_export_safe: bool = False,
+    ev_export_safe: bool | None = None,
     ev_export_evidence: str = "no verified disconnected EV evidence",
 ) -> tuple[ControlState, dict[str, Any]]:
     """Cap deliberate export by *measured* SOC minus future house reserve.
@@ -176,7 +176,11 @@ def guard_paid_agile_physical_export(
     # A bounded previously-verified unplugged grace may bridge unavailable
     # Ohme status, but live positive EV signals must *always* veto export.
     if (
-        not ev_export_safe
+        not (
+            ev_export_safe
+            if ev_export_safe is not None
+            else snapshot.ev_connected is False and snapshot.ev_charging is False
+        )
         or snapshot.ev_connected is True
         or snapshot.ev_charging is True
         or (
