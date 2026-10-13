@@ -245,7 +245,10 @@ def test_restoration_does_not_release_on_optimistic_ha_state_alone() -> None:
     assert backend._owned is True
     assert backend._previous_min_soc_on_grid == 10.0
     assert backend._previous_export_power_limit_w == 14500.0
-    assert "awaiting a separate FoxESS physical readback scan" in backend._last_write_result
+    assert (
+        "awaiting a separate FoxESS physical readback scan"
+        in backend._last_write_result
+    )
 
     confirmed = asyncio.run(
         restore(backend, _baseline_entities(), writes, verify_physical_baseline=True)
