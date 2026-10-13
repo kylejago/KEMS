@@ -116,6 +116,9 @@ def guard_paid_agile_physical_export(
         or age is None
         or age < 0.0
         or age > control_config.stale_data_seconds
+        or physical_age is None
+        or physical_age < 0.0
+        or physical_age > control_config.stale_data_seconds
     ):
         return reduce("fresh physical battery SOC unavailable")
 
