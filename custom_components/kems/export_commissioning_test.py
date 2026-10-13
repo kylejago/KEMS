@@ -49,7 +49,6 @@ def agile_export_target_kw(agile_state: dict[str, Any]) -> float | None:
     return max(target, 0.0) if target is not None else None
 
 
-
 def _ev_confirmed_safe_for_export(snapshot: Any) -> bool:
     """Allow known-unplugged Ohme without mistaking transient fields for charging.
 
