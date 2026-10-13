@@ -124,6 +124,7 @@ def should_freeze_owned_ev_hold(
     pending_intelligent_ev_hold_active: bool = False,
     write_authority_recovered: bool = False,
     ev_hold_guard_active: bool = True,
+    force_charge_hold_authorised: bool = False,
     site_import_limit_exceeded: bool = False,
     eps_critical: bool = False,
 ) -> bool:
@@ -141,6 +142,8 @@ def should_freeze_owned_ev_hold(
     if write_authority_recovered or not ev_hold_guard_active:
         return False
     if site_import_limit_exceeded or eps_critical:
+        return False
+    if last_applied_action == "force_charge" and not force_charge_hold_authorised:
         return False
     if latched_min_soc_percent is None:
         return False
