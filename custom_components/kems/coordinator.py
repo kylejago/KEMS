@@ -623,7 +623,7 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                     activation_cutoff=paid_start,
                 )
                 if tariff_type == EXPORT_TARIFF_TYPE_NONE or paid_start is not None
-                else None  # No verified cutover: don't invent paid income.
+                else 0.0  # No verified cutoff: book no speculative income.
             )
             base_simulation = revalue_actual_export_income(
                 base_simulation,
