@@ -274,10 +274,7 @@ class LifetimeLedgerRecorder:
             if values is None or day in self._historical_tariff_corrections:
                 continue
             deltas = audit["deltas"]
-            before = {
-                key: values.get(key)
-                for key in deltas
-            }
+            before = {key: values.get(key) for key in deltas}
             if any(value is None for value in before.values()):
                 self._historical_tariff_skipped[day] = (
                     "missing original financial field in retained daily ledger"
@@ -301,10 +298,14 @@ class LifetimeLedgerRecorder:
                 and date.fromisoformat(day) >= self._ledger.commissioning_date
             )
             for key, delta in deltas.items():
-                if key in {
-                    "actual_avoided_import_value_pence",
-                    "actual_system_value_pence",
-                } and not commissioned:
+                if (
+                    key
+                    in {
+                        "actual_avoided_import_value_pence",
+                        "actual_system_value_pence",
+                    }
+                    and not commissioned
+                ):
                     continue
                 setattr(
                     self._ledger,

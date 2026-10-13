@@ -486,10 +486,13 @@ def resolve_tariff(
         intelligent_slot_evidence=evidence,
     )
 
+
 # Alpha9.87: correct the formerly published 12 Oct default only when all
 # three prices exactly match that old default. Preserve genuinely custom
 # supplier changes and distinct manual user-entered rates.
-def normalise_october_2026_loyal_options(options: dict[str, object]) -> dict[str, object]:
+def normalise_october_2026_loyal_options(
+    options: dict[str, object],
+) -> dict[str, object]:
     """Backdate the previously defaulted Loyal tariff after Octopus confirmation."""
     result = dict(options)
     if str(result.get("tariff_change_3_effective_date")) != "2026-10-12":

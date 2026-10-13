@@ -479,9 +479,11 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
             and export_tariff_type_from_options(self.entry.options)
             == EXPORT_TARIFF_TYPE_NONE
         ):
-            corrected = await self._lifetime.async_revalue_october_2026_financial_history(
-                self._history.records,
-                self.settings.simulation,
+            corrected = (
+                await self._lifetime.async_revalue_october_2026_financial_history(
+                    self._history.records,
+                    self.settings.simulation,
+                )
             )
             if corrected:
                 await async_reconcile_financial_commissioning(

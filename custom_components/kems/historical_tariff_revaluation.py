@@ -119,7 +119,9 @@ def calculate_2026_tariff_financial_deltas(
         if stored.get(PERIOD_DATA_COMPLETE_KEY, 1.0) < 0.5:
             skipped[label] = "daily ledger explicitly incomplete"
             continue
-        changed = sum(a is not b for a, b in zip(source, revised_groups[day], strict=True))
+        changed = sum(
+            a is not b for a, b in zip(source, revised_groups[day], strict=True)
+        )
         if not changed:
             skipped[label] = "no qualifying old tariff readings"
             continue

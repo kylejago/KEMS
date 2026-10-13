@@ -69,12 +69,15 @@ def test_corrected_date_default_and_saved_old_default() -> None:
         }
     )
     assert updated["tariff_change_3_effective_date"] == "2026-10-06"
-    assert normalise_october_2026_loyal_options(
-        {
-            "tariff_change_3_effective_date": "2026-10-12",
-            "tariff_change_3_day_rate_pence": 25.0,
-        }
-    )["tariff_change_3_effective_date"] == "2026-10-12"
+    assert (
+        normalise_october_2026_loyal_options(
+            {
+                "tariff_change_3_effective_date": "2026-10-12",
+                "tariff_change_3_day_rate_pence": 25.0,
+            }
+        )["tariff_change_3_effective_date"]
+        == "2026-10-12"
+    )
 
 
 def test_reprice_readonly_preserves_energy_and_native_provenance() -> None:
@@ -88,13 +91,15 @@ def test_reprice_readonly_preserves_energy_and_native_provenance() -> None:
 
 def test_rates_outside_backdate_window_remain_unchanged() -> None:
     assert (
-        mod.corrected_2026_import_snapshot(_source(date(2026, 10, 5))[0])
-        .current_import_rate
+        mod.corrected_2026_import_snapshot(
+            _source(date(2026, 10, 5))[0]
+        ).current_import_rate
         == 37.17
     )
     assert (
-        mod.corrected_2026_import_snapshot(_source(date(2026, 10, 12))[0])
-        .current_import_rate
+        mod.corrected_2026_import_snapshot(
+            _source(date(2026, 10, 12))[0]
+        ).current_import_rate
         == 37.17
     )
 
@@ -103,8 +108,9 @@ def test_old_cheap_extra_slot_is_revalued_but_custom_rate_is_preserved() -> None
     records = _source(date(2026, 10, 7), rate=8.0)
     assert mod.financial_replay_records(records)[0].current_import_rate == 6.6
     assert (
-        mod.financial_replay_records(_source(date(2026, 10, 7), rate=11.0))[0]
-        .current_import_rate
+        mod.financial_replay_records(_source(date(2026, 10, 7), rate=11.0))[
+            0
+        ].current_import_rate
         == 11.0
     )
 
