@@ -298,7 +298,9 @@ def _paid_baseline_eligible(entities=None, **overrides: Any) -> bool:
         "ev_power_kw": 0.0,
     }
     values.update(overrides)
-    return predicate(_paid_baseline_entities() if entities is None else entities, **values)
+    return predicate(
+        _paid_baseline_entities() if entities is None else entities, **values
+    )
 
 
 def test_paid_agile_can_repair_only_exact_13_october_rollback_signature() -> None:
@@ -347,7 +349,7 @@ def test_paid_baseline_repair_does_not_alter_no_paid_export_policy() -> None:
     assert "== EXPORT_TARIFF_TYPE_AGILE" in backend
     assert "and not commissioning_export_test" in backend
     assert "paid_activation_baseline_blocked" in backend
-    assert "self._previous_work_mode = \"Self Use\"" in backend
+    assert 'self._previous_work_mode = "Self Use"' in backend
     assert "self._previous_min_soc_on_grid = 10.0" in backend
     assert "self._previous_export_limit_w = 14500.0" not in backend
     assert "no_paid_export_mode and not commissioning_export_test" in backend
