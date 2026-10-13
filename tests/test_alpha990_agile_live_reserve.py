@@ -154,3 +154,66 @@ def test_paid_ev_hold_gate_is_invoked_before_physical_backend() -> None:
     )
     assert "paid_agile_ev_hold_eligible=paid_agile_ev_hold_eligible" in coordinator
     assert "paid_agile_ev_hold_eligible" in backend
+
+
+def test_paid_agile_confirmed_cheap_ev_uses_same_physical_floor() -> None:
+    from kems_core.ev_grid_guard import protect_live_cheap_ev
+
+    control = ControlState(
+        operating_mode="control",
+        operating_reason="agile_rolling_cheap_charge",
+        desired_work_mode="Force Charge",
+        desired_charge_power_kw=5.0,
+        desired_min_soc_percent=10.0,
+        desired_grid_export_allowed=False,
+        grid_bypass_power_kw=1.0,
+        data_fresh=True,
+        plan_safe=True,
+    )
+    observed = _snapshot(
+        off_peak=True,
+        ev_connected=True,
+        ev_charging=True,
+        ev_power_kw=7.0,
+        ev_power_age_seconds=5.0,
+        house_load_kw=2.0,
+        grid_import_kw=8.0,
+        ev_load_in_house_load=False,
+        source_data_age_seconds=5.0,
+    )
+    held = protect_live_cheap_ev(
+        observed,
+        control,
+        ControlConfig(site_import_limit_kw=14.5, stale_data_seconds=180),
+        no_paid_export_mode=True,  # Coordinator's verified paid-cheap guard.
+    )
+    assert held.desired_min_soc_percent == 45.0
+    assert held.desired_battery_export_power_kw == 0.0
+    assert held.ev_grid_guard_status.startswith("ev_battery_hold")
+    assert held.desired_charge_power_kw <= 5.0
+
+
+def test_paid_hold_stays_fail_closed_on_unconfirmed_cheap() -> None:
+    from kems_core.ev_grid_guard import protect_live_cheap_ev
+
+    control = ControlState(
+        operating_mode="control",
+        operating_reason="agile_rolling_cheap_charge",
+        desired_work_mode="Force Charge",
+        desired_charge_power_kw=5.0,
+        desired_min_soc_percent=10.0,
+    )
+    observed = _snapshot(
+        off_peak=False,
+        ev_connected=True,
+        ev_charging=True,
+        ev_power_kw=7.0,
+        ev_power_age_seconds=5.0,
+    )
+    unchanged = protect_live_cheap_ev(
+        observed,
+        control,
+        ControlConfig(site_import_limit_kw=14.5),
+        no_paid_export_mode=True,
+    )
+    assert unchanged is control
