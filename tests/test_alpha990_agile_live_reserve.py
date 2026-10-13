@@ -74,7 +74,7 @@ def test_replans_using_actual_soc_and_house_forecast() -> None:
     assert high.desired_battery_export_power_kw == 6.4
     assert high_report["status"] == "permitted_with_physical_house_budget"
     low, low_report = _guard(
-        snapshot=_snapshot(battery_soc=70.0),
+        snapshot=_snapshot(battery_soc=65.0),
         forecast=_forecast(expected_house_remaining_today_kwh=24.0),
     )
     assert low.desired_battery_export_power_kw == 0.0
