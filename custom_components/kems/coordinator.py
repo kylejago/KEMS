@@ -604,9 +604,7 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
             # the configured fixed export rate.
             tariff_type = export_tariff_type_from_options(self.entry.options)
             agile_state = self._agile_smart_export.state
-            paid_start_raw = self.entry.options.get(
-                "paid_export_accounting_started_at"
-            )
+            paid_start_raw = self.entry.options.get("paid_export_accounting_started_at")
             paid_start = None
             if tariff_type != EXPORT_TARIFF_TYPE_NONE:
                 try:
