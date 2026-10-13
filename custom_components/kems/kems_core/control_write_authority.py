@@ -127,6 +127,7 @@ def should_freeze_owned_ev_hold(
     force_charge_hold_authorised: bool = False,
     site_import_limit_exceeded: bool = False,
     eps_critical: bool = False,
+    force_restore_requested: bool = False,
 ) -> bool:
     """Return whether an already-applied cheap-window EV hold must be frozen.
 
@@ -139,7 +140,7 @@ def should_freeze_owned_ev_hold(
     bounded source-uncertainty grace may retain an already-verified confirmed
     hold without becoming new cheap-period authority.
     """
-    if write_authority_recovered or not ev_hold_guard_active:
+    if write_authority_recovered or not ev_hold_guard_active or force_restore_requested:
         return False
     if site_import_limit_exceeded or eps_critical:
         return False
