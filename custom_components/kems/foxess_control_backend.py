@@ -581,6 +581,7 @@ class FoxESSControlBackend:
         cheap_period_confirmed: bool,
         ev_hold_floor_percent: float | None = None,
         ev_connected: bool | None = None,
+        paid_agile_ev_hold_eligible: bool = False,
         ev_hold_source_grace_active: bool = False,
         pending_intelligent_ev_hold_active: bool = False,
         commissioning_export_test: bool = False,
@@ -753,7 +754,13 @@ class FoxESSControlBackend:
             last_verified_min_soc_on_grid_percent=(self._last_verified_min_soc_on_grid),
             cheap_period_confirmed=cheap_period_confirmed,
             source_uncertainty_grace_active=ev_hold_source_grace_active,
-            no_paid_export_mode=no_paid_export_mode,
+            no_paid_export_mode=(
+                no_paid_export_mode
+                or (
+                    paid_agile_ev_hold_eligible
+                    and control.desired_battery_export_power_kw <= 0.001
+                )
+            ),
             ev_connected=ev_connected,
             operating_mode=control.operating_mode,
             master_control_enabled=bool(coordinator.settings.control.control_enabled),

@@ -197,7 +197,13 @@ def protect_live_cheap_ev(
     """
     if (
         control.operating_mode != "control"
-        or control.operating_reason != "awaiting_export_tariff_charge"
+        or control.operating_reason
+        not in {
+            "awaiting_export_tariff_charge",
+            "confirmed_cheap_charge",
+            "agile_rolling_cheap_charge",
+            "agile_rolling_happy_hour_charge",
+        }
         or not no_paid_export_mode
         or not snapshot.cheap_period_confirmed
         or snapshot.saving_session_active
