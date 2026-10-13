@@ -776,6 +776,7 @@ class FoxESSControlBackend:
                     "ev_battery_hold_pending_intelligent_window",
                 }
             ),
+            force_charge_hold_authorised=True,
             site_import_limit_exceeded=bool(control.site_import_limit_exceeded),
             eps_critical=bool(control.eps_critical),
         )
