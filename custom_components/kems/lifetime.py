@@ -10,6 +10,10 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.storage import Store
 
 from .const import DOMAIN, SIMULATION_LEDGER_VERSION, STORAGE_NAMESPACE
+from .historical_tariff_revaluation import (
+    MIGRATION_ID,
+    calculate_2026_tariff_financial_deltas,
+)
 from .kems_core import (
     PERIOD_DATA_COMPLETE_KEY,
     GasEngine,
@@ -57,11 +61,23 @@ class LifetimeLedgerRecorder:
         self._repair_required = False
         self._ledger_schema_version = LEDGER_SCHEMA_VERSION
         self._simulation_ledger_version = SIMULATION_LEDGER_VERSION
+        self._historical_tariff_corrections: dict[str, dict[str, Any]] = {}
+        self._historical_tariff_skipped: dict[str, str] = {}
 
     @property
     def ledger(self) -> LifetimeLedger:
         """Return the current mutable ledger object."""
         return self._ledger
+
+    @property
+    def historical_tariff_revaluation_status(self) -> dict[str, Any]:
+        """Expose a persisted, auditable financial-only correction summary."""
+        return {
+            "migration_id": MIGRATION_ID,
+            "applied": dict(self._historical_tariff_corrections),
+            "skipped": dict(self._historical_tariff_skipped),
+            "no_physical_energy_edits": True,
+        }
 
     @property
     def loaded_existing(self) -> bool:
@@ -74,6 +90,13 @@ class LifetimeLedgerRecorder:
         if not data:
             return
         self._loaded_existing = True
+        saved_corrections = data.get("historical_tariff_corrections", {})
+        if isinstance(saved_corrections, dict):
+            self._historical_tariff_corrections = {
+                str(day): dict(audit)
+                for day, audit in saved_corrections.items()
+                if isinstance(audit, dict)
+            }
         self._ledger = LifetimeLedger.from_dict(data.get("ledger", {}))
         stored_ledger_version = int(data.get("ledger_schema_version", 1))
         self._repair_required = stored_ledger_version < LEDGER_SCHEMA_VERSION
@@ -220,6 +243,85 @@ class LifetimeLedgerRecorder:
             await self.async_save()
         return self._ledger
 
+    async def async_revalue_october_2026_financial_history(
+        self,
+        records: list[Snapshot],
+        config: SimulationConfig,
+    ) -> bool:
+        """Reprice only fully supported 6–11 October financial daily records.
+
+        Never edit the archived physical samples or kWh, never backdate paid
+        export, and never apply a day twice. A saved per-day before/after audit
+        permits rollback if supplier evidence changes.
+        """
+        if self._tracking_date is not None and self._tracking_date <= date(
+            2026, 10, 11
+        ):
+            self._historical_tariff_skipped = {
+                "pending": "Wait until the complete tariff interval has closed"
+            }
+            return False
+        proposals, skipped = calculate_2026_tariff_financial_deltas(
+            records,
+            self._daily_records,
+            config,
+            self._historical_tariff_corrections,
+        )
+        self._historical_tariff_skipped = skipped
+        changed = False
+        for day, audit in proposals.items():
+            values = self._daily_records.get(day)
+            if values is None or day in self._historical_tariff_corrections:
+                continue
+            deltas = audit["deltas"]
+            before = {
+                key: values.get(key)
+                for key in deltas
+            }
+            if any(value is None for value in before.values()):
+                self._historical_tariff_skipped[day] = (
+                    "missing original financial field in retained daily ledger"
+                )
+                continue
+            # Two-phase in-memory preparation; reject an implausible cost
+            # rather than partially modifying the ledger.
+            proposed = {
+                key: round(float(before[key]) + float(delta), 6)
+                for key, delta in deltas.items()
+            }
+            if any(
+                proposed[key] < -0.001
+                for key in ("import_cost_pence", "simulated_import_cost_pence")
+            ):
+                self._historical_tariff_skipped[day] = "negative import cost"
+                continue
+            values.update(proposed)
+            commissioned = (
+                self._ledger.commissioning_date is not None
+                and date.fromisoformat(day) >= self._ledger.commissioning_date
+            )
+            for key, delta in deltas.items():
+                if key in {
+                    "actual_avoided_import_value_pence",
+                    "actual_system_value_pence",
+                } and not commissioned:
+                    continue
+                setattr(
+                    self._ledger,
+                    key,
+                    getattr(self._ledger, key) + float(delta),
+                )
+            self._historical_tariff_corrections[day] = {
+                **audit,
+                "before": before,
+                "after": proposed,
+            }
+            changed = True
+        if changed:
+            self._reconcile_observed_totals()
+            await self.async_save()
+        return changed
+
     async def async_save(self) -> None:
         """Persist totals and the latest daily cumulative values."""
         if self._tracking_date is not None:
@@ -232,6 +334,7 @@ class LifetimeLedgerRecorder:
                 ),
                 "tracking_values": self._tracking_values,
                 "daily_records": self._daily_records,
+                "historical_tariff_corrections": self._historical_tariff_corrections,
                 "maintenance_date": (
                     self._maintenance_date.isoformat()
                     if self._maintenance_date
