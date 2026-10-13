@@ -479,17 +479,22 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
             and export_tariff_type_from_options(self.entry.options)
             == EXPORT_TARIFF_TYPE_NONE
         ):
-            corrected = (
-                await self._lifetime.async_revalue_october_2026_financial_history(
-                    self._history.records,
-                    self.settings.simulation,
+            try:
+                corrected = (
+                    await self._lifetime.async_revalue_october_2026_financial_history(
+                        self._history.records,
+                        self.settings.simulation,
+                    )
                 )
-            )
-            if corrected:
-                await async_reconcile_financial_commissioning(
-                    self._lifetime,
-                    self.settings.roi.commissioning_date,
-                )
+                if corrected:
+                    await async_reconcile_financial_commissioning(
+                        self._lifetime,
+                        self.settings.roi.commissioning_date,
+                    )
+            except (TypeError, ValueError, ArithmeticError) as err:
+                # Historical finance must never prevent live KEMS startup or
+                # grant/revoke inverter control. Leave uncertain days untouched.
+                LOGGER.warning("Historical Loyal tariff replay skipped: %s", err)
 
     async def _async_update_data(self) -> KEMSData:
         """Run the complete read-only KEMS analysis pipeline."""
