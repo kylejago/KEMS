@@ -29,6 +29,8 @@ from .kems_core.control_write_authority import (
     should_freeze_owned_ev_hold,
 )
 
+from .product_types import EXPORT_TARIFF_TYPE_AGILE, export_tariff_type_from_options
+
 _STORAGE_VERSION = 1
 _PAID_EXPORT_STAGE_KW = 1.0
 _PAID_EXPORT_PROOF_SAMPLES = 2
@@ -847,6 +849,8 @@ class FoxESSControlBackend:
         paid_activation_baseline_blocked = False
         if (
             not no_paid_export_mode
+            and export_tariff_type_from_options(coordinator.entry.options)
+            == EXPORT_TARIFF_TYPE_AGILE
             and not commissioning_export_test
             and not force_restore
             and self._owned
