@@ -28,7 +28,6 @@ from .kems_core.control_write_authority import (
     resolve_live_min_soc_on_grid,
     should_freeze_owned_ev_hold,
 )
-
 from .product_types import EXPORT_TARIFF_TYPE_AGILE, export_tariff_type_from_options
 
 _STORAGE_VERSION = 1
