@@ -150,7 +150,16 @@ def revalue_actual_export_income(
 ) -> SimulationState:
     """Return live actual financial fields reconciled to authoritative income."""
     if export_income_pence is None:
-        return simulation
+        # A temporarily missing published Agile price cannot entitle KEMS to
+        # the legacy fixed-price benchmark. Report conservatively until
+        # authoritative prices recover, without changing measured grid kWh.
+        return replace(
+            simulation,
+            actual_export_income_pence=0.0,
+            actual_cost_pence=simulation.actual_import_cost_pence,
+            actual_system_value_pence=simulation.actual_avoided_import_value_pence,
+            saving_pence=None,
+        )
     income = round(float(export_income_pence), 2)
     import_cost = simulation.actual_import_cost_pence
     actual_cost = (
