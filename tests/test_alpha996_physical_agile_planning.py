@@ -88,6 +88,13 @@ def _working_evidence() -> tuple[Snapshot, object]:
     anchor_time = NOW - timedelta(minutes=7)
     previous = _scan(anchor_time, anchor_time - timedelta(seconds=5))
     tracker.observe(previous, SIM, CONTROL, now=anchor_time)
+    middle_time = NOW - timedelta(minutes=1)
+    tracker.observe(
+        _scan(middle_time, anchor_time - timedelta(seconds=5)),
+        SIM,
+        CONTROL,
+        now=middle_time,
+    )
     snap = _scan(NOW, anchor_time - timedelta(seconds=5))
     evidence = tracker.observe(snap, SIM, CONTROL, now=NOW)
     assert evidence.lower_bound_kwh is not None
