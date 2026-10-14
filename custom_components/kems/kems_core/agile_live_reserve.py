@@ -116,7 +116,6 @@ def physical_energy_evidence_matches_snapshot(
     )
 
 
-
 # Cloud Ohme periodically reports unavailable for ~40 seconds. This is an
 # explicitly bounded, session-only concession for an *already verified idle*
 # connected EV. It is not electrical isolation: the EV could start during an
