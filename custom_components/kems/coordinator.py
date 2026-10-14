@@ -611,6 +611,37 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                 tariff=self.settings.tariff,
                 config=self.settings.simulation,
             )
+            # Alpha9.96: bind one scan-scoped verified physical battery
+            # energy lower bound before price/deadline plan construction.
+            # The independent settled digital twin remains unchanged.
+            selected_export_tariff = export_tariff_type_from_options(self.entry.options)
+            if selected_export_tariff == EXPORT_TARIFF_TYPE_AGILE:
+                self._paid_agile_energy_evidence = (
+                    self._paid_agile_physical_energy.observe(
+                        snapshot,
+                        self.settings.simulation,
+                        self.settings.control,
+                        now=now,
+                    )
+                )
+            else:
+                self._paid_agile_physical_energy.reset()
+                self._paid_agile_energy_evidence = None
+            self._agile_smart_export._kems_physical_planning_context = (
+                {
+                    "snapshot": snapshot,
+                    "evidence": self._paid_agile_energy_evidence,
+                    "control": self.settings.control,
+                }
+                if (
+                    selected_export_tariff == EXPORT_TARIFF_TYPE_AGILE
+                    and self.settings.control.operating_mode == "control"
+                    and not self.settings.control.emergency_stop
+                    and not snapshot.saving_session_active
+                    and not snapshot.cheap_period_confirmed
+                )
+                else None
+            )
             await self._agile_smart_export.async_update(
                 records=agile_records,
                 now=now,
@@ -781,14 +812,6 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
             # Physically constrain paid Agile before any FoxESS writes. The
             # simulation / financial / shadow plan remains unchanged.
             if tariff_type == EXPORT_TARIFF_TYPE_AGILE:
-                self._paid_agile_energy_evidence = (
-                    self._paid_agile_physical_energy.observe(
-                        snapshot,
-                        self.settings.simulation,
-                        self.settings.control,
-                        now=now,
-                    )
-                )
                 (
                     ev_export_safe,
                     self._paid_agile_last_unplugged_at,

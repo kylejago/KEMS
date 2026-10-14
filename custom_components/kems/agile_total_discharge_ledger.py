@@ -248,7 +248,9 @@ def _apply_total_discharge_ledger(
     if mode in {"cheap_charge", "happy_hour_charge", "power_down_session"}:
         return plan
 
-    soc = _number(plan.get("simulated_soc_percent"))
+    soc = _number(plan.get("planning_soc_percent"))
+    if soc is None:
+        soc = _number(plan.get("simulated_soc_percent"))
     target = _number(plan.get("target_soc_percent"))
     if soc is None or target is None or deadline <= now.astimezone(UTC):
         return plan

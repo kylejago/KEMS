@@ -157,7 +157,9 @@ def _apply_forecast_path(
         }
         return plan
 
-    soc = _number(plan.get("simulated_soc_percent"))
+    soc = _number(plan.get("planning_soc_percent"))
+    if soc is None:
+        soc = _number(plan.get("simulated_soc_percent"))
     target = _number(plan.get("target_soc_percent"))
     forecast_target = _number(plan.get("effective_precheap_target_soc_percent"))
     if soc is None or target is None:

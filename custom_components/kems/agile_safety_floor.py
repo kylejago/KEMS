@@ -158,7 +158,9 @@ def _rolling_plan_with_hard_safety_floor(
     if not isinstance(plan, dict) or not plan.get("available"):
         return plan
 
-    soc = _number(plan.get("simulated_soc_percent"))
+    soc = _number(plan.get("planning_soc_percent"))
+    if soc is None:
+        soc = _number(plan.get("simulated_soc_percent"))
     latched = _hard_safety_floor_latched(self, soc)
     return _apply_hard_safety_floor(plan, soc=soc, latched=latched)
 
@@ -199,6 +201,15 @@ def build_safety_floor_manager(base_class: type) -> type:
 
 def install_agile_safety_floor() -> None:
     """Install the final absolute battery safety owner around Agile planning."""
+    # Delay this import: a lightweight, Home Assistant-independent caller may
+    # import the original safety-floor functions without loading the HA runtime.
+    from .agile_physical_deadline_reconciliation import (
+        install_physical_deadline_reconciliation,
+    )
+
+    # Preserve the frozen Alpha7 deadline runtime byte-for-byte and only wrap
+    # its existing pure guard with exact-scan physical evidence when available.
+    install_physical_deadline_reconciliation()
     rolling_plan = rolling._rolling_plan
     if getattr(rolling_plan, "_kems_agile_safety_floor", False):
         return
