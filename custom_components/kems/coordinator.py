@@ -65,7 +65,10 @@ from .kems_core.agile_live_reserve import (
     guard_paid_agile_physical_export,
 )
 from .kems_core.agile_physical_energy import PaidAgilePhysicalEnergyTracker
-from .kems_core.control_event_refresh import control_source_state_uncertain
+from .kems_core.control_event_refresh import (
+    control_source_state_uncertain,
+    meaningful_ev_power_transition,
+)
 from .kems_core.shared_bus_balance import (
     assess_shared_bus_balance,
     summarise_shared_bus_audits,
@@ -179,6 +182,7 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
             entities.ev_status,
             entities.ev_connected,
             entities.ev_charging,
+            entities.ev_power_kw,
             entities.intelligent_slot,
             entities.off_peak,
             entities.next_offpeak_start,
@@ -221,12 +225,19 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
         new_state = event.data.get("new_state")
         if old_state is None or new_state is None:
             return
-        if not meaningful_control_state_transition(
-            str(old_state.state),
-            str(new_state.state),
+        entity_id = str(event.data.get("entity_id") or new_state.entity_id)
+        # Ohme status can remain plugged_in when charging starts. Watch
+        # only zero/positive/unknown power *threshold crossings*, not every
+        # charger wattage update, and reuse the immediate + 2-second refresh.
+        if entity_id == self.entities.ev_power_kw:
+            if not meaningful_ev_power_transition(
+                str(old_state.state), str(new_state.state)
+            ):
+                return
+        elif not meaningful_control_state_transition(
+            str(old_state.state), str(new_state.state)
         ):
             return
-        entity_id = str(event.data.get("entity_id") or new_state.entity_id)
         self._last_critical_refresh_event = {
             "entity_id": entity_id,
             "old_state": str(old_state.state),
