@@ -81,9 +81,7 @@ def physical_planning_soc(
         "physical_soc_anchor": evidence.source_soc_at.isoformat(),
         "physical_samples": evidence.samples,
         "worst_case_gap_kwh": round(evidence.worst_case_gap_kwh, 3),
-        "pessimistic_discharge_kwh": round(
-            evidence.pessimistic_discharge_kwh, 3
-        ),
+        "pessimistic_discharge_kwh": round(evidence.pessimistic_discharge_kwh, 3),
         "replay_simulation_soc_preserved": True,
         "scope": "paid_agile_live_control_only",
     }

@@ -103,9 +103,7 @@ def _working_evidence() -> tuple[Snapshot, object]:
 
 def test_physical_100_percent_reconciles_live_budget_above_74_5_percent_twin() -> None:
     snap, evidence = _working_evidence()
-    assert physical_energy_evidence_matches_snapshot(
-        evidence, snap, CONTROL, now=NOW
-    )
+    assert physical_energy_evidence_matches_snapshot(evidence, snap, CONTROL, now=NOW)
     physical_soc, proof = planning.physical_planning_soc(
         _manager(snap, evidence), now=NOW, config=SIM
     )
@@ -116,12 +114,13 @@ def test_physical_100_percent_reconciles_live_budget_above_74_5_percent_twin() -
     assert proof["physical_energy_lower_bound_kwh"] > 54.0
     assert proof["replay_simulation_soc_preserved"] is True
     physical_export_budget = (
-        (physical_soc - 15.0) / 100.0 * SIM.battery_capacity_kwh
+        (physical_soc - 15.0)
+        / 100.0
+        * SIM.battery_capacity_kwh
         * SIM.discharge_efficiency
     )
     twin_export_budget = (
-        (74.457 - 15.0) / 100.0 * SIM.battery_capacity_kwh
-        * SIM.discharge_efficiency
+        (74.457 - 15.0) / 100.0 * SIM.battery_capacity_kwh * SIM.discharge_efficiency
     )
     assert physical_export_budget > twin_export_budget + 11.0
 
@@ -133,9 +132,7 @@ def test_missing_restart_or_expired_proof_does_not_create_physical_authority() -
         (_manager(snap, None), NOW),
         (_manager(snap, evidence), NOW + timedelta(minutes=1)),
     ):
-        result, proof = planning.physical_planning_soc(
-            manager, now=at, config=SIM
-        )
+        result, proof = planning.physical_planning_soc(manager, now=at, config=SIM)
         assert result is None
         assert proof["available"] is False
 
@@ -173,7 +170,9 @@ def test_capacity_mismatch_and_invalid_physical_values_cannot_grant_export() -> 
     assert diagnostic["available"] is False
 
 
-def test_rolling_chain_uses_planning_soc_for_discharge_forecast_and_hard_floor() -> None:
+def test_rolling_chain_uses_planning_soc_for_discharge_forecast_and_hard_floor() -> (
+    None
+):
     """Keep simulation independent while routing live dispatch through one basis."""
     rolling = (ROOT / "agile_rolling_replan_runtime.py").read_text()
     deadline = (ROOT / "agile_deadline_guard_runtime.py").read_text()
@@ -193,12 +192,15 @@ def test_rolling_chain_uses_planning_soc_for_discharge_forecast_and_hard_floor()
         coordinator.index("await self._agile_smart_export.async_update(")
     )
     assert "guard_paid_agile_physical_export(" in coordinator
-    assert '"scope": "paid_agile_live_control_only"' in (
-        ROOT / "agile_physical_planning.py"
-    ).read_text()
+    assert (
+        '"scope": "paid_agile_live_control_only"'
+        in (ROOT / "agile_physical_planning.py").read_text()
+    )
 
 
-def test_legacy_cheap_charge_and_no_paid_export_always_exclude_physical_planner() -> None:
+def test_legacy_cheap_charge_and_no_paid_export_always_exclude_physical_planner() -> (
+    None
+):
     coordinator = (ROOT / "coordinator.py").read_text()
     assert "selected_export_tariff == EXPORT_TARIFF_TYPE_AGILE" in coordinator
     assert 'self.settings.control.operating_mode == "control"' in coordinator

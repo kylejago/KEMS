@@ -224,9 +224,11 @@ def _deadline_guard_context(
         "deadline": deadline.isoformat(),
         "target_soc_percent": round(target_soc, 1),
         "simulated_soc_percent": round(
-            rolling._current_agile_soc(state)
-            if rolling._current_agile_soc(state) is not None
-            else soc,
+            (
+                rolling._current_agile_soc(state)
+                if rolling._current_agile_soc(state) is not None
+                else soc
+            ),
             2,
         ),
         "planning_soc_percent": round(soc, 3),

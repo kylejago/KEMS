@@ -614,9 +614,7 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
             # Alpha9.96: bind one scan-scoped verified physical battery
             # energy lower bound before price/deadline plan construction.
             # The independent settled digital twin remains unchanged.
-            selected_export_tariff = export_tariff_type_from_options(
-                self.entry.options
-            )
+            selected_export_tariff = export_tariff_type_from_options(self.entry.options)
             if selected_export_tariff == EXPORT_TARIFF_TYPE_AGILE:
                 self._paid_agile_energy_evidence = (
                     self._paid_agile_physical_energy.observe(
