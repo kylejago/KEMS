@@ -182,7 +182,7 @@ class PaidAgilePhysicalEnergyTracker:
             if fresh_power and signed is not None
             else None
         )
-        soc_sample_at = now - timedelta(seconds=soc_age)
+        soc_sample_at = snapshot.timestamp - timedelta(seconds=soc_age)
 
         # Never seed from a SOC that is already more than an hour old.
         # This is a deliberate cold-start protection, not a timer reset.
