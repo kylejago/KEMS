@@ -26,9 +26,6 @@ from typing import Any
 
 from homeassistant.helpers.storage import Store
 
-from .agile_physical_deadline_reconciliation import (
-    install_physical_deadline_reconciliation,
-)
 from .agile_rolling_planning import rolling_runtime as rolling
 from .const import DOMAIN
 from .kems_core import SimulationConfig
@@ -204,6 +201,12 @@ def build_safety_floor_manager(base_class: type) -> type:
 
 def install_agile_safety_floor() -> None:
     """Install the final absolute battery safety owner around Agile planning."""
+    # Delay this import: a lightweight, Home Assistant-independent caller may
+    # import the original safety-floor functions without loading the HA runtime.
+    from .agile_physical_deadline_reconciliation import (
+        install_physical_deadline_reconciliation,
+    )
+
     # Preserve the frozen Alpha7 deadline runtime byte-for-byte and only wrap
     # its existing pure guard with exact-scan physical evidence when available.
     install_physical_deadline_reconciliation()
