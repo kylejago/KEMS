@@ -274,7 +274,7 @@ def test_old_soc_without_live_cohort_fails_closed() -> None:
     beyond_window = _snapshot(
         battery_soc=90.0,
         source_age_seconds={
-            "battery_soc": 901.0,
+            "battery_soc": 3601.0,
             "battery_power_kw": 0.1,
         },
     )

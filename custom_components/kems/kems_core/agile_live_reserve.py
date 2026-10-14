@@ -21,10 +21,12 @@ _EXPORT_PROOF_HORIZON_HOURS = 0.5
 _MAX_FORECAST_SOLAR_CREDIT_FRACTION = 0.25
 _SOLAR_CREDIT_MIN_CONFIDENCE = 80.0
 # FoxESS may report an unchanged integer SOC less frequently than power/CT.
-# Only extend eligibility within a short, pessimistically debited window when
-# another *same-device* Modbus source is reporting. The FoxESS provider already
-# validates device IDs before accepting an old SOC via its cohort policy.
-_MAX_COHORT_SOC_AGE_SECONDS = 900.0
+# Accept unchanged physical SOC for at most one hour, but pessimistically
+# debit the full elapsed time at worst-case battery discharge before any export.
+# This window requires live same-device FoxESS Modbus cohort evidence; the
+# provider validates device identity and excludes unverified/stale readings.
+# A missing cohort or expired window always fails closed.
+_MAX_COHORT_SOC_AGE_SECONDS = 3600.0
 _MIN_CONSERVATIVE_DISCHARGE_KW = 10.0
 # Grace applies only to a *previously verified unplugged* EV with live zero
 # charging power. Never carry this across restart or a positive EV observation.
