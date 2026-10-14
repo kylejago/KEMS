@@ -176,6 +176,7 @@ def test_rolling_chain_uses_planning_soc_for_discharge_forecast_and_hard_floor()
     """Keep simulation independent while routing live dispatch through one basis."""
     rolling = (ROOT / "agile_rolling_replan_runtime.py").read_text()
     deadline = (ROOT / "agile_deadline_guard_runtime.py").read_text()
+    assert "soc = rolling._current_agile_soc(state)" in deadline
     total = (ROOT / "agile_total_discharge_ledger.py").read_text()
     forecast = (ROOT / "agile_forecast_path_scheduler.py").read_text()
     floor = (ROOT / "agile_safety_floor.py").read_text()
