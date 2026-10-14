@@ -58,5 +58,3 @@ def meaningful_ev_power_transition(
     return _ev_power_band(
         old_state, threshold_kw=charging_threshold_kw
     ) != _ev_power_band(new_state, threshold_kw=charging_threshold_kw)
-
-

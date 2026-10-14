@@ -62,7 +62,9 @@ def _assess(
     )
 
 
-def _guard(snapshot: Snapshot, *, safe: bool, evidence: str) -> tuple[ControlState, dict]:
+def _guard(
+    snapshot: Snapshot, *, safe: bool, evidence: str
+) -> tuple[ControlState, dict]:
     return guard_paid_agile_physical_export(
         _plan(),
         snapshot,
