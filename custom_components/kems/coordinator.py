@@ -834,8 +834,10 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                     now=now,
                     last_confirmed_unplugged_at=self._paid_agile_last_unplugged_at,
                 )
-                connected_idle_grace = self._paid_agile_connected_idle_continuity.assess(
-                    snapshot, now=now
+                connected_idle_grace = (
+                    self._paid_agile_connected_idle_continuity.assess(
+                        snapshot, now=now
+                    )
                 )
                 if not ev_export_safe and connected_idle_grace:
                     ev_export_safe = True
