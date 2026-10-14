@@ -116,6 +116,132 @@ def physical_energy_evidence_matches_snapshot(
     )
 
 
+
+# Cloud Ohme periodically reports unavailable for ~40 seconds. This is an
+# explicitly bounded, session-only concession for an *already verified idle*
+# connected EV. It is not electrical isolation: the EV could start during an
+# outage before cloud telemetry resumes. An independently metered EV circuit
+# is required for hard battery-to-EV protection.
+_AGILE_CONNECTED_IDLE_GRACE_SECONDS = 60.0
+_AGILE_CONNECTED_IDLE_LAST_PROOF_SECONDS = 90.0
+_AGILE_CONNECTED_IDLE_LOAD_AGE_SECONDS = 35.0
+_AGILE_CONNECTED_IDLE_LOAD_STEP_KW = 1.0
+_AGILE_CONNECTED_IDLE_GRID_IMPORT_VETO_KW = 0.3
+
+
+class PaidAgileConnectedIdleContinuity:
+    """Non-persistent, single-outage EV idle proof for paid Agile only.
+
+    A lost Ohme report cannot refresh its own grace. All positive charging
+    indications, a large site-load step, or absent/stale Modbus load telemetry
+    invalidate the proof for the remainder of this outage.
+    """
+
+    def __init__(self) -> None:
+        self.clear()
+
+    def clear(self) -> None:
+        self._last_idle_at: datetime | None = None
+        self._idle_house_load_kw: float | None = None
+        self._outage_started_at: datetime | None = None
+
+    @staticmethod
+    def _live_house_load(snapshot: Snapshot) -> float | None:
+        power = _finite(snapshot.house_load_kw)
+        age = _finite(snapshot.source_age_seconds.get("house_load_kw"))
+        if (
+            power is None
+            or power < 0.0
+            or age is None
+            or not 0.0 <= age <= _AGILE_CONNECTED_IDLE_LOAD_AGE_SECONDS
+            or "house_load_kw" in snapshot.stale_fields
+        ):
+            return None
+        return power
+
+    def _continuity_valid(self, snapshot: Snapshot, *, now: datetime) -> bool:
+        if (
+            self._last_idle_at is None
+            or self._idle_house_load_kw is None
+            or self._outage_started_at is None
+            or now.tzinfo is None
+            or self._last_idle_at.tzinfo is None
+            or self._outage_started_at.tzinfo is None
+            or snapshot.ev_connected is False
+            or snapshot.ev_charging is True
+        ):
+            return False
+        ev_power = _finite(snapshot.ev_power_kw)
+        if ev_power is not None and (ev_power < 0.0 or ev_power > _AGILE_EV_IDLE_POWER_KW):
+            return False
+        if not (
+            timedelta(0)
+            <= now - self._outage_started_at
+            <= timedelta(seconds=_AGILE_CONNECTED_IDLE_GRACE_SECONDS)
+            and timedelta(0)
+            <= self._outage_started_at - self._last_idle_at
+            <= timedelta(seconds=_AGILE_CONNECTED_IDLE_LAST_PROOF_SECONDS)
+        ):
+            return False
+        house = self._live_house_load(snapshot)
+        if house is None or house > (
+            self._idle_house_load_kw + _AGILE_CONNECTED_IDLE_LOAD_STEP_KW
+        ):
+            return False
+        grid_import = _finite(snapshot.grid_import_kw)
+        grid_age = _finite(snapshot.source_age_seconds.get("grid_import_kw"))
+        if (
+            grid_import is not None
+            and grid_import > _AGILE_CONNECTED_IDLE_GRID_IMPORT_VETO_KW
+            and grid_age is not None
+            and 0.0 <= grid_age <= _AGILE_CONNECTED_IDLE_LOAD_AGE_SECONDS
+            and "grid_import_kw" not in snapshot.stale_fields
+        ):
+            return False
+        return True
+
+    def permits(self, snapshot: Snapshot, *, now: datetime) -> bool:
+        """Independent final-guard check; evidence string alone is insufficient."""
+        return self._continuity_valid(snapshot, now=now)
+
+    def assess(self, snapshot: Snapshot, *, now: datetime) -> bool:
+        """Return a bounded temporary allowance or learn a fresh idle baseline."""
+        ev_power = _finite(snapshot.ev_power_kw)
+        if (
+            snapshot.ev_connected is False
+            or snapshot.ev_charging is True
+            or (ev_power is not None and (ev_power < 0.0 or ev_power > _AGILE_EV_IDLE_POWER_KW))
+        ):
+            self.clear()
+            return False
+
+        power_age = _finite(snapshot.ev_power_age_seconds)
+        house = self._live_house_load(snapshot)
+        if (
+            snapshot.ev_connected is True
+            and snapshot.ev_charging is False
+            and ev_power is not None
+            and 0.0 <= ev_power <= _AGILE_EV_IDLE_POWER_KW
+            and power_age is not None
+            and 0.0 <= power_age <= _AGILE_EV_CONNECTED_IDLE_POWER_AGE_SECONDS
+            and "ev_power_kw" not in snapshot.stale_fields
+        ):
+            # Fresh confirmed idle is the sole way to re-arm this grace.
+            self._last_idle_at = now if house is not None else None
+            self._idle_house_load_kw = house
+            self._outage_started_at = None
+            return False
+
+        if self._last_idle_at is None or self._idle_house_load_kw is None:
+            return False
+        if self._outage_started_at is None:
+            self._outage_started_at = now
+        if not self._continuity_valid(snapshot, now=now):
+            self.clear()
+            return False
+        return True
+
+
 def assess_paid_agile_ev_continuity(
     snapshot: Snapshot,
     *,
@@ -197,6 +323,7 @@ def guard_paid_agile_physical_export(
     ev_export_safe: bool | None = None,
     ev_export_evidence: str = "no verified disconnected EV evidence",
     physical_energy_evidence: PhysicalEnergyEvidence | None = None,
+    connected_idle_continuity: PaidAgileConnectedIdleContinuity | None = None,
 ) -> tuple[ControlState, dict[str, Any]]:
     """Cap deliberate export by *measured* SOC minus future house reserve.
 
@@ -261,10 +388,17 @@ def guard_paid_agile_physical_export(
             report,
         )
 
-    # Defence in depth: when continuity was explicitly supplied by the
-    # coordinator, require a live zero-power measurement in this final guard
-    # too. Older callers with no continuity argument retain their old gate.
-    if ev_export_safe is not None:
+    # An explicit connected-idle grace is valid only if the session's physical
+    # evidence still passes at this exact final command guard. Generic safe=True
+    # and a copied evidence string never grant export on their own.
+    connected_idle_grace_proven = bool(
+        ev_export_safe is True
+        and ev_export_evidence == "bounded_connected_idle_source_grace"
+        and connected_idle_continuity is not None
+        and connected_idle_continuity.permits(snapshot, now=now)
+    )
+    # Direct live zero Ohme power remains mandatory outside the bounded bridge.
+    if ev_export_safe is not None and not connected_idle_grace_proven:
         ev_power = _finite(snapshot.ev_power_kw)
         ev_age = _finite(snapshot.ev_power_age_seconds)
         if (
@@ -298,7 +432,10 @@ def guard_paid_agile_physical_export(
             if ev_export_safe is not None
             else snapshot.ev_connected is False and snapshot.ev_charging is False
         )
-        or (snapshot.ev_connected is True and not connected_idle_proven)
+        or (
+            snapshot.ev_connected is True
+            and not (connected_idle_proven or connected_idle_grace_proven)
+        )
         or snapshot.ev_charging is True
         or (
             (live_ev_power := _finite(snapshot.ev_power_kw)) is not None
