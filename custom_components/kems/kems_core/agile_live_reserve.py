@@ -191,15 +191,13 @@ class PaidAgileConnectedIdleContinuity:
             return False
         grid_import = _finite(snapshot.grid_import_kw)
         grid_age = _finite(snapshot.source_age_seconds.get("grid_import_kw"))
-        if (
+        return not (
             grid_import is not None
             and grid_import > _AGILE_CONNECTED_IDLE_GRID_IMPORT_VETO_KW
             and grid_age is not None
             and 0.0 <= grid_age <= _AGILE_CONNECTED_IDLE_LOAD_AGE_SECONDS
             and "grid_import_kw" not in snapshot.stale_fields
-        ):
-            return False
-        return True
+        )
 
     def permits(self, snapshot: Snapshot, *, now: datetime) -> bool:
         """Independent final-guard check; evidence string alone is insufficient."""
