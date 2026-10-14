@@ -168,9 +168,7 @@ def _deadline_guard_context(
     tariff: TariffSettings,
 ) -> dict[str, Any]:
     """Calculate latest-safe-start evidence for the current coordinator scan."""
-    soc, soc_source, physical_proof = rolling._planning_soc_basis(
-        self, state, now=now, config=config
-    )
+    soc = rolling._current_agile_soc(state)
     target_soc = _target_percent(config)
     effective_kw = _effective_deadline_kw(config)
     deadline = agile._next_cheap(now, tariff).astimezone(UTC)
@@ -223,17 +221,7 @@ def _deadline_guard_context(
         "generated_at": now.isoformat(),
         "deadline": deadline.isoformat(),
         "target_soc_percent": round(target_soc, 1),
-        "simulated_soc_percent": round(
-            (
-                rolling._current_agile_soc(state)
-                if rolling._current_agile_soc(state) is not None
-                else soc
-            ),
-            2,
-        ),
-        "planning_soc_percent": round(soc, 3),
-        "planning_soc_source": soc_source,
-        "physical_planning_evidence": physical_proof,
+        "simulated_soc_percent": round(soc, 2),
         "required_discharge_kwh": round(required_ac, 3),
         "solar_aware_remaining_capacity_kwh": round(remaining_capacity, 3),
         "solar_aware_deadline_margin_kwh": round(margin, 3),

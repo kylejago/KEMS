@@ -27,6 +27,9 @@ from typing import Any
 from homeassistant.helpers.storage import Store
 
 from .agile_rolling_planning import rolling_runtime as rolling
+from .agile_physical_deadline_reconciliation import (
+    install_physical_deadline_reconciliation,
+)
 from .const import DOMAIN
 from .kems_core import SimulationConfig
 from .tariff import TariffSettings
@@ -201,6 +204,9 @@ def build_safety_floor_manager(base_class: type) -> type:
 
 def install_agile_safety_floor() -> None:
     """Install the final absolute battery safety owner around Agile planning."""
+    # Preserve the frozen Alpha7 deadline runtime byte-for-byte and only wrap
+    # its existing pure guard with exact-scan physical evidence when available.
+    install_physical_deadline_reconciliation()
     rolling_plan = rolling._rolling_plan
     if getattr(rolling_plan, "_kems_agile_safety_floor", False):
         return

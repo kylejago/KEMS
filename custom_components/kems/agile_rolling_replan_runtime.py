@@ -213,9 +213,13 @@ def _rolling_plan(
     tariff: TariffSettings,
 ) -> dict[str, Any]:
     """Allocate currently exportable battery energy across remaining Agile slots."""
-    soc, soc_source, physical_planning = _planning_soc_basis(
-        self, state, now=now, config=config
-    )
+    soc = _current_agile_soc(state)
+    soc_source = _current_agile_soc_source(state)
+    physical_planning: dict[str, Any] = {"available": False}
+    if getattr(self, "_kems_physical_planning_context", None) is not None:
+        soc, soc_source, physical_planning = _planning_soc_basis(
+            self, state, now=now, config=config
+        )
     effective_kw = _effective_deadline_kw(config)
     capacity = max(config.battery_capacity_kwh, 0.1)
     efficiency = max(config.discharge_efficiency, 0.01)

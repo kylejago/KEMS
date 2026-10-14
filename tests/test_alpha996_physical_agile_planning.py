@@ -183,7 +183,9 @@ def test_rolling_chain_uses_planning_soc_for_discharge_forecast_and_hard_floor()
     assert "physical_planning_soc(self, now=now, config=config)" in rolling
     assert '"planning_soc_percent": round(soc, 3)' in rolling
     assert '"simulated_soc_percent": round(' in rolling
-    assert "rolling._planning_soc_basis(" in deadline
+    assert "install_physical_deadline_reconciliation()" in floor
+    physical_deadline = (ROOT / "agile_physical_deadline_reconciliation.py").read_text()
+    assert "deadline_runtime._deadline_guard_context" in physical_deadline
     assert 'plan.get("planning_soc_percent")' in total
     assert 'plan.get("planning_soc_percent")' in forecast
     assert 'plan.get("planning_soc_percent")' in floor
