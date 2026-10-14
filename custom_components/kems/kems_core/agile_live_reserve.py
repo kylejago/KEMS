@@ -33,6 +33,9 @@ _MIN_CONSERVATIVE_DISCHARGE_KW = 10.0
 # charging power. Never carry this across restart or a positive EV observation.
 _AGILE_EV_UNPLUGGED_GRACE_SECONDS = 90.0
 _AGILE_EV_MAX_POWER_REPORT_AGE_SECONDS = 180.0
+# Plugged-in EVs may start charging without another status transition. A
+# zero-power sample from a cloud charger must be very recent before export.
+_AGILE_EV_CONNECTED_IDLE_POWER_AGE_SECONDS = 30.0
 _AGILE_EV_IDLE_POWER_KW = 0.1
 
 _COHORT_POWER_FIELDS = (
@@ -119,23 +122,22 @@ def assess_paid_agile_ev_continuity(
     now: datetime,
     last_confirmed_unplugged_at: datetime | None,
 ) -> tuple[bool, datetime | None, str]:
-    """Accept short Ohme dropouts ONLY after recent physical unplugged evidence.
+    """Permit paid export when Ohme is verifiably idle, even if plugged in.
 
-    An EV signal indicating connected, charging, or measured draw immediately
-    cancels the allowance. Missing power or expired evidence blocks export;
-    neither missing data nor a previous *connected* state can create grace.
-    This state is session-only and affects paid Agile deliberate export alone.
+    Positive charging or EV draw always veto export. Connected-idle is allowed
+    only with an explicit NOT charging state and a particularly fresh zero-power
+    sample. Unknown connections retain the older bounded *unplugged-only*
+    grace: connected-idle evidence never creates a grace anchor. This cannot
+    provide hard electrical isolation of a shared home/EV bus.
     """
     connected = snapshot.ev_connected
     charging = snapshot.ev_charging
     power_kw = _finite(snapshot.ev_power_kw)
     power_age = _finite(snapshot.ev_power_age_seconds)
-    if (
-        connected is True
-        or charging is True
-        or (power_kw is not None and power_kw > _AGILE_EV_IDLE_POWER_KW)
+    if charging is True or (
+        power_kw is not None and power_kw > _AGILE_EV_IDLE_POWER_KW
     ):
-        return False, None, "EV connected/charging/power observed"
+        return False, None, "EV charging or measured EV power observed"
 
     zero_power_fresh = bool(
         power_kw is not None
@@ -146,6 +148,17 @@ def assess_paid_agile_ev_continuity(
     )
     if not zero_power_fresh:
         return False, None, "EV zero-power observation missing/stale"
+
+    if connected is True:
+        # An attached car must have a *definitely stopped* charger and an
+        # especially fresh zero-power reading. A plugged-in vehicle can start
+        # charging without changing its physical connection status. Clear any
+        # previous unplugged grace, so an Ohme outage fails closed afterward.
+        if charging is not False:
+            return False, None, "EV connected; charging state not confirmed idle"
+        if power_age is None or power_age > _AGILE_EV_CONNECTED_IDLE_POWER_AGE_SECONDS:
+            return False, None, "EV connected; zero-power sample too old"
+        return True, None, "confirmed_connected_idle_zero_power"
 
     if connected is False:
         # Confirmed unplugged is stronger than a transient unavailable
@@ -263,15 +276,29 @@ def guard_paid_agile_physical_export(
         ):
             return reduce("EV zero-power observation missing/stale")
 
-    # A bounded previously-verified unplugged grace may bridge unavailable
-    # Ohme status, but live positive EV signals must *always* veto export.
+    # A connected-idle EV is eligible only with a matching *current-scan*
+    # assessment and a strictly newer direct zero-power report. A caller
+    # supplying a generic True cannot bypass the connection veto.
+    connected_idle_proven = bool(
+        ev_export_safe is True
+        and ev_export_evidence == "confirmed_connected_idle_zero_power"
+        and snapshot.ev_connected is True
+        and snapshot.ev_charging is False
+        and (direct_ev_power := _finite(snapshot.ev_power_kw)) is not None
+        and 0.0 <= direct_ev_power <= _AGILE_EV_IDLE_POWER_KW
+        and (direct_ev_age := _finite(snapshot.ev_power_age_seconds)) is not None
+        and 0.0 <= direct_ev_age <= _AGILE_EV_CONNECTED_IDLE_POWER_AGE_SECONDS
+        and "ev_power_kw" not in snapshot.stale_fields
+    )
+    # Previously verified *unplugged* grace may bridge missing Ohme status,
+    # but any live positive charging or power signal always vetoes export.
     if (
         not (
             ev_export_safe
             if ev_export_safe is not None
             else snapshot.ev_connected is False and snapshot.ev_charging is False
         )
-        or snapshot.ev_connected is True
+        or (snapshot.ev_connected is True and not connected_idle_proven)
         or snapshot.ev_charging is True
         or (
             (live_ev_power := _finite(snapshot.ev_power_kw)) is not None

@@ -100,7 +100,7 @@ def test_ev_unavailable_for_40_seconds_preserves_agile_export() -> None:
 
 def test_ev_becomes_connected_or_draws_current_clears_grace_immediately() -> None:
     for changes in (
-        {"ev_connected": True, "ev_charging": False},
+        {"ev_connected": True, "ev_charging": None},
         {"ev_connected": True, "ev_charging": True},
         {"ev_connected": None, "ev_charging": True},
         {"ev_power_kw": 0.2},
