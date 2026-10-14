@@ -3,6 +3,7 @@
 The EV shares the site bus: this is not independent circuit isolation. A fresh
 FoxESS load baseline mitigates (but cannot eliminate) undetected EV draw.
 """
+
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
@@ -190,12 +191,18 @@ def test_no_restart_carryover_or_forged_continuity_flag() -> None:
     ready.assess(snapshot(), now=NOW)
     assert ready.assess(lost, now=at)
     assert physical_guard(lost, None, at=at)[0].desired_battery_export_power_kw == 0.0
-    assert physical_guard(
-        lost, ready, at=at, permission=False
-    )[0].desired_battery_export_power_kw == 0.0
-    assert physical_guard(
-        lost, ready, at=at, evidence="confirmed_connected_idle_zero_power"
-    )[0].desired_battery_export_power_kw == 0.0
+    assert (
+        physical_guard(lost, ready, at=at, permission=False)[
+            0
+        ].desired_battery_export_power_kw
+        == 0.0
+    )
+    assert (
+        physical_guard(
+            lost, ready, at=at, evidence="confirmed_connected_idle_zero_power"
+        )[0].desired_battery_export_power_kw
+        == 0.0
+    )
 
 
 def test_fresh_idle_report_is_only_way_to_rearm() -> None:
