@@ -172,7 +172,7 @@ def test_cheap_charge_and_zero_export_routes_remain_untouched() -> None:
     assert untouched is idle
     assert detail["status"] == "no_deliberate_export_requested"
 
-    cheap = _snapshot(cheap_period_confirmed=True)
+    cheap = _snapshot(off_peak=True)
     unchanged, detail = _guard(snapshot=cheap)
     assert unchanged is not None
     assert detail["status"] == "higher_priority_cheap_or_event"
