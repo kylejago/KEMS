@@ -17,8 +17,8 @@ from . import agile_smart_export as agile
 from . import agile_smart_export_runtime_base as runtime
 from . import history as history_module
 from .agile_deadline_dispatch import _effective_deadline_kw, _target_percent
-from .kems_core import SimulationConfig
 from .agile_physical_planning import physical_planning_soc
+from .kems_core import SimulationConfig
 from .tariff import TariffSettings
 
 SAFETY_HEADROOM_MINUTES = 30
