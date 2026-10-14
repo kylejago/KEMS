@@ -1,3 +1,12 @@
+## 0.9.0-alpha9.98 — bounded plugged-in Ohme outage export continuity
+
+- Paid Agile Control only: after a freshly confirmed connected-but-idle Ohme reading, allow a single, non-renewable 60-second outage window instead of immediately cancelling deliberate grid export on cloud API `unavailable`.
+- Require recent verified zero EV power and fresh FoxESS whole-site load baseline before entry. The final hardware export guard rechecks the same in-memory continuity evidence; an evidence string or stale flag cannot bypass it.
+- Immediately veto continuity on Ohme charging/positive EV power, a house-load rise above the last confirmed idle sample by more than 1.0 kW, newly observed grid import above 0.3 kW, missing/stale FoxESS load data, or elapsed 60 seconds.
+- Re-arm only after Ohme explicitly reports connected, not charging, and fresh zero EV power. The window is never persisted across KEMS/Home Assistant restart.
+- No change to EV MinSOC hold, no-paid-export control, cheap-slot authorisation, export limits, house-energy reserve, Agile forecasts or financial calculations.
+- This software safeguard does not physically isolate the EV from the shared bus. Independent EV-circuit metering is still recommended for hard battery-to-EV protection.
+
 ## 0.9.0-alpha9.68 — scheduled tariff renewal
 
 - Added two effective-dated electricity tariff fallback changes while keeping live Octopus/Home Assistant values authoritative in Automatic mode.
