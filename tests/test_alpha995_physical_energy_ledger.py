@@ -137,9 +137,7 @@ def test_power_dropout_debits_maximum_and_fails_closed_until_recovery() -> None:
     tracker = PaidAgilePhysicalEnergyTracker()
     tracker.observe(_snapshot(START), SIM, CONFIG, now=START)
     missing_at = START + timedelta(minutes=1)
-    missing = _snapshot(
-        missing_at, battery_kw=None, power_age=200.0
-    )
+    missing = _snapshot(missing_at, battery_kw=None, power_age=200.0)
     evidence = tracker.observe(missing, SIM, CONFIG, now=missing_at)
     assert evidence.lower_bound_kwh is None
     assert evidence.status == "power_unavailable_no_export"
@@ -185,9 +183,7 @@ def test_fresh_newer_real_soc_can_reanchor_but_stale_soc_cannot() -> None:
     inconsistent = _snapshot(
         inconsistent_at, soc_at=at - timedelta(seconds=2), soc=98.0
     )
-    conflict = tracker.observe(
-        inconsistent, SIM, CONFIG, now=inconsistent_at
-    )
+    conflict = tracker.observe(inconsistent, SIM, CONFIG, now=inconsistent_at)
     assert conflict.lower_bound_kwh is None
     assert conflict.status == "soc_source_timestamp_or_value_conflict"
 
@@ -258,9 +254,7 @@ def test_hardware_min_soc_and_no_paid_export_paths_are_unchanged() -> None:
 
     root = Path(__file__).parents[1] / "custom_components" / "kems"
     coordinator = (root / "coordinator.py").read_text(encoding="utf-8")
-    core = (root / "kems_core" / "agile_live_reserve.py").read_text(
-        encoding="utf-8"
-    )
+    core = (root / "kems_core" / "agile_live_reserve.py").read_text(encoding="utf-8")
     backend = (root / "kems_core" / "control_write_authority.py").read_text(
         encoding="utf-8"
     )

@@ -64,9 +64,7 @@ class PhysicalEnergyEvidence:
             ),
             "source_soc_percent": self.source_soc_percent,
             "samples": self.samples,
-            "total_pessimistic_discharge_kwh": round(
-                self.pessimistic_discharge_kwh, 3
-            ),
+            "total_pessimistic_discharge_kwh": round(self.pessimistic_discharge_kwh, 3),
             "worst_case_gap_kwh": round(self.worst_case_gap_kwh, 3),
             "direct_power_age_seconds": self.direct_power_age_seconds,
             "scope": "paid_agile_physical_reserve_only",
@@ -168,7 +166,9 @@ class PaidAgilePhysicalEnergyTracker:
         fresh_power = (
             signed is not None
             and power_age is not None
-            and 0.0 <= power_age <= min(
+            and 0.0
+            <= power_age
+            <= min(
                 _MAX_POWER_SOURCE_AGE_SECONDS,
                 control.stale_data_seconds,
             )
@@ -295,8 +295,7 @@ class PaidAgilePhysicalEnergyTracker:
             (
                 item
                 for item in records
-                if item.timestamp.tzinfo is not None
-                and start <= item.timestamp <= now
+                if item.timestamp.tzinfo is not None and start <= item.timestamp <= now
             ),
             key=lambda item: item.timestamp,
         )

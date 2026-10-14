@@ -253,10 +253,9 @@ def guard_paid_agile_physical_export(
                 physical_energy_evidence.source_soc_at
                 - (snapshot.timestamp - timedelta(seconds=physical_age))
             ).total_seconds()
-        ) <= 2.0
-        and 0.0
-        <= (now - physical_energy_evidence.observed_at).total_seconds()
+        )
         <= 2.0
+        and 0.0 <= (now - physical_energy_evidence.observed_at).total_seconds() <= 2.0
         and physical_power_age is not None
         and 0.0 <= physical_power_age <= min(control_config.stale_data_seconds, 90)
         and "battery_power_kw" not in snapshot.stale_fields
@@ -293,9 +292,7 @@ def guard_paid_agile_physical_export(
     else:
         report["soc_freshness_basis"] = "physical_soc_report_with_worst_case_discharge"
     if energy_proven:
-        report["soc_freshness_basis"] = (
-            "session_physical_energy_ledger_with_gap_debits"
-        )
+        report["soc_freshness_basis"] = "session_physical_energy_ledger_with_gap_debits"
     report["raw_physical_soc_age_seconds"] = round(physical_age, 1)
 
     deadline = snapshot.next_offpeak_start
