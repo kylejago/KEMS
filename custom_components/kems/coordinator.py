@@ -64,6 +64,7 @@ from .kems_core.agile_live_reserve import (
     assess_paid_agile_ev_continuity,
     guard_paid_agile_physical_export,
 )
+from .kems_core.agile_physical_energy import PaidAgilePhysicalEnergyTracker
 from .kems_core.control_event_refresh import control_source_state_uncertain
 from .kems_core.shared_bus_balance import (
     assess_shared_bus_balance,
@@ -124,6 +125,10 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
         self._ev_grid_hold = EVGridHoldSession(hass, entry.entry_id)
         # Short-lived, non-persistent proof; cannot survive KEMS restart.
         self._paid_agile_last_unplugged_at: datetime | None = None
+        # Read-only physical-energy evidence; paid Agile only, never a generic
+        # SoC replacement for charging, No Paid Export or simulation.
+        self._paid_agile_physical_energy = PaidAgilePhysicalEnergyTracker()
+        self._paid_agile_energy_evidence = None
         self._learning = LearningEngine()
         self._forecast = SolarForecastCoordinator(hass, settings.forecast)
         self._forecast_planning = ForecastPlanningEngine()
@@ -451,6 +456,19 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
         await self._foxess_control.async_setup()
         await self._export_commissioning_test.async_load()
         await self._history.async_load()
+        # The existing five-minute history can warm-start the physical ledger,
+        # but *each missing historical minute* consumes worst-case battery
+        # energy. A restart never trusts a saved simulated/ledger SOC figure.
+        if (
+            export_tariff_type_from_options(self.entry.options)
+            == EXPORT_TARIFF_TYPE_AGILE
+        ):
+            self._paid_agile_physical_energy.replay(
+                self._history.records,
+                self.settings.simulation,
+                self.settings.control,
+                now=dt_util.now(),
+            )
         await self._ev_charge_trace.async_load()
         await self._ev_grid_hold.async_load()
         await self._forecast_validation.async_load()
@@ -763,6 +781,14 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
             # Physically constrain paid Agile before any FoxESS writes. The
             # simulation / financial / shadow plan remains unchanged.
             if tariff_type == EXPORT_TARIFF_TYPE_AGILE:
+                self._paid_agile_energy_evidence = (
+                    self._paid_agile_physical_energy.observe(
+                        snapshot,
+                        self.settings.simulation,
+                        self.settings.control,
+                        now=now,
+                    )
+                )
                 (
                     ev_export_safe,
                     self._paid_agile_last_unplugged_at,
@@ -782,10 +808,13 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                         now=now,
                         ev_export_safe=ev_export_safe,
                         ev_export_evidence=ev_export_evidence,
+                        physical_energy_evidence=self._paid_agile_energy_evidence,
                     )
                 )
             else:
                 self._paid_agile_last_unplugged_at = None
+                self._paid_agile_physical_energy.reset()
+                self._paid_agile_energy_evidence = None
                 self._agile_live_reserve_status = {
                     "status": "not_agile",
                     "permitted_export_kw": 0.0,

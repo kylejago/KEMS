@@ -176,6 +176,11 @@ async def async_get_config_entry_diagnostics(
         "agile_physical_export_reserve": getattr(
             coordinator, "_agile_live_reserve_status", {"status": "not_yet_evaluated"}
         ),
+        "agile_physical_energy_evidence": (
+            coordinator._paid_agile_energy_evidence.as_dict()
+            if coordinator._paid_agile_energy_evidence is not None
+            else {"status": "not_yet_observed"}
+        ),
         "happy_hour_ohme_control": coordinator.happy_hour_ohme_control_state,
         "agile_history_backfill": coordinator.agile_history_backfill_state,
         "forecast": data.forecast.to_dict(),
