@@ -86,15 +86,15 @@ def physical_guard(
 
 
 def unavailable(at: datetime, **extra: object) -> Snapshot:
-    return snapshot(
-        at,
+    changes = dict(
         ev_connected=None,
         ev_charging=None,
         ev_power_kw=None,
         ev_power_age_seconds=None,
         house_load_kw=1.09,
-        **extra,
     )
+    changes.update(extra)
+    return snapshot(at, **changes)
 
 
 def test_evening_40_second_cloud_dropout_keeps_paid_export() -> None:
@@ -126,7 +126,8 @@ def test_grace_expires_after_60_seconds_without_renewal() -> None:
     desired, report = physical_guard(lost, proof, at=after)
     assert desired.desired_battery_export_power_kw == 0.0, report
     # Still unavailable: another cycle cannot restart the window.
-    assert not proof.assess(unavailable(after + timedelta(seconds=5)), now=after + timedelta(seconds=5))
+    later = after + timedelta(seconds=5)
+    assert not proof.assess(unavailable(later), now=later)
 
 
 def test_live_charging_and_positive_power_immediately_veto() -> None:
@@ -156,7 +157,8 @@ def test_physical_site_load_spike_aborts_for_remainder_of_outage() -> None:
     assert not proof.assess(spike, now=at + timedelta(seconds=5))
     desired, _ = physical_guard(spike, proof, at=at + timedelta(seconds=5))
     assert desired.desired_battery_export_power_kw == 0.0
-    assert not proof.assess(unavailable(at + timedelta(seconds=7)), now=at + timedelta(seconds=7))
+    later = at + timedelta(seconds=7)
+    assert not proof.assess(unavailable(later), now=later)
 
 
 def test_grid_import_and_stale_modbus_both_abort_continuity() -> None:
@@ -173,7 +175,8 @@ def test_grid_import_and_stale_modbus_both_abort_continuity() -> None:
         for key, value in changes.items():
             setattr(lost, key, value)
         assert not proof.assess(lost, now=at)
-        assert physical_guard(lost, proof, at=at)[0].desired_battery_export_power_kw == 0.0
+        desired, _ = physical_guard(lost, proof, at=at)
+        assert desired.desired_battery_export_power_kw == 0.0
 
 
 def test_no_restart_carryover_or_forged_continuity_flag() -> None:
@@ -200,7 +203,8 @@ def test_fresh_idle_report_is_only_way_to_rearm() -> None:
     proof.assess(snapshot(), now=NOW)
     start = NOW + timedelta(seconds=40)
     assert proof.assess(unavailable(start), now=start)
-    assert not proof.assess(unavailable(start + timedelta(seconds=61)), now=start + timedelta(seconds=61))
+    expired_at = start + timedelta(seconds=61)
+    assert not proof.assess(unavailable(expired_at), now=expired_at)
     # A new independently confirmed cloud idle reading rearms the session.
     recovered_at = start + timedelta(seconds=65)
     assert not proof.assess(snapshot(recovered_at), now=recovered_at)
