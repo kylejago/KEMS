@@ -12,6 +12,7 @@ from datetime import datetime, timedelta
 from math import isfinite
 from typing import Any
 
+from .agile_physical_energy import PhysicalEnergyEvidence
 from .models import ControlConfig, ControlState, SimulationConfig, Snapshot
 
 _MIN_PLANNING_RESERVE_PERCENT = 15.0
@@ -123,6 +124,7 @@ def guard_paid_agile_physical_export(
     now: datetime,
     ev_export_safe: bool | None = None,
     ev_export_evidence: str = "no verified disconnected EV evidence",
+    physical_energy_evidence: PhysicalEnergyEvidence | None = None,
 ) -> tuple[ControlState, dict[str, Any]]:
     """Cap deliberate export by *measured* SOC minus future house reserve.
 
@@ -138,6 +140,11 @@ def guard_paid_agile_physical_export(
         "status": "not_applicable",
         "basis": "physical FoxESS SOC + forecast house demand; simulated SOC excluded",
         "ev_export_evidence": ev_export_evidence,
+        "physical_energy_evidence": (
+            physical_energy_evidence.as_dict()
+            if physical_energy_evidence is not None
+            else None
+        ),
     }
     if snapshot.cheap_period_confirmed or snapshot.saving_session_active:
         report["status"] = "higher_priority_cheap_or_event"
@@ -222,6 +229,39 @@ def guard_paid_agile_physical_export(
         else None
     )
     observed = _finite(snapshot.battery_soc)
+    # Never accept a tracker from an earlier cycle or another physical SOC
+    # source. Device origin is corroborated by FoxESSProvider's cohort checks.
+    physical_power_age = _finite(
+        snapshot.source_age_seconds.get("battery_power_kw")
+        if isinstance(snapshot.source_age_seconds, dict)
+        else None
+    )
+    energy_proven = (
+        physical_energy_evidence is not None
+        and physical_energy_evidence.lower_bound_kwh is not None
+        and physical_energy_evidence.source_soc_at is not None
+        and physical_energy_evidence.source_soc_percent is not None
+        and physical_energy_evidence.samples >= 2
+        and physical_age is not None
+        and physical_age >= 0.0
+        and observed is not None
+        and abs(physical_energy_evidence.source_soc_percent - observed) < 0.01
+        and snapshot.timestamp.tzinfo is not None
+        and now.tzinfo is not None
+        and abs(
+            (
+                physical_energy_evidence.source_soc_at
+                - (snapshot.timestamp - timedelta(seconds=physical_age))
+            ).total_seconds()
+        ) <= 2.0
+        and 0.0
+        <= (now - physical_energy_evidence.observed_at).total_seconds()
+        <= 2.0
+        and physical_power_age is not None
+        and 0.0 <= physical_power_age <= min(control_config.stale_data_seconds, 90)
+        and "battery_power_kw" not in snapshot.stale_fields
+        and _finite(snapshot.battery_power_kw) is not None
+    )
     if (
         observed is None
         or not 0.0 <= observed <= 100.0
@@ -231,7 +271,7 @@ def guard_paid_agile_physical_export(
         or age > control_config.stale_data_seconds
         or physical_age is None
         or physical_age < 0.0
-        or physical_age > _MAX_COHORT_SOC_AGE_SECONDS
+        or (physical_age > _MAX_COHORT_SOC_AGE_SECONDS and not energy_proven)
     ):
         return reduce("physical battery SOC missing, stale or too old to bound")
 
@@ -252,6 +292,10 @@ def guard_paid_agile_physical_export(
         report["soc_freshness_basis"] = "same_device_cohort_with_worst_case_discharge"
     else:
         report["soc_freshness_basis"] = "physical_soc_report_with_worst_case_discharge"
+    if energy_proven:
+        report["soc_freshness_basis"] = (
+            "session_physical_energy_ledger_with_gap_debits"
+        )
     report["raw_physical_soc_age_seconds"] = round(physical_age, 1)
 
     deadline = snapshot.next_offpeak_start
@@ -315,11 +359,26 @@ def guard_paid_agile_physical_export(
         _finite(control_config.max_discharge_kw) or 0.0,
         _finite(control_config.inverter_limit_kw) or 0.0,
     )
-    pessimistic_discharge_kwh = (
-        possible_discharge_kw * physical_age / (3600.0 * efficiency)
-    )
-    soc_lower_bound = max(observed - 100.0 * pessimistic_discharge_kwh / capacity, 0.0)
-    measured_energy_kwh = capacity * soc_lower_bound / 100.0
+    if energy_proven:
+        assert physical_energy_evidence is not None
+        tracked_energy = _finite(physical_energy_evidence.lower_bound_kwh)
+        if tracked_energy is None or not 0.0 <= tracked_energy <= capacity:
+            return reduce("physical energy ledger bound invalid")
+        measured_energy_kwh = tracked_energy
+        soc_lower_bound = 100.0 * measured_energy_kwh / capacity
+        pessimistic_discharge_kwh = max(
+            _finite(physical_energy_evidence.pessimistic_discharge_kwh) or 0.0,
+            0.0,
+        )
+    else:
+        pessimistic_discharge_kwh = (
+            possible_discharge_kw * physical_age / (3600.0 * efficiency)
+        )
+        soc_lower_bound = max(
+            observed - 100.0 * pessimistic_discharge_kwh / capacity,
+            0.0,
+        )
+        measured_energy_kwh = capacity * soc_lower_bound / 100.0
     protected_home_kwh = net_home / efficiency + buffer_kwh
     surplus_kwh = max(measured_energy_kwh - reserve_kwh - protected_home_kwh, 0.0)
     max_export_kw = surplus_kwh / _EXPORT_PROOF_HORIZON_HOURS
