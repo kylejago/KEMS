@@ -158,7 +158,9 @@ def _rolling_plan_with_hard_safety_floor(
     if not isinstance(plan, dict) or not plan.get("available"):
         return plan
 
-    soc = _number(plan.get("simulated_soc_percent"))
+    soc = _number(plan.get("planning_soc_percent"))
+    if soc is None:
+        soc = _number(plan.get("simulated_soc_percent"))
     latched = _hard_safety_floor_latched(self, soc)
     return _apply_hard_safety_floor(plan, soc=soc, latched=latched)
 

@@ -18,6 +18,7 @@ from . import agile_smart_export_runtime_base as runtime
 from . import history as history_module
 from .agile_deadline_dispatch import _effective_deadline_kw, _target_percent
 from .kems_core import SimulationConfig
+from .agile_physical_planning import physical_planning_soc
 from .tariff import TariffSettings
 
 SAFETY_HEADROOM_MINUTES = 30
@@ -95,6 +96,36 @@ def _current_agile_soc_source(state: dict[str, Any]) -> str:
     ):
         return "current routing SOC"
     return "today Agile replay SOC"
+
+
+def _planning_soc_basis(
+    self,
+    state: dict[str, Any],
+    *,
+    now: datetime,
+    config: SimulationConfig,
+) -> tuple[float | None, str, dict[str, Any]]:
+    """Prefer verified physical energy for actual Agile dispatch planning."""
+    twin_soc = _current_agile_soc(state)
+    physical_soc, proof = physical_planning_soc(self, now=now, config=config)
+    if physical_soc is not None:
+        return (
+            physical_soc,
+            "verified FoxESS physical lower bound",
+            {
+                **proof,
+                "independent_digital_twin_soc_percent": twin_soc,
+            },
+        )
+    return (
+        twin_soc,
+        _current_agile_soc_source(state),
+        {
+            **proof,
+            "independent_digital_twin_soc_percent": twin_soc,
+            "fallback": "simulation_only; physical export guard retains authority",
+        },
+    )
 
 
 def _rolling_threshold(
@@ -182,8 +213,9 @@ def _rolling_plan(
     tariff: TariffSettings,
 ) -> dict[str, Any]:
     """Allocate currently exportable battery energy across remaining Agile slots."""
-    soc = _current_agile_soc(state)
-    soc_source = _current_agile_soc_source(state)
+    soc, soc_source, physical_planning = _planning_soc_basis(
+        self, state, now=now, config=config
+    )
     effective_kw = _effective_deadline_kw(config)
     capacity = max(config.battery_capacity_kwh, 0.1)
     efficiency = max(config.discharge_efficiency, 0.01)
@@ -326,8 +358,14 @@ def _rolling_plan(
             "protect target SOC plus forecast net house energy to cheap start; "
             "the reserve declines toward target on every replan"
         ),
-        "simulated_soc_percent": round(soc, 3),
-        "simulated_soc_source": soc_source,
+        "simulated_soc_percent": round(
+            _current_agile_soc(state) if _current_agile_soc(state) is not None else soc,
+            3,
+        ),
+        "simulated_soc_source": _current_agile_soc_source(state),
+        "planning_soc_percent": round(soc, 3),
+        "planning_soc_source": soc_source,
+        "physical_planning_evidence": physical_planning,
         "protected_house_energy_kwh": round(protected_house_ac, 3),
         "exportable_battery_energy_kwh": round(exportable_ac, 3),
         "planned_battery_export_kwh": round(planned, 3),

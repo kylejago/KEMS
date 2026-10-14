@@ -54,6 +54,65 @@ def _finite(value: Any) -> float | None:
     return number if isfinite(number) else None
 
 
+def physical_energy_evidence_matches_snapshot(
+    evidence: PhysicalEnergyEvidence | None,
+    snapshot: Snapshot,
+    control_config: ControlConfig,
+    *,
+    now: datetime,
+) -> bool:
+    """Require the exact same fresh FoxESS physical ledger proof for plan and guard.
+
+    An old coordinator cycle, a changed SOC report, an invalid physical source,
+    or stale device power can never re-authorise live battery export.
+    """
+    physical_age = _finite(
+        snapshot.source_age_seconds.get("battery_soc")
+        if isinstance(snapshot.source_age_seconds, dict)
+        else None
+    )
+    observed = _finite(snapshot.battery_soc)
+    physical_power_age = _finite(
+        snapshot.source_age_seconds.get("battery_power_kw")
+        if isinstance(snapshot.source_age_seconds, dict)
+        else None
+    )
+    overall_age = _finite(snapshot.source_data_age_seconds)
+    if (
+        observed is None
+        or not 0.0 <= observed <= 100.0
+        or "battery_soc" in snapshot.stale_fields
+        or overall_age is None
+        or not 0.0 <= overall_age <= control_config.stale_data_seconds
+    ):
+        return False
+    return bool(
+        evidence is not None
+        and evidence.lower_bound_kwh is not None
+        and evidence.source_soc_at is not None
+        and evidence.source_soc_percent is not None
+        and evidence.samples >= 2
+        and physical_age is not None
+        and physical_age >= 0.0
+        and observed is not None
+        and abs(evidence.source_soc_percent - observed) < 0.01
+        and snapshot.timestamp.tzinfo is not None
+        and now.tzinfo is not None
+        and abs(
+            (
+                evidence.source_soc_at
+                - (snapshot.timestamp - timedelta(seconds=physical_age))
+            ).total_seconds()
+        )
+        <= 2.0
+        and 0.0 <= (now - evidence.observed_at).total_seconds() <= 2.0
+        and physical_power_age is not None
+        and 0.0 <= physical_power_age <= min(control_config.stale_data_seconds, 90)
+        and "battery_power_kw" not in snapshot.stale_fields
+        and _finite(snapshot.battery_power_kw) is not None
+    )
+
+
 def assess_paid_agile_ev_continuity(
     snapshot: Snapshot,
     *,
@@ -229,37 +288,11 @@ def guard_paid_agile_physical_export(
         else None
     )
     observed = _finite(snapshot.battery_soc)
-    # Never accept a tracker from an earlier cycle or another physical SOC
-    # source. Device origin is corroborated by FoxESSProvider's cohort checks.
-    physical_power_age = _finite(
-        snapshot.source_age_seconds.get("battery_power_kw")
-        if isinstance(snapshot.source_age_seconds, dict)
-        else None
-    )
-    energy_proven = (
-        physical_energy_evidence is not None
-        and physical_energy_evidence.lower_bound_kwh is not None
-        and physical_energy_evidence.source_soc_at is not None
-        and physical_energy_evidence.source_soc_percent is not None
-        and physical_energy_evidence.samples >= 2
-        and physical_age is not None
-        and physical_age >= 0.0
-        and observed is not None
-        and abs(physical_energy_evidence.source_soc_percent - observed) < 0.01
-        and snapshot.timestamp.tzinfo is not None
-        and now.tzinfo is not None
-        and abs(
-            (
-                physical_energy_evidence.source_soc_at
-                - (snapshot.timestamp - timedelta(seconds=physical_age))
-            ).total_seconds()
-        )
-        <= 2.0
-        and 0.0 <= (now - physical_energy_evidence.observed_at).total_seconds() <= 2.0
-        and physical_power_age is not None
-        and 0.0 <= physical_power_age <= min(control_config.stale_data_seconds, 90)
-        and "battery_power_kw" not in snapshot.stale_fields
-        and _finite(snapshot.battery_power_kw) is not None
+    energy_proven = physical_energy_evidence_matches_snapshot(
+        physical_energy_evidence,
+        snapshot,
+        control_config,
+        now=now,
     )
     if (
         observed is None
