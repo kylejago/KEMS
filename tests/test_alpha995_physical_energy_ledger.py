@@ -204,10 +204,7 @@ def test_stale_soc_source_and_unsafe_ev_still_fail_closed() -> None:
         scan = _snapshot(START, **condition)
         # An unknown/stale EV is never authorised by physical battery proof.
         decided, _ = _guard(scan, None)
-        if "stale_fields" in condition or "source_data_age_seconds" in condition:
-            assert decided.desired_battery_export_power_kw == 0.0
-        elif "ev_connected" in condition or "ev_charging" in condition:
-            assert decided.desired_battery_export_power_kw == 0.0
+        assert decided.desired_battery_export_power_kw == 0.0
 
 
 def test_physical_proof_cannot_be_reused_for_another_scan() -> None:

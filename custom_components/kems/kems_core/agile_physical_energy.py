@@ -8,10 +8,10 @@ An absent observation is debited at the *full* feasible discharge rate.
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from math import isfinite
-from typing import Iterable
 
 from .models import ControlConfig, SimulationConfig, Snapshot
 
