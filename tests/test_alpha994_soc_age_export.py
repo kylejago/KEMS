@@ -94,9 +94,7 @@ def test_real_morning_1515_second_soc_can_prove_safe_agile_export() -> None:
 
 
 def test_extended_window_is_pessimistic_and_caps_available_energy() -> None:
-    fresh, fresh_detail = _guard(
-        _snapshot(source_age_seconds={"battery_soc": 9.2})
-    )
+    fresh, fresh_detail = _guard(_snapshot(source_age_seconds={"battery_soc": 9.2}))
     aged, aged_detail = _guard()
     assert aged.desired_battery_export_power_kw <= (
         fresh.desired_battery_export_power_kw
