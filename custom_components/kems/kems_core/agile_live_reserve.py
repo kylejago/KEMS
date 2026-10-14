@@ -172,7 +172,9 @@ class PaidAgileConnectedIdleContinuity:
         ):
             return False
         ev_power = _finite(snapshot.ev_power_kw)
-        if ev_power is not None and (ev_power < 0.0 or ev_power > _AGILE_EV_IDLE_POWER_KW):
+        if ev_power is not None and (
+            ev_power < 0.0 or ev_power > _AGILE_EV_IDLE_POWER_KW
+        ):
             return False
         if not (
             timedelta(0)
@@ -210,7 +212,10 @@ class PaidAgileConnectedIdleContinuity:
         if (
             snapshot.ev_connected is False
             or snapshot.ev_charging is True
-            or (ev_power is not None and (ev_power < 0.0 or ev_power > _AGILE_EV_IDLE_POWER_KW))
+            or (
+                ev_power is not None
+                and (ev_power < 0.0 or ev_power > _AGILE_EV_IDLE_POWER_KW)
+            )
         ):
             self.clear()
             return False
