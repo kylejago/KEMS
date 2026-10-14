@@ -61,6 +61,7 @@ from .kems_core import (
     meaningful_control_state_transition,
 )
 from .kems_core.agile_live_reserve import (
+    PaidAgileConnectedIdleContinuity,
     assess_paid_agile_ev_continuity,
     guard_paid_agile_physical_export,
 )
@@ -128,6 +129,7 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
         self._ev_grid_hold = EVGridHoldSession(hass, entry.entry_id)
         # Short-lived, non-persistent proof; cannot survive KEMS restart.
         self._paid_agile_last_unplugged_at: datetime | None = None
+        self._paid_agile_connected_idle_continuity = PaidAgileConnectedIdleContinuity()
         # Read-only physical-energy evidence; paid Agile only, never a generic
         # SoC replacement for charging, No Paid Export or simulation.
         self._paid_agile_physical_energy = PaidAgilePhysicalEnergyTracker()
@@ -832,6 +834,12 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                     now=now,
                     last_confirmed_unplugged_at=self._paid_agile_last_unplugged_at,
                 )
+                connected_idle_grace = self._paid_agile_connected_idle_continuity.assess(
+                    snapshot, now=now
+                )
+                if not ev_export_safe and connected_idle_grace:
+                    ev_export_safe = True
+                    ev_export_evidence = "bounded_connected_idle_source_grace"
                 control, self._agile_live_reserve_status = (
                     guard_paid_agile_physical_export(
                         control,
@@ -843,10 +851,14 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                         ev_export_safe=ev_export_safe,
                         ev_export_evidence=ev_export_evidence,
                         physical_energy_evidence=self._paid_agile_energy_evidence,
+                        connected_idle_continuity=(
+                            self._paid_agile_connected_idle_continuity
+                        ),
                     )
                 )
             else:
                 self._paid_agile_last_unplugged_at = None
+                self._paid_agile_connected_idle_continuity.clear()
                 self._paid_agile_physical_energy.reset()
                 self._paid_agile_energy_evidence = None
                 self._agile_live_reserve_status = {
