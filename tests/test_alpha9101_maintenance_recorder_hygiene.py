@@ -44,8 +44,10 @@ def test_maintenance_sensor_is_replaced_by_recorder_safe_entity_on_setup() -> No
     assert "elif isinstance(entity, updater.KEMSMaintenanceStatusSensor):" in source
     assert "RecorderSafeMaintenanceStatusSensor(" in source
     assert 'super().__init__(coordinator, "maintenance_status")' in updater
-    assert 'KEMSMaintenanceStatusSensor(coordinator, orchestrator)' in updater
-    assert 'return str(self.orchestrator.maintenance.get("status") or "none")' in updater
+    assert "KEMSMaintenanceStatusSensor(coordinator, orchestrator)" in updater
+    assert (
+        'return str(self.orchestrator.maintenance.get("status") or "none")' in updater
+    )
     assert "return dict(self.orchestrator.maintenance)" in updater
 
 
@@ -56,21 +58,20 @@ def test_maintenance_wrapper_excludes_all_rich_attributes_from_recorder() -> Non
         for node in wrapper.body
         if isinstance(node, ast.Assign)
         and any(
-            isinstance(target, ast.Name)
-            and target.id == "_unrecorded_attributes"
+            isinstance(target, ast.Name) and target.id == "_unrecorded_attributes"
             for target in node.targets
         )
     )
     assert isinstance(attribute.value, ast.Name)
     assert attribute.value.id == "RECORDER_LIVE_ONLY_ATTRIBUTES"
-    assert "RECORDER_LIVE_ONLY_ATTRIBUTES = frozenset({MATCH_ALL})" in _source(
-        HYGIENE
-    )
+    assert "RECORDER_LIVE_ONLY_ATTRIBUTES = frozenset({MATCH_ALL})" in _source(HYGIENE)
 
     maintenance = {
         "status": "completed",
         "reason": "KEMS release verified",
-        "components": [{"name": f"component-{n}", "data": "x" * 1_000} for n in range(28)],
+        "components": [
+            {"name": f"component-{n}", "data": "x" * 1_000} for n in range(28)
+        ],
         "latest_bundle": {"description": "y" * 12_000},
     }
     assert len(json.dumps(maintenance).encode()) > RECORDER_ATTRIBUTE_LIMIT
@@ -86,10 +87,7 @@ def test_maintenance_wrapper_excludes_all_rich_attributes_from_recorder() -> Non
 def test_maintenance_recorder_repair_cannot_modify_updates_or_live_energy() -> None:
     code = _source(HYGIENE)
     wrapper = _wrapper_class()
-    assert all(
-        isinstance(node, (ast.Expr, ast.Assign))
-        for node in wrapper.body
-    )
+    assert all(isinstance(node, (ast.Expr, ast.Assign)) for node in wrapper.body)
     assert not any(
         isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
         for node in wrapper.body
