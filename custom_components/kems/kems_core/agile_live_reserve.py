@@ -348,8 +348,8 @@ def guard_paid_agile_physical_export(
             else None
         ),
     }
-    if snapshot.cheap_period_confirmed or (
-        snapshot.saving_session_active and not power_down_export_authorised
+    if not power_down_export_authorised and (
+        snapshot.cheap_period_confirmed or snapshot.saving_session_active
     ):
         report["status"] = "higher_priority_cheap_or_event"
         return control, report
