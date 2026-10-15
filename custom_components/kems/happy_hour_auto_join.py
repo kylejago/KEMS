@@ -654,7 +654,6 @@ def _simulation_soc(data: Any) -> float | None:
     return value
 
 
-
 def _booking_soc(data: Any, *, operating_mode: str) -> float | None:
     """Only measured battery SOC can authorise a live Control-mode booking."""
     if operating_mode != "control":
