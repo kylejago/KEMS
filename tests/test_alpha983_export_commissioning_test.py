@@ -318,7 +318,9 @@ def test_financial_contract_is_zero_income_and_recharge_cost_only() -> None:
     assert '"normal_live_agile_interval_settlement"' in source
     assert '"zero_no_paid_export"' in source
     assert '"physical_energy_history": "retained"' in source
-    assert '"actual_roi_policy": "exclude_test_recharge_cost"' in source
+    assert '"actual_roi_policy": (' in source
+    assert '"exclude_test_recharge_cost"' in source
+    assert '"normal_paid_agile_accounting"' in source
     assert (
         "actual_import_cost_pence"
         not in source.split("def roi_adjusted_simulation", 1)[1]
