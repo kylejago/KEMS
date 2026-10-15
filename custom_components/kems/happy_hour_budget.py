@@ -603,9 +603,11 @@ def apply_happy_hour_control(control: Any, snapshot: Any, context: dict[str, Any
             "Force Charge" if live_charge_kw > 0.001 else control.desired_work_mode
         ),
         desired_charge_power_kw=max(
-            live_charge_kw
-            if live_charge_kw > 0.001
-            else (_number(context.get("charge_target_kw")) or 0.0),
+            (
+                live_charge_kw
+                if live_charge_kw > 0.001
+                else (_number(context.get("charge_target_kw")) or 0.0)
+            ),
             0.0,
         ),
         desired_ev_charging_allowed=ev_allowed,
