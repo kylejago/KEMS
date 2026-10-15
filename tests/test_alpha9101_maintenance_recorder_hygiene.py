@@ -5,7 +5,6 @@ from __future__ import annotations
 import ast
 import json
 from pathlib import Path
-from types import SimpleNamespace
 
 ROOT = Path(__file__).resolve().parents[1]
 KEMS = ROOT / "custom_components" / "kems"
