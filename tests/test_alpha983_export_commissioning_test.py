@@ -748,7 +748,10 @@ def test_paid_agile_commissioning_remains_opt_in_and_normal_ledger_owned() -> No
     coordinator = COORDINATOR.read_text(encoding="utf-8")
     test = (KEMS / "export_commissioning_test.py").read_text(encoding="utf-8")
     switch = SWITCH.read_text(encoding="utf-8")
-    assert "paid_agile_mode=selected_export_tariff == EXPORT_TARIFF_TYPE_AGILE" in coordinator
+    assert (
+        "paid_agile_mode=selected_export_tariff == EXPORT_TARIFF_TYPE_AGILE"
+        in coordinator
+    )
     assert "paid_agile_mode=tariff_type == EXPORT_TARIFF_TYPE_AGILE" in coordinator
     assert "actual_export_income_pence(" in coordinator
     assert "revalue_actual_export_income(" in coordinator
