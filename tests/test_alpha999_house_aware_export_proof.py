@@ -42,6 +42,7 @@ def _production():
         "_PAID_EXPORT_PROOF_SAMPLES": 2,
         "_PAID_EXPORT_FAILURE_SAMPLES": 3,
         "_PAID_EXPORT_PROOF_PROTOCOL": 2,
+        "_LOCAL_WORK_MODES": {"Self Use", "Feed-in First", "Back-up"},
     }
     exec(compile(ast.Module(body=selected, type_ignores=[]), str(BACKEND), "exec"), scope)
     return scope
