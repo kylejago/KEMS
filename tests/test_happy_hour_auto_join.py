@@ -264,7 +264,7 @@ def test_auto_join_never_invents_missing_battery_soc() -> None:
     ],
 )
 def test_happy_hour_charge_authority_fail_closed(override) -> None:
-    from custom_components.kems.kems_core.control_write_authority import (
+    from kems_core.control_write_authority import (
         assess_happy_hour_charge_authority,
     )
 
