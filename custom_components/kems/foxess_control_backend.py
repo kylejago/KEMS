@@ -1474,6 +1474,13 @@ class FoxESSControlBackend:
             "force_restore_requested": bool(force_restore),
             "export_authority_active": export_authority_active,
             "cheap_period_confirmed": bool(cheap_period_confirmed),
+            "power_down_export_authorised": bool(power_down_export_authorised),
+            "happy_hour_charge_authorised": bool(happy_hour_charge_authorised),
+            "happy_hour_charge_setpoint_kw": (
+                decision.force_charge_power_kw
+                if happy_hour_charge_authorised and decision.action == "force_charge"
+                else 0.0
+            ),
             "backend_available": bool(decision.backend_available),
             "commands_permitted": bool(decision.commands_permitted and applied),
             "decision_action": (
