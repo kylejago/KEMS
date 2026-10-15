@@ -514,3 +514,246 @@ def test_live_agile_target_zero_during_stress_requests_safe_restore() -> None:
     assert result is control
     assert controller._restore_requested is True
     assert controller._command_target_kw == 0.0
+
+
+def test_paid_agile_manual_test_starts_without_changing_selected_tariff() -> None:
+    module = _load_module()
+    now = datetime(2026, 10, 15, 19, 30, tzinfo=UTC)
+    controller = module.ExportCommissioningTestController(object(), "entry")
+    started, reason = asyncio.run(
+        controller.async_start(
+            snapshot=_snapshot(now),
+            control=_control(),
+            agile_state=_agile(5.6),
+            no_paid_export_mode=False,
+            paid_agile_mode=True,
+            technical_ready=True,
+            emergency_stop=False,
+            ev_hold_active=False,
+            now=now,
+        )
+    )
+    assert started, reason
+    state = controller.status
+    assert state["real_export_tariff"] == "Agile Outgoing"
+    assert state["export_income_policy"] == "normal_live_agile_interval_settlement"
+    assert state["actual_roi_policy"] == "normal_paid_agile_accounting"
+    assert state["stage"] == "proof"
+    assert state["proof_target_kw"] == 1.0
+    assert controller._store.data["paid_agile_session"] is True
+
+    config = ControlConfig(
+        operating_mode="control",
+        control_enabled=True,
+        commissioned=True,
+        normal_reserve_percent=10.0,
+        max_discharge_kw=7.0,
+        export_limit_kw=7.0,
+        inverter_limit_kw=7.0,
+    )
+    control, promoted = asyncio.run(
+        controller.async_control_override(
+            control=_control(),
+            snapshot=_snapshot(now),
+            agile_state=_agile(5.6),
+            config=config,
+            backend_status={"paid_export_live_proven": False},
+            no_paid_export_mode=False,
+            paid_agile_mode=True,
+            emergency_stop=False,
+            ev_hold_active=False,
+            now=now,
+        )
+    )
+    assert not promoted
+    assert control.operating_reason == "export_commissioning_proof"
+    assert control.desired_battery_export_power_kw == 1.0
+    assert control.desired_total_discharge_power_kw == 1.8
+    assert control.desired_min_soc_percent >= 15.0
+    assert control.desired_total_discharge_power_kw <= config.max_discharge_kw
+
+
+def test_paid_agile_test_restores_when_user_changes_export_tariff() -> None:
+    module = _load_module()
+    now = datetime(2026, 10, 15, 19, 30, tzinfo=UTC)
+    controller = module.ExportCommissioningTestController(object(), "entry")
+    original = _control()
+    snapshot = _snapshot(now)
+    started, reason = asyncio.run(
+        controller.async_start(
+            snapshot=snapshot,
+            control=original,
+            agile_state=_agile(),
+            no_paid_export_mode=False,
+            paid_agile_mode=True,
+            technical_ready=True,
+            emergency_stop=False,
+            ev_hold_active=False,
+            now=now,
+        )
+    )
+    assert started, reason
+    config = ControlConfig(
+        operating_mode="control",
+        control_enabled=True,
+        commissioned=True,
+        normal_reserve_percent=10,
+        max_discharge_kw=7,
+        export_limit_kw=7,
+        inverter_limit_kw=7,
+    )
+    returned, promoted = asyncio.run(
+        controller.async_control_override(
+            control=original,
+            snapshot=snapshot,
+            agile_state=_agile(),
+            config=config,
+            backend_status={},
+            no_paid_export_mode=True,
+            paid_agile_mode=False,
+            emergency_stop=False,
+            ev_hold_active=False,
+            now=now,
+        )
+    )
+    assert returned is original
+    assert not promoted
+    assert controller.restore_requested
+    assert controller.status["stage"] == "restoring"
+    assert controller.status["command_target_kw"] == 0.0
+    assert "tariff changed" in controller.status["stop_reason"]
+
+
+def test_manual_paid_agile_rejects_unsafe_start_conditions() -> None:
+    module = _load_module()
+    now = datetime(2026, 10, 15, 19, 30, tzinfo=UTC)
+    unsafe = (
+        (_snapshot(now, solar_power_kw=0.05), "0.01 kW"),
+        (_snapshot(now, ev_connected=None), "Ohme"),
+        (_snapshot(now, cheap_period_confirmed=True), "cheap period"),
+        (_snapshot(now, battery_soc=19.0), "at least 20%"),
+        (_snapshot(now, stale_fields=("grid_export_kw",)), "stale"),
+    )
+    for snapshot, message in unsafe:
+        controller = module.ExportCommissioningTestController(object(), "entry")
+        started, reason = asyncio.run(
+            controller.async_start(
+                snapshot=snapshot,
+                control=_control(),
+                agile_state=_agile(),
+                no_paid_export_mode=False,
+                paid_agile_mode=True,
+                technical_ready=True,
+                emergency_stop=False,
+                ev_hold_active=False,
+                now=now,
+            )
+        )
+        assert not started
+        assert message in reason
+        assert not controller.active
+
+    for no_paid, paid in ((False, False), (True, True)):
+        controller = module.ExportCommissioningTestController(object(), "entry")
+        started, reason = asyncio.run(
+            controller.async_start(
+                snapshot=_snapshot(now),
+                control=_control(),
+                agile_state=_agile(),
+                no_paid_export_mode=no_paid,
+                paid_agile_mode=paid,
+                technical_ready=True,
+                emergency_stop=False,
+                ev_hold_active=False,
+                now=now,
+            )
+        )
+        assert not started
+        assert "No paid export or Agile Outgoing" in reason
+
+
+def test_paid_agile_test_uses_normal_roi_and_does_not_create_unpaid_debt() -> None:
+    module = _load_module()
+    now = datetime(2026, 10, 15, 19, 30, tzinfo=UTC)
+    controller = module.ExportCommissioningTestController(object(), "entry")
+    started, reason = asyncio.run(
+        controller.async_start(
+            snapshot=_snapshot(now),
+            control=_control(),
+            agile_state=_agile(),
+            no_paid_export_mode=False,
+            paid_agile_mode=True,
+            technical_ready=True,
+            emergency_stop=False,
+            ev_hold_active=False,
+            now=now,
+        )
+    )
+    assert started, reason
+    controller._exported_kwh = 0.23
+    controller._peak_grid_export_kw = 0.9
+    simulation = SimulationState(
+        ready=True,
+        actual_grid_import_kwh=3.5,
+        actual_grid_export_kwh=0.23,
+        actual_import_cost_pence=140.0,
+        actual_export_income_pence=5.808,
+        actual_avoided_import_value_pence=105.0,
+        actual_system_value_pence=110.808,
+    )
+    assert controller.roi_adjusted_simulation(simulation, now) is simulation
+    controller._successful_completion_requested = True
+    asyncio.run(controller._async_finalize(now=now, config=ControlConfig()))
+    assert controller._recharge_debt_stored_kwh == 0.0
+    last = controller.status["history"][-1]
+    assert last["completed_successfully"] is True
+    assert last["paid_agile_session"] is True
+    assert last["roi_included"] is True
+    assert last["export_income_pence"] is None
+    assert last["export_income_policy"] == "normal_live_agile_interval_settlement"
+    assert not controller.active
+
+
+def test_paid_agile_session_restart_restores_without_resuming_export() -> None:
+    module = _load_module()
+    now = datetime(2026, 10, 15, 19, 30, tzinfo=UTC)
+    controller = module.ExportCommissioningTestController(object(), "entry")
+    started, reason = asyncio.run(
+        controller.async_start(
+            snapshot=_snapshot(now),
+            control=_control(),
+            agile_state=_agile(),
+            no_paid_export_mode=False,
+            paid_agile_mode=True,
+            technical_ready=True,
+            emergency_stop=False,
+            ev_hold_active=False,
+            now=now,
+        )
+    )
+    assert started, reason
+    stored = dict(controller._store.data)
+    assert stored["active"]
+    assert stored["paid_agile_session"]
+    reloaded = module.ExportCommissioningTestController(object(), "entry")
+    reloaded._store.data = stored
+    asyncio.run(reloaded.async_load())
+    assert reloaded.restore_requested
+    assert not reloaded.hardware_authority_active
+    assert reloaded.status["stage"] == "restoring"
+    assert reloaded.status["real_export_tariff"] == "Agile Outgoing"
+
+
+def test_paid_agile_commissioning_remains_opt_in_and_normal_ledger_owned() -> None:
+    coordinator = COORDINATOR.read_text(encoding="utf-8")
+    test = (KEMS / "export_commissioning_test.py").read_text(encoding="utf-8")
+    switch = SWITCH.read_text(encoding="utf-8")
+    assert "paid_agile_mode=selected_export_tariff == EXPORT_TARIFF_TYPE_AGILE" in coordinator
+    assert "paid_agile_mode=tariff_type == EXPORT_TARIFF_TYPE_AGILE" in coordinator
+    assert "actual_export_income_pence(" in coordinator
+    assert "revalue_actual_export_income(" in coordinator
+    assert "normal_live_agile_interval_settlement" in test
+    assert "if not self._paid_agile_session:" in test
+    assert "self._paid_agile_session != paid_agile_mode" in test
+    assert '"manual_start_only": True' in switch
+    assert '"Agile Outgoing"' in switch
