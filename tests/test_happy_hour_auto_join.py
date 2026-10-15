@@ -8,8 +8,8 @@ import pytest
 
 from custom_components.kems.happy_hour_auto_join import (
     HappyHourCandidate,
-    _simulation_soc,
     RateSlot,
+    _simulation_soc,
     auto_join_control_gate,
     choose_best_candidate,
     day_rate_coverage,
