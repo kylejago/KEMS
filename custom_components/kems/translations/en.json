@@ -341,11 +341,13 @@
         "data": {
           "scan_interval_seconds": "Observation interval (seconds)",
           "history_days": "Learning history retention (days)",
+          "detailed_comparisons_enabled": "Detailed what-if comparisons (extra processing)",
           "gas_kwh_per_m3": "Gas conversion factor (kWh per m³)"
         },
         "data_description": {
           "scan_interval_seconds": "KEMS reads Home Assistant state only; minimum 30 seconds.",
           "history_days": "KEMS stores compact observations locally in Home Assistant storage.",
+          "detailed_comparisons_enabled": "On preserves all seven hypothetical replays and comparison charts. Off keeps the grid-only No KEMS baseline, measured KEMS Live control/history, planning and ROI; unused what-if scenario entities become unavailable. Existing installations default On until switched off.",
           "gas_kwh_per_m3": "Used only when the configured gas source reports cubic metres rather than kWh."
         }
       },
