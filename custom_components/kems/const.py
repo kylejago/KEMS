@@ -108,6 +108,9 @@ CONF_INTELLIGENT_SLOTS_ENABLED = "intelligent_slots_enabled"
 
 CONF_SCAN_INTERVAL = "scan_interval_seconds"
 CONF_HISTORY_DAYS = "history_days"
+# Optional reporting-only what-if replay. Existing installations keep it on
+# until explicitly switched off; never a KEMS live control authority.
+CONF_DETAILED_COMPARISONS_ENABLED = "detailed_comparisons_enabled"
 CONF_BATTERY_INSTALLED = "battery_installed"
 CONF_BATTERY_CAPACITY = "battery_capacity_kwh"
 CONF_BATTERY_RESERVE = "battery_reserve_percent"
@@ -203,6 +206,7 @@ DEFAULT_OPTIONS = {
     CONF_EV_SOC_SYNC_ENABLED: False,
     CONF_SCAN_INTERVAL: DEFAULT_SCAN_INTERVAL_SECONDS,
     CONF_HISTORY_DAYS: DEFAULT_HISTORY_DAYS,
+    CONF_DETAILED_COMPARISONS_ENABLED: True,
     # Physical battery installation is explicit and fail-closed. Telemetry can
     # validate or contradict this setting, but can never switch it on itself.
     CONF_BATTERY_INSTALLED: False,

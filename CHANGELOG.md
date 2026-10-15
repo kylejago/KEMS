@@ -1,3 +1,12 @@
+## 0.9.0-alpha9.100 — optional what-if replay and compact diagnostics
+
+- **No change to live FoxESS or Ohme control, scheduling, forecasting, battery reserve, tariff handling or overnight charging target.** Full KEMS Live and the original no-solar/no-battery grid-only No KEMS ROI baseline are retained.
+- Add a **Detailed what-if comparisons** switch under Monitoring and history. Default **On** for existing and new installations, so installing this release alone cannot remove existing comparison data. Explicitly switching **Off** stops the seven-scenario replay and island/timeline reconstruction each scan while preserving lightweight, mathematically equivalent No KEMS comparisons for Today, Yesterday, 7 and 30 days. Other hypothetical comparison sensors remain installed but report unavailable while Off; On restores them without rewriting history.
+- Keep the separately calculated grid-only cost basis, actual measured import/export, live Control, payment and ROI ledgers, learning history, forecast and Agile optimiser untouched. Never modify historical records or the user's 100%-when-feasible overnight charge target.
+- Limit KEMS diagnostics to the latest 64 EV trace samples with inclusion/omission counts. The original recorder retains all 960 bounded samples for physical EV/charging investigations.
+- Add parity regressions for all four No KEMS comparison periods, data-gap semantics, legacy defaults and live-control isolation. This is a performance-oriented switch, not a claim that Home Assistant watchdog restarts are solved.
+- **Rollout:** install while the inverter is in a stable mode, verify unchanged KEMS/FoxESS/EV operation and ROI, then turn Detailed what-if comparisons Off; measure the coordinator's update latency and CPU before/after. Flip back On if an engineering comparison is needed. Physical export validation for Alpha9.99 remains independent.
+
 ## 0.9.0-alpha9.99 — house-aware physical net-export proof
 
 - Correct FoxESS Force Discharge interpretation: the inverter needs to cover measured non-solar household load **plus** the planned grid export; the previous 1.0 kW *total discharge* stage could produce no measured export when the home consumed more than 1 kW.

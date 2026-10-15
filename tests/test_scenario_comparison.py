@@ -695,3 +695,52 @@ def test_full_kems_forecast_uses_solar_recovery_only_in_new_scenario() -> None:
     assert (forecast.current_solar_to_battery_kw or 0.0) > 0.0
     assert (forecast.current_solar_to_home_kw or 0.0) > 0.0
     assert (full.current_solar_to_battery_kw or 0.0) == 0.0
+
+
+def test_lightweight_baseline_matches_full_grid_only_result_for_every_period() -> None:
+    """Turning off unused scenarios must never change the ROI baseline."""
+    start = datetime(2026, 8, 10, 0, 0, tzinfo=UTC)
+    records = _records(start, count=8) + _records(start + timedelta(days=1), count=9)
+    now = records[-1].timestamp
+    config = SimulationConfig(proposal_solar_enabled=False)
+    engine = ScenarioComparisonEngine()
+
+    full = engine.compare(records, now, config)
+    minimal = engine.baseline_only(records, now, config)
+
+    for key in ("today", "yesterday", "7_days", "30_days"):
+        reference = full.period(key)
+        retained = minimal.period(key)
+        assert reference is not None and retained is not None
+        assert retained.days_included == reference.days_included
+        assert len(retained.scenarios) == 1
+        assert retained.scenario("no_system") == reference.scenario("no_system")
+    assert minimal.timeline == ()
+    assert minimal.scenario("solar_only") is None
+    assert minimal.scenario("solar_battery") is None
+    assert minimal.scenario("kems_no_export") is None
+    assert minimal.scenario("kems_full") is None
+    assert minimal.scenario("kems_forecast") is None
+    assert minimal.scenario("full_island") is None
+
+
+def test_lightweight_baseline_respects_missing_tariff_and_load() -> None:
+    """Never fill gaps with fabricated costs or assume physical source values."""
+    start = datetime(2026, 8, 11, 0, 0, tzinfo=UTC)
+    records = _records(start, count=9)
+    records[3].current_import_rate = None
+    records[4].house_load_kw = None
+    config = SimulationConfig(proposal_solar_enabled=False)
+    engine = ScenarioComparisonEngine()
+    full = engine.compare(records, records[-1].timestamp, config)
+    minimal = engine.baseline_only(records, records[-1].timestamp, config)
+    assert minimal.scenario("no_system") == full.scenario("no_system")
+
+
+def test_lightweight_baseline_preserves_absent_history_as_unavailable() -> None:
+    start = datetime(2026, 8, 11, 0, 0, tzinfo=UTC)
+    result = ScenarioComparisonEngine().baseline_only([], start, SimulationConfig())
+    assert result.period("today") is not None
+    assert result.period("today").scenarios == ()
+    assert result.scenario("no_system") is None
+    assert result.timeline == ()

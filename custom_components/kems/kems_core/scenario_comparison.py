@@ -121,6 +121,126 @@ class ScenarioComparisonEngine:
     def __init__(self) -> None:
         self._simulation = SimulationEngine()
 
+    def baseline_only(
+        self,
+        records: list[Snapshot],
+        now: datetime,
+        config: SimulationConfig,
+        current_snapshot: Snapshot | None = None,
+    ) -> ScenarioComparisonState:
+        """Compute only the grid-only No KEMS comparison, never a control plan.
+
+        Retain the same rate, coverage, load and standing-charge semantics as
+        full scenario comparison. No solar/battery/Agile/island replays or
+        timeline, and no impact on the separate live KEMS/ROI engine.
+        """
+        grouped: dict[date, list[Snapshot]] = {}
+        replay_start = now.date() - timedelta(days=30)
+        for record in records:
+            day = record.timestamp.date()
+            if replay_start <= day <= now.date():
+                grouped.setdefault(day, []).append(record)
+
+        daily: dict[date, ScenarioSummary] = {}
+        for day, unordered in grouped.items():
+            day_records = sorted(unordered, key=lambda item: item.timestamp)
+            standing = _standing_charge(day_records)
+            intervals = 0
+            covered = 0
+            house = 0.0
+            imported = 0.0
+            cheap_import = 0.0
+            day_import = 0.0
+            cheap_cost = 0.0
+            day_cost = 0.0
+            for current, following in zip(day_records, day_records[1:], strict=False):
+                hours = _interval_hours(current.timestamp, following.timestamp)
+                if hours <= 0:
+                    continue
+                intervals += 1
+                load = _load_kw(current)
+                if load is None or _load_kw(following) is None:
+                    continue
+                rate = current.current_import_rate
+                if rate is None or "current_import_rate" in current.tariff_stale_fields:
+                    continue
+                covered += 1
+                energy = max(load, 0.0) * hours
+                cost = energy * rate
+                house += energy
+                imported += energy
+                if current.cheap_period_confirmed:
+                    cheap_import += energy
+                    cheap_cost += cost
+                else:
+                    day_import += energy
+                    day_cost += cost
+            newest = (
+                current_snapshot
+                if day == now.date() and current_snapshot is not None
+                else day_records[-1]
+            )
+            live_load = _load_kw(newest)
+            total_cost = cheap_cost + day_cost
+            daily[day] = ScenarioSummary(
+                key=SCENARIO_NO_SYSTEM,
+                label=SCENARIO_LABELS[SCENARIO_NO_SYSTEM],
+                description=SCENARIO_DESCRIPTIONS[SCENARIO_NO_SYSTEM],
+                ready=covered >= 3,
+                samples=len(day_records),
+                data_coverage=round(100 * covered / intervals, 1) if intervals else 0.0,
+                import_cost_pence=round(total_cost, 2),
+                cheap_import_cost_pence=round(cheap_cost, 2),
+                day_import_cost_pence=round(day_cost, 2),
+                standing_charge_pence=round(standing, 2),
+                energy_net_cost_pence=round(total_cost, 2),
+                total_cost_pence=round(total_cost + standing, 2),
+                house_consumption_kwh=round(house, 3),
+                grid_import_kwh=round(imported, 3),
+                cheap_grid_import_kwh=round(cheap_import, 3),
+                day_grid_import_kwh=round(day_import, 3),
+                current_house_load_kw=_round(live_load),
+                current_solar_power_kw=0.0 if live_load is not None else None,
+                current_grid_import_kw=_round(live_load),
+                current_grid_export_kw=0.0 if live_load is not None else None,
+                current_solar_to_home_kw=0.0 if live_load is not None else None,
+                current_solar_to_battery_kw=0.0 if live_load is not None else None,
+                current_solar_export_kw=0.0 if live_load is not None else None,
+                current_grid_to_battery_kw=0.0 if live_load is not None else None,
+                current_battery_to_home_kw=0.0 if live_load is not None else None,
+                current_battery_export_kw=0.0 if live_load is not None else None,
+            )
+
+        periods: dict[str, ScenarioPeriodComparison] = {}
+        for key, days in PERIOD_SPECS:
+            if key == "today":
+                start = end = now.date()
+                label = "Today"
+            elif key == "yesterday":
+                start = end = now.date() - timedelta(days=1)
+                label = "Yesterday"
+            else:
+                end = now.date()
+                start = end - timedelta(days=days - 1)
+                label = "7 days" if key == "7_days" else "30 days"
+            parts = [daily[d] for d in sorted(daily) if start <= d <= end]
+            scenarios = (
+                (self._aggregate_summaries(SCENARIO_NO_SYSTEM, parts),) if parts else ()
+            )
+            periods[key] = ScenarioPeriodComparison(
+                key=key,
+                label=label,
+                start_date=start,
+                end_date=end,
+                days_included=len(parts),
+                scenarios=scenarios,
+            )
+        return ScenarioComparisonState(
+            generated_at=now,
+            periods=periods,
+            timeline=(),
+        )
+
     def compare(
         self,
         records: list[Snapshot],

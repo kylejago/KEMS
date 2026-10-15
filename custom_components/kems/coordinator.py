@@ -22,7 +22,7 @@ from .agile_smart_export_runtime import EfficientAgileSmartExportManager
 from .collector import Collector
 from .commissioning import build_commissioning_snapshot
 from .commissioning_restart_proof import CommissioningRestartProof
-from .const import NAME
+from .const import CONF_DETAILED_COMPARISONS_ENABLED, NAME
 from .entity_discovery import SourceValidationResult
 from .ev_charge_trace import EVChargeTraceRecorder
 from .ev_grid_hold_session import EVGridHoldSession
@@ -611,13 +611,24 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                 learned.predicted_energy_until_offpeak_kwh,
                 current_snapshot=snapshot,
             )
-            scenarios = self._scenarios.compare(
-                records,
-                now,
-                self.settings.simulation,
-                learned.predicted_energy_until_offpeak_kwh,
-                current_snapshot=snapshot,
-            )
+            # Alpha9.100: expensive multi-scenario replay is reporting-only.
+            # Keep the same live simulation, planning, paid Agile, ROI, history
+            # and hardware authority paths untouched on either setting.
+            if self.entry.options.get(CONF_DETAILED_COMPARISONS_ENABLED, True):
+                scenarios = self._scenarios.compare(
+                    records,
+                    now,
+                    self.settings.simulation,
+                    learned.predicted_energy_until_offpeak_kwh,
+                    current_snapshot=snapshot,
+                )
+            else:
+                scenarios = self._scenarios.baseline_only(
+                    records,
+                    now,
+                    self.settings.simulation,
+                    current_snapshot=snapshot,
+                )
             agile_records = await self._agile_history_backfill.async_records(
                 native_records=records,
                 now=now,
