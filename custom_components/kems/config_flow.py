@@ -34,6 +34,7 @@ from .const import (
     CONF_CURRENT_EXPORT_RATE,
     CONF_CURRENT_IMPORT_RATE,
     CONF_DISCHARGE_EFFICIENCY,
+    CONF_DETAILED_COMPARISONS_ENABLED,
     CONF_DISCOUNT_RATE,
     CONF_ELECTRICITY_INFLATION,
     CONF_ELECTRICITY_STANDING_CHARGE,
@@ -342,6 +343,7 @@ MONITORING_SCHEMA = vol.Schema(
     {
         vol.Required(CONF_SCAN_INTERVAL): _number(30, 3600, 1, "seconds"),
         vol.Required(CONF_HISTORY_DAYS): _number(1, 365, 1, "days"),
+        vol.Required(CONF_DETAILED_COMPARISONS_ENABLED): BOOLEAN_SELECTOR,
         vol.Required(CONF_GAS_KWH_PER_M3): _number(1, 20, "any", "kWh/m³"),
     }
 )
