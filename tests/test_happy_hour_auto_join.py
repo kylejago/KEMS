@@ -251,7 +251,9 @@ def test_power_down_missing_soc_never_plans_battery_export(monkeypatch) -> None:
 
     monkeypatch.setattr(event_runtime, "_recent_house_load_kw", lambda _self: 0.9)
     monkeypatch.setattr(event_runtime, "_current_solar_kw", lambda _self, _config: 0.0)
-    monkeypatch.setattr(event_runtime.rolling, "_current_agile_soc", lambda _state: None)
+    monkeypatch.setattr(
+        event_runtime.rolling, "_current_agile_soc", lambda _state: None
+    )
 
     config = SimpleNamespace(
         max_discharge_kw=10.0,
