@@ -252,6 +252,7 @@ def test_auto_join_never_invents_missing_battery_soc() -> None:
         {"joined_event_active": False},
         {"reward_ledger_complete": False},
         {"remaining_reward_kwh": 0.0},
+        {"remaining_reward_kwh": 16.01},
         {"remaining_reward_kwh": float("nan")},
         {"battery_headroom_kwh": None},
         {"battery_headroom_kwh": 0.0},
