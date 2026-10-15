@@ -196,7 +196,6 @@ def should_freeze_owned_ev_hold(
     )
 
 
-
 def active_joined_power_down_window(
     *,
     joined: bool,
