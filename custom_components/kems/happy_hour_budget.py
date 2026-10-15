@@ -611,9 +611,11 @@ def apply_happy_hour_control(
         # existing charge authority even if no Happy Hour booking is proven.
         desired_charge_power_kw=max(
             live_charge_kw,
-            (_number(context.get("charge_target_kw")) or 0.0)
-            if getattr(snapshot, "cheap_period_confirmed", False)
-            else 0.0,
+            (
+                (_number(context.get("charge_target_kw")) or 0.0)
+                if getattr(snapshot, "cheap_period_confirmed", False)
+                else 0.0
+            ),
         ),
         desired_ev_charging_allowed=ev_allowed,
         desired_battery_to_home_power_kw=0.0,
