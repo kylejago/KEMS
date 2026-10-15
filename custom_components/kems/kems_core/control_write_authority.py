@@ -228,7 +228,7 @@ def assess_happy_hour_charge_authority(
         return False
     return bool(
         all(isfinite(value) for value in (remaining, headroom, target))
-        and remaining > _EPSILON_KW
+        and _EPSILON_KW < remaining <= 16.0
         and headroom > _EPSILON_KW
         and target > _EPSILON_KW
     )
