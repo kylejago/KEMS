@@ -314,7 +314,9 @@ def test_coordinator_uses_manual_switch_timeout_and_roi_only_adjustment() -> Non
 def test_financial_contract_is_zero_income_and_recharge_cost_only() -> None:
     source = (KEMS / "export_commissioning_test.py").read_text(encoding="utf-8")
 
-    assert '"export_income_policy": "zero_no_paid_export"' in source
+    assert '"export_income_policy": (' in source
+    assert '"normal_live_agile_interval_settlement"' in source
+    assert '"zero_no_paid_export"' in source
     assert '"physical_energy_history": "retained"' in source
     assert '"actual_roi_policy": "exclude_test_recharge_cost"' in source
     assert (
