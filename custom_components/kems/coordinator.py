@@ -66,6 +66,7 @@ from .kems_core.agile_live_reserve import (
     guard_paid_agile_physical_export,
 )
 from .kems_core.agile_physical_energy import PaidAgilePhysicalEnergyTracker
+from .kems_core.control_write_authority import active_joined_power_down_window
 from .kems_core.control_event_refresh import (
     control_source_state_uncertain,
     meaningful_ev_power_transition,
@@ -832,6 +833,19 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
             if not isinstance(power_down_plan, dict):
                 power_down_plan = {}
             control = apply_happy_hour_control(control, snapshot, happy_hour_plan)
+            # An Octopus Power Down must be both joined and inside its actual
+            # event window. Mere simulation intent never grants live authority.
+            power_down_export_authorised = bool(
+                tariff_type == EXPORT_TARIFF_TYPE_AGILE
+                and control.operating_reason == "power_down_session"
+                and active_joined_power_down_window(
+                    joined=bool(snapshot.saving_session_joined),
+                    active=bool(snapshot.saving_session_active),
+                    start=snapshot.saving_session_start,
+                    end=snapshot.saving_session_end,
+                    now=now,
+                )
+            )
             # Physically constrain paid Agile before any FoxESS writes. The
             # simulation / financial / shadow plan remains unchanged.
             if tariff_type == EXPORT_TARIFF_TYPE_AGILE:
@@ -860,6 +874,7 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                         now=now,
                         ev_export_safe=ev_export_safe,
                         ev_export_evidence=ev_export_evidence,
+                        power_down_export_authorised=power_down_export_authorised,
                         physical_energy_evidence=self._paid_agile_energy_evidence,
                         connected_idle_continuity=(
                             self._paid_agile_connected_idle_continuity
@@ -1032,6 +1047,7 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                     self._export_commissioning_test.hardware_authority_active
                 ),
                 force_restore=self._export_commissioning_test.restore_requested,
+                power_down_export_authorised=power_down_export_authorised,
             )
             promoted_to_stress = (
                 await self._export_commissioning_test.async_after_backend(
