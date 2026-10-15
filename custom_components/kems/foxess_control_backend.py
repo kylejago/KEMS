@@ -837,6 +837,7 @@ class FoxESSControlBackend:
         commissioning_export_test: bool = False,
         force_restore: bool = False,
         power_down_export_authorised: bool = False,
+        happy_hour_charge_authorised: bool = False,
     ) -> dict[str, Any]:
         """Apply the authoritative bounded command for this scan."""
         shadow = build_foxess_command_shadow_snapshot(
@@ -1017,6 +1018,7 @@ class FoxESSControlBackend:
             emergency_stop=bool(coordinator.settings.control.emergency_stop),
             effective_export_limit_kw=effective_export_limit_kw,
             power_down_export_authorised=power_down_export_authorised,
+            happy_hour_charge_authorised=happy_hour_charge_authorised,
         )
 
         if (
