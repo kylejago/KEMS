@@ -349,7 +349,9 @@ def test_alpha9102_physical_happy_hour_charge_requires_all_live_evidence() -> No
     }
     snapshot = SimpleNamespace(
         battery_soc=50.0,
-        source_age_seconds={"battery_soc": 10.0},
+        source_age_seconds={"battery_soc": 10.0, "house_load_kw": 10.0},
+        ev_power_age_seconds=10.0,
+        ev_connected=False,
         stale_fields=(),
         house_load_kw=1.0,
         ev_power_kw=0.0,
@@ -396,6 +398,8 @@ def test_alpha9102_physical_happy_hour_charge_requires_all_live_evidence() -> No
     low_site = SimpleNamespace(**{**vars(ctrl), "site_import_limit_kw": 0.5})
     assert target(snapshot_value=no_soc) == 0.0
     assert target(snapshot_value=old_soc) == 0.0
+    old_ev = SimpleNamespace(**{**vars(snapshot), "ev_power_age_seconds": 120.0})
+    assert target(snapshot_value=old_ev) == 0.0
     assert target(config_value=low_site) == 0.0
     assert target(power_down=True) == 0.0
     assert target(grid=False) == 0.0
