@@ -496,7 +496,6 @@ def _corrected_soc_with_hourly_budget(
     return round(100.0 * corrected / capacity, 2)
 
 
-
 def verified_live_happy_hour_charge_kw(
     *,
     booking: dict[str, Any],
@@ -535,8 +534,19 @@ def verified_live_happy_hour_charge_kw(
     if any(
         value is None
         for value in (
-            soc_age, soc, capacity, max_charge, inverter, site_limit,
-            house, ev, grid, target, remaining, bucket_start, bucket_end,
+            soc_age,
+            soc,
+            capacity,
+            max_charge,
+            inverter,
+            site_limit,
+            house,
+            ev,
+            grid,
+            target,
+            remaining,
+            bucket_start,
+            bucket_end,
         )
     ):
         return 0.0
@@ -551,9 +561,7 @@ def verified_live_happy_hour_charge_kw(
     # Never credit charging headroom that may have been consumed after the
     # reported SOC. Reserve extra space for delayed FoxESS/meter feedback.
     headroom = max(
-        capacity * (100.0 - soc) / 100.0
-        - max_charge * soc_age / 3600.0
-        - 0.5,
+        capacity * (100.0 - soc) / 100.0 - max_charge * soc_age / 3600.0 - 0.5,
         0.0,
     )
     hours_left = max((bucket_end - now).total_seconds() / 3600.0, 0.001)
@@ -599,9 +607,7 @@ def apply_happy_hour_control(
         desired_work_mode=(
             "Force Charge" if live_charge_kw > 0.001 else control.desired_work_mode
         ),
-        desired_charge_power_kw=max(
-            live_charge_kw, 0.0
-        ),
+        desired_charge_power_kw=max(live_charge_kw, 0.0),
         desired_ev_charging_allowed=ev_allowed,
         desired_battery_to_home_power_kw=0.0,
         desired_battery_export_power_kw=0.0,
