@@ -387,17 +387,15 @@ def test_alpha9102_physical_happy_hour_charge_requires_all_live_evidence() -> No
     assert 0.0 < target() <= 8.0
     assert target(booking_value={**booking, "status": "recommended"}) == 0.0
     assert target(context_value={**context, "charge_target_kw": 0}) == 0.0
-    assert target(
-        context_value={**context, "current_reward_hour_remaining_kwh": 0.1}
-    ) == 0.0
-    assert target(snapshot_value=SimpleNamespace(**{
-        **vars(snapshot), "battery_soc": None
-    })) == 0.0
-    assert target(snapshot_value=SimpleNamespace(**{
-        **vars(snapshot), "source_age_seconds": {"battery_soc": 400}
-    })) == 0.0
-    assert target(config_value=SimpleNamespace(**{
-        **vars(ctrl), "site_import_limit_kw": 0.5
-    })) == 0.0
+    exhausted = {**context, "current_reward_hour_remaining_kwh": 0.1}
+    assert target(context_value=exhausted) == 0.0
+    no_soc = SimpleNamespace(**{**vars(snapshot), "battery_soc": None})
+    old_soc = SimpleNamespace(
+        **{**vars(snapshot), "source_age_seconds": {"battery_soc": 400}}
+    )
+    low_site = SimpleNamespace(**{**vars(ctrl), "site_import_limit_kw": 0.5})
+    assert target(snapshot_value=no_soc) == 0.0
+    assert target(snapshot_value=old_soc) == 0.0
+    assert target(config_value=low_site) == 0.0
     assert target(power_down=True) == 0.0
     assert target(grid=False) == 0.0
