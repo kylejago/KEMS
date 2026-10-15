@@ -700,9 +700,7 @@ def test_full_kems_forecast_uses_solar_recovery_only_in_new_scenario() -> None:
 def test_lightweight_baseline_matches_full_grid_only_result_for_every_period() -> None:
     """Turning off unused scenarios must never change the ROI baseline."""
     start = datetime(2026, 8, 10, 0, 0, tzinfo=UTC)
-    records = _records(start, count=8) + _records(
-        start + timedelta(days=1), count=9
-    )
+    records = _records(start, count=8) + _records(start + timedelta(days=1), count=9)
     now = records[-1].timestamp
     config = SimulationConfig(proposal_solar_enabled=False)
     engine = ScenarioComparisonEngine()

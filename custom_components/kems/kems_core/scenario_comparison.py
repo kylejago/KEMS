@@ -153,9 +153,7 @@ class ScenarioComparisonEngine:
             day_import = 0.0
             cheap_cost = 0.0
             day_cost = 0.0
-            for current, following in zip(
-                day_records, day_records[1:], strict=False
-            ):
+            for current, following in zip(day_records, day_records[1:], strict=False):
                 hours = _interval_hours(current.timestamp, following.timestamp)
                 if hours <= 0:
                     continue
@@ -190,9 +188,7 @@ class ScenarioComparisonEngine:
                 description=SCENARIO_DESCRIPTIONS[SCENARIO_NO_SYSTEM],
                 ready=covered >= 3,
                 samples=len(day_records),
-                data_coverage=round(100 * covered / intervals, 1)
-                if intervals
-                else 0.0,
+                data_coverage=round(100 * covered / intervals, 1) if intervals else 0.0,
                 import_cost_pence=round(total_cost, 2),
                 cheap_import_cost_pence=round(cheap_cost, 2),
                 day_import_cost_pence=round(day_cost, 2),
@@ -229,9 +225,7 @@ class ScenarioComparisonEngine:
                 label = "7 days" if key == "7_days" else "30 days"
             parts = [daily[d] for d in sorted(daily) if start <= d <= end]
             scenarios = (
-                (self._aggregate_summaries(SCENARIO_NO_SYSTEM, parts),)
-                if parts
-                else ()
+                (self._aggregate_summaries(SCENARIO_NO_SYSTEM, parts),) if parts else ()
             )
             periods[key] = ScenarioPeriodComparison(
                 key=key,

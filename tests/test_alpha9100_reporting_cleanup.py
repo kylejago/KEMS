@@ -12,17 +12,24 @@ def test_optional_replay_is_disabled_only_after_explicit_operator_choice() -> No
     constants = (KEMS / "const.py").read_text(encoding="utf-8")
     flow = (KEMS / "config_flow.py").read_text(encoding="utf-8")
     coordinator = (KEMS / "coordinator.py").read_text(encoding="utf-8")
-    assert 'CONF_DETAILED_COMPARISONS_ENABLED = "detailed_comparisons_enabled"' in constants
+    assert (
+        'CONF_DETAILED_COMPARISONS_ENABLED = "detailed_comparisons_enabled"'
+        in constants
+    )
     assert "CONF_DETAILED_COMPARISONS_ENABLED: True" in constants
     assert "vol.Required(CONF_DETAILED_COMPARISONS_ENABLED): BOOLEAN_SELECTOR" in flow
-    assert "self.entry.options.get(CONF_DETAILED_COMPARISONS_ENABLED, True)" in coordinator
+    assert (
+        "self.entry.options.get(CONF_DETAILED_COMPARISONS_ENABLED, True)" in coordinator
+    )
     assert "scenarios = self._scenarios.baseline_only(" in coordinator
     assert "scenarios = self._scenarios.compare(" in coordinator
 
 
 def test_scenario_switch_has_no_inverter_or_ev_control_authority() -> None:
     coordinator = (KEMS / "coordinator.py").read_text(encoding="utf-8")
-    begin = coordinator.index("if self.entry.options.get(CONF_DETAILED_COMPARISONS_ENABLED")
+    begin = coordinator.index(
+        "if self.entry.options.get(CONF_DETAILED_COMPARISONS_ENABLED"
+    )
     end = coordinator.index("agile_records = await", begin)
     block = coordinator[begin:end]
     assert "self._scenarios.compare(" in block
@@ -35,10 +42,18 @@ def test_scenario_switch_has_no_inverter_or_ev_control_authority() -> None:
         "self._forecast_planning.plan(",
     ):
         assert forbidden not in block
-    assert coordinator.index("planning_simulation = self._simulation.simulate_today") < begin
-    assert coordinator.index("base_simulation = self._simulation.simulate_today") < begin
+    assert (
+        coordinator.index("planning_simulation = self._simulation.simulate_today")
+        < begin
+    )
+    assert (
+        coordinator.index("base_simulation = self._simulation.simulate_today") < begin
+    )
     assert coordinator.index("control = self._control.plan(") > end
-    assert coordinator.index("foxess_control = await self._foxess_control.async_update(") > end
+    assert (
+        coordinator.index("foxess_control = await self._foxess_control.async_update(")
+        > end
+    )
 
 
 def test_diagnostic_trim_does_not_modify_ev_trace_recorder_or_history() -> None:
@@ -57,6 +72,12 @@ def test_actual_roi_still_uses_meter_based_no_system_ledger() -> None:
     simulation = (KEMS / "kems_core" / "simulation.py").read_text(encoding="utf-8")
     roi = (KEMS / "kems_core" / "roi.py").read_text(encoding="utf-8")
     assert "baseline_import_cost += actual_house_kwh * rate" in simulation
-    assert "actual_avoided_import_value = baseline_import_cost - actual_import_cost" in simulation
-    assert "actual_system_value = actual_avoided_import_value + actual_export_income" in simulation
+    assert (
+        "actual_avoided_import_value = baseline_import_cost - actual_import_cost"
+        in simulation
+    )
+    assert (
+        "actual_system_value = actual_avoided_import_value + actual_export_income"
+        in simulation
+    )
     assert "actual_value = ledger.actual_system_value_pence / 100" in roi
