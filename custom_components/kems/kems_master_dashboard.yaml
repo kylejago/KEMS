@@ -50,13 +50,13 @@ views:
             content: |
               {% set bad = ['unknown','unavailable','none',''] %}
               {% set import_rate = states('sensor.kems_current_import_rate') %}
-              {% set export_rate = states('sensor.kems_agile_export_rate_now') %}
+              {% set export_rate = state_attr('sensor.kems_agile_slots', 'current_rate_pence') %}
               {% set reserve = states('sensor.kems_exportable_battery_energy_remaining') %}
               {% set target = states('sensor.kems_target_battery_export_power') %}
               | Right now | Value |
               |:---|---:|
               | Import price | {{ (import_rate ~ ' p/kWh') if import_rate | lower not in bad else '—' }} |
-              | Agile export price | {{ (export_rate ~ ' p/kWh') if export_rate | lower not in bad else '—' }} |
+              | Agile export price | {{ (export_rate ~ ' p/kWh') if export_rate is not none else '—' }} |
               | Cheap period | {{ 'Active' if is_state('binary_sensor.kems_cheap_period_confirmed', 'on') else 'Not active' }} |
               | Export permitted | {{ 'Yes' if is_state('binary_sensor.kems_grid_export_allowed_by_control', 'on') else 'No' }} |
               | Battery export target | {{ (target ~ ' kW') if target | lower not in bad else '—' }} |
@@ -118,7 +118,7 @@ views:
           {% set slots = slots + tomorrow[:6 - (slots | count)] %}
           {% endif %}
           **Today's published plan:** {{ today | count }}/48 slots · **Tomorrow:** {{ tomorrow | count }}/48 slots  
-          **Current Agile export price:** {{ states('sensor.kems_agile_export_rate_now') }} p/kWh
+          **Current Agile export price:** {{ (state_attr('sensor.kems_agile_slots', 'current_rate_pence') ~ ' p/kWh') if state_attr('sensor.kems_agile_slots', 'current_rate_pence') is not none else '—' }}
 
           {% if slots %}
           | Time | Export rate | Planned action | Est. SOC |
