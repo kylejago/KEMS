@@ -654,6 +654,18 @@ def _simulation_soc(data: Any) -> float | None:
     return value
 
 
+
+def _booking_soc(data: Any, *, operating_mode: str) -> float | None:
+    """Only measured battery SOC can authorise a live Control-mode booking."""
+    if operating_mode != "control":
+        return _simulation_soc(data)
+    snapshot = getattr(data, "snapshot", None)
+    value = _number(getattr(snapshot, "battery_soc", None))
+    if value is None or not math.isfinite(value) or not 0.0 <= value <= 100.0:
+        return None
+    return value
+
+
 def _iso_or_none(value: Any) -> datetime | None:
     return _dt(value)
 
@@ -801,12 +813,14 @@ class HappyHourAutoJoinController:
             self.state = state
             return
 
-        measured_simulation_soc = _simulation_soc(data)
-        if measured_simulation_soc is None:
+        booking_soc = _booking_soc(
+            data, operating_mode=str(self.coordinator.settings.control.operating_mode)
+        )
+        if booking_soc is None:
             # Booking can change external Octopus commitments. Never fabricate
             # a 50% battery state when the planner has no usable SOC evidence.
             state["status"] = "waiting_for_battery_soc"
-            state["join_block_reason"] = "missing_or_invalid_simulated_battery_soc"
+            state["join_block_reason"] = "missing_or_invalid_battery_soc"
             self.state = state
             return
 
@@ -820,7 +834,7 @@ class HappyHourAutoJoinController:
                 export_rates=export_rates,
                 export_tariff_type=export_type,
                 fixed_export_rate_pence=float(config.export_rate_pence),
-                current_soc_percent=measured_simulation_soc,
+                current_soc_percent=booking_soc,
                 battery_capacity_kwh=float(config.battery_capacity_kwh),
                 battery_reserve_percent=float(config.battery_reserve_percent),
                 max_charge_kw=float(config.max_charge_kw),
