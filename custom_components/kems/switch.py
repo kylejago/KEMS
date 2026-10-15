@@ -445,12 +445,19 @@ class KEMSExportCommissioningTestSwitch(KEMSEntity, SwitchEntity):
         return {
             **state,
             "manual_start_only": True,
-            "real_export_tariff_required": False,
-            "real_export_tariff_must_remain": "No paid export",
+            "supported_real_export_tariffs": [
+                "No paid export",
+                "Agile Outgoing",
+            ],
+            "real_export_tariff_must_remain": (
+                "Keep the selected No paid export or Agile Outgoing tariff "
+                "unchanged throughout commissioning"
+            ),
             "control_authority": (
-                "Temporary commissioning only: 1 kW direction proof, then at most "
-                "60 seconds following the live Agile export target. The test "
-                "restores the captured FoxESS baseline afterwards."
+                "Temporary commissioning only: 1 kW net-export proof with "
+                "near-zero solar, then at most 60 seconds following the "
+                "bounded Agile target. The test restores the verified FoxESS "
+                "baseline; Agile income stays in the normal live ledger."
             ),
         }
 
