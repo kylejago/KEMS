@@ -87,10 +87,7 @@ def test_optional_uncommissioned_live_hardware_is_rendered_defensively() -> None
 
     assert "['unknown', 'unavailable', 'none', '']" in content
     assert "Optional physical sensors remain `—` until commissioned" in content
-    assert (
-        "Live solar/battery values remain `—` until the physical system is commissioned"
-        in content
-    )
+    assert "Physical readings, not the simulated digital twin" in content
 
 
 def test_agile_slots_has_one_stable_state_backed_by_retained_runtime_data() -> None:

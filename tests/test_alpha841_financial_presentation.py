@@ -102,19 +102,20 @@ def test_alpha841_whole_home_totals_remain_like_for_like() -> None:
     assert whole_home.simulated_saving_pence == 364.18
 
 
-def test_alpha841_home_summary_uses_bill_totals_for_all_in_rows() -> None:
+def test_live_home_uses_canonical_actual_bill_totals() -> None:
+    """The customer Home view shows actual bill-equivalent data, not a twin."""
     payload = (KEMS_ROOT / "kems_master_dashboard.yaml").read_bytes()
     rendered = dashboard_pipeline._finalise_dashboard_bytes(payload).decode("utf-8")
+    home = rendered.split("  - title: Home", 1)[1].split("  - title: Live Data", 1)[0]
 
-    assert "{% set live_total = live_bill.get('total_energy_cost_pence') %}" in rendered
-    assert "{% set kems_total = kems_bill.get('total_energy_cost_pence') %}" in rendered
-    assert "{% set saving = bill.get('saving_pence') %}" in rendered
+    assert "sensor.kems_energy_cost_comparison" in home
+    assert "live = today.get('live_data', {})" in home
+    assert "total_energy_cost_pence" in home
+    assert "electricity_standing_charge_pence" in home
+    assert "electricity_export_income_pence" in home
+    assert "sensor.kems_simulated_kems_cost_today" not in home
     assert "format((live_e + gas) / 100)" not in rendered
     assert "format((kems_e + gas) / 100)" not in rendered
-    assert (
-        "Total energy cost includes electricity standing charge, export income, "
-        "supplier/account credits and gas."
-    ) in rendered
 
 
 def test_alpha841_does_not_override_the_saving_sensor_or_hardware() -> None:
