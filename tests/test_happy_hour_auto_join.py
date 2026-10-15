@@ -1,12 +1,14 @@
 """Alpha9.40 Weekend Happy Hour recommendation/auto-join contracts."""
 
 from datetime import UTC, date, datetime, timedelta
+from types import SimpleNamespace
 from zoneinfo import ZoneInfo
 
 import pytest
 
 from custom_components.kems.happy_hour_auto_join import (
     HappyHourCandidate,
+    _simulation_soc,
     RateSlot,
     auto_join_control_gate,
     choose_best_candidate,
@@ -230,3 +232,14 @@ def test_day_coverage_requires_most_of_the_happy_hour_day() -> None:
     assert day_rate_coverage(rates, target_day) == pytest.approx(1.0)
     assert day_rate_coverage(rates[:-4], target_day) >= 0.90
     assert day_rate_coverage(rates[:-5], target_day) < 0.90
+
+
+def test_auto_join_never_invents_missing_battery_soc() -> None:
+    assert _simulation_soc(SimpleNamespace()) is None
+    assert _simulation_soc(SimpleNamespace(simulation=None)) is None
+    assert _simulation_soc(SimpleNamespace(simulation=SimpleNamespace(simulated_battery_soc=None))) is None
+    assert _simulation_soc(SimpleNamespace(simulation=SimpleNamespace(simulated_battery_soc=float("nan")))) is None
+    assert _simulation_soc(SimpleNamespace(simulation=SimpleNamespace(simulated_battery_soc=-1))) is None
+    assert _simulation_soc(SimpleNamespace(simulation=SimpleNamespace(simulated_battery_soc=101))) is None
+    assert _simulation_soc(SimpleNamespace(simulation=SimpleNamespace(simulated_battery_soc=80))) == 80.0
+    assert _simulation_soc(SimpleNamespace(simulation=SimpleNamespace(simulated_battery_soc=0))) == 0.0
