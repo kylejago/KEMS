@@ -519,6 +519,19 @@ def verified_live_happy_hour_charge_kw(
         return 0.0
     ages = getattr(snapshot, "source_age_seconds", None)
     soc_age = _number(ages.get("battery_soc")) if isinstance(ages, dict) else None
+    house_age = _number(ages.get("house_load_kw")) if isinstance(ages, dict) else None
+    ev_age = _number(getattr(snapshot, "ev_power_age_seconds", None))
+    if (
+        house_age is None
+        or house_age > 180.0
+        or house_age < 0.0
+        or ev_age is None
+        or not 0.0 <= ev_age <= 60.0
+        or getattr(snapshot, "ev_connected", None) is None
+        or "house_load_kw" in (getattr(snapshot, "stale_fields", ()) or ())
+        or "ev_power_kw" in (getattr(snapshot, "stale_fields", ()) or ())
+    ):
+        return 0.0
     soc = _number(getattr(snapshot, "battery_soc", None))
     capacity = _number(getattr(simulation_config, "battery_capacity_kwh", None))
     max_charge = _number(getattr(control_config, "max_charge_kw", None))
