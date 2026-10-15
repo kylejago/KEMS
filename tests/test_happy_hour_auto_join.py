@@ -6,18 +6,18 @@ from zoneinfo import ZoneInfo
 
 import pytest
 
-from custom_components.kems.happy_hour_budget import verified_live_happy_hour_charge_kw
 from custom_components.kems.happy_hour_auto_join import (
     HappyHourCandidate,
     RateSlot,
     _booking_soc,
-    booked_happy_hour_matches_plan,
     _simulation_soc,
     auto_join_control_gate,
+    booked_happy_hour_matches_plan,
     choose_best_candidate,
     day_rate_coverage,
     score_candidate,
 )
+from custom_components.kems.happy_hour_budget import verified_live_happy_hour_charge_kw
 from custom_components.kems.product_types import (
     EXPORT_TARIFF_TYPE_AGILE,
     EXPORT_TARIFF_TYPE_NONE,
