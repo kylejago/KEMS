@@ -301,7 +301,9 @@ def test_current_release_identity_and_scope() -> None:
     assert "Export Power Limit" in reason
 
 
-def test_power_down_deliberate_export_remains_fail_closed_before_event_authority() -> None:
+def test_power_down_deliberate_export_remains_fail_closed_before_event_authority() -> (
+    None
+):
     """Do not promote Power Down export using ordinary paid Agile authority."""
     control = _control(
         operating_reason="power_down_session",
