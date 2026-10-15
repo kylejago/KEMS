@@ -506,6 +506,7 @@ def verified_live_happy_hour_charge_kw(
     control_config: Any,
     now: datetime,
     power_down_active: bool,
+    grid_available: bool,
 ) -> float:
     """Fail closed before granting physical grid charging for a booked event."""
     joined = booked_happy_hour_matches_plan(booking, context, now)
@@ -572,7 +573,7 @@ def verified_live_happy_hour_charge_kw(
         battery_headroom_kwh=headroom,
         charge_target_kw=safe_target,
         power_down_active=power_down_active,
-        grid_available=bool(getattr(snapshot, "grid_available", False)),
+        grid_available=grid_available,
         emergency_stop=bool(getattr(control_config, "emergency_stop", False)),
     )
     return round(safe_target, 3) if safe else 0.0
