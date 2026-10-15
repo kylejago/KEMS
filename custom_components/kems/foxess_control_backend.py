@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import asyncio
 from datetime import UTC, datetime
+from math import isfinite
 from typing import Any
 
 from homeassistant.helpers.storage import Store
@@ -32,6 +33,7 @@ from .product_types import EXPORT_TARIFF_TYPE_AGILE, export_tariff_type_from_opt
 
 _STORAGE_VERSION = 1
 _PAID_EXPORT_STAGE_KW = 1.0
+_PAID_EXPORT_PROOF_PROTOCOL = 2
 _PAID_EXPORT_PROOF_SAMPLES = 2
 _PAID_EXPORT_FAILURE_SAMPLES = 3
 _PAID_EXPORT_MAX_SOLAR_KW = 0.5
@@ -48,6 +50,62 @@ def _number(value: object) -> float | None:
         return float(value)
     except (TypeError, ValueError):
         return None
+
+
+
+def _bounded_paid_export_discharge_setpoint(
+    *,
+    requested_grid_export_kw: object,
+    planned_total_discharge_kw: object,
+    observed_house_load_kw: object,
+    observed_solar_kw: object,
+    max_discharge_kw: object,
+    inverter_limit_kw: object,
+    effective_export_limit_kw: object,
+    staging: bool,
+) -> float | None:
+    """Bound the *total* inverter discharge needed for a net grid-export target.
+
+    The Agile decision expresses export power, whereas the FoxESS Force
+    Discharge entity commands total battery output. A 1 kW discharge into a
+    1.2 kW home cannot prove 1 kW of grid export. Account for current home
+    demand without exceeding the authoritative total-discharge plan, hardware
+    discharge/inverter limits or the independently configured grid-export
+    ceiling. If any observation is untrustworthy or there is insufficient
+    physical headroom for a measurable export, do not issue a write.
+    """
+    values = (
+        requested_grid_export_kw,
+        planned_total_discharge_kw,
+        observed_house_load_kw,
+        observed_solar_kw,
+        max_discharge_kw,
+        inverter_limit_kw,
+        effective_export_limit_kw,
+    )
+    converted = tuple(_number(value) for value in values)
+    if any(
+        value is None or not isfinite(value) or value < 0.0
+        for value in converted
+    ):
+        return None
+    requested, planned_total, house_load, solar, battery_limit, inverter_limit, export_limit = converted
+    home_from_battery = max(house_load - solar, 0.0)
+    requested_net_export = min(
+        requested, export_limit, _PAID_EXPORT_STAGE_KW if staging else requested
+    )
+    if requested_net_export + 1e-6 < _PAID_EXPORT_MIN_GRID_EXPORT_KW:
+        return None
+    discharge = min(
+        planned_total,
+        battery_limit,
+        max(inverter_limit - solar, 0.0),
+        home_from_battery + requested_net_export,
+        home_from_battery + export_limit,
+    )
+    if discharge + 1e-6 < home_from_battery + _PAID_EXPORT_MIN_GRID_EXPORT_KW:
+        return None
+    return round(discharge, 3)
 
 
 def _commissioning_restore_readback_matches(
@@ -216,6 +274,18 @@ class FoxESSControlBackend:
             )
             stage_reason = data.get("paid_export_stage_reason")
             self._paid_export_stage_reason = str(stage_reason) if stage_reason else None
+            # Alpha9.99 changes the physical proof from a 1 kW *total*
+            # discharge to a house-aware 1 kW *net export* stage. Discard
+            # only an obsolete proof lockout once per protocol upgrade.
+            # Full paid export remains gated on two NEW physical samples.
+            proof_protocol = data.get("paid_export_proof_protocol")
+            if proof_protocol != _PAID_EXPORT_PROOF_PROTOCOL:
+                self._paid_export_stage_blocked = False
+                self._paid_export_stage_reason = (
+                    "House-aware paid export proof upgraded; fresh physical "
+                    "direction samples still required"
+                )
+                await self._async_save()
             last_action = data.get("last_applied_action")
             self._last_applied_action = (
                 str(last_action)
@@ -238,6 +308,7 @@ class FoxESSControlBackend:
                     self._previous_force_discharge_power_kw
                 ),
                 "previous_export_power_limit_w": self._previous_export_power_limit_w,
+                "paid_export_proof_protocol": _PAID_EXPORT_PROOF_PROTOCOL,
                 "paid_export_stage_blocked": self._paid_export_stage_blocked,
                 "paid_export_stage_reason": self._paid_export_stage_reason,
                 "last_applied_action": self._last_applied_action,
@@ -532,15 +603,18 @@ class FoxESSControlBackend:
             return
 
         stale = set(getattr(snapshot, "stale_fields", ()) or ())
-        if {"battery_power_kw", "grid_export_kw", "solar_power_kw"} & stale:
+        if {"battery_power_kw", "grid_export_kw", "solar_power_kw", "house_load_kw"} & stale:
             return
         solar = _number(getattr(snapshot, "solar_power_kw", None))
+        house = _number(getattr(snapshot, "house_load_kw", None))
         battery = _number(getattr(snapshot, "battery_power_kw", None))
         grid_export = _number(getattr(snapshot, "grid_export_kw", None))
         export_limit = _number(
             (entities.get("export_power_limit") or {}).get("normalised_observation")
         )
-        if None in (solar, battery, grid_export, export_limit):
+        if None in (solar, house, battery, grid_export, export_limit):
+            return
+        if not all(isfinite(value) for value in (solar, house, battery, grid_export, export_limit)):
             return
         if solar > _PAID_EXPORT_MAX_SOLAR_KW:
             return
@@ -554,6 +628,18 @@ class FoxESSControlBackend:
             battery >= _PAID_EXPORT_MIN_BATTERY_DISCHARGE_KW
             and grid_export >= _PAID_EXPORT_MIN_GRID_EXPORT_KW
         )
+        # A shortfall in *net* grid export is inconclusive when the house
+        # consumes the staged battery output. Do not count that as a hardware
+        # direction failure or persist an unjustified lockout.
+        if not direction_verified and grid_export < _PAID_EXPORT_MIN_GRID_EXPORT_KW:
+            home_from_battery = max(house - solar, 0.0)
+            if battery < home_from_battery + _PAID_EXPORT_MIN_GRID_EXPORT_KW:
+                self._paid_export_stage_samples = 0
+                self._paid_export_stage_reason = (
+                    "Waiting for physical net-export headroom above house demand"
+                )
+                return
+
         if limit_verified and direction_verified:
             self._paid_export_stage_samples += 1
             self._paid_export_stage_failures = 0
@@ -1183,19 +1269,52 @@ class FoxESSControlBackend:
                         and force_discharge_entity is not None
                         and export_limit_entity is not None
                     ):
-                        requested_discharge = float(decision.force_discharge_power_kw)
-                        if not self._paid_export_live_proven:
-                            requested_discharge = min(
-                                requested_discharge,
-                                _PAID_EXPORT_STAGE_KW,
+                        # Force Discharge controls *total battery power*, not
+                        # just net grid export. Preserve the upstream planned
+                        # total-discharge/solar envelope and 7 kW grid ceiling.
+                        stale_fields = set(getattr(snapshot, "stale_fields", ()) or ())
+                        requested_discharge = (
+                            None
+                            if {"house_load_kw", "solar_power_kw"} & stale_fields
+                            else _bounded_paid_export_discharge_setpoint(
+                                requested_grid_export_kw=(
+                                    decision.force_discharge_power_kw
+                                ),
+                                planned_total_discharge_kw=(
+                                    control.desired_total_discharge_power_kw
+                                ),
+                                observed_house_load_kw=getattr(
+                                    snapshot, "house_load_kw", None
+                                ),
+                                observed_solar_kw=getattr(
+                                    snapshot, "solar_power_kw", None
+                                ),
+                                max_discharge_kw=(
+                                    coordinator.settings.control.max_discharge_kw
+                                ),
+                                inverter_limit_kw=(
+                                    coordinator.settings.control.inverter_limit_kw
+                                ),
+                                effective_export_limit_kw=(
+                                    decision.export_power_limit_kw
+                                ),
+                                staging=not self._paid_export_live_proven,
                             )
-                        export_limit_w = float(decision.export_power_limit_kw) * 1000.0
-                        export_limit_ok = await self._async_number(
-                            export_limit_entity,
-                            export_limit_w,
-                            writes,
-                            tolerance=1.0,
                         )
+                        export_limit_w = float(decision.export_power_limit_kw) * 1000.0
+                        export_limit_ok = False
+                        if requested_discharge is None:
+                            self._last_write_result = (
+                                "Paid export held: insufficient verified physical "
+                                "headroom for net grid-export direction proof"
+                            )
+                        else:
+                            export_limit_ok = await self._async_number(
+                                export_limit_entity,
+                                export_limit_w,
+                                writes,
+                                tolerance=1.0,
+                            )
                         if export_limit_ok:
                             export_limit_ok = await self._async_wait_number(
                                 entities,
@@ -1231,8 +1350,8 @@ class FoxESSControlBackend:
                                 )
                         if action_ok and not self._paid_export_live_proven:
                             self._paid_export_stage_reason = (
-                                "1.0 kW first-export stage applied; awaiting two "
-                                "low-solar physical direction samples"
+                                "House-aware 1.0 kW net-export stage applied; "
+                                "awaiting two low-solar physical direction samples"
                             )
                     applied = bool(min_soc_ok and action_ok)
                     if (
