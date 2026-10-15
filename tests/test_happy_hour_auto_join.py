@@ -10,6 +10,7 @@ from custom_components.kems.happy_hour_auto_join import (
     HappyHourCandidate,
     RateSlot,
     _booking_soc,
+    booked_happy_hour_matches_plan,
     _simulation_soc,
     auto_join_control_gate,
     choose_best_candidate,
@@ -295,3 +296,29 @@ def test_live_happy_hour_booking_requires_measured_soc() -> None:
     assert _booking_soc(data, operating_mode="control") is None
     data.snapshot.battery_soc = 101
     assert _booking_soc(data, operating_mode="control") is None
+
+
+def test_happy_hour_live_booking_must_match_active_event() -> None:
+    start = datetime(2026, 10, 17, 12, 0, tzinfo=UTC)
+    end = start + timedelta(hours=1)
+    booking = {
+        "status": "booked",
+        "booked_event_code": "TEST-BOOKING",
+        "booked_start": start.isoformat(),
+        "booked_end": end.isoformat(),
+    }
+    plan = {"start": start.isoformat(), "end": end.isoformat()}
+    assert booked_happy_hour_matches_plan(booking, plan, start)
+    assert not booked_happy_hour_matches_plan(booking, plan, end)
+    assert not booked_happy_hour_matches_plan(
+        booking, plan, start - timedelta(seconds=1)
+    )
+    assert not booked_happy_hour_matches_plan(
+        booking, {"start": start.isoformat(), "end": (end + timedelta(hours=1)).isoformat()}, start
+    )
+    assert not booked_happy_hour_matches_plan(
+        {**booking, "status": "recommended"}, plan, start
+    )
+    assert not booked_happy_hour_matches_plan(
+        {**booking, "booked_event_code": None}, plan, start
+    )
