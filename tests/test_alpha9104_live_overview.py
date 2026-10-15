@@ -3,6 +3,7 @@
 from pathlib import Path
 
 import yaml
+from jinja2 import Environment
 
 ROOT = Path(__file__).parents[1]
 SOURCE = ROOT / "dashboards/kems_master_dashboard.yaml"
@@ -20,7 +21,9 @@ def test_live_home_keeps_stable_navigation_and_packaged_parity() -> None:
     assert home["title"] == "Home"
     assert home["path"] == "home"
     assert home["icon"] == "mdi:home-lightning-bolt"
-    assert all(card["type"] in {"markdown", "grid", "entities"} for card in home["cards"])
+    assert all(
+        card["type"] in {"markdown", "grid", "entities"} for card in home["cards"]
+    )
 
 
 def test_live_home_excludes_digital_twin_and_uses_actual_energy() -> None:
@@ -66,3 +69,17 @@ def test_live_home_avoids_custom_cards_and_hardware_actions() -> None:
     assert "perform-action" not in text
     assert "call-service" not in text
     assert "tap_action" not in text
+
+
+def test_home_markdown_templates_have_valid_jinja_syntax() -> None:
+    env = Environment(autoescape=False)
+    home = _home()
+
+    def check(cards: list[dict]) -> None:
+        for card in cards:
+            if card["type"] == "markdown":
+                env.parse(card["content"])
+            elif card["type"] == "grid":
+                check(card["cards"])
+
+    check(home["cards"])
