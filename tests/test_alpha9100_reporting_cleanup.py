@@ -81,3 +81,36 @@ def test_actual_roi_still_uses_meter_based_no_system_ledger() -> None:
         in simulation
     )
     assert "actual_value = ledger.actual_system_value_pence / 100" in roi
+
+
+def test_today_finance_cards_share_canonical_sources() -> None:
+    """Both Today cards must reconcile live/simulated cost scopes and show KEMS."""
+    from pathlib import Path
+
+    root = Path(__file__).parents[1]
+    source = (root / "dashboards/kems_master_dashboard.yaml").read_text()
+    packaged = (
+        root / "custom_components/kems/kems_master_dashboard.yaml"
+    ).read_text()
+    assert source == packaged
+    first = source.split("title: Today — Live Data vs KEMS", 1)[1].split(
+        "title: Current power flow", 1
+    )[0]
+    second = source.split("title: Today — side by side", 1)[1].split(
+        "- type: history-graph", 1
+    )[0]
+    for entity in (
+        "sensor.kems_observed_cost_today",
+        "sensor.kems_simulated_kems_cost_today",
+        "sensor.kems_gas_cost_today",
+        "sensor.kems_observed_grid_import_today",
+        "sensor.kems_simulated_grid_import_today",
+        "sensor.kems_observed_grid_export_today",
+        "sensor.kems_simulated_grid_export_today",
+    ):
+        assert entity in first
+        assert entity in second
+    assert "live.get('total_energy_cost_pence')" not in second
+    assert "kems.get('total_energy_cost_pence')" not in second
+    assert "if kems_e is not none else '—'" in second
+    assert "Observed vs simulated net electricity difference:" in first
