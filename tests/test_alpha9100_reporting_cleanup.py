@@ -89,9 +89,7 @@ def test_today_finance_cards_share_canonical_sources() -> None:
 
     root = Path(__file__).parents[1]
     source = (root / "dashboards/kems_master_dashboard.yaml").read_text()
-    packaged = (
-        root / "custom_components/kems/kems_master_dashboard.yaml"
-    ).read_text()
+    packaged = (root / "custom_components/kems/kems_master_dashboard.yaml").read_text()
     assert source == packaged
     first = source.split("title: Today — Live Data vs KEMS", 1)[1].split(
         "title: Current power flow", 1
