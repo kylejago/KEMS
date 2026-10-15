@@ -95,9 +95,7 @@ def test_alpha840_managed_dashboard_headlines_use_reconciled_sensor_surfaces() -
     sensor_source = Path("custom_components/kems/sensor.py").read_text()
 
     assert "sensor.kems_simulated_kems_cost_today" in master
-    home = master.split("  - title: Home", 1)[1].split(
-        "  - title: Live Data", 1
-    )[0]
+    home = master.split("  - title: Home", 1)[1].split("  - title: Live Data", 1)[0]
     assert "sensor.kems_energy_cost_comparison" in home
     assert "total_energy_cost_pence" in home
     assert "sensor.kems_simulated_" not in home
