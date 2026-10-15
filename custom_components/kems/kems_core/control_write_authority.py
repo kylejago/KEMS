@@ -195,6 +195,46 @@ def should_freeze_owned_ev_hold(
     )
 
 
+
+def assess_happy_hour_charge_authority(
+    *,
+    joined_event_active: bool,
+    reward_ledger_complete: bool,
+    remaining_reward_kwh: float | None,
+    battery_headroom_kwh: float | None,
+    charge_target_kw: float | None,
+    power_down_active: bool,
+    grid_available: bool,
+    emergency_stop: bool,
+) -> bool:
+    """Fail-closed independent prerequisite for future live reward-hour charging.
+
+    This pure predicate never authorises a FoxESS service call by itself.
+    Confirmed Intelligent cheap periods remain a distinct authority.
+    """
+    if (
+        not joined_event_active
+        or not reward_ledger_complete
+        or power_down_active
+        or not grid_available
+        or emergency_stop
+    ):
+        return False
+    quantities = (remaining_reward_kwh, battery_headroom_kwh, charge_target_kw)
+    if any(value is None for value in quantities):
+        return False
+    try:
+        remaining, headroom, target = (float(value) for value in quantities)
+    except (TypeError, ValueError, OverflowError):
+        return False
+    return bool(
+        all(isfinite(value) for value in (remaining, headroom, target))
+        and remaining > _EPSILON_KW
+        and headroom > _EPSILON_KW
+        and target > _EPSILON_KW
+    )
+
+
 def assess_foxess_control_write_authority(
     control: ControlState,
     *,
