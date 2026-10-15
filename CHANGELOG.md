@@ -1,3 +1,13 @@
+## 0.9.0-alpha9.99 — house-aware physical net-export proof
+
+- Correct FoxESS Force Discharge interpretation: the inverter needs to cover measured non-solar household load **plus** the planned grid export; the previous 1.0 kW *total discharge* stage could produce no measured export when the home consumed more than 1 kW.
+- The initial proof now caps the **net export target** to 1.0 kW and bounds total inverter discharge by the independent KEMS total-discharge plan, verified FoxESS export ceiling, battery discharge limit and inverter/solar headroom. Unavailable, invalid or insufficient house/solar telemetry fails closed before any paid-export write.
+- Keep the existing two fresh physical battery/grid direction samples, 3-failure lockout, reviewed readbacks, 7 kW DNO export ceiling, EV safety, battery SOC reserve, cheap-period restrictions and restoration safeguards.
+- When a 1 kW stage's battery output is insufficient to cover measured home demand, treat absent grid export as inconclusive instead of permanently counting it as an inverter proof failure.
+- Migrate the obsolete persisted pre-Alpha9.99 stage lockout only once, after reloading the entire original FoxESS rollback baseline. Fresh physical proof remains mandatory before full Agile output; subsequent genuine failures still persist.
+- Add isolated production-function regression tests for home load, solar, ceiling/headroom, invalid telemetry, persisted rollback state and decisive/inconclusive direction evidence.
+- This release does not fix the separate Home Assistant watchdog, Modbus polling or cloud Ohme outages. Do not attempt supervised physical export testing until their readiness gates are healthy.
+
 ## 0.9.0-alpha9.98 — bounded plugged-in Ohme outage export continuity
 
 - Paid Agile Control only: after a freshly confirmed connected-but-idle Ohme reading, allow a single, non-renewable 60-second outage window instead of immediately cancelling deliberate grid export on cloud API `unavailable`.
