@@ -91,9 +91,7 @@ def test_today_side_by_side_uses_bill_equivalent_source() -> None:
     source = (root / "dashboards/kems_master_dashboard.yaml").read_text()
     packaged = (root / "custom_components/kems/kems_master_dashboard.yaml").read_text()
     assert source == packaged
-    home = source.split("  - title: Home", 1)[1].split(
-        "  - title: Live Data", 1
-    )[0]
+    home = source.split("  - title: Home", 1)[1].split("  - title: Live Data", 1)[0]
     second = source.split("title: Today — side by side", 1)[1].split(
         "- type: history-graph", 1
     )[0]
