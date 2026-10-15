@@ -314,7 +314,9 @@ def test_happy_hour_live_booking_must_match_active_event() -> None:
         booking, plan, start - timedelta(seconds=1)
     )
     assert not booked_happy_hour_matches_plan(
-        booking, {"start": start.isoformat(), "end": (end + timedelta(hours=1)).isoformat()}, start
+        booking,
+        {"start": start.isoformat(), "end": (end + timedelta(hours=1)).isoformat()},
+        start,
     )
     assert not booked_happy_hour_matches_plan(
         {**booking, "status": "recommended"}, plan, start
