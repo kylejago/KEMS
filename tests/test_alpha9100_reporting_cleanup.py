@@ -83,7 +83,6 @@ def test_actual_roi_still_uses_meter_based_no_system_ledger() -> None:
     assert "actual_value = ledger.actual_system_value_pence / 100" in roi
 
 
-
 def test_today_finance_cards_use_bill_equivalent_source() -> None:
     """Both Today cards must use canonical bill totals without net-simulation fallback."""
     from pathlib import Path
