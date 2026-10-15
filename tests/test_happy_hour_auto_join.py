@@ -9,6 +9,7 @@ import pytest
 from custom_components.kems.happy_hour_auto_join import (
     HappyHourCandidate,
     RateSlot,
+    _booking_soc,
     _simulation_soc,
     auto_join_control_gate,
     choose_best_candidate,
@@ -281,3 +282,16 @@ def test_happy_hour_charge_authority_fail_closed(override) -> None:
     assert assess_happy_hour_charge_authority(**evidence)
     evidence.update(override)
     assert not assess_happy_hour_charge_authority(**evidence)
+
+
+def test_live_happy_hour_booking_requires_measured_soc() -> None:
+    data = SimpleNamespace(
+        simulation=SimpleNamespace(simulated_battery_soc=95),
+        snapshot=SimpleNamespace(battery_soc=20),
+    )
+    assert _booking_soc(data, operating_mode="control") == 20.0
+    assert _booking_soc(data, operating_mode="simulate") == 95.0
+    data.snapshot.battery_soc = None
+    assert _booking_soc(data, operating_mode="control") is None
+    data.snapshot.battery_soc = 101
+    assert _booking_soc(data, operating_mode="control") is None
