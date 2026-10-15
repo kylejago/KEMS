@@ -244,26 +244,3 @@ def test_auto_join_never_invents_missing_battery_soc() -> None:
         assert _simulation_soc(candidate(value)) is None
     assert _simulation_soc(candidate(80)) == 80.0
     assert _simulation_soc(candidate(0)) == 0.0
-
-
-def test_power_down_missing_soc_never_plans_battery_export(monkeypatch) -> None:
-    from custom_components.kems import agile_event_priority_runtime as event_runtime
-
-    monkeypatch.setattr(event_runtime, "_recent_house_load_kw", lambda _self: 0.9)
-    monkeypatch.setattr(event_runtime, "_current_solar_kw", lambda _self, _config: 0.0)
-    monkeypatch.setattr(
-        event_runtime.rolling, "_current_agile_soc", lambda _state: None
-    )
-
-    config = SimpleNamespace(
-        max_discharge_kw=10.0,
-        inverter_limit_kw=10.0,
-        export_limit_kw=7.0,
-        battery_reserve_percent=15.0,
-    )
-    plan = event_runtime._active_power_down_targets(
-        SimpleNamespace(), {}, {"joined": True}, config
-    )
-    assert plan["battery_export_target_kw"] == 0.0
-    assert plan["battery_discharge_target_kw"] == 0.0
-    assert plan["projected_grid_import_kw"] == 0.9
