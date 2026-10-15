@@ -665,7 +665,6 @@ def _booking_soc(data: Any, *, operating_mode: str) -> float | None:
     return value
 
 
-
 def booked_happy_hour_matches_plan(
     booking: Mapping[str, Any], plan: Mapping[str, Any], now: datetime
 ) -> bool:
