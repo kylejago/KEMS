@@ -1,3 +1,11 @@
+## 0.9.0-alpha9.101 — Recorder-safe KEMS maintenance status
+
+- Fix the Home Assistant Recorder warning that `sensor.kems_maintenance_status` contains more than 16 KiB of state attributes. The maintenance notice is sometimes an intentionally large update payload; it must remain fully readable **live**, but Recorder should store only its compact state and standard metadata.
+- Reuse the established Alpha9.17 `MATCH_ALL` Recorder-safe entity wrapper for the previously omitted `KEMSMaintenanceStatusSensor`. Preserve the same entity ID, value, coordinator/orchestrator, live maintenance attributes, update verification, dashboard and restart behaviour.
+- Add regression tests to ensure the maintenance wrapper is installed at setup, only the Recorder attribute boundary changes, large live payloads remain available and no optimisation/forecasting/EV/FoxESS/update-installing code is modified.
+- No changes to live energy control, Agile strategy, solar forecasts, grid-only No KEMS baseline/ROI, comparison-switch setting, 25-second FoxESS Modbus polling, or 100%-when-feasible charging goal.
+- Release does **not** claim Home Assistant watchdog, go2rtc, Zigbee or cloud timeouts are fixed. After installing, check for *new* Recorder oversize warnings; historic log entries remain in old files.
+
 ## 0.9.0-alpha9.100 — optional what-if replay and compact diagnostics
 
 - **No change to live FoxESS or Ohme control, scheduling, forecasting, battery reserve, tariff handling or overnight charging target.** Full KEMS Live and the original no-solar/no-battery grid-only No KEMS ROI baseline are retained.
