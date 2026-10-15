@@ -1,4 +1,4 @@
-"""Manual, ROI-neutral physical export commissioning for Alpha9.83."""
+"""Explicit bounded export proof under No paid export or paid Agile tariffs."""
 
 from __future__ import annotations
 
@@ -80,12 +80,12 @@ def _ev_confirmed_safe_for_export(snapshot: Any) -> bool:
 class ExportCommissioningTestController:
     """Own one manually requested physical export commissioning session.
 
-    The real export tariff remains No paid export.  The session temporarily
-    grants only the reviewed Force Discharge/Export Power Limit authority:
-    1 kW physical proof first, then at most 60 seconds following the already
-    calculated Agile rolling export target.  Physical energy stays in history;
-    export income remains zero and any later cheap-grid recharge cost created
-    by the test is excluded from actual ROI value.
+    The selected tariff is never changed automatically. The session grants
+    only the reviewed Force Discharge/Export Power Limit authority: a 1 kW
+    physical net-export proof first, then at most 60 seconds following the
+    bounded Agile rolling target. No paid export remains ROI-neutral, while
+    paid Agile uses normal metered export settlement and actual recharge cost.
+    Both modes restore the verified FoxESS baseline or fail closed.
     """
 
     def __init__(self, hass: Any, entry_id: str) -> None:
