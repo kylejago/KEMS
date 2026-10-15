@@ -195,7 +195,6 @@ def should_freeze_owned_ev_hold(
     )
 
 
-
 def assess_happy_hour_charge_authority(
     *,
     joined_event_active: bool,
