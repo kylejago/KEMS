@@ -52,7 +52,6 @@ def _number(value: object) -> float | None:
         return None
 
 
-
 def _bounded_paid_export_discharge_setpoint(
     *,
     requested_grid_export_kw: object,
@@ -84,10 +83,7 @@ def _bounded_paid_export_discharge_setpoint(
         effective_export_limit_kw,
     )
     converted = tuple(_number(value) for value in values)
-    if any(
-        value is None or not isfinite(value) or value < 0.0
-        for value in converted
-    ):
+    if any(value is None or not isfinite(value) or value < 0.0 for value in converted):
         return None
     (
         requested,
@@ -287,9 +283,7 @@ class FoxESSControlBackend:
             # only an obsolete proof lockout once per protocol upgrade.
             # Full paid export remains gated on two NEW physical samples.
             proof_protocol = data.get("paid_export_proof_protocol")
-            legacy_paid_export_proof = (
-                proof_protocol != _PAID_EXPORT_PROOF_PROTOCOL
-            )
+            legacy_paid_export_proof = proof_protocol != _PAID_EXPORT_PROOF_PROTOCOL
             if legacy_paid_export_proof:
                 self._paid_export_stage_blocked = False
                 self._paid_export_stage_reason = (
@@ -615,7 +609,12 @@ class FoxESSControlBackend:
             return
 
         stale = set(getattr(snapshot, "stale_fields", ()) or ())
-        if {"battery_power_kw", "grid_export_kw", "solar_power_kw", "house_load_kw"} & stale:
+        if {
+            "battery_power_kw",
+            "grid_export_kw",
+            "solar_power_kw",
+            "house_load_kw",
+        } & stale:
             return
         solar = _number(getattr(snapshot, "solar_power_kw", None))
         house = _number(getattr(snapshot, "house_load_kw", None))
