@@ -390,3 +390,34 @@ def test_alpha9102_power_down_export_requires_independent_event_permission() -> 
     assert permitted.commands_permitted
     assert permitted.action == "force_discharge"
     assert permitted.force_discharge_power_kw == 2.0
+
+
+def test_alpha9102_happy_hour_charging_is_not_an_intelligent_cheap_slot() -> None:
+    control = _control(
+        operating_reason="happy_hour_reward_hour",
+        desired_work_mode="Force Charge",
+        desired_charge_power_kw=6.0,
+        desired_grid_export_allowed=False,
+        desired_battery_export_power_kw=0.0,
+    )
+    denied = _decision(control, no_paid_export_mode=False)
+    assert not denied.commands_permitted
+    permitted = _decision(
+        control,
+        no_paid_export_mode=False,
+        happy_hour_charge_authorised=True,
+    )
+    assert permitted.commands_permitted
+    assert permitted.action == "force_charge"
+    assert permitted.force_charge_power_kw == 6.0
+    assert "Happy Hour" in permitted.reason
+    wrong_reason = _decision(
+        _control(
+            operating_reason="agile_rolling",
+            desired_work_mode="Force Charge",
+            desired_charge_power_kw=6.0,
+        ),
+        no_paid_export_mode=False,
+        happy_hour_charge_authorised=True,
+    )
+    assert not wrong_reason.commands_permitted
