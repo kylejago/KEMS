@@ -587,13 +587,7 @@ def verified_live_happy_hour_charge_kw(
     return round(safe_target, 3) if safe else 0.0
 
 
-def apply_happy_hour_control(
-    control: Any,
-    snapshot: Any,
-    context: dict[str, Any],
-    *,
-    live_charge_kw: float = 0.0,
-):
+def apply_happy_hour_control(control: Any, snapshot: Any, context: dict[str, Any]):
     """Overlay Happy Hour EV permission without widening normal cheap authority."""
     if not context.get("happy_hour_import_authority_active"):
         return control
@@ -601,21 +595,18 @@ def apply_happy_hour_control(
         getattr(snapshot, "ev_connected", False)
         and context.get("ev_happy_hour_allowed")
     )
+    live_charge_kw = _number(context.get("physical_charge_target_kw")) or 0.0
     return replace(
         control,
         operating_reason="happy_hour_reward_hour",
         desired_work_mode=(
             "Force Charge" if live_charge_kw > 0.001 else control.desired_work_mode
         ),
-        # A separate, genuinely confirmed Intelligent cheap slot retains its
-        # existing charge authority even if no Happy Hour booking is proven.
         desired_charge_power_kw=max(
-            live_charge_kw,
-            (
-                (_number(context.get("charge_target_kw")) or 0.0)
-                if getattr(snapshot, "cheap_period_confirmed", False)
-                else 0.0
-            ),
+            live_charge_kw
+            if live_charge_kw > 0.001
+            else (_number(context.get("charge_target_kw")) or 0.0),
+            0.0,
         ),
         desired_ev_charging_allowed=ev_allowed,
         desired_battery_to_home_power_kw=0.0,
