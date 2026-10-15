@@ -836,6 +836,11 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
             power_down_plan = agile_state.get("power_down_priority")
             if not isinstance(power_down_plan, dict):
                 power_down_plan = {}
+            if snapshot.saving_session_active or power_down_plan.get("active"):
+                # Independent override even if retained Happy Hour ledger data
+                # is late: Power Down always owns event-time dispatch and EV.
+                happy_hour_plan["happy_hour_import_authority_active"] = False
+                happy_hour_plan["ev_happy_hour_allowed"] = False
             happy_hour_live_charge_kw = verified_live_happy_hour_charge_kw(
                 booking=_controller_for(self).state,
                 context=happy_hour_plan,
