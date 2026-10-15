@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import json
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from kems_core import ControlState
 from kems_core.control_write_authority import (
+    active_joined_power_down_window,
     assess_foxess_control_write_authority,
     resolve_live_min_soc_on_grid,
 )
@@ -338,3 +340,53 @@ def test_normal_paid_agile_export_still_uses_bounded_force_discharge() -> None:
     assert result.action == "force_discharge"
     assert result.force_discharge_power_kw == 6.1
     assert result.export_power_limit_kw == 7.0
+
+
+def test_alpha9102_power_down_requires_joined_active_time_window() -> None:
+    now = datetime(2026, 10, 15, 18, 30, tzinfo=UTC)
+    start = now - timedelta(minutes=30)
+    end = now + timedelta(minutes=30)
+    assert active_joined_power_down_window(
+        joined=True, active=True, start=start, end=end, now=now
+    )
+    for joined, active, test_start, test_end, current in (
+        (False, True, start, end, now),
+        (True, False, start, end, now),
+        (True, True, start, end, end),
+        (True, True, start, end, start - timedelta(seconds=1)),
+        (True, True, None, end, now),
+        (True, True, start, None, now),
+        (True, True, end, start, now),
+        (True, True, start, start + timedelta(hours=5), now),
+    ):
+        assert not active_joined_power_down_window(
+            joined=joined,
+            active=active,
+            start=test_start,
+            end=test_end,
+            now=current,
+        )
+
+
+def test_alpha9102_power_down_export_requires_independent_event_permission() -> None:
+    control = _control(
+        operating_reason="power_down_session",
+        desired_work_mode="Feed-in First",
+        desired_battery_export_power_kw=2.0,
+        desired_grid_export_allowed=True,
+    )
+    denied = _decision(
+        control,
+        no_paid_export_mode=False,
+        effective_export_limit_kw=7.0,
+    )
+    assert not denied.commands_permitted
+    permitted = _decision(
+        control,
+        no_paid_export_mode=False,
+        effective_export_limit_kw=7.0,
+        power_down_export_authorised=True,
+    )
+    assert permitted.commands_permitted
+    assert permitted.action == "force_discharge"
+    assert permitted.force_discharge_power_kw == 2.0
