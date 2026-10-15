@@ -299,3 +299,40 @@ def test_current_release_identity_and_scope() -> None:
     assert "Deliberate/economic Force Discharge" in reason
     assert "Import Power Limit" in reason
     assert "Export Power Limit" in reason
+
+
+def test_power_down_deliberate_export_remains_fail_closed_before_event_authority() -> None:
+    """Do not promote Power Down export using ordinary paid Agile authority."""
+    control = _control(
+        operating_reason="power_down_session",
+        desired_work_mode="Feed-in First",
+        desired_battery_export_power_kw=4.0,
+        desired_grid_export_allowed=True,
+    )
+    result = _decision(
+        control,
+        no_paid_export_mode=False,
+        effective_export_limit_kw=7.0,
+    )
+    assert result.backend_available is True
+    assert result.commands_permitted is False
+    assert result.action == "release"
+    assert "Power Down deliberate export" in result.reason
+
+
+def test_normal_paid_agile_export_still_uses_bounded_force_discharge() -> None:
+    control = _control(
+        operating_reason="agile_rolling_normal",
+        desired_work_mode="Feed-in First",
+        desired_battery_export_power_kw=6.1,
+        desired_grid_export_allowed=True,
+    )
+    result = _decision(
+        control,
+        no_paid_export_mode=False,
+        effective_export_limit_kw=7.0,
+    )
+    assert result.commands_permitted is True
+    assert result.action == "force_discharge"
+    assert result.force_discharge_power_kw == 6.1
+    assert result.export_power_limit_kw == 7.0
