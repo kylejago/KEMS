@@ -406,14 +406,15 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
         if data is None:
             return False, "KEMS has no current coordinator data yet"
         readiness = build_commissioning_snapshot(self.hass, self)
+        selected_export_tariff = export_tariff_type_from_options(
+            self.entry.options
+        )
         started, reason = await self._export_commissioning_test.async_start(
             snapshot=data.snapshot,
             control=data.control,
             agile_state=self._agile_smart_export.state,
-            no_paid_export_mode=(
-                export_tariff_type_from_options(self.entry.options)
-                == EXPORT_TARIFF_TYPE_NONE
-            ),
+            no_paid_export_mode=selected_export_tariff == EXPORT_TARIFF_TYPE_NONE,
+            paid_agile_mode=selected_export_tariff == EXPORT_TARIFF_TYPE_AGILE,
             technical_ready=bool(readiness.get("ready_for_control")),
             emergency_stop=bool(self.settings.control.emergency_stop),
             ev_hold_active=self._export_commissioning_ev_hold_active(),
@@ -911,6 +912,7 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                     config=self.settings.control,
                     backend_status=self._foxess_control.status,
                     no_paid_export_mode=base_simulation.no_export_mode_active,
+                    paid_agile_mode=tariff_type == EXPORT_TARIFF_TYPE_AGILE,
                     emergency_stop=bool(self.settings.control.emergency_stop),
                     ev_hold_active=self._export_commissioning_ev_hold_active(),
                     now=now,
