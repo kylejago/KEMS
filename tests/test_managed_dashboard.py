@@ -115,7 +115,10 @@ def test_managed_sync_uses_canonical_finaliser() -> None:
     root = Path(__file__).parents[1]
     source = (root / "custom_components/kems/dashboard.py").read_text()
     assert "from .dashboard_pipeline import _finalise_dashboard_bytes" in source
-    assert 'return _finalise_dashboard_bytes(f"{master}\\n\\n{agile_views}".encode())' in source
+    assert (
+        'return _finalise_dashboard_bytes(f"{master}\\n\\n{agile_views}".encode())'
+        in source
+    )
     assert "dashboard_bytes = await hass.async_add_executor_job(" in source
     assert "_combined_master_dashboard_bytes" in source
 
