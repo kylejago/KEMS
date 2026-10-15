@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
 from math import isfinite
 
 from .models import ControlState
@@ -195,6 +196,30 @@ def should_freeze_owned_ev_hold(
     )
 
 
+
+def active_joined_power_down_window(
+    *,
+    joined: bool,
+    active: bool,
+    start: datetime | None,
+    end: datetime | None,
+    now: datetime,
+) -> bool:
+    """Independently verify an active, joined, time-bounded Power Down."""
+    return bool(
+        joined
+        and active
+        and start is not None
+        and end is not None
+        and start.tzinfo is not None
+        and end.tzinfo is not None
+        and now.tzinfo is not None
+        and start < end
+        and start <= now < end
+        and (end - start).total_seconds() <= 4 * 3600
+    )
+
+
 def assess_happy_hour_charge_authority(
     *,
     joined_event_active: bool,
@@ -246,6 +271,7 @@ def assess_foxess_control_write_authority(
     master_control_enabled: bool,
     emergency_stop: bool,
     effective_export_limit_kw: float | None = None,
+    power_down_export_authorised: bool = False,
 ) -> FoxESSControlDecision:
     """Return the bounded hardware action for the current physical policy.
 
@@ -308,6 +334,7 @@ def assess_foxess_control_write_authority(
         not no_paid_export_mode
         and control.operating_reason == "power_down_session"
         and desired_export > _EPSILON_KW
+        and not power_down_export_authorised
     ):
         return blocked("Power Down deliberate export is not promoted by Alpha9.82")
 
