@@ -272,6 +272,7 @@ def assess_foxess_control_write_authority(
     emergency_stop: bool,
     effective_export_limit_kw: float | None = None,
     power_down_export_authorised: bool = False,
+    happy_hour_charge_authorised: bool = False,
 ) -> FoxESSControlDecision:
     """Return the bounded hardware action for the current physical policy.
 
@@ -352,8 +353,18 @@ def assess_foxess_control_write_authority(
 
     min_soc = round(control.desired_min_soc_percent, 1)
     if control.desired_work_mode == "Force Charge":
-        if not cheap_period_confirmed:
-            return blocked("Force Charge is not backed by a confirmed cheap period")
+        event_charge = bool(
+            happy_hour_charge_authorised
+            and control.operating_reason == "happy_hour_reward_hour"
+            and not control.desired_grid_export_allowed
+            and desired_export <= _EPSILON_KW
+            and not control.site_import_limit_exceeded
+        )
+        if not cheap_period_confirmed and not event_charge:
+            return blocked(
+                "Force Charge requires confirmed Intelligent cheap slot "
+                "or separately validated joined Happy Hour"
+            )
         if control.desired_charge_power_kw <= _EPSILON_KW:
             return FoxESSControlDecision(
                 backend_available=True,
@@ -366,7 +377,11 @@ def assess_foxess_control_write_authority(
             backend_available=True,
             commands_permitted=True,
             action="force_charge",
-            reason="Confirmed cheap-period charging is inside the bounded live scope",
+            reason=(
+                "Confirmed joined Happy Hour bounded reward charging"
+                if event_charge and not cheap_period_confirmed
+                else "Confirmed cheap-period charging is inside the bounded live scope"
+            ),
             force_charge_power_kw=round(control.desired_charge_power_kw, 3),
             min_soc_on_grid_percent=min_soc,
         )
