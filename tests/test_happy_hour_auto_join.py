@@ -244,3 +244,39 @@ def test_auto_join_never_invents_missing_battery_soc() -> None:
         assert _simulation_soc(candidate(value)) is None
     assert _simulation_soc(candidate(80)) == 80.0
     assert _simulation_soc(candidate(0)) == 0.0
+
+
+@pytest.mark.parametrize(
+    "override",
+    [
+        {"joined_event_active": False},
+        {"reward_ledger_complete": False},
+        {"remaining_reward_kwh": 0.0},
+        {"remaining_reward_kwh": float("nan")},
+        {"battery_headroom_kwh": None},
+        {"battery_headroom_kwh": 0.0},
+        {"charge_target_kw": 0.0},
+        {"charge_target_kw": float("inf")},
+        {"power_down_active": True},
+        {"grid_available": False},
+        {"emergency_stop": True},
+    ],
+)
+def test_happy_hour_charge_authority_fail_closed(override) -> None:
+    from custom_components.kems.kems_core.control_write_authority import (
+        assess_happy_hour_charge_authority,
+    )
+
+    evidence = {
+        "joined_event_active": True,
+        "reward_ledger_complete": True,
+        "remaining_reward_kwh": 10.0,
+        "battery_headroom_kwh": 20.0,
+        "charge_target_kw": 5.0,
+        "power_down_active": False,
+        "grid_available": True,
+        "emergency_stop": False,
+    }
+    assert assess_happy_hour_charge_authority(**evidence)
+    evidence.update(override)
+    assert not assess_happy_hour_charge_authority(**evidence)
