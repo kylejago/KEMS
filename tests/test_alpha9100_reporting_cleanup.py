@@ -81,3 +81,26 @@ def test_actual_roi_still_uses_meter_based_no_system_ledger() -> None:
         in simulation
     )
     assert "actual_value = ledger.actual_system_value_pence / 100" in roi
+
+
+def test_today_side_by_side_uses_bill_equivalent_source() -> None:
+    """The comparison card must retain canonical bill totals."""
+    from pathlib import Path
+
+    root = Path(__file__).parents[1]
+    source = (root / "dashboards/kems_master_dashboard.yaml").read_text()
+    packaged = (root / "custom_components/kems/kems_master_dashboard.yaml").read_text()
+    assert source == packaged
+    first = source.split("title: Today — Live Data vs KEMS", 1)[1].split(
+        "title: Current power flow", 1
+    )[0]
+    second = source.split("title: Today — side by side", 1)[1].split(
+        "- type: history-graph", 1
+    )[0]
+    assert "sensor.kems_simulated_kems_cost_today" in first
+    assert "sensor.kems_energy_cost_comparison" in second
+    assert "total_energy_cost_pence" in second
+    assert "electricity_total_cost_pence" in second
+    assert "gas_total_cost_pence" in second
+    assert "sensor.kems_simulated_kems_cost_today" not in second
+    assert "not interchangeable with this total" in second

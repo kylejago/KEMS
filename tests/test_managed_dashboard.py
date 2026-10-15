@@ -106,3 +106,18 @@ def test_kems_setup_syncs_managed_dashboard() -> None:
     assert 'MANAGED_DASHBOARD_FILENAME = "kems_master_dashboard.yaml"' in sync
     assert "hass.config.path(MANAGED_DASHBOARD_FILENAME)" in sync
     assert "os.replace(temporary, target)" in sync
+
+
+def test_managed_sync_uses_canonical_finaliser() -> None:
+    """The actual HA sync path must apply the bill-aware finaliser."""
+    from pathlib import Path
+
+    root = Path(__file__).parents[1]
+    source = (root / "custom_components/kems/dashboard.py").read_text()
+    assert "from .dashboard_pipeline import _finalise_dashboard_bytes" in source
+    assert (
+        'return _finalise_dashboard_bytes(f"{master}\\n\\n{agile_views}".encode())'
+        in source
+    )
+    assert "dashboard_bytes = await hass.async_add_executor_job(" in source
+    assert "_combined_master_dashboard_bytes" in source

@@ -539,8 +539,8 @@ views:
           | Total energy cost | {{ ('£%.2f' | format(base_total / 100)) if base_total is not none else '—' }} | {{ ('£%.2f' | format((live.get('total_energy_cost_pence') | float) / 100)) if live.get('total_energy_cost_pence') is not none else '—' }} | {{ ('£%.2f' | format((kems.get('total_energy_cost_pence') | float) / 100)) if kems.get('total_energy_cost_pence') is not none else '—' }} |
           | Electricity | {{ ('£%.2f' | format(base_e / 100)) if base_e is not none else '—' }} | {{ ('£%.2f' | format((live.get('electricity_total_cost_pence') | float) / 100)) if live.get('electricity_total_cost_pence') is not none else '—' }} | {{ ('£%.2f' | format((kems.get('electricity_total_cost_pence') | float) / 100)) if kems.get('electricity_total_cost_pence') is not none else '—' }} |
           | Gas | {{ ('£%.2f' | format((gas | float) / 100)) if gas is not none else '—' }} | {{ ('£%.2f' | format((live.get('gas_total_cost_pence') | float) / 100)) if live.get('gas_total_cost_pence') is not none else '—' }} | {{ ('£%.2f' | format((kems.get('gas_total_cost_pence') | float) / 100)) if kems.get('gas_total_cost_pence') is not none else '—' }} |
-          | Grid import | {{ state_attr('sensor.kems_compare_no_system_cost_today', 'grid_import_kwh') or '—' }} | {{ live.get('grid_import_kwh', '—') }} | {{ kems.get('grid_import_kwh', '—') }} |
-          | Grid export | {{ state_attr('sensor.kems_compare_no_system_cost_today', 'grid_export_kwh') or 0 }} | {{ live.get('grid_export_kwh', '—') }} | {{ kems.get('grid_export_kwh', '—') }} |
+          | Grid import | {{ state_attr('sensor.kems_compare_no_system_cost_today', 'grid_import_kwh') if state_attr('sensor.kems_compare_no_system_cost_today', 'grid_import_kwh') is not none else '—' }} | {{ live.get('grid_import_kwh', '—') }} | {{ kems.get('grid_import_kwh', '—') }} |
+          | Grid export | {{ state_attr('sensor.kems_compare_no_system_cost_today', 'grid_export_kwh') if state_attr('sensor.kems_compare_no_system_cost_today', 'grid_export_kwh') is not none else '—' }} | {{ live.get('grid_export_kwh', '—') }} | {{ kems.get('grid_export_kwh', '—') }} |
 
           {% if base_total is not none and live.get('total_energy_cost_pence') is not none %}
           **Live system value vs no system:** £{{ '%.2f' | format((base_total - (live.get('total_energy_cost_pence') | float)) / 100) }}
@@ -548,6 +548,8 @@ views:
           {% if base_total is not none and kems.get('total_energy_cost_pence') is not none %}
           **KEMS potential value vs no system:** £{{ '%.2f' | format((base_total - (kems.get('total_energy_cost_pence') | float)) / 100) }}
           {% endif %}
+
+          _Both Live and KEMS bill-equivalent totals come from the same comparison report. If KEMS is unavailable, the simulated bill has not been published; standalone net simulation figures are not interchangeable with this total. The no-system baseline is a separate counterfactual estimate._
 
       - type: history-graph
         title: Electricity cost — Live vs KEMS

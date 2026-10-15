@@ -134,7 +134,9 @@ def _combined_master_dashboard_bytes() -> bytes:
     master = _dashboard_readability_pass(master)
     master = _inject_power_down_card(master)
     agile_views = _dashboard_readability_pass(agile_views)
-    return f"{master}\n\n{agile_views}".encode()
+    from .dashboard_pipeline import _finalise_dashboard_bytes
+
+    return _finalise_dashboard_bytes(f"{master}\n\n{agile_views}".encode())
 
 
 def _managed_panel_bytes() -> bytes:
