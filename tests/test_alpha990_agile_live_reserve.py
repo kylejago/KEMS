@@ -310,3 +310,34 @@ def test_ohme_unavailable_prevents_export_regardless_of_soc_confidence() -> None
     guarded, detail = _guard(snapshot=observed)
     assert guarded.desired_battery_export_power_kw == 0.0
     assert "EV connected/uncertain" in detail["reason"]
+
+
+def test_alpha9102_joined_power_down_uses_physical_house_reserve() -> None:
+    session = _snapshot(saving_session_active=True, battery_soc=100.0)
+    old, old_report = _guard(snapshot=session)
+    assert old_report["status"] == "higher_priority_cheap_or_event"
+    assert old.desired_battery_export_power_kw == 6.4
+
+    permitted, report = guard_paid_agile_physical_export(
+        _control(),
+        session,
+        _forecast(),
+        SimulationConfig(),
+        ControlConfig(stale_data_seconds=180),
+        now=NOW,
+        power_down_export_authorised=True,
+    )
+    assert permitted.desired_battery_export_power_kw == 6.4
+    assert report["status"] == "permitted_with_physical_house_budget"
+
+    blocked, report = guard_paid_agile_physical_export(
+        _control(),
+        _snapshot(saving_session_active=True, battery_soc=44.0),
+        _forecast(),
+        SimulationConfig(),
+        ControlConfig(stale_data_seconds=180),
+        now=NOW,
+        power_down_export_authorised=True,
+    )
+    assert blocked.desired_battery_export_power_kw == 0.0
+    assert report["status"] == "blocked"
