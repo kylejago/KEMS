@@ -148,7 +148,8 @@ def test_first_physical_export_is_staged_and_limit_is_verified_first() -> None:
     assert "_PAID_EXPORT_STAGE_KW = 1.0" in source
     assert "_PAID_EXPORT_PROOF_SAMPLES = 2" in source
     assert "_PAID_EXPORT_FAILURE_SAMPLES = 3" in source
-    assert "requested_discharge = min(" in live
+    assert "_bounded_paid_export_discharge_setpoint(" in live
+    assert "staging=not self._paid_export_live_proven" in live
     assert "requested_discharge," in live
     export_write = live.index("export_limit_ok = await self._async_number(")
     export_verify = live.index(
