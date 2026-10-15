@@ -121,4 +121,3 @@ def test_managed_sync_uses_canonical_finaliser() -> None:
     )
     assert "dashboard_bytes = await hass.async_add_executor_job(" in source
     assert "_combined_master_dashboard_bytes" in source
-
