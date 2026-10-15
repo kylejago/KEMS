@@ -291,7 +291,7 @@ def test_current_release_identity_and_scope() -> None:
     bundle = json.loads(BUNDLE.read_text(encoding="utf-8"))
     reason = str(bundle["maintenance"]["reason"])
 
-    assert manifest["version"] == "0.9.0-alpha9.100"
+    assert manifest["version"] == "0.9.0-alpha9.101"
     assert reason.startswith("Alpha9.84")
     assert "Self Use" in reason
     assert "confirmed-cheap Force Charge" in reason

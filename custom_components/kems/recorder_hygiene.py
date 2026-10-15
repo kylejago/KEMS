@@ -306,6 +306,11 @@ def install_alpha917_recorder_hygiene() -> None:
     class RecorderSafeUpdateStatusSensor(updater.KEMSUpdateStatusSensor):
         _unrecorded_attributes = RECORDER_LIVE_ONLY_ATTRIBUTES
 
+    class RecorderSafeMaintenanceStatusSensor(updater.KEMSMaintenanceStatusSensor):
+        """Keep the full live notice while recording only compact state data."""
+
+        _unrecorded_attributes = RECORDER_LIVE_ONLY_ATTRIBUTES
+
     async def setup_with_recorder_hygiene(
         hass: HomeAssistant,
         entry: ConfigEntry,
@@ -343,6 +348,13 @@ def install_alpha917_recorder_hygiene() -> None:
                 elif isinstance(entity, updater.KEMSUpdateStatusSensor):
                     repaired.append(
                         RecorderSafeUpdateStatusSensor(
+                            entity.coordinator,
+                            entity.orchestrator,
+                        )
+                    )
+                elif isinstance(entity, updater.KEMSMaintenanceStatusSensor):
+                    repaired.append(
+                        RecorderSafeMaintenanceStatusSensor(
                             entity.coordinator,
                             entity.orchestrator,
                         )

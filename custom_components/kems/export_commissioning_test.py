@@ -1,4 +1,4 @@
-"""Manual, ROI-neutral physical export commissioning for Alpha9.83."""
+"""Explicit bounded export proof under No paid export or paid Agile tariffs."""
 
 from __future__ import annotations
 
@@ -80,12 +80,12 @@ def _ev_confirmed_safe_for_export(snapshot: Any) -> bool:
 class ExportCommissioningTestController:
     """Own one manually requested physical export commissioning session.
 
-    The real export tariff remains No paid export.  The session temporarily
-    grants only the reviewed Force Discharge/Export Power Limit authority:
-    1 kW physical proof first, then at most 60 seconds following the already
-    calculated Agile rolling export target.  Physical energy stays in history;
-    export income remains zero and any later cheap-grid recharge cost created
-    by the test is excluded from actual ROI value.
+    The selected tariff is never changed automatically. The session grants
+    only the reviewed Force Discharge/Export Power Limit authority: a 1 kW
+    physical net-export proof first, then at most 60 seconds following the
+    bounded Agile rolling target. No paid export remains ROI-neutral, while
+    paid Agile uses normal metered export settlement and actual recharge cost.
+    Both modes restore the verified FoxESS baseline or fail closed.
     """
 
     def __init__(self, hass: Any, entry_id: str) -> None:
@@ -104,6 +104,7 @@ class ExportCommissioningTestController:
         self._stop_reason: str | None = None
         self._latest_agile_target_kw: float | None = None
         self._physical_only_commissioning = False
+        self._paid_agile_session = False
         self._command_target_kw = 0.0
         self._peak_grid_export_kw = 0.0
         self._exported_kwh = 0.0
@@ -166,9 +167,20 @@ class ExportCommissioningTestController:
                 )
             },
             "financial_scope": "commissioning",
-            "export_income_policy": "zero_no_paid_export",
+            "real_export_tariff": (
+                "Agile Outgoing" if self._paid_agile_session else "No paid export"
+            ),
+            "export_income_policy": (
+                "normal_live_agile_interval_settlement"
+                if self._paid_agile_session
+                else "zero_no_paid_export"
+            ),
             "physical_energy_history": "retained",
-            "actual_roi_policy": "exclude_test_recharge_cost",
+            "actual_roi_policy": (
+                "normal_paid_agile_accounting"
+                if self._paid_agile_session
+                else "exclude_test_recharge_cost"
+            ),
             "simulated_roi_policy": "unchanged_counterfactual",
             "history": list(self._history),
         }
@@ -178,6 +190,7 @@ class ExportCommissioningTestController:
         data = await self._store.async_load()
         if not isinstance(data, dict):
             return
+        self._paid_agile_session = data.get("paid_agile_session") is True
         self._recharge_debt_stored_kwh = max(
             _number(data.get("recharge_debt_stored_kwh")) or 0.0,
             0.0,
@@ -228,6 +241,7 @@ class ExportCommissioningTestController:
             {
                 "active": self.active,
                 "stage": self._stage,
+                "paid_agile_session": self._paid_agile_session,
                 "requested_at": _iso(self._requested_at),
                 "measured_commissioning_export_kwh": self._exported_kwh,
                 "peak_measured_grid_export_kw": self._peak_grid_export_kw,
@@ -246,14 +260,16 @@ class ExportCommissioningTestController:
         control: ControlState,
         agile_state: dict[str, Any],
         no_paid_export_mode: bool,
+        paid_agile_mode: bool = False,
         technical_ready: bool,
         emergency_stop: bool,
         ev_hold_active: bool,
     ) -> str | None:
         """Return a fail-closed reason or None when a test may begin."""
-        if not no_paid_export_mode:
+        if no_paid_export_mode == paid_agile_mode:
             return (
-                "Export commissioning requires the real tariff to remain No paid export"
+                "Export commissioning requires exactly one selected tariff: "
+                "No paid export or Agile Outgoing"
             )
         if control.operating_mode != "control":
             return "KEMS Mode must be Control"
@@ -303,6 +319,7 @@ class ExportCommissioningTestController:
         control: ControlState,
         agile_state: dict[str, Any],
         no_paid_export_mode: bool,
+        paid_agile_mode: bool = False,
         technical_ready: bool,
         emergency_stop: bool,
         ev_hold_active: bool,
@@ -316,6 +333,7 @@ class ExportCommissioningTestController:
             control=control,
             agile_state=agile_state,
             no_paid_export_mode=no_paid_export_mode,
+            paid_agile_mode=paid_agile_mode,
             technical_ready=technical_ready,
             emergency_stop=emergency_stop,
             ev_hold_active=ev_hold_active,
@@ -332,6 +350,7 @@ class ExportCommissioningTestController:
         self._completed_at = None
         self._stop_reason = None
         self._latest_agile_target_kw = agile_export_target_kw(agile_state)
+        self._paid_agile_session = paid_agile_mode
         self._physical_only_commissioning = (
             self._latest_agile_target_kw is not None
             and self._latest_agile_target_kw <= 0.01
@@ -370,11 +389,15 @@ class ExportCommissioningTestController:
         snapshot: Any,
         control: ControlState,
         no_paid_export_mode: bool,
+        paid_agile_mode: bool = False,
         emergency_stop: bool,
         ev_hold_active: bool,
     ) -> str | None:
         """Return a reason that requires immediate fail-safe restoration."""
-        if not no_paid_export_mode:
+        if (
+            self._paid_agile_session != paid_agile_mode
+            or no_paid_export_mode == paid_agile_mode
+        ):
             return "Real export tariff changed during commissioning"
         if control.operating_mode != "control":
             return "KEMS left Control mode"
@@ -416,6 +439,7 @@ class ExportCommissioningTestController:
         config: ControlConfig,
         backend_status: dict[str, Any],
         no_paid_export_mode: bool,
+        paid_agile_mode: bool = False,
         emergency_stop: bool,
         ev_hold_active: bool,
         now: datetime,
@@ -428,6 +452,7 @@ class ExportCommissioningTestController:
             snapshot=snapshot,
             control=control,
             no_paid_export_mode=no_paid_export_mode,
+            paid_agile_mode=paid_agile_mode,
             emergency_stop=emergency_stop,
             ev_hold_active=ev_hold_active,
         )
@@ -545,8 +570,9 @@ class ExportCommissioningTestController:
                 ),
                 plan_safe=True,
                 blocked_reason=(
-                    "Manual export commissioning only; real export tariff remains "
-                    "No paid export and export income remains zero"
+                    "Manual export commissioning only; real export tariff "
+                    "remains unchanged, with the selected tariff's normal "
+                    "metered financial accounting"
                 ),
                 next_action=(
                     "Prove 1 kW battery discharge and physical grid export"
@@ -704,7 +730,11 @@ class ExportCommissioningTestController:
             float(getattr(config, "discharge_efficiency", 0.95)),
             0.01,
         )
-        self._recharge_debt_stored_kwh += max(discharged_stored, 0.0)
+        if not self._paid_agile_session:
+            # An unpaid proof is financially neutralised on later cheap
+            # recharging. A paid Agile test instead retains both its actual
+            # metered income and genuine recharge cost in the normal ROI.
+            self._recharge_debt_stored_kwh += max(discharged_stored, 0.0)
         result = {
             "requested_at": _iso(self._requested_at),
             "completed_at": _iso(now),
@@ -713,8 +743,16 @@ class ExportCommissioningTestController:
             "measured_export_kwh": round(self._exported_kwh, 5),
             "peak_grid_export_kw": round(self._peak_grid_export_kw, 3),
             "agile_target_kw": self._latest_agile_target_kw,
-            "roi_included": False,
-            "export_income_pence": 0.0,
+            "paid_agile_session": self._paid_agile_session,
+            "roi_included": self._paid_agile_session,
+            "export_income_policy": (
+                "normal_live_agile_interval_settlement"
+                if self._paid_agile_session
+                else "zero_no_paid_export"
+            ),
+            # Only the independent actual export ledger can correctly price
+            # half-hour intervals. Never fabricate a test-specific revenue.
+            "export_income_pence": None if self._paid_agile_session else 0.0,
         }
         self._history = [*self._history[-(_HISTORY_LIMIT - 1) :], result]
         self._active = False
@@ -735,10 +773,11 @@ class ExportCommissioningTestController:
     ) -> SimulationState:
         """Exclude only replacement-energy cost from actual ROI value.
 
-        Measured import/export energy and actual import cost stay truthful.  With
-        the real tariff still No paid export, actual export income is already
-        zero.  The only financial side effect to neutralise is the later cost of
-        restoring battery energy spent by this physical test.
+        Measured import/export energy and actual import cost stay truthful.
+        With No paid export selected, income is zero and only the replacement
+        energy cost from that unpaid session is neutralised. With Agile Outgoing
+        selected, the normal metered export income and replacement cost are both
+        retained; no new ROI adjustment is created for the paid session.
         """
         excluded = self._roi_excluded_recharge_cost_pence_by_date.get(
             now.date().isoformat(),
