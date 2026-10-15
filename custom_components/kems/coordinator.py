@@ -406,9 +406,7 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
         if data is None:
             return False, "KEMS has no current coordinator data yet"
         readiness = build_commissioning_snapshot(self.hass, self)
-        selected_export_tariff = export_tariff_type_from_options(
-            self.entry.options
-        )
+        selected_export_tariff = export_tariff_type_from_options(self.entry.options)
         started, reason = await self._export_commissioning_test.async_start(
             snapshot=data.snapshot,
             control=data.control,
