@@ -51,25 +51,19 @@ views:
       - type: markdown
         title: Today — Live Data vs KEMS
         content: |
-          {% set bill_periods = state_attr('sensor.kems_energy_cost_comparison', 'periods') or {} %}
-          {% set bill = bill_periods.get('today', {}) or {} %}
-          {% set live_bill = bill.get('live_data', {}) or {} %}
-          {% set kems_bill = bill.get('kems', {}) or {} %}
-          {% set live_total = live_bill.get('total_energy_cost_pence') %}
-          {% set kems_total = kems_bill.get('total_energy_cost_pence') %}
-          {% set saving = bill.get('saving_pence') %}
-          {% set gas = live_bill.get('gas_total_cost_pence') %}
+          {% set live_e = states('sensor.kems_observed_cost_today') | float(0) %}
+          {% set kems_e = states('sensor.kems_simulated_kems_cost_today') | float(0) %}
+          {% set gas = states('sensor.kems_gas_cost_today') | float(0) %}
+          {% set saving = live_e - kems_e %}
           | Today | Live Data | KEMS |
           |---|---:|---:|
-          | Electricity (bill equivalent) | {{ ('£%.2f' | format((live_bill.get('electricity_total_cost_pence') | float) / 100)) if live_bill.get('electricity_total_cost_pence') is not none else '—' }} | {{ ('£%.2f' | format((kems_bill.get('electricity_total_cost_pence') | float) / 100)) if kems_bill.get('electricity_total_cost_pence') is not none else '—' }} |
-          | Gas cost | {{ ('£%.2f' | format((gas | float) / 100)) if gas is not none else '—' }} | {{ ('£%.2f' | format((kems_bill.get('gas_total_cost_pence') | float) / 100)) if kems_bill.get('gas_total_cost_pence') is not none else '—' }} |
-          | **Total energy cost** | **{{ ('£%.2f' | format((live_total | float) / 100)) if live_total is not none else '—' }}** | **{{ ('£%.2f' | format((kems_total | float) / 100)) if kems_total is not none else '—' }}** |
-          | Grid import | {{ live_bill.get('grid_import_kwh', '—') }} kWh | {{ kems_bill.get('grid_import_kwh', '—') }} kWh |
-          | Grid export | {{ live_bill.get('grid_export_kwh', '—') }} kWh | {{ kems_bill.get('grid_export_kwh', '—') }} kWh |
+          | Electricity net cost | £{{ '%.2f' | format(live_e / 100) }} | £{{ '%.2f' | format(kems_e / 100) }} |
+          | Gas cost | £{{ '%.2f' | format(gas / 100) }} | £{{ '%.2f' | format(gas / 100) }} |
+          | **Total energy cost** | **£{{ '%.2f' | format((live_e + gas) / 100) }}** | **£{{ '%.2f' | format((kems_e + gas) / 100) }}** |
+          | Grid import | {{ states('sensor.kems_observed_grid_import_today') }} kWh | {{ states('sensor.kems_simulated_grid_import_today') }} kWh |
+          | Grid export | {{ states('sensor.kems_observed_grid_export_today') }} kWh | {{ states('sensor.kems_simulated_grid_export_today') }} kWh |
 
-          **KEMS saving today (bill equivalent):** {{ ('£%.2f' | format((saving | float) / 100)) if saving is not none else '—' }}
-
-          _Missing KEMS values are shown as unavailable, not substituted with a different simulation accounting basis. Electricity standing charge, export income and supplier credits must be reconciled within the bill-equivalent source._
+          **KEMS saving today:** £{{ '%.2f' | format(saving / 100) }}
 
       - type: markdown
         title: Current power flow
