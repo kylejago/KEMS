@@ -59,11 +59,11 @@ views:
           |---|---:|---:|
           | Electricity net cost | £{{ '%.2f' | format(live_e / 100) }} | £{{ '%.2f' | format(kems_e / 100) }} |
           | Gas cost | £{{ '%.2f' | format(gas / 100) }} | £{{ '%.2f' | format(gas / 100) }} |
-          | **Total energy cost** | **£{{ '%.2f' | format((live_e + gas) / 100) }}** | **£{{ '%.2f' | format((kems_e + gas) / 100) }}** |
+          | **Net electricity + gas** | **£{{ '%.2f' | format((live_e + gas) / 100) }}** | **£{{ '%.2f' | format((kems_e + gas) / 100) }}** |
           | Grid import | {{ states('sensor.kems_observed_grid_import_today') }} kWh | {{ states('sensor.kems_simulated_grid_import_today') }} kWh |
           | Grid export | {{ states('sensor.kems_observed_grid_export_today') }} kWh | {{ states('sensor.kems_simulated_grid_export_today') }} kWh |
 
-          **Observed vs simulated net electricity difference:** £{{ '%.2f' | format(saving / 100) }}
+          **Observed vs simulated net electricity difference:** £{{ '%.2f' | format(saving / 100) }}\n\n          _Net electricity after export credits plus reported gas. This is not a reconciled supplier bill total and may exclude standing charges._
 
       - type: markdown
         title: Current power flow
