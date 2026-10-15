@@ -361,7 +361,7 @@ def assess_foxess_control_write_authority(
         )
         if not cheap_period_confirmed and not event_charge:
             return blocked(
-                "Force Charge requires confirmed Intelligent cheap slot "
+                "Force Charge is not backed by a confirmed cheap period "
                 "or separately validated joined Happy Hour"
             )
         if control.desired_charge_power_kw <= _EPSILON_KW:
