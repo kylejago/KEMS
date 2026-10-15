@@ -17,6 +17,8 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from .happy_hour import HAPPY_HOUR_FAIR_USE_KWH_PER_REWARD
+from .happy_hour_auto_join import booked_happy_hour_matches_plan
+from .kems_core.control_write_authority import assess_happy_hour_charge_authority
 
 _EPSILON = 1e-6
 _MAX_LEDGER_GAP = timedelta(minutes=10)
@@ -494,7 +496,95 @@ def _corrected_soc_with_hourly_budget(
     return round(100.0 * corrected / capacity, 2)
 
 
-def apply_happy_hour_control(control: Any, snapshot: Any, context: dict[str, Any]):
+
+def verified_live_happy_hour_charge_kw(
+    *,
+    booking: dict[str, Any],
+    context: dict[str, Any],
+    snapshot: Any,
+    simulation_config: Any,
+    control_config: Any,
+    now: datetime,
+    power_down_active: bool,
+) -> float:
+    """Fail closed before granting physical grid charging for a booked event."""
+    joined = booked_happy_hour_matches_plan(booking, context, now)
+    if not joined or not context.get("happy_hour_import_authority_active"):
+        return 0.0
+    if not context.get("current_reward_hour_ledger_complete"):
+        return 0.0
+    if power_down_active or bool(getattr(snapshot, "saving_session_active", False)):
+        return 0.0
+    if "battery_soc" in (getattr(snapshot, "stale_fields", ()) or ()):
+        return 0.0
+    ages = getattr(snapshot, "source_age_seconds", None)
+    soc_age = _number(ages.get("battery_soc")) if isinstance(ages, dict) else None
+    soc = _number(getattr(snapshot, "battery_soc", None))
+    capacity = _number(getattr(simulation_config, "battery_capacity_kwh", None))
+    max_charge = _number(getattr(control_config, "max_charge_kw", None))
+    inverter = _number(getattr(control_config, "inverter_limit_kw", None))
+    site_limit = _number(getattr(control_config, "site_import_limit_kw", None))
+    house = _number(getattr(snapshot, "house_load_kw", None))
+    ev = _number(getattr(snapshot, "ev_power_kw", None))
+    grid = _number(getattr(snapshot, "grid_import_kw", None))
+    target = _number(context.get("charge_target_kw"))
+    remaining = _number(context.get("current_reward_hour_remaining_kwh"))
+    bucket_start = _dt(context.get("current_reward_hour_start"))
+    bucket_end = _dt(context.get("current_reward_hour_end"))
+    if any(
+        value is None
+        for value in (
+            soc_age, soc, capacity, max_charge, inverter, site_limit,
+            house, ev, grid, target, remaining, bucket_start, bucket_end,
+        )
+    ):
+        return 0.0
+    if not 0.0 <= soc <= 100.0 or not 0.0 <= soc_age <= 180.0:
+        return 0.0
+    if not bucket_start <= now < bucket_end:
+        return 0.0
+    if min(capacity, max_charge, inverter, site_limit) <= 0.0:
+        return 0.0
+    if min(house, ev, grid) < 0.0 or not 0.25 < remaining <= 16.0:
+        return 0.0
+    # Never credit charging headroom that may have been consumed after the
+    # reported SOC. Reserve extra space for delayed FoxESS/meter feedback.
+    headroom = max(
+        capacity * (100.0 - soc) / 100.0
+        - max_charge * soc_age / 3600.0
+        - 0.5,
+        0.0,
+    )
+    hours_left = max((bucket_end - now).total_seconds() / 3600.0, 0.001)
+    site_headroom = max(site_limit - max(grid, house + ev) - 0.5, 0.0)
+    safe_target = min(
+        target,
+        max_charge,
+        inverter,
+        site_headroom,
+        headroom / max(hours_left, 0.05),
+        (remaining - 0.25) / max(hours_left, 0.05),
+    )
+    safe = assess_happy_hour_charge_authority(
+        joined_event_active=joined,
+        reward_ledger_complete=True,
+        remaining_reward_kwh=remaining,
+        battery_headroom_kwh=headroom,
+        charge_target_kw=safe_target,
+        power_down_active=power_down_active,
+        grid_available=bool(getattr(snapshot, "grid_available", False)),
+        emergency_stop=bool(getattr(control_config, "emergency_stop", False)),
+    )
+    return round(safe_target, 3) if safe else 0.0
+
+
+def apply_happy_hour_control(
+    control: Any,
+    snapshot: Any,
+    context: dict[str, Any],
+    *,
+    live_charge_kw: float = 0.0,
+):
     """Overlay Happy Hour EV permission without widening normal cheap authority."""
     if not context.get("happy_hour_import_authority_active"):
         return control
@@ -505,8 +595,11 @@ def apply_happy_hour_control(control: Any, snapshot: Any, context: dict[str, Any
     return replace(
         control,
         operating_reason="happy_hour_reward_hour",
+        desired_work_mode=(
+            "Force Charge" if live_charge_kw > 0.001 else control.desired_work_mode
+        ),
         desired_charge_power_kw=max(
-            _number(context.get("charge_target_kw")) or 0.0, 0.0
+            live_charge_kw, 0.0
         ),
         desired_ev_charging_allowed=ev_allowed,
         desired_battery_to_home_power_kw=0.0,
