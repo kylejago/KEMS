@@ -106,9 +106,7 @@ def test_live_home_uses_canonical_actual_bill_totals() -> None:
     """The customer Home view shows actual bill-equivalent data, not a twin."""
     payload = (KEMS_ROOT / "kems_master_dashboard.yaml").read_bytes()
     rendered = dashboard_pipeline._finalise_dashboard_bytes(payload).decode("utf-8")
-    home = rendered.split("  - title: Home", 1)[1].split(
-        "  - title: Live Data", 1
-    )[0]
+    home = rendered.split("  - title: Home", 1)[1].split("  - title: Live Data", 1)[0]
 
     assert "sensor.kems_energy_cost_comparison" in home
     assert "live = today.get('live_data', {})" in home
