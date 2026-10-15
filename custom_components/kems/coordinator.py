@@ -38,7 +38,11 @@ from .forecast_validation import ForecastValidationRecorder
 from .forecasting import SolarForecastCoordinator
 from .foxess_command_shadow import build_foxess_command_shadow_snapshot
 from .foxess_control_backend import FoxESSControlBackend
-from .happy_hour_budget import apply_happy_hour_control
+from .happy_hour_auto_join import _controller_for
+from .happy_hour_budget import (
+    apply_happy_hour_control,
+    verified_live_happy_hour_charge_kw,
+)
 from .happy_hour_ohme_control import OhmeHappyHourController
 from .historical_tariff_revaluation import financial_replay_records
 from .history import HistoryRecorder
@@ -70,6 +74,7 @@ from .kems_core.control_event_refresh import (
     control_source_state_uncertain,
     meaningful_ev_power_transition,
 )
+from .kems_core.control_write_authority import active_joined_power_down_window
 from .kems_core.shared_bus_balance import (
     assess_shared_bus_balance,
     summarise_shared_bus_audits,
@@ -831,7 +836,41 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
             power_down_plan = agile_state.get("power_down_priority")
             if not isinstance(power_down_plan, dict):
                 power_down_plan = {}
+            if snapshot.saving_session_active or power_down_plan.get("active"):
+                # Independent override even if retained Happy Hour ledger data
+                # is late: Power Down always owns event-time dispatch and EV.
+                happy_hour_plan["happy_hour_import_authority_active"] = False
+                happy_hour_plan["ev_happy_hour_allowed"] = False
+            happy_hour_live_charge_kw = verified_live_happy_hour_charge_kw(
+                booking=_controller_for(self).state,
+                context=happy_hour_plan,
+                snapshot=snapshot,
+                simulation_config=self.settings.simulation,
+                control_config=self.settings.control,
+                now=now,
+                power_down_active=bool(
+                    snapshot.saving_session_active or power_down_plan.get("active")
+                ),
+                grid_available=bool(control.grid_available),
+            )
+            happy_hour_plan["physical_charge_authorised"] = bool(
+                happy_hour_live_charge_kw > 0.001
+            )
+            happy_hour_plan["physical_charge_target_kw"] = happy_hour_live_charge_kw
             control = apply_happy_hour_control(control, snapshot, happy_hour_plan)
+            # An Octopus Power Down must be both joined and inside its actual
+            # event window. Mere simulation intent never grants live authority.
+            power_down_export_authorised = bool(
+                tariff_type == EXPORT_TARIFF_TYPE_AGILE
+                and control.operating_reason == "power_down_session"
+                and active_joined_power_down_window(
+                    joined=bool(snapshot.saving_session_joined),
+                    active=bool(snapshot.saving_session_active),
+                    start=snapshot.saving_session_start,
+                    end=snapshot.saving_session_end,
+                    now=now,
+                )
+            )
             # Physically constrain paid Agile before any FoxESS writes. The
             # simulation / financial / shadow plan remains unchanged.
             if tariff_type == EXPORT_TARIFF_TYPE_AGILE:
@@ -860,6 +899,7 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                         now=now,
                         ev_export_safe=ev_export_safe,
                         ev_export_evidence=ev_export_evidence,
+                        power_down_export_authorised=power_down_export_authorised,
                         physical_energy_evidence=self._paid_agile_energy_evidence,
                         connected_idle_continuity=(
                             self._paid_agile_connected_idle_continuity
@@ -1032,6 +1072,8 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                     self._export_commissioning_test.hardware_authority_active
                 ),
                 force_restore=self._export_commissioning_test.restore_requested,
+                power_down_export_authorised=power_down_export_authorised,
+                happy_hour_charge_authorised=happy_hour_live_charge_kw > 0.001,
             )
             promoted_to_stress = (
                 await self._export_commissioning_test.async_after_backend(

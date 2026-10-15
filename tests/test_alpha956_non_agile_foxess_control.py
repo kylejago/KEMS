@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import json
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from kems_core import ControlState
 from kems_core.control_write_authority import (
+    active_joined_power_down_window,
     assess_foxess_control_write_authority,
     resolve_live_min_soc_on_grid,
 )
@@ -291,7 +293,7 @@ def test_current_release_identity_and_scope() -> None:
     bundle = json.loads(BUNDLE.read_text(encoding="utf-8"))
     reason = str(bundle["maintenance"]["reason"])
 
-    assert manifest["version"] == "0.9.0-alpha9.101"
+    assert manifest["version"] == "0.9.0-alpha9.102"
     assert reason.startswith("Alpha9.84")
     assert "Self Use" in reason
     assert "confirmed-cheap Force Charge" in reason
@@ -299,3 +301,123 @@ def test_current_release_identity_and_scope() -> None:
     assert "Deliberate/economic Force Discharge" in reason
     assert "Import Power Limit" in reason
     assert "Export Power Limit" in reason
+
+
+def test_power_down_deliberate_export_remains_fail_closed_before_event_authority() -> (
+    None
+):
+    """Do not promote Power Down export using ordinary paid Agile authority."""
+    control = _control(
+        operating_reason="power_down_session",
+        desired_work_mode="Feed-in First",
+        desired_battery_export_power_kw=4.0,
+        desired_grid_export_allowed=True,
+    )
+    result = _decision(
+        control,
+        no_paid_export_mode=False,
+        effective_export_limit_kw=7.0,
+    )
+    assert result.backend_available is True
+    assert result.commands_permitted is False
+    assert result.action == "release"
+    assert "Power Down deliberate export" in result.reason
+
+
+def test_normal_paid_agile_export_still_uses_bounded_force_discharge() -> None:
+    control = _control(
+        operating_reason="agile_rolling_normal",
+        desired_work_mode="Feed-in First",
+        desired_battery_export_power_kw=6.1,
+        desired_grid_export_allowed=True,
+    )
+    result = _decision(
+        control,
+        no_paid_export_mode=False,
+        effective_export_limit_kw=7.0,
+    )
+    assert result.commands_permitted is True
+    assert result.action == "force_discharge"
+    assert result.force_discharge_power_kw == 6.1
+    assert result.export_power_limit_kw == 7.0
+
+
+def test_alpha9102_power_down_requires_joined_active_time_window() -> None:
+    now = datetime(2026, 10, 15, 18, 30, tzinfo=UTC)
+    start = now - timedelta(minutes=30)
+    end = now + timedelta(minutes=30)
+    assert active_joined_power_down_window(
+        joined=True, active=True, start=start, end=end, now=now
+    )
+    for joined, active, test_start, test_end, current in (
+        (False, True, start, end, now),
+        (True, False, start, end, now),
+        (True, True, start, end, end),
+        (True, True, start, end, start - timedelta(seconds=1)),
+        (True, True, None, end, now),
+        (True, True, start, None, now),
+        (True, True, end, start, now),
+        (True, True, start, start + timedelta(hours=5), now),
+    ):
+        assert not active_joined_power_down_window(
+            joined=joined,
+            active=active,
+            start=test_start,
+            end=test_end,
+            now=current,
+        )
+
+
+def test_alpha9102_power_down_export_requires_independent_event_permission() -> None:
+    control = _control(
+        operating_reason="power_down_session",
+        desired_work_mode="Feed-in First",
+        desired_battery_export_power_kw=2.0,
+        desired_grid_export_allowed=True,
+    )
+    denied = _decision(
+        control,
+        no_paid_export_mode=False,
+        effective_export_limit_kw=7.0,
+    )
+    assert not denied.commands_permitted
+    permitted = _decision(
+        control,
+        no_paid_export_mode=False,
+        effective_export_limit_kw=7.0,
+        power_down_export_authorised=True,
+    )
+    assert permitted.commands_permitted
+    assert permitted.action == "force_discharge"
+    assert permitted.force_discharge_power_kw == 2.0
+
+
+def test_alpha9102_happy_hour_charging_is_not_an_intelligent_cheap_slot() -> None:
+    control = _control(
+        operating_reason="happy_hour_reward_hour",
+        desired_work_mode="Force Charge",
+        desired_charge_power_kw=6.0,
+        desired_grid_export_allowed=False,
+        desired_battery_export_power_kw=0.0,
+    )
+    denied = _decision(control, no_paid_export_mode=False)
+    assert not denied.commands_permitted
+    permitted = _decision(
+        control,
+        no_paid_export_mode=False,
+        happy_hour_charge_authorised=True,
+    )
+    assert permitted.commands_permitted
+    assert permitted.action == "force_charge"
+    assert permitted.force_charge_power_kw == 6.0
+    assert "Happy Hour" in permitted.reason
+    wrong_reason = _decision(
+        _control(
+            operating_reason="agile_rolling",
+            desired_work_mode="Force Charge",
+            desired_charge_power_kw=6.0,
+        ),
+        no_paid_export_mode=False,
+        happy_hour_charge_authorised=True,
+    )
+    assert not wrong_reason.commands_permitted

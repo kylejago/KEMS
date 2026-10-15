@@ -836,6 +836,8 @@ class FoxESSControlBackend:
         pending_intelligent_ev_hold_active: bool = False,
         commissioning_export_test: bool = False,
         force_restore: bool = False,
+        power_down_export_authorised: bool = False,
+        happy_hour_charge_authorised: bool = False,
     ) -> dict[str, Any]:
         """Apply the authoritative bounded command for this scan."""
         shadow = build_foxess_command_shadow_snapshot(
@@ -1015,6 +1017,8 @@ class FoxESSControlBackend:
             master_control_enabled=bool(coordinator.settings.control.control_enabled),
             emergency_stop=bool(coordinator.settings.control.emergency_stop),
             effective_export_limit_kw=effective_export_limit_kw,
+            power_down_export_authorised=power_down_export_authorised,
+            happy_hour_charge_authorised=happy_hour_charge_authorised,
         )
 
         if (
@@ -1470,6 +1474,13 @@ class FoxESSControlBackend:
             "force_restore_requested": bool(force_restore),
             "export_authority_active": export_authority_active,
             "cheap_period_confirmed": bool(cheap_period_confirmed),
+            "power_down_export_authorised": bool(power_down_export_authorised),
+            "happy_hour_charge_authorised": bool(happy_hour_charge_authorised),
+            "happy_hour_charge_setpoint_kw": (
+                decision.force_charge_power_kw
+                if happy_hour_charge_authorised and decision.action == "force_charge"
+                else 0.0
+            ),
             "backend_available": bool(decision.backend_available),
             "commands_permitted": bool(decision.commands_permitted and applied),
             "decision_action": (

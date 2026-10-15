@@ -1,6 +1,7 @@
 """Alpha9.40 Weekend Happy Hour recommendation/auto-join contracts."""
 
 from datetime import UTC, date, datetime, timedelta
+from types import SimpleNamespace
 from zoneinfo import ZoneInfo
 
 import pytest
@@ -8,11 +9,15 @@ import pytest
 from custom_components.kems.happy_hour_auto_join import (
     HappyHourCandidate,
     RateSlot,
+    _booking_soc,
+    _simulation_soc,
     auto_join_control_gate,
+    booked_happy_hour_matches_plan,
     choose_best_candidate,
     day_rate_coverage,
     score_candidate,
 )
+from custom_components.kems.happy_hour_budget import verified_live_happy_hour_charge_kw
 from custom_components.kems.product_types import (
     EXPORT_TARIFF_TYPE_AGILE,
     EXPORT_TARIFF_TYPE_NONE,
@@ -230,3 +235,171 @@ def test_day_coverage_requires_most_of_the_happy_hour_day() -> None:
     assert day_rate_coverage(rates, target_day) == pytest.approx(1.0)
     assert day_rate_coverage(rates[:-4], target_day) >= 0.90
     assert day_rate_coverage(rates[:-5], target_day) < 0.90
+
+
+def test_auto_join_never_invents_missing_battery_soc() -> None:
+    def candidate(value: object) -> SimpleNamespace:
+        return SimpleNamespace(simulation=SimpleNamespace(simulated_battery_soc=value))
+
+    assert _simulation_soc(SimpleNamespace()) is None
+    assert _simulation_soc(SimpleNamespace(simulation=None)) is None
+    for value in (None, float("nan"), float("inf"), -1, 101):
+        assert _simulation_soc(candidate(value)) is None
+    assert _simulation_soc(candidate(80)) == 80.0
+    assert _simulation_soc(candidate(0)) == 0.0
+
+
+@pytest.mark.parametrize(
+    "override",
+    [
+        {"joined_event_active": False},
+        {"reward_ledger_complete": False},
+        {"remaining_reward_kwh": 0.0},
+        {"remaining_reward_kwh": 16.01},
+        {"remaining_reward_kwh": float("nan")},
+        {"battery_headroom_kwh": None},
+        {"battery_headroom_kwh": 0.0},
+        {"charge_target_kw": 0.0},
+        {"charge_target_kw": float("inf")},
+        {"power_down_active": True},
+        {"grid_available": False},
+        {"emergency_stop": True},
+    ],
+)
+def test_happy_hour_charge_authority_fail_closed(override) -> None:
+    from kems_core.control_write_authority import (
+        assess_happy_hour_charge_authority,
+    )
+
+    evidence = {
+        "joined_event_active": True,
+        "reward_ledger_complete": True,
+        "remaining_reward_kwh": 10.0,
+        "battery_headroom_kwh": 20.0,
+        "charge_target_kw": 5.0,
+        "power_down_active": False,
+        "grid_available": True,
+        "emergency_stop": False,
+    }
+    assert assess_happy_hour_charge_authority(**evidence)
+    evidence.update(override)
+    assert not assess_happy_hour_charge_authority(**evidence)
+
+
+def test_live_happy_hour_booking_requires_measured_soc() -> None:
+    data = SimpleNamespace(
+        simulation=SimpleNamespace(simulated_battery_soc=95),
+        snapshot=SimpleNamespace(battery_soc=20),
+    )
+    assert _booking_soc(data, operating_mode="control") == 20.0
+    assert _booking_soc(data, operating_mode="simulate") == 95.0
+    data.snapshot.battery_soc = None
+    assert _booking_soc(data, operating_mode="control") is None
+    data.snapshot.battery_soc = 101
+    assert _booking_soc(data, operating_mode="control") is None
+
+
+def test_happy_hour_live_booking_must_match_active_event() -> None:
+    start = datetime(2026, 10, 17, 12, 0, tzinfo=UTC)
+    end = start + timedelta(hours=1)
+    booking = {
+        "status": "booked",
+        "booked_event_code": "TEST-BOOKING",
+        "booked_start": start.isoformat(),
+        "booked_end": end.isoformat(),
+    }
+    plan = {"start": start.isoformat(), "end": end.isoformat()}
+    assert booked_happy_hour_matches_plan(booking, plan, start)
+    assert not booked_happy_hour_matches_plan(booking, plan, end)
+    assert not booked_happy_hour_matches_plan(
+        booking, plan, start - timedelta(seconds=1)
+    )
+    assert not booked_happy_hour_matches_plan(
+        booking,
+        {"start": start.isoformat(), "end": (end + timedelta(hours=1)).isoformat()},
+        start,
+    )
+    assert not booked_happy_hour_matches_plan(
+        {**booking, "status": "recommended"}, plan, start
+    )
+    assert not booked_happy_hour_matches_plan(
+        {**booking, "booked_event_code": None}, plan, start
+    )
+
+
+def test_alpha9102_physical_happy_hour_charge_requires_all_live_evidence() -> None:
+    now = datetime(2026, 10, 17, 12, 15, tzinfo=UTC)
+    start = now - timedelta(minutes=15)
+    end = now + timedelta(minutes=45)
+    booking = {
+        "status": "booked",
+        "booked_event_code": "MATCH",
+        "booked_start": start.isoformat(),
+        "booked_end": end.isoformat(),
+    }
+    context = {
+        "start": start.isoformat(),
+        "end": end.isoformat(),
+        "happy_hour_import_authority_active": True,
+        "current_reward_hour_ledger_complete": True,
+        "current_reward_hour_start": start.isoformat(),
+        "current_reward_hour_end": end.isoformat(),
+        "current_reward_hour_remaining_kwh": 12.0,
+        "charge_target_kw": 8.0,
+    }
+    snapshot = SimpleNamespace(
+        battery_soc=50.0,
+        source_age_seconds={"battery_soc": 10.0, "house_load_kw": 10.0},
+        ev_power_age_seconds=10.0,
+        ev_connected=False,
+        stale_fields=(),
+        house_load_kw=1.0,
+        ev_power_kw=0.0,
+        grid_import_kw=0.0,
+        saving_session_active=False,
+    )
+    sim = SimpleNamespace(battery_capacity_kwh=56.42)
+    ctrl = SimpleNamespace(
+        max_charge_kw=10.0,
+        inverter_limit_kw=10.0,
+        site_import_limit_kw=14.5,
+        emergency_stop=False,
+    )
+
+    def target(
+        *,
+        booking_value=None,
+        context_value=None,
+        snapshot_value=None,
+        config_value=None,
+        power_down=False,
+        grid=True,
+    ):
+        return verified_live_happy_hour_charge_kw(
+            booking=booking if booking_value is None else booking_value,
+            context=context if context_value is None else context_value,
+            snapshot=snapshot if snapshot_value is None else snapshot_value,
+            simulation_config=sim,
+            control_config=ctrl if config_value is None else config_value,
+            now=now,
+            power_down_active=power_down,
+            grid_available=grid,
+        )
+
+    assert 0.0 < target() <= 8.0
+    assert target(booking_value={**booking, "status": "recommended"}) == 0.0
+    assert target(context_value={**context, "charge_target_kw": 0}) == 0.0
+    exhausted = {**context, "current_reward_hour_remaining_kwh": 0.1}
+    assert target(context_value=exhausted) == 0.0
+    no_soc = SimpleNamespace(**{**vars(snapshot), "battery_soc": None})
+    old_soc = SimpleNamespace(
+        **{**vars(snapshot), "source_age_seconds": {"battery_soc": 400}}
+    )
+    low_site = SimpleNamespace(**{**vars(ctrl), "site_import_limit_kw": 0.5})
+    assert target(snapshot_value=no_soc) == 0.0
+    assert target(snapshot_value=old_soc) == 0.0
+    old_ev = SimpleNamespace(**{**vars(snapshot), "ev_power_age_seconds": 120.0})
+    assert target(snapshot_value=old_ev) == 0.0
+    assert target(config_value=low_site) == 0.0
+    assert target(power_down=True) == 0.0
+    assert target(grid=False) == 0.0

@@ -645,10 +645,47 @@ def _forecast_value(data: Any, name: str) -> float | None:
     return _number(getattr(plan, name, None))
 
 
-def _simulation_soc(data: Any) -> float:
+def _simulation_soc(data: Any) -> float | None:
+    """Return observed simulation SOC without inventing 50% battery headroom."""
     simulation = getattr(data, "simulation", None)
     value = _number(getattr(simulation, "simulated_battery_soc", None))
-    return min(max(value if value is not None else 50.0, 0.0), 100.0)
+    if value is None or not math.isfinite(value) or not 0.0 <= value <= 100.0:
+        return None
+    return value
+
+
+def _booking_soc(data: Any, *, operating_mode: str) -> float | None:
+    """Only measured battery SOC can authorise a live Control-mode booking."""
+    if operating_mode != "control":
+        return _simulation_soc(data)
+    snapshot = getattr(data, "snapshot", None)
+    value = _number(getattr(snapshot, "battery_soc", None))
+    if value is None or not math.isfinite(value) or not 0.0 <= value <= 100.0:
+        return None
+    return value
+
+
+def booked_happy_hour_matches_plan(
+    booking: Mapping[str, Any], plan: Mapping[str, Any], now: datetime
+) -> bool:
+    """Require a confirmed, matching Octopus booking within the active hour."""
+    if booking.get("status") != "booked":
+        return False
+    if not booking.get("booked_event_code"):
+        return False
+    start = _dt(booking.get("booked_start"))
+    end = _dt(booking.get("booked_end"))
+    plan_start = _dt(plan.get("start"))
+    plan_end = _dt(plan.get("end"))
+    current = _dt(now)
+    return bool(
+        start is not None
+        and end is not None
+        and plan_start == start
+        and plan_end == end
+        and current is not None
+        and start <= current < end
+    )
 
 
 def _iso_or_none(value: Any) -> datetime | None:
@@ -798,6 +835,17 @@ class HappyHourAutoJoinController:
             self.state = state
             return
 
+        booking_soc = _booking_soc(
+            data, operating_mode=str(self.coordinator.settings.control.operating_mode)
+        )
+        if booking_soc is None:
+            # Booking can change external Octopus commitments. Never fabricate
+            # a 50% battery state when the planner has no usable SOC evidence.
+            state["status"] = "waiting_for_battery_soc"
+            state["join_block_reason"] = "missing_or_invalid_battery_soc"
+            self.state = state
+            return
+
         config = self.coordinator.settings.simulation
         scores: list[CandidateScore] = []
         for candidate in tomorrow:
@@ -808,7 +856,7 @@ class HappyHourAutoJoinController:
                 export_rates=export_rates,
                 export_tariff_type=export_type,
                 fixed_export_rate_pence=float(config.export_rate_pence),
-                current_soc_percent=_simulation_soc(data),
+                current_soc_percent=booking_soc,
                 battery_capacity_kwh=float(config.battery_capacity_kwh),
                 battery_reserve_percent=float(config.battery_reserve_percent),
                 max_charge_kw=float(config.max_charge_kw),

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
 from math import isfinite
 
 from .models import ControlState
@@ -195,6 +196,68 @@ def should_freeze_owned_ev_hold(
     )
 
 
+def active_joined_power_down_window(
+    *,
+    joined: bool,
+    active: bool,
+    start: datetime | None,
+    end: datetime | None,
+    now: datetime,
+) -> bool:
+    """Independently verify an active, joined, time-bounded Power Down."""
+    return bool(
+        joined
+        and active
+        and start is not None
+        and end is not None
+        and start.tzinfo is not None
+        and end.tzinfo is not None
+        and now.tzinfo is not None
+        and start < end
+        and start <= now < end
+        and (end - start).total_seconds() <= 4 * 3600
+    )
+
+
+def assess_happy_hour_charge_authority(
+    *,
+    joined_event_active: bool,
+    reward_ledger_complete: bool,
+    remaining_reward_kwh: float | None,
+    battery_headroom_kwh: float | None,
+    charge_target_kw: float | None,
+    power_down_active: bool,
+    grid_available: bool,
+    emergency_stop: bool,
+) -> bool:
+    """Fail-closed independent prerequisite for future live reward-hour charging.
+
+    This pure predicate never authorises a FoxESS service call by itself.
+    Confirmed Intelligent cheap periods remain a distinct authority.
+    """
+    if (
+        not joined_event_active
+        or not reward_ledger_complete
+        or power_down_active
+        or not grid_available
+        or emergency_stop
+    ):
+        return False
+    quantities = (remaining_reward_kwh, battery_headroom_kwh, charge_target_kw)
+    if any(value is None for value in quantities):
+        return False
+    try:
+        remaining, headroom, target = (float(value) for value in quantities)
+    except (TypeError, ValueError, OverflowError):
+        return False
+    return bool(
+        all(isfinite(value) for value in (remaining, headroom, target))
+        and _EPSILON_KW < remaining <= 16.0
+        and headroom > _EPSILON_KW
+        and target > _EPSILON_KW
+    )
+
+
 def assess_foxess_control_write_authority(
     control: ControlState,
     *,
@@ -207,6 +270,8 @@ def assess_foxess_control_write_authority(
     master_control_enabled: bool,
     emergency_stop: bool,
     effective_export_limit_kw: float | None = None,
+    power_down_export_authorised: bool = False,
+    happy_hour_charge_authorised: bool = False,
 ) -> FoxESSControlDecision:
     """Return the bounded hardware action for the current physical policy.
 
@@ -269,6 +334,7 @@ def assess_foxess_control_write_authority(
         not no_paid_export_mode
         and control.operating_reason == "power_down_session"
         and desired_export > _EPSILON_KW
+        and not power_down_export_authorised
     ):
         return blocked("Power Down deliberate export is not promoted by Alpha9.82")
 
@@ -286,8 +352,18 @@ def assess_foxess_control_write_authority(
 
     min_soc = round(control.desired_min_soc_percent, 1)
     if control.desired_work_mode == "Force Charge":
-        if not cheap_period_confirmed:
-            return blocked("Force Charge is not backed by a confirmed cheap period")
+        event_charge = bool(
+            happy_hour_charge_authorised
+            and control.operating_reason == "happy_hour_reward_hour"
+            and not control.desired_grid_export_allowed
+            and desired_export <= _EPSILON_KW
+            and not control.site_import_limit_exceeded
+        )
+        if not cheap_period_confirmed and not event_charge:
+            return blocked(
+                "Force Charge is not backed by a confirmed cheap period "
+                "or separately validated joined Happy Hour"
+            )
         if control.desired_charge_power_kw <= _EPSILON_KW:
             return FoxESSControlDecision(
                 backend_available=True,
@@ -300,7 +376,11 @@ def assess_foxess_control_write_authority(
             backend_available=True,
             commands_permitted=True,
             action="force_charge",
-            reason="Confirmed cheap-period charging is inside the bounded live scope",
+            reason=(
+                "Confirmed joined Happy Hour bounded reward charging"
+                if event_charge and not cheap_period_confirmed
+                else "Confirmed cheap-period charging is inside the bounded live scope"
+            ),
             force_charge_power_kw=round(control.desired_charge_power_kw, 3),
             min_soc_on_grid_percent=min_soc,
         )
