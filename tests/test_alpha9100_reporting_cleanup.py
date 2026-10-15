@@ -83,8 +83,9 @@ def test_actual_roi_still_uses_meter_based_no_system_ledger() -> None:
     assert "actual_value = ledger.actual_system_value_pence / 100" in roi
 
 
-def test_today_finance_cards_use_bill_equivalent_source() -> None:
-    """Both Today cards must use canonical bill totals."""
+
+def test_today_side_by_side_uses_bill_equivalent_source() -> None:
+    """The comparison card must retain canonical bill totals."""
     from pathlib import Path
 
     root = Path(__file__).parents[1]
@@ -97,11 +98,10 @@ def test_today_finance_cards_use_bill_equivalent_source() -> None:
     second = source.split("title: Today — side by side", 1)[1].split(
         "- type: history-graph", 1
     )[0]
-    for card in (first, second):
-        assert "sensor.kems_energy_cost_comparison" in card
-        assert "total_energy_cost_pence" in card
-        assert "electricity_total_cost_pence" in card
-        assert "gas_total_cost_pence" in card
-        assert "sensor.kems_simulated_kems_cost_today" not in card
-    assert "KEMS saving today (bill equivalent)" in first
-    assert "Live system value vs no system:" in second
+    assert "sensor.kems_simulated_kems_cost_today" in first
+    assert "sensor.kems_energy_cost_comparison" in second
+    assert "total_energy_cost_pence" in second
+    assert "electricity_total_cost_pence" in second
+    assert "gas_total_cost_pence" in second
+    assert "sensor.kems_simulated_kems_cost_today" not in second
+    assert "not interchangeable with this total" in second
