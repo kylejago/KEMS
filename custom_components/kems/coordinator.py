@@ -38,7 +38,11 @@ from .forecast_validation import ForecastValidationRecorder
 from .forecasting import SolarForecastCoordinator
 from .foxess_command_shadow import build_foxess_command_shadow_snapshot
 from .foxess_control_backend import FoxESSControlBackend
-from .happy_hour_budget import apply_happy_hour_control
+from .happy_hour_auto_join import _controller_for
+from .happy_hour_budget import (
+    apply_happy_hour_control,
+    verified_live_happy_hour_charge_kw,
+)
 from .happy_hour_ohme_control import OhmeHappyHourController
 from .historical_tariff_revaluation import financial_replay_records
 from .history import HistoryRecorder
@@ -832,7 +836,28 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
             power_down_plan = agile_state.get("power_down_priority")
             if not isinstance(power_down_plan, dict):
                 power_down_plan = {}
-            control = apply_happy_hour_control(control, snapshot, happy_hour_plan)
+            happy_hour_live_charge_kw = verified_live_happy_hour_charge_kw(
+                booking=_controller_for(self).state,
+                context=happy_hour_plan,
+                snapshot=snapshot,
+                simulation_config=self.settings.simulation,
+                control_config=self.settings.control,
+                now=now,
+                power_down_active=bool(
+                    snapshot.saving_session_active or power_down_plan.get("active")
+                ),
+                grid_available=bool(control.grid_available),
+            )
+            happy_hour_plan["physical_charge_authorised"] = bool(
+                happy_hour_live_charge_kw > 0.001
+            )
+            happy_hour_plan["physical_charge_target_kw"] = happy_hour_live_charge_kw
+            control = apply_happy_hour_control(
+                control,
+                snapshot,
+                happy_hour_plan,
+                live_charge_kw=happy_hour_live_charge_kw,
+            )
             # An Octopus Power Down must be both joined and inside its actual
             # event window. Mere simulation intent never grants live authority.
             power_down_export_authorised = bool(
@@ -1048,6 +1073,7 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                 ),
                 force_restore=self._export_commissioning_test.restore_requested,
                 power_down_export_authorised=power_down_export_authorised,
+                happy_hour_charge_authorised=happy_hour_live_charge_kw > 0.001,
             )
             promoted_to_stress = (
                 await self._export_commissioning_test.async_after_backend(
