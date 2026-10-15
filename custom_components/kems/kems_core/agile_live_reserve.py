@@ -326,6 +326,7 @@ def guard_paid_agile_physical_export(
     ev_export_evidence: str = "no verified disconnected EV evidence",
     physical_energy_evidence: PhysicalEnergyEvidence | None = None,
     connected_idle_continuity: PaidAgileConnectedIdleContinuity | None = None,
+    power_down_export_authorised: bool = False,
 ) -> tuple[ControlState, dict[str, Any]]:
     """Cap deliberate export by *measured* SOC minus future house reserve.
 
@@ -347,7 +348,9 @@ def guard_paid_agile_physical_export(
             else None
         ),
     }
-    if snapshot.cheap_period_confirmed or snapshot.saving_session_active:
+    if snapshot.cheap_period_confirmed or (
+        snapshot.saving_session_active and not power_down_export_authorised
+    ):
         report["status"] = "higher_priority_cheap_or_event"
         return control, report
     if request <= 0.001:
