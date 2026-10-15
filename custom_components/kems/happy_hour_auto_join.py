@@ -665,6 +665,30 @@ def _booking_soc(data: Any, *, operating_mode: str) -> float | None:
     return value
 
 
+
+def booked_happy_hour_matches_plan(
+    booking: Mapping[str, Any], plan: Mapping[str, Any], now: datetime
+) -> bool:
+    """Require a confirmed, matching Octopus booking within the active hour."""
+    if booking.get("status") != "booked":
+        return False
+    if not booking.get("booked_event_code"):
+        return False
+    start = _dt(booking.get("booked_start"))
+    end = _dt(booking.get("booked_end"))
+    plan_start = _dt(plan.get("start"))
+    plan_end = _dt(plan.get("end"))
+    current = _dt(now)
+    return bool(
+        start is not None
+        and end is not None
+        and plan_start == start
+        and plan_end == end
+        and current is not None
+        and start <= current < end
+    )
+
+
 def _iso_or_none(value: Any) -> datetime | None:
     return _dt(value)
 
