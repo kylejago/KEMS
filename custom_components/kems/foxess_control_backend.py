@@ -89,7 +89,15 @@ def _bounded_paid_export_discharge_setpoint(
         for value in converted
     ):
         return None
-    requested, planned_total, house_load, solar, battery_limit, inverter_limit, export_limit = converted
+    (
+        requested,
+        planned_total,
+        house_load,
+        solar,
+        battery_limit,
+        inverter_limit,
+        export_limit,
+    ) = converted
     home_from_battery = max(house_load - solar, 0.0)
     requested_net_export = min(
         requested, export_limit, _PAID_EXPORT_STAGE_KW if staging else requested
@@ -279,13 +287,15 @@ class FoxESSControlBackend:
             # only an obsolete proof lockout once per protocol upgrade.
             # Full paid export remains gated on two NEW physical samples.
             proof_protocol = data.get("paid_export_proof_protocol")
-            if proof_protocol != _PAID_EXPORT_PROOF_PROTOCOL:
+            legacy_paid_export_proof = (
+                proof_protocol != _PAID_EXPORT_PROOF_PROTOCOL
+            )
+            if legacy_paid_export_proof:
                 self._paid_export_stage_blocked = False
                 self._paid_export_stage_reason = (
                     "House-aware paid export proof upgraded; fresh physical "
                     "direction samples still required"
                 )
-                await self._async_save()
             last_action = data.get("last_applied_action")
             self._last_applied_action = (
                 str(last_action)
@@ -297,6 +307,8 @@ class FoxESSControlBackend:
             )
             verified_at = data.get("last_verified_min_soc_at")
             self._last_verified_min_soc_at = str(verified_at) if verified_at else None
+            if legacy_paid_export_proof:
+                await self._async_save()
 
     async def _async_save(self) -> None:
         await self._store.async_save(
@@ -614,7 +626,10 @@ class FoxESSControlBackend:
         )
         if None in (solar, house, battery, grid_export, export_limit):
             return
-        if not all(isfinite(value) for value in (solar, house, battery, grid_export, export_limit)):
+        if not all(
+            isfinite(value)
+            for value in (solar, house, battery, grid_export, export_limit)
+        ):
             return
         if solar > _PAID_EXPORT_MAX_SOLAR_KW:
             return
