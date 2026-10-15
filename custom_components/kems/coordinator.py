@@ -852,12 +852,7 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                 happy_hour_live_charge_kw > 0.001
             )
             happy_hour_plan["physical_charge_target_kw"] = happy_hour_live_charge_kw
-            control = apply_happy_hour_control(
-                control,
-                snapshot,
-                happy_hour_plan,
-                live_charge_kw=happy_hour_live_charge_kw,
-            )
+            control = apply_happy_hour_control(control, snapshot, happy_hour_plan)
             # An Octopus Power Down must be both joined and inside its actual
             # event window. Mere simulation intent never grants live authority.
             power_down_export_authorised = bool(
