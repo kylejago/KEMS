@@ -243,7 +243,9 @@ def _active_power_down_targets(
     )
     soc = rolling._current_agile_soc(state)
     reserve = max(config.battery_reserve_percent, 0.0)
-    battery_allowed = soc is None or soc > reserve + 0.05
+    # Missing SOC is not evidence of exportable battery energy. Keep the
+    # Power Down plan conservative even before the independent physical guard.
+    battery_allowed = soc is not None and soc > reserve + 0.05
     house_battery = (
         min(max(house - solar_to_home, 0.0), battery_inverter_headroom)
         if battery_allowed
