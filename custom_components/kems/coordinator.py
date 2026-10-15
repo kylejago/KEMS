@@ -66,11 +66,11 @@ from .kems_core.agile_live_reserve import (
     guard_paid_agile_physical_export,
 )
 from .kems_core.agile_physical_energy import PaidAgilePhysicalEnergyTracker
-from .kems_core.control_write_authority import active_joined_power_down_window
 from .kems_core.control_event_refresh import (
     control_source_state_uncertain,
     meaningful_ev_power_transition,
 )
+from .kems_core.control_write_authority import active_joined_power_down_window
 from .kems_core.shared_bus_balance import (
     assess_shared_bus_balance,
     summarise_shared_bus_audits,
