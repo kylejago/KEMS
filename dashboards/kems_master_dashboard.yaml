@@ -63,7 +63,7 @@ views:
           | Grid import | {{ states('sensor.kems_observed_grid_import_today') }} kWh | {{ states('sensor.kems_simulated_grid_import_today') }} kWh |
           | Grid export | {{ states('sensor.kems_observed_grid_export_today') }} kWh | {{ states('sensor.kems_simulated_grid_export_today') }} kWh |
 
-          **KEMS saving today:** £{{ '%.2f' | format(saving / 100) }}
+          **Observed vs simulated net electricity difference:** £{{ '%.2f' | format(saving / 100) }}
 
       - type: markdown
         title: Current power flow
@@ -527,27 +527,39 @@ views:
       - type: markdown
         title: Today — side by side
         content: |
-          {% set p = ((state_attr('sensor.kems_energy_cost_comparison', 'periods') or {}).get('today', {}) or {}) %}
-          {% set live = p.get('live_data', {}) or {} %}
-          {% set kems = p.get('kems', {}) or {} %}
+          {# Share the same observed and simulated source sensors as the Live Data vs KEMS card.
+             The separate comparison attributes previously mixed non-reconciling cost scopes
+             and could leave KEMS blank despite a populated digital twin. #}
+          {% set live_state = states('sensor.kems_observed_cost_today') %}
+          {% set kems_state = states('sensor.kems_simulated_kems_cost_today') %}
+          {% set gas_state = states('sensor.kems_gas_cost_today') %}
           {% set base_state = states('sensor.kems_compare_no_system_cost_today') %}
-          {% set base_e = (base_state | float(0)) if base_state not in ['unknown','unavailable','none',''] else none %}
-          {% set gas = live.get('gas_total_cost_pence') %}
-          {% set base_total = (base_e + (gas | float(0))) if base_e is not none and gas is not none else none %}
+          {% set invalid = ['unknown', 'unavailable', 'none', ''] %}
+          {% set live_e = (live_state | float) if live_state not in invalid else none %}
+          {% set kems_e = (kems_state | float) if kems_state not in invalid else none %}
+          {% set gas = (gas_state | float) if gas_state not in invalid else none %}
+          {% set base_e = (base_state | float) if base_state not in invalid else none %}
+          {% set live_total = (live_e + gas) if live_e is not none and gas is not none else none %}
+          {% set kems_total = (kems_e + gas) if kems_e is not none and gas is not none else none %}
+          {% set base_total = (base_e + gas) if base_e is not none and gas is not none else none %}
           | Metric | Without KEMS | Live | KEMS |
           |---|---:|---:|---:|
-          | Total energy cost | {{ ('£%.2f' | format(base_total / 100)) if base_total is not none else '—' }} | {{ ('£%.2f' | format((live.get('total_energy_cost_pence') | float) / 100)) if live.get('total_energy_cost_pence') is not none else '—' }} | {{ ('£%.2f' | format((kems.get('total_energy_cost_pence') | float) / 100)) if kems.get('total_energy_cost_pence') is not none else '—' }} |
-          | Electricity | {{ ('£%.2f' | format(base_e / 100)) if base_e is not none else '—' }} | {{ ('£%.2f' | format((live.get('electricity_total_cost_pence') | float) / 100)) if live.get('electricity_total_cost_pence') is not none else '—' }} | {{ ('£%.2f' | format((kems.get('electricity_total_cost_pence') | float) / 100)) if kems.get('electricity_total_cost_pence') is not none else '—' }} |
-          | Gas | {{ ('£%.2f' | format((gas | float) / 100)) if gas is not none else '—' }} | {{ ('£%.2f' | format((live.get('gas_total_cost_pence') | float) / 100)) if live.get('gas_total_cost_pence') is not none else '—' }} | {{ ('£%.2f' | format((kems.get('gas_total_cost_pence') | float) / 100)) if kems.get('gas_total_cost_pence') is not none else '—' }} |
-          | Grid import | {{ state_attr('sensor.kems_compare_no_system_cost_today', 'grid_import_kwh') or '—' }} | {{ live.get('grid_import_kwh', '—') }} | {{ kems.get('grid_import_kwh', '—') }} |
-          | Grid export | {{ state_attr('sensor.kems_compare_no_system_cost_today', 'grid_export_kwh') or 0 }} | {{ live.get('grid_export_kwh', '—') }} | {{ kems.get('grid_export_kwh', '—') }} |
+          | Electricity net cost | {{ ('£%.2f' | format(base_e / 100)) if base_e is not none else '—' }} | {{ ('£%.2f' | format(live_e / 100)) if live_e is not none else '—' }} | {{ ('£%.2f' | format(kems_e / 100)) if kems_e is not none else '—' }} |
+          | Gas | {{ ('£%.2f' | format(gas / 100)) if gas is not none else '—' }} | {{ ('£%.2f' | format(gas / 100)) if gas is not none else '—' }} | {{ ('£%.2f' | format(gas / 100)) if gas is not none else '—' }} |
+          | **Net electricity + gas** | **{{ ('£%.2f' | format(base_total / 100)) if base_total is not none else '—' }}** | **{{ ('£%.2f' | format(live_total / 100)) if live_total is not none else '—' }}** | **{{ ('£%.2f' | format(kems_total / 100)) if kems_total is not none else '—' }}** |
+          | Grid import | {{ state_attr('sensor.kems_compare_no_system_cost_today', 'grid_import_kwh') if state_attr('sensor.kems_compare_no_system_cost_today', 'grid_import_kwh') is not none else '—' }} | {{ states('sensor.kems_observed_grid_import_today') }} | {{ states('sensor.kems_simulated_grid_import_today') }} |
+          | Grid export | {{ state_attr('sensor.kems_compare_no_system_cost_today', 'grid_export_kwh') if state_attr('sensor.kems_compare_no_system_cost_today', 'grid_export_kwh') is not none else '—' }} | {{ states('sensor.kems_observed_grid_export_today') }} | {{ states('sensor.kems_simulated_grid_export_today') }} |
 
-          {% if base_total is not none and live.get('total_energy_cost_pence') is not none %}
-          **Live system value vs no system:** £{{ '%.2f' | format((base_total - (live.get('total_energy_cost_pence') | float)) / 100) }}
+          {% if base_total is not none and live_total is not none %}
+          **Live system value vs no system:** £{{ '%.2f' | format((base_total - live_total) / 100) }}
           {% endif %}
-          {% if base_total is not none and kems.get('total_energy_cost_pence') is not none %}
-          **KEMS potential value vs no system:** £{{ '%.2f' | format((base_total - (kems.get('total_energy_cost_pence') | float)) / 100) }}
+          {% if base_total is not none and kems_total is not none %}
+          **KEMS potential value vs no system:** £{{ '%.2f' | format((base_total - kems_total) / 100) }}
           {% endif %}
+
+          _Electricity values are net of export credits. This comparison uses the
+          named source sensors and does not independently prove final bill settlement
+          or the inclusion of all fixed charges._
 
       - type: history-graph
         title: Electricity cost — Live vs KEMS
