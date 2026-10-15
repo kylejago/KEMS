@@ -234,12 +234,9 @@ def test_day_coverage_requires_most_of_the_happy_hour_day() -> None:
     assert day_rate_coverage(rates[:-5], target_day) < 0.90
 
 
-
 def test_auto_join_never_invents_missing_battery_soc() -> None:
     def candidate(value: object) -> SimpleNamespace:
-        return SimpleNamespace(
-            simulation=SimpleNamespace(simulated_battery_soc=value)
-        )
+        return SimpleNamespace(simulation=SimpleNamespace(simulated_battery_soc=value))
 
     assert _simulation_soc(SimpleNamespace()) is None
     assert _simulation_soc(SimpleNamespace(simulation=None)) is None
