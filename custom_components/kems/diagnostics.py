@@ -92,6 +92,17 @@ async def async_get_config_entry_diagnostics(
         ),
     }
 
+    # Diagnostics should be compact: the recorder retains up to 960 full
+    # EV transition samples for safety investigations, but the default JSON
+    # export needs only the latest 64. Never delete underlying trace history.
+    ev_trace = dict(coordinator.ev_charge_trace_state)
+    ev_trace_samples = list(ev_trace.get("samples") or ())
+    ev_trace["samples"] = ev_trace_samples[-64:]
+    ev_trace["samples_included"] = len(ev_trace["samples"])
+    ev_trace["samples_omitted"] = max(
+        len(ev_trace_samples) - ev_trace["samples_included"], 0
+    )
+
     return {
         "integration": {
             "entry_id": entry.entry_id,
@@ -136,7 +147,7 @@ async def async_get_config_entry_diagnostics(
         "snapshot": data.snapshot.to_dict(),
         "shared_bus_ev_balance": dict(data.snapshot.shared_bus_ev_audit),
         "shared_bus_ev_evidence": coordinator.shared_bus_ev_evidence,
-        "ev_charge_trace": coordinator.ev_charge_trace_state,
+        "ev_charge_trace": ev_trace,
         "ev_grid_hold_session": coordinator.ev_grid_hold_state,
         "ev_soc_sync": coordinator.ev_soc_sync_state,
         "control_event_refresh": coordinator.control_event_refresh_state,
