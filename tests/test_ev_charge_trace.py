@@ -161,4 +161,6 @@ def test_trace_fails_safe_when_not_installed_or_ev_data_missing():
     assert "await self._ev_charge_trace.async_load()" in coordinator
     assert "await self._ev_charge_trace.async_save()" in coordinator
     diagnostics = (KEMS / "diagnostics.py").read_text(encoding="utf-8")
-    assert '"ev_charge_trace": coordinator.ev_charge_trace_state' in diagnostics
+    assert "ev_trace = dict(coordinator.ev_charge_trace_state)" in diagnostics
+    assert 'ev_trace["samples"] = ev_trace_samples[-64:]' in diagnostics
+    assert '"ev_charge_trace": ev_trace' in diagnostics
