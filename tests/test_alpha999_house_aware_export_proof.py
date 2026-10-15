@@ -14,7 +14,10 @@ from types import SimpleNamespace
 from typing import Any
 
 BACKEND = (
-    Path(__file__).parents[1] / "custom_components" / "kems" / "foxess_control_backend.py"
+    Path(__file__).parents[1]
+    / "custom_components"
+    / "kems"
+    / "foxess_control_backend.py"
 )
 
 
@@ -22,13 +25,19 @@ def _production():
     tree = ast.parse(BACKEND.read_text(encoding="utf-8"), filename=str(BACKEND))
     wanted = {"_number", "_bounded_paid_export_discharge_setpoint"}
     methods = {"async_setup", "_async_save", "_async_observe_paid_export_stage"}
-    selected = [node for node in tree.body if isinstance(node, ast.FunctionDef) and node.name in wanted]
+    selected = [
+        node
+        for node in tree.body
+        if isinstance(node, ast.FunctionDef) and node.name in wanted
+    ]
     backend = next(
-        node for node in tree.body
+        node
+        for node in tree.body
         if isinstance(node, ast.ClassDef) and node.name == "FoxESSControlBackend"
     )
     selected.extend(
-        node for node in backend.body
+        node
+        for node in backend.body
         if isinstance(node, ast.AsyncFunctionDef) and node.name in methods
     )
     assert len(selected) == len(wanted) + len(methods)
@@ -44,7 +53,9 @@ def _production():
         "_PAID_EXPORT_PROOF_PROTOCOL": 2,
         "_LOCAL_WORK_MODES": {"Self Use", "Feed-in First", "Back-up"},
     }
-    exec(compile(ast.Module(body=selected, type_ignores=[]), str(BACKEND), "exec"), scope)
+    exec(
+        compile(ast.Module(body=selected, type_ignores=[]), str(BACKEND), "exec"), scope
+    )
     return scope
 
 
@@ -77,20 +88,26 @@ def test_proof_commands_one_kw_net_export_not_one_kw_total_discharge():
 
 
 def test_export_ceiling_limits_net_export_without_truncating_house_power():
-    assert _setpoint(
-        requested_grid_export_kw=9,
-        planned_total_discharge_kw=9,
-        observed_house_load_kw=1.2,
-        effective_export_limit_kw=7,
-        staging=False,
-    ) == 8.2
-    assert _setpoint(
-        requested_grid_export_kw=9,
-        planned_total_discharge_kw=9,
-        observed_house_load_kw=1.2,
-        effective_export_limit_kw=7,
-        staging=True,
-    ) == 2.2
+    assert (
+        _setpoint(
+            requested_grid_export_kw=9,
+            planned_total_discharge_kw=9,
+            observed_house_load_kw=1.2,
+            effective_export_limit_kw=7,
+            staging=False,
+        )
+        == 8.2
+    )
+    assert (
+        _setpoint(
+            requested_grid_export_kw=9,
+            planned_total_discharge_kw=9,
+            observed_house_load_kw=1.2,
+            effective_export_limit_kw=7,
+            staging=True,
+        )
+        == 2.2
+    )
 
 
 def test_solar_and_inverter_limits_remain_bounded():
@@ -144,18 +161,20 @@ def _backend(store=None):
 
 
 def test_legacy_failure_latch_requalified_once_preserving_rollback_baseline():
-    store = _MemoryStore({
-        "paid_export_stage_blocked": True,
-        "paid_export_stage_reason": "Failed legacy 1 kW proof",
-        "owned": True,
-        "previous_work_mode": "Self Use",
-        "previous_min_soc_on_grid": 10,
-        "previous_force_discharge_power_kw": 0.666,
-        "previous_export_power_limit_w": 7000,
-        "last_applied_action": "force_discharge",
-        "last_verified_min_soc_on_grid": 10,
-        "last_verified_min_soc_at": "2026-10-14T23:00:00+00:00",
-    })
+    store = _MemoryStore(
+        {
+            "paid_export_stage_blocked": True,
+            "paid_export_stage_reason": "Failed legacy 1 kW proof",
+            "owned": True,
+            "previous_work_mode": "Self Use",
+            "previous_min_soc_on_grid": 10,
+            "previous_force_discharge_power_kw": 0.666,
+            "previous_export_power_limit_w": 7000,
+            "last_applied_action": "force_discharge",
+            "last_verified_min_soc_on_grid": 10,
+            "last_verified_min_soc_at": "2026-10-14T23:00:00+00:00",
+        }
+    )
     backend = _backend(store)
     asyncio.run(SETUP(backend))
     assert not backend._paid_export_stage_blocked
@@ -177,8 +196,10 @@ def test_legacy_failure_latch_requalified_once_preserving_rollback_baseline():
 def test_home_demand_absorbing_battery_does_not_count_as_direction_failure():
     backend = _backend()
     backend._last_applied_action = "force_discharge"
+
     async def save_observation():
         return None
+
     backend._async_save = save_observation
     snapshot = SimpleNamespace(
         stale_fields=(),
@@ -212,8 +233,10 @@ def test_decisive_direction_mismatch_still_latches_after_three_samples():
     backend = _backend()
     backend._last_applied_action = "force_discharge"
     calls = []
+
     async def record():
         calls.append(True)
+
     backend._async_save = record
     snapshot = SimpleNamespace(
         stale_fields=(),
@@ -231,7 +254,9 @@ def test_decisive_direction_mismatch_still_latches_after_three_samples():
         export_limit_kw=7.0,
     )
     for _ in range(3):
-        asyncio.run(OBSERVE(backend, snapshot=snapshot, entities=entities, config=config))
+        asyncio.run(
+            OBSERVE(backend, snapshot=snapshot, entities=entities, config=config)
+        )
     assert backend._paid_export_stage_blocked
     assert backend._paid_export_stage_failures == 3
     assert calls
