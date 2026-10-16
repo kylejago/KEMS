@@ -50,7 +50,8 @@ def test_live_home_excludes_digital_twin_and_uses_actual_energy() -> None:
 def test_live_home_shows_agile_power_down_and_happy_hour_plans() -> None:
     text = str(_home())
     assert "sensor.kems_agile_slots" in text
-    assert "rolling_action" in text
+    assert "physical_live_slot_outlook" in text
+    assert "rolling_action" not in text
     assert "today[idx:idx + 6]" in text
     assert "sensor.kems_next_power_down_session_start" in text
     assert "saving_session_export_target_kw" in text

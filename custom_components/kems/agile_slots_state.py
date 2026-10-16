@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
@@ -63,6 +64,124 @@ def _presentation_slots(value: Any) -> list[Any]:
     return [_presentation_slot(slot) for slot in value]
 
 
+def _utc_time(value: Any) -> datetime | None:
+    """Decode provider timestamps without guessing a timezone."""
+    if not isinstance(value, str):
+        return None
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return parsed.astimezone(UTC) if parsed.tzinfo is not None else None
+
+
+def _finite_nonnegative(value: Any) -> float | None:
+    """Keep projected presentation numbers finite and non-negative."""
+    import math
+
+    try:
+        result = float(value)
+    except (ValueError, TypeError, OverflowError):
+        return None
+    return result if math.isfinite(result) and result >= 0 else None
+
+
+def _physical_live_slot_outlook(
+    coordinator: Any, state: dict[str, Any]
+) -> dict[str, Any]:
+    """Project *live physical* SOC through the already-reviewed Agile ledger.
+
+    This is reporting-only: no changes to the digital twin, export schedule,
+    command authority, reserve or FoxESS writes. Fail closed to unavailable
+    rather than mixing physical SOC with simulated slot-action annotations.
+    """
+    plan = state.get("rolling_export_plan")
+    if not isinstance(plan, dict) or plan.get("available") is not True:
+        return {}
+    proof = plan.get("physical_planning_evidence")
+    schedule = plan.get("forecast_path_scheduler")
+    if (
+        not isinstance(proof, dict)
+        or proof.get("available") is not True
+        or plan.get("planning_soc_source") != "verified FoxESS physical lower bound"
+        or not isinstance(schedule, dict)
+        or schedule.get("available") is not True
+        or schedule.get("active") is not True
+        or schedule.get("future_solar_borrowing") is not False
+    ):
+        return {}
+    generated = _utc_time(plan.get("generated_at"))
+    now = datetime.now(UTC)
+    if generated is None or not timedelta(0) <= now - generated <= timedelta(minutes=5):
+        return {}
+    soc = _finite_nonnegative(plan.get("planning_soc_percent"))
+    if soc is None or soc > 100:
+        return {}
+    simulation = getattr(getattr(coordinator, "settings", None), "simulation", None)
+    capacity = _finite_nonnegative(getattr(simulation, "battery_capacity_kwh", None))
+    discharge_efficiency = _finite_nonnegative(
+        getattr(simulation, "discharge_efficiency", None)
+    )
+    if (
+        capacity is None
+        or capacity <= 0
+        or discharge_efficiency is None
+        or not 0 < discharge_efficiency <= 1
+    ):
+        return {}
+    # The scheduler's slot-energy ledger is discharged chronologically.
+    # An unsupported future solar recharge cannot be projected from total
+    # net energy alone, so do not publish an invented per-slot battery SOC.
+    stored_solar = _finite_nonnegative(schedule.get("forecast_solar_stored_kwh"))
+    if stored_solar is None or stored_solar > 0:
+        return {}
+    allocations = schedule.get("allocations")
+    if not isinstance(allocations, list) or not allocations:
+        return {}
+    result: dict[str, Any] = {}
+    previous_end: datetime | None = None
+    for allocation in allocations:
+        if not isinstance(allocation, dict):
+            return {}
+        start = _utc_time(allocation.get("valid_from"))
+        end = _utc_time(allocation.get("valid_to"))
+        discharged = _finite_nonnegative(allocation.get("planned_total_discharge_kwh"))
+        exported = _finite_nonnegative(allocation.get("planned_battery_export_kwh"))
+        to_house = _finite_nonnegative(allocation.get("planned_house_battery_kwh"))
+        if (
+            start is None
+            or end is None
+            or end <= start
+            or (previous_end is not None and start < previous_end)
+            or discharged is None
+            or exported is None
+            or to_house is None
+        ):
+            return {}
+        previous_end = end
+        if discharged + 0.02 < exported + to_house:
+            return {}
+        soc = max(0.0, soc - 100.0 * discharged / (capacity * discharge_efficiency))
+        if end <= now:
+            continue
+        if exported > 0.01:
+            action = "Planned battery export; house first"
+        elif to_house > 0.01:
+            action = "Battery powers home; no deliberate battery export planned"
+        else:
+            action = "No battery discharge scheduled"
+        result[str(allocation["valid_from"])] = {
+            "estimated_soc_percent": round(soc, 1),
+            "action": action,
+            "basis": "verified physical planning SOC + chronological live ledger",
+            "reporting_only": True,
+        }
+    expected_end = _finite_nonnegative(schedule.get("ending_soc_percent"))
+    if expected_end is None or abs(soc - expected_end) > 1.0:
+        return {}
+    return result
+
+
 def _attributes(coordinator: Any) -> dict[str, Any]:
     """Return the slot payload used by the rebuilt dashboard and Pi/Web."""
     state = _agile_state(coordinator)
@@ -72,6 +191,7 @@ def _attributes(coordinator: Any) -> dict[str, Any]:
 
     today_slots = _presentation_slots(state.get("today_slots"))
     tomorrow_slots = _presentation_slots(state.get("tomorrow_slots"))
+    live_outlook = _physical_live_slot_outlook(coordinator, state)
 
     periods = state.get("periods")
     periods = periods if isinstance(periods, dict) else {}
@@ -103,6 +223,13 @@ def _attributes(coordinator: Any) -> dict[str, Any]:
         "today_missing_slots": quality.get("today_missing_slots") or [],
         "tomorrow_missing_labels": quality.get("tomorrow_missing_labels") or [],
         "today_slots": today_slots,
+        "physical_live_slot_outlook": live_outlook,
+        "physical_live_slot_outlook_available": bool(live_outlook),
+        "physical_live_slot_outlook_basis": (
+            "verified FoxESS physical lower bound + live chronological Agile allocation"
+            if live_outlook
+            else "unavailable: do not substitute simulated SOC for physical SOC"
+        ),
         "tomorrow_slots": tomorrow_slots,
         "today_agile": today_agile,
         "current_day_settlement_reconciliation": state.get(
