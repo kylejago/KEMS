@@ -93,6 +93,20 @@ def ohme_happy_hour_write_decision(
     return True, "Automatic Happy Hour EV allowance available", round(guard_kwh, 3)
 
 
+def _automatic_happy_hour_source(happy_hour: dict[str, Any]) -> bool:
+    """Accept live joined events or KEMS-confirmed reward bookings only."""
+    status = str(happy_hour.get("automatic_status") or "")
+    confirmed_kems_booking = bool(
+        happy_hour.get("booking_authoritative") is True
+        and happy_hour.get("booking_source") == "kems_auto_join"
+        and status in ("detected_kems_booking", "retained_active")
+    )
+    return bool(
+        happy_hour.get("source") == "octopus_energy"
+        and (status.endswith("active") or confirmed_kems_booking)
+    )
+
+
 class OhmeHappyHourController:
     """Own only the temporary Ohme mode change KEMS itself initiated."""
 
@@ -273,16 +287,7 @@ class OhmeHappyHourController:
         entity_id = self._charge_mode_entity()
         state = self._hass.states.get(entity_id) if entity_id else None
         observed_mode = state.state if state is not None else None
-        status = str(happy_hour.get("automatic_status") or "")
-        confirmed_kems_booking = bool(
-            happy_hour.get("booking_authoritative") is True
-            and happy_hour.get("booking_source") == "kems_auto_join"
-            and status in ("detected_kems_booking", "retained_active")
-        )
-        automatic_source = bool(
-            happy_hour.get("source") == "octopus_energy"
-            and (status.endswith("active") or confirmed_kems_booking)
-        )
+        automatic_source = _automatic_happy_hour_source(happy_hour)
         allow, reason, guard_kwh = ohme_happy_hour_write_decision(
             enabled=enabled,
             automatic_source=automatic_source,
