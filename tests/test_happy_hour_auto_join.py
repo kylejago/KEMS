@@ -1,5 +1,6 @@
 """Alpha9.40 Weekend Happy Hour recommendation/auto-join contracts."""
 
+import asyncio
 from datetime import UTC, date, datetime, timedelta
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
@@ -524,87 +525,89 @@ def test_alpha9108_one_reward_cannot_book_two() -> None:
     )
 
 
-@pytest.mark.asyncio
-async def test_alpha9108_booking_controller_confirms_two_distinct_services(
+def test_alpha9108_booking_controller_confirms_two_distinct_services(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """One successful external booking must not block the next reward."""
-    now = datetime.now(UTC)
-    first_start = (now + timedelta(days=3)).replace(
-        hour=10, minute=0, second=0, microsecond=0
-    )
-    slots = [
-        HappyHourCandidate(
-            code=f"SUNDAY-{i}",
-            start=first_start + timedelta(hours=i),
-            end=first_start + timedelta(hours=i + 1),
-            availability="AVAILABLE",
-            source="public_event_entity",
-            source_entity="event.octopus_energy_test_octoplus_power_up_events",
+    async def _run() -> None:
+        now = datetime.now(UTC)
+        first_start = (now + timedelta(days=3)).replace(
+            hour=10, minute=0, second=0, microsecond=0
         )
-        for i in range(4)
-    ]
-    calls = []
+        slots = [
+            HappyHourCandidate(
+                code=f"SUNDAY-{i}",
+                start=first_start + timedelta(hours=i),
+                end=first_start + timedelta(hours=i + 1),
+                availability="AVAILABLE",
+                source="public_event_entity",
+                source_entity="event.octopus_energy_test_octoplus_power_up_events",
+            )
+            for i in range(4)
+        ]
+        calls = []
 
-    async def service(domain, action, params, **kwargs):
-        calls.append(params["event_code"])
-        return {"success": True}
+        async def service(domain, action, params, **kwargs):
+            calls.append(params["event_code"])
+            return {"success": True}
 
-    monkeypatch.setattr(
-        happy_join,
-        "discover_available_happy_hours",
-        lambda hass, now: (slots, {"weekend_happy_hours_available": 10}),
-    )
-    monkeypatch.setattr(happy_join, "discover_octopus_rates", lambda hass: ([], []))
-    monkeypatch.setattr(happy_join, "day_rate_coverage", lambda rates, day: 0.0)
-    control = SimpleNamespace(
-        operating_mode="control",
-        commissioned=True,
-        control_enabled=True,
-        emergency_stop=False,
-    )
-    simulation = SimpleNamespace(
-        export_rate_pence=0.0,
-        battery_capacity_kwh=56.42,
-        battery_reserve_percent=15.0,
-        max_charge_kw=8.0,
-        max_discharge_kw=8.0,
-        export_limit_kw=7.0,
-        charge_efficiency=0.95,
-        discharge_efficiency=0.95,
-    )
-    hass = SimpleNamespace(
-        services=SimpleNamespace(has_service=lambda *args: True, async_call=service)
-    )
-    entry = SimpleNamespace(
-        options={"happy_hour_auto_join_enabled": True, "battery_installed": True}
-    )
-    coordinator = SimpleNamespace(
-        hass=hass,
-        entry=entry,
-        settings=SimpleNamespace(control=control, simulation=simulation),
-    )
-    controller = happy_join.HappyHourAutoJoinController.__new__(
-        happy_join.HappyHourAutoJoinController
-    )
-    controller.coordinator = coordinator
-    controller.hass = hass
-    controller.entry = entry
-    controller._persisted = {}
-    controller.state = {}
-    controller.async_load = AsyncMock()
-    controller._async_save = AsyncMock()
-    data = SimpleNamespace(
-        snapshot=SimpleNamespace(battery_soc=91.0),
-        forecast_plan=None,
-    )
-    await controller.async_update(data)
-    assert len(calls) == 1
-    assert controller.state["booked_reward_hours"] == 1
-    await controller.async_update(data)
-    assert len(calls) == 2
-    assert calls[0] != calls[1]
-    assert controller.state["booked_reward_hours"] == 2
-    assert len(confirmed_booking_windows(controller.state)) == 1
-    await controller.async_update(data)
-    assert len(calls) == 2  # never duplicate a booked reward
+        monkeypatch.setattr(
+            happy_join,
+            "discover_available_happy_hours",
+            lambda hass, now: (slots, {"weekend_happy_hours_available": 10}),
+        )
+        monkeypatch.setattr(happy_join, "discover_octopus_rates", lambda hass: ([], []))
+        monkeypatch.setattr(happy_join, "day_rate_coverage", lambda rates, day: 0.0)
+        control = SimpleNamespace(
+            operating_mode="control",
+            commissioned=True,
+            control_enabled=True,
+            emergency_stop=False,
+        )
+        simulation = SimpleNamespace(
+            export_rate_pence=0.0,
+            battery_capacity_kwh=56.42,
+            battery_reserve_percent=15.0,
+            max_charge_kw=8.0,
+            max_discharge_kw=8.0,
+            export_limit_kw=7.0,
+            charge_efficiency=0.95,
+            discharge_efficiency=0.95,
+        )
+        hass = SimpleNamespace(
+            services=SimpleNamespace(has_service=lambda *args: True, async_call=service)
+        )
+        entry = SimpleNamespace(
+            options={"happy_hour_auto_join_enabled": True, "battery_installed": True}
+        )
+        coordinator = SimpleNamespace(
+            hass=hass,
+            entry=entry,
+            settings=SimpleNamespace(control=control, simulation=simulation),
+        )
+        controller = happy_join.HappyHourAutoJoinController.__new__(
+            happy_join.HappyHourAutoJoinController
+        )
+        controller.coordinator = coordinator
+        controller.hass = hass
+        controller.entry = entry
+        controller._persisted = {}
+        controller.state = {}
+        controller.async_load = AsyncMock()
+        controller._async_save = AsyncMock()
+        data = SimpleNamespace(
+            snapshot=SimpleNamespace(battery_soc=91.0),
+            forecast_plan=None,
+        )
+        await controller.async_update(data)
+        assert len(calls) == 1
+        assert controller.state["booked_reward_hours"] == 1
+        await controller.async_update(data)
+        assert len(calls) == 2
+        assert calls[0] != calls[1]
+        assert controller.state["booked_reward_hours"] == 2
+        assert len(confirmed_booking_windows(controller.state)) == 1
+        await controller.async_update(data)
+        assert len(calls) == 2  # never duplicate a booked reward
+
+    asyncio.run(_run())
