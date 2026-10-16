@@ -159,7 +159,10 @@ class OhmeHappyHourController:
                     _normalise(option)
                     for option in (confirmed.attributes.get("options") or [])
                 }
-                if _EXPECTED_MODES.issubset(options):
+                if (
+                    _EXPECTED_MODES.issubset(options)
+                    and _normalise(confirmed.state) in _EXPECTED_MODES
+                ):
                     return _CONFIRMED_CHARGE_MODE_ENTITY
         registry = er.async_get(self._hass)
         device_id = None
@@ -189,6 +192,8 @@ class OhmeHappyHourController:
             )
             if (
                 _EXPECTED_MODES.issubset(options)
+                and state is not None
+                and _normalise(state.state) in _EXPECTED_MODES
                 and "charge" in text
                 and "mode" in text
             ):
@@ -248,7 +253,7 @@ class OhmeHappyHourController:
         target = self._previous_mode or "Smart charge"
         if _normalise(target) == "max charge":
             target = "Smart charge"
-        if current and current != "max charge":
+        if current in _EXPECTED_MODES and current != "max charge":
             self._owned = False
             self._restore_attempts = 0
             await self._async_save()
@@ -319,9 +324,9 @@ class OhmeHappyHourController:
                     reason = "Ohme already in Max charge; KEMS did not take ownership"
             else:
                 if not self._owned:
-                    if observed_mode is None:
+                    if _normalise(observed_mode) not in _EXPECTED_MODES:
                         allow = False
-                        reason = "Cannot preserve prior Ohme mode before Max charge"
+                        reason = "Cannot preserve unverified prior Ohme mode before Max charge"
                     else:
                         self._previous_mode = observed_mode
                         self._event_start = str(happy_hour.get("start") or "")
