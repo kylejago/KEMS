@@ -50,7 +50,7 @@ def _production():
         "_PAID_EXPORT_MAX_SOLAR_KW": 0.5,
         "_PAID_EXPORT_PROOF_SAMPLES": 2,
         "_PAID_EXPORT_FAILURE_SAMPLES": 3,
-        "_PAID_EXPORT_PROOF_PROTOCOL": 2,
+        "_PAID_EXPORT_PROOF_PROTOCOL": 3,
         "_LOCAL_WORK_MODES": {"Self Use", "Feed-in First", "Back-up"},
     }
     exec(
@@ -111,9 +111,42 @@ def test_export_ceiling_limits_net_export_without_truncating_house_power():
 
 
 def test_solar_and_inverter_limits_remain_bounded():
-    assert _setpoint(observed_house_load_kw=1.2, observed_solar_kw=1.5) == 1.0
+    assert _setpoint(observed_house_load_kw=1.2, observed_solar_kw=1.5) == 2.5
     assert _setpoint(max_discharge_kw=1.6) == 1.6
     assert _setpoint(inverter_limit_kw=1.4) == 1.4
+
+
+def test_daytime_actual_telemetry_commands_ac_output_above_solar():
+    # 16 October FoxESS: old 1 kW command absorbed 2.32 kW into the battery.
+    # Battery power is incremental to solar when setting the AC limit.
+    readings = {
+        "requested_grid_export_kw": 3.691,
+        "planned_total_discharge_kw": 3.691,
+        "observed_house_load_kw": 1.254,
+        "observed_solar_kw": 3.309,
+    }
+    assert _setpoint(**readings) == 4.309
+    assert _setpoint(**readings, staging=False) == 7.0
+
+
+def test_solar_included_in_both_dno_ceiling_and_inverter_limit():
+    assert (
+        _setpoint(
+            observed_solar_kw=6.8,
+            observed_house_load_kw=0.2,
+            requested_grid_export_kw=3.0,
+            planned_total_discharge_kw=5.0,
+            staging=False,
+        )
+        == 7.2
+    )
+    assert _setpoint(observed_solar_kw=9.0, observed_house_load_kw=1.0) is None
+    assert _setpoint(observed_solar_kw=3.3, inverter_limit_kw=3.0) is None
+
+
+def test_small_requested_export_never_increases_battery_beyond_request():
+    assert _setpoint(requested_grid_export_kw=0.3, observed_solar_kw=2.0) == 2.3
+    assert _setpoint(requested_grid_export_kw=0.2, observed_solar_kw=2.0) is None
 
 
 def test_unverified_or_insufficient_headroom_never_commands_discharge():
@@ -179,7 +212,7 @@ def test_legacy_failure_latch_requalified_once_preserving_rollback_baseline():
     asyncio.run(SETUP(backend))
     assert not backend._paid_export_stage_blocked
     assert not backend._paid_export_live_proven
-    assert store.saves and store.value["paid_export_proof_protocol"] == 2
+    assert store.saves and store.value["paid_export_proof_protocol"] == 3
     assert store.value["previous_work_mode"] == "Self Use"
     assert store.value["previous_min_soc_on_grid"] == 10
     assert store.value["last_applied_action"] == "force_discharge"
@@ -227,6 +260,45 @@ def test_home_demand_absorbing_battery_does_not_count_as_direction_failure():
     assert backend._paid_export_stage_samples == 1
     asyncio.run(OBSERVE(backend, snapshot=snapshot, entities=entities, config=config))
     assert backend._paid_export_live_proven
+
+
+def test_high_solar_proof_requires_measured_battery_discharge_and_export():
+    backend = _backend()
+    backend._last_applied_action = "force_discharge"
+    called = []
+
+    async def record():
+        called.append(True)
+
+    backend._async_save = record
+    snapshot = SimpleNamespace(
+        stale_fields=(),
+        house_load_kw=1.254,
+        solar_power_kw=3.309,
+        battery_power_kw=-2.320,
+        grid_export_kw=3.0,
+    )
+    entities = {
+        "work_mode": {"normalised_observation": "Force Discharge"},
+        "export_power_limit": {"normalised_observation": 7000.0},
+    }
+    config = SimpleNamespace(
+        battery_power_positive_is_discharge=True,
+        export_limit_kw=7.0,
+    )
+    asyncio.run(OBSERVE(backend, snapshot=snapshot, entities=entities, config=config))
+    assert backend._paid_export_stage_samples == 0
+    assert backend._paid_export_stage_failures == 0
+    assert not backend._paid_export_live_proven
+    assert "PV-only" in backend._paid_export_stage_reason
+
+    # Distinct checks on physically discharging battery + exporting grid.
+    snapshot.battery_power_kw = 0.8
+    asyncio.run(OBSERVE(backend, snapshot=snapshot, entities=entities, config=config))
+    assert backend._paid_export_stage_samples == 1
+    asyncio.run(OBSERVE(backend, snapshot=snapshot, entities=entities, config=config))
+    assert backend._paid_export_live_proven
+    assert called
 
 
 def test_decisive_direction_mismatch_still_latches_after_three_samples():

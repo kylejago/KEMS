@@ -1,3 +1,12 @@
+## 0.9.0-alpha9.107 — solar-aware FoxESS AC output and physical export proof
+
+- Correct live paid-Agile FoxESS Force Discharge Power translation: the Modbus parameter caps AC-interface output (including PV), not battery-only output. Alpha9.106's 1.0 kW command during ~3.3 kW PV resulted in ~2.3 kW battery charging and zero export; it could not establish the required discharge-direction proof.
+- Set AC output from fresh physical solar plus the independently bounded battery contribution. For unproven control, stage at up to 1 kW *incremental battery export* after the home's unmet solar demand. Physical solar export can add to metered net export, bounded by the independent 7 kW DNO/hardware ceiling.
+- Continue to cap every output by the physical battery-discharge plan, battery and inverter ratings, live house/PV evidence and the site grid-export ceiling; fail closed on invalid or insufficient physical headroom.
+- Permit the original two physical battery-discharge **and** grid-export direction samples during sunshine. PV-only export does not satisfy battery proof or spuriously trigger a permanent failure lockout. Genuine low-solar direction failures retain their three-sample latch.
+- Upgrade the proof protocol from 2 to 3, requalifying any obsolete persisted proof lockout exactly once without discarding the pre-KEMS rollback baseline. Restart still requires new physical proof; this release is **not** asserted live-proven until Home Assistant diagnostics confirm battery power >0 and grid export >0.
+- No changes to EV charging/MinSOC hold, cheap Intelligent charging, physical reserve budget, forecast plan, Power Down precedence, Happy Hour, export limit settings or upstream tariff economics. Never treat unknown Ohme as unplugged.
+
 ## 0.9.0-alpha9.101 — Recorder-safe KEMS maintenance status
 
 - Fix the Home Assistant Recorder warning that `sensor.kems_maintenance_status` contains more than 16 KiB of state attributes. The maintenance notice is sometimes an intentionally large update payload; it must remain fully readable **live**, but Recorder should store only its compact state and standard metadata.

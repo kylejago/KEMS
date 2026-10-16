@@ -33,7 +33,7 @@ from .product_types import EXPORT_TARIFF_TYPE_AGILE, export_tariff_type_from_opt
 
 _STORAGE_VERSION = 1
 _PAID_EXPORT_STAGE_KW = 1.0
-_PAID_EXPORT_PROOF_PROTOCOL = 2
+_PAID_EXPORT_PROOF_PROTOCOL = 3
 _PAID_EXPORT_PROOF_SAMPLES = 2
 _PAID_EXPORT_FAILURE_SAMPLES = 3
 _PAID_EXPORT_MAX_SOLAR_KW = 0.5
@@ -63,15 +63,17 @@ def _bounded_paid_export_discharge_setpoint(
     effective_export_limit_kw: object,
     staging: bool,
 ) -> float | None:
-    """Bound the *total* inverter discharge needed for a net grid-export target.
+    """Translate bounded battery-export demand into FoxESS *AC-interface* power.
 
-    The Agile decision expresses export power, whereas the FoxESS Force
-    Discharge entity commands total battery output. A 1 kW discharge into a
-    1.2 kW home cannot prove 1 kW of grid export. Account for current home
-    demand without exceeding the authoritative total-discharge plan, hardware
-    discharge/inverter limits or the independently configured grid-export
-    ceiling. If any observation is untrustworthy or there is insufficient
-    physical headroom for a measurable export, do not issue a write.
+    FoxESS Modbus Force Discharge Power limits AC output, *not* battery
+    discharge. Solar generation also contributes to that output: commanding
+    1 kW AC with 3 kW PV can charge the battery instead of discharging it.
+
+    Preserve the independent physical battery-discharge plan, inverter and
+    battery limits, and the metered net grid-export ceiling. The unproven
+    stage limits the incremental battery contribution to 1 kW after any
+    solar deficit serving the house; solar export may add to total grid
+    export, but the DNO limit still bounds the complete AC setpoint.
     """
     values = (
         requested_grid_export_kw,
@@ -94,22 +96,31 @@ def _bounded_paid_export_discharge_setpoint(
         inverter_limit,
         export_limit,
     ) = converted
-    home_from_battery = max(house_load - solar, 0.0)
-    requested_net_export = min(
-        requested, export_limit, _PAID_EXPORT_STAGE_KW if staging else requested
-    )
-    if requested_net_export + 1e-6 < _PAID_EXPORT_MIN_GRID_EXPORT_KW:
+    if requested + 1e-6 < _PAID_EXPORT_MIN_GRID_EXPORT_KW:
         return None
-    discharge = min(
+
+    home_from_battery = max(house_load - solar, 0.0)
+    incremental_battery_export = min(
+        requested,
+        _PAID_EXPORT_STAGE_KW if staging else requested,
+    )
+    battery_discharge = min(
         planned_total,
         battery_limit,
-        max(inverter_limit - solar, 0.0),
-        home_from_battery + requested_net_export,
-        home_from_battery + export_limit,
+        inverter_limit - solar,
+        house_load + export_limit - solar,
+        home_from_battery + incremental_battery_export,
     )
-    if discharge + 1e-6 < home_from_battery + _PAID_EXPORT_MIN_GRID_EXPORT_KW:
+    minimum_battery = max(
+        _PAID_EXPORT_MIN_BATTERY_DISCHARGE_KW,
+        home_from_battery + _PAID_EXPORT_MIN_GRID_EXPORT_KW,
+    )
+    if battery_discharge + 1e-6 < minimum_battery:
         return None
-    return round(discharge, 3)
+    ac_output = solar + battery_discharge
+    if ac_output + 1e-6 < house_load + _PAID_EXPORT_MIN_GRID_EXPORT_KW:
+        return None
+    return round(ac_output, 3)
 
 
 def _commissioning_restore_readback_matches(
@@ -278,17 +289,17 @@ class FoxESSControlBackend:
             )
             stage_reason = data.get("paid_export_stage_reason")
             self._paid_export_stage_reason = str(stage_reason) if stage_reason else None
-            # Alpha9.99 changes the physical proof from a 1 kW *total*
-            # discharge to a house-aware 1 kW *net export* stage. Discard
-            # only an obsolete proof lockout once per protocol upgrade.
-            # Full paid export remains gated on two NEW physical samples.
+            # Alpha9.107 corrects the proof's AC-interface power basis and
+            # permits measured high-solar battery direction proof. Requalify
+            # any previous protocol lockout once, preserving rollback state.
+            # Two new physical direction samples are still mandatory.
             proof_protocol = data.get("paid_export_proof_protocol")
             legacy_paid_export_proof = proof_protocol != _PAID_EXPORT_PROOF_PROTOCOL
             if legacy_paid_export_proof:
                 self._paid_export_stage_blocked = False
                 self._paid_export_stage_reason = (
-                    "House-aware paid export proof upgraded; fresh physical "
-                    "direction samples still required"
+                    "Solar-aware AC-interface export proof upgraded; fresh "
+                    "physical direction samples still required"
                 )
             last_action = data.get("last_applied_action")
             self._last_applied_action = (
@@ -630,9 +641,6 @@ class FoxESSControlBackend:
             for value in (solar, house, battery, grid_export, export_limit)
         ):
             return
-        if solar > _PAID_EXPORT_MAX_SOLAR_KW:
-            return
-
         if not bool(getattr(config, "battery_power_positive_is_discharge", True)):
             battery = -battery
 
@@ -642,6 +650,16 @@ class FoxESSControlBackend:
             battery >= _PAID_EXPORT_MIN_BATTERY_DISCHARGE_KW
             and grid_export >= _PAID_EXPORT_MIN_GRID_EXPORT_KW
         )
+        # Solar can export on its own without any battery discharge. Never
+        # count PV-only export as a battery-direction proof or as a decisive
+        # failed battery test during daytime commissioning.
+        if solar > _PAID_EXPORT_MAX_SOLAR_KW and not direction_verified:
+            self._paid_export_stage_samples = 0
+            self._paid_export_stage_reason = (
+                "Waiting for measured battery discharge and net grid export "
+                "with active solar; PV-only export is not battery proof"
+            )
+            return
         # A shortfall in *net* grid export is inconclusive when the house
         # consumes the staged battery output. Do not count that as a hardware
         # direction failure or persist an unjustified lockout.
@@ -1287,9 +1305,10 @@ class FoxESSControlBackend:
                         and force_discharge_entity is not None
                         and export_limit_entity is not None
                     ):
-                        # Force Discharge controls *total battery power*, not
-                        # just net grid export. Preserve the upstream planned
-                        # total-discharge/solar envelope and 7 kW grid ceiling.
+                        # FoxESS Force Discharge commands AC-interface output,
+                        # including solar generation, not battery-only power.
+                        # Bound battery contribution by the upstream plan and
+                        # total AC/grid export by the physical inverter/DNO caps.
                         stale_fields = set(getattr(snapshot, "stale_fields", ()) or ())
                         requested_discharge = (
                             None
@@ -1368,8 +1387,8 @@ class FoxESSControlBackend:
                                 )
                         if action_ok and not self._paid_export_live_proven:
                             self._paid_export_stage_reason = (
-                                "House-aware 1.0 kW net-export stage applied; "
-                                "awaiting two low-solar physical direction samples"
+                                "Solar-aware 1.0 kW incremental battery-export "
+                                "stage applied; awaiting two physical direction samples"
                             )
                     applied = bool(min_soc_ok and action_ok)
                     if (
