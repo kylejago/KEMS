@@ -391,6 +391,7 @@ class PaidAgileUnpluggedContinuity:
         self._assessment = "permitted_bounded_unplugged_outage"
         return True
 
+
 def assess_paid_agile_ev_continuity(
     snapshot: Snapshot,
     *,
