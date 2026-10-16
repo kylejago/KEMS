@@ -331,7 +331,10 @@ def test_alpha9111_ohme_mode_unavailable_does_not_allow_a_blind_write(
         )
     )
     monkeypatch.setattr(
-        _ohme.er, "async_get", lambda hass: SimpleNamespace(entities={}, async_get=lambda entity: None), raising=False
+        _ohme.er,
+        "async_get",
+        lambda hass: SimpleNamespace(entities={}, async_get=lambda entity: None),
+        raising=False,
     )
     assert controller._charge_mode_entity() is None
 
