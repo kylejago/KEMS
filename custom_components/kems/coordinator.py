@@ -332,6 +332,7 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
             "follow_up_refresh_seconds": _ALPHA975_FOLLOW_UP_REFRESH_SECONDS,
             "ev_hold_source_grace_seconds": _ALPHA975_EV_HOLD_SOURCE_GRACE_SECONDS,
             "ev_hold_source_uncertain": self._ev_hold_source_uncertain(),
+            "agile_unplugged_source_proof": self._paid_agile_unplugged_continuity.status,
             "last_trigger": (
                 dict(self._last_critical_refresh_event)
                 if self._last_critical_refresh_event is not None
