@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import importlib.util
 import sys
 import types
@@ -297,3 +298,170 @@ def test_ohme_write_path_is_narrow_and_foxess_remains_absent() -> None:
     assert 'happy_hour.get("source") == "octopus_energy"' in source
     assert "from .foxess" not in source
     assert "FoxESSCommand" not in source
+
+
+def test_alpha9111_confirmed_ohme_charge_mode_is_discovered_when_plugged_in() -> None:
+    state = SimpleNamespace(
+        state="Smart charge",
+        attributes={"options": ["Smart charge", "Max charge", "Paused"]},
+    )
+    controller = _ohme.OhmeHappyHourController.__new__(
+        _ohme.OhmeHappyHourController
+    )
+    controller._ev_status_entity = "sensor.ohme_epod_status"
+    controller._hass = SimpleNamespace(
+        states=SimpleNamespace(
+            get=lambda entity: (
+                state if entity == "select.ohme_epod_charge_mode" else None
+            )
+        )
+    )
+    assert controller._charge_mode_entity() == "select.ohme_epod_charge_mode"
+
+
+def test_alpha9111_ohme_mode_unavailable_does_not_allow_a_blind_write(
+    monkeypatch,
+) -> None:
+    controller = _ohme.OhmeHappyHourController.__new__(
+        _ohme.OhmeHappyHourController
+    )
+    controller._ev_status_entity = "sensor.ohme_epod_status"
+    controller._hass = SimpleNamespace(
+        states=SimpleNamespace(
+            get=lambda entity: SimpleNamespace(
+                state="unavailable", attributes={"options": []}
+            )
+        )
+    )
+    monkeypatch.setattr(
+        _ohme.er, "async_get", lambda hass: SimpleNamespace(entities={})
+    )
+    assert controller._charge_mode_entity() is None
+
+
+def test_alpha9111_kems_confirmed_booking_enables_ohme_but_not_manual() -> None:
+    eligible = {
+        "source": "octopus_energy",
+        "automatic_status": "detected_kems_booking",
+        "booking_authoritative": True,
+        "booking_source": "kems_auto_join",
+    }
+    assert _ohme._automatic_happy_hour_source(eligible) is True
+    assert _ohme._automatic_happy_hour_source(
+        {**eligible, "booking_authoritative": False}
+    ) is False
+    assert _ohme._automatic_happy_hour_source(
+        {**eligible, "source": "manual"}
+    ) is False
+    assert _ohme._automatic_happy_hour_source(
+        {**eligible, "automatic_status": "detected_upcoming"}
+    ) is False
+    assert _ohme._automatic_happy_hour_source(
+        {"source": "octopus_energy", "automatic_status": "detected_active"}
+    ) is True
+
+
+def test_alpha9111_restores_prior_paused_mode_after_owned_max_charge() -> None:
+    current = SimpleNamespace(
+        state="Max charge",
+        attributes={"options": ["Smart charge", "Max charge", "Paused"]},
+    )
+    calls = []
+
+    async def call(domain, action, data, **kwargs):
+        calls.append((domain, action, dict(data)))
+        current.state = data["option"]
+
+    controller = _ohme.OhmeHappyHourController.__new__(
+        _ohme.OhmeHappyHourController
+    )
+    controller._hass = SimpleNamespace(
+        states=SimpleNamespace(get=lambda entity: current),
+        services=SimpleNamespace(async_call=call),
+    )
+    controller._owned = True
+    controller._previous_mode = "Paused"
+    controller._restore_attempts = 0
+    controller._last_result = ""
+    controller._last_command = None
+    controller._last_command_at = None
+
+    async def save():
+        return None
+
+    controller._async_save = save
+    asyncio.run(controller._async_restore("select.ohme_epod_charge_mode"))
+    assert calls == [
+        (
+            "select",
+            "select_option",
+            {"entity_id": "select.ohme_epod_charge_mode", "option": "Paused"},
+        )
+    ]
+    assert controller._owned is False
+    assert current.state == "Paused"
+
+
+def test_alpha9111_physical_headroom_uses_soc_upper_bound_not_export_lower_bound(
+    monkeypatch,
+) -> None:
+    now = datetime(2026, 10, 18, 11, 0, tzinfo=UTC)
+    snapshot = SimpleNamespace(
+        battery_soc=95.0,
+        source_age_seconds={"battery_soc": 60.0},
+    )
+    manager = SimpleNamespace(
+        _kems_physical_planning_context={
+            "snapshot": snapshot,
+            "control": SimpleNamespace(max_charge_kw=9.0),
+        }
+    )
+    fake = types.ModuleType("custom_components.kems.agile_physical_planning")
+    fake.physical_planning_soc = lambda manager, now, config: (
+        80.0,
+        {"available": True},
+    )
+    monkeypatch.setitem(
+        sys.modules, "custom_components.kems.agile_physical_planning", fake
+    )
+    evidence = _budget.verified_happy_hour_physical_headroom(
+        manager,
+        now=now,
+        config=SimpleNamespace(battery_capacity_kwh=50.0),
+    )
+    assert evidence["physical_soc_verified"] is True
+    assert evidence["current_physical_soc_percent"] == 95.0
+    assert evidence["physical_soc_lower_bound_percent"] == 80.0
+    # 5% physical space is only 2.5 kWh, less 9 kW x 60 s and 0.5 kWh.
+    assert evidence["physical_battery_headroom_kwh"] == 1.85
+    assert _budget._adjusted_headroom({}, evidence, None) == 1.85
+
+
+def test_alpha9111_no_verified_physical_soc_never_uses_simulated_headroom(
+    monkeypatch,
+) -> None:
+    fake = types.ModuleType("custom_components.kems.agile_physical_planning")
+    fake.physical_planning_soc = lambda manager, now, config: (
+        None,
+        {"available": False, "reason": "stale FoxESS source"},
+    )
+    monkeypatch.setitem(
+        sys.modules, "custom_components.kems.agile_physical_planning", fake
+    )
+    manager = SimpleNamespace(_kems_physical_planning_context=None)
+    physical = _budget.verified_happy_hour_physical_headroom(
+        manager,
+        now=START,
+        config=SimpleNamespace(battery_capacity_kwh=56.42),
+    )
+    assert physical["physical_soc_verified"] is False
+    assert physical["current_physical_soc_percent"] is None
+    assert _budget._adjusted_headroom(
+        {"happy_hour_adjusted_soc_percent": 6.07},
+        {
+            "current_simulated_soc_percent": 6.07,
+            "current_battery_headroom_kwh": 50.0,
+            **physical,
+        },
+        SimpleNamespace(battery_capacity_kwh=56.42),
+    ) == 0.0
