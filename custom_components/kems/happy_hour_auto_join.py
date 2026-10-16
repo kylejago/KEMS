@@ -780,7 +780,7 @@ def booked_happy_hour_matches_plan(
     booking: Mapping[str, Any], plan: Mapping[str, Any], now: datetime
 ) -> bool:
     """Authorise physical reward charging only for a matching confirmed window."""
-    if booking.get("status") != "booked":
+    if booking.get("status") != "booked" and not booking.get("bookings"):
         return False
     plan_start = _dt(plan.get("start"))
     plan_end = _dt(plan.get("end"))
@@ -851,7 +851,7 @@ class HappyHourAutoJoinController:
             "emergency_stop": bool(control.emergency_stop),
             "battery_installed": bool(options.get("battery_installed", False)),
             "external_join_authority": False,
-            "decision_policy": "night_before_after_90_percent_price_coverage",
+            "decision_policy": "two_banked_rewards_as_soon_as_available",
             "price_coverage_required_percent": int(
                 HAPPY_HOUR_PRICE_COVERAGE_REQUIRED * 100
             ),
