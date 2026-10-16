@@ -331,7 +331,7 @@ class OhmeHappyHourController:
                 if not self._owned:
                     if _normalise(observed_mode) not in _EXPECTED_MODES:
                         allow = False
-                        reason = "Cannot preserve unverified prior Ohme mode before Max charge"
+                        reason = "Unverified prior Ohme mode; Max charge blocked"
                     else:
                         self._previous_mode = observed_mode
                         self._event_start = str(happy_hour.get("start") or "")
