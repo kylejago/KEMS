@@ -504,3 +504,133 @@ def test_alpha9111_ohme_restoration_waits_when_mode_becomes_unavailable() -> Non
     assert controller._restore_attempts == 0
     assert "deferred" in controller._last_result
     assert calls == []
+
+
+def test_alpha9112_discovers_real_ohme_underscore_modes() -> None:
+    """The live ePod exposes smart_charge/max_charge, not title-case labels."""
+    current = SimpleNamespace(
+        state="smart_charge",
+        attributes={"options": ["smart_charge", "max_charge", "paused"]},
+    )
+    controller = _ohme.OhmeHappyHourController.__new__(_ohme.OhmeHappyHourController)
+    controller._ev_status_entity = "sensor.ohme_epod_status"
+    controller._hass = SimpleNamespace(
+        states=SimpleNamespace(
+            get=lambda entity: (
+                current if entity == "select.ohme_epod_charge_mode" else None
+            )
+        )
+    )
+    assert controller._charge_mode_entity() == "select.ohme_epod_charge_mode"
+    assert controller._exact_option("select.ohme_epod_charge_mode", "Max charge") == (
+        "max_charge"
+    )
+
+
+def test_alpha9112_max_charge_write_uses_exact_real_ohme_option() -> None:
+    current = SimpleNamespace(
+        state="smart_charge",
+        attributes={"options": ["smart_charge", "max_charge", "paused"]},
+    )
+    commands = []
+
+    async def call(domain, action, payload, **kwargs):
+        commands.append((domain, action, dict(payload)))
+        current.state = payload["option"]
+
+    controller = _ohme.OhmeHappyHourController.__new__(_ohme.OhmeHappyHourController)
+    controller._hass = SimpleNamespace(
+        states=SimpleNamespace(get=lambda entity: current),
+        services=SimpleNamespace(async_call=call),
+    )
+    controller._last_result = ""
+    controller._last_command = None
+    controller._last_command_at = None
+    assert asyncio.run(
+        controller._async_set_mode("select.ohme_epod_charge_mode", "Max charge")
+    )
+    assert commands == [
+        (
+            "select",
+            "select_option",
+            {"entity_id": "select.ohme_epod_charge_mode", "option": "max_charge"},
+        )
+    ]
+    assert controller._last_result == "Confirmed max_charge"
+
+
+def test_alpha9112_restore_prior_underscore_mode_only_after_verified_readback() -> None:
+    current = SimpleNamespace(
+        state="max_charge",
+        attributes={"options": ["smart_charge", "max_charge", "paused"]},
+    )
+    commands = []
+
+    async def call(domain, action, payload, **kwargs):
+        commands.append(dict(payload))
+        current.state = "unavailable"
+
+    saved = []
+
+    async def save():
+        saved.append(True)
+
+    controller = _ohme.OhmeHappyHourController.__new__(_ohme.OhmeHappyHourController)
+    controller._hass = SimpleNamespace(
+        states=SimpleNamespace(get=lambda entity: current),
+        services=SimpleNamespace(async_call=call),
+    )
+    controller._owned = True
+    controller._previous_mode = "smart_charge"
+    controller._restore_attempts = 0
+    controller._last_result = ""
+    controller._last_command = None
+    controller._last_command_at = None
+    controller._async_save = save
+
+    asyncio.run(controller._async_restore("select.ohme_epod_charge_mode"))
+    assert commands == [
+        {"entity_id": "select.ohme_epod_charge_mode", "option": "smart_charge"}
+    ]
+    assert controller._owned is True
+    assert saved == []
+
+    # Once Ohme confirms the requested mode KEMS can release ownership.
+    current.state = "smart_charge"
+    asyncio.run(controller._async_restore("select.ohme_epod_charge_mode"))
+    assert controller._owned is False
+    assert saved == [True]
+
+
+def test_alpha9112_underscore_max_charge_is_not_mistaken_for_a_restored_mode() -> None:
+    current = SimpleNamespace(
+        state="max_charge",
+        attributes={"options": ["smart_charge", "max_charge", "paused"]},
+    )
+    commands = []
+
+    async def call(domain, action, payload, **kwargs):
+        commands.append(dict(payload))
+        current.state = payload["option"]
+
+    async def save():
+        return None
+
+    controller = _ohme.OhmeHappyHourController.__new__(_ohme.OhmeHappyHourController)
+    controller._hass = SimpleNamespace(
+        states=SimpleNamespace(get=lambda entity: current),
+        services=SimpleNamespace(async_call=call),
+    )
+    controller._owned = True
+    controller._previous_mode = "paused"
+    controller._restore_attempts = 0
+    controller._last_result = ""
+    controller._last_command = None
+    controller._last_command_at = None
+    controller._async_save = save
+    asyncio.run(controller._async_restore("select.ohme_epod_charge_mode"))
+    assert commands == [
+        {"entity_id": "select.ohme_epod_charge_mode", "option": "paused"}
+    ]
+    assert current.state == "paused"
+    assert controller._owned is False
