@@ -529,6 +529,7 @@ def test_alpha9108_booking_controller_confirms_two_distinct_services(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """One successful external booking must not block the next reward."""
+
     async def _run() -> None:
         now = datetime.now(UTC)
         first_start = (now + timedelta(days=3)).replace(
