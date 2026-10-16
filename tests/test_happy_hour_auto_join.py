@@ -8,7 +8,6 @@ from zoneinfo import ZoneInfo
 import pytest
 
 import custom_components.kems.happy_hour_auto_join as happy_join
-
 from custom_components.kems.happy_hour_auto_join import (
     HappyHourCandidate,
     RateSlot,
