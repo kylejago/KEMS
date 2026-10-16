@@ -112,6 +112,7 @@ views:
         content: |
           {% set today = state_attr('sensor.kems_agile_slots', 'today_slots') or [] %}
           {% set tomorrow = state_attr('sensor.kems_agile_slots', 'tomorrow_slots') or [] %}
+          {% set physical_slots = state_attr('sensor.kems_agile_slots', 'physical_live_slot_outlook') or {} %}
           {% set idx = now().hour * 2 + (1 if now().minute >= 30 else 0) %}
           {% set slots = today[idx:idx + 6] %}
           {% if slots | count < 6 %}
@@ -124,16 +125,17 @@ views:
           | Time | Export rate | Planned action | Est. SOC |
           |:---|---:|:---|---:|
           {% for p in slots %}
-          {% set action = p.get('rolling_action') or p.get('flow_battery_action') or ((p.get('actions') or ['Not published']) | join(', ')) %}
-          {% set soc = p.get('flow_estimated_soc_percent') %}
-          {% if soc is none %}{% set soc = p.get('ending_soc_percent') %}{% endif %}
-          | {{ ('Tomorrow ' if loop.index0 + idx >= 48 else '') ~ p.get('label', '—') }}{{ ' · NOW' if loop.first else '' }} | {{ ('%.2fp' | format(p.get('rate_pence') | float)) if p.get('rate_pence') is not none else '—' }} | {{ action }} | {{ ('%.1f%%' | format(soc | float)) if soc is not none else '—' }} |
+          {% set is_tomorrow = loop.index0 + idx >= 48 %}
+          {% set physical = physical_slots.get(p.get('valid_from'), {}) if not is_tomorrow else {} %}
+          {% set action = physical.get('action') or ('Physical outlook unavailable — see Agile Plan' if not is_tomorrow else 'Tomorrow forecast — see Agile Plan') %}
+          {% set soc = physical.get('estimated_soc_percent') %}
+          | {{ ('Tomorrow ' if is_tomorrow else '') ~ p.get('label', '—') }}{{ ' · NOW' if loop.first else '' }} | {{ ('%.2fp' | format(p.get('rate_pence') | float)) if p.get('rate_pence') is not none else '—' }} | {{ action }} | {{ ('%.1f%%' | format(soc | float)) if soc is not none else '—' }} |
           {% endfor %}
           {% else %}
           The upcoming Agile plan has not been published yet.
           {% endif %}
 
-          _Forecast actions may change as live load, prices and battery conditions change. See the Agile Plan tab for the full daily schedule._
+          _Live SOC outlook uses verified physical FoxESS evidence and the rolling discharge ledger; unavailable values are shown as — rather than simulated SOC. The separate Agile Plan tab retains digital-twin forecasts. All actions can change as conditions change._
 
       - type: grid
         columns: 2
