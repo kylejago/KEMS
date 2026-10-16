@@ -221,6 +221,10 @@ views:
               _Battery, household and EV allowances will appear when an automatic event is verified and a plan is available._
               {% endif %}
 
+              **Verified FoxESS SOC:** {{ (state_attr(plan, 'current_physical_soc_percent') ~ '%') if state_attr(plan, 'physical_soc_verified') else '— (awaiting verified physical evidence)' }}  
+              **Physical battery charging headroom:** {{ (state_attr(plan, 'physical_battery_headroom_kwh') ~ ' kWh') if state_attr(plan, 'physical_soc_verified') else '—' }}  
+              **Physical pre-event export requirement:** {{ (state_attr(plan, 'physical_required_headroom_export_kwh') ~ ' kWh') if state_attr(plan, 'physical_required_headroom_export_kwh') is not none else '— (re-evaluate after cheap recharge)' }}  
+              **Ohme charge mode:** {{ states('select.ohme_epod_charge_mode') }}  
               **Reward-hour import remaining:** {{ state_attr(plan, 'current_reward_hour_remaining_kwh') if state_attr(plan, 'current_reward_hour_remaining_kwh') is not none else '—' }} kWh  
               **EV allowance remaining:** {{ state_attr(plan, 'ev_allowance_kwh_remaining') if state_attr(plan, 'ev_allowance_kwh_remaining') is not none else '—' }} kWh
 
@@ -1081,7 +1085,12 @@ views:
               **Recommended end:** {{ state_attr(hh, 'recommended_end') or state_attr(hh, 'booked_end') or '-' }}
               **Import price coverage:** {{ (state_attr(hh, 'import_price_coverage_percent') ~ '%') if state_attr(hh, 'import_price_coverage_percent') is not none else '-' }}
               **Export price coverage:** {{ (state_attr(hh, 'export_price_coverage_percent') ~ '%') if state_attr(hh, 'export_price_coverage_percent') is not none else '-' }}
-              **Battery free charge:** {{ (rec.get('expected_battery_free_import_kwh') ~ ' kWh') if rec.get('expected_battery_free_import_kwh') is not none else '-' }}
+              {% set live = 'sensor.kems_agile_happy_hour_plan' %}
+              **FoxESS SOC (verified):** {{ (state_attr(live, 'current_physical_soc_percent') ~ '%') if state_attr(live, 'physical_soc_verified') else 'Unavailable — never substitute simulated SOC' }}
+              **Conservative physical charging space:** {{ (state_attr(live, 'physical_battery_headroom_kwh') ~ ' kWh') if state_attr(live, 'physical_soc_verified') else '-' }}
+              **Physical headroom preparation:** {{ (state_attr(live, 'physical_required_headroom_export_kwh') ~ ' kWh') if state_attr(live, 'physical_required_headroom_export_kwh') is not none else 'Not yet physically forecastable across the next cheap recharge' }}
+              **Ohme mode entity:** select.ohme_epod_charge_mode · **Actual mode:** {{ states('select.ohme_epod_charge_mode') }}
+              **Battery free charge (economic simulation):** {{ (rec.get('expected_battery_free_import_kwh') ~ ' kWh') if rec.get('expected_battery_free_import_kwh') is not none else '-' }}
               **Free house import:** {{ (rec.get('expected_house_free_import_kwh') ~ ' kWh') if rec.get('expected_house_free_import_kwh') is not none else '-' }}
               **Solar opportunity:** {{ (rec.get('expected_solar_opportunity_kwh') ~ ' kWh') if rec.get('expected_solar_opportunity_kwh') is not none else '-' }}
               **Planned pre-event export:** {{ (state_attr(hh, 'planned_pre_event_export_kwh') ~ ' kWh') if state_attr(hh, 'planned_pre_event_export_kwh') is not none else ((rec.get('planned_pre_event_export_kwh') ~ ' kWh') if rec.get('planned_pre_event_export_kwh') is not none else '-') }}
