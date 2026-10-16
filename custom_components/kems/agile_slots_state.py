@@ -86,7 +86,9 @@ def _finite_nonnegative(value: Any) -> float | None:
     return result if math.isfinite(result) and result >= 0 else None
 
 
-def _physical_live_slot_outlook(coordinator: Any, state: dict[str, Any]) -> dict[str, Any]:
+def _physical_live_slot_outlook(
+    coordinator: Any, state: dict[str, Any]
+) -> dict[str, Any]:
     """Project *live physical* SOC through the already-reviewed Agile ledger.
 
     This is reporting-only: no changes to the digital twin, export schedule,
