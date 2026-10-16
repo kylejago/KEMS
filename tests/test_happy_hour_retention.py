@@ -231,7 +231,6 @@ def test_confirmed_kems_booking_bridges_coded_19_1_event_into_dispatch() -> None
     assert result["end"] == booked_end
 
 
-
 def test_alpha9108_two_confirmed_hours_become_one_retained_dispatch_event() -> None:
     hass = object()
     start = NOW + timedelta(days=1)
