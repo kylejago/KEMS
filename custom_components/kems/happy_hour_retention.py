@@ -91,15 +91,10 @@ def _same_window(left: Mapping[str, Any], right: Mapping[str, Any]) -> bool:
 
 
 def _auto_join_booking_event(hass: Any, now: datetime) -> dict[str, Any] | None:
-    """Return one KEMS-confirmed booking as dispatch-safe Octopus evidence.
+    """Bridge KEMS-confirmed Octopus booking codes into active dispatch evidence.
 
-    Octopus Energy 19.1 retains an event ``code`` on joined Power Up events.
-    Historical KEMS discovery deliberately rejects coded events because older
-    generic free-electricity events used the same feed. Alpha9.40 has stronger
-    evidence after the supported Weekend Happy Hour join service returns success:
-    the exact code and window that KEMS itself booked. Bridge that confirmed
-    booking into the existing retained-event authority rather than weakening the
-    generic coded-event classifier.
+    Adjacent one-hour bookings become a single two-hour plan; non-adjacent
+    bookings remain separate and are selected in chronological order.
     """
     try:
         from . import happy_hour_auto_join
@@ -120,16 +115,17 @@ def _auto_join_booking_event(hass: Any, now: datetime) -> dict[str, Any] | None:
     state = getattr(matches[0], "state", None)
     if not isinstance(state, Mapping) or state.get("status") != "booked":
         return None
-    code = str(state.get("booked_event_code") or "").strip()
-    start = _dt(state.get("booked_start"))
-    end = _dt(state.get("booked_end"))
-    if not code or start is None or end is None or end <= start:
+    windows = happy_hour_auto_join.confirmed_booking_windows(state)
+    if not windows:
         return None
+    selected = next((item for item in windows if item["end"] > now), windows[-1])
+    start = selected["start"]
+    end = selected["end"]
+    codes = selected["event_codes"]
     if end < now - _MAX_RETAINED_PLAN_AGE:
         return None
 
-    duration = max((end - start).total_seconds() / 3600.0, 0.0)
-    reward_hours = 2 if duration >= 1.5 else 1
+    reward_hours = len(codes)
     return {
         "enabled": True,
         "source": "octopus_energy",
@@ -139,12 +135,12 @@ def _auto_join_booking_event(hass: Any, now: datetime) -> dict[str, Any] | None:
         "source_entity": state.get("source_entity"),
         "source_account": state.get("source_account"),
         "classification_basis": (
-            "KEMS-confirmed Weekend Happy Hour booking via the supported "
+            "KEMS-confirmed Weekend Happy Hour bookings via supported "
             "Octopus join service"
         ),
         "confidence": "confirmed_booking",
-        "event_ids": [code],
-        "event_code": code,
+        "event_ids": codes,
+        "event_code": codes[0],
         "booking_authoritative": True,
         "booking_source": "kems_auto_join",
         "start": start,
