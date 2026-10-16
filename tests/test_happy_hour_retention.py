@@ -177,6 +177,13 @@ def test_confirmed_kems_booking_bridges_coded_19_1_event_into_dispatch() -> None
     booked_end = booked_start + timedelta(hours=1)
     module_name = f"{MODULE.__package__}.happy_hour_auto_join"
     auto_join = ModuleType(module_name)
+    auto_join.confirmed_booking_windows = lambda state: [
+        {
+            "start": datetime.fromisoformat(state["booked_start"]),
+            "end": datetime.fromisoformat(state["booked_end"]),
+            "event_codes": [state["booked_event_code"]],
+        }
+    ]
     auto_join._CONTROLLERS = {
         (id(hass), "entry-1"): SimpleNamespace(
             state={
@@ -222,6 +229,61 @@ def test_confirmed_kems_booking_bridges_coded_19_1_event_into_dispatch() -> None
     assert result["event_code"] == "WEEKEND-HH-19-1"
     assert result["start"] == booked_start
     assert result["end"] == booked_end
+
+
+
+def test_alpha9108_two_confirmed_hours_become_one_retained_dispatch_event() -> None:
+    hass = object()
+    start = NOW + timedelta(days=1)
+    first_end = start + timedelta(hours=1)
+    second_end = first_end + timedelta(hours=1)
+    module_name = f"{MODULE.__package__}.happy_hour_auto_join"
+    auto_join = ModuleType(module_name)
+
+    def groups(state):
+        entries = state["bookings"]
+        return [
+            {
+                "start": datetime.fromisoformat(entries[0]["start"]),
+                "end": datetime.fromisoformat(entries[1]["end"]),
+                "event_codes": [
+                    entries[0]["event_code"],
+                    entries[1]["event_code"],
+                ],
+            }
+        ]
+
+    auto_join.confirmed_booking_windows = groups
+    auto_join._CONTROLLERS = {
+        (id(hass), "entry-1"): SimpleNamespace(
+            state={
+                "status": "booked",
+                "bookings": [
+                    {
+                        "event_code": "SUNDAY-1",
+                        "start": start.isoformat(),
+                        "end": first_end.isoformat(),
+                    },
+                    {
+                        "event_code": "SUNDAY-2",
+                        "start": first_end.isoformat(),
+                        "end": second_end.isoformat(),
+                    },
+                ],
+            }
+        )
+    }
+    sys.modules[module_name] = auto_join
+    try:
+        booking = MODULE._auto_join_booking_event(hass, NOW)
+    finally:
+        sys.modules.pop(module_name, None)
+    assert booking is not None
+    assert booking["event_ids"] == ["SUNDAY-1", "SUNDAY-2"]
+    assert booking["duration_hours"] == 2
+    assert booking["fair_use_cap_kwh"] == 32.0
+    assert booking["start"] == start
+    assert booking["end"] == second_end
 
 
 def test_ambiguous_live_evidence_still_beats_confirmed_booking_bridge() -> None:
