@@ -1,11 +1,14 @@
 """Alpha9.40 Weekend Happy Hour recommendation/auto-join contracts."""
 
+import asyncio
 from datetime import UTC, date, datetime, timedelta
 from types import SimpleNamespace
+from unittest.mock import AsyncMock
 from zoneinfo import ZoneInfo
 
 import pytest
 
+import custom_components.kems.happy_hour_auto_join as happy_join
 from custom_components.kems.happy_hour_auto_join import (
     HappyHourCandidate,
     RateSlot,
@@ -14,8 +17,10 @@ from custom_components.kems.happy_hour_auto_join import (
     auto_join_control_gate,
     booked_happy_hour_matches_plan,
     choose_best_candidate,
+    confirmed_booking_windows,
     day_rate_coverage,
     score_candidate,
+    select_reward_booking_codes,
 )
 from custom_components.kems.happy_hour_budget import verified_live_happy_hour_charge_kw
 from custom_components.kems.product_types import (
@@ -403,3 +408,207 @@ def test_alpha9102_physical_happy_hour_charge_requires_all_live_evidence() -> No
     assert target(config_value=low_site) == 0.0
     assert target(power_down=True) == 0.0
     assert target(grid=False) == 0.0
+
+
+def test_alpha9108_picks_two_adjacent_rewards_from_four_available() -> None:
+    candidates = [_candidate(h, f"EVENT-{h}") for h in (11, 12, 13, 14)]
+    choices = select_reward_booking_codes(
+        candidates=candidates,
+        booked_codes=set(),
+        booked_windows=[],
+        scored={},
+        target_count=2,
+    )
+    assert len(choices) == 2
+    by_code = {item.code: item for item in candidates}
+    assert by_code[choices[0]].end == by_code[choices[1]].start
+
+
+def test_alpha9108_second_booking_preserves_selected_pair() -> None:
+    candidates = [_candidate(h, f"EVENT-{h}") for h in (11, 12, 13, 14)]
+    first = candidates[1]
+    choices = select_reward_booking_codes(
+        candidates=candidates,
+        booked_codes={first.code},
+        booked_windows=[
+            {
+                "start": first.start,
+                "end": first.end,
+                "event_codes": [first.code],
+            }
+        ],
+        scored={},
+        target_count=2,
+        preferred_codes=[candidates[2].code],
+    )
+    assert choices == [candidates[2].code]
+
+
+def test_alpha9108_two_bookings_merge_and_authorise_full_two_hours() -> None:
+    first = _candidate(11, "CODE-A")
+    second = _candidate(12, "CODE-B")
+    state = {
+        "status": "booked",
+        "bookings": [
+            {
+                "event_code": first.code,
+                "start": first.start.isoformat(),
+                "end": first.end.isoformat(),
+            },
+            {
+                "event_code": second.code,
+                "start": second.start.isoformat(),
+                "end": second.end.isoformat(),
+            },
+        ],
+    }
+    windows = confirmed_booking_windows(state)
+    assert len(windows) == 1
+    assert windows[0]["event_codes"] == [first.code, second.code]
+    context = {
+        "start": first.start.isoformat(),
+        "end": second.end.isoformat(),
+    }
+    assert booked_happy_hour_matches_plan(
+        state, context, first.start + timedelta(minutes=15)
+    )
+    assert booked_happy_hour_matches_plan(
+        state, context, second.start + timedelta(minutes=15)
+    )
+    assert not booked_happy_hour_matches_plan(state, context, second.end)
+
+
+def test_alpha9108_nonadjacent_bookings_are_distinct_dispatch_windows() -> None:
+    first = _candidate(11, "CODE-A")
+    second = _candidate(13, "CODE-B")
+    state = {
+        "status": "booked",
+        "bookings": [
+            {
+                "event_code": first.code,
+                "start": first.start.isoformat(),
+                "end": first.end.isoformat(),
+            },
+            {
+                "event_code": second.code,
+                "start": second.start.isoformat(),
+                "end": second.end.isoformat(),
+            },
+        ],
+    }
+    assert len(confirmed_booking_windows(state)) == 2
+    assert not booked_happy_hour_matches_plan(
+        state,
+        {"start": first.start.isoformat(), "end": second.end.isoformat()},
+        first.start,
+    )
+    assert booked_happy_hour_matches_plan(
+        state,
+        {"start": second.start.isoformat(), "end": second.end.isoformat()},
+        second.start,
+    )
+
+
+def test_alpha9108_one_reward_cannot_book_two() -> None:
+    candidates = [_candidate(h, f"EVENT-{h}") for h in (11, 12)]
+    assert (
+        len(
+            select_reward_booking_codes(
+                candidates=candidates,
+                booked_codes=set(),
+                booked_windows=[],
+                scored={},
+                target_count=1,
+            )
+        )
+        == 1
+    )
+
+
+def test_alpha9108_booking_controller_confirms_two_distinct_services(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """One successful external booking must not block the next reward."""
+
+    async def _run() -> None:
+        now = datetime.now(UTC)
+        first_start = (now + timedelta(days=3)).replace(
+            hour=10, minute=0, second=0, microsecond=0
+        )
+        slots = [
+            HappyHourCandidate(
+                code=f"SUNDAY-{i}",
+                start=first_start + timedelta(hours=i),
+                end=first_start + timedelta(hours=i + 1),
+                availability="AVAILABLE",
+                source="public_event_entity",
+                source_entity="event.octopus_energy_test_octoplus_power_up_events",
+            )
+            for i in range(4)
+        ]
+        calls = []
+
+        async def service(domain, action, params, **kwargs):
+            calls.append(params["event_code"])
+            return {"success": True}
+
+        monkeypatch.setattr(
+            happy_join,
+            "discover_available_happy_hours",
+            lambda hass, now: (slots, {"weekend_happy_hours_available": 10}),
+        )
+        monkeypatch.setattr(happy_join, "discover_octopus_rates", lambda hass: ([], []))
+        monkeypatch.setattr(happy_join, "day_rate_coverage", lambda rates, day: 0.0)
+        control = SimpleNamespace(
+            operating_mode="control",
+            commissioned=True,
+            control_enabled=True,
+            emergency_stop=False,
+        )
+        simulation = SimpleNamespace(
+            export_rate_pence=0.0,
+            battery_capacity_kwh=56.42,
+            battery_reserve_percent=15.0,
+            max_charge_kw=8.0,
+            max_discharge_kw=8.0,
+            export_limit_kw=7.0,
+            charge_efficiency=0.95,
+            discharge_efficiency=0.95,
+        )
+        hass = SimpleNamespace(
+            services=SimpleNamespace(has_service=lambda *args: True, async_call=service)
+        )
+        entry = SimpleNamespace(
+            options={"happy_hour_auto_join_enabled": True, "battery_installed": True}
+        )
+        coordinator = SimpleNamespace(
+            hass=hass,
+            entry=entry,
+            settings=SimpleNamespace(control=control, simulation=simulation),
+        )
+        controller = happy_join.HappyHourAutoJoinController.__new__(
+            happy_join.HappyHourAutoJoinController
+        )
+        controller.coordinator = coordinator
+        controller.hass = hass
+        controller.entry = entry
+        controller._persisted = {}
+        controller.state = {}
+        controller.async_load = AsyncMock()
+        controller._async_save = AsyncMock()
+        data = SimpleNamespace(
+            snapshot=SimpleNamespace(battery_soc=91.0),
+            forecast_plan=None,
+        )
+        await controller.async_update(data)
+        assert len(calls) == 1
+        assert controller.state["booked_reward_hours"] == 1
+        await controller.async_update(data)
+        assert len(calls) == 2
+        assert calls[0] != calls[1]
+        assert controller.state["booked_reward_hours"] == 2
+        assert len(confirmed_booking_windows(controller.state)) == 1
+        await controller.async_update(data)
+        assert len(calls) == 2  # never duplicate a booked reward
+
+    asyncio.run(_run())
