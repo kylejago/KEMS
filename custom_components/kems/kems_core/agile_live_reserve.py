@@ -244,7 +244,6 @@ class PaidAgileConnectedIdleContinuity:
         return True
 
 
-
 class PaidAgileUnpluggedContinuity:
     """Short, non-persistent bridge when an unplugged Ohme cloud source drops out.
 
@@ -267,9 +266,7 @@ class PaidAgileUnpluggedContinuity:
         raw = getattr(snapshot, field, None)
         value = _finite(raw)
         source_ages = snapshot.source_age_seconds
-        age = _finite(
-            source_ages.get(field) if isinstance(source_ages, dict) else None
-        )
+        age = _finite(source_ages.get(field) if isinstance(source_ages, dict) else None)
         if (
             value is None
             or value < 0.0
@@ -311,8 +308,7 @@ class PaidAgileUnpluggedContinuity:
         grid_import = self._site_meter(snapshot, "grid_import_kw")
         return bool(
             house is not None
-            and house
-            <= self._baseline_house_kw + _AGILE_CONNECTED_IDLE_LOAD_STEP_KW
+            and house <= self._baseline_house_kw + _AGILE_CONNECTED_IDLE_LOAD_STEP_KW
             and grid_import is not None
             and grid_import <= _AGILE_CONNECTED_IDLE_GRID_IMPORT_VETO_KW
         )
