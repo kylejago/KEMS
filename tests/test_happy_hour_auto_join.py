@@ -556,12 +556,8 @@ async def test_alpha9108_booking_controller_confirms_two_distinct_services(
         "discover_available_happy_hours",
         lambda hass, now: (slots, {"weekend_happy_hours_available": 10}),
     )
-    monkeypatch.setattr(
-        happy_join, "discover_octopus_rates", lambda hass: ([], [])
-    )
-    monkeypatch.setattr(
-        happy_join, "day_rate_coverage", lambda rates, day: 0.0
-    )
+    monkeypatch.setattr(happy_join, "discover_octopus_rates", lambda hass: ([], []))
+    monkeypatch.setattr(happy_join, "day_rate_coverage", lambda rates, day: 0.0)
     control = SimpleNamespace(
         operating_mode="control",
         commissioned=True,
