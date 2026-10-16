@@ -1,4 +1,4 @@
-"""Alpha9.106: asynchronous Ohme status/power reports must not hide explicit unplugged proof."""
+"""Alpha9.106: asynchronous Ohme source proof for unplugged EV."""
 
 from __future__ import annotations
 
@@ -169,10 +169,8 @@ def test_diagnostics_exposes_why_proof_is_not_armed() -> None:
     coordinator = (
         Path(__file__).parents[1] / "custom_components" / "kems" / "coordinator.py"
     ).read_text(encoding="utf-8")
-    assert (
-        '"agile_unplugged_source_proof": self._paid_agile_unplugged_continuity.status'
-        in coordinator
-    )
+    assert '"agile_unplugged_source_proof": (' in coordinator
+    assert "self._paid_agile_unplugged_continuity.status" in coordinator
     proof = PaidAgileUnpluggedContinuity()
     assert proof.status["assessment"] == "no_unplugged_proof"
     proof.assess(_snapshot(ev_connected=None), now=NOW)
