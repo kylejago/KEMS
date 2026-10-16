@@ -251,6 +251,11 @@ class OhmeHappyHourController:
         state = self._hass.states.get(entity_id)
         current = _normalise(state.state if state else None)
         target = self._previous_mode or "Smart charge"
+        if current not in _EXPECTED_MODES:
+            self._last_result = (
+                "Ohme restoration deferred until a valid charge mode returns"
+            )
+            return
         if _normalise(target) == "max charge":
             target = "Smart charge"
         if current in _EXPECTED_MODES and current != "max charge":
