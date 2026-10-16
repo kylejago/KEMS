@@ -327,9 +327,7 @@ def verified_happy_hour_physical_headroom(
             "physical_headroom_basis": "unavailable — simulation is not live SOC",
         }
     headroom = max(
-        capacity * (100.0 - report) / 100.0
-        - max_charge * soc_age / 3600.0
-        - 0.5,
+        capacity * (100.0 - report) / 100.0 - max_charge * soc_age / 3600.0 - 0.5,
         0.0,
     )
     return {
@@ -384,7 +382,8 @@ def decorate_happy_hour_context(
     physical = verified_happy_hour_physical_headroom(self, now=now, config=config)
     context.update(physical)
     context["headroom_forecast_basis"] = (
-        "physical FoxESS verified" if physical["physical_soc_verified"]
+        "physical FoxESS verified"
+        if physical["physical_soc_verified"]
         else "physical estimate unavailable; simulated forecast separate"
     )
     context["physical_required_headroom_export_kwh"] = None
@@ -397,12 +396,35 @@ def decorate_happy_hour_context(
         and start_after_now
         and context.get("preparation_in_current_horizon") is True
     ):
-        efficiency = max(_number(getattr(config, "discharge_efficiency", None)) or 0.0, 0.01)
-        stored_charging = max(_number(context.get("desired_stored_charge_kwh")) or 0.0, 0.0)
-        home_stored = max(_number(context.get("expected_house_discharge_before_event_kwh")) or 0.0, 0.0) / efficiency
-        pd_stored = max(_number(context.get("expected_power_down_export_before_event_kwh")) or 0.0, 0.0) / efficiency
-        live_headroom = max(_number(physical.get("physical_battery_headroom_kwh")) or 0.0, 0.0)
-        required = max(stored_charging - live_headroom - home_stored - pd_stored, 0.0) * efficiency
+        efficiency = max(
+            _number(getattr(config, "discharge_efficiency", None)) or 0.0, 0.01
+        )
+        stored_charging = max(
+            _number(context.get("desired_stored_charge_kwh")) or 0.0, 0.0
+        )
+        home_stored = (
+            max(
+                _number(context.get("expected_house_discharge_before_event_kwh"))
+                or 0.0,
+                0.0,
+            )
+            / efficiency
+        )
+        pd_stored = (
+            max(
+                _number(context.get("expected_power_down_export_before_event_kwh"))
+                or 0.0,
+                0.0,
+            )
+            / efficiency
+        )
+        live_headroom = max(
+            _number(physical.get("physical_battery_headroom_kwh")) or 0.0, 0.0
+        )
+        required = (
+            max(stored_charging - live_headroom - home_stored - pd_stored, 0.0)
+            * efficiency
+        )
         context["physical_required_headroom_export_kwh"] = round(required, 3)
 
     now_utc = now.astimezone(UTC)
