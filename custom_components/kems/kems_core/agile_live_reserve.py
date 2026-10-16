@@ -247,10 +247,11 @@ class PaidAgileConnectedIdleContinuity:
 class PaidAgileUnpluggedContinuity:
     """Short, non-persistent bridge when an unplugged Ohme cloud source drops out.
 
-    Arming needs an actual unplugged AND zero-power Ohme observation. During
-    an outage independent FoxESS home-load and grid-import readings must
-    remain fresh and consistent with the last measured unplugged baseline.
-    Neither a reported idle connected car nor an expired outage can arm it.
+    Arming requires a fresh explicit unplugged Ohme status. Zero Ohme power
+    corroborates when available, but the cloud power entity may be unavailable
+    independently of the unplugged status. In that case fresh physical FoxESS
+    load and grid-import readings are mandatory, as for any short outage.
+    A connected car, positive EV demand or an expired outage cannot arm it.
     """
 
     def __init__(self) -> None:
@@ -260,6 +261,26 @@ class PaidAgileUnpluggedContinuity:
         self._last_unplugged_at: datetime | None = None
         self._baseline_house_kw: float | None = None
         self._outage_started_at: datetime | None = None
+        self._assessment = "no_unplugged_proof"
+
+    @property
+    def status(self) -> dict[str, object]:
+        """Read-only proof lifecycle, excluding untrusted EV power estimates."""
+        return {
+            "assessment": self._assessment,
+            "last_confirmed_unplugged_at": (
+                self._last_unplugged_at.isoformat()
+                if self._last_unplugged_at is not None
+                else None
+            ),
+            "outage_started_at": (
+                self._outage_started_at.isoformat()
+                if self._outage_started_at is not None
+                else None
+            ),
+            "baseline_house_kw": self._baseline_house_kw,
+            "grace_seconds": _AGILE_EV_UNPLUGGED_GRACE_SECONDS,
+        }
 
     @staticmethod
     def _site_meter(snapshot: Snapshot, field: str) -> float | None:
@@ -314,7 +335,7 @@ class PaidAgileUnpluggedContinuity:
         )
 
     def assess(self, snapshot: Snapshot, *, now: datetime) -> bool:
-        """Never extend an outage without a newly confirmed unplugged reading."""
+        """Use explicit unplugged status; otherwise bridge only a brief outage."""
         power = _finite(snapshot.ev_power_kw)
         if (
             snapshot.ev_connected is True
@@ -322,34 +343,53 @@ class PaidAgileUnpluggedContinuity:
             or (power is not None and not 0.0 <= power <= _AGILE_EV_IDLE_POWER_KW)
         ):
             self.clear()
+            self._assessment = "vetoed_connected_charging_or_ev_power"
             return False
-        power_age = _finite(snapshot.ev_power_age_seconds)
         house = self._site_meter(snapshot, "house_load_kw")
         grid_import = self._site_meter(snapshot, "grid_import_kw")
+        # The Ohme provider only emits an explicit False for a fresh
+        # disconnection report. Its power entity is independently flaky.
         if (
             snapshot.ev_connected is False
-            and power is not None
-            and 0.0 <= power <= _AGILE_EV_IDLE_POWER_KW
-            and power_age is not None
-            and 0.0 <= power_age <= _AGILE_EV_CONNECTED_IDLE_POWER_AGE_SECONDS
-            and "ev_power_kw" not in snapshot.stale_fields
+            and snapshot.ev_charging is False
             and house is not None
             and grid_import is not None
             and grid_import <= _AGILE_CONNECTED_IDLE_GRID_IMPORT_VETO_KW
         ):
+            power_age = _finite(snapshot.ev_power_age_seconds)
+            fresh_zero_power = bool(
+                power is not None
+                and power_age is not None
+                and 0.0 <= power_age <= _AGILE_EV_CONNECTED_IDLE_POWER_AGE_SECONDS
+                and "ev_power_kw" not in snapshot.stale_fields
+            )
             self._last_unplugged_at = now
             self._baseline_house_kw = house
-            self._outage_started_at = None
+            if fresh_zero_power:
+                self._outage_started_at = None
+                self._assessment = "armed_fresh_unplugged_zero_power"
+                return False
+            # The direct EV power sensor is independently unavailable or
+            # aged. Fresh explicit UNPLUGGED status plus physical meters is
+            # stronger evidence than inventing a zero-power reading.
+            self._outage_started_at = now
+            if self.permits(snapshot, now=now):
+                self._assessment = "permitted_explicit_unplugged_physical_proof"
+                return True
+            self.clear()
+            self._assessment = "invalid_explicit_unplugged_physical_proof"
             return False
         if self._last_unplugged_at is None:
+            self._assessment = "awaiting_fresh_explicit_unplugged_status"
             return False
         if self._outage_started_at is None:
             self._outage_started_at = now
         if not self.permits(snapshot, now=now):
             self.clear()
+            self._assessment = "outage_grace_expired_or_physical_veto"
             return False
+        self._assessment = "permitted_bounded_unplugged_outage"
         return True
-
 
 def assess_paid_agile_ev_continuity(
     snapshot: Snapshot,
