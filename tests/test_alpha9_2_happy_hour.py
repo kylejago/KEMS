@@ -305,9 +305,7 @@ def test_alpha9111_confirmed_ohme_charge_mode_is_discovered_when_plugged_in() ->
         state="Smart charge",
         attributes={"options": ["Smart charge", "Max charge", "Paused"]},
     )
-    controller = _ohme.OhmeHappyHourController.__new__(
-        _ohme.OhmeHappyHourController
-    )
+    controller = _ohme.OhmeHappyHourController.__new__(_ohme.OhmeHappyHourController)
     controller._ev_status_entity = "sensor.ohme_epod_status"
     controller._hass = SimpleNamespace(
         states=SimpleNamespace(
@@ -322,9 +320,7 @@ def test_alpha9111_confirmed_ohme_charge_mode_is_discovered_when_plugged_in() ->
 def test_alpha9111_ohme_mode_unavailable_does_not_allow_a_blind_write(
     monkeypatch,
 ) -> None:
-    controller = _ohme.OhmeHappyHourController.__new__(
-        _ohme.OhmeHappyHourController
-    )
+    controller = _ohme.OhmeHappyHourController.__new__(_ohme.OhmeHappyHourController)
     controller._ev_status_entity = "sensor.ohme_epod_status"
     controller._hass = SimpleNamespace(
         states=SimpleNamespace(
@@ -347,18 +343,23 @@ def test_alpha9111_kems_confirmed_booking_enables_ohme_but_not_manual() -> None:
         "booking_source": "kems_auto_join",
     }
     assert _ohme._automatic_happy_hour_source(eligible) is True
-    assert _ohme._automatic_happy_hour_source(
-        {**eligible, "booking_authoritative": False}
-    ) is False
-    assert _ohme._automatic_happy_hour_source(
-        {**eligible, "source": "manual"}
-    ) is False
-    assert _ohme._automatic_happy_hour_source(
-        {**eligible, "automatic_status": "detected_upcoming"}
-    ) is False
-    assert _ohme._automatic_happy_hour_source(
-        {"source": "octopus_energy", "automatic_status": "detected_active"}
-    ) is True
+    assert (
+        _ohme._automatic_happy_hour_source({**eligible, "booking_authoritative": False})
+        is False
+    )
+    assert _ohme._automatic_happy_hour_source({**eligible, "source": "manual"}) is False
+    assert (
+        _ohme._automatic_happy_hour_source(
+            {**eligible, "automatic_status": "detected_upcoming"}
+        )
+        is False
+    )
+    assert (
+        _ohme._automatic_happy_hour_source(
+            {"source": "octopus_energy", "automatic_status": "detected_active"}
+        )
+        is True
+    )
 
 
 def test_alpha9111_restores_prior_paused_mode_after_owned_max_charge() -> None:
@@ -372,9 +373,7 @@ def test_alpha9111_restores_prior_paused_mode_after_owned_max_charge() -> None:
         calls.append((domain, action, dict(data)))
         current.state = data["option"]
 
-    controller = _ohme.OhmeHappyHourController.__new__(
-        _ohme.OhmeHappyHourController
-    )
+    controller = _ohme.OhmeHappyHourController.__new__(_ohme.OhmeHappyHourController)
     controller._hass = SimpleNamespace(
         states=SimpleNamespace(get=lambda entity: current),
         services=SimpleNamespace(async_call=call),
@@ -456,12 +455,15 @@ def test_alpha9111_no_verified_physical_soc_never_uses_simulated_headroom(
     )
     assert physical["physical_soc_verified"] is False
     assert physical["current_physical_soc_percent"] is None
-    assert _budget._adjusted_headroom(
-        {"happy_hour_adjusted_soc_percent": 6.07},
-        {
-            "current_simulated_soc_percent": 6.07,
-            "current_battery_headroom_kwh": 50.0,
-            **physical,
-        },
-        SimpleNamespace(battery_capacity_kwh=56.42),
-    ) == 0.0
+    assert (
+        _budget._adjusted_headroom(
+            {"happy_hour_adjusted_soc_percent": 6.07},
+            {
+                "current_simulated_soc_percent": 6.07,
+                "current_battery_headroom_kwh": 50.0,
+                **physical,
+            },
+            SimpleNamespace(battery_capacity_kwh=56.42),
+        )
+        == 0.0
+    )
