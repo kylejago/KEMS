@@ -113,7 +113,9 @@ def _auto_join_booking_event(hass: Any, now: datetime) -> dict[str, Any] | None:
         return None
 
     state = getattr(matches[0], "state", None)
-    if not isinstance(state, Mapping) or state.get("status") != "booked":
+    if not isinstance(state, Mapping) or (
+        state.get("status") != "booked" and not state.get("bookings")
+    ):
         return None
     windows = happy_hour_auto_join.confirmed_booking_windows(state)
     if not windows:
