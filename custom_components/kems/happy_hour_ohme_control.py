@@ -26,6 +26,7 @@ STORAGE_VERSION = 1
 MAX_SAFE_SCAN_SECONDS = 120
 ASSUMED_OHME_MAX_CHARGE_KW = 7.4
 _EXPECTED_MODES = {"smart charge", "max charge", "paused"}
+_CONFIRMED_CHARGE_MODE_ENTITY = "select.ohme_epod_charge_mode"
 _HAPPY_HOUR_SENSOR = "sensor.kems_agile_happy_hour_plan"
 
 
@@ -134,6 +135,18 @@ class OhmeHappyHourController:
         )
 
     def _charge_mode_entity(self) -> str | None:
+        # The user-confirmed ePod selector is authoritative for this charger.
+        # Require the actual live option set: the select may be unavailable
+        # while unplugged, and its existence alone never authorises a write.
+        if self._ev_status_entity == "sensor.ohme_epod_status":
+            confirmed = self._hass.states.get(_CONFIRMED_CHARGE_MODE_ENTITY)
+            if confirmed is not None:
+                options = {
+                    _normalise(option)
+                    for option in (confirmed.attributes.get("options") or [])
+                }
+                if _EXPECTED_MODES.issubset(options):
+                    return _CONFIRMED_CHARGE_MODE_ENTITY
         registry = er.async_get(self._hass)
         device_id = None
         if self._ev_status_entity:
@@ -260,9 +273,15 @@ class OhmeHappyHourController:
         entity_id = self._charge_mode_entity()
         state = self._hass.states.get(entity_id) if entity_id else None
         observed_mode = state.state if state is not None else None
+        status = str(happy_hour.get("automatic_status") or "")
+        confirmed_kems_booking = bool(
+            happy_hour.get("booking_authoritative") is True
+            and happy_hour.get("booking_source") == "kems_auto_join"
+            and status in ("detected_kems_booking", "retained_active")
+        )
         automatic_source = bool(
             happy_hour.get("source") == "octopus_energy"
-            and str(happy_hour.get("automatic_status") or "").endswith("active")
+            and (status.endswith("active") or confirmed_kems_booking)
         )
         allow, reason, guard_kwh = ohme_happy_hour_write_decision(
             enabled=enabled,
