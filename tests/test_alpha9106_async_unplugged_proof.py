@@ -40,7 +40,9 @@ def _snapshot(now: datetime = NOW, **changes: object) -> Snapshot:
     return Snapshot(**defaults)
 
 
-def _export(snapshot: Snapshot, proof: PaidAgileUnpluggedContinuity, now: datetime) -> tuple:
+def _export(
+    snapshot: Snapshot, proof: PaidAgileUnpluggedContinuity, now: datetime
+) -> tuple:
     control = ControlState(
         operating_mode="control",
         operating_reason="agile_rolling_economic_preemptive_export",
@@ -91,7 +93,9 @@ def test_asynchronous_cloud_power_age_can_arm_with_explicit_disconnect() -> None
     assert _export(snapshot, proof, NOW)[0].desired_battery_export_power_kw > 0
 
 
-def test_simultaneously_unavailable_after_fresh_disconnection_has_bounded_grace() -> None:
+def test_simultaneously_unavailable_after_fresh_disconnection_has_bounded_grace() -> (
+    None
+):
     proof = PaidAgileUnpluggedContinuity()
     proof.assess(_snapshot(), now=NOW)
     at = NOW + timedelta(seconds=50)
@@ -99,7 +103,9 @@ def test_simultaneously_unavailable_after_fresh_disconnection_has_bounded_grace(
     assert proof.assess(missing, now=at)
     assert _export(missing, proof, at)[0].desired_battery_export_power_kw > 0
     expired = NOW + timedelta(seconds=91)
-    assert not proof.assess(_snapshot(expired, ev_connected=None, ev_charging=None), now=expired)
+    assert not proof.assess(
+        _snapshot(expired, ev_connected=None, ev_charging=None), now=expired
+    )
     assert proof.status["assessment"] == "outage_grace_expired_or_physical_veto"
 
 
@@ -151,17 +157,22 @@ def test_restart_does_not_inherit_unplugged_source_proof() -> None:
     restarted = PaidAgileUnpluggedContinuity()
     missing = _snapshot(NOW + timedelta(seconds=15), ev_connected=None)
     assert not restarted.assess(missing, now=missing.timestamp)
-    assert _export(missing, restarted, missing.timestamp)[0].desired_battery_export_power_kw == 0
+    assert (
+        _export(missing, restarted, missing.timestamp)[
+            0
+        ].desired_battery_export_power_kw
+        == 0
+    )
 
 
 def test_diagnostics_exposes_why_proof_is_not_armed() -> None:
     coordinator = (
-        Path(__file__).parents[1]
-        / "custom_components"
-        / "kems"
-        / "coordinator.py"
+        Path(__file__).parents[1] / "custom_components" / "kems" / "coordinator.py"
     ).read_text(encoding="utf-8")
-    assert '"agile_unplugged_source_proof": self._paid_agile_unplugged_continuity.status' in coordinator
+    assert (
+        '"agile_unplugged_source_proof": self._paid_agile_unplugged_continuity.status'
+        in coordinator
+    )
     proof = PaidAgileUnpluggedContinuity()
     assert proof.status["assessment"] == "no_unplugged_proof"
     proof.assess(_snapshot(ev_connected=None), now=NOW)
