@@ -325,7 +325,8 @@ def test_alpha9111_ohme_mode_unavailable_does_not_allow_a_blind_write(
     controller._hass = SimpleNamespace(
         states=SimpleNamespace(
             get=lambda entity: SimpleNamespace(
-                state="unavailable", attributes={"options": []}
+                state="unavailable",
+                attributes={"options": ["Smart charge", "Max charge", "Paused"]},
             )
         )
     )
@@ -467,3 +468,36 @@ def test_alpha9111_no_verified_physical_soc_never_uses_simulated_headroom(
         )
         == 0.0
     )
+
+
+def test_alpha9111_ohme_restoration_waits_when_mode_becomes_unavailable() -> None:
+    current = SimpleNamespace(
+        state="unavailable",
+        attributes={"options": ["Smart charge", "Max charge", "Paused"]},
+    )
+    calls = []
+
+    async def call(domain, action, data, **kwargs):
+        calls.append(dict(data))
+
+    controller = _ohme.OhmeHappyHourController.__new__(_ohme.OhmeHappyHourController)
+    controller._hass = SimpleNamespace(
+        states=SimpleNamespace(get=lambda entity: current),
+        services=SimpleNamespace(async_call=call),
+    )
+    controller._owned = True
+    controller._previous_mode = "Paused"
+    controller._restore_attempts = 0
+    controller._last_result = ""
+    controller._last_command = None
+    controller._last_command_at = None
+
+    async def save():
+        raise AssertionError("Do not release ownership without a valid mode")
+
+    controller._async_save = save
+    asyncio.run(controller._async_restore("select.ohme_epod_charge_mode"))
+    assert controller._owned is True
+    assert controller._restore_attempts == 0
+    assert "deferred" in controller._last_result
+    assert calls == []
