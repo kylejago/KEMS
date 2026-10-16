@@ -212,6 +212,8 @@ def test_only_agile_branch_passes_verified_unplugged_proof() -> None:
         / "coordinator.py"
     ).read_text(encoding="utf-8")
     assert "self._paid_agile_unplugged_continuity.assess(" in coordinator
-    assert 'ev_export_evidence = "bounded_unplugged_physical_source_grace"' in coordinator
+    assert (
+        'ev_export_evidence = "bounded_unplugged_physical_source_grace"' in coordinator
+    )
     assert "unplugged_continuity=self._paid_agile_unplugged_continuity" in coordinator
     assert "self._paid_agile_unplugged_continuity.clear()" in coordinator
