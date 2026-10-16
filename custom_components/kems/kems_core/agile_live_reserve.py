@@ -244,6 +244,117 @@ class PaidAgileConnectedIdleContinuity:
         return True
 
 
+
+class PaidAgileUnpluggedContinuity:
+    """Short, non-persistent bridge when an unplugged Ohme cloud source drops out.
+
+    Arming needs an actual unplugged AND zero-power Ohme observation. During
+    an outage independent FoxESS home-load and grid-import readings must
+    remain fresh and consistent with the last measured unplugged baseline.
+    Neither a reported idle connected car nor an expired outage can arm it.
+    """
+
+    def __init__(self) -> None:
+        self.clear()
+
+    def clear(self) -> None:
+        self._last_unplugged_at: datetime | None = None
+        self._baseline_house_kw: float | None = None
+        self._outage_started_at: datetime | None = None
+
+    @staticmethod
+    def _site_meter(snapshot: Snapshot, field: str) -> float | None:
+        raw = getattr(snapshot, field, None)
+        value = _finite(raw)
+        source_ages = snapshot.source_age_seconds
+        age = _finite(
+            source_ages.get(field) if isinstance(source_ages, dict) else None
+        )
+        if (
+            value is None
+            or value < 0.0
+            or age is None
+            or not 0.0 <= age <= _AGILE_CONNECTED_IDLE_LOAD_AGE_SECONDS
+            or field in snapshot.stale_fields
+        ):
+            return None
+        return value
+
+    def permits(self, snapshot: Snapshot, *, now: datetime) -> bool:
+        """Recheck physical evidence at the final paid-export command guard."""
+        if (
+            self._last_unplugged_at is None
+            or self._baseline_house_kw is None
+            or self._outage_started_at is None
+            or now.tzinfo is None
+            or self._last_unplugged_at.tzinfo is None
+            or self._outage_started_at.tzinfo is None
+            or snapshot.ev_connected is True
+            or snapshot.ev_charging is True
+        ):
+            return False
+        observed_ev_power = _finite(snapshot.ev_power_kw)
+        if observed_ev_power is not None and not (
+            0.0 <= observed_ev_power <= _AGILE_EV_IDLE_POWER_KW
+        ):
+            return False
+        if not (
+            timedelta(0)
+            <= now - self._outage_started_at
+            <= timedelta(seconds=_AGILE_EV_UNPLUGGED_GRACE_SECONDS)
+            and timedelta(0)
+            <= self._outage_started_at - self._last_unplugged_at
+            <= timedelta(seconds=_AGILE_EV_UNPLUGGED_GRACE_SECONDS)
+        ):
+            return False
+        house = self._site_meter(snapshot, "house_load_kw")
+        grid_import = self._site_meter(snapshot, "grid_import_kw")
+        return bool(
+            house is not None
+            and house
+            <= self._baseline_house_kw + _AGILE_CONNECTED_IDLE_LOAD_STEP_KW
+            and grid_import is not None
+            and grid_import <= _AGILE_CONNECTED_IDLE_GRID_IMPORT_VETO_KW
+        )
+
+    def assess(self, snapshot: Snapshot, *, now: datetime) -> bool:
+        """Never extend an outage without a newly confirmed unplugged reading."""
+        power = _finite(snapshot.ev_power_kw)
+        if (
+            snapshot.ev_connected is True
+            or snapshot.ev_charging is True
+            or (power is not None and not 0.0 <= power <= _AGILE_EV_IDLE_POWER_KW)
+        ):
+            self.clear()
+            return False
+        power_age = _finite(snapshot.ev_power_age_seconds)
+        house = self._site_meter(snapshot, "house_load_kw")
+        grid_import = self._site_meter(snapshot, "grid_import_kw")
+        if (
+            snapshot.ev_connected is False
+            and power is not None
+            and 0.0 <= power <= _AGILE_EV_IDLE_POWER_KW
+            and power_age is not None
+            and 0.0 <= power_age <= _AGILE_EV_CONNECTED_IDLE_POWER_AGE_SECONDS
+            and "ev_power_kw" not in snapshot.stale_fields
+            and house is not None
+            and grid_import is not None
+            and grid_import <= _AGILE_CONNECTED_IDLE_GRID_IMPORT_VETO_KW
+        ):
+            self._last_unplugged_at = now
+            self._baseline_house_kw = house
+            self._outage_started_at = None
+            return False
+        if self._last_unplugged_at is None:
+            return False
+        if self._outage_started_at is None:
+            self._outage_started_at = now
+        if not self.permits(snapshot, now=now):
+            self.clear()
+            return False
+        return True
+
+
 def assess_paid_agile_ev_continuity(
     snapshot: Snapshot,
     *,
@@ -326,6 +437,7 @@ def guard_paid_agile_physical_export(
     ev_export_evidence: str = "no verified disconnected EV evidence",
     physical_energy_evidence: PhysicalEnergyEvidence | None = None,
     connected_idle_continuity: PaidAgileConnectedIdleContinuity | None = None,
+    unplugged_continuity: PaidAgileUnpluggedContinuity | None = None,
     power_down_export_authorised: bool = False,
 ) -> tuple[ControlState, dict[str, Any]]:
     """Cap deliberate export by *measured* SOC minus future house reserve.
@@ -402,8 +514,22 @@ def guard_paid_agile_physical_export(
         and connected_idle_continuity is not None
         and connected_idle_continuity.permits(snapshot, now=now)
     )
-    # Direct live zero Ohme power remains mandatory outside the bounded bridge.
-    if ev_export_safe is not None and not connected_idle_grace_proven:
+    # A previously verified unplugged car may bridge a brief simultaneous
+    # Ohme status/power outage, but only with fresh FoxESS demand and grid
+    # corroboration. Validate the proof again at the final command guard.
+    unplugged_grace_proven = bool(
+        ev_export_safe is True
+        and ev_export_evidence == "bounded_unplugged_physical_source_grace"
+        and unplugged_continuity is not None
+        and unplugged_continuity.permits(snapshot, now=now)
+    )
+    # Unknown or missing EV power is not sufficient by itself to authorise
+    # paid export. Require direct zero power or independently checked grace.
+    if (
+        ev_export_safe is not None
+        and not connected_idle_grace_proven
+        and not unplugged_grace_proven
+    ):
         ev_power = _finite(snapshot.ev_power_kw)
         ev_age = _finite(snapshot.ev_power_age_seconds)
         if (
@@ -444,7 +570,11 @@ def guard_paid_agile_physical_export(
         or snapshot.ev_charging is True
         or (
             (live_ev_power := _finite(snapshot.ev_power_kw)) is not None
-            and live_ev_power > _AGILE_EV_IDLE_POWER_KW
+            and not 0.0 <= live_ev_power <= _AGILE_EV_IDLE_POWER_KW
+        )
+        or (
+            ev_export_evidence == "bounded_unplugged_physical_source_grace"
+            and not unplugged_grace_proven
         )
     ):
         return reduce("EV connected/uncertain; protect shared-bus battery")
