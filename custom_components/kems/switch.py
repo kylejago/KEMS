@@ -343,6 +343,11 @@ class KEMSHappyHourOhmeControlSwitch(KEMSEntity, SwitchEntity):
         super().__init__(coordinator, "happy_hour_ohme_control")
 
     @property
+    def extra_state_attributes(self):
+        """Expose the resolved select, current mode and restoration proof."""
+        return dict(self.coordinator.happy_hour_ohme_control_state)
+
+    @property
     def is_on(self) -> bool:
         return bool(
             self.coordinator.entry.options.get(
