@@ -26,6 +26,7 @@ STORAGE_VERSION = 1
 MAX_SAFE_SCAN_SECONDS = 120
 ASSUMED_OHME_MAX_CHARGE_KW = 7.4
 _EXPECTED_MODES = {"smart charge", "max charge", "paused"}
+_CONFIRMED_CHARGE_MODE_ENTITY = "select.ohme_epod_charge_mode"
 _HAPPY_HOUR_SENSOR = "sensor.kems_agile_happy_hour_plan"
 
 
@@ -92,6 +93,20 @@ def ohme_happy_hour_write_decision(
     return True, "Automatic Happy Hour EV allowance available", round(guard_kwh, 3)
 
 
+def _automatic_happy_hour_source(happy_hour: dict[str, Any]) -> bool:
+    """Accept live joined events or KEMS-confirmed reward bookings only."""
+    status = str(happy_hour.get("automatic_status") or "")
+    confirmed_kems_booking = bool(
+        happy_hour.get("booking_authoritative") is True
+        and happy_hour.get("booking_source") == "kems_auto_join"
+        and status in ("detected_kems_booking", "retained_active")
+    )
+    return bool(
+        happy_hour.get("source") == "octopus_energy"
+        and (status.endswith("active") or confirmed_kems_booking)
+    )
+
+
 class OhmeHappyHourController:
     """Own only the temporary Ohme mode change KEMS itself initiated."""
 
@@ -134,6 +149,21 @@ class OhmeHappyHourController:
         )
 
     def _charge_mode_entity(self) -> str | None:
+        # The user-confirmed ePod selector is authoritative for this charger.
+        # Require the actual live option set: the select may be unavailable
+        # while unplugged, and its existence alone never authorises a write.
+        if self._ev_status_entity == "sensor.ohme_epod_status":
+            confirmed = self._hass.states.get(_CONFIRMED_CHARGE_MODE_ENTITY)
+            if confirmed is not None:
+                options = {
+                    _normalise(option)
+                    for option in (confirmed.attributes.get("options") or [])
+                }
+                if (
+                    _EXPECTED_MODES.issubset(options)
+                    and _normalise(confirmed.state) in _EXPECTED_MODES
+                ):
+                    return _CONFIRMED_CHARGE_MODE_ENTITY
         registry = er.async_get(self._hass)
         device_id = None
         if self._ev_status_entity:
@@ -162,6 +192,8 @@ class OhmeHappyHourController:
             )
             if (
                 _EXPECTED_MODES.issubset(options)
+                and state is not None
+                and _normalise(state.state) in _EXPECTED_MODES
                 and "charge" in text
                 and "mode" in text
             ):
@@ -219,9 +251,14 @@ class OhmeHappyHourController:
         state = self._hass.states.get(entity_id)
         current = _normalise(state.state if state else None)
         target = self._previous_mode or "Smart charge"
+        if current not in _EXPECTED_MODES:
+            self._last_result = (
+                "Ohme restoration deferred until a valid charge mode returns"
+            )
+            return
         if _normalise(target) == "max charge":
             target = "Smart charge"
-        if current and current != "max charge":
+        if current in _EXPECTED_MODES and current != "max charge":
             self._owned = False
             self._restore_attempts = 0
             await self._async_save()
@@ -260,10 +297,7 @@ class OhmeHappyHourController:
         entity_id = self._charge_mode_entity()
         state = self._hass.states.get(entity_id) if entity_id else None
         observed_mode = state.state if state is not None else None
-        automatic_source = bool(
-            happy_hour.get("source") == "octopus_energy"
-            and str(happy_hour.get("automatic_status") or "").endswith("active")
-        )
+        automatic_source = _automatic_happy_hour_source(happy_hour)
         allow, reason, guard_kwh = ohme_happy_hour_write_decision(
             enabled=enabled,
             automatic_source=automatic_source,
@@ -295,9 +329,9 @@ class OhmeHappyHourController:
                     reason = "Ohme already in Max charge; KEMS did not take ownership"
             else:
                 if not self._owned:
-                    if observed_mode is None:
+                    if _normalise(observed_mode) not in _EXPECTED_MODES:
                         allow = False
-                        reason = "Cannot preserve prior Ohme mode before Max charge"
+                        reason = "Unverified prior Ohme mode; Max charge blocked"
                     else:
                         self._previous_mode = observed_mode
                         self._event_start = str(happy_hour.get("start") or "")

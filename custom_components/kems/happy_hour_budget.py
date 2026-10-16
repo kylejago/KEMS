@@ -281,16 +281,75 @@ def _home_grid_kw(
     return home_grid, max(house, 0.0), ev, max(grid or 0.0, 0.0)
 
 
+def verified_happy_hour_physical_headroom(
+    manager: Any, *, now: datetime, config: Any
+) -> dict[str, Any]:
+    """Report fresh, conservative FoxESS charging space without altering Agile.
+
+    SOC lower bounds are suitable for export reserves, not for charging
+    headroom: charge headroom must instead account for the *highest* SOC
+    consistent with the last physical report and any unobserved charging.
+    """
+    from .agile_physical_planning import physical_planning_soc
+
+    physical_lower, evidence = physical_planning_soc(manager, now=now, config=config)
+    scan = getattr(manager, "_kems_physical_planning_context", None)
+    scan = scan if isinstance(scan, dict) else {}
+    snapshot = scan.get("snapshot")
+    control = scan.get("control")
+    report = _number(getattr(snapshot, "battery_soc", None))
+    capacity = _number(getattr(config, "battery_capacity_kwh", None))
+    soc_age = _number(
+        (getattr(snapshot, "source_age_seconds", None) or {}).get("battery_soc")
+        if snapshot is not None
+        else None
+    )
+    max_charge = _number(getattr(control, "max_charge_kw", None))
+    if (
+        physical_lower is None
+        or not evidence.get("available")
+        or report is None
+        or not 0.0 <= report <= 100.0
+        or capacity is None
+        or capacity <= 0.0
+        or soc_age is None
+        or not 0.0 <= soc_age <= 180.0
+        or max_charge is None
+        or max_charge <= 0.0
+    ):
+        return {
+            "physical_soc_verified": False,
+            "physical_soc_unavailable_reason": evidence.get(
+                "reason", "verified physical charging headroom unavailable"
+            ),
+            "current_physical_soc_percent": None,
+            "physical_battery_headroom_kwh": None,
+            "physical_headroom_basis": "unavailable — simulation is not live SOC",
+        }
+    headroom = max(
+        capacity * (100.0 - report) / 100.0 - max_charge * soc_age / 3600.0 - 0.5,
+        0.0,
+    )
+    return {
+        "physical_soc_verified": True,
+        "current_physical_soc_percent": round(report, 2),
+        "physical_soc_lower_bound_percent": round(physical_lower, 2),
+        "physical_battery_headroom_kwh": round(headroom, 3),
+        "physical_headroom_basis": (
+            "fresh FoxESS SOC, worst-case charging during reporting age "
+            "and 0.5 kWh buffer"
+        ),
+        "physical_soc_report_age_seconds": round(soc_age, 1),
+    }
+
+
 def _adjusted_headroom(
     state: dict[str, Any], context: dict[str, Any], config: Any
 ) -> float:
-    capacity = max(float(config.battery_capacity_kwh), 0.1)
-    soc = _number(state.get("happy_hour_adjusted_soc_percent"))
-    if soc is None:
-        soc = _number(context.get("current_simulated_soc_percent"))
-    if soc is not None:
-        return capacity * (100.0 - min(max(soc, 0.0), 100.0)) / 100.0
-    return max(_number(context.get("current_battery_headroom_kwh")) or 0.0, 0.0)
+    """Active reward allocation must not infer charging space from twin SOC."""
+    if context.get("physical_soc_verified") is not True:
+        return 0.0
+    return max(_number(context.get("physical_battery_headroom_kwh")) or 0.0, 0.0)
 
 
 def decorate_happy_hour_context(
@@ -318,6 +377,55 @@ def decorate_happy_hour_context(
     context["base_happy_hour_charge_target_kw"] = max(
         _number(context.get("charge_target_kw")) or 0.0, 0.0
     )
+    # The historical/digital-twin forecast remains independent. Publish a
+    # separately labelled physical estimate, never the replayed SOC as live.
+    physical = verified_happy_hour_physical_headroom(self, now=now, config=config)
+    context.update(physical)
+    context["headroom_forecast_basis"] = (
+        "physical FoxESS verified"
+        if physical["physical_soc_verified"]
+        else "physical estimate unavailable; simulated forecast separate"
+    )
+    context["physical_required_headroom_export_kwh"] = None
+    context["physical_event_entry_soc_percent"] = None
+    # A physical entry forecast cannot cross an overnight grid recharge using
+    # today's current SOC; do not silently assume a 100% charge will happen.
+    start_after_now = now.astimezone(UTC) < start
+    if (
+        physical["physical_soc_verified"]
+        and start_after_now
+        and context.get("preparation_in_current_horizon") is True
+    ):
+        efficiency = max(
+            _number(getattr(config, "discharge_efficiency", None)) or 0.0, 0.01
+        )
+        stored_charging = max(
+            _number(context.get("desired_stored_charge_kwh")) or 0.0, 0.0
+        )
+        home_stored = (
+            max(
+                _number(context.get("expected_house_discharge_before_event_kwh"))
+                or 0.0,
+                0.0,
+            )
+            / efficiency
+        )
+        pd_stored = (
+            max(
+                _number(context.get("expected_power_down_export_before_event_kwh"))
+                or 0.0,
+                0.0,
+            )
+            / efficiency
+        )
+        live_headroom = max(
+            _number(physical.get("physical_battery_headroom_kwh")) or 0.0, 0.0
+        )
+        required = (
+            max(stored_charging - live_headroom - home_stored - pd_stored, 0.0)
+            * efficiency
+        )
+        context["physical_required_headroom_export_kwh"] = round(required, 3)
 
     now_utc = now.astimezone(UTC)
     current = next(
@@ -405,7 +513,10 @@ def decorate_happy_hour_context(
             "mode": "charging",
             "charge_target_kw": allocation["battery_charge_target_kw"],
             "happy_hour_import_authority_active": True,
-            "ev_happy_hour_allowed": (allocation["ev_allowance_kwh_remaining"] > 0.10),
+            "ev_happy_hour_allowed": (
+                context.get("physical_soc_verified") is True
+                and allocation["ev_allowance_kwh_remaining"] > 0.10
+            ),
             "status": (
                 f"Reward hour {current['index']}: "
                 f"{float(current['remaining_kwh']):.2f} kWh remaining; "

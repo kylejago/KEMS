@@ -417,6 +417,9 @@ def install_automatic_happy_hour() -> None:
             "classification_basis",
             "confidence",
             "event_ids",
+            "booking_authoritative",
+            "booking_source",
+            "automatic_evidence",
             "fallback_reason",
         ):
             if key in event:
