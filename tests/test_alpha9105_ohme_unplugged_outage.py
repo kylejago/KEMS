@@ -130,7 +130,9 @@ def test_same_outage_grace_expires_and_cannot_rearm_without_ohme() -> None:
     lost = _cloud_outage(at)
     assert not proof.assess(lost, now=at)
     assert _guard(lost, proof, when=at)[0].desired_battery_export_power_kw == 0
-    assert not proof.assess(_cloud_outage(at + timedelta(seconds=1)), now=at + timedelta(seconds=1))
+    assert not proof.assess(
+        _cloud_outage(at + timedelta(seconds=1)), now=at + timedelta(seconds=1)
+    )
     # A new fresh physical unplugged+zero observation can re-arm.
     recovered_at = at + timedelta(seconds=10)
     assert not proof.assess(_snapshot(recovered_at), now=recovered_at)
@@ -185,7 +187,12 @@ def test_no_fake_evidence_and_no_restart_carryover() -> None:
     for label in ("confirmed_unplugged", "bounded_connected_idle_source_grace"):
         requested, _ = _guard(lost, proof, when=at, evidence=label)
         assert requested.desired_battery_export_power_kw == 0
-    assert _guard(lost, proof, when=at, permission=False)[0].desired_battery_export_power_kw == 0
+    assert (
+        _guard(lost, proof, when=at, permission=False)[
+            0
+        ].desired_battery_export_power_kw
+        == 0
+    )
 
 
 def test_verified_plugged_in_idle_never_arms_unplugged_outage() -> None:
