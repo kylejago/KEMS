@@ -665,26 +665,133 @@ def _booking_soc(data: Any, *, operating_mode: str) -> float | None:
     return value
 
 
+def confirmed_booking_windows(booking: Mapping[str, Any]) -> list[dict[str, Any]]:
+    """Group independently confirmed one-hour bookings into active reward windows.
+
+    Only adjacent slots are combined, at most two hours per group. Distinct
+    non-adjacent bookings remain distinct Happy Hour sessions.
+    """
+    entries = booking.get("bookings")
+    if not isinstance(entries, list):
+        code = booking.get("booked_event_code")
+        start = booking.get("booked_start")
+        end = booking.get("booked_end")
+        entries = [{"event_code": code, "start": start, "end": end}] if code else []
+
+    valid: list[tuple[datetime, datetime, str]] = []
+    codes_seen: set[str] = set()
+    for item in entries:
+        if not isinstance(item, Mapping):
+            continue
+        code = str(item.get("event_code") or "").strip()
+        start = _dt(item.get("start"))
+        end = _dt(item.get("end"))
+        if (
+            not code
+            or code in codes_seen
+            or start is None
+            or end is None
+            or not start < end <= start + timedelta(hours=2)
+        ):
+            continue
+        codes_seen.add(code)
+        valid.append((start, end, code))
+    valid.sort()
+    groups: list[dict[str, Any]] = []
+    for start, end, code in valid:
+        previous = groups[-1] if groups else None
+        if (
+            previous
+            and start == previous["end"]
+            and end - previous["start"] <= timedelta(hours=2)
+            and len(previous["event_codes"]) < 2
+        ):
+            previous["end"] = end
+            previous["event_codes"].append(code)
+        else:
+            groups.append({"start": start, "end": end, "event_codes": [code]})
+    return groups
+
+
+def select_reward_booking_codes(
+    *,
+    candidates: list[HappyHourCandidate],
+    booked_codes: set[str],
+    booked_windows: list[dict[str, Any]],
+    scored: Mapping[str, CandidateScore],
+    target_count: int,
+    preferred_codes: list[str] | None = None,
+) -> list[str]:
+    """Select up to two distinct rewards; prefer consecutive windows.
+
+    Booking earned rewards takes priority over an incomplete price forecast.
+    When prices are published, rank complete pairs by combined modelled value.
+    """
+    eligible = [item for item in candidates if item.code not in booked_codes]
+    remaining = max(min(target_count, 2) - len(booked_codes), 0)
+    if remaining <= 0 or not eligible:
+        return []
+    by_code = {item.code: item for item in eligible}
+    if preferred_codes:
+        preferred = [code for code in preferred_codes if code in by_code]
+        if preferred:
+            return preferred[:remaining]
+    if booked_windows:
+        anchor = booked_windows[0]
+        neighbors = [
+            item for item in eligible
+            if item.end == anchor["start"] or item.start == anchor["end"]
+        ]
+        if neighbors:
+            eligible = neighbors
+    if remaining == 1:
+        return [
+            max(
+                eligible,
+                key=lambda item: (
+                    scored[item.code].net_benefit_pence if item.code in scored else 0.0,
+                    -item.start.timestamp(),
+                ),
+            ).code
+        ]
+    pairs: list[tuple[HappyHourCandidate, HappyHourCandidate]] = [
+        (left, right)
+        for i, left in enumerate(eligible)
+        for right in eligible[i + 1 :]
+    ]
+    if pairs:
+        def pair_key(
+            pair: tuple[HappyHourCandidate, HappyHourCandidate],
+        ) -> tuple[float, float, float]:
+            left, right = sorted(pair, key=lambda item: item.start)
+            consecutive = left.end == right.start
+            value = sum(
+                scored[item.code].net_benefit_pence if item.code in scored else 0.0
+                for item in pair
+            )
+            return (float(consecutive), value, -left.start.timestamp())
+
+        winner = max(pairs, key=pair_key)
+        return [item.code for item in sorted(winner, key=lambda item: item.start)]
+    return [eligible[0].code]
+
+
 def booked_happy_hour_matches_plan(
     booking: Mapping[str, Any], plan: Mapping[str, Any], now: datetime
 ) -> bool:
-    """Require a confirmed, matching Octopus booking within the active hour."""
+    """Authorise physical reward charging only for a matching confirmed window."""
     if booking.get("status") != "booked":
         return False
-    if not booking.get("booked_event_code"):
-        return False
-    start = _dt(booking.get("booked_start"))
-    end = _dt(booking.get("booked_end"))
     plan_start = _dt(plan.get("start"))
     plan_end = _dt(plan.get("end"))
     current = _dt(now)
-    return bool(
-        start is not None
-        and end is not None
-        and plan_start == start
-        and plan_end == end
-        and current is not None
-        and start <= current < end
+    if plan_start is None or plan_end is None or current is None:
+        return False
+    return any(
+        window["start"] == plan_start
+        and window["end"] == plan_end
+        and plan_start <= current < plan_end
+        for window in confirmed_booking_windows(booking)
     )
 
 
@@ -760,7 +867,6 @@ class HappyHourAutoJoinController:
         await self.async_load()
         now = datetime.now(UTC)
         state = self._base_state(now)
-
         candidates, discovery = discover_available_happy_hours(self.hass, now=now)
         state.update(discovery)
         state["candidate_count"] = len(candidates)
@@ -774,73 +880,127 @@ class HappyHourAutoJoinController:
             for item in candidates
         ]
 
-        if self._stored_booking_active(now):
+        # Retain every independently confirmed event. Migrate the original
+        # single-event storage format without rebooking an existing reward.
+        booked = self._persisted.get("bookings")
+        if not isinstance(booked, list):
+            code = str(self._persisted.get("booked_event_code") or "").strip()
+            booked = (
+                [
+                    {
+                        "event_code": code,
+                        "start": self._persisted.get("booked_start"),
+                        "end": self._persisted.get("booked_end"),
+                        "booked_at": self._persisted.get("booked_at"),
+                    }
+                ]
+                if code
+                else []
+            )
+        booked = [
+            dict(item)
+            for item in booked
+            if isinstance(item, Mapping)
+            and item.get("event_code")
+            and _dt(item.get("start")) is not None
+            and _dt(item.get("end")) is not None
+        ]
+        windows = confirmed_booking_windows({"bookings": booked})
+        state["bookings"] = booked
+        state["booked_event_codes"] = [
+            str(item["event_code"]) for item in booked
+        ]
+        state["booked_reward_hours"] = len(booked)
+        if windows:
+            current_or_next = next(
+                (window for window in windows if window["end"] > now),
+                windows[-1],
+            )
             state.update(
                 {
                     "status": "booked",
-                    "booked_event_code": self._persisted.get("booked_event_code"),
-                    "booked_start": self._persisted.get("booked_start"),
-                    "booked_end": self._persisted.get("booked_end"),
-                    "booked_at": self._persisted.get("booked_at"),
-                    "recommendation": self._persisted.get("recommendation"),
+                    "booked_event_code": current_or_next["event_codes"][0],
+                    "booked_start": current_or_next["start"].isoformat(),
+                    "booked_end": current_or_next["end"].isoformat(),
+                    "booked_at": booked[-1].get("booked_at"),
                 }
             )
+
+        # Book once the slots are announced, not the night before: rewards
+        # cannot be spent after expiry if all desirable slots have filled.
+        candidates = sorted(candidates, key=lambda item: item.start)
+        days = sorted(
+            {
+                item.start.astimezone(_LONDON).date()
+                for item in candidates
+            }
+        )
+        pending_day: date | None = None
+        for day in days:
+            already = [
+                item for item in booked
+                if (_dt(item.get("start")) or now).astimezone(_LONDON).date() == day
+            ]
+            if len(already) < HAPPY_HOUR_MAX_REWARDS_PER_EVENT_DAY:
+                pending_day = day
+                break
+
+        if pending_day is None:
+            if not windows:
+                state["status"] = "no_available_happy_hour_slots"
             self.state = state
             return
 
-        if not candidates:
-            state["status"] = "no_available_happy_hour_slots"
-            self.state = state
-            return
-
-        local_today = now.astimezone(_LONDON).date()
-        decision_day = local_today + timedelta(days=1)
-        tomorrow = [
+        day_candidates = [
             item
             for item in candidates
-            if item.start.astimezone(_LONDON).date() == decision_day
+            if item.start.astimezone(_LONDON).date() == pending_day
         ]
-        if not tomorrow:
-            next_day = min(item.start.astimezone(_LONDON).date() for item in candidates)
-            state.update(
-                {
-                    "status": "waiting_for_night_before",
-                    "next_candidate_day": next_day.isoformat(),
-                }
-            )
+        day_booked = [
+            item for item in booked
+            if (_dt(item.get("start")) or now).astimezone(_LONDON).date()
+            == pending_day
+        ]
+        balance = discovery.get("weekend_happy_hours_available")
+        if balance is None:
+            state["status"] = "waiting_for_reward_balance"
+            self.state = state
+            return
+        target_count = min(
+            HAPPY_HOUR_MAX_REWARDS_PER_EVENT_DAY,
+            len(day_booked) + max(int(balance), 0),
+        )
+        state["target_day"] = pending_day.isoformat()
+        state["target_reward_hours"] = target_count
+        state["booked_target_day_hours"] = len(day_booked)
+        if len(day_booked) >= target_count:
+            self.state = state
+            return
+        if target_count <= 0:
+            state["status"] = "no_banked_happy_hours"
             self.state = state
             return
 
         import_rates, export_rates = discover_octopus_rates(self.hass)
-        import_coverage = day_rate_coverage(import_rates, decision_day)
+        import_coverage = day_rate_coverage(import_rates, pending_day)
         export_type = export_tariff_type_from_options(self.entry.options)
         export_coverage = (
-            day_rate_coverage(export_rates, decision_day)
+            day_rate_coverage(export_rates, pending_day)
             if export_type == EXPORT_TARIFF_TYPE_AGILE
             else 1.0
         )
         state.update(
             {
-                "target_day": decision_day.isoformat(),
                 "import_price_coverage_percent": round(import_coverage * 100.0, 1),
                 "export_price_coverage_percent": round(export_coverage * 100.0, 1),
                 "export_tariff_type": export_type,
+                "decision_policy": "two_banked_rewards_as_soon_as_available",
             }
         )
-        if (
-            import_coverage < HAPPY_HOUR_PRICE_COVERAGE_REQUIRED
-            or export_coverage < HAPPY_HOUR_PRICE_COVERAGE_REQUIRED
-        ):
-            state["status"] = "waiting_for_agile_prices"
-            self.state = state
-            return
-
         booking_soc = _booking_soc(
             data, operating_mode=str(self.coordinator.settings.control.operating_mode)
         )
         if booking_soc is None:
-            # Booking can change external Octopus commitments. Never fabricate
-            # a 50% battery state when the planner has no usable SOC evidence.
             state["status"] = "waiting_for_battery_soc"
             state["join_block_reason"] = "missing_or_invalid_battery_soc"
             self.state = state
@@ -848,7 +1008,7 @@ class HappyHourAutoJoinController:
 
         config = self.coordinator.settings.simulation
         scores: list[CandidateScore] = []
-        for candidate in tomorrow:
+        for candidate in day_candidates:
             score = score_candidate(
                 candidate,
                 now=now,
@@ -873,38 +1033,57 @@ class HappyHourAutoJoinController:
             )
             if score is not None:
                 scores.append(score)
-        best = choose_best_candidate(scores)
         state["evaluated_candidates"] = [item.to_dict() for item in scores]
-        if best is None:
-            state["status"] = "insufficient_candidate_price_data"
+        scored = {item.candidate.code: item for item in scores}
+        booked_codes = {str(item["event_code"]) for item in day_booked}
+        day_windows = confirmed_booking_windows({"bookings": day_booked})
+        preferred = self._persisted.get("preferred_event_codes")
+        choices = select_reward_booking_codes(
+            candidates=day_candidates,
+            booked_codes=booked_codes,
+            booked_windows=day_windows,
+            scored=scored,
+            target_count=target_count,
+            preferred_codes=preferred if isinstance(preferred, list) else None,
+        )
+        if not choices:
+            if not day_booked:
+                state["status"] = "no_available_happy_hour_slots"
             self.state = state
             return
-
-        recommendation = best.to_dict()
+        chosen = next(
+            (item for item in day_candidates if item.code == choices[0]), None
+        )
+        if chosen is None:
+            self.state = state
+            return
+        selected_score = scored.get(chosen.code)
+        recommendation = (
+            selected_score.to_dict()
+            if selected_score is not None
+            else {
+                "event_code": chosen.code,
+                "start": chosen.start.isoformat(),
+                "end": chosen.end.isoformat(),
+                "model": "banked_reward_priority_missing_tariff_prices",
+            }
+        )
         state.update(
             {
                 "recommendation": recommendation,
-                "recommended_event_code": best.candidate.code,
-                "recommended_start": best.candidate.start.isoformat(),
-                "recommended_end": best.candidate.end.isoformat(),
-                "estimated_net_benefit_pence": round(best.net_benefit_pence, 2),
-                "estimated_free_import_kwh": round(
-                    best.expected_house_free_import_kwh
-                    + best.expected_battery_free_import_kwh,
-                    3,
+                "recommended_event_code": chosen.code,
+                "recommended_event_codes": choices,
+                "recommended_start": chosen.start.isoformat(),
+                "recommended_end": chosen.end.isoformat(),
+                "estimated_net_benefit_pence": (
+                    round(selected_score.net_benefit_pence, 2)
+                    if selected_score is not None
+                    else None
                 ),
-                "planned_pre_event_export_kwh": round(
-                    best.planned_pre_event_export_kwh, 3
-                ),
-                "recommendation_status": (
-                    "recommended" if best.net_benefit_pence > 0 else "not_economic"
-                ),
+                "recommendation_status": "use_earned_rewards",
+                "price_model_complete": selected_score is not None,
             }
         )
-        if best.net_benefit_pence <= 0:
-            state["status"] = "no_economic_happy_hour"
-            self.state = state
-            return
 
         control = self.coordinator.settings.control
         auto_enabled = bool(
@@ -918,47 +1097,21 @@ class HappyHourAutoJoinController:
             emergency_stop=bool(control.emergency_stop),
             battery_installed=bool(self.entry.options.get("battery_installed", False)),
         )
-        if "operating_mode_not_control" in gate_reasons:
-            state.update(
-                {
-                    "status": "would_join_simulation",
-                    "would_auto_join": True,
-                    "join_block_reason": "operating_mode_not_control",
-                }
-            )
-            self.state = state
-            return
-        if "auto_join_switch_off" in gate_reasons:
-            state.update(
-                {
-                    "status": "recommended_auto_join_off",
-                    "would_auto_join": True,
-                    "join_block_reason": "auto_join_switch_off",
-                }
-            )
-            self.state = state
-            return
         if not control_gate:
-            state.update(
-                {
-                    "status": "join_safety_gate_blocked",
-                    "would_auto_join": True,
-                    "join_block_reason": ",".join(gate_reasons) or "control_gate",
-                }
+            state["status"] = (
+                "would_join_simulation"
+                if "operating_mode_not_control" in gate_reasons
+                else "recommended_auto_join_off"
+                if "auto_join_switch_off" in gate_reasons
+                else "join_safety_gate_blocked"
             )
+            state["would_auto_join"] = True
+            state["join_block_reason"] = ",".join(gate_reasons)
             self.state = state
             return
-        if not best.candidate.source_entity:
-            state.update(
-                {
-                    "status": "join_service_target_unavailable",
-                    "would_auto_join": True,
-                    "join_block_reason": (
-                        "Enable the Octopus Energy Octoplus Power Up Events entity "
-                        "so KEMS can use the supported join service."
-                    ),
-                }
-            )
+        if not chosen.source_entity:
+            state["status"] = "join_service_target_unavailable"
+            state["join_block_reason"] = "Octopus Power Up Events entity unavailable"
             self.state = state
             return
 
@@ -967,54 +1120,45 @@ class HappyHourAutoJoinController:
         if callable(has_service) and not has_service(
             "octopus_energy", "join_octoplus_weekend_happy_hour_event"
         ):
-            state.update(
-                {
-                    "status": "join_service_unavailable",
-                    "join_block_reason": "Octopus Energy 19.1+ join service unavailable",
-                }
-            )
+            state["status"] = "join_service_unavailable"
+            state["join_block_reason"] = "Octopus Weekend Happy Hour join service unavailable"
             self.state = state
             return
 
         last_attempt = _iso_or_none(self._persisted.get("last_attempt_at"))
         if (
-            self._persisted.get("last_attempt_event_code") == best.candidate.code
+            self._persisted.get("last_attempt_event_code") == chosen.code
             and last_attempt is not None
             and now - last_attempt < HAPPY_HOUR_JOIN_RETRY_COOLDOWN
         ):
-            state.update(
-                {
-                    "status": "join_retry_cooldown",
-                    "last_attempt_at": last_attempt.isoformat(),
-                }
-            )
+            state["status"] = "join_retry_cooldown"
+            state["last_attempt_at"] = last_attempt.isoformat()
             self.state = state
             return
 
         self._persisted.update(
             {
-                "last_attempt_event_code": best.candidate.code,
+                "last_attempt_event_code": chosen.code,
                 "last_attempt_at": now.isoformat(),
-                "recommendation": recommendation,
+                "preferred_event_codes": choices,
             }
         )
         await self._async_save()
         state["status"] = "joining"
         state["external_join_authority"] = True
         self.state = state
-
         try:
             response = await services.async_call(
                 "octopus_energy",
                 "join_octoplus_weekend_happy_hour_event",
                 {
-                    "entity_id": best.candidate.source_entity,
-                    "event_code": best.candidate.code,
+                    "entity_id": chosen.source_entity,
+                    "event_code": chosen.code,
                 },
                 blocking=True,
                 return_response=True,
             )
-        except Exception as err:  # service owns validation/failure detail
+        except Exception as err:
             LOGGER.warning("KEMS Happy Hour auto-join failed safely: %s", err)
             state.update(
                 {
@@ -1025,7 +1169,6 @@ class HappyHourAutoJoinController:
             )
             self.state = state
             return
-
         if not isinstance(response, Mapping) or response.get("success") is not True:
             state.update(
                 {
@@ -1040,23 +1183,36 @@ class HappyHourAutoJoinController:
             return
 
         booked_at = datetime.now(UTC)
-        self._persisted.update(
+        booked.append(
             {
-                "booked_event_code": best.candidate.code,
-                "booked_start": best.candidate.start.isoformat(),
-                "booked_end": best.candidate.end.isoformat(),
+                "event_code": chosen.code,
+                "start": chosen.start.isoformat(),
+                "end": chosen.end.isoformat(),
                 "booked_at": booked_at.isoformat(),
-                "recommendation": recommendation,
             }
         )
+        self._persisted["bookings"] = booked
+        # A confirmed first hour does not complete a two-hour booking.
+        remaining_choices = [code for code in choices[1:] if code != chosen.code]
+        self._persisted["preferred_event_codes"] = remaining_choices
         await self._async_save()
+        windows = confirmed_booking_windows({"bookings": booked})
+        next_window = next(
+            (window for window in windows if window["end"] > now),
+            windows[-1],
+        )
         state.update(
             {
                 "status": "booked",
                 "external_join_authority": False,
-                "booked_event_code": best.candidate.code,
-                "booked_start": best.candidate.start.isoformat(),
-                "booked_end": best.candidate.end.isoformat(),
+                "bookings": booked,
+                "booked_event_codes": [
+                    str(item["event_code"]) for item in booked
+                ],
+                "booked_reward_hours": len(booked),
+                "booked_event_code": next_window["event_codes"][0],
+                "booked_start": next_window["start"].isoformat(),
+                "booked_end": next_window["end"].isoformat(),
                 "booked_at": booked_at.isoformat(),
             }
         )
