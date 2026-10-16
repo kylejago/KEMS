@@ -739,7 +739,8 @@ def select_reward_booking_codes(
     if booked_windows:
         anchor = booked_windows[0]
         neighbors = [
-            item for item in eligible
+            item
+            for item in eligible
             if item.end == anchor["start"] or item.start == anchor["end"]
         ]
         if neighbors:
@@ -755,11 +756,10 @@ def select_reward_booking_codes(
             ).code
         ]
     pairs: list[tuple[HappyHourCandidate, HappyHourCandidate]] = [
-        (left, right)
-        for i, left in enumerate(eligible)
-        for right in eligible[i + 1 :]
+        (left, right) for i, left in enumerate(eligible) for right in eligible[i + 1 :]
     ]
     if pairs:
+
         def pair_key(
             pair: tuple[HappyHourCandidate, HappyHourCandidate],
         ) -> tuple[float, float, float]:
@@ -907,9 +907,7 @@ class HappyHourAutoJoinController:
         ]
         windows = confirmed_booking_windows({"bookings": booked})
         state["bookings"] = booked
-        state["booked_event_codes"] = [
-            str(item["event_code"]) for item in booked
-        ]
+        state["booked_event_codes"] = [str(item["event_code"]) for item in booked]
         state["booked_reward_hours"] = len(booked)
         if windows:
             current_or_next = next(
@@ -929,16 +927,12 @@ class HappyHourAutoJoinController:
         # Book once the slots are announced, not the night before: rewards
         # cannot be spent after expiry if all desirable slots have filled.
         candidates = sorted(candidates, key=lambda item: item.start)
-        days = sorted(
-            {
-                item.start.astimezone(_LONDON).date()
-                for item in candidates
-            }
-        )
+        days = sorted({item.start.astimezone(_LONDON).date() for item in candidates})
         pending_day: date | None = None
         for day in days:
             already = [
-                item for item in booked
+                item
+                for item in booked
                 if (_dt(item.get("start")) or now).astimezone(_LONDON).date() == day
             ]
             if len(already) < HAPPY_HOUR_MAX_REWARDS_PER_EVENT_DAY:
@@ -957,9 +951,9 @@ class HappyHourAutoJoinController:
             if item.start.astimezone(_LONDON).date() == pending_day
         ]
         day_booked = [
-            item for item in booked
-            if (_dt(item.get("start")) or now).astimezone(_LONDON).date()
-            == pending_day
+            item
+            for item in booked
+            if (_dt(item.get("start")) or now).astimezone(_LONDON).date() == pending_day
         ]
         balance = discovery.get("weekend_happy_hours_available")
         if balance is None:
@@ -1101,9 +1095,11 @@ class HappyHourAutoJoinController:
             state["status"] = (
                 "would_join_simulation"
                 if "operating_mode_not_control" in gate_reasons
-                else "recommended_auto_join_off"
-                if "auto_join_switch_off" in gate_reasons
-                else "join_safety_gate_blocked"
+                else (
+                    "recommended_auto_join_off"
+                    if "auto_join_switch_off" in gate_reasons
+                    else "join_safety_gate_blocked"
+                )
             )
             state["would_auto_join"] = True
             state["join_block_reason"] = ",".join(gate_reasons)
@@ -1121,7 +1117,9 @@ class HappyHourAutoJoinController:
             "octopus_energy", "join_octoplus_weekend_happy_hour_event"
         ):
             state["status"] = "join_service_unavailable"
-            state["join_block_reason"] = "Octopus Weekend Happy Hour join service unavailable"
+            state["join_block_reason"] = (
+                "Octopus Weekend Happy Hour join service unavailable"
+            )
             self.state = state
             return
 
@@ -1206,9 +1204,7 @@ class HappyHourAutoJoinController:
                 "status": "booked",
                 "external_join_authority": False,
                 "bookings": booked,
-                "booked_event_codes": [
-                    str(item["event_code"]) for item in booked
-                ],
+                "booked_event_codes": [str(item["event_code"]) for item in booked],
                 "booked_reward_hours": len(booked),
                 "booked_event_code": next_window["event_codes"][0],
                 "booked_start": next_window["start"].isoformat(),
