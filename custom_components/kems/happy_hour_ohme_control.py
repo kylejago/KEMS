@@ -31,7 +31,11 @@ _HAPPY_HOUR_SENSOR = "sensor.kems_agile_happy_hour_plan"
 
 
 def _normalise(value: Any) -> str:
-    return str(value or "").strip().casefold()
+    """Compare Ohme's smart_charge or Smart charge as the same mode.
+
+    Keep the original HA select option unchanged for service calls.
+    """
+    return " ".join(str(value or "").replace("_", " ").split()).casefold()
 
 
 def ohme_happy_hour_write_decision(
@@ -269,7 +273,9 @@ class OhmeHappyHourController:
         self._restore_attempts += 1
         if await self._async_set_mode(entity_id, target):
             observed = self._hass.states.get(entity_id)
-            if observed is not None and _normalise(observed.state) != "max charge":
+            if observed is not None and _normalise(observed.state) == _normalise(
+                target
+            ):
                 self._owned = False
                 self._restore_attempts = 0
                 await self._async_save()
