@@ -531,10 +531,16 @@ def test_alpha9108_booking_controller_confirms_two_distinct_services(
     """One successful external booking must not block the next reward."""
 
     async def _run() -> None:
-        now = datetime.now(UTC)
-        first_start = (now + timedelta(days=3)).replace(
-            hour=10, minute=0, second=0, microsecond=0
-        )
+        clock = {"when": datetime(2026, 10, 16, 15, 0, tzinfo=UTC)}
+
+        class ControlledDateTime(datetime):
+            @classmethod
+            def now(cls, tz=None):
+                return clock["when"].astimezone(tz or UTC)
+
+        monkeypatch.setattr(happy_join, "datetime", ControlledDateTime)
+        # The four published slots are Sunday 18 October, 11:00–15:00 BST.
+        first_start = datetime(2026, 10, 18, 10, 0, tzinfo=UTC)
         slots = [
             HappyHourCandidate(
                 code=f"SUNDAY-{i}",
@@ -600,6 +606,21 @@ def test_alpha9108_booking_controller_confirms_two_distinct_services(
             snapshot=SimpleNamespace(battery_soc=91.0),
             forecast_plan=None,
         )
+        # Friday: available reward choices are visible, but no selection or join.
+        await controller.async_update(data)
+        assert calls == []
+        assert controller.state["status"] == "waiting_for_night_before"
+        assert controller.state["candidate_count"] == 4
+        assert controller.state["next_candidate_day"] == "2026-10-18"
+
+        # Saturday: before 90% publication, still do not select or book.
+        clock["when"] = datetime(2026, 10, 17, 11, 0, tzinfo=UTC)
+        await controller.async_update(data)
+        assert calls == []
+        assert controller.state["status"] == "waiting_for_agile_prices"
+
+        # Once both price feeds have >=90% coverage, confirm two distinct slots.
+        monkeypatch.setattr(happy_join, "day_rate_coverage", lambda rates, day: 1.0)
         await controller.async_update(data)
         assert len(calls) == 1
         assert controller.state["booked_reward_hours"] == 1

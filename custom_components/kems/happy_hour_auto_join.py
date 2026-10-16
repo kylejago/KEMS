@@ -851,7 +851,7 @@ class HappyHourAutoJoinController:
             "emergency_stop": bool(control.emergency_stop),
             "battery_installed": bool(options.get("battery_installed", False)),
             "external_join_authority": False,
-            "decision_policy": "two_banked_rewards_as_soon_as_available",
+            "decision_policy": "two_banked_rewards_night_before_with_verified_prices",
             "price_coverage_required_percent": int(
                 HAPPY_HOUR_PRICE_COVERAGE_REQUIRED * 100
             ),
@@ -924,32 +924,33 @@ class HappyHourAutoJoinController:
                 }
             )
 
-        # Book once the slots are announced, not the night before: rewards
-        # cannot be spent after expiry if all desirable slots have filled.
+        # Restore Alpha9.107's night-before selection: do not rank or join
+        # events until their local calendar day is tomorrow. The two distinct
+        # reward bookings and independent confirmation remain Alpha9.108.
         candidates = sorted(candidates, key=lambda item: item.start)
-        days = sorted({item.start.astimezone(_LONDON).date() for item in candidates})
-        pending_day: date | None = None
-        for day in days:
-            already = [
-                item
-                for item in booked
-                if (_dt(item.get("start")) or now).astimezone(_LONDON).date() == day
-            ]
-            if len(already) < HAPPY_HOUR_MAX_REWARDS_PER_EVENT_DAY:
-                pending_day = day
-                break
-
-        if pending_day is None:
-            if not windows:
-                state["status"] = "no_available_happy_hour_slots"
-            self.state = state
-            return
-
+        local_today = now.astimezone(_LONDON).date()
+        decision_day = local_today + timedelta(days=1)
         day_candidates = [
             item
             for item in candidates
-            if item.start.astimezone(_LONDON).date() == pending_day
+            if item.start.astimezone(_LONDON).date() == decision_day
         ]
+        if not day_candidates:
+            upcoming_days = sorted(
+                {item.start.astimezone(_LONDON).date() for item in candidates}
+            )
+            if upcoming_days:
+                state["next_candidate_day"] = upcoming_days[0].isoformat()
+            if not windows:
+                state["status"] = (
+                    "waiting_for_night_before"
+                    if upcoming_days
+                    else "no_available_happy_hour_slots"
+                )
+            self.state = state
+            return
+
+        pending_day = decision_day
         day_booked = [
             item
             for item in booked
@@ -988,9 +989,19 @@ class HappyHourAutoJoinController:
                 "import_price_coverage_percent": round(import_coverage * 100.0, 1),
                 "export_price_coverage_percent": round(export_coverage * 100.0, 1),
                 "export_tariff_type": export_type,
-                "decision_policy": "two_banked_rewards_as_soon_as_available",
+                "decision_policy": "two_banked_rewards_night_before_with_verified_prices",
             }
         )
+        # Preserve the original requirement for sufficiently published Agile
+        # prices before deciding which two earned reward hours to book.
+        if (
+            import_coverage < HAPPY_HOUR_PRICE_COVERAGE_REQUIRED
+            or export_coverage < HAPPY_HOUR_PRICE_COVERAGE_REQUIRED
+        ):
+            state["status"] = "waiting_for_agile_prices"
+            self.state = state
+            return
+
         booking_soc = _booking_soc(
             data, operating_mode=str(self.coordinator.settings.control.operating_mode)
         )
