@@ -508,12 +508,15 @@ def test_alpha9108_nonadjacent_bookings_are_distinct_dispatch_windows() -> None:
 
 def test_alpha9108_one_reward_cannot_book_two() -> None:
     candidates = [_candidate(h, f"EVENT-{h}") for h in (11, 12)]
-    assert len(
-        select_reward_booking_codes(
-            candidates=candidates,
-            booked_codes=set(),
-            booked_windows=[],
-            scored={},
-            target_count=1,
+    assert (
+        len(
+            select_reward_booking_codes(
+                candidates=candidates,
+                booked_codes=set(),
+                booked_windows=[],
+                scored={},
+                target_count=1,
+            )
         )
-    ) == 1
+        == 1
+    )
