@@ -14,6 +14,8 @@ from custom_components.kems.happy_hour_auto_join import (
     auto_join_control_gate,
     booked_happy_hour_matches_plan,
     choose_best_candidate,
+    confirmed_booking_windows,
+    select_reward_booking_codes,
     day_rate_coverage,
     score_candidate,
 )
@@ -403,3 +405,115 @@ def test_alpha9102_physical_happy_hour_charge_requires_all_live_evidence() -> No
     assert target(config_value=low_site) == 0.0
     assert target(power_down=True) == 0.0
     assert target(grid=False) == 0.0
+
+
+def test_alpha9108_picks_two_adjacent_rewards_from_four_available() -> None:
+    candidates = [_candidate(h, f"EVENT-{h}") for h in (11, 12, 13, 14)]
+    choices = select_reward_booking_codes(
+        candidates=candidates,
+        booked_codes=set(),
+        booked_windows=[],
+        scored={},
+        target_count=2,
+    )
+    assert len(choices) == 2
+    by_code = {item.code: item for item in candidates}
+    assert by_code[choices[0]].end == by_code[choices[1]].start
+
+
+def test_alpha9108_second_booking_preserves_selected_pair() -> None:
+    candidates = [_candidate(h, f"EVENT-{h}") for h in (11, 12, 13, 14)]
+    first = candidates[1]
+    choices = select_reward_booking_codes(
+        candidates=candidates,
+        booked_codes={first.code},
+        booked_windows=[
+            {
+                "start": first.start,
+                "end": first.end,
+                "event_codes": [first.code],
+            }
+        ],
+        scored={},
+        target_count=2,
+        preferred_codes=[candidates[2].code],
+    )
+    assert choices == [candidates[2].code]
+
+
+def test_alpha9108_two_bookings_merge_and_authorise_full_two_hours() -> None:
+    first = _candidate(11, "CODE-A")
+    second = _candidate(12, "CODE-B")
+    state = {
+        "status": "booked",
+        "bookings": [
+            {
+                "event_code": first.code,
+                "start": first.start.isoformat(),
+                "end": first.end.isoformat(),
+            },
+            {
+                "event_code": second.code,
+                "start": second.start.isoformat(),
+                "end": second.end.isoformat(),
+            },
+        ],
+    }
+    windows = confirmed_booking_windows(state)
+    assert len(windows) == 1
+    assert windows[0]["event_codes"] == [first.code, second.code]
+    context = {
+        "start": first.start.isoformat(),
+        "end": second.end.isoformat(),
+    }
+    assert booked_happy_hour_matches_plan(
+        state, context, first.start + timedelta(minutes=15)
+    )
+    assert booked_happy_hour_matches_plan(
+        state, context, second.start + timedelta(minutes=15)
+    )
+    assert not booked_happy_hour_matches_plan(state, context, second.end)
+
+
+def test_alpha9108_nonadjacent_bookings_are_distinct_dispatch_windows() -> None:
+    first = _candidate(11, "CODE-A")
+    second = _candidate(13, "CODE-B")
+    state = {
+        "status": "booked",
+        "bookings": [
+            {
+                "event_code": first.code,
+                "start": first.start.isoformat(),
+                "end": first.end.isoformat(),
+            },
+            {
+                "event_code": second.code,
+                "start": second.start.isoformat(),
+                "end": second.end.isoformat(),
+            },
+        ],
+    }
+    assert len(confirmed_booking_windows(state)) == 2
+    assert not booked_happy_hour_matches_plan(
+        state,
+        {"start": first.start.isoformat(), "end": second.end.isoformat()},
+        first.start,
+    )
+    assert booked_happy_hour_matches_plan(
+        state,
+        {"start": second.start.isoformat(), "end": second.end.isoformat()},
+        second.start,
+    )
+
+
+def test_alpha9108_one_reward_cannot_book_two() -> None:
+    candidates = [_candidate(h, f"EVENT-{h}") for h in (11, 12)]
+    assert len(
+        select_reward_booking_codes(
+            candidates=candidates,
+            booked_codes=set(),
+            booked_windows=[],
+            scored={},
+            target_count=1,
+        )
+    ) == 1
