@@ -12,6 +12,7 @@ import pytest
 from kems_core.forecast_path_scheduler import allocate_forecast_path_exports
 
 import custom_components.kems.happy_hour_auto_join as joining
+from custom_components.kems.agile_slots_state import _physical_live_slot_outlook
 from custom_components.kems.happy_hour_auto_join import (
     HappyHourCandidate,
     booked_happy_hour_matches_plan,
@@ -239,3 +240,49 @@ def test_solar_chronological_slot_soc_tracks_recharge_after_arrival() -> None:
     assert plan.allocations[-1].ending_soc_percent == pytest.approx(
         plan.ending_soc_percent, abs=0.002
     )
+
+
+def test_dashboard_accepts_solar_recharged_physical_soc_without_simulation() -> None:
+    now = datetime.now(UTC)
+    start = now + timedelta(minutes=1)
+    end = start + timedelta(minutes=30)
+    verified_plan = {
+        "available": True,
+        "planning_soc_source": "verified FoxESS physical lower bound",
+        "physical_planning_evidence": {"available": True},
+        "generated_at": now.isoformat(),
+        "planning_soc_percent": 65.0,
+        "forecast_path_scheduler": {
+            "available": True,
+            "active": True,
+            "future_solar_borrowing": False,
+            "forecast_solar_stored_kwh": 0.5,
+            "ending_soc_percent": 66.0,
+            "allocations": [
+                {
+                    "valid_from": start.isoformat(),
+                    "valid_to": end.isoformat(),
+                    "planned_total_discharge_kwh": 0.0,
+                    "planned_battery_export_kwh": 0.0,
+                    "planned_house_battery_kwh": 0.0,
+                    "ending_soc_percent": 66.0,
+                }
+            ],
+        },
+    }
+    coordinator = SimpleNamespace(
+        settings=SimpleNamespace(
+            simulation=SimpleNamespace(
+                battery_capacity_kwh=56.42, discharge_efficiency=0.95
+            )
+        )
+    )
+    outlook = _physical_live_slot_outlook(
+        coordinator, {"rolling_export_plan": verified_plan}
+    )
+    assert outlook[start.isoformat()]["estimated_soc_percent"] == 66.0
+    # Missing chronological replay must fail closed, never show simulated SOC.
+    del verified_plan["forecast_path_scheduler"]["allocations"][0]["ending_soc_percent"]
+    assert _physical_live_slot_outlook(
+        coordinator, {"rolling_export_plan": verified_plan}
+    ) == {}
