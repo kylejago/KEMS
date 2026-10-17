@@ -469,7 +469,8 @@ def allocate_forecast_path_exports(
                 planned_total_discharge_kwh=round(house_energy + export, 3),
                 ending_soc_percent=(
                     round(ending_by_slot[item["valid_from"]], 3)
-                    if item["valid_from"] in ending_by_slot else None
+                    if item["valid_from"] in ending_by_slot
+                    else None
                 ),
             )
         )
