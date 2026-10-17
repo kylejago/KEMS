@@ -134,9 +134,7 @@ def _auto_join_booking_event(hass: Any, now: datetime) -> dict[str, Any] | None:
         if _dt(item.get("start")) is not None
         and selected["start"] <= _dt(item["start"]) < selected["end"]
     )
-    booking_source = (
-        "octopus_joined_events" if externally_joined else "kems_auto_join"
-    )
+    booking_source = "octopus_joined_events" if externally_joined else "kems_auto_join"
     return {
         "enabled": True,
         "source": "octopus_energy",
@@ -144,7 +142,8 @@ def _auto_join_booking_event(hass: Any, now: datetime) -> dict[str, Any] | None:
         "automatic_status": "detected_kems_booking",
         "source_kind": (
             "octopus_confirmed_joined_events"
-            if externally_joined else "kems_auto_join_booking"
+            if externally_joined
+            else "kems_auto_join_booking"
         ),
         "source_entity": state.get("source_entity"),
         "source_account": state.get("source_account"),
@@ -156,10 +155,15 @@ def _auto_join_booking_event(hass: Any, now: datetime) -> dict[str, Any] | None:
         ),
         "confidence": "confirmed_booking",
         "event_ids": (
-            [str(item["event_id"]) for item in state.get("bookings", [])
-             if item.get("event_id") and _dt(item.get("start")) is not None
-             and selected["start"] <= _dt(item["start"]) < selected["end"]]
-            if externally_joined else codes
+            [
+                str(item["event_id"])
+                for item in state.get("bookings", [])
+                if item.get("event_id")
+                and _dt(item.get("start")) is not None
+                and selected["start"] <= _dt(item["start"]) < selected["end"]
+            ]
+            if externally_joined
+            else codes
         ),
         "event_code": None if externally_joined else codes[0],
         "booking_authoritative": True,
