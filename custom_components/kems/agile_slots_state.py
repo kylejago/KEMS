@@ -129,9 +129,12 @@ def _physical_live_slot_outlook(
         or not 0 < discharge_efficiency <= 1
     ):
         return {}
-    # Per-slot SOC comes directly from the pure scheduler's chronological
-    # replay. This includes solar only after its actual forecast arrival.
-    # Missing slot-end evidence still fails closed to unavailable.
+    # Prefer the scheduler's chronological SOC (including solar). Older
+    # discharge-only allocations remain safely projectable from physical SOC.
+    # Never interpolate aggregate solar into slots without replay evidence.
+    stored_solar = _finite_nonnegative(schedule.get("forecast_solar_stored_kwh"))
+    if stored_solar is None:
+        return {}
     allocations = schedule.get("allocations")
     if not isinstance(allocations, list) or not allocations:
         return {}
@@ -154,14 +157,20 @@ def _physical_live_slot_outlook(
             or discharged is None
             or exported is None
             or to_house is None
-            or slot_soc is None
-            or slot_soc > 100.0
+            or (slot_soc is not None and slot_soc > 100.0)
         ):
             return {}
         previous_end = end
         if discharged + 0.02 < exported + to_house:
             return {}
-        soc = slot_soc
+        if slot_soc is None:
+            if stored_solar > 0.0:
+                return {}
+            soc = max(
+                0.0, soc - 100.0 * discharged / (capacity * discharge_efficiency)
+            )
+        else:
+            soc = slot_soc
         if end <= now:
             continue
         if exported > 0.01:
