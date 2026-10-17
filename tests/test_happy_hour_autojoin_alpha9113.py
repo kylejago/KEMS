@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import asyncio
+import sys
+import types
 from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
@@ -12,7 +14,6 @@ import pytest
 from kems_core.forecast_path_scheduler import allocate_forecast_path_exports
 
 import custom_components.kems.happy_hour_auto_join as joining
-from custom_components.kems.agile_slots_state import _physical_live_slot_outlook
 from custom_components.kems.happy_hour_auto_join import (
     HappyHourCandidate,
     booked_happy_hour_matches_plan,
@@ -243,6 +244,17 @@ def test_solar_chronological_slot_soc_tracks_recharge_after_arrival() -> None:
 
 
 def test_dashboard_accepts_solar_recharged_physical_soc_without_simulation() -> None:
+    # Home Assistant isn't installed in the pure-core test environment.
+    config_entries = sys.modules.setdefault(
+        "homeassistant.config_entries", types.ModuleType("homeassistant.config_entries")
+    )
+    config_entries.ConfigEntry = object
+    core = sys.modules.setdefault(
+        "homeassistant.core", types.ModuleType("homeassistant.core")
+    )
+    core.HomeAssistant = object
+    from custom_components.kems.agile_slots_state import _physical_live_slot_outlook
+
     now = datetime.now(UTC)
     start = now + timedelta(minutes=1)
     end = start + timedelta(minutes=30)
