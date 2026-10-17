@@ -295,6 +295,7 @@ def test_dashboard_accepts_solar_recharged_physical_soc_without_simulation() -> 
     assert outlook[start.isoformat()]["estimated_soc_percent"] == 66.0
     # Missing chronological replay must fail closed, never show simulated SOC.
     del verified_plan["forecast_path_scheduler"]["allocations"][0]["ending_soc_percent"]
-    assert _physical_live_slot_outlook(
-        coordinator, {"rolling_export_plan": verified_plan}
-    ) == {}
+    assert (
+        _physical_live_slot_outlook(coordinator, {"rolling_export_plan": verified_plan})
+        == {}
+    )
