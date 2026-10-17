@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import sys
 import types
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 from zoneinfo import ZoneInfo
@@ -97,7 +97,7 @@ def test_unavailable_and_ambiguous_octopus_sources_cannot_authorise() -> None:
 
 def test_published_agile_export_fallback_preserves_missing_prices() -> None:
     now = datetime.now(UTC)
-    local_tomorrow = now.astimezone(LONDON).date() + timedelta(days=1)
+    local_tomorrow = date(2026, 10, 18)
     start = datetime.combine(local_tomorrow, datetime.min.time(), tzinfo=LONDON)
     start = start.astimezone(UTC)
     slots = [
