@@ -113,13 +113,15 @@ views:
           {% set today = state_attr('sensor.kems_agile_slots', 'today_slots') or [] %}
           {% set tomorrow = state_attr('sensor.kems_agile_slots', 'tomorrow_slots') or [] %}
           {% set physical_slots = state_attr('sensor.kems_agile_slots', 'physical_live_slot_outlook') or {} %}
+          {% set live_soc = state_attr('sensor.kems_agile_slots', 'physical_live_slot_outlook_current_soc_percent') %}
           {% set idx = now().hour * 2 + (1 if now().minute >= 30 else 0) %}
           {% set slots = today[idx:idx + 6] %}
           {% if slots | count < 6 %}
           {% set slots = slots + tomorrow[:6 - (slots | count)] %}
           {% endif %}
           **Today's published plan:** {{ today | count }}/48 slots · **Tomorrow:** {{ tomorrow | count }}/48 slots  
-          **Current Agile export price:** {{ (state_attr('sensor.kems_agile_slots', 'current_rate_pence') ~ ' p/kWh') if state_attr('sensor.kems_agile_slots', 'current_rate_pence') is not none else '—' }}
+          **Current Agile export price:** {{ (state_attr('sensor.kems_agile_slots', 'current_rate_pence') ~ ' p/kWh') if state_attr('sensor.kems_agile_slots', 'current_rate_pence') is not none else '—' }}  
+          **Physical planning SOC:** {{ ('%.1f%%' | format(live_soc | float)) if live_soc is not none else 'Awaiting verified physical evidence' }}
 
           {% if slots %}
           | Time | Export rate | Planned action | Est. SOC |
@@ -127,7 +129,7 @@ views:
           {% for p in slots %}
           {% set is_tomorrow = loop.index0 + idx >= 48 %}
           {% set physical = physical_slots.get(p.get('valid_from'), {}) if not is_tomorrow else {} %}
-          {% set action = physical.get('action') or ('Physical outlook unavailable — see Agile Plan' if not is_tomorrow else 'Tomorrow forecast — see Agile Plan') %}
+          {% set action = physical.get('action') or ('Physical SOC path unavailable — see Agile Plan' if not is_tomorrow else 'Tomorrow forecast — see Agile Plan') %}
           {% set soc = physical.get('estimated_soc_percent') %}
           | {{ ('Tomorrow ' if is_tomorrow else '') ~ p.get('label', '—') }}{{ ' · NOW' if loop.first else '' }} | {{ ('%.2fp' | format(p.get('rate_pence') | float)) if p.get('rate_pence') is not none else '—' }} | {{ action }} | {{ ('%.1f%%' | format(soc | float)) if soc is not none else '—' }} |
           {% endfor %}
@@ -135,7 +137,7 @@ views:
           The upcoming Agile plan has not been published yet.
           {% endif %}
 
-          _Live SOC outlook uses verified physical FoxESS evidence and the rolling discharge ledger; unavailable values are shown as — rather than simulated SOC. The separate Agile Plan tab retains digital-twin forecasts. All actions can change as conditions change._
+          _Live SOC outlook uses verified physical FoxESS evidence and the forecast scheduler's chronological solar and discharge replay. Unavailable values are shown as — rather than simulated SOC. The separate Agile Plan tab retains digital-twin forecasts. All actions can change as conditions change._
 
       - type: grid
         columns: 2
