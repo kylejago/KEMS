@@ -33,6 +33,7 @@ class ForecastPathSlotAllocation:
     planned_house_battery_kwh: float
     planned_battery_export_kwh: float
     planned_total_discharge_kwh: float
+    ending_soc_percent: float | None = None
 
     def to_dict(self) -> dict[str, object]:
         """Return JSON-compatible allocation evidence."""
@@ -285,8 +286,11 @@ def allocate_forecast_path_exports(
             if export_capacity > _EPSILON:
                 candidate["segment_caps"][index] = export_capacity
 
-    def simulate(allocations: dict[datetime, float]) -> dict[str, float | bool]:
+    def simulate(
+        allocations: dict[datetime, float], *, capture_slot_ends: bool = False
+    ) -> dict[str, Any]:
         battery = initial_stored
+        slot_end_soc_percent: dict[datetime, float] = {}
         minimum = battery
         stored_solar = 0.0
         spill = 0.0
@@ -325,6 +329,17 @@ def allocate_forecast_path_exports(
             battery += stored_gain
             stored_solar += stored_gain
             spill += max(surplus_solar_ac - stored_gain / charge_eff, 0.0)
+            if capture_slot_ends:
+                # Publish the exact replay result only at a chronological
+                # settlement boundary. Never infer SOC from aggregate solar.
+                for candidate in candidates:
+                    if (
+                        candidate["active_end"] == segment["end"]
+                        and candidate["active_start"] < segment["end"]
+                    ):
+                        slot_end_soc_percent[candidate["valid_from"]] = (
+                            100.0 * battery / capacity
+                        )
 
         if battery + 1e-7 < target_stored:
             feasible = False
@@ -336,6 +351,7 @@ def allocate_forecast_path_exports(
             "solar_input_kwh": solar_input,
             "spill_kwh": spill,
             "house_battery_kwh": house_battery_total,
+            "slot_end_soc_percent": slot_end_soc_percent,
         }
 
     allocations: dict[datetime, float] = {
@@ -436,7 +452,8 @@ def allocate_forecast_path_exports(
                 allocations[current_key] += low
                 shift_needed -= low
 
-    outcome = simulate(allocations)
+    outcome = simulate(allocations, capture_slot_ends=True)
+    ending_by_slot = outcome["slot_end_soc_percent"]
     slot_allocations: list[ForecastPathSlotAllocation] = []
     for item in sorted(candidates, key=lambda value: value["valid_from"]):
         export = max(allocations[item["valid_from"]], 0.0)
@@ -450,6 +467,10 @@ def allocate_forecast_path_exports(
                 planned_house_battery_kwh=round(house_energy, 3),
                 planned_battery_export_kwh=round(export, 3),
                 planned_total_discharge_kwh=round(house_energy + export, 3),
+                ending_soc_percent=(
+                    round(ending_by_slot[item["valid_from"]], 3)
+                    if item["valid_from"] in ending_by_slot else None
+                ),
             )
         )
 
