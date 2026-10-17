@@ -9,6 +9,7 @@ from unittest.mock import AsyncMock
 from zoneinfo import ZoneInfo
 
 import pytest
+from kems_core.forecast_path_scheduler import allocate_forecast_path_exports
 
 import custom_components.kems.happy_hour_auto_join as joining
 from custom_components.kems.happy_hour_auto_join import (
@@ -19,7 +20,6 @@ from custom_components.kems.happy_hour_auto_join import (
     published_agile_export_rates,
     verified_octopus_joined_bookings,
 )
-from kems_core.forecast_path_scheduler import allocate_forecast_path_exports
 
 LONDON = ZoneInfo("Europe/London")
 
