@@ -29,19 +29,31 @@ def _joined_hass() -> SimpleNamespace:
         entity_id="event.octopus_energy_a_test_octoplus_power_up_events",
         attributes={
             "events": [
-                {"id": "octopus-7244", "code": None,
-                 "start": "2026-10-18T11:00:00+01:00",
-                 "end": "2026-10-18T12:00:00+01:00"},
-                {"id": "octopus-7245", "code": None,
-                 "start": "2026-10-18T12:00:00+01:00",
-                 "end": "2026-10-18T13:00:00+01:00"},
-                {"id": "not-reward", "code": "ordinary-power-up",
-                 "start": "2026-10-18T13:00:00+01:00",
-                 "end": "2026-10-18T14:00:00+01:00"},
+                {
+                    "id": "octopus-7244",
+                    "code": None,
+                    "start": "2026-10-18T11:00:00+01:00",
+                    "end": "2026-10-18T12:00:00+01:00",
+                },
+                {
+                    "id": "octopus-7245",
+                    "code": None,
+                    "start": "2026-10-18T12:00:00+01:00",
+                    "end": "2026-10-18T13:00:00+01:00",
+                },
+                {
+                    "id": "not-reward",
+                    "code": "ordinary-power-up",
+                    "start": "2026-10-18T13:00:00+01:00",
+                    "end": "2026-10-18T14:00:00+01:00",
+                },
             ],
             "available_events": [
-                {"code": "NOT-BOOKED", "start": "2026-10-18T14:00:00+01:00",
-                 "end": "2026-10-18T15:00:00+01:00"}
+                {
+                    "code": "NOT-BOOKED",
+                    "start": "2026-10-18T14:00:00+01:00",
+                    "end": "2026-10-18T15:00:00+01:00",
+                }
             ],
         },
     )
@@ -53,9 +65,7 @@ def test_two_code_less_joined_hours_are_confirmed_without_inventing_codes() -> N
     confirmed = verified_octopus_joined_bookings(_joined_hass(), now=now)
     assert len(confirmed) == 2
     assert all(item.get("event_code") is None for item in confirmed)
-    assert {item["event_id"] for item in confirmed} == {
-        "octopus-7244", "octopus-7245"
-    }
+    assert {item["event_id"] for item in confirmed} == {"octopus-7244", "octopus-7245"}
     joined = {"status": "booked", "bookings": confirmed}
     windows = confirmed_booking_windows(joined)
     assert len(windows) == 1
@@ -72,10 +82,13 @@ def test_unavailable_and_ambiguous_octopus_sources_cannot_authorise() -> None:
     now = datetime(2026, 10, 17, 18, 0, tzinfo=UTC)
     hass = _joined_hass()
     event = hass.states.async_all()[0]
-    assert verified_octopus_joined_bookings(
-        SimpleNamespace(states=SimpleNamespace(async_all=lambda: [event, event])),
-        now=now,
-    ) == []
+    assert (
+        verified_octopus_joined_bookings(
+            SimpleNamespace(states=SimpleNamespace(async_all=lambda: [event, event])),
+            now=now,
+        )
+        == []
+    )
     event.attributes["events"] = []
     assert verified_octopus_joined_bookings(hass, now=now) == []
 
@@ -93,23 +106,21 @@ def test_published_agile_export_fallback_preserves_missing_prices() -> None:
         }
         for i in range(46)
     ]
-    coordinator = SimpleNamespace(agile_smart_export_state={
-        "generated_at": now.isoformat(),
-        "tariff_code": "E-1R-AGILE-OUTGOING",
-        "tomorrow_slots": slots,
-    })
-    rates = published_agile_export_rates(
-        coordinator, target_day=local_tomorrow
+    coordinator = SimpleNamespace(
+        agile_smart_export_state={
+            "generated_at": now.isoformat(),
+            "tariff_code": "E-1R-AGILE-OUTGOING",
+            "tomorrow_slots": slots,
+        }
     )
+    rates = published_agile_export_rates(coordinator, target_day=local_tomorrow)
     assert len(rates) == 46
     assert day_rate_coverage(rates, local_tomorrow) == pytest.approx(46 / 48)
     assert all(rate.value_pence >= 20.0 for rate in rates)
     coordinator.agile_smart_export_state["generated_at"] = (
         now - timedelta(hours=1)
     ).isoformat()
-    assert published_agile_export_rates(
-        coordinator, target_day=local_tomorrow
-    ) == []
+    assert published_agile_export_rates(coordinator, target_day=local_tomorrow) == []
 
 
 def test_confirmed_octopus_hours_never_trigger_duplicate_bookings(
@@ -117,6 +128,7 @@ def test_confirmed_octopus_hours_never_trigger_duplicate_bookings(
 ) -> None:
     async def exercise() -> None:
         now = datetime(2026, 10, 17, 18, 0, tzinfo=UTC)
+
         class Clock(datetime):
             @classmethod
             def now(cls, tz=None):
@@ -125,32 +137,38 @@ def test_confirmed_octopus_hours_never_trigger_duplicate_bookings(
         monkeypatch.setattr(joining, "datetime", Clock)
         hass = _joined_hass()
         calls: list[object] = []
-        hass.services = SimpleNamespace(async_call=lambda *args, **kwargs: calls.append(args))
+        hass.services = SimpleNamespace(
+            async_call=lambda *args, **kwargs: calls.append(args)
+        )
         options = {"happy_hour_auto_join_enabled": True, "battery_installed": True}
         entry = SimpleNamespace(options=options)
         control = SimpleNamespace(
-            operating_mode="control", commissioned=True,
-            control_enabled=True, emergency_stop=False,
+            operating_mode="control",
+            commissioned=True,
+            control_enabled=True,
+            emergency_stop=False,
         )
         coordinator = SimpleNamespace(
-            hass=hass, entry=entry,
+            hass=hass,
+            entry=entry,
             settings=SimpleNamespace(control=control),
         )
         first = datetime(2026, 10, 18, 10, tzinfo=UTC)
         candidates = [
             HappyHourCandidate(
-                code=f"EVENT-{i}", start=first + timedelta(hours=i),
+                code=f"EVENT-{i}",
+                start=first + timedelta(hours=i),
                 end=first + timedelta(hours=i + 1),
-                availability="available", source="test",
+                availability="available",
+                source="test",
                 source_entity=hass.states.async_all()[0].entity_id,
             )
             for i in range(4)
         ]
         monkeypatch.setattr(
-            joining, "discover_available_happy_hours",
-            lambda _hass, now: (
-                candidates, {"weekend_happy_hours_available": 10}
-            ),
+            joining,
+            "discover_available_happy_hours",
+            lambda _hass, now: (candidates, {"weekend_happy_hours_available": 10}),
         )
         controller = joining.HappyHourAutoJoinController.__new__(
             joining.HappyHourAutoJoinController
@@ -173,6 +191,7 @@ def test_confirmed_octopus_hours_never_trigger_duplicate_bookings(
         options["happy_hour_auto_join_enabled"] = False
         await controller.async_update(SimpleNamespace())
         assert controller.state["booked_reward_hours"] == 2
+
     asyncio.run(exercise())
 
 
@@ -196,18 +215,26 @@ def test_solar_chronological_slot_soc_tracks_recharge_after_arrival() -> None:
         for index in range(18)
     ]
     plan = allocate_forecast_path_exports(
-        slots=slots, capacity_segments=segments,
-        now=start, deadline=start + timedelta(minutes=90),
-        battery_capacity_kwh=10.0, soc_percent=40.0,
+        slots=slots,
+        capacity_segments=segments,
+        now=start,
+        deadline=start + timedelta(minutes=90),
+        battery_capacity_kwh=10.0,
+        soc_percent=40.0,
         target_soc_percent=20.0,
-        charge_efficiency=1.0, discharge_efficiency=1.0,
-        max_charge_kw=7.0, house_kw=0.0,
-        export_limit_kw=7.0, minimum_export_rate_pence=3.5,
+        charge_efficiency=1.0,
+        discharge_efficiency=1.0,
+        max_charge_kw=7.0,
+        house_kw=0.0,
+        export_limit_kw=7.0,
+        minimum_export_rate_pence=3.5,
     )
     assert plan.available
     assert plan.forecast_solar_stored_kwh > 0.0
     assert all(a.ending_soc_percent is not None for a in plan.allocations)
-    assert plan.allocations[1].ending_soc_percent > plan.allocations[0].ending_soc_percent
+    assert (
+        plan.allocations[1].ending_soc_percent > plan.allocations[0].ending_soc_percent
+    )
     assert plan.allocations[-1].ending_soc_percent == pytest.approx(
         plan.ending_soc_percent, abs=0.002
     )
