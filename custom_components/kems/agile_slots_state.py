@@ -129,12 +129,9 @@ def _physical_live_slot_outlook(
         or not 0 < discharge_efficiency <= 1
     ):
         return {}
-    # The scheduler's slot-energy ledger is discharged chronologically.
-    # An unsupported future solar recharge cannot be projected from total
-    # net energy alone, so do not publish an invented per-slot battery SOC.
-    stored_solar = _finite_nonnegative(schedule.get("forecast_solar_stored_kwh"))
-    if stored_solar is None or stored_solar > 0:
-        return {}
+    # Per-slot SOC comes directly from the pure scheduler's chronological
+    # replay. This includes solar only after its actual forecast arrival.
+    # Missing slot-end evidence still fails closed to unavailable.
     allocations = schedule.get("allocations")
     if not isinstance(allocations, list) or not allocations:
         return {}
@@ -148,6 +145,7 @@ def _physical_live_slot_outlook(
         discharged = _finite_nonnegative(allocation.get("planned_total_discharge_kwh"))
         exported = _finite_nonnegative(allocation.get("planned_battery_export_kwh"))
         to_house = _finite_nonnegative(allocation.get("planned_house_battery_kwh"))
+        slot_soc = _finite_nonnegative(allocation.get("ending_soc_percent"))
         if (
             start is None
             or end is None
@@ -156,12 +154,14 @@ def _physical_live_slot_outlook(
             or discharged is None
             or exported is None
             or to_house is None
+            or slot_soc is None
+            or slot_soc > 100.0
         ):
             return {}
         previous_end = end
         if discharged + 0.02 < exported + to_house:
             return {}
-        soc = max(0.0, soc - 100.0 * discharged / (capacity * discharge_efficiency))
+        soc = slot_soc
         if end <= now:
             continue
         if exported > 0.01:
@@ -169,11 +169,11 @@ def _physical_live_slot_outlook(
         elif to_house > 0.01:
             action = "Battery powers home; no deliberate battery export planned"
         else:
-            action = "No battery discharge scheduled"
+            action = "Solar recharge / hold; no battery discharge scheduled"
         result[str(allocation["valid_from"])] = {
             "estimated_soc_percent": round(soc, 1),
             "action": action,
-            "basis": "verified physical planning SOC + chronological live ledger",
+            "basis": "verified physical SOC + forecast scheduler chronological replay",
             "reporting_only": True,
         }
     expected_end = _finite_nonnegative(schedule.get("ending_soc_percent"))
@@ -226,9 +226,16 @@ def _attributes(coordinator: Any) -> dict[str, Any]:
         "physical_live_slot_outlook": live_outlook,
         "physical_live_slot_outlook_available": bool(live_outlook),
         "physical_live_slot_outlook_basis": (
-            "verified FoxESS physical lower bound + live chronological Agile allocation"
+            "verified FoxESS physical lower bound + forecast scheduler chronological replay"
             if live_outlook
-            else "unavailable: do not substitute simulated SOC for physical SOC"
+            else "unavailable: verified chronological physical SOC path absent or stale"
+        ),
+        "physical_live_slot_outlook_current_soc_percent": (
+            state.get("rolling_export_plan", {}).get("planning_soc_percent")
+            if isinstance(state.get("rolling_export_plan"), dict)
+            and state["rolling_export_plan"].get("planning_soc_source")
+            == "verified FoxESS physical lower bound"
+            else None
         ),
         "tomorrow_slots": tomorrow_slots,
         "today_agile": today_agile,
