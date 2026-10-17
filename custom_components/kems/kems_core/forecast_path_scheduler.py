@@ -299,6 +299,7 @@ def allocate_forecast_path_exports(
         feasible = True
 
         for index, segment in enumerate(raw_segments):
+            battery_before_segment = battery
             hours = (segment["end"] - segment["start"]).total_seconds() / 3600.0
             solar_kw = segment["solar_kw"]
             battery_kw = segment["battery_kw"]
@@ -333,12 +334,23 @@ def allocate_forecast_path_exports(
                 # Publish the exact replay result only at a chronological
                 # settlement boundary. Never infer SOC from aggregate solar.
                 for candidate in candidates:
+                    boundary = candidate["active_end"]
                     if (
-                        candidate["active_end"] == segment["end"]
-                        and candidate["active_start"] < segment["end"]
+                        segment["start"] < boundary <= segment["end"]
+                        and candidate["active_start"] < boundary
                     ):
+                        # Segments start at the scan time, not the half-hour.
+                        # Interpolate this five-minute forecast step at the
+                        # actual tariff boundary; never borrow future segments.
+                        fraction = (
+                            (boundary - segment["start"]).total_seconds()
+                            / (segment["end"] - segment["start"]).total_seconds()
+                        )
+                        boundary_energy = battery_before_segment + fraction * (
+                            battery - battery_before_segment
+                        )
                         slot_end_soc_percent[candidate["valid_from"]] = (
-                            100.0 * battery / capacity
+                            100.0 * boundary_energy / capacity
                         )
 
         if battery + 1e-7 < target_stored:
