@@ -1313,7 +1313,12 @@ class HappyHourAutoJoinController:
                 "booked_at": booked_at.isoformat(),
             }
         )
-        self._persisted["bookings"] = booked
+        # Only persist bookings confirmed by a KEMS join service call.
+        # External Octopus joined-event evidence must be refreshed live.
+        self._persisted["bookings"] = [
+            item for item in booked
+            if item.get("booking_source") != "octopus_joined_events"
+        ]
         # A confirmed first hour does not complete a two-hour booking.
         remaining_choices = [code for code in choices[1:] if code != chosen.code]
         self._persisted["preferred_event_codes"] = remaining_choices
