@@ -359,7 +359,9 @@ def discover_available_happy_hours(
     }
 
 
-def verified_octopus_joined_bookings(hass: Any, *, now: datetime) -> list[dict[str, Any]]:
+def verified_octopus_joined_bookings(
+    hass: Any, *, now: datetime
+) -> list[dict[str, Any]]:
     """Confirm code-less reward hours from the Octopus *joined* event feed.
 
     Available events are never booking evidence.  Require one unambiguous
@@ -411,7 +413,9 @@ def _booking_identity(item: Mapping[str, Any]) -> str:
     return "octopus-joined:" + (event_id or f"{start.isoformat()}:{end.isoformat()}")
 
 
-def published_agile_export_rates(coordinator: Any, *, target_day: date) -> list[RateSlot]:
+def published_agile_export_rates(
+    coordinator: Any, *, target_day: date
+) -> list[RateSlot]:
     """Reuse real Octopus-fetched Agile prices when export event entities lack rates.
 
     This read-only fallback never guesses unavailable slots or prices.
@@ -421,7 +425,9 @@ def published_agile_export_rates(coordinator: Any, *, target_day: date) -> list[
         return []
     generated = _dt(state.get("generated_at"))
     now = datetime.now(UTC)
-    if generated is None or not timedelta(0) <= now - generated <= timedelta(minutes=30):
+    if generated is None or not timedelta(0) <= now - generated <= timedelta(
+        minutes=30
+    ):
         return []
     slots = state.get("tomorrow_slots")
     if not isinstance(slots, list):
@@ -995,7 +1001,8 @@ class HappyHourAutoJoinController:
             (_dt(item["start"]), _dt(item["end"])) for item in externally_joined
         }
         booked = [
-            item for item in booked
+            item
+            for item in booked
             if (_dt(item["start"]), _dt(item["end"])) not in external_windows
         ] + externally_joined
         windows = confirmed_booking_windows({"bookings": booked})
@@ -1316,7 +1323,8 @@ class HappyHourAutoJoinController:
         # Only persist bookings confirmed by a KEMS join service call.
         # External Octopus joined-event evidence must be refreshed live.
         self._persisted["bookings"] = [
-            item for item in booked
+            item
+            for item in booked
             if item.get("booking_source") != "octopus_joined_events"
         ]
         # A confirmed first hour does not complete a two-hour booking.
