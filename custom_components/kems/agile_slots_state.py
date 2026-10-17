@@ -166,9 +166,7 @@ def _physical_live_slot_outlook(
         if slot_soc is None:
             if stored_solar > 0.0:
                 return {}
-            soc = max(
-                0.0, soc - 100.0 * discharged / (capacity * discharge_efficiency)
-            )
+            soc = max(0.0, soc - 100.0 * discharged / (capacity * discharge_efficiency))
         else:
             soc = slot_soc
         if end <= now:
