@@ -197,6 +197,7 @@ def test_confirmed_octopus_hours_never_trigger_duplicate_bookings(
 
 def test_solar_chronological_slot_soc_tracks_recharge_after_arrival() -> None:
     start = datetime(2026, 10, 17, 8, tzinfo=UTC)
+    scan = start + timedelta(minutes=2)  # intentionally not a slot boundary
     slots = [
         {
             "valid_from": (start + timedelta(minutes=30 * index)).isoformat(),
@@ -207,8 +208,8 @@ def test_solar_chronological_slot_soc_tracks_recharge_after_arrival() -> None:
     ]
     segments = [
         {
-            "start": (start + timedelta(minutes=5 * index)).isoformat(),
-            "end": (start + timedelta(minutes=5 * (index + 1))).isoformat(),
+            "start": (scan + timedelta(minutes=5 * index)).isoformat(),
+            "end": (scan + timedelta(minutes=5 * (index + 1))).isoformat(),
             "solar_kw": 4.0 if 6 <= index < 12 else 0.0,
             "battery_kw": 7.0,
         }
@@ -217,7 +218,7 @@ def test_solar_chronological_slot_soc_tracks_recharge_after_arrival() -> None:
     plan = allocate_forecast_path_exports(
         slots=slots,
         capacity_segments=segments,
-        now=start,
+        now=scan,
         deadline=start + timedelta(minutes=90),
         battery_capacity_kwh=10.0,
         soc_percent=40.0,
