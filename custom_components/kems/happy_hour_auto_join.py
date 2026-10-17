@@ -359,6 +359,89 @@ def discover_available_happy_hours(
     }
 
 
+def verified_octopus_joined_bookings(hass: Any, *, now: datetime) -> list[dict[str, Any]]:
+    """Confirm code-less reward hours from the Octopus *joined* event feed.
+
+    Available events are never booking evidence.  Require one unambiguous
+    public Octopus account, independently joined, one-hour weekend events.
+    Do not persist these external observations: losing source confirmation
+    must revoke their live charging authority.
+    """
+    sources = _public_power_up_sources(hass)
+    if len(sources) != 1:
+        return []
+    joined = _state_attributes(sources[0]).get("events")
+    if not isinstance(joined, list):
+        return []
+    confirmed: dict[tuple[datetime, datetime], dict[str, Any]] = {}
+    for raw in joined:
+        if not isinstance(raw, Mapping) or _field(raw, "code"):
+            continue
+        start, end = _dt(_field(raw, "start")), _dt(_field(raw, "end"))
+        if start is None or end is None:
+            continue
+        if not 55 <= (end - start).total_seconds() / 60 <= 65:
+            continue
+        if start.astimezone(_LONDON).weekday() < 5:
+            continue
+        if end < now - timedelta(hours=2) or start > now + timedelta(days=2):
+            continue
+        identity = str(_field(raw, "id") or "").strip()
+        confirmed[(start, end)] = {
+            "start": start.isoformat(),
+            "end": end.isoformat(),
+            "event_id": identity or None,
+            "booking_source": "octopus_joined_events",
+            "source_entity": str(sources[0].entity_id),
+        }
+    return [confirmed[key] for key in sorted(confirmed)]
+
+
+def _booking_identity(item: Mapping[str, Any]) -> str:
+    """Distinguish a confirmed joined window without inventing a service code."""
+    code = str(item.get("event_code") or "").strip()
+    if code:
+        return code
+    if item.get("booking_source") != "octopus_joined_events":
+        return ""
+    start, end = _dt(item.get("start")), _dt(item.get("end"))
+    if start is None or end is None:
+        return ""
+    event_id = str(item.get("event_id") or "").strip()
+    return "octopus-joined:" + (event_id or f"{start.isoformat()}:{end.isoformat()}")
+
+
+def published_agile_export_rates(coordinator: Any, *, target_day: date) -> list[RateSlot]:
+    """Reuse real Octopus-fetched Agile prices when export event entities lack rates.
+
+    This read-only fallback never guesses unavailable slots or prices.
+    """
+    state = getattr(coordinator, "agile_smart_export_state", None)
+    if not isinstance(state, Mapping) or not state.get("tariff_code"):
+        return []
+    generated = _dt(state.get("generated_at"))
+    now = datetime.now(UTC)
+    if generated is None or not timedelta(0) <= now - generated <= timedelta(minutes=30):
+        return []
+    slots = state.get("tomorrow_slots")
+    if not isinstance(slots, list):
+        return []
+    result: list[RateSlot] = []
+    for raw in slots:
+        if not isinstance(raw, Mapping):
+            continue
+        start, end = _dt(raw.get("valid_from")), _dt(raw.get("valid_to"))
+        price = _number(raw.get("rate_pence"))
+        if start is None or end is None or end <= start or price is None:
+            continue
+        if start.astimezone(_LONDON).date() != target_day:
+            continue
+        if (end - start) != timedelta(minutes=30):
+            continue
+        result.append(RateSlot(start=start, end=end, value_pence=price))
+    return _dedupe_rates(result)
+
+
 def _normalise_rate(raw: Any) -> RateSlot | None:
     start = _dt(_field(raw, "start"))
     end = _dt(_field(raw, "end"))
@@ -683,7 +766,7 @@ def confirmed_booking_windows(booking: Mapping[str, Any]) -> list[dict[str, Any]
     for item in entries:
         if not isinstance(item, Mapping):
             continue
-        code = str(item.get("event_code") or "").strip()
+        code = _booking_identity(item)
         start = _dt(item.get("start"))
         end = _dt(item.get("end"))
         if (
@@ -905,9 +988,24 @@ class HappyHourAutoJoinController:
             and _dt(item.get("start")) is not None
             and _dt(item.get("end")) is not None
         ]
+        # Merge live Octopus confirmations without writing them to our store.
+        # A matching external confirmation supersedes a stale local record.
+        externally_joined = verified_octopus_joined_bookings(self.hass, now=now)
+        external_windows = {
+            (_dt(item["start"]), _dt(item["end"])) for item in externally_joined
+        }
+        booked = [
+            item for item in booked
+            if (_dt(item["start"]), _dt(item["end"])) not in external_windows
+        ] + externally_joined
         windows = confirmed_booking_windows({"bookings": booked})
         state["bookings"] = booked
-        state["booked_event_codes"] = [str(item["event_code"]) for item in booked]
+        state["booked_event_codes"] = [
+            str(item["event_code"]) for item in booked if item.get("event_code")
+        ]
+        state["booked_event_ids"] = [
+            str(item["event_id"]) for item in booked if item.get("event_id")
+        ]
         state["booked_reward_hours"] = len(booked)
         if windows:
             current_or_next = next(
@@ -979,6 +1077,20 @@ class HappyHourAutoJoinController:
         import_rates, export_rates = discover_octopus_rates(self.hass)
         import_coverage = day_rate_coverage(import_rates, pending_day)
         export_type = export_tariff_type_from_options(self.entry.options)
+        export_rate_source = "octopus_export_rate_events"
+        if (
+            export_type == EXPORT_TARIFF_TYPE_AGILE
+            and day_rate_coverage(export_rates, pending_day)
+            < HAPPY_HOUR_PRICE_COVERAGE_REQUIRED
+        ):
+            published = published_agile_export_rates(
+                self.coordinator, target_day=pending_day
+            )
+            if day_rate_coverage(published, pending_day) > day_rate_coverage(
+                export_rates, pending_day
+            ):
+                export_rates = published
+                export_rate_source = "verified_octopus_agile_publication"
         export_coverage = (
             day_rate_coverage(export_rates, pending_day)
             if export_type == EXPORT_TARIFF_TYPE_AGILE
@@ -989,6 +1101,7 @@ class HappyHourAutoJoinController:
                 "import_price_coverage_percent": round(import_coverage * 100.0, 1),
                 "export_price_coverage_percent": round(export_coverage * 100.0, 1),
                 "export_tariff_type": export_type,
+                "export_price_source": export_rate_source,
                 "decision_policy": "two_banked_rewards_night_before_with_verified_prices",
             }
         )
@@ -1215,7 +1328,12 @@ class HappyHourAutoJoinController:
                 "status": "booked",
                 "external_join_authority": False,
                 "bookings": booked,
-                "booked_event_codes": [str(item["event_code"]) for item in booked],
+                "booked_event_codes": [
+                    str(item["event_code"]) for item in booked if item.get("event_code")
+                ],
+                "booked_event_ids": [
+                    str(item["event_id"]) for item in booked if item.get("event_id")
+                ],
                 "booked_reward_hours": len(booked),
                 "booked_event_code": next_window["event_codes"][0],
                 "booked_start": next_window["start"].isoformat(),
