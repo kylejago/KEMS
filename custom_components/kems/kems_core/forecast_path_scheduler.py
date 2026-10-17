@@ -342,10 +342,9 @@ def allocate_forecast_path_exports(
                         # Segments start at the scan time, not the half-hour.
                         # Interpolate this five-minute forecast step at the
                         # actual tariff boundary; never borrow future segments.
-                        fraction = (
-                            (boundary - segment["start"]).total_seconds()
-                            / (segment["end"] - segment["start"]).total_seconds()
-                        )
+                        fraction = (boundary - segment["start"]).total_seconds() / (
+                            segment["end"] - segment["start"]
+                        ).total_seconds()
                         boundary_energy = battery_before_segment + fraction * (
                             battery - battery_before_segment
                         )
