@@ -226,7 +226,7 @@ def _attributes(coordinator: Any) -> dict[str, Any]:
         "physical_live_slot_outlook": live_outlook,
         "physical_live_slot_outlook_available": bool(live_outlook),
         "physical_live_slot_outlook_basis": (
-            "verified FoxESS physical lower bound + forecast scheduler chronological replay"
+            "verified FoxESS lower bound + chronological solar SOC replay"
             if live_outlook
             else "unavailable: verified chronological physical SOC path absent or stale"
         ),
