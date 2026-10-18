@@ -62,6 +62,7 @@ def _load_kems_module(name: str):
 _install_package_stubs()
 _budget = _load_kems_module("happy_hour_budget")
 _ohme = _load_kems_module("happy_hour_ohme_control")
+_import_ledger = _load_kems_module("happy_hour_import_ledger")
 
 allocate_reward_hour = _budget.allocate_reward_hour
 apply_happy_hour_control = _budget.apply_happy_hour_control
@@ -786,3 +787,223 @@ def test_alpha9114_ohme_must_wait_for_confirmed_foxess_grid_charge() -> None:
     control.desired_ev_charging_allowed = True
     assert asyncio.run(scan())["max_charge_allowed_this_scan"]
     assert calls[-1]["option"] == "max_charge"
+
+
+def test_alpha9115_happy_hour_import_recorder_survives_restart_and_separates_hours(
+    monkeypatch,
+) -> None:
+    """Every control scan is durably witnessed; next hour gets its own cap."""
+
+    class FakeStore:
+        persisted = None
+
+        def __init__(self, *args, **kwargs):
+            pass
+
+        async def async_load(self):
+            return self.persisted
+
+        async def async_save(self, data):
+            FakeStore.persisted = data
+
+    FakeStore.persisted = None
+    monkeypatch.setattr(_import_ledger, "Store", FakeStore)
+    start = datetime.now(UTC).replace(microsecond=0) - timedelta(hours=2)
+    windows = [
+        {"start": start.isoformat(), "end": (start + timedelta(hours=2)).isoformat()}
+    ]
+
+    async def exercise() -> None:
+        first = _import_ledger.HappyHourImportLedgerRecorder(
+            None, "test", grid_import_entity="sensor.kh7_grid_consumption"
+        )
+        await first.async_load()
+        # A direct source sample one minute before the session is the seed.
+        for i in range(-1, 41):
+            when = start + timedelta(minutes=i)
+            snap = SimpleNamespace(
+                timestamp=when,
+                grid_import_kw=6.0,
+                source_age_seconds={"grid_import_kw": 5.0},
+                stale_fields=(),
+            )
+            assert await first.async_observe(snap, now=when, confirmed_windows=windows)
+        assert len(first.samples) == 42
+
+        # Home Assistant restart: restore *persisted* physical observations,
+        # then continue from the same physical meter without a history gap.
+        second = _import_ledger.HappyHourImportLedgerRecorder(
+            None, "test", grid_import_entity="sensor.kh7_grid_consumption"
+        )
+        await second.async_load()
+        assert len(second.samples) == 42
+        for i in range(41, 91):
+            when = start + timedelta(minutes=i)
+            snap = SimpleNamespace(
+                timestamp=when,
+                grid_import_kw=(10.0 if i >= 60 else 6.0),
+                source_age_seconds={"grid_import_kw": 5.0},
+                stale_fields=(),
+            )
+            assert await second.async_observe(snap, now=when, confirmed_windows=[])
+        ledgers = reward_hour_ledger(
+            second.samples,
+            start=start,
+            end=start + timedelta(hours=2),
+            now=start + timedelta(minutes=90),
+        )
+        assert len(ledgers) == 2
+        assert all(hour["coverage_complete"] for hour in ledgers)
+        assert ledgers[0]["import_kwh"] == 6.0
+        assert ledgers[1]["import_kwh"] == 5.0
+        assert ledgers[0]["remaining_kwh"] == 10.0
+        assert ledgers[1]["remaining_kwh"] == 11.0
+
+        # A rebound meter cannot inherit another entity's saved kWh.
+        rebound = _import_ledger.HappyHourImportLedgerRecorder(
+            None, "test", grid_import_entity="sensor.other_meter"
+        )
+        await rebound.async_load()
+        assert rebound.samples == []
+        assert rebound.status["retained_samples"] == 0
+
+    asyncio.run(exercise())
+
+
+def test_alpha9115_missing_meter_data_and_restart_gap_fail_closed(
+    monkeypatch,
+) -> None:
+    """Unknown interval is never filled with simulated or invented kWh."""
+
+    class FakeStore:
+        persisted = None
+
+        def __init__(self, *args, **kwargs):
+            pass
+
+        async def async_load(self):
+            return FakeStore.persisted
+
+        async def async_save(self, data):
+            FakeStore.persisted = data
+
+    FakeStore.persisted = None
+    monkeypatch.setattr(_import_ledger, "Store", FakeStore)
+    start = datetime.now(UTC).replace(microsecond=0) - timedelta(hours=2)
+    windows = [
+        {"start": start.isoformat(), "end": (start + timedelta(hours=1)).isoformat()}
+    ]
+
+    async def exercise() -> None:
+        recorder = _import_ledger.HappyHourImportLedgerRecorder(
+            None, "test", grid_import_entity="sensor.kh7_grid_consumption"
+        )
+        await recorder.async_load()
+
+        async def sample(minute, power=4.0, age=4.0, stale=()):
+            when = start + timedelta(minutes=minute)
+            return await recorder.async_observe(
+                SimpleNamespace(
+                    timestamp=when,
+                    grid_import_kw=power,
+                    source_age_seconds={"grid_import_kw": age},
+                    stale_fields=stale,
+                ),
+                now=when,
+                confirmed_windows=windows,
+            )
+
+        assert await sample(-1)
+        for i in range(0, 11):
+            assert await sample(i)
+        assert not await sample(11, age=65.0)
+        assert not await sample(12, power=-2.0)
+        assert not await sample(13, stale=("grid_import_kw",))
+        # Explicitly skip beyond the permitted 10min meter gap.
+        assert await sample(27)
+        new = _import_ledger.HappyHourImportLedgerRecorder(
+            None, "test", grid_import_entity="sensor.kh7_grid_consumption"
+        )
+        await new.async_load()
+        ledger = reward_hour_ledger(
+            new.samples,
+            start=start,
+            end=start + timedelta(hours=1),
+            now=start + timedelta(minutes=27),
+        )
+        assert ledger[0]["coverage_complete"] is False
+        # Raw arithmetic can be displayed, but not treated as authority.
+        assert ledger[0]["authority_duration_hours"] == 0.0
+        assert not await sample(27)  # duplicated source timestamp
+        assert not await sample(28, power=float("nan"))
+
+    asyncio.run(exercise())
+
+
+def test_alpha9115_complete_dense_meter_repairs_incomplete_history(
+    monkeypatch,
+) -> None:
+    """Use only individually complete series, never splice their gaps."""
+    start = datetime.now(UTC).replace(microsecond=0) - timedelta(hours=2)
+    end = start + timedelta(hours=2)
+    dense = [_record(start + timedelta(minutes=i), 4.0) for i in range(-1, 96)]
+    # Simulate KEMS history missing observations due to a 15-minute
+    # batching/restart gap; it must not be silently extrapolated.
+    historic = [
+        _record(start - timedelta(minutes=1), 4.0),
+        _record(start + timedelta(minutes=20), 4.0),
+        _record(start + timedelta(minutes=95), 4.0),
+    ]
+    manager = SimpleNamespace(
+        _panel_today_records=historic,
+        _verified_happy_hour_grid_samples=dense,
+        _latest_live_happy_hour_snapshot=SimpleNamespace(
+            timestamp=start + timedelta(minutes=95),
+            house_load_kw=1.0,
+            ev_power_kw=0.0,
+            solar_power_kw=0.0,
+            grid_import_kw=4.0,
+        ),
+    )
+    monkeypatch.setattr(
+        _budget,
+        "verified_happy_hour_physical_headroom",
+        lambda *args, **kwargs: {
+            "physical_soc_verified": True,
+            "physical_charge_headroom_verified": True,
+            "physical_battery_headroom_kwh": 9.0,
+        },
+    )
+    config = SimpleNamespace(
+        charge_efficiency=0.95,
+        discharge_efficiency=0.95,
+        max_charge_kw=7.0,
+        inverter_limit_kw=10.0,
+        site_import_limit_kw=15.0,
+    )
+    actual = _budget.decorate_happy_hour_context(
+        manager,
+        {},
+        {"start": start.isoformat(), "end": end.isoformat(), "charge_target_kw": 7.0},
+        now=start + timedelta(minutes=95),
+        config=config,
+        power_down={},
+    )
+    assert actual["current_reward_hour_index"] == 2
+    assert actual["current_reward_hour_ledger_complete"] is True
+    assert actual["current_reward_hour_ledger_source"] == ("persisted_physical_import")
+    assert actual["reward_hours"][1]["import_kwh"] == round(4.0 * 35 / 60, 3)
+    assert actual["happy_hour_import_authority_active"] is True
+    manager._verified_happy_hour_grid_samples = [
+        _record(start + timedelta(minutes=i), 4.0) for i in range(65, 96)
+    ]
+    incomplete = _budget.decorate_happy_hour_context(
+        manager,
+        {},
+        {"start": start.isoformat(), "end": end.isoformat(), "charge_target_kw": 7.0},
+        now=start + timedelta(minutes=95),
+        config=config,
+        power_down={},
+    )
+    assert incomplete["current_reward_hour_ledger_complete"] is False
+    assert incomplete["happy_hour_import_authority_active"] is False
