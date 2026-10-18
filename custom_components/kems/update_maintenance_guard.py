@@ -139,9 +139,9 @@ def maintenance_energy_blockers(
         reasons.append("Inverter force-charge/discharge mode active")
 
     rolling = rolling_export if isinstance(rolling_export, dict) else {}
-    if (
-        _number(rolling.get("current_battery_export_target_kw")) or 0.0
-    ) > 0.15 and _on(states, "control_enabled"):
+    if (_number(rolling.get("current_battery_export_target_kw")) or 0.0) > 0.15 and _on(
+        states, "control_enabled"
+    ):
         reasons.append("Physical Agile export requested")
 
     return reasons
