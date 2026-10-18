@@ -995,7 +995,7 @@ def test_alpha9115_complete_dense_meter_repairs_incomplete_history(
     assert actual["reward_hours"][1]["import_kwh"] == round(4.0 * 35 / 60, 3)
     assert actual["happy_hour_import_authority_active"] is True
     manager._verified_happy_hour_grid_samples = [
-        _record(start + timedelta(minutes=i), 4.0) for i in range(25, 96)
+        _record(start + timedelta(minutes=i), 4.0) for i in range(65, 96)
     ]
     incomplete = _budget.decorate_happy_hour_context(
         manager,
