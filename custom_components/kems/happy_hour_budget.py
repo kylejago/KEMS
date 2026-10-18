@@ -301,7 +301,7 @@ def _bounded_happy_hour_charge_headroom(
         soc is None
         or not 0.0 <= soc <= 100.0
         or soc_age is None
-        or not 0.0 <= soc_age <= 1800.0
+        or not 0.0 <= soc_age <= 3600.0
         or capacity <= 0.0
         or max_charge <= 0.0
         or "battery_soc" in stale
@@ -366,6 +366,7 @@ def verified_happy_hour_physical_headroom(
     ):
         return {
             "physical_soc_verified": False,
+            "physical_charge_headroom_verified": False,
             "physical_soc_unavailable_reason": evidence.get(
                 "reason", "verified physical charging headroom unavailable"
             ),
@@ -375,7 +376,10 @@ def verified_happy_hour_physical_headroom(
         }
     headroom, headroom_basis = bounded
     return {
-        "physical_soc_verified": True,
+        "physical_soc_verified": bool(
+            physical_lower is not None and evidence.get("available")
+        ),
+        "physical_charge_headroom_verified": True,
         "current_physical_soc_percent": round(report, 2),
         "physical_soc_lower_bound_percent": (
             round(physical_lower, 2) if physical_lower is not None else None
@@ -390,7 +394,7 @@ def _adjusted_headroom(
     state: dict[str, Any], context: dict[str, Any], config: Any
 ) -> float:
     """Active reward allocation must not infer charging space from twin SOC."""
-    if context.get("physical_soc_verified") is not True:
+    if context.get("physical_charge_headroom_verified") is not True:
         return 0.0
     return max(_number(context.get("physical_battery_headroom_kwh")) or 0.0, 0.0)
 
@@ -557,7 +561,7 @@ def decorate_happy_hour_context(
             "charge_target_kw": allocation["battery_charge_target_kw"],
             "happy_hour_import_authority_active": True,
             "ev_happy_hour_allowed": (
-                context.get("physical_soc_verified") is True
+                context.get("physical_charge_headroom_verified") is True
                 and allocation["ev_allowance_kwh_remaining"] > 0.10
             ),
             "status": (
