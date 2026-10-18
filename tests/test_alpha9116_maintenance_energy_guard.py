@@ -82,6 +82,9 @@ def test_power_down_active_and_imminent_are_blockers() -> None:
         "next_power_down_end": (NOW + timedelta(hours=1)).isoformat(),
     }
     assert "Power Down" in " ".join(_check(states=states))
+    assert "Power Down" in " ".join(
+        _check(states={"next_power_down_start": states["next_power_down_start"]})
+    )
 
 
 def test_intelligent_and_cheap_windows_are_protected() -> None:
