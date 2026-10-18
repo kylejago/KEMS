@@ -38,11 +38,16 @@ from .forecast_validation import ForecastValidationRecorder
 from .forecasting import SolarForecastCoordinator
 from .foxess_command_shadow import build_foxess_command_shadow_snapshot
 from .foxess_control_backend import FoxESSControlBackend
-from .happy_hour_auto_join import _controller_for
+from .happy_hour_auto_join import (
+    _controller_for,
+    confirmed_booking_windows,
+    verified_octopus_joined_bookings,
+)
 from .happy_hour_budget import (
     apply_happy_hour_control,
     verified_live_happy_hour_charge_kw,
 )
+from .happy_hour_import_ledger import HappyHourImportLedgerRecorder
 from .happy_hour_ohme_control import OhmeHappyHourController
 from .historical_tariff_revaluation import financial_replay_records
 from .history import HistoryRecorder
@@ -122,6 +127,9 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
             settings.history_days,
         )
         self._ev_charge_trace = EVChargeTraceRecorder(hass, entry.entry_id)
+        self._happy_hour_import_ledger = HappyHourImportLedgerRecorder(
+            hass, entry.entry_id, grid_import_entity=entities.grid_import_kw
+        )
         self._ev_soc_sync = EVSOCSyncController(
             hass,
             entry,
@@ -478,6 +486,7 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
         await self._foxess_control.async_setup()
         await self._export_commissioning_test.async_load()
         await self._history.async_load()
+        await self._happy_hour_import_ledger.async_load()
         # The existing five-minute history can warm-start the physical ledger,
         # but *each missing historical minute* consumes worst-case battery
         # energy. A restart never trusts a saved simulated/ledger SOC figure.
@@ -609,6 +618,21 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                 await self._forecast_validation.async_save()
 
             await self._history.async_record(snapshot)
+            # Dedicated short, restart-safe physical meter trace for booked
+            # reward hours. Never substitute a digital-twin estimate for an
+            # unknown section of the 16kWh per-hour import allowance.
+            joined_windows = confirmed_booking_windows(_controller_for(self).state)
+            external_windows = confirmed_booking_windows(
+                {"bookings": verified_octopus_joined_bookings(self.hass, now=now)}
+            )
+            await self._happy_hour_import_ledger.async_observe(
+                snapshot,
+                now=now,
+                confirmed_windows=[*joined_windows, *external_windows],
+            )
+            self._agile_smart_export._verified_happy_hour_grid_samples = (
+                self._happy_hour_import_ledger.samples
+            )
             records = financial_replay_records(self._history.records)
             self._forecast_validation.analyse(records, now)
             learned = self._learning.analyse(records, now)
@@ -683,6 +707,14 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                 forecast=forecast,
                 forecast_plan=forecast_plan,
                 tariff=self.settings.tariff,
+            )
+
+            # Reward-hour import cannot use a five-minute cached ledger near
+            # the strict hourly cap. Refresh only the physical event budget
+            # each scan, without replaying the expensive Agile simulation.
+            self._agile_smart_export.refresh_live_happy_hour_budget(
+                now=now,
+                config=self.settings.simulation,
             )
 
             # Actual/live export money follows the user's selected tariff, not
