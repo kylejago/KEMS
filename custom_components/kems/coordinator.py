@@ -633,6 +633,7 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
             self._agile_smart_export._verified_happy_hour_grid_samples = (
                 self._happy_hour_import_ledger.samples
             )
+            self._agile_smart_export._latest_live_happy_hour_snapshot = snapshot
             records = financial_replay_records(self._history.records)
             self._forecast_validation.analyse(records, now)
             learned = self._learning.analyse(records, now)
