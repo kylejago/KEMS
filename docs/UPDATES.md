@@ -20,6 +20,24 @@ A component whose target version has not changed is not updated. A component wit
 
 Automatic updates are opt-in. Once enabled, KEMS checks for a verified bundle periodically. A release that requires a Home Assistant restart is scheduled into the configured maintenance window (03:00–04:00 by default). KEMS can create an automatic Home Assistant backup before installation and can restart Home Assistant inside the window when automatic maintenance restarts are enabled. When backup-before-update is enabled, an unavailable or failed backup is a hard safety gate and the software update is not started.
 
+## Energy-aware unattended maintenance
+
+Automatic KEMS installs and Home Assistant restarts are deferred whenever a booked
+Happy Hour or Power Down session is active/imminent, an Octopus cheap/Intelligent
+slot is active, an EV is charging, FoxESS is force-charging/discharging, physical
+battery charging/grid export is active, or recent control telemetry is missing.
+The updater rechecks before installing **and** immediately before restarting,
+and leaves the target release pending with a visible deferral reason rather
+than attempting to stop any energy equipment.
+
+A session can become active during a backup or software installation, so the
+second restart check is independent of the first one. A postponed update is
+retried at subsequent checks in a permitted maintenance window; no direct
+hardware commands are used to make an update possible. User-initiated manual
+HACS installations/restarts remain outside this automatic guard. For fewer
+interruptions configure the maintenance window around 06:00–06:30, but the
+window alone is not a safety override.
+
 The first release containing the orchestrator is a bootstrap exception: an older installed KEMS cannot automatically install code it does not have yet, so that release still needs one normal/manual KEMS install. Future compatible releases can then install themselves. Automatic updating remains opt-in after that bootstrap install; installing the feature does not silently enable unattended software changes.
 
 If no coordinated bundle asset exists yet, KEMS can fall back to the Home Assistant `update.kems_update` entity for KEMS-only updates. Exact coordinated bundles take precedence when present.
