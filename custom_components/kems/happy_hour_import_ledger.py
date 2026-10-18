@@ -62,7 +62,8 @@ class HappyHourImportLedgerRecorder:
     def __init__(self, hass: Any, entry_id: str, *, grid_import_entity: str | None):
         self._grid_import_entity = str(grid_import_entity or "")
         self._store = Store(
-            hass, _STORAGE_VERSION,
+            hass,
+            _STORAGE_VERSION,
             f"{DOMAIN}.{entry_id}.{STORAGE_NAMESPACE}.happy_hour_import_ledger",
         )
         self._samples: list[GridImportReading] = []
@@ -93,7 +94,8 @@ class HappyHourImportLedgerRecorder:
     def _prune(self, now: datetime) -> None:
         cutoff = now - _RETENTION
         self._samples = [
-            sample for sample in self._samples
+            sample
+            for sample in self._samples
             if cutoff <= sample.timestamp <= now + timedelta(minutes=1)
         ][-_MAX_SAMPLES:]
         self._windows = [
@@ -154,8 +156,7 @@ class HappyHourImportLedgerRecorder:
                     self._windows.append(window)
         self._prune(now_utc)
         if not any(
-            start - _PRE_EVENT_SEED <= now_utc < end
-            for start, end in self._windows
+            start - _PRE_EVENT_SEED <= now_utc < end for start, end in self._windows
         ):
             return False
 
