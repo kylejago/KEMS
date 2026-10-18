@@ -420,15 +420,9 @@ def decorate_happy_hour_context(
     if start is None or end is None or end <= start:
         return context
     records = list(getattr(self, "_panel_today_records", []) or [])
-    retained_meter = list(
-        getattr(self, "_verified_happy_hour_grid_samples", []) or []
-    )
-    historical_ledgers = reward_hour_ledger(
-        records, start=start, end=end, now=now
-    )
-    retained_ledgers = reward_hour_ledger(
-        retained_meter, start=start, end=end, now=now
-    )
+    retained_meter = list(getattr(self, "_verified_happy_hour_grid_samples", []) or [])
+    historical_ledgers = reward_hour_ledger(records, start=start, end=end, now=now)
+    retained_ledgers = reward_hour_ledger(retained_meter, start=start, end=end, now=now)
     # A retained scan-by-scan physical meter trace bridges a normal HA
     # restart that would otherwise lose KEMS' 15-minute history checkpoint.
     # Neither series can fill an unverifiable gap in the other; accept only
@@ -436,17 +430,14 @@ def decorate_happy_hour_context(
     ledger_sources = [
         (
             "persisted_physical_import"
-            if dense["coverage_complete"] else "kems_historical_import"
+            if dense["coverage_complete"]
+            else "kems_historical_import"
         )
         for dense in retained_ledgers
     ]
     ledgers = [
-        (
-            dense if dense["coverage_complete"] else historical
-        )
-        for dense, historical in zip(
-            retained_ledgers, historical_ledgers, strict=True
-        )
+        (dense if dense["coverage_complete"] else historical)
+        for dense, historical in zip(retained_ledgers, historical_ledgers, strict=True)
     ]
     if not retained_meter:
         ledger_sources = ["kems_historical_import" for _ in ledgers]
