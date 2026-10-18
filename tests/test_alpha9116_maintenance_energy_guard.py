@@ -159,5 +159,11 @@ def test_install_and_restart_paths_each_recheck_energy_activity() -> None:
     restart_check = code.index(
         'if not self.hass.services.has_service("homeassistant", "restart")'
     )
-    assert code.rfind("blockers = self._energy_maintenance_blockers()", 0, install_check)
-    assert code.rfind("blockers = self._energy_maintenance_blockers()", 0, restart_check)
+    assert (
+        code.rfind("blockers = self._energy_maintenance_blockers()", 0, install_check)
+        >= 0
+    )
+    assert (
+        code.rfind("blockers = self._energy_maintenance_blockers()", 0, restart_check)
+        >= 0
+    )
