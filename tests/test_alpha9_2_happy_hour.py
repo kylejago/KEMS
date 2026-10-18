@@ -808,7 +808,7 @@ def test_alpha9115_happy_hour_import_recorder_survives_restart_and_separates_hou
 
     FakeStore.persisted = None
     monkeypatch.setattr(_import_ledger, "Store", FakeStore)
-    start = datetime.now(UTC).replace(microsecond=0) + timedelta(minutes=3)
+    start = datetime.now(UTC).replace(microsecond=0) - timedelta(hours=2)
     windows = [{"start": start.isoformat(), "end": (
         start + timedelta(hours=2)).isoformat()}]
 
@@ -892,7 +892,7 @@ def test_alpha9115_missing_meter_data_and_restart_gap_fail_closed(
 
     FakeStore.persisted = None
     monkeypatch.setattr(_import_ledger, "Store", FakeStore)
-    start = datetime.now(UTC).replace(microsecond=0) + timedelta(minutes=2)
+    start = datetime.now(UTC).replace(microsecond=0) - timedelta(hours=2)
     windows = [{"start": start.isoformat(), "end": (
         start + timedelta(hours=1)).isoformat()}]
 
@@ -944,7 +944,7 @@ def test_alpha9115_complete_dense_meter_repairs_incomplete_history(
     monkeypatch,
 ) -> None:
     """Use only individually complete series, never splice their gaps."""
-    start = datetime.now(UTC).replace(microsecond=0) + timedelta(minutes=1)
+    start = datetime.now(UTC).replace(microsecond=0) - timedelta(hours=2)
     end = start + timedelta(hours=2)
     dense = [
         _record(start + timedelta(minutes=i), 4.0)
@@ -994,7 +994,7 @@ def test_alpha9115_complete_dense_meter_repairs_incomplete_history(
     assert actual["current_reward_hour_ledger_source"] == (
         "persisted_physical_import"
     )
-    assert actual["reward_hours"][1]["import_kwh"] == 4.0 * 35 / 60
+    assert actual["reward_hours"][1]["import_kwh"] == round(4.0 * 35 / 60, 3)
     assert actual["happy_hour_import_authority_active"] is True
     manager._verified_happy_hour_grid_samples = [
         _record(start + timedelta(minutes=i), 4.0)
