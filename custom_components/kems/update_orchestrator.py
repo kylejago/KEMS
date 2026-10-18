@@ -27,6 +27,7 @@ from homeassistant.util import dt as dt_util
 
 from .const import DOMAIN
 from .entity import KEMSEntity
+from .update_maintenance_guard import maintenance_energy_blockers
 from .versioning import version_is_newer, version_relation
 
 LOGGER = logging.getLogger(__name__)
@@ -568,6 +569,64 @@ class KEMSUpdateOrchestrator:
             _parse_clock(self.policy.maintenance_end),
         )
 
+    def _energy_maintenance_blockers(self) -> list[str]:
+        """Read live KEMS control and meter state before unattended disruption."""
+        coordinator = getattr(self.entry, "runtime_data", None)
+        if coordinator is None or getattr(coordinator, "data", None) is None:
+            return ["KEMS live coordinator is not ready"]
+        agile = getattr(coordinator, "agile_smart_export_state", {})
+        agile = agile if isinstance(agile, dict) else {}
+        latest = coordinator.data
+        snapshot = getattr(latest, "snapshot", None)
+        foxess = getattr(coordinator, "foxess_control_state", {})
+        foxess = foxess if isinstance(foxess, dict) else {}
+        def state(entity_id: str) -> str:
+            observed = self.hass.states.get(entity_id)
+            return str(observed.state) if observed is not None else "unknown"
+
+        return maintenance_energy_blockers(
+            now=dt_util.now(),
+            snapshot=snapshot,
+            happy_hour=agile.get("happy_hour_plan"),
+            power_down=agile.get("power_down_priority"),
+            foxess=foxess,
+            rolling_export=agile.get("rolling_export_plan"),
+            states={
+                "off_peak": state("binary_sensor.kems_off_peak"),
+                "intelligent_slot": state("binary_sensor.kems_intelligent_slot"),
+                "ev_charging": state("binary_sensor.kems_ev_charging"),
+                "control_enabled": state("binary_sensor.kems_control_enabled"),
+                "foxess_work_mode": state("select.kh7_work_mode"),
+                "next_power_down_start": state(
+                    "sensor.kems_next_power_down_session_start"
+                ),
+                "next_power_down_end": state(
+                    "sensor.kems_next_power_down_session_end"
+                ),
+                "next_off_peak_start": state("sensor.kems_next_off_peak_start"),
+                "off_peak_end": state("sensor.kems_off_peak_end"),
+            },
+        )
+
+    async def _defer_for_energy_activity(self, blockers: list[str]) -> None:
+        """Keep an unattended update pending, with its exact reason visible."""
+        pending = self.pending
+        if pending is None:
+            return
+        reason = "; ".join(blockers)
+        if (
+            pending.get("stage") == "waiting_for_safe_energy_state"
+            and pending.get("deferred_reason") == reason
+        ):
+            return
+        pending["stage"] = "waiting_for_safe_energy_state"
+        pending["deferred_reason"] = reason
+        pending["scheduled_for"] = self._scheduled_time().isoformat()
+        self.maintenance = self._maintenance_payload("scheduled", pending)
+        LOGGER.info("Deferring unattended KEMS maintenance: %s", reason)
+        await self._async_save()
+        self._write_legacy_states()
+
     async def _maybe_run_pending(self) -> None:
         """Run a pending transaction only when the policy permits it."""
         if not self.pending or not self.policy.automatic_updates:
@@ -606,6 +665,13 @@ class KEMSUpdateOrchestrator:
             and not self._in_maintenance_window()
         ):
             return
+
+        if not force:
+            blockers = self._energy_maintenance_blockers()
+            if blockers:
+                await self._defer_for_energy_activity(blockers)
+                return
+            pending.pop("deferred_reason", None)
 
         target = str(pending.get("target") or "")
         state = self._find_kems_update_entity()
@@ -658,6 +724,11 @@ class KEMSUpdateOrchestrator:
                         "backup.create_automatic is unavailable"
                     )
                     return
+            if not force:
+                blockers = self._energy_maintenance_blockers()
+                if blockers:
+                    await self._defer_for_energy_activity(blockers)
+                    return
             if not self.hass.services.has_service("update", "install"):
                 await self._fail_pending(
                     "Home Assistant update.install service is unavailable"
@@ -698,6 +769,11 @@ class KEMSUpdateOrchestrator:
             self.maintenance = self._maintenance_payload("scheduled", pending)
             await self._async_save()
             return
+        if not force:
+            blockers = self._energy_maintenance_blockers()
+            if blockers:
+                await self._defer_for_energy_activity(blockers)
+                return
         if not self.hass.services.has_service("homeassistant", "restart"):
             await self._fail_pending("Home Assistant restart service is unavailable")
             return
@@ -1093,6 +1169,7 @@ class KEMSUpdateOrchestrator:
             "components": [item.to_dict() for item in self.component_status],
             "history": self.history[-10:],
             "running_kems_version": _installed_integration_version(),
+            "automatic_maintenance_blockers": self._energy_maintenance_blockers(),
         }
 
     def _write_legacy_states(self) -> None:
