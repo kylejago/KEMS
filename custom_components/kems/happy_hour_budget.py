@@ -267,7 +267,13 @@ def _latest_record(self: Any, now: datetime) -> Any | None:
 def _home_grid_kw(
     self: Any, context: dict[str, Any], now: datetime
 ) -> tuple[float, float, float, float]:
-    latest = _latest_record(self, now)
+    latest = getattr(self, "_latest_live_happy_hour_snapshot", None)
+    timestamp = _dt(getattr(latest, "timestamp", None))
+    if (
+        timestamp is None
+        or abs((now.astimezone(UTC) - timestamp).total_seconds()) > 60.0
+    ):
+        latest = _latest_record(self, now)
     house = _number(getattr(latest, "house_load_kw", None)) if latest else None
     ev = _number(getattr(latest, "ev_power_kw", None)) if latest else None
     solar = _number(getattr(latest, "solar_power_kw", None)) if latest else None
@@ -414,10 +420,41 @@ def decorate_happy_hour_context(
     if start is None or end is None or end <= start:
         return context
     records = list(getattr(self, "_panel_today_records", []) or [])
-    ledgers = reward_hour_ledger(records, start=start, end=end, now=now)
+    retained_meter = list(
+        getattr(self, "_verified_happy_hour_grid_samples", []) or []
+    )
+    historical_ledgers = reward_hour_ledger(
+        records, start=start, end=end, now=now
+    )
+    retained_ledgers = reward_hour_ledger(
+        retained_meter, start=start, end=end, now=now
+    )
+    # A retained scan-by-scan physical meter trace bridges a normal HA
+    # restart that would otherwise lose KEMS' 15-minute history checkpoint.
+    # Neither series can fill an unverifiable gap in the other; accept only
+    # a *complete* independent series for each 16kWh reward hour.
+    ledger_sources = [
+        (
+            "persisted_physical_import"
+            if dense["coverage_complete"] else "kems_historical_import"
+        )
+        for dense in retained_ledgers
+    ]
+    ledgers = [
+        (
+            dense if dense["coverage_complete"] else historical
+        )
+        for dense, historical in zip(
+            retained_ledgers, historical_ledgers, strict=True
+        )
+    ]
+    if not retained_meter:
+        ledger_sources = ["kems_historical_import" for _ in ledgers]
     context["reward_cap_kwh_per_hour"] = float(HAPPY_HOUR_FAIR_USE_KWH_PER_REWARD)
     context["reward_hour_count"] = len(ledgers)
     context["reward_hours"] = ledgers
+    context["reward_hour_ledger_sources"] = ledger_sources
+    context["retained_physical_import_samples"] = len(retained_meter)
     context["reward_allowance_is_pooled"] = False
     context["unused_reward_allowance_carries_forward"] = False
     context["future_reward_allowance_can_be_borrowed"] = False
@@ -510,6 +547,9 @@ def decorate_happy_hour_context(
             "current_reward_hour_remaining_kwh": current["remaining_kwh"],
             "current_reward_hour_cap_reached": current["cap_reached"],
             "current_reward_hour_ledger_complete": current["coverage_complete"],
+            "current_reward_hour_ledger_source": ledger_sources[
+                int(current["index"]) - 1
+            ],
             "current_reward_hour_cap_reached_at": current["cap_reached_at"],
             "hours_remaining_in_reward_hour": round(hours_remaining, 4),
             "projected_non_ev_home_grid_kw": round(home_grid_kw, 3),
