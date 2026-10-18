@@ -353,8 +353,7 @@ class OhmeHappyHourController:
             and battery_kw <= 0.15
             and battery_age is not None
             and 0.0 <= battery_age <= 30.0
-            and "battery_power_kw"
-            not in (getattr(snapshot, "stale_fields", ()) or ())
+            and "battery_power_kw" not in (getattr(snapshot, "stale_fields", ()) or ())
         )
         verified_grid_charge = bool(
             foxess.get("happy_hour_charge_authorised") is True
