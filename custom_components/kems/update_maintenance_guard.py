@@ -92,6 +92,12 @@ def maintenance_energy_blockers(
         states.get("next_power_down_end"),
     ):
         reasons.append("Power Down session imminent or settling")
+    upcoming_power_down = _datetime(states.get("next_power_down_start"))
+    if (
+        upcoming_power_down is not None
+        and timedelta(0) <= upcoming_power_down - timepoint <= EVENT_LEAD
+    ):
+        reasons.append("Power Down starts within 15 minutes")
 
     if _on(states, "off_peak") or _on(states, "intelligent_slot"):
         reasons.append("Cheap or Intelligent Octopus charging window active")
