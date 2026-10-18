@@ -580,6 +580,7 @@ class KEMSUpdateOrchestrator:
         snapshot = getattr(latest, "snapshot", None)
         foxess = getattr(coordinator, "foxess_control_state", {})
         foxess = foxess if isinstance(foxess, dict) else {}
+
         def state(entity_id: str) -> str:
             observed = self.hass.states.get(entity_id)
             return str(observed.state) if observed is not None else "unknown"
@@ -600,9 +601,7 @@ class KEMSUpdateOrchestrator:
                 "next_power_down_start": state(
                     "sensor.kems_next_power_down_session_start"
                 ),
-                "next_power_down_end": state(
-                    "sensor.kems_next_power_down_session_end"
-                ),
+                "next_power_down_end": state("sensor.kems_next_power_down_session_end"),
                 "next_off_peak_start": state("sensor.kems_next_off_peak_start"),
                 "off_peak_end": state("sensor.kems_off_peak_end"),
             },
