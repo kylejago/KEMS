@@ -118,6 +118,44 @@ class EfficientAgileSmartExportManager(AgileSmartExportManager):
             tariff=tariff,
         )
 
+    def refresh_live_happy_hour_budget(
+        self, *, now: datetime, config: SimulationConfig
+    ) -> None:
+        """Re-evaluate only the physical reward allowance each control scan.
+
+        Full Agile day analysis remains on its five-minute cadence. The
+        published simulator does not grant import authority, and the cached
+        dashboard allocation must never permit five minutes of extra import
+        at an exhausted independent reward-hour limit.
+        """
+        from .happy_hour_budget import _dt, decorate_happy_hour_context
+
+        plan = self._state.get("happy_hour_plan")
+        if not isinstance(plan, dict):
+            return
+        start = _dt(plan.get("start"))
+        end = _dt(plan.get("end"))
+        if start is None or end is None:
+            return
+        current = now.astimezone(UTC)
+        if not start <= current < end:
+            if current >= end:
+                plan["happy_hour_import_authority_active"] = False
+                plan["ev_happy_hour_allowed"] = False
+                plan["charge_target_kw"] = 0.0
+            return
+        power_down = self._state.get("power_down_priority")
+        if not isinstance(power_down, dict):
+            power_down = {}
+        self._state["happy_hour_plan"] = decorate_happy_hour_context(
+            self,
+            self._state,
+            dict(plan),
+            now=now,
+            config=config,
+            power_down=power_down,
+        )
+
     async def _fetch_rates(
         self,
         records: list[Snapshot],
