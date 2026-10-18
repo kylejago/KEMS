@@ -660,24 +660,36 @@ def test_alpha9114_soc_reporting_gap_has_bounded_physical_headroom() -> None:
     assert "bounded FoxESS" in basis
     # An unobserved 30-minute window is the maximum allowed proof.
     snap.source_age_seconds["battery_soc"] = 1801.0
-    assert _budget._bounded_happy_hour_charge_headroom(
-        snap, capacity=56.42, max_charge=7.0
-    ) is None
+    assert (
+        _budget._bounded_happy_hour_charge_headroom(
+            snap, capacity=56.42, max_charge=7.0
+        )
+        is None
+    )
     snap.source_age_seconds["battery_soc"] = 1200.0
     snap.source_age_seconds["battery_power_kw"] = 60.0
-    assert _budget._bounded_happy_hour_charge_headroom(
-        snap, capacity=56.42, max_charge=7.0
-    ) is None
+    assert (
+        _budget._bounded_happy_hour_charge_headroom(
+            snap, capacity=56.42, max_charge=7.0
+        )
+        is None
+    )
     snap.source_age_seconds["battery_power_kw"] = 9.0
     snap.stale_fields = ("grid_import_kw",)
-    assert _budget._bounded_happy_hour_charge_headroom(
-        snap, capacity=56.42, max_charge=7.0
-    ) is None
+    assert (
+        _budget._bounded_happy_hour_charge_headroom(
+            snap, capacity=56.42, max_charge=7.0
+        )
+        is None
+    )
     snap.stale_fields = ()
     snap.battery_soc = 99.0
-    assert _budget._bounded_happy_hour_charge_headroom(
-        snap, capacity=56.42, max_charge=7.0
-    )[0] == 0.0
+    assert (
+        _budget._bounded_happy_hour_charge_headroom(
+            snap, capacity=56.42, max_charge=7.0
+        )[0]
+        == 0.0
+    )
 
 
 def test_alpha9114_ohme_must_wait_for_confirmed_foxess_grid_charge() -> None:
