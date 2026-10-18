@@ -634,3 +634,155 @@ def test_alpha9112_underscore_max_charge_is_not_mistaken_for_a_restored_mode() -
     ]
     assert current.state == "paused"
     assert controller._owned is False
+
+
+def test_alpha9114_soc_reporting_gap_has_bounded_physical_headroom() -> None:
+    """An unchanged integer FoxESS SOC is bounded, never declared fresh."""
+    snap = SimpleNamespace(
+        battery_soc=88.0,
+        battery_power_kw=-0.131,
+        house_load_kw=3.641,
+        grid_import_kw=0.079,
+        source_age_seconds={
+            "battery_soc": 1200.0,
+            "battery_power_kw": 9.0,
+            "house_load_kw": 9.0,
+            "grid_import_kw": 9.0,
+        },
+        stale_fields=(),
+    )
+    bounded = _budget._bounded_happy_hour_charge_headroom(
+        snap, capacity=56.42, max_charge=7.0
+    )
+    assert bounded is not None
+    headroom, basis = bounded
+    assert 3.9 < headroom < 4.0
+    assert "bounded FoxESS" in basis
+    # After one hour, even bounded telemetry must fail closed.
+    snap.source_age_seconds["battery_soc"] = 3601.0
+    assert (
+        _budget._bounded_happy_hour_charge_headroom(
+            snap, capacity=56.42, max_charge=7.0
+        )
+        is None
+    )
+    snap.source_age_seconds["battery_soc"] = 1200.0
+    snap.source_age_seconds["battery_power_kw"] = 60.0
+    assert (
+        _budget._bounded_happy_hour_charge_headroom(
+            snap, capacity=56.42, max_charge=7.0
+        )
+        is None
+    )
+    snap.source_age_seconds["battery_power_kw"] = 9.0
+    snap.stale_fields = ("grid_import_kw",)
+    assert (
+        _budget._bounded_happy_hour_charge_headroom(
+            snap, capacity=56.42, max_charge=7.0
+        )
+        is None
+    )
+    snap.stale_fields = ()
+    snap.battery_soc = 99.0
+    assert (
+        _budget._bounded_happy_hour_charge_headroom(
+            snap, capacity=56.42, max_charge=7.0
+        )[0]
+        == 0.0
+    )
+
+
+def test_alpha9114_ohme_must_wait_for_confirmed_foxess_grid_charge() -> None:
+    """A valid reward alone never enables a shared-bus EV battery drain."""
+    current = SimpleNamespace(
+        state="smart_charge",
+        attributes={"options": ["smart_charge", "max_charge", "paused"]},
+    )
+    calls = []
+
+    async def call(domain, action, payload, **kwargs):
+        calls.append(dict(payload))
+        current.state = payload["option"]
+
+    async def save():
+        return None
+
+    controller = _ohme.OhmeHappyHourController.__new__(_ohme.OhmeHappyHourController)
+    controller._entry = SimpleNamespace(
+        options={_ohme.CONF_HAPPY_HOUR_OHME_CONTROL_ENABLED: True}
+    )
+    controller._ev_status_entity = "sensor.ohme_epod_status"
+    controller._hass = SimpleNamespace(
+        states=SimpleNamespace(get=lambda entity: current),
+        services=SimpleNamespace(async_call=call),
+    )
+    controller._owned = False
+    controller._previous_mode = None
+    controller._event_start = None
+    controller._last_command = None
+    controller._last_result = ""
+    controller._last_command_at = None
+    controller._restore_attempts = 0
+    controller._status = {}
+    controller._async_save = save
+
+    snap = SimpleNamespace(
+        ev_connected=True,
+        battery_power_kw=2.0,
+        source_age_seconds={"battery_power_kw": 9.0},
+        stale_fields=(),
+    )
+    control = SimpleNamespace(
+        data_fresh=True,
+        plan_safe=True,
+        grid_available=True,
+        island_mode_active=False,
+        desired_ev_charging_allowed=True,
+    )
+    happy = dict(
+        source="octopus_energy",
+        automatic_status="detected_active",
+        happy_hour_import_authority_active=True,
+        current_reward_hour_ledger_complete=True,
+        current_reward_hour_remaining_kwh=15.0,
+        ev_allowance_kwh_remaining=10.0,
+        projected_non_ev_home_grid_kw=2.0,
+        charge_target_kw=4.0,
+        start="2026-10-18T10:00:00+00:00",
+    )
+    foxess = dict(
+        happy_hour_charge_authorised=True,
+        commands_permitted=True,
+        decision_action="force_charge",
+        last_applied_action="force_charge",
+    )
+
+    async def scan():
+        return await controller.async_update(
+            snapshot=snap,
+            control=control,
+            happy_hour=happy,
+            power_down={"active": False},
+            scan_interval_seconds=60,
+            emergency_stop=False,
+            foxess_control=foxess,
+        )
+
+    result = asyncio.run(scan())
+    assert not result["max_charge_allowed_this_scan"]
+    assert "Battery is discharging" in result["reason"]
+    assert calls == []
+
+    snap.battery_power_kw = -2.0
+    foxess["commands_permitted"] = False
+    assert not asyncio.run(scan())["max_charge_allowed_this_scan"]
+    assert calls == []
+
+    foxess["commands_permitted"] = True
+    control.desired_ev_charging_allowed = False
+    assert not asyncio.run(scan())["max_charge_allowed_this_scan"]
+    assert calls == []
+
+    control.desired_ev_charging_allowed = True
+    assert asyncio.run(scan())["max_charge_allowed_this_scan"]
+    assert calls[-1]["option"] == "max_charge"

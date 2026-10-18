@@ -30,6 +30,18 @@ _CONFIRMED_CHARGE_MODE_ENTITY = "select.ohme_epod_charge_mode"
 _HAPPY_HOUR_SENSOR = "sensor.kems_agile_happy_hour_plan"
 
 
+def _number(value: Any) -> float | None:
+    import math
+
+    if value is None or isinstance(value, bool):
+        return None
+    try:
+        number = float(value)
+    except (TypeError, ValueError, OverflowError):
+        return None
+    return number if math.isfinite(number) else None
+
+
 def _normalise(value: Any) -> str:
     """Compare Ohme's smart_charge or Smart charge as the same mode.
 
@@ -293,6 +305,7 @@ class OhmeHappyHourController:
         power_down: dict[str, Any],
         scan_interval_seconds: int,
         emergency_stop: bool,
+        foxess_control: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         enabled = bool(
             self._entry.options.get(
@@ -326,6 +339,37 @@ class OhmeHappyHourController:
             ),
             battery_charge_target_kw=float(happy_hour.get("charge_target_kw") or 0.0),
         )
+
+        # Happy Hour EV charging is *additional site demand*, never an
+        # independent permission. A generic Control plan and a reward ledger
+        # cannot override absent battery protection or a rejected FoxESS write.
+        foxess = foxess_control if isinstance(foxess_control, dict) else {}
+        battery_kw = _number(getattr(snapshot, "battery_power_kw", None))
+        ages = getattr(snapshot, "source_age_seconds", None)
+        ages = ages if isinstance(ages, dict) else {}
+        battery_age = _number(ages.get("battery_power_kw"))
+        battery_currently_safe = bool(
+            battery_kw is not None
+            and battery_kw <= 0.15
+            and battery_age is not None
+            and 0.0 <= battery_age <= 30.0
+            and "battery_power_kw" not in (getattr(snapshot, "stale_fields", ()) or ())
+        )
+        verified_grid_charge = bool(
+            foxess.get("happy_hour_charge_authorised") is True
+            and foxess.get("commands_permitted") is True
+            and foxess.get("decision_action") == "force_charge"
+            and foxess.get("last_applied_action") == "force_charge"
+        )
+        if allow and not bool(getattr(control, "desired_ev_charging_allowed", False)):
+            allow = False
+            reason = "Main Happy Hour control has not authorised EV charging"
+        if allow and not verified_grid_charge:
+            allow = False
+            reason = "FoxESS grid-charging mode is not verified active"
+        if allow and not battery_currently_safe:
+            allow = False
+            reason = "Battery is discharging or live battery power is unverified"
 
         if allow and entity_id is not None:
             if _normalise(observed_mode) == "max charge":
