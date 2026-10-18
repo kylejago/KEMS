@@ -979,15 +979,6 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                 config=self.settings.control,
                 agile_state=agile_state,
             )
-            await self._happy_hour_ohme.async_update(
-                snapshot=snapshot,
-                control=control,
-                happy_hour=happy_hour_plan,
-                power_down=power_down_plan,
-                scan_interval_seconds=self.settings.scan_interval_seconds,
-                emergency_stop=self.settings.control.emergency_stop,
-            )
-
             # Capture any half-hour that settled during this scan, then rebuild
             # the published headline simulation from the same authoritative
             # current-day ledger. Dashboard, Pi/API consumers and financial
@@ -1087,6 +1078,18 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                 force_restore=self._export_commissioning_test.restore_requested,
                 power_down_export_authorised=power_down_export_authorised,
                 happy_hour_charge_authorised=happy_hour_live_charge_kw > 0.001,
+            )
+            # Never start Ohme Max Charge before the *physical* FoxESS
+            # command is applied and reported. Safe order: battery/grid first,
+            # discretionary EV load second.
+            await self._happy_hour_ohme.async_update(
+                snapshot=snapshot,
+                control=control,
+                happy_hour=happy_hour_plan,
+                power_down=power_down_plan,
+                scan_interval_seconds=self.settings.scan_interval_seconds,
+                emergency_stop=self.settings.control.emergency_stop,
+                foxess_control=foxess_control,
             )
             promoted_to_stress = (
                 await self._export_commissioning_test.async_after_backend(
