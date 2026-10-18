@@ -281,6 +281,55 @@ def _home_grid_kw(
     return home_grid, max(house, 0.0), ev, max(grid or 0.0, 0.0)
 
 
+def _bounded_happy_hour_charge_headroom(
+    snapshot: Any, *, capacity: float, max_charge: float
+) -> tuple[float, str] | None:
+    """Prove remaining charge space using a worst-case upper SOC bound.
+
+    FoxESS SOC may not emit another report until its integer percentage
+    changes. During a brief reporting gap, assume the battery could have
+    charged at the *maximum configured rate* for the entire gap. Require
+    current independent physical battery, house and grid metering. The
+    result is a conservative capacity bound, never a fabricated fresh SOC.
+    """
+    soc = _number(getattr(snapshot, "battery_soc", None))
+    ages = getattr(snapshot, "source_age_seconds", None)
+    ages = ages if isinstance(ages, dict) else {}
+    soc_age = _number(ages.get("battery_soc"))
+    stale = set(getattr(snapshot, "stale_fields", ()) or ())
+    if (
+        soc is None or not 0.0 <= soc <= 100.0
+        or soc_age is None or not 0.0 <= soc_age <= 1800.0
+        or capacity <= 0.0 or max_charge <= 0.0
+        or "battery_soc" in stale
+    ):
+        return None
+    if soc_age > 180.0:
+        for field in ("battery_power_kw", "house_load_kw", "grid_import_kw"):
+            value = _number(getattr(snapshot, field, None))
+            age = _number(ages.get(field))
+            if (
+                value is None or age is None
+                or not 0.0 <= age <= 30.0
+                or field in stale
+            ):
+                return None
+        # In particular, battery power must be measured, not inferred from
+        # simulated SOC, and source age never resets on repeated KEMS scans.
+    headroom = max(
+        capacity * (100.0 - soc) / 100.0
+        - max_charge * soc_age / 3600.0 - 0.5,
+        0.0,
+    )
+    basis = (
+        "fresh FoxESS SOC and worst-case unobserved charging"
+        if soc_age <= 180.0
+        else "bounded FoxESS SOC gap, worst-case 100% charging since last report "
+        "and fresh independent power meters"
+    )
+    return headroom, basis
+
+
 def verified_happy_hour_physical_headroom(
     manager: Any, *, now: datetime, config: Any
 ) -> dict[str, Any]:
@@ -305,17 +354,22 @@ def verified_happy_hour_physical_headroom(
         else None
     )
     max_charge = _number(getattr(control, "max_charge_kw", None))
+    bounded = (
+        _bounded_happy_hour_charge_headroom(
+            snapshot, capacity=capacity, max_charge=max_charge
+        )
+        if snapshot is not None
+        and capacity is not None
+        and max_charge is not None
+        else None
+    )
     if (
-        physical_lower is None
-        or not evidence.get("available")
-        or report is None
-        or not 0.0 <= report <= 100.0
-        or capacity is None
-        or capacity <= 0.0
-        or soc_age is None
-        or not 0.0 <= soc_age <= 180.0
-        or max_charge is None
-        or max_charge <= 0.0
+        bounded is None
+        or (
+            soc_age is not None
+            and soc_age <= 180.0
+            and (physical_lower is None or not evidence.get("available"))
+        )
     ):
         return {
             "physical_soc_verified": False,
@@ -326,19 +380,15 @@ def verified_happy_hour_physical_headroom(
             "physical_battery_headroom_kwh": None,
             "physical_headroom_basis": "unavailable — simulation is not live SOC",
         }
-    headroom = max(
-        capacity * (100.0 - report) / 100.0 - max_charge * soc_age / 3600.0 - 0.5,
-        0.0,
-    )
+    headroom, headroom_basis = bounded
     return {
         "physical_soc_verified": True,
         "current_physical_soc_percent": round(report, 2),
-        "physical_soc_lower_bound_percent": round(physical_lower, 2),
-        "physical_battery_headroom_kwh": round(headroom, 3),
-        "physical_headroom_basis": (
-            "fresh FoxESS SOC, worst-case charging during reporting age "
-            "and 0.5 kWh buffer"
+        "physical_soc_lower_bound_percent": (
+            round(physical_lower, 2) if physical_lower is not None else None
         ),
+        "physical_battery_headroom_kwh": round(headroom, 3),
+        "physical_headroom_basis": headroom_basis,
         "physical_soc_report_age_seconds": round(soc_age, 1),
     }
 
@@ -674,7 +724,10 @@ def verified_live_happy_hour_charge_kw(
         )
     ):
         return 0.0
-    if not 0.0 <= soc <= 100.0 or not 0.0 <= soc_age <= 180.0:
+    bounded = _bounded_happy_hour_charge_headroom(
+        snapshot, capacity=capacity, max_charge=max_charge
+    )
+    if bounded is None:
         return 0.0
     if not bucket_start <= now < bucket_end:
         return 0.0
@@ -684,10 +737,7 @@ def verified_live_happy_hour_charge_kw(
         return 0.0
     # Never credit charging headroom that may have been consumed after the
     # reported SOC. Reserve extra space for delayed FoxESS/meter feedback.
-    headroom = max(
-        capacity * (100.0 - soc) / 100.0 - max_charge * soc_age / 3600.0 - 0.5,
-        0.0,
-    )
+    headroom, _headroom_basis = bounded
     hours_left = max((bucket_end - now).total_seconds() / 3600.0, 0.001)
     site_headroom = max(site_limit - max(grid, house + ev) - 0.5, 0.0)
     safe_target = min(
