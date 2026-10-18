@@ -809,8 +809,9 @@ def test_alpha9115_happy_hour_import_recorder_survives_restart_and_separates_hou
     FakeStore.persisted = None
     monkeypatch.setattr(_import_ledger, "Store", FakeStore)
     start = datetime.now(UTC).replace(microsecond=0) - timedelta(hours=2)
-    windows = [{"start": start.isoformat(), "end": (
-        start + timedelta(hours=2)).isoformat()}]
+    windows = [
+        {"start": start.isoformat(), "end": (start + timedelta(hours=2)).isoformat()}
+    ]
 
     async def exercise() -> None:
         first = _import_ledger.HappyHourImportLedgerRecorder(
@@ -826,9 +827,7 @@ def test_alpha9115_happy_hour_import_recorder_survives_restart_and_separates_hou
                 source_age_seconds={"grid_import_kw": 5.0},
                 stale_fields=(),
             )
-            assert await first.async_observe(
-                snap, now=when, confirmed_windows=windows
-            )
+            assert await first.async_observe(snap, now=when, confirmed_windows=windows)
         assert len(first.samples) == 42
 
         # Home Assistant restart: restore *persisted* physical observations,
@@ -846,9 +845,7 @@ def test_alpha9115_happy_hour_import_recorder_survives_restart_and_separates_hou
                 source_age_seconds={"grid_import_kw": 5.0},
                 stale_fields=(),
             )
-            assert await second.async_observe(
-                snap, now=when, confirmed_windows=[]
-            )
+            assert await second.async_observe(snap, now=when, confirmed_windows=[])
         ledgers = reward_hour_ledger(
             second.samples,
             start=start,
@@ -893,8 +890,9 @@ def test_alpha9115_missing_meter_data_and_restart_gap_fail_closed(
     FakeStore.persisted = None
     monkeypatch.setattr(_import_ledger, "Store", FakeStore)
     start = datetime.now(UTC).replace(microsecond=0) - timedelta(hours=2)
-    windows = [{"start": start.isoformat(), "end": (
-        start + timedelta(hours=1)).isoformat()}]
+    windows = [
+        {"start": start.isoformat(), "end": (start + timedelta(hours=1)).isoformat()}
+    ]
 
     async def exercise() -> None:
         recorder = _import_ledger.HappyHourImportLedgerRecorder(
@@ -928,7 +926,9 @@ def test_alpha9115_missing_meter_data_and_restart_gap_fail_closed(
         )
         await new.async_load()
         ledger = reward_hour_ledger(
-            new.samples, start=start, end=start + timedelta(hours=1),
+            new.samples,
+            start=start,
+            end=start + timedelta(hours=1),
             now=start + timedelta(minutes=27),
         )
         assert ledger[0]["coverage_complete"] is False
@@ -946,10 +946,7 @@ def test_alpha9115_complete_dense_meter_repairs_incomplete_history(
     """Use only individually complete series, never splice their gaps."""
     start = datetime.now(UTC).replace(microsecond=0) - timedelta(hours=2)
     end = start + timedelta(hours=2)
-    dense = [
-        _record(start + timedelta(minutes=i), 4.0)
-        for i in range(-1, 96)
-    ]
+    dense = [_record(start + timedelta(minutes=i), 4.0) for i in range(-1, 96)]
     # Simulate KEMS history missing observations due to a 15-minute
     # batching/restart gap; it must not be silently extrapolated.
     historic = [
@@ -962,12 +959,15 @@ def test_alpha9115_complete_dense_meter_repairs_incomplete_history(
         _verified_happy_hour_grid_samples=dense,
         _latest_live_happy_hour_snapshot=SimpleNamespace(
             timestamp=start + timedelta(minutes=95),
-            house_load_kw=1.0, ev_power_kw=0.0,
-            solar_power_kw=0.0, grid_import_kw=4.0,
+            house_load_kw=1.0,
+            ev_power_kw=0.0,
+            solar_power_kw=0.0,
+            grid_import_kw=4.0,
         ),
     )
     monkeypatch.setattr(
-        _budget, "verified_happy_hour_physical_headroom",
+        _budget,
+        "verified_happy_hour_physical_headroom",
         lambda *args, **kwargs: {
             "physical_soc_verified": True,
             "physical_charge_headroom_verified": True,
@@ -982,28 +982,25 @@ def test_alpha9115_complete_dense_meter_repairs_incomplete_history(
         site_import_limit_kw=15.0,
     )
     actual = _budget.decorate_happy_hour_context(
-        manager, {},
-        {"start": start.isoformat(), "end": end.isoformat(),
-         "charge_target_kw": 7.0},
+        manager,
+        {},
+        {"start": start.isoformat(), "end": end.isoformat(), "charge_target_kw": 7.0},
         now=start + timedelta(minutes=95),
         config=config,
         power_down={},
     )
     assert actual["current_reward_hour_index"] == 2
     assert actual["current_reward_hour_ledger_complete"] is True
-    assert actual["current_reward_hour_ledger_source"] == (
-        "persisted_physical_import"
-    )
+    assert actual["current_reward_hour_ledger_source"] == ("persisted_physical_import")
     assert actual["reward_hours"][1]["import_kwh"] == round(4.0 * 35 / 60, 3)
     assert actual["happy_hour_import_authority_active"] is True
     manager._verified_happy_hour_grid_samples = [
-        _record(start + timedelta(minutes=i), 4.0)
-        for i in range(25, 96)
+        _record(start + timedelta(minutes=i), 4.0) for i in range(25, 96)
     ]
     incomplete = _budget.decorate_happy_hour_context(
-        manager, {},
-        {"start": start.isoformat(), "end": end.isoformat(),
-         "charge_target_kw": 7.0},
+        manager,
+        {},
+        {"start": start.isoformat(), "end": end.isoformat(), "charge_target_kw": 7.0},
         now=start + timedelta(minutes=95),
         config=config,
         power_down={},
