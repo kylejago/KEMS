@@ -298,9 +298,12 @@ def _bounded_happy_hour_charge_headroom(
     soc_age = _number(ages.get("battery_soc"))
     stale = set(getattr(snapshot, "stale_fields", ()) or ())
     if (
-        soc is None or not 0.0 <= soc <= 100.0
-        or soc_age is None or not 0.0 <= soc_age <= 1800.0
-        or capacity <= 0.0 or max_charge <= 0.0
+        soc is None
+        or not 0.0 <= soc <= 100.0
+        or soc_age is None
+        or not 0.0 <= soc_age <= 1800.0
+        or capacity <= 0.0
+        or max_charge <= 0.0
         or "battery_soc" in stale
     ):
         return None
@@ -308,17 +311,12 @@ def _bounded_happy_hour_charge_headroom(
         for field in ("battery_power_kw", "house_load_kw", "grid_import_kw"):
             value = _number(getattr(snapshot, field, None))
             age = _number(ages.get(field))
-            if (
-                value is None or age is None
-                or not 0.0 <= age <= 30.0
-                or field in stale
-            ):
+            if value is None or age is None or not 0.0 <= age <= 30.0 or field in stale:
                 return None
         # In particular, battery power must be measured, not inferred from
         # simulated SOC, and source age never resets on repeated KEMS scans.
     headroom = max(
-        capacity * (100.0 - soc) / 100.0
-        - max_charge * soc_age / 3600.0 - 0.5,
+        capacity * (100.0 - soc) / 100.0 - max_charge * soc_age / 3600.0 - 0.5,
         0.0,
     )
     basis = (
@@ -358,18 +356,13 @@ def verified_happy_hour_physical_headroom(
         _bounded_happy_hour_charge_headroom(
             snapshot, capacity=capacity, max_charge=max_charge
         )
-        if snapshot is not None
-        and capacity is not None
-        and max_charge is not None
+        if snapshot is not None and capacity is not None and max_charge is not None
         else None
     )
-    if (
-        bounded is None
-        or (
-            soc_age is not None
-            and soc_age <= 180.0
-            and (physical_lower is None or not evidence.get("available"))
-        )
+    if bounded is None or (
+        soc_age is not None
+        and soc_age <= 180.0
+        and (physical_lower is None or not evidence.get("available"))
     ):
         return {
             "physical_soc_verified": False,
