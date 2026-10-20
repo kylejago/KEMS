@@ -124,6 +124,11 @@ def physical_energy_evidence_matches_snapshot(
 _AGILE_CONNECTED_IDLE_GRACE_SECONDS = 60.0
 _AGILE_CONNECTED_IDLE_LAST_PROOF_SECONDS = 90.0
 _AGILE_CONNECTED_IDLE_LOAD_AGE_SECONDS = 35.0
+# A confirmed unplugged EV has a stronger connection proof than an uncertain
+# or plugged-in EV. FoxESS may not update its zero grid-import entity on every
+# poll; allow that unchanged value within the existing 180-second site freshness
+# contract, but never reuse this allowance for a cloud status outage.
+_AGILE_UNPLUGGED_GRID_IMPORT_AGE_SECONDS = 180.0
 _AGILE_CONNECTED_IDLE_LOAD_STEP_KW = 1.0
 _AGILE_CONNECTED_IDLE_GRID_IMPORT_VETO_KW = 0.3
 
@@ -283,16 +288,21 @@ class PaidAgileUnpluggedContinuity:
         }
 
     @staticmethod
-    def _site_meter(snapshot: Snapshot, field: str) -> float | None:
+    def _site_meter(
+        snapshot: Snapshot, field: str, *, explicit_unplugged: bool = False
+    ) -> float | None:
         raw = getattr(snapshot, field, None)
         value = _finite(raw)
         source_ages = snapshot.source_age_seconds
         age = _finite(source_ages.get(field) if isinstance(source_ages, dict) else None)
+        max_age = _AGILE_CONNECTED_IDLE_LOAD_AGE_SECONDS
+        if field == "grid_import_kw" and explicit_unplugged:
+            max_age = _AGILE_UNPLUGGED_GRID_IMPORT_AGE_SECONDS
         if (
             value is None
             or value < 0.0
             or age is None
-            or not 0.0 <= age <= _AGILE_CONNECTED_IDLE_LOAD_AGE_SECONDS
+            or not 0.0 <= age <= max_age
             or field in snapshot.stale_fields
         ):
             return None
@@ -326,7 +336,13 @@ class PaidAgileUnpluggedContinuity:
         ):
             return False
         house = self._site_meter(snapshot, "house_load_kw")
-        grid_import = self._site_meter(snapshot, "grid_import_kw")
+        grid_import = self._site_meter(
+            snapshot,
+            "grid_import_kw",
+            explicit_unplugged=(
+                snapshot.ev_connected is False and snapshot.ev_charging is False
+            ),
+        )
         return bool(
             house is not None
             and house <= self._baseline_house_kw + _AGILE_CONNECTED_IDLE_LOAD_STEP_KW
@@ -346,7 +362,13 @@ class PaidAgileUnpluggedContinuity:
             self._assessment = "vetoed_connected_charging_or_ev_power"
             return False
         house = self._site_meter(snapshot, "house_load_kw")
-        grid_import = self._site_meter(snapshot, "grid_import_kw")
+        grid_import = self._site_meter(
+            snapshot,
+            "grid_import_kw",
+            explicit_unplugged=(
+                snapshot.ev_connected is False and snapshot.ev_charging is False
+            ),
+        )
         # The Ohme provider only emits an explicit False for a fresh
         # disconnection report. Its power entity is independently flaky.
         if (

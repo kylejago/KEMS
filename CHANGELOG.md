@@ -1,3 +1,11 @@
+## 0.9.0-alpha9.117 — safer unplugged Ohme continuity and commissioning diagnostics
+
+- Stop unnecessary paid-Agile pauses while Ohme **freshly confirms unplugged** but its zero-power field is missing or old and FoxESS grid-import reads remain unchanged. A non-stale grid-import value may be up to 180 seconds old for this explicit-unplugged proof only, matching the existing control data freshness contract; household load still needs a recent reading, grid import must remain low, and the final export guard independently rechecks the session-only physical proof.
+- Connected or uncertain EVs retain the stricter 35-second site corroboration and connected-idle source checks. Positive charging power, connected/charging status, missing physical measurements and genuinely stale evidence still veto export. This does not electrically isolate a shared bus and cannot guarantee instantaneous detection of a newly started charge.
+- Add a bounded, non-persistent list of the latest eight **failed** FoxESS whole-site power-balance samples to the commissioning diagnostic, with timestamps, five physical power values, per-source ages, residual and tolerance. The original 90% / last-60 commissioning requirement, physical reserve, DNO export ceiling, Force Discharge proof, safety releases, and overnight Force Charge conditions are **not changed**.
+- No changes to scheduling, simulation, ROI, No KEMS baseline, dashboard or the automatic maintenance-window guard. Intended for deployment only through the existing 06:00–06:30 safe automatic maintenance window, and only once CI passes; unattended installation/restart should defer if physical energy activity blocks it.
+- Regression tests cover unplugged proof, connected/uncertain and charging vetoes, out-of-date meters, spoofed evidence, bounded failed-sample reporting, and unchanged commissioning threshold. Inspect the following day's physical logs before declaring live proven.
+
 ## 0.9.0-alpha9.107 — solar-aware FoxESS AC output and physical export proof
 
 - Correct live paid-Agile FoxESS Force Discharge Power translation: the Modbus parameter caps AC-interface output (including PV), not battery-only output. Alpha9.106's 1.0 kW command during ~3.3 kW PV resulted in ~2.3 kW battery charging and zero export; it could not establish the required discharge-direction proof.
