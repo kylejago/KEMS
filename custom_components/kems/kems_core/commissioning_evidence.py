@@ -643,9 +643,7 @@ def assess_foxess_power_balance(
                         if hasattr(timestamp, "isoformat")
                         else None
                     ),
-                    "power_kw": {
-                        name: round(values[name], 3) for name in power_fields
-                    },
+                    "power_kw": {name: round(values[name], 3) for name in power_fields},
                     "source_ages_seconds": {
                         name: _diagnostic_source_age(source_ages.get(name))
                         for name in power_fields
