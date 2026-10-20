@@ -6,7 +6,6 @@ from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 
 import pytest
-
 from kems_core import ControlConfig, ControlState, SimulationConfig, Snapshot
 from kems_core.agile_live_reserve import (
     PaidAgileUnpluggedContinuity,
