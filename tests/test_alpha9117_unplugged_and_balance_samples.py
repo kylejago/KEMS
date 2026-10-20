@@ -114,9 +114,7 @@ def test_no_export_when_explicit_disconnection_or_physical_proof_missing(
 
 def test_uncertain_connection_does_not_inherit_relaxed_grid_age() -> None:
     proof = PaidAgileUnpluggedContinuity()
-    fresh = _snapshot(
-        source_age_seconds={"house_load_kw": 9.0, "grid_import_kw": 9.0}
-    )
+    fresh = _snapshot(source_age_seconds={"house_load_kw": 9.0, "grid_import_kw": 9.0})
     assert proof.assess(fresh, now=NOW)
     uncertain = _snapshot(
         timestamp=NOW + timedelta(seconds=20),
@@ -181,6 +179,7 @@ def test_power_balance_threshold_unchanged_and_failed_samples_bounded() -> None:
         positive_is_discharge=True,
     )
     assert len(many.failed_samples) == 8
-    assert many.failed_samples[0]["timestamp"] == (
-        NOW + timedelta(seconds=25 * 4)
-    ).isoformat()
+    assert (
+        many.failed_samples[0]["timestamp"]
+        == (NOW + timedelta(seconds=25 * 4)).isoformat()
+    )
