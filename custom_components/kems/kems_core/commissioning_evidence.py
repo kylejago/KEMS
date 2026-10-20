@@ -146,6 +146,8 @@ class PowerBalanceEvidence:
     maximum_absolute_residual_kw: float | None
     absolute_tolerance_kw: float
     relative_tolerance_percent: float
+    # Last eight mismatches only; purely diagnostic and never used for readiness.
+    failed_samples: tuple[dict[str, Any], ...] = ()
 
     def to_dict(self) -> dict[str, Any]:
         """Return a stable serialisable physical-balance payload."""
@@ -161,6 +163,7 @@ class PowerBalanceEvidence:
             "maximum_absolute_residual_kw": self.maximum_absolute_residual_kw,
             "absolute_tolerance_kw": self.absolute_tolerance_kw,
             "relative_tolerance_percent": self.relative_tolerance_percent,
+            "failed_samples": list(self.failed_samples),
         }
 
 
@@ -542,6 +545,7 @@ def assess_foxess_power_balance(
     """
     recent = list(records)[-max(int(recent_sample_limit), minimum_samples, 1) :]
     residuals: list[float] = []
+    failed_samples: list[dict[str, Any]] = []
     balanced = 0
     invalid = 0
     required = set(
@@ -610,6 +614,42 @@ def assess_foxess_power_balance(
         residuals.append(residual)
         if abs(residual) <= tolerance:
             balanced += 1
+        else:
+            timestamp = getattr(record, "timestamp", None)
+            ages = getattr(record, "source_age_seconds", None)
+            source_ages = ages if isinstance(ages, dict) else {}
+            power_fields = (
+                "solar_power_kw",
+                "battery_power_kw",
+                "house_load_kw",
+                "grid_import_kw",
+                "grid_export_kw",
+            )
+            failed_samples.append(
+                {
+                    "timestamp": (
+                        timestamp.isoformat()
+                        if hasattr(timestamp, "isoformat")
+                        else None
+                    ),
+                    "power_kw": {
+                        name: round(values[name], 3) for name in power_fields
+                    },
+                    "source_ages_seconds": {
+                        name: (
+                            round(float(source_ages[name]), 1)
+                            if name in source_ages
+                            and isfinite(float(source_ages[name]))
+                            else None
+                        )
+                        for name in power_fields
+                    },
+                    "residual_kw": round(residual, 3),
+                    "tolerance_kw": round(tolerance, 3),
+                }
+            )
+            if len(failed_samples) > 8:
+                del failed_samples[:-8]
 
     eligible = len(residuals)
     balance_percent = round(100.0 * balanced / eligible, 1) if eligible else 0.0
@@ -649,6 +689,7 @@ def assess_foxess_power_balance(
         relative_tolerance_percent=round(
             max(float(relative_tolerance_percent), 0.0), 1
         ),
+        failed_samples=tuple(failed_samples),
     )
 
 
