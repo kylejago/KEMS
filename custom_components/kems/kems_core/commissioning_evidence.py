@@ -524,6 +524,17 @@ def _battery_routing(
     return charge, discharge
 
 
+def _diagnostic_source_age(value: Any) -> float | None:
+    """Never let malformed optional age metadata affect commissioning."""
+    if value is None or isinstance(value, bool):
+        return None
+    try:
+        age = float(value)
+    except (TypeError, ValueError, OverflowError):
+        return None
+    return round(age, 1) if isfinite(age) and age >= 0.0 else None
+
+
 def assess_foxess_power_balance(
     records: tuple[Any, ...] | list[Any],
     *,
@@ -636,12 +647,7 @@ def assess_foxess_power_balance(
                         name: round(values[name], 3) for name in power_fields
                     },
                     "source_ages_seconds": {
-                        name: (
-                            round(float(source_ages[name]), 1)
-                            if name in source_ages
-                            and isfinite(float(source_ages[name]))
-                            else None
-                        )
+                        name: _diagnostic_source_age(source_ages.get(name))
                         for name in power_fields
                     },
                     "residual_kw": round(residual, 3),
