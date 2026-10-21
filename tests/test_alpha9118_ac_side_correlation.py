@@ -889,7 +889,6 @@ def test_alpha9120_no_exclusion_never_waives_genuine_mismatch() -> None:
     assert evidence.ac_side_audit["post_command_settling_quarantined_count"] == 0
 
 
-
 def _alpha9121_released_backup_history() -> list[SimpleNamespace]:
     """Replay the 22:55 BST KH7 backup / stopped-reporting RPower deadlock."""
     records = _alpha9119_history(bad_count=1)
@@ -923,16 +922,12 @@ def _alpha9121_released_backup_history() -> list[SimpleNamespace]:
                 "grid_ct": {
                     "value": -0.278,
                     "unit": "kW",
-                    "last_reported": (
-                        observed - timedelta(seconds=44.8)
-                    ).isoformat(),
+                    "last_reported": (observed - timedelta(seconds=44.8)).isoformat(),
                 },
                 "inverter_reported_load": {
                     "value": 0.272,
                     "unit": "kW",
-                    "last_reported": (
-                        observed - timedelta(seconds=9.1)
-                    ).isoformat(),
+                    "last_reported": (observed - timedelta(seconds=9.1)).isoformat(),
                 },
             }
         )
@@ -982,18 +977,14 @@ def test_alpha9121_live_2255_deadlock_recovers_with_two_safe_backup_samples() ->
         lambda r: r.foxess_balance_probe["grid_ct"].update(
             {"last_reported": (r.timestamp - timedelta(seconds=95)).isoformat()}
         ),
-        lambda r: r.foxess_balance_probe["grid_ct"].update(
-            {"value": 2.9}
-        ),
+        lambda r: r.foxess_balance_probe["grid_ct"].update({"value": 2.9}),
         lambda r: r.foxess_balance_probe["inverter_reported_load"].update(
             {"last_reported": (r.timestamp - timedelta(seconds=50)).isoformat()}
         ),
         lambda r: r.foxess_balance_probe["inverter_ac_output"].update(
             {"last_reported": (r.timestamp - timedelta(seconds=2)).isoformat()}
         ),
-        lambda r: r.foxess_balance_probe["inverter_ac_output"].update(
-            {"value": 2.0}
-        ),
+        lambda r: r.foxess_balance_probe["inverter_ac_output"].update({"value": 2.0}),
         lambda r: setattr(r, "grid_flow_mode", "signed_grid_source"),
         lambda r: setattr(r, "raw_grid_import_kw", None),
         lambda r: setattr(r, "raw_grid_import_kw", 0.8),
