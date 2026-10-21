@@ -212,3 +212,99 @@ def paid_export_stage_ct_conflict(
         and signed_battery >= 0.25
         and abs(signed_battery + solar - inverter) <= 0.4
     )
+
+
+
+def assess_foxess_ac_ct_transition(previous: Any, current: Any) -> dict[str, Any]:
+    """Compare adjacent valid KH register cohorts without asserting CT fault.
+
+    Only a formerly consistent grid-export reading followed by a contradictory,
+    near-zero CT is considered a candidate. AC, battery, house load and PV must
+    remain nearly steady. The two samples must be within 100 seconds; a normal
+    inverter setpoint change, stale sensor or missing proof is not a CT fault.
+    This evidence NEVER changes commissioning or inverter write authority.
+    """
+    result: dict[str, Any] = {
+        "status": "no_comparable_transition",
+        "informational_only": True,
+        "ct_hardware_fault_proven": False,
+        "independent_meter_proven": False,
+        "hardware_write_authorised": False,
+    }
+    prior_at = getattr(previous, "timestamp", None)
+    current_at = getattr(current, "timestamp", None)
+    if (
+        not isinstance(prior_at, datetime)
+        or not isinstance(current_at, datetime)
+        or prior_at.tzinfo is None
+        or current_at.tzinfo is None
+    ):
+        return result
+    seconds = (current_at - prior_at).total_seconds()
+    if not 0.0 < seconds <= 100.0:
+        return result
+    prior = assess_foxess_ac_side_sample(previous)
+    now = assess_foxess_ac_side_sample(current)
+    if prior["status"] != "ac_cross_check_pass":
+        return result
+    if now["status"] != "ac_load_mismatch":
+        result["status"] = "no_ac_disagreement"
+        return result
+    ac_previous = _number(prior.get("inverter_ac_kw"))
+    ac_now = _number(now.get("inverter_ac_kw"))
+    ct_previous = _number(prior.get("grid_ct_kw"))
+    ct_now = _number(now.get("grid_ct_kw"))
+    house_previous = _number(prior.get("foxess_reported_load_kw"))
+    house_now = _number(now.get("foxess_reported_load_kw"))
+    battery_previous = _number(getattr(previous, "battery_power_kw", None))
+    battery_now = _number(getattr(current, "battery_power_kw", None))
+    solar_previous = _number(getattr(previous, "solar_power_kw", None))
+    solar_now = _number(getattr(current, "solar_power_kw", None))
+    values = (
+        ac_previous,
+        ac_now,
+        ct_previous,
+        ct_now,
+        house_previous,
+        house_now,
+        battery_previous,
+        battery_now,
+        solar_previous,
+        solar_now,
+    )
+    if any(value is None for value in values):
+        return result
+    assert all(value is not None for value in values)
+    if {"battery_power_kw", "solar_power_kw"} & (
+        set(getattr(previous, "stale_fields", ()) or ())
+        | set(getattr(current, "stale_fields", ()) or ())
+    ):
+        return result
+    delta_ac = ac_now - ac_previous
+    delta_ct = ct_now - ct_previous
+    delta_house = house_now - house_previous
+    delta_battery = battery_now - battery_previous
+    delta_solar = solar_now - solar_previous
+    result.update(
+        {
+            "seconds_between_samples": round(seconds, 1),
+            "inverter_ac_change_kw": round(delta_ac, 3),
+            "grid_ct_change_kw": round(delta_ct, 3),
+            "reported_house_change_kw": round(delta_house, 3),
+            "battery_dc_change_kw": round(delta_battery, 3),
+            "solar_change_kw": round(delta_solar, 3),
+            "ac_residual_after_kw": now["ac_load_residual_kw"],
+            "status": "ac_disagreement_without_isolated_ct_step",
+        }
+    )
+    if (
+        ct_previous > 0.75
+        and -0.25 <= ct_now <= 0.25
+        and delta_ct < -0.75
+        and abs(delta_ac) <= 0.2
+        and abs(delta_house) <= 0.2
+        and abs(delta_battery) <= 0.3
+        and abs(delta_solar) <= 0.3
+    ):
+        result["status"] = "ct_export_step_without_matching_source_or_load_step"
+    return result
