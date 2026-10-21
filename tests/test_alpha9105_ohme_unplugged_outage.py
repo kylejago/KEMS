@@ -219,7 +219,6 @@ def test_only_agile_branch_passes_verified_unplugged_proof() -> None:
     assert "self._paid_agile_unplugged_continuity.clear()" in coordinator
 
 
-
 def _fresh_coherent_export_with_aged_zero_import(
     at: datetime, **changes: object
 ) -> Snapshot:
@@ -305,28 +304,32 @@ def test_alpha9119_fresh_split_ct_keeps_unplugged_export_during_brief_ohme_loss(
         {"grid_import_kw": 0.35},
         {"raw_grid_export_kw": 0.0},
         {"grid_export_kw": 0.0},
-        {"source_age_seconds": {
-            "house_load_kw": 9.0,
-            "grid_import_kw": 2633.5,
-            "grid_export_kw": 45.0,
-        }},
+        {
+            "source_age_seconds": {
+                "house_load_kw": 9.0,
+                "grid_import_kw": 2633.5,
+                "grid_export_kw": 45.0,
+            }
+        },
         {"stale_fields": ("grid_import_kw",)},
         {"stale_fields": ("grid_export_kw",)},
         {"foxess_balance_probe": {}},
-        {"foxess_balance_probe": {
-            "inverter_ac_output": {
-                "value": 6.98,
-                "last_reported": (NOW - timedelta(seconds=9)).isoformat(),
-            },
-            "grid_ct": {
-                "value": 0.666,
-                "last_reported": (NOW - timedelta(seconds=9)).isoformat(),
-            },
-            "inverter_reported_load": {
-                "value": 0.272,
-                "last_reported": (NOW - timedelta(seconds=9)).isoformat(),
-            },
-        }},
+        {
+            "foxess_balance_probe": {
+                "inverter_ac_output": {
+                    "value": 6.98,
+                    "last_reported": (NOW - timedelta(seconds=9)).isoformat(),
+                },
+                "grid_ct": {
+                    "value": 0.666,
+                    "last_reported": (NOW - timedelta(seconds=9)).isoformat(),
+                },
+                "inverter_reported_load": {
+                    "value": 0.272,
+                    "last_reported": (NOW - timedelta(seconds=9)).isoformat(),
+                },
+            }
+        },
     ],
 )
 def test_alpha9119_split_ct_proof_refuses_stale_contradictory_or_untrusted_sources(
