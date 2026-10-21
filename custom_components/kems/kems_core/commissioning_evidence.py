@@ -621,6 +621,116 @@ def _self_use_register_settling_conflict(
     )
 
 
+def _released_backup_ct_recovery(
+    record: Any, *, ac_cross_check: dict[str, Any]
+) -> bool:
+    """Narrow idle-only recovery when KH RPower stops reporting after release.
+
+    This is not export proof: a future deliberate paid export must still pass
+    the independent live guard and 2/2 staged battery/export checks.
+    """
+    probe = getattr(record, "foxess_balance_probe", None)
+    at = getattr(record, "timestamp", None)
+    if (
+        not isinstance(probe, dict)
+        or not isinstance(at, datetime)
+        or at.tzinfo is None
+        or ac_cross_check.get("status") != "not_time_aligned"
+        or probe.get("last_write_result") != "KEMS FoxESS ownership released safely"
+        or probe.get("last_applied_action") is not None
+        or probe.get("commands_permitted_previous_cycle") is not False
+        or not isinstance(probe.get("work_mode"), dict)
+        or probe["work_mode"].get("value") != "Back-up"
+        or probe["work_mode"].get("status") != "PASS"
+        or getattr(record, "grid_flow_mode", None) != "separate_positive_sources"
+    ):
+        return False
+
+    def reported_time(entry: Any) -> datetime | None:
+        if not isinstance(entry, dict):
+            return None
+        value = entry.get("last_reported")
+        if not isinstance(value, str):
+            return None
+        try:
+            reported = datetime.fromisoformat(value)
+        except ValueError:
+            return None
+        return reported if reported.tzinfo is not None else None
+
+    try:
+        release_at = datetime.fromisoformat(probe["last_write_at"])
+    except (KeyError, TypeError, ValueError):
+        return False
+    if release_at.tzinfo is None:
+        return False
+    elapsed = (at - release_at).total_seconds()
+    if not 60.0 <= elapsed <= 7200.0:
+        return False
+
+    ac = probe.get("inverter_ac_output")
+    ct = probe.get("grid_ct")
+    house_probe = probe.get("inverter_reported_load")
+    ac_at = reported_time(ac)
+    ct_at = reported_time(ct)
+    house_at = reported_time(house_probe)
+    if any(value is None for value in (ac_at, ct_at, house_at)):
+        return False
+    # RPower zero after KEMS gave up ownership is allowed to become old.
+    # Fresh non-zero or contradictory AC must never take this fallback.
+    if not (
+        0.0 <= (ac_at - release_at).total_seconds() <= 180.0
+        and (at - ac_at).total_seconds() >= 90.0
+        and 0.0 <= (at - ct_at).total_seconds() <= 90.0
+        and 0.0 <= (at - house_at).total_seconds() <= 45.0
+    ):
+        return False
+    try:
+        ac_kw = float(ac["value"])
+        ct_kw = float(ct["value"])
+        reported_house_kw = float(house_probe["value"])
+        actual_house = float(record.house_load_kw)
+        battery = float(record.battery_power_kw)
+        grid_import = float(record.grid_import_kw)
+        grid_export = float(record.grid_export_kw)
+        raw_import = float(record.raw_grid_import_kw)
+        raw_export = float(record.raw_grid_export_kw)
+        battery_age = float(record.source_age_seconds["battery_power_kw"])
+        load_age = float(record.source_age_seconds["house_load_kw"])
+    except (KeyError, AttributeError, TypeError, ValueError):
+        return False
+    if not all(
+        isfinite(value)
+        for value in (
+            ac_kw,
+            ct_kw,
+            reported_house_kw,
+            actual_house,
+            battery,
+            grid_import,
+            grid_export,
+            raw_import,
+            raw_export,
+            battery_age,
+            load_age,
+        )
+    ):
+        return False
+    return bool(
+        abs(ac_kw) <= 0.10
+        and abs(ct_kw + grid_import - grid_export) <= 0.10
+        and abs(raw_import - grid_import) <= 0.05
+        and abs(raw_export - grid_export) <= 0.05
+        and abs(reported_house_kw - actual_house) <= 0.10
+        and 0.0 <= grid_export <= 0.10
+        and 0.0 <= grid_import <= 1.5
+        and 0.0 <= actual_house <= 1.5
+        and abs(battery) <= 0.6
+        and 0.0 <= battery_age <= 45.0
+        and 0.0 <= load_age <= 45.0
+    )
+
+
 def assess_foxess_power_balance(
     records: tuple[Any, ...] | list[Any],
     *,
@@ -650,6 +760,7 @@ def assess_foxess_power_balance(
     previous_eligible: Any = None
     settling_quarantined: list[dict[str, Any]] = []
     settled_current_samples: dict[int, bool] = {}
+    safe_release_idle_proof_count = 0
     balanced = 0
     invalid = 0
     observed_export_limit_violations = 0
@@ -750,10 +861,24 @@ def assess_foxess_power_balance(
             )
         else:
             residuals.append(residual)
+        # A KH in Back-up after a verified safe ownership release can stop
+        # updating RPower. Require fresh split-grid CT, house and battery
+        # measurements instead; *never* accept a live AC disagreement.
+        idle_release_verified = bool(
+            quarantine_self_use_settling
+            and not settling
+            and abs(residual) <= tolerance
+            and _released_backup_ct_recovery(record, ac_cross_check=ac_cross_check)
+        )
+        if idle_release_verified:
+            safe_release_idle_proof_count += 1
         settled_current_samples[record_index] = (
             not settling
             and abs(residual) <= tolerance
-            and ac_cross_check.get("status") == "ac_cross_check_pass"
+            and (
+                ac_cross_check.get("status") == "ac_cross_check_pass"
+                or idle_release_verified
+            )
         )
         if ac_transition is not None:
             transition_statuses[str(ac_transition["status"])] += 1
@@ -889,6 +1014,7 @@ def assess_foxess_power_balance(
             "post_command_settling_quarantined_count": len(settling_quarantined),
             "post_command_settling_examples": settling_quarantined[-8:],
             "post_command_settling_verified": settling_verified,
+            "post_safe_release_idle_proofs": safe_release_idle_proof_count,
             "observed_grid_export_limit_violations": observed_export_limit_violations,
             "status_counts": dict(sorted(ac_statuses.items())),
             "transition_status_counts": dict(sorted(transition_statuses.items())),

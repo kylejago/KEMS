@@ -887,3 +887,147 @@ def test_alpha9120_no_exclusion_never_waives_genuine_mismatch() -> None:
     assert evidence.balance_percent < 90.0
     assert evidence.state == "power_balance_mismatch"
     assert evidence.ac_side_audit["post_command_settling_quarantined_count"] == 0
+
+
+def _alpha9121_released_backup_history() -> list[SimpleNamespace]:
+    """Replay the 22:55 BST KH7 backup / stopped-reporting RPower deadlock."""
+    records = _alpha9119_history(bad_count=1)
+    release_at = records[-1].timestamp - timedelta(seconds=600)
+    ac_reported = (release_at + timedelta(seconds=25)).isoformat()
+    for record in records[-2:]:
+        observed = record.timestamp
+        record.battery_power_kw = 0.199
+        record.house_load_kw = 0.272
+        record.grid_import_kw = 0.278
+        record.grid_export_kw = 0.0
+        record.grid_flow_mode = "separate_positive_sources"
+        record.raw_grid_import_kw = 0.278
+        record.raw_grid_export_kw = 0.0
+        record.source_age_seconds = {
+            "battery_power_kw": 9.1,
+            "house_load_kw": 9.1,
+        }
+        record.foxess_balance_probe.update(
+            {
+                "last_applied_action": None,
+                "last_write_result": "KEMS FoxESS ownership released safely",
+                "last_write_at": release_at.isoformat(),
+                "commands_permitted_previous_cycle": False,
+                "work_mode": {"value": "Back-up", "status": "PASS"},
+                "inverter_ac_output": {
+                    "value": 0.0,
+                    "unit": "kW",
+                    "last_reported": ac_reported,
+                },
+                "grid_ct": {
+                    "value": -0.278,
+                    "unit": "kW",
+                    "last_reported": (observed - timedelta(seconds=44.8)).isoformat(),
+                },
+                "inverter_reported_load": {
+                    "value": 0.272,
+                    "unit": "kW",
+                    "last_reported": (observed - timedelta(seconds=9.1)).isoformat(),
+                },
+            }
+        )
+    return records
+
+
+def test_alpha9121_live_2255_deadlock_recovers_with_two_safe_backup_samples() -> None:
+    records = _alpha9121_released_backup_history()
+    # Reproduce release-only mode where RPower ceased updating but physical
+    # grid, house, battery and split-grid readings remained coherent and fresh.
+    previous = assess_foxess_power_balance(records, positive_is_discharge=True)
+    assert previous.ready
+    assert previous.balanced_samples == 59
+
+    evidence = assess_foxess_power_balance(
+        records, positive_is_discharge=True, quarantine_self_use_settling=True
+    )
+    assert evidence.ready
+    assert evidence.state == "balanced"
+    assert evidence.balanced_samples == 59
+    assert evidence.eligible_samples == 59
+    assert evidence.balance_percent == 100.0
+    assert evidence.ac_side_audit["post_command_settling_quarantined_count"] == 1
+    assert evidence.ac_side_audit["post_safe_release_idle_proofs"] == 2
+    assert evidence.ac_side_audit["post_command_settling_verified"]
+    assert not evidence.ac_side_audit["hardware_write_authorised"]
+
+
+@pytest.mark.parametrize(
+    "break_recovery",
+    [
+        lambda r: r.foxess_balance_probe.update(
+            {"last_write_result": "command applied"}
+        ),
+        lambda r: r.foxess_balance_probe.update(
+            {"last_write_at": r.timestamp.isoformat()}
+        ),
+        lambda r: r.foxess_balance_probe.update(
+            {"work_mode": {"value": "Force Discharge", "status": "PASS"}}
+        ),
+        lambda r: r.foxess_balance_probe.update(
+            {"work_mode": {"value": "Back-up", "status": "UNKNOWN"}}
+        ),
+        lambda r: r.foxess_balance_probe.update(
+            {"commands_permitted_previous_cycle": True}
+        ),
+        lambda r: r.foxess_balance_probe["grid_ct"].update(
+            {"last_reported": (r.timestamp - timedelta(seconds=95)).isoformat()}
+        ),
+        lambda r: r.foxess_balance_probe["grid_ct"].update({"value": 2.9}),
+        lambda r: r.foxess_balance_probe["inverter_reported_load"].update(
+            {"last_reported": (r.timestamp - timedelta(seconds=50)).isoformat()}
+        ),
+        lambda r: r.foxess_balance_probe["inverter_ac_output"].update(
+            {"last_reported": (r.timestamp - timedelta(seconds=2)).isoformat()}
+        ),
+        lambda r: r.foxess_balance_probe["inverter_ac_output"].update({"value": 2.0}),
+        lambda r: setattr(r, "grid_flow_mode", "signed_grid_source"),
+        lambda r: setattr(r, "raw_grid_import_kw", None),
+        lambda r: setattr(r, "raw_grid_import_kw", 0.8),
+        lambda r: setattr(r, "grid_export_kw", 7.2),
+        lambda r: setattr(r, "battery_power_kw", 1.2),
+        lambda r: setattr(r, "house_load_kw", 3.0),
+    ],
+)
+def test_alpha9121_idle_recovery_fail_closed_on_missing_or_unsafe_proof(
+    break_recovery,
+) -> None:
+    records = _alpha9121_released_backup_history()
+    # One of the two newest is enough to veto the entire recovered authority.
+    break_recovery(records[-1])
+    evidence = assess_foxess_power_balance(
+        records, positive_is_discharge=True, quarantine_self_use_settling=True
+    )
+    assert not evidence.ready
+    assert evidence.ac_side_audit["post_command_settling_quarantined_count"] == 1
+
+
+def test_alpha9121_missing_first_post_release_backup_proof_blocks() -> None:
+    records = _alpha9121_released_backup_history()
+    records[-2].foxess_balance_probe["last_write_result"] = "not verified"
+    evidence = assess_foxess_power_balance(
+        records, positive_is_discharge=True, quarantine_self_use_settling=True
+    )
+    assert not evidence.ready
+    assert evidence.state == "settling_unverified"
+
+
+def test_alpha9121_no_quarantine_does_not_require_idle_recovery() -> None:
+    records = _alpha9121_released_backup_history()
+    records[3] = _alpha9119_mode_change_sample(
+        records[3].timestamp,
+        ac_kw=6.0,
+        ct_kw=5.6,
+        house_kw=0.4,
+        battery_kw=6.0,
+        transition=False,
+    )
+    evidence = assess_foxess_power_balance(
+        records, positive_is_discharge=True, quarantine_self_use_settling=True
+    )
+    assert evidence.ready
+    assert evidence.ac_side_audit["post_command_settling_quarantined_count"] == 0
