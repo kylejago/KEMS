@@ -601,15 +601,19 @@ def test_ct_disagreement_persists_across_two_actual_physical_cohorts() -> None:
     assert not result["hardware_write_authorised"]
 
 
-
 def _alpha9119_mode_change_sample(
-    at: datetime, *, ac_kw: float, ct_kw: float, house_kw: float,
-    battery_kw: float, transition: bool
+    at: datetime,
+    *,
+    ac_kw: float,
+    ct_kw: float,
+    house_kw: float,
+    battery_kw: float,
+    transition: bool,
 ) -> SimpleNamespace:
     """Reproduce the exact timing/provenance of 19:02 KH7 historical failures."""
     write_at = at - timedelta(seconds=10.2)
-    observed_at = write_at + timedelta(seconds=1.0) if transition else (
-        at - timedelta(seconds=1)
+    observed_at = (
+        write_at + timedelta(seconds=1.0) if transition else (at - timedelta(seconds=1))
     )
     sample = _observation(
         battery_kw=battery_kw,
@@ -635,9 +639,7 @@ def _alpha9119_mode_change_sample(
     )
     for role in ("inverter_ac_output", "grid_ct"):
         sample.foxess_balance_probe[role]["last_reported"] = observed_at.isoformat()
-    sample.source_age_seconds["house_load_kw"] = (
-        at - observed_at
-    ).total_seconds()
+    sample.source_age_seconds["house_load_kw"] = (at - observed_at).total_seconds()
     return sample
 
 
@@ -665,15 +667,23 @@ def _alpha9119_history(
             ]
             records.append(
                 _alpha9119_mode_change_sample(
-                    at, ac_kw=ac, ct_kw=ct, house_kw=house,
-                    battery_kw=battery, transition=transition
+                    at,
+                    ac_kw=ac,
+                    ct_kw=ct,
+                    house_kw=house,
+                    battery_kw=battery,
+                    transition=transition,
                 )
             )
         else:
             records.append(
                 _alpha9119_mode_change_sample(
-                    at, ac_kw=6.0, ct_kw=5.6, house_kw=0.4,
-                    battery_kw=6.0, transition=False
+                    at,
+                    ac_kw=6.0,
+                    ct_kw=5.6,
+                    house_kw=0.4,
+                    battery_kw=6.0,
+                    transition=False,
                 )
             )
     return records
@@ -753,8 +763,12 @@ def test_alpha9119_more_than_eight_transitions_fail_closed() -> None:
     records = _alpha9119_history()
     for index in (42, 44):
         records[index] = _alpha9119_mode_change_sample(
-            records[index].timestamp, ac_kw=6.981, ct_kw=-0.042,
-            house_kw=0.421, battery_kw=7.280, transition=True
+            records[index].timestamp,
+            ac_kw=6.981,
+            ct_kw=-0.042,
+            house_kw=0.421,
+            battery_kw=7.280,
+            transition=True,
         )
     evidence = assess_foxess_power_balance(
         records, positive_is_discharge=True, quarantine_self_use_settling=True
