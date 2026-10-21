@@ -164,7 +164,6 @@ def assess_foxess_ac_side_sample(
     return result
 
 
-
 def paid_export_stage_ct_conflict(
     observation: Any, *, positive_is_discharge: bool = True
 ) -> bool:
