@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import logging
+from math import isfinite
 from dataclasses import replace
 from datetime import date, datetime, timedelta
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import Event, HomeAssistant, callback
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.event import async_call_later, async_track_state_change_event
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
@@ -585,6 +587,50 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                         "entity_id": bound.get("observation_entity_id"),
                         "observation_source": bound.get("observation_source"),
                         "status": bound.get("status"),
+                    }
+            # KH7's battery power is on the battery/DC side while the
+            # inverter AC-output register is a distinct physical quantity.
+            # Correlate both without assuming AC == DC or using this evidence
+            # to bypass commissioning. Scope optional registers to the same
+            # FoxESS device as the configured battery source.
+            registry = er.async_get(self.hass)
+            battery_entry = registry.async_get(self.entities.battery_power_kw or "")
+            battery_entity_id = self.entities.battery_power_kw or ""
+            if battery_entry is not None and battery_entry.device_id and (
+                battery_entity_id.startswith("sensor.")
+                and battery_entity_id.endswith("_invbatpower")
+            ):
+                prefix = battery_entity_id.removesuffix("_invbatpower")
+                for role, candidate_id in (
+                    ("inverter_ac_output", prefix + "_rpower"),
+                    ("grid_ct", prefix + "_grid_ct"),
+                ):
+                    match = registry.async_get(candidate_id)
+                    if (
+                        match is None
+                        or match.device_id != battery_entry.device_id
+                        or match.platform != battery_entry.platform
+                    ):
+                        continue
+                    state = self.hass.states.get(candidate_id)
+                    if state is None:
+                        continue
+                    try:
+                        value = float(state.state)
+                    except (TypeError, ValueError):
+                        value = None
+                    if value is not None and not isfinite(value):
+                        value = None
+                    balance_probe[role] = {
+                        "entity_id": candidate_id,
+                        "value": value,
+                        "unit": state.attributes.get("unit_of_measurement"),
+                        "last_updated": state.last_updated.isoformat(),
+                        "last_reported": (
+                            state.last_reported.isoformat()
+                            if getattr(state, "last_reported", None) is not None
+                            else None
+                        ),
                     }
             snapshot.foxess_balance_probe = balance_probe
             # Use the same already-collected physical snapshot as every other
