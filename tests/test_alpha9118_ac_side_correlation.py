@@ -777,7 +777,6 @@ def test_alpha9119_more_than_eight_transitions_fail_closed() -> None:
     assert evidence.state == "settling_unverified"
 
 
-
 @pytest.mark.parametrize("count", [12, 14, 29])
 def test_alpha9120_clean_restarted_session_needs_no_transition_quarantine(
     count: int,
