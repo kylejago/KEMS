@@ -73,7 +73,7 @@ def test_alpha949_release_identity_and_scope() -> None:
     reason = str(bundle["maintenance"]["reason"])
 
     assert manifest["version"] == "0.9.0-alpha9.118"
-    assert reason.startswith("Alpha9.117")
+    assert reason.startswith("Alpha9.118")
     assert "Power Down" in reason
     assert "dashboard/observability" in reason
     assert "joining" in reason
