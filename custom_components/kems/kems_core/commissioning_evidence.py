@@ -650,6 +650,11 @@ def assess_foxess_power_balance(
                     },
                     "residual_kw": round(residual, 3),
                     "tolerance_kw": round(tolerance, 3),
+                    # Read-only mode/write context captured in the same
+                    # coordinator cycle, never evidence for control authority.
+                    "foxess_mode_probe": dict(
+                        getattr(record, "foxess_balance_probe", None) or {}
+                    ),
                 }
             )
             if len(failed_samples) > 8:
