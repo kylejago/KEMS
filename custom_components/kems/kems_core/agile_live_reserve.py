@@ -308,6 +308,22 @@ class PaidAgileUnpluggedContinuity:
             return None
         return value
 
+    @staticmethod
+    def _grid_import_consistent_with_unplugged_house(
+        snapshot: Snapshot, house_kw: float | None, grid_import_kw: float | None
+    ) -> bool:
+        """Distinguish ordinary house imports from unexplained EV demand.
+
+        Only an explicitly unplugged and non-charging EV can use house-load
+        corroboration. Uncertain and connected sources keep the original
+        stricter grid-import threshold.
+        """
+        if house_kw is None or grid_import_kw is None:
+            return False
+        if snapshot.ev_connected is False and snapshot.ev_charging is False:
+            return grid_import_kw <= house_kw + _AGILE_CONNECTED_IDLE_GRID_IMPORT_VETO_KW
+        return grid_import_kw <= _AGILE_CONNECTED_IDLE_GRID_IMPORT_VETO_KW
+
     def permits(self, snapshot: Snapshot, *, now: datetime) -> bool:
         """Recheck physical evidence at the final paid-export command guard."""
         if (
@@ -347,7 +363,9 @@ class PaidAgileUnpluggedContinuity:
             house is not None
             and house <= self._baseline_house_kw + _AGILE_CONNECTED_IDLE_LOAD_STEP_KW
             and grid_import is not None
-            and grid_import <= _AGILE_CONNECTED_IDLE_GRID_IMPORT_VETO_KW
+            and self._grid_import_consistent_with_unplugged_house(
+                snapshot, house, grid_import
+            )
         )
 
     def assess(self, snapshot: Snapshot, *, now: datetime) -> bool:
@@ -376,7 +394,9 @@ class PaidAgileUnpluggedContinuity:
             and snapshot.ev_charging is False
             and house is not None
             and grid_import is not None
-            and grid_import <= _AGILE_CONNECTED_IDLE_GRID_IMPORT_VETO_KW
+            and self._grid_import_consistent_with_unplugged_house(
+                snapshot, house, grid_import
+            )
         ):
             power_age = _finite(snapshot.ev_power_age_seconds)
             fresh_zero_power = bool(
