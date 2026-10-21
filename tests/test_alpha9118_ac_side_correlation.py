@@ -266,3 +266,30 @@ def test_21_oct_adjacent_one_kw_export_is_ac_consistent() -> None:
     assert result["status"] == "ac_cross_check_pass"
     assert result["ac_load_residual_kw"] == pytest.approx(0.0)
     assert not result["hardware_write_authorised"]
+
+
+def test_optional_eps_ct2_load_probes_never_grant_commissioning() -> None:
+    """Additional same-device evidence is retained, not trusted as authority."""
+    sample = _observation()
+    sample.foxess_balance_probe.update(
+        {
+            "inverter_reported_load": {"value": 0.346, "unit": "kW"},
+            "ct2_meter": {"value": 0.0, "unit": "kW"},
+            "eps_ac_output": {"value": 0.0, "unit": "kW"},
+            "pv_power": {"value": 0.0, "unit": "kW"},
+        }
+    )
+    bad = assess_foxess_power_balance(
+        [sample] * 12, positive_is_discharge=True
+    )
+    assert not bad.ready
+    assert bad.balance_percent == 0.0
+    probe = bad.failed_samples[0]["foxess_mode_probe"]
+    assert probe["inverter_reported_load"]["value"] == 0.346
+    assert "ct2_meter" in probe
+    assert "eps_ac_output" in probe
+    assert "pv_power" in probe
+    assert bad.failed_samples[0]["foxess_ac_cross_check"]["informational_only"]
+    assert not bad.failed_samples[0]["foxess_ac_cross_check"][
+        "hardware_write_authorised"
+    ]
