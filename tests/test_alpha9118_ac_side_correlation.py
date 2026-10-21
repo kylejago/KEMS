@@ -775,3 +775,116 @@ def test_alpha9119_more_than_eight_transitions_fail_closed() -> None:
     assert evidence.ac_side_audit["post_command_settling_quarantined_count"] == 9
     assert not evidence.ready
     assert evidence.state == "settling_unverified"
+
+
+
+@pytest.mark.parametrize("count", [12, 14, 29])
+def test_alpha9120_clean_restarted_session_needs_no_transition_quarantine(
+    count: int,
+) -> None:
+    """Real 19:54 Alpha9.119 regression: all 14 records balanced, zero exclusions.
+
+    A previous unconditional 30-sample/two-latest requirement wrongly blocked
+    control after restart, despite a perfect physical balance history.
+    """
+    records = [
+        _alpha9119_mode_change_sample(
+            NOW + timedelta(seconds=i * 25),
+            ac_kw=6.0,
+            ct_kw=5.6,
+            house_kw=0.4,
+            battery_kw=6.0,
+            transition=False,
+        )
+        for i in range(count)
+    ]
+    # AC timing quality is a separate diagnostic when no cohort was waived.
+    # This is physically balanced, though the AC audit is not time aligned.
+    records[-1].foxess_balance_probe["grid_ct"]["last_reported"] = (
+        records[-1].timestamp + timedelta(seconds=1)
+    ).isoformat()
+    evidence = assess_foxess_power_balance(
+        records, positive_is_discharge=True, quarantine_self_use_settling=True
+    )
+    assert evidence.ready
+    assert evidence.state == "balanced"
+    assert evidence.eligible_samples == count
+    assert evidence.balanced_samples == count
+    assert evidence.balance_percent == 100.0
+    assert evidence.ac_side_audit["post_command_settling_quarantined_count"] == 0
+    assert evidence.ac_side_audit["post_command_settling_verified"]
+
+
+def test_alpha9120_clean_11_samples_still_collects() -> None:
+    records = [
+        _alpha9119_mode_change_sample(
+            NOW + timedelta(seconds=i * 25),
+            ac_kw=6.0,
+            ct_kw=5.6,
+            house_kw=0.4,
+            battery_kw=6.0,
+            transition=False,
+        )
+        for i in range(11)
+    ]
+    evidence = assess_foxess_power_balance(
+        records, positive_is_discharge=True, quarantine_self_use_settling=True
+    )
+    assert not evidence.ready
+    assert evidence.state == "collecting"
+
+
+@pytest.mark.parametrize("count,expected_ready", [(30, False), (31, True)])
+def test_alpha9120_real_excluded_transition_needs_30_settled_proofs(
+    count: int, expected_ready: bool
+) -> None:
+    records = [
+        _alpha9119_mode_change_sample(
+            NOW + timedelta(seconds=i * 25),
+            ac_kw=6.0,
+            ct_kw=5.6,
+            house_kw=0.4,
+            battery_kw=6.0,
+            transition=False,
+        )
+        for i in range(count)
+    ]
+    records[4] = _alpha9119_mode_change_sample(
+        records[4].timestamp,
+        ac_kw=6.981,
+        ct_kw=-0.042,
+        house_kw=0.421,
+        battery_kw=7.280,
+        transition=True,
+    )
+    evidence = assess_foxess_power_balance(
+        records, positive_is_discharge=True, quarantine_self_use_settling=True
+    )
+    assert evidence.ready is expected_ready
+    assert evidence.ac_side_audit["post_command_settling_quarantined_count"] == 1
+    assert evidence.eligible_samples == count - 1
+    assert evidence.balanced_samples == count - 1
+    assert evidence.state == ("balanced" if expected_ready else "settling_unverified")
+
+
+def test_alpha9120_no_exclusion_never_waives_genuine_mismatch() -> None:
+    records = [
+        _alpha9119_mode_change_sample(
+            NOW + timedelta(seconds=i * 25),
+            ac_kw=6.0,
+            ct_kw=5.6,
+            house_kw=0.4,
+            battery_kw=6.0,
+            transition=False,
+        )
+        for i in range(14)
+    ]
+    for index in (4, 8):
+        records[index].battery_power_kw = 9.0
+    evidence = assess_foxess_power_balance(
+        records, positive_is_discharge=True, quarantine_self_use_settling=True
+    )
+    assert not evidence.ready
+    assert evidence.balance_percent < 90.0
+    assert evidence.state == "power_balance_mismatch"
+    assert evidence.ac_side_audit["post_command_settling_quarantined_count"] == 0
