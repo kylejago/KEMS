@@ -469,7 +469,6 @@ def test_backend_checks_ct_conflict_before_three_strike_block() -> None:
     assert "self._paid_export_stage_blocked = True" in stage[fail_at:]
 
 
-
 def _history_pair(
     *,
     early_grid_kw: float = 1.074,
