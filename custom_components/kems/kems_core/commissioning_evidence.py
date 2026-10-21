@@ -702,9 +702,17 @@ def _released_backup_ct_recovery(
     if not all(
         isfinite(value)
         for value in (
-            ac_kw, ct_kw, reported_house_kw, actual_house, battery,
-            grid_import, grid_export, raw_import, raw_export,
-            battery_age, load_age,
+            ac_kw,
+            ct_kw,
+            reported_house_kw,
+            actual_house,
+            battery,
+            grid_import,
+            grid_export,
+            raw_import,
+            raw_export,
+            battery_age,
+            load_age,
         )
     ):
         return False
@@ -860,9 +868,7 @@ def assess_foxess_power_balance(
             quarantine_self_use_settling
             and not settling
             and abs(residual) <= tolerance
-            and _released_backup_ct_recovery(
-                record, ac_cross_check=ac_cross_check
-            )
+            and _released_backup_ct_recovery(record, ac_cross_check=ac_cross_check)
         )
         if idle_release_verified:
             safe_release_idle_proof_count += 1
