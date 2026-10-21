@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 import logging
-from math import isfinite
 from dataclasses import replace
 from datetime import date, datetime, timedelta
+from math import isfinite
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import Event, HomeAssistant, callback
