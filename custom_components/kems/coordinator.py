@@ -555,6 +555,42 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
         """Run the complete read-only KEMS analysis pipeline."""
         try:
             snapshot = self._collector.collect()
+            # Read-only timing correlation for commissioning outliers. This
+            # captures the inverter command mode alongside each physical
+            # observation; its metadata never participates in readiness.
+            # The command readback is sampled just AFTER the physical meters,
+            # so record this distinction instead of claiming simultaneity.
+            last_backend = self._foxess_control.status
+            balance_probe = {
+                "observed_after_snapshot_at": dt_util.now().isoformat(),
+                "last_applied_action": last_backend.get("last_applied_action"),
+                "last_write_at": last_backend.get("last_write_at"),
+                "last_write_result": last_backend.get("last_write_result"),
+                "paid_export_stage_samples": last_backend.get(
+                    "paid_export_stage_samples"
+                ),
+                "paid_export_live_proven": last_backend.get(
+                    "paid_export_live_proven"
+                ),
+                "force_discharge_stage_kw": last_backend.get(
+                    "paid_export_stage_kw"
+                ),
+                "commands_permitted_previous_cycle": last_backend.get(
+                    "commands_permitted"
+                ),
+            }
+            if self.data is not None:
+                parity = build_foxess_command_shadow_snapshot(self.hass, self)
+                bindings = parity.get("entity_binding", {}).get("entities", {})
+                for key in ("work_mode", "force_discharge_power"):
+                    bound = bindings.get(key) or {}
+                    balance_probe[key] = {
+                        "value": bound.get("normalised_observation"),
+                        "entity_id": bound.get("observation_entity_id"),
+                        "observation_source": bound.get("observation_source"),
+                        "status": bound.get("status"),
+                    }
+            snapshot.foxess_balance_probe = balance_probe
             # Use the same already-collected physical snapshot as every other
             # KEMS flow. This read-only audit never enters hardware authority.
             snapshot.shared_bus_ev_audit = assess_shared_bus_balance(
