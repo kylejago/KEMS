@@ -608,6 +608,13 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                 for role, candidate_id in (
                     ("inverter_ac_output", prefix + "_rpower"),
                     ("grid_ct", prefix + "_grid_ct"),
+                    # Optional KH registers narrow whether the ~1kW AC/CT
+                    # mismatch is a load/EPS/CT2 routing or register issue.
+                    # Same-device, read-only observations; never actuation.
+                    ("inverter_reported_load", prefix + "_load_power"),
+                    ("ct2_meter", prefix + "_ct2_meter"),
+                    ("eps_ac_output", prefix + "_eps_rpower"),
+                    ("pv_power", prefix + "_pv_power_now"),
                 ):
                     match = registry.async_get(candidate_id)
                     if (
