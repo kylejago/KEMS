@@ -546,7 +546,11 @@ def _diagnostic_source_age(value: Any) -> float | None:
 
 
 def _self_use_register_settling_conflict(
-    record: Any, *, ac_cross_check: dict[str, Any], residual_kw: float, tolerance_kw: float
+    record: Any,
+    *,
+    ac_cross_check: dict[str, Any],
+    residual_kw: float,
+    tolerance_kw: float,
 ) -> bool:
     """Identify a narrow known-bad KH register cohort immediately after our write.
 
@@ -822,15 +826,12 @@ def assess_foxess_power_balance(
 
     # Fail closed while a real mode change is still settling, or if too
     # many scores depend on excluding a source KEMS cannot independently meter.
-    settling_verified = (
-        not quarantine_self_use_settling
-        or (
-            len(settling_quarantined) <= 8
-            and eligible >= max(minimum_samples, 30)
-            and len(recent) >= 2
-            and settled_current_samples.get(len(recent) - 1, False)
-            and settled_current_samples.get(len(recent) - 2, False)
-        )
+    settling_verified = not quarantine_self_use_settling or (
+        len(settling_quarantined) <= 8
+        and eligible >= max(minimum_samples, 30)
+        and len(recent) >= 2
+        and settled_current_samples.get(len(recent) - 1, False)
+        and settled_current_samples.get(len(recent) - 2, False)
     )
     if len(recent) < minimum_samples:
         state = "collecting"
