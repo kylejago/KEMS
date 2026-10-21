@@ -65,6 +65,40 @@ def test_original_mismatch_can_be_ac_consistent_without_granting_control() -> No
     assert not result["hardware_write_authorised"]
 
 
+def test_real_21_oct_0958_live_export_matches_ac_ct_within_four_watts() -> None:
+    """Actual user-observed KH7 export: AC and CT align, DC is different."""
+    sample = _observation(
+        battery_kw=4.890,
+        inverter_kw=6.940,
+        ct_kw=6.778,
+        house_kw=0.158,
+        import_kw=0.0,
+        export_kw=6.778,
+        report_lag_seconds=0.001,
+    )
+    sample.timestamp = datetime(2026, 10, 21, 8, 58, 58, 590635, tzinfo=UTC)
+    # Capture a coordinated group of readings (all within about 3 ms).
+    sample.foxess_balance_probe["observed_after_snapshot_at"] = (
+        sample.timestamp + timedelta(milliseconds=20)
+    ).isoformat()
+    for role in ("inverter_ac_output", "grid_ct"):
+        sample.foxess_balance_probe[role]["last_reported"] = (
+            sample.timestamp - timedelta(milliseconds=2)
+        ).isoformat()
+    sample.source_age_seconds["house_load_kw"] = 0.003
+
+    result = assess_foxess_ac_side_sample(sample)
+    assert result["status"] == "ac_cross_check_pass"
+    assert result["ac_implied_load_kw"] == pytest.approx(0.162)
+    assert result["foxess_reported_load_kw"] == pytest.approx(0.158)
+    assert result["ac_load_residual_kw"] == pytest.approx(0.004)
+    assert result["ct_split_residual_kw"] == pytest.approx(0.0)
+    assert result["battery_dc_minus_inverter_ac_kw"] == pytest.approx(-2.05)
+    assert result["informational_only"]
+    assert not result["independent_load_proven"]
+    assert not result["hardware_write_authorised"]
+
+
 @pytest.mark.parametrize(
     "values",
     [
