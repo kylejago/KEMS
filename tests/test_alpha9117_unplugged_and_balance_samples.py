@@ -94,7 +94,7 @@ def test_fresh_explicit_unplugged_with_unchanged_zero_grid_allows_export() -> No
         {"ev_charging": True},
         {"ev_power_kw": 0.2},
         {"ev_power_kw": 7.0},
-        {"grid_import_kw": 0.5},
+        {"grid_import_kw": 1.2},
         {"house_load_kw": None},
         {"stale_fields": ("grid_import_kw",)},
         {"source_age_seconds": {"house_load_kw": 36.0, "grid_import_kw": 107.0}},
