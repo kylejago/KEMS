@@ -195,3 +195,76 @@ def test_original_rolling_gate_still_rejects_seven_bad_dc_samples() -> None:
     assert assessed.failed_samples[0]["foxess_ac_cross_check"]["status"] == (
         "ac_cross_check_pass"
     )
+
+
+@pytest.mark.parametrize(
+    "clock,dc_kw,ac_kw,ct_kw,house_kw",
+    [
+        # Seven real Alpha9.117 failures, joined to KH7 History within 9.4 s.
+        ("06:34:24", 1.516, 1.397, -0.006, 0.346),
+        ("06:36:37", 1.519, 1.398, 0.017, 0.362),
+        ("06:41:03", 1.513, 1.398, -0.012, 0.349),
+        ("06:43:16", 1.520, 1.400, -0.009, 0.356),
+        ("06:52:10", 1.397, 1.279, -0.009, 0.299),
+        ("07:05:19", 1.543, 1.426, -0.014, 0.364),
+        ("07:13:57", 1.469, 1.342, -0.019, 0.348),
+    ],
+)
+def test_21_oct_seven_live_commissioning_failures_are_ac_ct_load_disagreements(
+    clock: str,
+    dc_kw: float,
+    ac_kw: float,
+    ct_kw: float,
+    house_kw: float,
+) -> None:
+    """The missing 1kW is on the CT/load boundary, not DC-to-AC loss.
+
+    These are REAL recorded values from a single KH7. The reported grid split
+    is derived from signed CT and thus is NOT an independent validation.
+    Do not waive either the failed-commissioning threshold or DNO/EV guards.
+    """
+    hours, minutes, seconds = (int(piece) for piece in clock.split(":"))
+    timestamp = datetime(
+        2026, 10, 21, hours - 1, minutes, seconds, tzinfo=UTC
+    )
+    sample = _observation(
+        battery_kw=dc_kw,
+        inverter_kw=ac_kw,
+        ct_kw=ct_kw,
+        house_kw=house_kw,
+        import_kw=max(-ct_kw, 0.0),
+        export_kw=max(ct_kw, 0.0),
+    )
+    sample.timestamp = timestamp
+    sample.foxess_balance_probe["observed_after_snapshot_at"] = (
+        timestamp + timedelta(milliseconds=100)
+    ).isoformat()
+    for role in ("inverter_ac_output", "grid_ct"):
+        sample.foxess_balance_probe[role]["last_reported"] = (
+            timestamp - timedelta(seconds=9)
+        ).isoformat()
+    sample.source_age_seconds["house_load_kw"] = 9.0
+
+    result = assess_foxess_ac_side_sample(sample)
+    assert result["status"] == "ac_load_mismatch"
+    assert result["ac_load_residual_kw"] > 0.9
+    assert 0.10 <= result["battery_dc_minus_inverter_ac_kw"] <= 0.14
+    assert result["ct_split_residual_kw"] == pytest.approx(0.0)
+    assert not result["independent_load_proven"]
+    assert not result["hardware_write_authorised"]
+
+
+def test_21_oct_adjacent_one_kw_export_is_ac_consistent() -> None:
+    """Same stage and battery power, but a 1.052kW positive CT reading."""
+    sample = _observation(
+        battery_kw=1.513,
+        inverter_kw=1.397,
+        ct_kw=1.052,
+        house_kw=0.345,
+        import_kw=0.0,
+        export_kw=1.052,
+    )
+    result = assess_foxess_ac_side_sample(sample)
+    assert result["status"] == "ac_cross_check_pass"
+    assert result["ac_load_residual_kw"] == pytest.approx(0.0)
+    assert not result["hardware_write_authorised"]
