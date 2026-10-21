@@ -279,9 +279,7 @@ def test_optional_eps_ct2_load_probes_never_grant_commissioning() -> None:
             "pv_power": {"value": 0.0, "unit": "kW"},
         }
     )
-    bad = assess_foxess_power_balance(
-        [sample] * 12, positive_is_discharge=True
-    )
+    bad = assess_foxess_power_balance([sample] * 12, positive_is_discharge=True)
     assert not bad.ready
     assert bad.balance_percent == 0.0
     probe = bad.failed_samples[0]["foxess_mode_probe"]
@@ -290,6 +288,4 @@ def test_optional_eps_ct2_load_probes_never_grant_commissioning() -> None:
     assert "eps_ac_output" in probe
     assert "pv_power" in probe
     assert bad.failed_samples[0]["foxess_ac_cross_check"]["informational_only"]
-    assert not bad.failed_samples[0]["foxess_ac_cross_check"][
-        "hardware_write_authorised"
-    ]
+    assert not bad.failed_samples[0]["foxess_ac_cross_check"]["hardware_write_authorised"]
