@@ -142,9 +142,7 @@ def test_original_rolling_gate_still_rejects_seven_bad_dc_samples() -> None:
         for role in ("inverter_ac_output", "grid_ct"):
             sample.foxess_balance_probe[role] = {
                 **sample.foxess_balance_probe[role],
-                "last_reported": (
-                    sample.timestamp - timedelta(seconds=1)
-                ).isoformat(),
+                "last_reported": (sample.timestamp - timedelta(seconds=1)).isoformat(),
             }
         if i >= 7:
             sample.battery_power_kw = 1.846
