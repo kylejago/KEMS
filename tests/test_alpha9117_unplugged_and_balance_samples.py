@@ -111,6 +111,38 @@ def test_no_export_when_explicit_disconnection_or_physical_proof_missing(
     assert applied.desired_battery_export_power_kw == 0.0, report
 
 
+@pytest.mark.parametrize(
+    "house_kw, import_kw, permitted",
+    [
+        (0.305, 0.307, True),  # real Alpha9.117 observation
+        (0.5, 0.65, True),  # house import with bounded CT discrepancy
+        (0.305, 0.9, False),  # unexplained physical grid demand
+        (0.0, 0.35, False),  # no home demand to explain import
+    ],
+)
+def test_confirmed_unplugged_house_grid_import_not_mistaken_for_ev(
+    house_kw: float, import_kw: float, permitted: bool
+) -> None:
+    snapshot = _snapshot(house_load_kw=house_kw, grid_import_kw=import_kw)
+    proof = PaidAgileUnpluggedContinuity()
+    assert proof.assess(snapshot, now=NOW) is permitted
+    applied, _ = _export(snapshot, proof)
+    assert (applied.desired_battery_export_power_kw > 0.0) is permitted
+
+
+def test_uncertain_ev_cannot_use_house_load_to_authorise_export() -> None:
+    snapshot = _snapshot(
+        ev_connected=None,
+        ev_charging=None,
+        house_load_kw=0.305,
+        grid_import_kw=0.307,
+    )
+    proof = PaidAgileUnpluggedContinuity()
+    assert not proof.assess(snapshot, now=NOW)
+    applied, _ = _export(snapshot, proof)
+    assert applied.desired_battery_export_power_kw == 0.0
+
+
 def test_uncertain_connection_does_not_inherit_relaxed_grid_age() -> None:
     proof = PaidAgileUnpluggedContinuity()
     fresh = _snapshot(source_age_seconds={"house_load_kw": 9.0, "grid_import_kw": 9.0})
@@ -164,6 +196,7 @@ def test_power_balance_threshold_unchanged_and_failed_samples_bounded() -> None:
     assert first["source_ages_seconds"]["grid_import_kw"] is None
     assert first["residual_kw"] == pytest.approx(6.7)
     assert first["tolerance_kw"] == pytest.approx(1.08)
+    assert first["foxess_mode_probe"] == {}
 
     recovered = assess_foxess_power_balance(
         [_physical_record(i, bad=i < 4) for i in range(60)],
