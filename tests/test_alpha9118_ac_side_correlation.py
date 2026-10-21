@@ -224,9 +224,7 @@ def test_21_oct_seven_live_commissioning_failures_are_ac_ct_load_disagreements(
     Do not waive either the failed-commissioning threshold or DNO/EV guards.
     """
     hours, minutes, seconds = (int(piece) for piece in clock.split(":"))
-    timestamp = datetime(
-        2026, 10, 21, hours - 1, minutes, seconds, tzinfo=UTC
-    )
+    timestamp = datetime(2026, 10, 21, hours - 1, minutes, seconds, tzinfo=UTC)
     sample = _observation(
         battery_kw=dc_kw,
         inverter_kw=ac_kw,
