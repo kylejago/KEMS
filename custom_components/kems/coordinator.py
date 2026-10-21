@@ -5,9 +5,11 @@ from __future__ import annotations
 import logging
 from dataclasses import replace
 from datetime import date, datetime, timedelta
+from math import isfinite
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import Event, HomeAssistant, callback
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.event import async_call_later, async_track_state_change_event
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
@@ -555,6 +557,92 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
         """Run the complete read-only KEMS analysis pipeline."""
         try:
             snapshot = self._collector.collect()
+            # Read-only timing correlation for commissioning outliers. This
+            # captures the inverter command mode alongside each physical
+            # observation; its metadata never participates in readiness.
+            # The command readback is sampled just AFTER the physical meters,
+            # so record this distinction instead of claiming simultaneity.
+            last_backend = self._foxess_control.status
+            balance_probe = {
+                "observed_after_snapshot_at": dt_util.now().isoformat(),
+                "last_applied_action": last_backend.get("last_applied_action"),
+                "last_write_at": last_backend.get("last_write_at"),
+                "last_write_result": last_backend.get("last_write_result"),
+                "paid_export_stage_samples": last_backend.get(
+                    "paid_export_stage_samples"
+                ),
+                "paid_export_live_proven": last_backend.get("paid_export_live_proven"),
+                "force_discharge_stage_kw": last_backend.get("paid_export_stage_kw"),
+                "commands_permitted_previous_cycle": last_backend.get(
+                    "commands_permitted"
+                ),
+            }
+            if self.data is not None:
+                parity = build_foxess_command_shadow_snapshot(self.hass, self)
+                bindings = parity.get("entity_binding", {}).get("entities", {})
+                for key in ("work_mode", "force_discharge_power"):
+                    bound = bindings.get(key) or {}
+                    balance_probe[key] = {
+                        "value": bound.get("normalised_observation"),
+                        "entity_id": bound.get("observation_entity_id"),
+                        "observation_source": bound.get("observation_source"),
+                        "status": bound.get("status"),
+                    }
+            # KH7's battery power is on the battery/DC side while the
+            # inverter AC-output register is a distinct physical quantity.
+            # Correlate both without assuming AC == DC or using this evidence
+            # to bypass commissioning. Scope optional registers to the same
+            # FoxESS device as the configured battery source.
+            registry = er.async_get(self.hass)
+            battery_entry = registry.async_get(self.entities.battery_power_kw or "")
+            battery_entity_id = self.entities.battery_power_kw or ""
+            if (
+                battery_entry is not None
+                and battery_entry.device_id
+                and (
+                    battery_entity_id.startswith("sensor.")
+                    and battery_entity_id.endswith("_invbatpower")
+                )
+            ):
+                prefix = battery_entity_id.removesuffix("_invbatpower")
+                for role, candidate_id in (
+                    ("inverter_ac_output", prefix + "_rpower"),
+                    ("grid_ct", prefix + "_grid_ct"),
+                    # The owner confirms one shared grid/EPS/Henley path.
+                    # CT2 is physically disconnected. Only correlate the
+                    # meaningful same-device AC/load observations with the
+                    # work-mode / Force Discharge probe recorded above.
+                    # No optional register provides write authority.
+                    ("inverter_reported_load", prefix + "_load_power"),
+                ):
+                    match = registry.async_get(candidate_id)
+                    if (
+                        match is None
+                        or match.device_id != battery_entry.device_id
+                        or match.platform != battery_entry.platform
+                    ):
+                        continue
+                    state = self.hass.states.get(candidate_id)
+                    if state is None:
+                        continue
+                    try:
+                        value = float(state.state)
+                    except (TypeError, ValueError):
+                        value = None
+                    if value is not None and not isfinite(value):
+                        value = None
+                    balance_probe[role] = {
+                        "entity_id": candidate_id,
+                        "value": value,
+                        "unit": state.attributes.get("unit_of_measurement"),
+                        "last_updated": state.last_updated.isoformat(),
+                        "last_reported": (
+                            state.last_reported.isoformat()
+                            if getattr(state, "last_reported", None) is not None
+                            else None
+                        ),
+                    }
+            snapshot.foxess_balance_probe = balance_probe
             # Use the same already-collected physical snapshot as every other
             # KEMS flow. This read-only audit never enters hardware authority.
             snapshot.shared_bus_ev_audit = assess_shared_bus_balance(

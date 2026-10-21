@@ -29,6 +29,7 @@ from .kems_core.control_write_authority import (
     resolve_live_min_soc_on_grid,
     should_freeze_owned_ev_hold,
 )
+from .kems_core.foxess_ac_balance import paid_export_stage_ct_conflict
 from .product_types import EXPORT_TARIFF_TYPE_AGILE, export_tariff_type_from_options
 
 _STORAGE_VERSION = 1
@@ -660,6 +661,32 @@ class FoxESSControlBackend:
                 "with active solar; PV-only export is not battery proof"
             )
             return
+        # When fresh inverter-AC and battery observations indicate output
+        # but the primary grid CT briefly drops ~1 kW while the reported
+        # house load stays low, the physical telemetry disagrees. This does
+        # NOT prove export, and it does NOT prove that Force Discharge failed.
+        # Keep 1 kW staging and clear *success* progress; do not increment
+        # hardware-failure strikes or promote to unproven full-power export.
+        # Genuine, internally consistent missing-export samples still follow
+        # the ordinary 3-strike lockout below.
+        if (
+            not direction_verified
+            and grid_export < _PAID_EXPORT_MIN_GRID_EXPORT_KW
+            and paid_export_stage_ct_conflict(
+                snapshot,
+                positive_is_discharge=bool(
+                    getattr(config, "battery_power_positive_is_discharge", True)
+                ),
+            )
+        ):
+            self._paid_export_stage_samples = 0
+            self._paid_export_stage_reason = (
+                "1 kW export proof inconclusive: inverter AC, primary grid CT "
+                "and house-load reports disagree; waiting for consistent "
+                "physical grid export evidence"
+            )
+            return
+
         # A shortfall in *net* grid export is inconclusive when the house
         # consumes the staged battery output. Do not count that as a hardware
         # direction failure or persist an unjustified lockout.
