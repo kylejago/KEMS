@@ -480,6 +480,7 @@ def _history_pair(
     early_battery_kw: float = 1.516,
     late_battery_kw: float = 1.516,
     late_seconds: int = 66,
+    start_utc: tuple[int, int, int] = (5, 33, 9),
 ) -> tuple[SimpleNamespace, SimpleNamespace]:
     """Replay two FoxESS register cohorts from 06:33:09 and 06:34:15 BST."""
     snapshots = []
@@ -489,7 +490,7 @@ def _history_pair(
             (late_grid_kw, late_ac_kw, late_house_kw, late_battery_kw),
         )
     ):
-        at = datetime(2026, 10, 21, 5, 33, 9, tzinfo=UTC)
+        at = datetime(2026, 10, 21, *start_utc, tzinfo=UTC)
         if index:
             at += timedelta(seconds=late_seconds)
         sample = _observation(
@@ -574,3 +575,28 @@ def test_ct_step_audit_fails_closed_on_stale_modbus_cohort() -> None:
     assert assess_foxess_ac_ct_transition(early, late)["status"] == (
         "no_comparable_transition"
     )
+
+
+
+def test_ct_disagreement_persists_across_two_actual_physical_cohorts() -> None:
+    """06:36:28 to 06:37:26: grid CT stayed near zero for 58 seconds."""
+    first, second = _history_pair(
+        early_grid_kw=0.017,
+        late_grid_kw=0.029,
+        early_ac_kw=1.398,
+        late_ac_kw=1.395,
+        early_house_kw=0.362,
+        late_house_kw=0.345,
+        early_battery_kw=1.519,
+        late_battery_kw=1.512,
+        late_seconds=58,
+        start_utc=(5, 36, 28),
+    )
+    result = assess_foxess_ac_ct_transition(first, second)
+    assert result["status"] == "ct_load_disagreement_persists_across_cohorts"
+    assert result["seconds_between_samples"] == 58.0
+    assert result["grid_ct_change_kw"] == pytest.approx(0.012)
+    assert result["inverter_ac_change_kw"] == pytest.approx(-0.003)
+    assert result["reported_house_change_kw"] == pytest.approx(-0.017)
+    assert not result["ct_hardware_fault_proven"]
+    assert not result["hardware_write_authorised"]
