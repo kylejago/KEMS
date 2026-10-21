@@ -689,9 +689,7 @@ def _alpha9119_history(
     return records
 
 
-def test_alpha9119_seven_real_1910_transition_values_do_not_poison_statistical_gate() -> (
-    None
-):
+def test_alpha9119_seven_real_transitions_are_quarantined() -> None:
     records = _alpha9119_history()
     strict = assess_foxess_power_balance(records, positive_is_discharge=True)
     assert strict.balanced_samples == 53
