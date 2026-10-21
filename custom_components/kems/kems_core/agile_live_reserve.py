@@ -321,7 +321,9 @@ class PaidAgileUnpluggedContinuity:
         if house_kw is None or grid_import_kw is None:
             return False
         if snapshot.ev_connected is False and snapshot.ev_charging is False:
-            return grid_import_kw <= house_kw + _AGILE_CONNECTED_IDLE_GRID_IMPORT_VETO_KW
+            return (
+                grid_import_kw <= house_kw + _AGILE_CONNECTED_IDLE_GRID_IMPORT_VETO_KW
+            )
         return grid_import_kw <= _AGILE_CONNECTED_IDLE_GRID_IMPORT_VETO_KW
 
     def permits(self, snapshot: Snapshot, *, now: datetime) -> bool:
