@@ -645,7 +645,7 @@ def assess_foxess_power_balance(
     transition_examples: list[dict[str, Any]] = []
     previous_eligible: Any = None
     settling_quarantined: list[dict[str, Any]] = []
-    settled_current_samples: list[bool] = []
+    settled_current_samples: dict[int, bool] = {}
     balanced = 0
     invalid = 0
     required = set(
@@ -654,7 +654,7 @@ def assess_foxess_power_balance(
         else FOXESS_SITE_TELEMETRY_FIELDS
     )
 
-    for record in recent:
+    for record_index, record in enumerate(recent):
         if required & set(getattr(record, "stale_fields", ()) or ()):
             continue
         values: dict[str, float] = {}
@@ -741,7 +741,7 @@ def assess_foxess_power_balance(
             )
         else:
             residuals.append(residual)
-        settled_current_samples.append(
+        settled_current_samples[record_index] = (
             not settling
             and abs(residual) <= tolerance
             and ac_cross_check.get("status") == "ac_cross_check_pass"
@@ -827,8 +827,9 @@ def assess_foxess_power_balance(
         or (
             len(settling_quarantined) <= 8
             and eligible >= max(minimum_samples, 30)
-            and len(settled_current_samples) >= 2
-            and all(settled_current_samples[-2:])
+            and len(recent) >= 2
+            and settled_current_samples.get(len(recent) - 1, False)
+            and settled_current_samples.get(len(recent) - 2, False)
         )
     )
     if len(recent) < minimum_samples:
