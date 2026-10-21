@@ -217,3 +217,138 @@ def test_only_agile_branch_passes_verified_unplugged_proof() -> None:
     )
     assert "unplugged_continuity=self._paid_agile_unplugged_continuity" in coordinator
     assert "self._paid_agile_unplugged_continuity.clear()" in coordinator
+
+
+
+def _fresh_coherent_export_with_aged_zero_import(
+    at: datetime, **changes: object
+) -> Snapshot:
+    """Replay Alpha9.118's 17:08 KH7 split-grid cohort and stale zero import."""
+    ac_kw = 5.512
+    export_kw = 5.255
+    house_kw = 0.263
+    meter_at = (at - timedelta(seconds=9)).isoformat()
+    fields: dict[str, object] = {
+        "house_load_kw": house_kw,
+        "grid_import_kw": 0.0,
+        "grid_export_kw": export_kw,
+        "raw_grid_import_kw": 0.0,
+        "raw_grid_export_kw": export_kw,
+        "grid_flow_mode": "separate_positive_sources",
+        "source_age_seconds": {
+            "house_load_kw": 9.0,
+            "grid_import_kw": 2633.5,
+            "grid_export_kw": 9.0,
+            "battery_soc": 9.0,
+            "battery_power_kw": 9.0,
+        },
+        "foxess_balance_probe": {
+            "inverter_ac_output": {
+                "value": ac_kw,
+                "last_reported": meter_at,
+            },
+            "grid_ct": {"value": export_kw, "last_reported": meter_at},
+            "inverter_reported_load": {
+                "value": house_kw,
+                "last_reported": meter_at,
+            },
+        },
+    }
+    fields.update(changes)
+    return _snapshot(at, **fields)
+
+
+def test_alpha9119_fresh_split_ct_keeps_unplugged_export_during_brief_ohme_loss() -> (
+    None
+):
+    proof = PaidAgileUnpluggedContinuity()
+    # Fresh explicit disconnection arms the proof even when the cloud Ohme
+    # power entity itself is unavailable; the unchanged zero import alone
+    # must NOT be considered fresh.
+    anchored = _fresh_coherent_export_with_aged_zero_import(
+        NOW, ev_power_kw=None, ev_power_age_seconds=None
+    )
+    assert proof.assess(anchored, now=NOW)
+    assert proof.status["assessment"] == "permitted_explicit_unplugged_physical_proof"
+    at = NOW + timedelta(seconds=45)
+    outage = _fresh_coherent_export_with_aged_zero_import(
+        at,
+        ev_connected=None,
+        ev_charging=None,
+        ev_power_kw=None,
+        ev_power_age_seconds=None,
+    )
+    assert proof.assess(outage, now=at)
+    desired, report = _guard(outage, proof, when=at)
+    assert report["status"] == "permitted_with_physical_house_budget"
+    assert desired.desired_battery_export_power_kw == pytest.approx(5.177)
+    # Never renew or perpetuate cloud outage from CT data alone.
+    later = at + timedelta(seconds=91)
+    assert not proof.assess(
+        _fresh_coherent_export_with_aged_zero_import(
+            later,
+            ev_connected=None,
+            ev_charging=None,
+            ev_power_kw=None,
+            ev_power_age_seconds=None,
+        ),
+        now=later,
+    )
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        {"grid_flow_mode": "signed_grid_source"},
+        {"raw_grid_import_kw": None},
+        {"raw_grid_import_kw": 0.35},
+        {"grid_import_kw": 0.35},
+        {"raw_grid_export_kw": 0.0},
+        {"grid_export_kw": 0.0},
+        {"source_age_seconds": {
+            "house_load_kw": 9.0,
+            "grid_import_kw": 2633.5,
+            "grid_export_kw": 45.0,
+        }},
+        {"stale_fields": ("grid_import_kw",)},
+        {"stale_fields": ("grid_export_kw",)},
+        {"foxess_balance_probe": {}},
+        {"foxess_balance_probe": {
+            "inverter_ac_output": {
+                "value": 6.98,
+                "last_reported": (NOW - timedelta(seconds=9)).isoformat(),
+            },
+            "grid_ct": {
+                "value": 0.666,
+                "last_reported": (NOW - timedelta(seconds=9)).isoformat(),
+            },
+            "inverter_reported_load": {
+                "value": 0.272,
+                "last_reported": (NOW - timedelta(seconds=9)).isoformat(),
+            },
+        }},
+    ],
+)
+def test_alpha9119_split_ct_proof_refuses_stale_contradictory_or_untrusted_sources(
+    change: dict[str, object],
+) -> None:
+    proof = PaidAgileUnpluggedContinuity()
+    sample = _fresh_coherent_export_with_aged_zero_import(NOW, **change)
+    assert not proof.assess(sample, now=NOW)
+    assert _guard(sample, proof, when=NOW)[0].desired_battery_export_power_kw == 0.0
+
+
+def test_alpha9119_ct_without_prior_disconnection_does_not_authorise_unknown_ev() -> (
+    None
+):
+    proof = PaidAgileUnpluggedContinuity()
+    at = NOW + timedelta(seconds=10)
+    untrusted = _fresh_coherent_export_with_aged_zero_import(
+        at,
+        ev_connected=None,
+        ev_charging=None,
+        ev_power_kw=None,
+        ev_power_age_seconds=None,
+    )
+    assert not proof.assess(untrusted, now=at)
+    assert _guard(untrusted, proof, when=at)[0].desired_battery_export_power_kw == 0.0
