@@ -335,7 +335,14 @@ def test_21_oct_ct_changes_one_kw_while_inverter_and_house_remain_stable() -> No
 
 def test_constant_zero_ct2_is_not_a_secondary_source_proof() -> None:
     """The flat -0.0kW CT2 history cannot resolve the KH7 grid mismatch."""
-    sample = _observation()
+    sample = _observation(
+        battery_kw=1.519,
+        inverter_kw=1.398,
+        ct_kw=0.017,
+        house_kw=0.362,
+        import_kw=0.0,
+        export_kw=0.017,
+    )
     sample.foxess_balance_probe["ct2_meter"] = {
         "value": -0.0,
         "unit": "kW",
