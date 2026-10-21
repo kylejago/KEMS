@@ -244,10 +244,11 @@ def assess_foxess_ac_ct_transition(previous: Any, current: Any) -> dict[str, Any
         return result
     prior = assess_foxess_ac_side_sample(previous)
     now = assess_foxess_ac_side_sample(current)
-    if prior["status"] != "ac_cross_check_pass":
+    if prior["status"] not in ("ac_cross_check_pass", "ac_load_mismatch"):
         return result
     if now["status"] != "ac_load_mismatch":
-        result["status"] = "no_ac_disagreement"
+        if now["status"] == "ac_cross_check_pass":
+            result["status"] = "no_ac_disagreement"
         return result
     ac_previous = _number(prior.get("inverter_ac_kw"))
     ac_now = _number(now.get("inverter_ac_kw"))
@@ -297,7 +298,8 @@ def assess_foxess_ac_ct_transition(previous: Any, current: Any) -> dict[str, Any
         }
     )
     if (
-        ct_previous > 0.75
+        prior["status"] == "ac_cross_check_pass"
+        and ct_previous > 0.75
         and -0.25 <= ct_now <= 0.25
         and delta_ct < -0.75
         and abs(delta_ac) <= 0.2
@@ -306,4 +308,18 @@ def assess_foxess_ac_ct_transition(previous: Any, current: Any) -> dict[str, Any
         and abs(delta_solar) <= 0.3
     ):
         result["status"] = "ct_export_step_without_matching_source_or_load_step"
+    elif (
+        prior["status"] == "ac_load_mismatch"
+        and -0.25 <= ct_previous <= 0.25
+        and -0.25 <= ct_now <= 0.25
+        and ac_previous >= 1.0
+        and ac_now >= 1.0
+        and 0.75 <= prior["ac_load_residual_kw"] <= 1.75
+        and 0.75 <= now["ac_load_residual_kw"] <= 1.75
+        and abs(delta_ac) <= 0.2
+        and abs(delta_house) <= 0.2
+        and abs(delta_battery) <= 0.3
+        and abs(delta_solar) <= 0.3
+    ):
+        result["status"] = "ct_load_disagreement_persists_across_cohorts"
     return result
