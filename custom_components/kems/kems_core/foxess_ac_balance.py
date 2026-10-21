@@ -162,3 +162,54 @@ def assess_foxess_ac_side_sample(
     elif abs(ac_residual_kw) > absolute_tolerance_kw:
         result["status"] = "ac_load_mismatch"
     return result
+
+
+
+def paid_export_stage_ct_conflict(
+    observation: Any, *, positive_is_discharge: bool = True
+) -> bool:
+    """Identify contradictory, *not disproven*, physical 1 kW export evidence.
+
+    A KH7 may report roughly 1.4 kW inverter AC output, 1.5 kW battery
+    discharge and 0.35 kW house load while its CT unexpectedly reports near
+    zero export. This cannot prove grid export or a failed inverter write.
+    It cannot make the commissioning gate pass or grant hardware authority.
+
+    Apply only to recent, time-coherent, solar-low, battery-AC-agreeing
+    observations. Missing or stale probes are NOT treated as a CT conflict.
+    """
+    check = assess_foxess_ac_side_sample(observation)
+    if check["status"] != "ac_load_mismatch":
+        return False
+    residual = _number(check.get("ac_load_residual_kw"))
+    inverter = _number(check.get("inverter_ac_kw"))
+    house = _number(check.get("foxess_reported_load_kw"))
+    grid_ct = _number(check.get("grid_ct_kw"))
+    battery = _number(getattr(observation, "battery_power_kw", None))
+    solar = _number(getattr(observation, "solar_power_kw", None))
+    grid_export = _number(getattr(observation, "grid_export_kw", None))
+    if None in (residual, inverter, house, grid_ct, battery, solar, grid_export):
+        return False
+    assert residual is not None and inverter is not None and house is not None
+    assert grid_ct is not None and battery is not None and solar is not None
+    assert grid_export is not None
+    signed_battery = battery if positive_is_discharge else -battery
+    stale = set(getattr(observation, "stale_fields", ()) or ())
+    if {
+        "battery_power_kw",
+        "solar_power_kw",
+        "house_load_kw",
+        "grid_export_kw",
+        "grid_import_kw",
+    } & stale:
+        return False
+    return bool(
+        0.75 < residual < 1.75
+        and 1.0 <= inverter <= 2.5
+        and 0.0 <= house <= 1.5
+        and -0.2 <= grid_ct <= 0.2
+        and grid_export < 0.2
+        and solar < 0.5
+        and signed_battery >= 0.25
+        and abs(signed_battery + solar - inverter) <= 0.4
+    )
