@@ -626,6 +626,7 @@ def _alpha9119_mode_change_sample(
     sample.timestamp = at
     sample.foxess_balance_probe.update(
         {
+            "observed_after_snapshot_at": (at + timedelta(milliseconds=25)).isoformat(),
             "last_applied_action": "self_use" if transition else "force_discharge",
             "last_write_at": write_at.isoformat(),
             "last_write_result": "Alpha9.67 bounded FoxESS command applied",
