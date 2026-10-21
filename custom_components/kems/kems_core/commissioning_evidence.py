@@ -13,7 +13,10 @@ from dataclasses import dataclass
 from math import isfinite
 from typing import Any
 
-from .foxess_ac_balance import assess_foxess_ac_side_sample
+from .foxess_ac_balance import (
+    assess_foxess_ac_ct_transition,
+    assess_foxess_ac_side_sample,
+)
 
 FOXESS_SITE_TELEMETRY_FIELDS: tuple[str, ...] = (
     "solar_power_kw",
@@ -564,6 +567,9 @@ def assess_foxess_power_balance(
     residuals: list[float] = []
     failed_samples: list[dict[str, Any]] = []
     ac_statuses: Counter[str] = Counter()
+    transition_statuses: Counter[str] = Counter()
+    transition_examples: list[dict[str, Any]] = []
+    previous_eligible: Any = None
     balanced = 0
     invalid = 0
     required = set(
@@ -634,6 +640,31 @@ def assess_foxess_power_balance(
         # only failing DC/AC mixed-boundary samples. Never promote them to proof.
         ac_cross_check = assess_foxess_ac_side_sample(record)
         ac_statuses[str(ac_cross_check["status"])] += 1
+        ac_transition = (
+            assess_foxess_ac_ct_transition(previous_eligible, record)
+            if previous_eligible is not None
+            else None
+        )
+        previous_eligible = record
+        if ac_transition is not None:
+            transition_statuses[str(ac_transition["status"])] += 1
+            if (
+                ac_transition["status"]
+                == "ct_export_step_without_matching_source_or_load_step"
+            ):
+                current_time = getattr(record, "timestamp", None)
+                transition_examples.append(
+                    {
+                        "timestamp": (
+                            current_time.isoformat()
+                            if hasattr(current_time, "isoformat")
+                            else None
+                        ),
+                        **ac_transition,
+                    }
+                )
+                if len(transition_examples) > 8:
+                    del transition_examples[:-8]
         if abs(residual) <= tolerance:
             balanced += 1
         else:
@@ -667,6 +698,7 @@ def assess_foxess_power_balance(
                         getattr(record, "foxess_balance_probe", None) or {}
                     ),
                     "foxess_ac_cross_check": ac_cross_check,
+                    "foxess_ac_transition": ac_transition,
                 }
             )
             if len(failed_samples) > 8:
@@ -717,7 +749,13 @@ def assess_foxess_power_balance(
             "hardware_write_authorised": False,
             "eligible_samples": eligible,
             "status_counts": dict(sorted(ac_statuses.items())),
-            "caveat": "Calculated FoxESS Load Power may make AC identity circular",
+            "transition_status_counts": dict(sorted(transition_statuses.items())),
+            "ct_export_step_examples": transition_examples,
+            "caveat": (
+                "KH Load Power, RPower and Grid CT are distinct Modbus registers "
+                "but may be computed or filtered by FoxESS firmware; CT steps "
+                "do not prove the CT clamp or house meter is physically faulty"
+            ),
         },
     )
 
