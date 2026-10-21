@@ -392,7 +392,7 @@ def test_healthy_one_kw_export_remains_eligible_for_physical_proof() -> None:
         ct_kw=1.052,
         house_kw=0.345,
         import_kw=0.0,
-        export_kw=1.052
+        export_kw=1.052,
     )
     assert not paid_export_stage_ct_conflict(sample)
     assert assess_foxess_ac_side_sample(sample)["status"] == "ac_cross_check_pass"
@@ -419,7 +419,7 @@ def test_ct_conflict_does_not_hide_other_failure_types(
         ct_kw=0.017,
         house_kw=0.362,
         import_kw=0.0,
-        export_kw=0.017
+        export_kw=0.017,
     )
     defaults.update(changes)
     assert not paid_export_stage_ct_conflict(_observation(**defaults))
@@ -432,7 +432,7 @@ def test_ct_conflict_does_not_hide_solar_missing_or_stale_proof() -> None:
         ct_kw=0.017,
         house_kw=0.362,
         import_kw=0.0,
-        export_kw=0.017
+        export_kw=0.017,
     )
     sample.solar_power_kw = 1.0
     assert not paid_export_stage_ct_conflict(sample)
@@ -445,7 +445,7 @@ def test_ct_conflict_does_not_hide_solar_missing_or_stale_proof() -> None:
         ct_kw=0.017,
         house_kw=0.362,
         import_kw=0.0,
-        export_kw=0.017
+        export_kw=0.017,
     )
     sample.stale_fields = ("grid_import_kw",)
     assert not paid_export_stage_ct_conflict(sample)
