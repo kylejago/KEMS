@@ -268,25 +268,22 @@ def test_21_oct_adjacent_one_kw_export_is_ac_consistent() -> None:
     assert not result["hardware_write_authorised"]
 
 
-def test_optional_eps_ct2_load_probes_never_grant_commissioning() -> None:
-    """Additional same-device evidence is retained, not trusted as authority."""
+def test_same_path_load_probe_never_grants_commissioning() -> None:
+    """Only compare live shared-path registers; mode context stays diagnostic."""
     sample = _observation()
-    sample.foxess_balance_probe.update(
-        {
-            "inverter_reported_load": {"value": 0.346, "unit": "kW"},
-            "ct2_meter": {"value": 0.0, "unit": "kW"},
-            "eps_ac_output": {"value": 0.0, "unit": "kW"},
-            "pv_power": {"value": 0.0, "unit": "kW"},
-        }
-    )
+    sample.foxess_balance_probe["inverter_reported_load"] = {
+        "value": 0.346,
+        "unit": "kW",
+    }
     bad = assess_foxess_power_balance([sample] * 12, positive_is_discharge=True)
     assert not bad.ready
     assert bad.balance_percent == 0.0
     probe = bad.failed_samples[0]["foxess_mode_probe"]
     assert probe["inverter_reported_load"]["value"] == 0.346
-    assert "ct2_meter" in probe
-    assert "eps_ac_output" in probe
-    assert "pv_power" in probe
+    assert probe["force_discharge_stage_kw"] == 1.0
+    assert probe["last_applied_action"] == "force_discharge"
+    assert "ct2_meter" not in probe
+    assert "eps_ac_output" not in probe
     assert bad.failed_samples[0]["foxess_ac_cross_check"]["informational_only"]
     assert not bad.failed_samples[0]["foxess_ac_cross_check"][
         "hardware_write_authorised"
