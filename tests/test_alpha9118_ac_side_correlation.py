@@ -577,7 +577,6 @@ def test_ct_step_audit_fails_closed_on_stale_modbus_cohort() -> None:
     )
 
 
-
 def test_ct_disagreement_persists_across_two_actual_physical_cohorts() -> None:
     """06:36:28 to 06:37:26: grid CT stayed near zero for 58 seconds."""
     first, second = _history_pair(
