@@ -22,7 +22,6 @@ from homeassistant.loader import async_get_integration
 from .const import DOMAIN, STORAGE_NAMESPACE
 from .foxess_command_shadow import build_foxess_command_shadow_snapshot
 from .foxess_modbus_contract import FOXESS_MODBUS_REVIEWED_VERSION
-from .kems_core.foxess_ac_balance import paid_export_stage_ct_conflict
 from .kems_core.control_write_authority import (
     FoxESSControlDecision,
     assess_foxess_control_write_authority,
@@ -30,6 +29,7 @@ from .kems_core.control_write_authority import (
     resolve_live_min_soc_on_grid,
     should_freeze_owned_ev_hold,
 )
+from .kems_core.foxess_ac_balance import paid_export_stage_ct_conflict
 from .product_types import EXPORT_TARIFF_TYPE_AGILE, export_tariff_type_from_options
 
 _STORAGE_VERSION = 1
