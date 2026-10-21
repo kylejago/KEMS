@@ -214,7 +214,6 @@ def paid_export_stage_ct_conflict(
     )
 
 
-
 def assess_foxess_ac_ct_transition(previous: Any, current: Any) -> dict[str, Any]:
     """Compare adjacent valid KH register cohorts without asserting CT fault.
 
