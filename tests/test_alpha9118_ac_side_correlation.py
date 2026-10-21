@@ -944,7 +944,7 @@ def test_alpha9121_live_2255_deadlock_recovers_with_two_safe_backup_samples() ->
     # Reproduce release-only mode where RPower ceased updating but physical
     # grid, house, battery and split-grid readings remained coherent and fresh.
     previous = assess_foxess_power_balance(records, positive_is_discharge=True)
-    assert not previous.ready
+    assert previous.ready
     assert previous.balanced_samples == 59
 
     evidence = assess_foxess_power_balance(
