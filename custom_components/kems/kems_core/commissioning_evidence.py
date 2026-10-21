@@ -831,12 +831,21 @@ def assess_foxess_power_balance(
 
     # Fail closed while a real mode change is still settling, or if too
     # many scores depend on excluding a source KEMS cannot independently meter.
-    settling_verified = not quarantine_self_use_settling or (
-        len(settling_quarantined) <= 8
-        and eligible >= max(minimum_samples, 30)
-        and len(recent) >= 2
-        and settled_current_samples.get(len(recent) - 1, False)
-        and settled_current_samples.get(len(recent) - 2, False)
+    # A clean session needs the original minimum_samples observations.
+    # The more demanding 30-sample/two-latest-AC-readback rule applies ONLY
+    # when a transition has actually been excluded from the rolling score.
+    # Applying it on every fresh restart wrongly blocked commissioning at
+    # 14/14 genuinely balanced samples with zero quarantined transitions.
+    settling_verified = (
+        not quarantine_self_use_settling
+        or not settling_quarantined
+        or (
+            len(settling_quarantined) <= 8
+            and eligible >= max(minimum_samples, 30)
+            and len(recent) >= 2
+            and settled_current_samples.get(len(recent) - 1, False)
+            and settled_current_samples.get(len(recent) - 2, False)
+        )
     )
     if len(recent) < minimum_samples:
         state = "collecting"
