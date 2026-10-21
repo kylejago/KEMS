@@ -305,7 +305,7 @@ class PaidAgileUnpluggedContinuity:
         if (
             field == "grid_import_kw"
             and value == 0.0
-            and PaidAgileUnpluggedContinuity._fresh_export_corroborates_unchanged_zero_import(
+            and PaidAgileUnpluggedContinuity._fresh_split_grid_export_proof(
                 snapshot
             )
         ):
@@ -313,7 +313,7 @@ class PaidAgileUnpluggedContinuity:
         return None
 
     @staticmethod
-    def _fresh_export_corroborates_unchanged_zero_import(snapshot: Snapshot) -> bool:
+    def _fresh_split_grid_export_proof(snapshot: Snapshot) -> bool:
         """Use a fresh, coherent *net export* to corroborate unchanged zero import.
 
         HA/FoxESS may leave the complementary grid-import entity unchanged at
