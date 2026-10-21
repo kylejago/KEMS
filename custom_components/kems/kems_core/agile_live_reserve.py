@@ -305,9 +305,7 @@ class PaidAgileUnpluggedContinuity:
         if (
             field == "grid_import_kw"
             and value == 0.0
-            and PaidAgileUnpluggedContinuity._fresh_split_grid_export_proof(
-                snapshot
-            )
+            and PaidAgileUnpluggedContinuity._fresh_split_grid_export_proof(snapshot)
         ):
             return value
         return None
