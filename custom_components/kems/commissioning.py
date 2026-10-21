@@ -799,6 +799,10 @@ def build_commissioning_snapshot(
             records,
             positive_is_discharge=configured_positive_is_discharge,
             battery_required=not solar_only_commissioning,
+            # Ignore ONLY identified post-command KH register-cohort
+            # transients for long-window statistical readiness. Strict live
+            # balance, DNO/export direction and stage proofs are unchanged.
+            quarantine_self_use_settling=True,
         )
         power_balance_evidence_payload = power_balance_evidence.to_dict()
         if power_balance_evidence.ready:

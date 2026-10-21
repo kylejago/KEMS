@@ -10,6 +10,7 @@ from __future__ import annotations
 from collections import Counter
 from collections.abc import Mapping
 from dataclasses import dataclass
+from datetime import datetime
 from math import isfinite
 from typing import Any
 
@@ -544,6 +545,82 @@ def _diagnostic_source_age(value: Any) -> float | None:
     return round(age, 1) if isfinite(age) and age >= 0.0 else None
 
 
+def _self_use_register_settling_conflict(
+    record: Any,
+    *,
+    ac_cross_check: dict[str, Any],
+    residual_kw: float,
+    tolerance_kw: float,
+) -> bool:
+    """Identify a narrow known-bad KH register cohort immediately after our write.
+
+    These readings are NOT physical proof or control authority. A legitimate
+    abnormal CT reading, older/missing timestamps or an unidentified write must
+    still be counted as a failure. See 21 Oct 2026 commissioning issue #357.
+    """
+    probe = getattr(record, "foxess_balance_probe", None)
+    timestamp = getattr(record, "timestamp", None)
+    if (
+        not isinstance(probe, dict)
+        or not isinstance(timestamp, datetime)
+        or timestamp.tzinfo is None
+        or probe.get("last_applied_action") != "self_use"
+        or probe.get("work_mode", {}).get("value") != "Self Use"
+        or "command applied" not in str(probe.get("last_write_result", "")).lower()
+        or ac_cross_check.get("status") != "ac_load_mismatch"
+        or abs(residual_kw) <= tolerance_kw
+        or abs(float(ac_cross_check.get("ac_load_residual_kw") or 0.0)) < 0.9
+    ):
+        return False
+    raw_write_at = probe.get("last_write_at")
+    if not isinstance(raw_write_at, str):
+        return False
+    try:
+        write_at = datetime.fromisoformat(raw_write_at)
+    except ValueError:
+        return False
+    if write_at.tzinfo is None:
+        return False
+    # The sample is written into HA around ten seconds after the first
+    # Modbus cohort read at ~1 second after a mode write.
+    age_after_write = (timestamp - write_at).total_seconds()
+    if not 8.0 <= age_after_write <= 18.0:
+        return False
+    times = []
+    for field in ("inverter_ac_output", "grid_ct", "inverter_reported_load"):
+        entry = probe.get(field)
+        if not isinstance(entry, dict):
+            return False
+        raw = entry.get("last_reported")
+        if not isinstance(raw, str):
+            return False
+        try:
+            reported = datetime.fromisoformat(raw)
+        except ValueError:
+            return False
+        if reported.tzinfo is None:
+            return False
+        after_write = (reported - write_at).total_seconds()
+        if not 0.3 <= after_write <= 2.5:
+            return False
+        times.append(reported)
+    if (max(times) - min(times)).total_seconds() > 0.75:
+        return False
+    # Don't suppress a grid-limit violation or unexpected charging behaviour.
+    export = getattr(record, "grid_export_kw", None)
+    if export is None:
+        return False
+    try:
+        export_kw = float(export)
+    except (ValueError, TypeError):
+        return False
+    return bool(
+        isfinite(export_kw)
+        and 0.0 <= export_kw <= 7.0
+        and float(ac_cross_check.get("inverter_ac_kw") or 0.0) >= 1.0
+    )
+
+
 def assess_foxess_power_balance(
     records: tuple[Any, ...] | list[Any],
     *,
@@ -554,6 +631,7 @@ def assess_foxess_power_balance(
     recent_sample_limit: int = 60,
     absolute_tolerance_kw: float = 0.75,
     relative_tolerance_percent: float = 15.0,
+    quarantine_self_use_settling: bool = False,
 ) -> PowerBalanceEvidence:
     """Verify repeated whole-site power conservation using physical observations.
 
@@ -570,15 +648,18 @@ def assess_foxess_power_balance(
     transition_statuses: Counter[str] = Counter()
     transition_examples: list[dict[str, Any]] = []
     previous_eligible: Any = None
+    settling_quarantined: list[dict[str, Any]] = []
+    settled_current_samples: dict[int, bool] = {}
     balanced = 0
     invalid = 0
+    observed_export_limit_violations = 0
     required = set(
         FOXESS_REQUIRED_TELEMETRY_FIELDS
         if battery_required
         else FOXESS_SITE_TELEMETRY_FIELDS
     )
 
-    for record in recent:
+    for record_index, record in enumerate(recent):
         if required & set(getattr(record, "stale_fields", ()) or ()):
             continue
         values: dict[str, float] = {}
@@ -619,6 +700,10 @@ def assess_foxess_power_balance(
         house = max(values["house_load_kw"], 0.0)
         grid_import = max(values["grid_import_kw"], 0.0)
         grid_export = max(values["grid_export_kw"], 0.0)
+        if quarantine_self_use_settling and grid_export > 7.0:
+            # A real 7 kW DNO limit violation must block commissioning even
+            # when the statistical balance happens to match.
+            observed_export_limit_violations += 1
         if battery_required:
             charge, discharge = _battery_routing(
                 values["battery_power_kw"],
@@ -635,7 +720,6 @@ def assess_foxess_power_balance(
             max(float(absolute_tolerance_kw), 0.0),
             throughput * max(float(relative_tolerance_percent), 0.0) / 100.0,
         )
-        residuals.append(residual)
         # AC readings are correlated read-only for EVERY eligible sample, not
         # only failing DC/AC mixed-boundary samples. Never promote them to proof.
         ac_cross_check = assess_foxess_ac_side_sample(record)
@@ -646,6 +730,31 @@ def assess_foxess_power_balance(
             else None
         )
         previous_eligible = record
+        settling = bool(
+            quarantine_self_use_settling
+            and _self_use_register_settling_conflict(
+                record,
+                ac_cross_check=ac_cross_check,
+                residual_kw=residual,
+                tolerance_kw=tolerance,
+            )
+        )
+        if settling:
+            settling_quarantined.append(
+                {
+                    "timestamp": record.timestamp.isoformat(),
+                    "residual_kw": round(residual, 3),
+                    "last_write_at": record.foxess_balance_probe["last_write_at"],
+                    "reason": "Self Use command transitional KH register cohort",
+                }
+            )
+        else:
+            residuals.append(residual)
+        settled_current_samples[record_index] = (
+            not settling
+            and abs(residual) <= tolerance
+            and ac_cross_check.get("status") == "ac_cross_check_pass"
+        )
         if ac_transition is not None:
             transition_statuses[str(ac_transition["status"])] += 1
             if (
@@ -665,6 +774,11 @@ def assess_foxess_power_balance(
                 )
                 if len(transition_examples) > 8:
                     del transition_examples[:-8]
+        if settling:
+            # Never treat command-transition register disagreement as a pass.
+            # Exclusion applies only to rolling statistical readiness, not
+            # present-tense grid direction, power cap or stage export proof.
+            continue
         if abs(residual) <= tolerance:
             balanced += 1
         else:
@@ -715,11 +829,26 @@ def assess_foxess_power_balance(
         round(max(abs(value) for value in residuals), 3) if eligible else None
     )
 
+    # Fail closed while a real mode change is still settling, or if too
+    # many scores depend on excluding a source KEMS cannot independently meter.
+    settling_verified = not quarantine_self_use_settling or (
+        len(settling_quarantined) <= 8
+        and eligible >= max(minimum_samples, 30)
+        and len(recent) >= 2
+        and settled_current_samples.get(len(recent) - 1, False)
+        and settled_current_samples.get(len(recent) - 2, False)
+    )
     if len(recent) < minimum_samples:
         state = "collecting"
         ready = False
     elif eligible < minimum_samples:
         state = "incomplete"
+        ready = False
+    elif observed_export_limit_violations:
+        state = "grid_export_limit_violation"
+        ready = False
+    elif not settling_verified:
+        state = "settling_unverified"
         ready = False
     elif balance_percent < minimum_balance_percent:
         state = "power_balance_mismatch"
@@ -748,6 +877,10 @@ def assess_foxess_power_balance(
             "independent_load_proven": False,
             "hardware_write_authorised": False,
             "eligible_samples": eligible,
+            "post_command_settling_quarantined_count": len(settling_quarantined),
+            "post_command_settling_examples": settling_quarantined[-8:],
+            "post_command_settling_verified": settling_verified,
+            "observed_grid_export_limit_violations": observed_export_limit_violations,
             "status_counts": dict(sorted(ac_statuses.items())),
             "transition_status_counts": dict(sorted(transition_statuses.items())),
             "ct_export_step_examples": transition_examples,

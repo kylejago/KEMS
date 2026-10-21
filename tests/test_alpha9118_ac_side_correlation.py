@@ -599,3 +599,179 @@ def test_ct_disagreement_persists_across_two_actual_physical_cohorts() -> None:
     assert result["reported_house_change_kw"] == pytest.approx(-0.017)
     assert not result["ct_hardware_fault_proven"]
     assert not result["hardware_write_authorised"]
+
+
+def _alpha9119_mode_change_sample(
+    at: datetime,
+    *,
+    ac_kw: float,
+    ct_kw: float,
+    house_kw: float,
+    battery_kw: float,
+    transition: bool,
+) -> SimpleNamespace:
+    """Reproduce the exact timing/provenance of 19:02 KH7 historical failures."""
+    write_at = at - timedelta(seconds=10.2)
+    observed_at = (
+        write_at + timedelta(seconds=1.0) if transition else (at - timedelta(seconds=1))
+    )
+    sample = _observation(
+        battery_kw=battery_kw,
+        inverter_kw=ac_kw,
+        ct_kw=ct_kw,
+        house_kw=house_kw,
+        import_kw=max(-ct_kw, 0.0),
+        export_kw=max(ct_kw, 0.0),
+    )
+    sample.timestamp = at
+    sample.foxess_balance_probe.update(
+        {
+            "observed_after_snapshot_at": (at + timedelta(milliseconds=25)).isoformat(),
+            "last_applied_action": "self_use" if transition else "force_discharge",
+            "last_write_at": write_at.isoformat(),
+            "last_write_result": "Alpha9.67 bounded FoxESS command applied",
+            "work_mode": {"value": "Self Use" if transition else "Force Discharge"},
+            "inverter_reported_load": {
+                "value": house_kw,
+                "last_reported": observed_at.isoformat(),
+                "unit": "kW",
+            },
+        }
+    )
+    for role in ("inverter_ac_output", "grid_ct"):
+        sample.foxess_balance_probe[role]["last_reported"] = observed_at.isoformat()
+    sample.source_age_seconds["house_load_kw"] = (at - observed_at).total_seconds()
+    return sample
+
+
+_ALPHA9119_SEVEN_BAD = [
+    (6.003, 1.812, 0.426, 6.218),
+    (6.057, -0.029, 0.417, 6.292),
+    (7.046, 5.591, 0.461, 7.301),
+    (7.154, 1.607, 0.454, 7.453),
+    (6.981, -0.042, 0.421, 7.280),
+    (7.271, 0.279, 0.434, 7.563),
+    (7.263, 2.192, 0.424, 7.561),
+]
+
+
+def _alpha9119_history(
+    *, transition: bool = True, final_bad: bool = False, bad_count: int = 7
+) -> list[SimpleNamespace]:
+    records = []
+    bad_indices = [3, 7, 13, 21, 32, 40, 52]
+    for index in range(60):
+        at = NOW + timedelta(seconds=25 * index)
+        if index in bad_indices[:bad_count] or (final_bad and index == 59):
+            ac, ct, house, battery = _ALPHA9119_SEVEN_BAD[
+                (bad_indices.index(index) if index in bad_indices else 0) % 7
+            ]
+            records.append(
+                _alpha9119_mode_change_sample(
+                    at,
+                    ac_kw=ac,
+                    ct_kw=ct,
+                    house_kw=house,
+                    battery_kw=battery,
+                    transition=transition,
+                )
+            )
+        else:
+            records.append(
+                _alpha9119_mode_change_sample(
+                    at,
+                    ac_kw=6.0,
+                    ct_kw=5.6,
+                    house_kw=0.4,
+                    battery_kw=6.0,
+                    transition=False,
+                )
+            )
+    return records
+
+
+def test_alpha9119_seven_real_transitions_are_quarantined() -> None:
+    records = _alpha9119_history()
+    strict = assess_foxess_power_balance(records, positive_is_discharge=True)
+    assert strict.balanced_samples == 53
+    assert strict.eligible_samples == 60
+    assert strict.balance_percent == 88.3
+    assert not strict.ready
+
+    settled = assess_foxess_power_balance(
+        records, positive_is_discharge=True, quarantine_self_use_settling=True
+    )
+    assert settled.ready
+    assert settled.balance_percent == 100.0
+    assert settled.balanced_samples == 53
+    assert settled.eligible_samples == 53
+    assert settled.ac_side_audit["post_command_settling_quarantined_count"] == 7
+    assert settled.ac_side_audit["post_command_settling_verified"]
+    assert not settled.ac_side_audit["hardware_write_authorised"]
+
+
+def test_alpha9119_no_mode_write_no_settling_quarantine() -> None:
+    records = _alpha9119_history(transition=False)
+    evidence = assess_foxess_power_balance(
+        records, positive_is_discharge=True, quarantine_self_use_settling=True
+    )
+    assert not evidence.ready
+    assert evidence.balanced_samples == 53
+    assert evidence.ac_side_audit["post_command_settling_quarantined_count"] == 0
+
+
+def test_alpha9119_recent_unverified_transition_is_not_control_authority() -> None:
+    records = _alpha9119_history(final_bad=True)
+    evidence = assess_foxess_power_balance(
+        records, positive_is_discharge=True, quarantine_self_use_settling=True
+    )
+    assert not evidence.ready
+    assert evidence.state == "settling_unverified"
+    assert not evidence.ac_side_audit["post_command_settling_verified"]
+
+
+@pytest.mark.parametrize(
+    "mutate",
+    [
+        lambda x: x.foxess_balance_probe.update({"last_write_at": None}),
+        lambda x: x.foxess_balance_probe.update({"last_write_result": None}),
+        lambda x: x.foxess_balance_probe.update({"work_mode": {"value": "Back-up"}}),
+        lambda x: x.foxess_balance_probe["grid_ct"].update(
+            {"last_reported": (x.timestamp - timedelta(seconds=7)).isoformat()}
+        ),
+        lambda x: x.foxess_balance_probe["grid_ct"].update(
+            {"last_reported": (x.timestamp - timedelta(seconds=1)).isoformat()}
+        ),
+        lambda x: setattr(x, "grid_export_kw", 7.2),
+    ],
+)
+def test_alpha9119_untrusted_timing_readback_and_export_limit_fail_closed(
+    mutate,
+) -> None:
+    records = _alpha9119_history()
+    for index in [3, 7, 13, 21, 32, 40, 52]:
+        mutate(records[index])
+    evidence = assess_foxess_power_balance(
+        records, positive_is_discharge=True, quarantine_self_use_settling=True
+    )
+    assert not evidence.ready
+    assert evidence.ac_side_audit["post_command_settling_quarantined_count"] == 0
+
+
+def test_alpha9119_more_than_eight_transitions_fail_closed() -> None:
+    records = _alpha9119_history()
+    for index in (42, 44):
+        records[index] = _alpha9119_mode_change_sample(
+            records[index].timestamp,
+            ac_kw=6.981,
+            ct_kw=-0.042,
+            house_kw=0.421,
+            battery_kw=7.280,
+            transition=True,
+        )
+    evidence = assess_foxess_power_balance(
+        records, positive_is_discharge=True, quarantine_self_use_settling=True
+    )
+    assert evidence.ac_side_audit["post_command_settling_quarantined_count"] == 9
+    assert not evidence.ready
+    assert evidence.state == "settling_unverified"

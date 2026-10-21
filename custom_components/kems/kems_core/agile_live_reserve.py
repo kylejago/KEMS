@@ -298,15 +298,95 @@ class PaidAgileUnpluggedContinuity:
         max_age = _AGILE_CONNECTED_IDLE_LOAD_AGE_SECONDS
         if field == "grid_import_kw" and explicit_unplugged:
             max_age = _AGILE_UNPLUGGED_GRID_IMPORT_AGE_SECONDS
-        if (
-            value is None
-            or value < 0.0
-            or age is None
-            or not 0.0 <= age <= max_age
-            or field in snapshot.stale_fields
-        ):
+        if value is None or value < 0.0 or field in snapshot.stale_fields:
             return None
-        return value
+        if age is not None and 0.0 <= age <= max_age:
+            return value
+        if (
+            field == "grid_import_kw"
+            and value == 0.0
+            and PaidAgileUnpluggedContinuity._fresh_split_grid_export_proof(snapshot)
+        ):
+            return value
+        return None
+
+    @staticmethod
+    def _fresh_split_grid_export_proof(snapshot: Snapshot) -> bool:
+        """Use a fresh, coherent *net export* to corroborate unchanged zero import.
+
+        HA/FoxESS may leave the complementary grid-import entity unchanged at
+        zero for hours while the same CT reports fresh positive export. An
+        aged zero alone must never authorise EV-outage export. Require the
+        separate-source contract, raw split, and same-device fresh AC/CT/load
+        coherence to reject the ~6 kW post-mode-change KH7 anomalies.
+        The normal explicit-unplugged, 90 s grace and EV/house vetoes still
+        apply. This is only a redundant-site-meter evidence path, not a new
+        source of grid export authority or physical export proof.
+        """
+        if (
+            snapshot.grid_flow_mode != "separate_positive_sources"
+            or "grid_import_kw" in snapshot.stale_fields
+            or "grid_export_kw" in snapshot.stale_fields
+            or _finite(snapshot.grid_import_kw) != 0.0
+            or _finite(snapshot.raw_grid_import_kw) != 0.0
+        ):
+            return False
+        ages = snapshot.source_age_seconds
+        if not isinstance(ages, dict):
+            return False
+        export = _finite(snapshot.grid_export_kw)
+        raw_export = _finite(snapshot.raw_grid_export_kw)
+        age = _finite(ages.get("grid_export_kw"))
+        if (
+            export is None
+            or raw_export is None
+            or export <= 0.5
+            or abs(raw_export - export) > 0.05
+            or age is None
+            or not 0.0 <= age <= _AGILE_CONNECTED_IDLE_LOAD_AGE_SECONDS
+        ):
+            return False
+        probe = getattr(snapshot, "foxess_balance_probe", None)
+        if not isinstance(probe, dict):
+            return False
+        observed: dict[str, float] = {}
+        reported_at: list[datetime] = []
+        for role in ("inverter_ac_output", "grid_ct", "inverter_reported_load"):
+            entry = probe.get(role)
+            if not isinstance(entry, dict):
+                return False
+            value = _finite(entry.get("value"))
+            stamp = entry.get("last_reported")
+            if value is None or not isinstance(stamp, str):
+                return False
+            try:
+                reported = datetime.fromisoformat(stamp)
+            except ValueError:
+                return False
+            if (
+                snapshot.timestamp.tzinfo is None
+                or reported.tzinfo is None
+                or not 0.0
+                <= (snapshot.timestamp - reported).total_seconds()
+                <= _AGILE_CONNECTED_IDLE_LOAD_AGE_SECONDS
+            ):
+                return False
+            observed[role] = value
+            reported_at.append(reported)
+        if (max(reported_at) - min(reported_at)).total_seconds() > 5.0:
+            return False
+        ct = observed["grid_ct"]
+        ac = observed["inverter_ac_output"]
+        house = _finite(snapshot.house_load_kw)
+        registered_house = observed["inverter_reported_load"]
+        return bool(
+            house is not None
+            and ct >= 0.0
+            and ac >= 0.0
+            and abs(ct - export) <= 0.10
+            and abs(registered_house - house) <= 0.10
+            and abs(ac - ct - registered_house) <= 0.40
+        )
 
     @staticmethod
     def _grid_import_consistent_with_unplugged_house(
