@@ -517,9 +517,7 @@ def _history_pair(
 def test_historical_ct_step_is_flagged_without_blame_or_write_authority() -> None:
     early, late = _history_pair()
     result = assess_foxess_ac_ct_transition(early, late)
-    assert result["status"] == (
-        "ct_export_step_without_matching_source_or_load_step"
-    )
+    assert result["status"] == ("ct_export_step_without_matching_source_or_load_step")
     assert result["grid_ct_change_kw"] == pytest.approx(-1.08)
     assert result["inverter_ac_change_kw"] == pytest.approx(0.001)
     assert result["reported_house_change_kw"] == pytest.approx(0.028)
@@ -565,9 +563,7 @@ def test_ct_step_audit_does_not_accuse_meter_on_normal_or_unpaired_changes(
 ) -> None:
     early, late = _history_pair(**change)
     result = assess_foxess_ac_ct_transition(early, late)
-    assert result["status"] != (
-        "ct_export_step_without_matching_source_or_load_step"
-    )
+    assert result["status"] != ("ct_export_step_without_matching_source_or_load_step")
     assert not result["hardware_write_authorised"]
 
 
