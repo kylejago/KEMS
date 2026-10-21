@@ -7,7 +7,10 @@ from types import SimpleNamespace
 
 import pytest
 from kems_core.commissioning_evidence import assess_foxess_power_balance
-from kems_core.foxess_ac_balance import assess_foxess_ac_side_sample
+from kems_core.foxess_ac_balance import (
+    assess_foxess_ac_side_sample,
+    paid_export_stage_ct_conflict,
+)
 
 NOW = datetime(2026, 10, 21, 5, 34, 24, tzinfo=UTC)
 
@@ -352,3 +355,98 @@ def test_constant_zero_ct2_is_not_a_secondary_source_proof() -> None:
     assert result["status"] == "ac_load_mismatch"
     assert not result["independent_load_proven"]
     assert not result["hardware_write_authorised"]
+
+
+@pytest.mark.parametrize(
+    "dc_kw,ac_kw,ct_kw,house_kw",
+    [
+        (1.516, 1.397, -0.006, 0.346),
+        (1.519, 1.398, 0.017, 0.362),
+        (1.513, 1.398, -0.012, 0.349),
+        (1.520, 1.400, -0.009, 0.356),
+        (1.397, 1.279, -0.009, 0.299),
+        (1.543, 1.426, -0.014, 0.364),
+        (1.469, 1.342, -0.019, 0.348),
+    ],
+)
+def test_real_ct_conflicts_are_inconclusive_at_staged_export(
+    dc_kw: float, ac_kw: float, ct_kw: float, house_kw: float
+) -> None:
+    """Seven recorded anomalies must not be mistaken for failed inverter writes."""
+    sample = _observation(
+        battery_kw=dc_kw,
+        inverter_kw=ac_kw,
+        ct_kw=ct_kw,
+        house_kw=house_kw,
+        import_kw=max(-ct_kw, 0.0),
+        export_kw=max(ct_kw, 0.0),
+    )
+    assert paid_export_stage_ct_conflict(sample)
+    assert not assess_foxess_ac_side_sample(sample)["hardware_write_authorised"]
+
+
+def test_healthy_one_kw_export_remains_eligible_for_physical_proof() -> None:
+    sample = _observation(
+        battery_kw=1.513, inverter_kw=1.397, ct_kw=1.052,
+        house_kw=0.345, import_kw=0.0, export_kw=1.052
+    )
+    assert not paid_export_stage_ct_conflict(sample)
+    assert assess_foxess_ac_side_sample(sample)["status"] == "ac_cross_check_pass"
+
+
+@pytest.mark.parametrize(
+    "changes",
+    [
+        {"inverter_kw": 0.34, "ct_kw": -0.006, "house_kw": 0.346},
+        {"battery_kw": 0.0},
+        {"battery_kw": -1.516},
+        {"inverter_kw": 3.0},
+        {"ct_kw": 0.4, "export_kw": 0.4},
+        {"report_lag_seconds": 90.0},
+        {"age_seconds": 90.0},
+    ],
+)
+def test_ct_conflict_does_not_hide_other_failure_types(
+    changes: dict[str, object],
+) -> None:
+    defaults: dict[str, object] = dict(
+        battery_kw=1.519, inverter_kw=1.398, ct_kw=0.017,
+        house_kw=0.362, import_kw=0.0, export_kw=0.017
+    )
+    defaults.update(changes)
+    assert not paid_export_stage_ct_conflict(_observation(**defaults))
+
+
+def test_ct_conflict_does_not_hide_solar_missing_or_stale_proof() -> None:
+    sample = _observation(
+        battery_kw=1.519, inverter_kw=1.398, ct_kw=0.017,
+        house_kw=0.362, import_kw=0.0, export_kw=0.017
+    )
+    sample.solar_power_kw = 1.0
+    assert not paid_export_stage_ct_conflict(sample)
+    sample.solar_power_kw = 0.0
+    sample.foxess_balance_probe = {}
+    assert not paid_export_stage_ct_conflict(sample)
+    sample = _observation(
+        battery_kw=1.519, inverter_kw=1.398, ct_kw=0.017,
+        house_kw=0.362, import_kw=0.0, export_kw=0.017
+    )
+    sample.stale_fields = ("grid_import_kw",)
+    assert not paid_export_stage_ct_conflict(sample)
+
+
+def test_backend_checks_ct_conflict_before_three_strike_block() -> None:
+    from pathlib import Path
+
+    source = (
+        Path(__file__).resolve().parents[1]
+        / "custom_components/kems/foxess_control_backend.py"
+    ).read_text(encoding="utf-8")
+    stage = source.split("async def _async_observe_paid_export_stage(", 1)[1]
+    stage = stage.split("async def _async_restore(", 1)[0]
+    check_at = stage.index("and paid_export_stage_ct_conflict(")
+    fail_at = stage.index("self._paid_export_stage_failures += 1")
+    assert check_at < fail_at
+    assert "self._paid_export_stage_samples = 0" in stage[check_at:fail_at]
+    assert "self._paid_export_stage_failures += 1" not in stage[check_at:fail_at]
+    assert "self._paid_export_stage_blocked = True" in stage[fail_at:]
