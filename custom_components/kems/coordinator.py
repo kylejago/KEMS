@@ -569,12 +569,8 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                 "paid_export_stage_samples": last_backend.get(
                     "paid_export_stage_samples"
                 ),
-                "paid_export_live_proven": last_backend.get(
-                    "paid_export_live_proven"
-                ),
-                "force_discharge_stage_kw": last_backend.get(
-                    "paid_export_stage_kw"
-                ),
+                "paid_export_live_proven": last_backend.get("paid_export_live_proven"),
+                "force_discharge_stage_kw": last_backend.get("paid_export_stage_kw"),
                 "commands_permitted_previous_cycle": last_backend.get(
                     "commands_permitted"
                 ),
