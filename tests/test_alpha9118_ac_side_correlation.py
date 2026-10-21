@@ -291,3 +291,57 @@ def test_optional_eps_ct2_load_probes_never_grant_commissioning() -> None:
     assert not bad.failed_samples[0]["foxess_ac_cross_check"][
         "hardware_write_authorised"
     ]
+
+
+def test_21_oct_ct_changes_one_kw_while_inverter_and_house_remain_stable() -> None:
+    """History confirms CT-only transition, not a DC/AC efficiency mismatch."""
+    before = _observation(
+        battery_kw=1.513,
+        inverter_kw=1.397,
+        ct_kw=1.052,
+        house_kw=0.346,
+        import_kw=0.0,
+        export_kw=1.052,
+    )
+    after = _observation(
+        battery_kw=1.519,
+        inverter_kw=1.398,
+        ct_kw=0.017,
+        house_kw=0.362,
+        import_kw=0.0,
+        export_kw=0.017,
+    )
+    previous = assess_foxess_ac_side_sample(before)
+    current = assess_foxess_ac_side_sample(after)
+    assert previous["status"] == "ac_cross_check_pass"
+    assert previous["ac_load_residual_kw"] == pytest.approx(-0.001)
+    assert current["status"] == "ac_load_mismatch"
+    assert current["ac_load_residual_kw"] == pytest.approx(1.019)
+    assert abs(after.battery_power_kw - before.battery_power_kw) < 0.01
+    assert (
+        abs(
+            after.foxess_balance_probe["inverter_ac_output"]["value"]
+            - before.foxess_balance_probe["inverter_ac_output"]["value"]
+        )
+        < 0.01
+    )
+    assert abs(after.house_load_kw - before.house_load_kw) < 0.02
+    assert abs(
+        after.foxess_balance_probe["grid_ct"]["value"]
+        - before.foxess_balance_probe["grid_ct"]["value"]
+    ) > 1.0
+    assert not current["hardware_write_authorised"]
+
+
+def test_constant_zero_ct2_is_not_a_secondary_source_proof() -> None:
+    """The flat -0.0kW CT2 history cannot resolve the KH7 grid mismatch."""
+    sample = _observation()
+    sample.foxess_balance_probe["ct2_meter"] = {
+        "value": -0.0,
+        "unit": "kW",
+        "last_reported": "2026-10-21T05:30:00+00:00",
+    }
+    result = assess_foxess_ac_side_sample(sample)
+    assert result["status"] == "ac_load_mismatch"
+    assert not result["independent_load_proven"]
+    assert not result["hardware_write_authorised"]
