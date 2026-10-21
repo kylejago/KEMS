@@ -13,6 +13,8 @@ from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
 
+from kems_core.foxess_ac_balance import paid_export_stage_ct_conflict
+
 BACKEND = (
     Path(__file__).parents[1]
     / "custom_components"
@@ -44,6 +46,7 @@ def _production():
     scope = {
         "Any": Any,
         "isfinite": isfinite,
+        "paid_export_stage_ct_conflict": paid_export_stage_ct_conflict,
         "_PAID_EXPORT_STAGE_KW": 1.0,
         "_PAID_EXPORT_MIN_GRID_EXPORT_KW": 0.2,
         "_PAID_EXPORT_MIN_BATTERY_DISCHARGE_KW": 0.25,
