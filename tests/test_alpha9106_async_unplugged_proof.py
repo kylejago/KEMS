@@ -119,7 +119,7 @@ def test_simultaneously_unavailable_after_fresh_disconnection_has_bounded_grace(
         {"ev_power_kw": -0.1},
         {"house_load_kw": None},
         {"grid_import_kw": None},
-        {"grid_import_kw": 0.6},
+        {"grid_import_kw": 1.2},
         {"source_age_seconds": {"house_load_kw": 80.0, "grid_import_kw": 9.0}},
         {"stale_fields": ("grid_import_kw",)},
     ],
