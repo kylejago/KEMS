@@ -596,9 +596,13 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
             registry = er.async_get(self.hass)
             battery_entry = registry.async_get(self.entities.battery_power_kw or "")
             battery_entity_id = self.entities.battery_power_kw or ""
-            if battery_entry is not None and battery_entry.device_id and (
-                battery_entity_id.startswith("sensor.")
-                and battery_entity_id.endswith("_invbatpower")
+            if (
+                battery_entry is not None
+                and battery_entry.device_id
+                and (
+                    battery_entity_id.startswith("sensor.")
+                    and battery_entity_id.endswith("_invbatpower")
+                )
             ):
                 prefix = battery_entity_id.removesuffix("_invbatpower")
                 for role, candidate_id in (
