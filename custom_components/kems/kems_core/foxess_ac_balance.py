@@ -147,9 +147,12 @@ def assess_foxess_ac_side_sample(
             "tolerance_kw": round(absolute_tolerance_kw, 3),
             "battery_dc_minus_inverter_ac_kw": (
                 round(battery_kw - inverter_kw, 3)
-                if (battery_kw := _number(
-                    getattr(observation, "battery_power_kw", None)
-                )) is not None
+                if (
+                    battery_kw := _number(
+                        getattr(observation, "battery_power_kw", None)
+                    )
+                )
+                is not None
                 else None
             ),
         }
