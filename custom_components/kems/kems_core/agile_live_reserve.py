@@ -298,11 +298,7 @@ class PaidAgileUnpluggedContinuity:
         max_age = _AGILE_CONNECTED_IDLE_LOAD_AGE_SECONDS
         if field == "grid_import_kw" and explicit_unplugged:
             max_age = _AGILE_UNPLUGGED_GRID_IMPORT_AGE_SECONDS
-        if (
-            value is None
-            or value < 0.0
-            or field in snapshot.stale_fields
-        ):
+        if value is None or value < 0.0 or field in snapshot.stale_fields:
             return None
         if age is not None and 0.0 <= age <= max_age:
             return value
