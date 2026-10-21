@@ -652,6 +652,7 @@ def assess_foxess_power_balance(
     settled_current_samples: dict[int, bool] = {}
     balanced = 0
     invalid = 0
+    observed_export_limit_violations = 0
     required = set(
         FOXESS_REQUIRED_TELEMETRY_FIELDS
         if battery_required
@@ -699,6 +700,10 @@ def assess_foxess_power_balance(
         house = max(values["house_load_kw"], 0.0)
         grid_import = max(values["grid_import_kw"], 0.0)
         grid_export = max(values["grid_export_kw"], 0.0)
+        if quarantine_self_use_settling and grid_export > 7.0:
+            # A real 7 kW DNO limit violation must block commissioning even
+            # when the statistical balance happens to match.
+            observed_export_limit_violations += 1
         if battery_required:
             charge, discharge = _battery_routing(
                 values["battery_power_kw"],
@@ -839,6 +844,9 @@ def assess_foxess_power_balance(
     elif eligible < minimum_samples:
         state = "incomplete"
         ready = False
+    elif observed_export_limit_violations:
+        state = "grid_export_limit_violation"
+        ready = False
     elif not settling_verified:
         state = "settling_unverified"
         ready = False
@@ -872,6 +880,7 @@ def assess_foxess_power_balance(
             "post_command_settling_quarantined_count": len(settling_quarantined),
             "post_command_settling_examples": settling_quarantined[-8:],
             "post_command_settling_verified": settling_verified,
+            "observed_grid_export_limit_violations": observed_export_limit_violations,
             "status_counts": dict(sorted(ac_statuses.items())),
             "transition_status_counts": dict(sorted(transition_statuses.items())),
             "ct_export_step_examples": transition_examples,
