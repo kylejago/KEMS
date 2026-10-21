@@ -326,10 +326,13 @@ def test_21_oct_ct_changes_one_kw_while_inverter_and_house_remain_stable() -> No
         < 0.01
     )
     assert abs(after.house_load_kw - before.house_load_kw) < 0.02
-    assert abs(
-        after.foxess_balance_probe["grid_ct"]["value"]
-        - before.foxess_balance_probe["grid_ct"]["value"]
-    ) > 1.0
+    assert (
+        abs(
+            after.foxess_balance_probe["grid_ct"]["value"]
+            - before.foxess_balance_probe["grid_ct"]["value"]
+        )
+        > 1.0
+    )
     assert not current["hardware_write_authorised"]
 
 
