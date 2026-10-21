@@ -8,6 +8,7 @@ from types import SimpleNamespace
 import pytest
 from kems_core.commissioning_evidence import assess_foxess_power_balance
 from kems_core.foxess_ac_balance import (
+    assess_foxess_ac_ct_transition,
     assess_foxess_ac_side_sample,
     paid_export_stage_ct_conflict,
 )
@@ -466,3 +467,115 @@ def test_backend_checks_ct_conflict_before_three_strike_block() -> None:
     assert "self._paid_export_stage_samples = 0" in stage[check_at:fail_at]
     assert "self._paid_export_stage_failures += 1" not in stage[check_at:fail_at]
     assert "self._paid_export_stage_blocked = True" in stage[fail_at:]
+
+
+
+def _history_pair(
+    *,
+    early_grid_kw: float = 1.074,
+    late_grid_kw: float = -0.006,
+    early_ac_kw: float = 1.396,
+    late_ac_kw: float = 1.397,
+    early_house_kw: float = 0.318,
+    late_house_kw: float = 0.346,
+    early_battery_kw: float = 1.516,
+    late_battery_kw: float = 1.516,
+    late_seconds: int = 66,
+) -> tuple[SimpleNamespace, SimpleNamespace]:
+    """Replay two FoxESS register cohorts from 06:33:09 and 06:34:15 BST."""
+    snapshots = []
+    for index, (ct, ac, house, battery) in enumerate(
+        (
+            (early_grid_kw, early_ac_kw, early_house_kw, early_battery_kw),
+            (late_grid_kw, late_ac_kw, late_house_kw, late_battery_kw),
+        )
+    ):
+        at = datetime(2026, 10, 21, 5, 33, 9, tzinfo=UTC)
+        if index:
+            at += timedelta(seconds=late_seconds)
+        sample = _observation(
+            battery_kw=battery,
+            inverter_kw=ac,
+            ct_kw=ct,
+            house_kw=house,
+            import_kw=max(-ct, 0.0),
+            export_kw=max(ct, 0.0),
+        )
+        sample.timestamp = at
+        sample.source_age_seconds["house_load_kw"] = 0.5
+        sample.foxess_balance_probe["observed_after_snapshot_at"] = (
+            at + timedelta(seconds=1)
+        ).isoformat()
+        for field in ("inverter_ac_output", "grid_ct"):
+            sample.foxess_balance_probe[field]["last_reported"] = (
+                at - timedelta(milliseconds=500)
+            ).isoformat()
+        snapshots.append(sample)
+    return snapshots[0], snapshots[1]
+
+
+def test_historical_ct_step_is_flagged_without_blame_or_write_authority() -> None:
+    early, late = _history_pair()
+    result = assess_foxess_ac_ct_transition(early, late)
+    assert result["status"] == (
+        "ct_export_step_without_matching_source_or_load_step"
+    )
+    assert result["grid_ct_change_kw"] == pytest.approx(-1.08)
+    assert result["inverter_ac_change_kw"] == pytest.approx(0.001)
+    assert result["reported_house_change_kw"] == pytest.approx(0.028)
+    assert result["battery_dc_change_kw"] == pytest.approx(0.0)
+    assert result["seconds_between_samples"] == 66.0
+    assert result["informational_only"]
+    assert not result["independent_meter_proven"]
+    assert not result["ct_hardware_fault_proven"]
+    assert not result["hardware_write_authorised"]
+
+
+def test_real_ct_transition_is_in_commissioning_diagnostics_but_cannot_pass() -> None:
+    early, late = _history_pair()
+    evidence = assess_foxess_power_balance(
+        [early, late], minimum_samples=1, positive_is_discharge=True
+    )
+    assert not evidence.ready
+    assert evidence.balance_percent == 50.0
+    assert evidence.ac_side_audit is not None
+    assert evidence.ac_side_audit["transition_status_counts"] == {
+        "ct_export_step_without_matching_source_or_load_step": 1
+    }
+    assert len(evidence.ac_side_audit["ct_export_step_examples"]) == 1
+    assert not evidence.ac_side_audit["hardware_write_authorised"]
+    assert evidence.failed_samples[0]["foxess_ac_transition"]["status"] == (
+        "ct_export_step_without_matching_source_or_load_step"
+    )
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        {"late_seconds": 120},
+        {"late_ac_kw": 0.30},
+        {"late_house_kw": 1.4},
+        {"late_battery_kw": 0.20},
+        {"late_grid_kw": 0.91},
+        {"early_grid_kw": 0.017},
+    ],
+)
+def test_ct_step_audit_does_not_accuse_meter_on_normal_or_unpaired_changes(
+    change: dict[str, float],
+) -> None:
+    early, late = _history_pair(**change)
+    result = assess_foxess_ac_ct_transition(early, late)
+    assert result["status"] != (
+        "ct_export_step_without_matching_source_or_load_step"
+    )
+    assert not result["hardware_write_authorised"]
+
+
+def test_ct_step_audit_fails_closed_on_stale_modbus_cohort() -> None:
+    early, late = _history_pair()
+    late.foxess_balance_probe["grid_ct"]["last_reported"] = (
+        late.timestamp - timedelta(seconds=90)
+    ).isoformat()
+    assert assess_foxess_ac_ct_transition(early, late)["status"] == (
+        "no_comparable_transition"
+    )
