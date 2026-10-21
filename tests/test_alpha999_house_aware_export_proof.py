@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import ast
 import asyncio
+from datetime import UTC, datetime, timedelta
 from math import isfinite
 from pathlib import Path
 from types import SimpleNamespace
@@ -335,3 +336,73 @@ def test_decisive_direction_mismatch_still_latches_after_three_samples():
     assert backend._paid_export_stage_blocked
     assert backend._paid_export_stage_failures == 3
     assert calls
+
+
+def test_live_ct_disagreement_does_not_latch_and_two_good_samples_recover():
+    """Exercise the real backend method, not just a pure helper or string test."""
+    backend = _backend()
+    backend._last_applied_action = "force_discharge"
+    backend._paid_export_stage_failures = 1
+
+    async def save_observation():
+        return None
+
+    backend._async_save = save_observation
+    timestamp = datetime(2026, 10, 21, 5, 34, 24, tzinfo=UTC)
+    snapshot = SimpleNamespace(
+        timestamp=timestamp,
+        stale_fields=(),
+        source_age_seconds={"house_load_kw": 9.0},
+        house_load_kw=0.346,
+        solar_power_kw=0.0,
+        battery_power_kw=1.516,
+        grid_import_kw=0.006,
+        grid_export_kw=0.0,
+        foxess_balance_probe={
+            "observed_after_snapshot_at": (
+                timestamp + timedelta(seconds=1)
+            ).isoformat(),
+            "inverter_ac_output": {
+                "value": 1.397,
+                "unit": "kW",
+                "last_reported": (timestamp - timedelta(seconds=1)).isoformat(),
+            },
+            "grid_ct": {
+                "value": -0.006,
+                "unit": "kW",
+                "last_reported": (timestamp - timedelta(seconds=1)).isoformat(),
+            },
+        },
+    )
+    entities = {
+        "work_mode": {"normalised_observation": "Force Discharge"},
+        "export_power_limit": {"normalised_observation": 7000.0},
+    }
+    config = SimpleNamespace(
+        battery_power_positive_is_discharge=True,
+        export_limit_kw=7.0,
+    )
+    for _ in range(5):
+        asyncio.run(
+            OBSERVE(backend, snapshot=snapshot, entities=entities, config=config)
+        )
+    assert backend._paid_export_stage_failures == 1
+    assert backend._paid_export_stage_samples == 0
+    assert not backend._paid_export_live_proven
+    assert not backend._paid_export_stage_blocked
+    assert "inconclusive" in backend._paid_export_stage_reason
+
+    # CT recovers and shows physical 1kW export with battery discharge.
+    snapshot.battery_power_kw = 1.513
+    snapshot.house_load_kw = 0.345
+    snapshot.grid_import_kw = 0.0
+    snapshot.grid_export_kw = 1.052
+    snapshot.foxess_balance_probe["grid_ct"]["value"] = 1.052
+    for sample_number in range(2):
+        asyncio.run(
+            OBSERVE(backend, snapshot=snapshot, entities=entities, config=config)
+        )
+        assert backend._paid_export_stage_samples == sample_number + 1
+        assert not backend._paid_export_stage_blocked
+    assert backend._paid_export_live_proven
+    assert backend._paid_export_stage_failures == 0
