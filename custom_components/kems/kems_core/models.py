@@ -60,6 +60,9 @@ class Snapshot:
     # Read-only site-balance audit, retained with the observation for replay.
     # A consistent balance never grants KH7 write authority or circuit isolation.
     shared_bus_ev_audit: dict[str, Any] = field(default_factory=dict)
+    # Observed within the same coordinator cycle as these physical readings.
+    # Read-only, non-authoritative, and never used to grant FoxESS control.
+    foxess_balance_probe: dict[str, Any] = field(default_factory=dict)
 
     house_load_kw: float | None = None
     battery_soc: float | None = None
