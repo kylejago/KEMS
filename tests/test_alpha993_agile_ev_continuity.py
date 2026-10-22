@@ -114,12 +114,12 @@ def test_ev_becomes_connected_or_draws_current_clears_grace_immediately() -> Non
         assert detail["status"] == "blocked"
 
 
-def test_90_second_limit_and_restart_without_anchor_fail_closed() -> None:
+def test_300_second_unplugged_limit_and_restart_without_anchor_fail_closed() -> None:
     lost = _snapshot(ev_connected=None, ev_charging=None)
-    for seconds in (1, 40, 90):
+    for seconds in (1, 40, 90, 180, 299, 300):
         ok, _, _ = _assess(lost, now=NOW + timedelta(seconds=seconds), previous=NOW)
         assert ok
-    for previous, seconds in ((None, 40), (NOW, 91)):
+    for previous, seconds in ((None, 40), (NOW, 301)):
         ok, anchor, _ = _assess(
             lost, now=NOW + timedelta(seconds=seconds), previous=previous
         )
