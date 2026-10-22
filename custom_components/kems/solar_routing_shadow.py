@@ -140,7 +140,7 @@ def evaluate_solar_routing_shadow(
     def verdict(status: str, reason: str, **fields: Any) -> dict[str, Any]:
         return {**base, "status": status, "reason": reason, **fields}
 
-    if not paid_agile_selected or not agile_state.get("ready"):
+    if not paid_agile_selected or not agile_state.get("live_ready"):
         return verdict("insufficient_evidence", "Agile export price data not ready")
     if getattr(snapshot, "cheap_period_confirmed", False):
         return verdict("higher_priority", "Confirmed cheap charging")
