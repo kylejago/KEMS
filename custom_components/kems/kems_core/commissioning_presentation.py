@@ -85,6 +85,9 @@ def recorder_safe_commissioning_attributes(
         if key in payload
         and (payload[key] is None or isinstance(payload[key], (str, int, float, bool)))
     }
+    for key, value in tuple(attributes.items()):
+        if isinstance(value, str):
+            attributes[key] = _text(value, 160)
     attributes["diagnostic_detail_location"] = "KEMS integration diagnostics"
     for name, fields in _EVIDENCE_FIELDS.items():
         evidence = payload.get(name)
@@ -146,6 +149,17 @@ def recorder_safe_commissioning_attributes(
         for key in _EVIDENCE_FIELDS:
             attributes.pop(key, None)
 
-    # All remaining keys are fixed-size scalars; the compact result must
-    # remain well below the actual 16 KiB Recorder ceiling.
+    # A future source schema must never be able to inflate Recorder again.
+    if _bytes(attributes) > COMMISSIONING_ATTRIBUTES_BUDGET_BYTES:
+        attributes = {
+            key: attributes[key]
+            for key in (
+                "ready_for_shadow", "ready_for_control", "pass_count",
+                "wait_count", "fail_count", "required_checks",
+            )
+            if key in attributes
+        }
+        attributes["checks_total"] = len(checks)
+        attributes["checks_omitted"] = len(checks)
+        attributes["diagnostic_detail_location"] = "KEMS integration diagnostics"
     return attributes
