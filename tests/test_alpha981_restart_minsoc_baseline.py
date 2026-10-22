@@ -118,8 +118,8 @@ def test_alpha981_release_identity_and_scope() -> None:
     bundle = json.loads(BUNDLE.read_text(encoding="utf-8"))
     reason = str(bundle["maintenance"]["reason"])
 
-    assert manifest["version"] == "0.9.0-alpha9.123"
-    assert reason.startswith("Alpha9.123")
+    assert manifest["version"] == "0.9.0-alpha9.124"
+    assert reason.startswith("Alpha9.124")
     assert "4–5 October" in reason
     assert "10%" in reason
     assert "read back" in reason
