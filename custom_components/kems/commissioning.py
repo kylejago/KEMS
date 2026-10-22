@@ -36,6 +36,9 @@ from .kems_core.commissioning_evidence import (
     assess_foxess_telemetry_stability,
     assess_foxess_unit_contract,
 )
+from .kems_core.commissioning_presentation import (
+    recorder_safe_commissioning_attributes,
+)
 from .panel import PANEL_CONFIG_VERSION, panel_health_snapshot
 from .product_types import EXPORT_TARIFF_TYPE_NONE, export_tariff_type_from_options
 from .source_authority import PHYSICAL_SOURCE_KEYS, duplicate_physical_sources
@@ -1244,7 +1247,7 @@ def build_commissioning_snapshot(
 
 
 class KEMSCommissioningReadinessSensor(KEMSEntity, SensorEntity):
-    """Expose the complete commissioning checklist and shadow readiness."""
+    """Expose compact Recorder-safe readiness; full evidence stays diagnostic."""
 
     _attr_name = "Commissioning readiness"
     _attr_icon = "mdi:clipboard-check-multiple-outline"
@@ -1261,7 +1264,7 @@ class KEMSCommissioningReadinessSensor(KEMSEntity, SensorEntity):
     @property
     def extra_state_attributes(self) -> Mapping[str, Any]:
         payload = build_commissioning_snapshot(self._hass, self.coordinator)
-        return {key: value for key, value in payload.items() if key != "state"}
+        return recorder_safe_commissioning_attributes(payload)
 
 
 class KEMSPanelManagementStatusSensor(KEMSEntity, SensorEntity):
