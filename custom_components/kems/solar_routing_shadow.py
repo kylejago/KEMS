@@ -59,11 +59,19 @@ def _future_marginal_rate(
         capacity = _num(item.get("physical_export_capacity_kwh"))
         allocated = _num(item.get("planned_battery_export_kwh"))
         if (
-            start is None or end is None or end <= now or end <= start
-            or rate is None or rate <= 0 or capacity is None or allocated is None
+            start is None
+            or end is None
+            or end <= now
+            or end <= start
+            or rate is None
+            or rate <= 0
+            or capacity is None
+            or allocated is None
         ):
             continue
-        fraction = min((end - max(start, now)).total_seconds() / (end - start).total_seconds(), 1.0)
+        fraction = min(
+            (end - max(start, now)).total_seconds() / (end - start).total_seconds(), 1.0
+        )
         spare = max(capacity * fraction - allocated, 0.0)
         if spare > _EPSILON:
             possible.append((rate, spare, str(item.get("label") or "")))
@@ -90,8 +98,13 @@ def _future_marginal_rate(
 
 
 def evaluate_solar_routing_shadow(
-    *, now: datetime, agile_state: Mapping[str, Any],
-    snapshot: Any, forecast: Any, forecast_plan: Any, config: Any,
+    *,
+    now: datetime,
+    agile_state: Mapping[str, Any],
+    snapshot: Any,
+    forecast: Any,
+    forecast_plan: Any,
+    config: Any,
     paid_agile_selected: bool,
 ) -> dict[str, Any]:
     """Compare solar revenue now to later battery value, not live dispatch.
@@ -107,8 +120,7 @@ def evaluate_solar_routing_shadow(
     grid_import = _num(getattr(snapshot, "grid_import_kw", None))
     routing = agile_state.get("current_routing_snapshot")
     predicted_export = (
-        _num(routing.get("solar_export_kw"))
-        if isinstance(routing, Mapping) else None
+        _num(routing.get("solar_export_kw")) if isinstance(routing, Mapping) else None
     )
     base: dict[str, Any] = {
         "status": "insufficient_evidence",
@@ -128,8 +140,11 @@ def evaluate_solar_routing_shadow(
         "digital_twin_solar_export_kw": predicted_export,
         "digital_twin_vs_grid_export_gap_kw": (
             round(predicted_export - grid_export, 3)
-            if predicted_export is not None and grid_export is not None
-            and battery_kw is not None and battery_kw <= 0 else None
+            if predicted_export is not None
+            and grid_export is not None
+            and battery_kw is not None
+            and battery_kw <= 0
+            else None
         ),
         "flow_comparison_note": (
             "Estimate versus metered TOTAL export only when battery is not "
@@ -155,12 +170,17 @@ def evaluate_solar_routing_shadow(
     if target > _EPSILON:
         return verdict("higher_priority", "Scheduled Force Discharge already active")
     if set(getattr(snapshot, "stale_fields", ()) or ()) & {
-        "solar_power_kw", "house_load_kw", "battery_power_kw",
-        "grid_import_kw", "grid_export_kw",
+        "solar_power_kw",
+        "house_load_kw",
+        "battery_power_kw",
+        "grid_import_kw",
+        "grid_export_kw",
     }:
         return verdict("insufficient_evidence", "Critical power telemetry stale")
     if any(v is None or v < 0 for v in (solar, house, grid_export, grid_import)):
-        return verdict("insufficient_evidence", "Physical solar/house/grid readings missing")
+        return verdict(
+            "insufficient_evidence", "Physical solar/house/grid readings missing"
+        )
     surplus = max(solar - house, 0.0)
     if surplus <= _EPSILON:
         return verdict("no_surplus", "No surplus solar")
@@ -171,14 +191,24 @@ def evaluate_solar_routing_shadow(
     confidence = _num(getattr(forecast, "confidence_percent", None))
     if (
         not getattr(forecast, "ready", False)
-        or confidence is None or confidence < _CONFIDENCE_MIN
+        or confidence is None
+        or confidence < _CONFIDENCE_MIN
         or not getattr(forecast_plan, "ready", False)
     ):
-        return verdict("insufficient_evidence", "Forecast confidence or house plan insufficient")
-    predicted_import = _num(getattr(forecast_plan, "predicted_day_rate_import_kwh", None))
+        return verdict(
+            "insufficient_evidence", "Forecast confidence or house plan insufficient"
+        )
+    predicted_import = _num(
+        getattr(forecast_plan, "predicted_day_rate_import_kwh", None)
+    )
     if predicted_import is None:
-        return verdict("insufficient_evidence", "Forecast expensive import estimate missing")
-    if getattr(forecast_plan, "battery_retention_required", False) or predicted_import > 0:
+        return verdict(
+            "insufficient_evidence", "Forecast expensive import estimate missing"
+        )
+    if (
+        getattr(forecast_plan, "battery_retention_required", False)
+        or predicted_import > 0
+    ):
         return verdict("keep_self_use", "Battery is needed to avoid expensive imports")
 
     capacity = _num(getattr(config, "battery_capacity_kwh", None))
@@ -190,37 +220,59 @@ def evaluate_solar_routing_shadow(
     eta_discharge = _num(getattr(config, "discharge_efficiency", None))
     wear = _num(agile_state.get("battery_wear_assumption_pence_per_discharged_kwh"))
     if (
-        capacity is None or capacity <= 0 or soc is None or not 0 <= soc <= 100
-        or max_charge is None or max_charge <= 0
-        or export_limit is None or export_limit <= 0
-        or inverter_limit is None or inverter_limit <= 0
-        or eta_charge is None or not 0 < eta_charge <= 1
-        or eta_discharge is None or not 0 < eta_discharge <= 1
-        or wear is None or wear < 0
+        capacity is None
+        or capacity <= 0
+        or soc is None
+        or not 0 <= soc <= 100
+        or max_charge is None
+        or max_charge <= 0
+        or export_limit is None
+        or export_limit <= 0
+        or inverter_limit is None
+        or inverter_limit <= 0
+        or eta_charge is None
+        or not 0 < eta_charge <= 1
+        or eta_discharge is None
+        or not 0 < eta_discharge <= 1
+        or wear is None
+        or wear < 0
         or _num(plan.get("planning_soc_percent")) is None
         or _num(plan.get("protected_house_energy_kwh")) is None
     ):
-        return verdict("insufficient_evidence", "Physical SOC, reserve, efficiency or wear missing")
+        return verdict(
+            "insufficient_evidence", "Physical SOC, reserve, efficiency or wear missing"
+        )
     remaining_h = max((_time(slot.get("valid_to")) - now).total_seconds() / 3600.0, 0.0)
-    extra_kwh = min(surplus, max_charge, export_limit, inverter_limit) * min(remaining_h, 0.5)
+    extra_kwh = min(surplus, max_charge, export_limit, inverter_limit) * min(
+        remaining_h, 0.5
+    )
     extra_kwh = min(extra_kwh, max(capacity * (100 - soc) / 100, 0.0) / eta_charge)
     if extra_kwh <= _EPSILON:
-        return verdict("feed_in_first_candidate", "Battery full; no useful storage headroom",
-                       current_rate_pence=price)
+        return verdict(
+            "feed_in_first_candidate",
+            "Battery full; no useful storage headroom",
+            current_rate_pence=price,
+        )
     later_rate, spare, label = _future_marginal_rate(
         plan, now, extra_kwh * eta_charge * eta_discharge
     )
     if later_rate is None:
         return verdict(
-            "keep_self_use", "Cannot verify spare future export capacity",
-            current_rate_pence=price, confirmed_future_spare_kwh=round(spare, 3),
+            "keep_self_use",
+            "Cannot verify spare future export capacity",
+            current_rate_pence=price,
+            confirmed_future_spare_kwh=round(spare, 3),
         )
     value_later = eta_charge * eta_discharge * max(later_rate - wear, 0.0)
     advantage = price - value_later
     is_export_better = advantage > _MARGIN_PENCE
     return verdict(
         "feed_in_first_candidate" if is_export_better else "keep_self_use",
-        "Export now is worth more" if is_export_better else "Store for later export is worth more",
+        (
+            "Export now is worth more"
+            if is_export_better
+            else "Store for later export is worth more"
+        ),
         current_rate_pence=round(price, 4),
         marginal_future_rate_pence=round(later_rate, 4),
         stored_value_pence_per_input_kwh=round(value_later, 4),
