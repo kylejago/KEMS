@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from datetime import UTC, datetime
 from math import isfinite
-from typing import Any, Mapping
+from typing import Any
 
 _MARGIN_PENCE = 0.5
 _CONFIDENCE_MIN = 65.0
