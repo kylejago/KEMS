@@ -434,8 +434,7 @@ class PaidAgileUnpluggedContinuity:
             and timedelta(0)
             <= now - self._last_unplugged_at
             <= timedelta(seconds=_AGILE_EV_UNPLUGGED_GRACE_SECONDS)
-            and timedelta(0)
-            <= self._outage_started_at - self._last_unplugged_at
+            and timedelta(0) <= self._outage_started_at - self._last_unplugged_at
         ):
             return False
         house = self._site_meter(snapshot, "house_load_kw")
