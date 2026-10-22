@@ -216,9 +216,7 @@ def evaluate_solar_routing_shadow(
     capacity = _num(getattr(config, "battery_capacity_kwh", None))
     soc = _num(getattr(snapshot, "battery_soc", None))
     ages = getattr(snapshot, "source_age_seconds", None)
-    raw_soc_age = (
-        _num(ages.get("battery_soc")) if isinstance(ages, Mapping) else None
-    )
+    raw_soc_age = _num(ages.get("battery_soc")) if isinstance(ages, Mapping) else None
     max_charge = _num(getattr(config, "max_charge_kw", None))
     export_limit = _num(getattr(config, "export_limit_kw", None))
     inverter_limit = _num(getattr(config, "inverter_limit_kw", None))
@@ -252,11 +250,7 @@ def evaluate_solar_routing_shadow(
     # watts and the separate physical-energy lower bound move. A lower SOC
     # bound is NOT proof of free charging headroom. Never infer a physically
     # full battery, or recommend a new mode, from an old raw SOC register.
-    if (
-        raw_soc_age is None
-        or raw_soc_age < 0
-        or raw_soc_age > _SOC_MAX_AGE_SECONDS
-    ):
+    if raw_soc_age is None or raw_soc_age < 0 or raw_soc_age > _SOC_MAX_AGE_SECONDS:
         return verdict(
             "insufficient_evidence",
             "Physical battery SOC report is too old to establish storage headroom",
