@@ -98,6 +98,10 @@ from .providers.entity_map import KEMSEntities
 from .roi_accounting import async_reconcile_financial_commissioning
 from .settings import KEMSSettings
 from .shadow_validation import ShadowValidationRecorder
+from .solar_routing_shadow import (
+    evaluate_solar_routing_shadow,
+    publish_solar_routing_shadow,
+)
 
 LOGGER = logging.getLogger(__name__)
 
@@ -797,6 +801,30 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                 forecast_plan=forecast_plan,
                 tariff=self.settings.tariff,
             )
+
+            # Alpha9.123 financial solar-routing SHADOW. This is deliberately
+            # outside the FoxESS write-authority and ControlState paths.
+            # Never let advisory evaluation or sensor publication fail a
+            # production control scan, and never feed its result to a writer.
+            try:
+                solar_shadow = evaluate_solar_routing_shadow(
+                    now=now,
+                    agile_state=self._agile_smart_export.state,
+                    snapshot=snapshot,
+                    forecast=forecast,
+                    forecast_plan=forecast_plan,
+                    config=self.settings.simulation,
+                    paid_agile_selected=(
+                        selected_export_tariff == EXPORT_TARIFF_TYPE_AGILE
+                    ),
+                )
+                publish_solar_routing_shadow(
+                    self._agile_smart_export, solar_shadow
+                )
+            except Exception:
+                LOGGER.exception(
+                    "Read-only Alpha9.123 solar-routing shadow failed"
+                )
 
             # Reward-hour import cannot use a five-minute cached ledger near
             # the strict hourly cap. Refresh only the physical event budget
