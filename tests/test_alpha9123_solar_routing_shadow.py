@@ -126,9 +126,7 @@ def test_existing_physical_priorities_override_economic_candidate(
 
 def test_existing_battery_export_plan_takes_priority() -> None:
     args = _inputs(current_rate=25.0, future_rate=12.0)
-    args["agile_state"]["rolling_export_plan"][
-        "current_battery_export_target_kw"
-    ] = 2.0
+    args["agile_state"]["rolling_export_plan"]["current_battery_export_target_kw"] = 2.0
     assert evaluate_solar_routing_shadow(**args)["status"] == "higher_priority"
 
 
