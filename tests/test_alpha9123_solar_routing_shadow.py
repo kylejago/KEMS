@@ -52,6 +52,7 @@ def _inputs(*, current_rate: float = 12.0, future_rate: float = 30.0):
         cheap_period_confirmed=False,
         saving_session_active=False,
         stale_fields=(),
+        source_age_seconds={"battery_soc": 9.1},
     )
     forecast = SimpleNamespace(ready=True, confidence_percent=72.0)
     future = SimpleNamespace(
@@ -104,8 +105,8 @@ def test_saturated_future_valuable_slot_must_not_count_twice() -> None:
         physical_export_capacity_kwh=3.0, planned_battery_export_kwh=3.0
     )
     result = evaluate_solar_routing_shadow(**args)
-    assert result["status"] == "keep_self_use"
-    assert "no verified" not in result["reason"].lower() or result["reporting_only"]
+    assert result["status"] == "insufficient_evidence"
+    assert "spare future export capacity" in result["reason"]
 
 
 @pytest.mark.parametrize(
@@ -168,6 +169,25 @@ def test_observed_flow_parity_reports_disagreement_only_when_not_discharging() -
     args["snapshot"].battery_power_kw = 2.0
     value = evaluate_solar_routing_shadow(**args)
     assert value["digital_twin_vs_grid_export_gap_kw"] is None
+
+
+def test_stale_raw_100_soc_does_not_falsely_mark_battery_full() -> None:
+    args = _inputs(current_rate=24.0, future_rate=10.0)
+    args["snapshot"].battery_soc = 100.0
+    args["snapshot"].source_age_seconds["battery_soc"] = 5_105.8
+    args["agile_state"]["rolling_export_plan"]["planning_soc_percent"] = 96.21
+    result = evaluate_solar_routing_shadow(**args)
+    assert result["status"] == "insufficient_evidence"
+    assert "too old" in result["reason"]
+    assert result["physical_soc_lower_bound_percent"] == 96.21
+    assert result["physical_soc_age_seconds"] == 5_105.8
+
+
+def test_missing_soc_readback_timestamp_cannot_enable_new_mode() -> None:
+    args = _inputs(current_rate=24.0, future_rate=10.0)
+    args["snapshot"].source_age_seconds = {}
+    result = evaluate_solar_routing_shadow(**args)
+    assert result["status"] == "insufficient_evidence"
 
 
 def test_publication_writes_only_separate_shadow_sensor() -> None:
