@@ -46,16 +46,29 @@ _SUMMARY_FIELDS = (
 )
 _EVIDENCE_FIELDS: dict[str, tuple[str, ...]] = {
     "foxess_telemetry_stability": (
-        "state", "ready", "samples", "complete_samples", "completeness_percent",
+        "state",
+        "ready",
+        "samples",
+        "complete_samples",
+        "completeness_percent",
         "maximum_gap_seconds",
     ),
     "foxess_power_balance": (
-        "state", "ready", "samples", "eligible_samples", "balanced_samples",
-        "balance_percent", "maximum_absolute_residual_kw",
+        "state",
+        "ready",
+        "samples",
+        "eligible_samples",
+        "balanced_samples",
+        "balance_percent",
+        "maximum_absolute_residual_kw",
     ),
     "foxess_battery_direction_evidence": (
-        "state", "ready", "evidence_samples", "confidence_percent",
-        "positive_is_discharge_votes", "positive_is_charge_votes",
+        "state",
+        "ready",
+        "evidence_samples",
+        "confidence_percent",
+        "positive_is_discharge_votes",
+        "positive_is_charge_votes",
     ),
 }
 
@@ -136,9 +149,7 @@ def recorder_safe_commissioning_attributes(
         # A future massively expanded commissioning checklist cannot recreate
         # the Recorder overflow. Use a deterministic bounded subset.
         attributes["checks"] = compact[:24]
-        attributes["checks_omitted"] = max(
-            len(checks) - len(attributes["checks"]), 0
-        )
+        attributes["checks_omitted"] = max(len(checks) - len(attributes["checks"]), 0)
     if _bytes(attributes) > COMMISSIONING_ATTRIBUTES_BUDGET_BYTES:
         attributes["checks"] = compact[:8]
         attributes["checks_omitted"] = max(len(checks) - len(attributes["checks"]), 0)
@@ -154,8 +165,12 @@ def recorder_safe_commissioning_attributes(
         attributes = {
             key: attributes[key]
             for key in (
-                "ready_for_shadow", "ready_for_control", "pass_count",
-                "wait_count", "fail_count", "required_checks",
+                "ready_for_shadow",
+                "ready_for_control",
+                "pass_count",
+                "wait_count",
+                "fail_count",
+                "required_checks",
             )
             if key in attributes
         }
