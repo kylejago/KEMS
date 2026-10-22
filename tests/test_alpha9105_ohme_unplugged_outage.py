@@ -126,7 +126,7 @@ def test_same_outage_grace_expires_and_cannot_rearm_without_ohme() -> None:
     proof.assess(_snapshot(), now=NOW)
     outage_at = NOW + timedelta(seconds=60)
     assert proof.assess(_cloud_outage(outage_at), now=outage_at)
-    at = outage_at + timedelta(seconds=91)
+    at = NOW + timedelta(seconds=301)
     lost = _cloud_outage(at)
     assert not proof.assess(lost, now=at)
     assert _guard(lost, proof, when=at)[0].desired_battery_export_power_kw == 0
@@ -282,7 +282,7 @@ def test_alpha9119_fresh_split_ct_keeps_unplugged_export_during_brief_ohme_loss(
     assert report["status"] == "permitted_with_physical_house_budget"
     assert desired.desired_battery_export_power_kw == pytest.approx(5.177)
     # Never renew or perpetuate cloud outage from CT data alone.
-    later = at + timedelta(seconds=91)
+    later = NOW + timedelta(seconds=301)
     assert not proof.assess(
         _fresh_coherent_export_with_aged_zero_import(
             later,
@@ -355,3 +355,89 @@ def test_alpha9119_ct_without_prior_disconnection_does_not_authorise_unknown_ev(
     )
     assert not proof.assess(untrusted, now=at)
     assert _guard(untrusted, proof, when=at)[0].desired_battery_export_power_kw == 0.0
+
+
+@pytest.mark.parametrize(
+    "seconds,allowed", [(60, True), (180, True), (299, True), (300, True), (301, False)]
+)
+def test_alpha9122_five_minute_unplugged_unknown_grace_is_absolute(
+    seconds: int, allowed: bool
+) -> None:
+    """No unknown report may renew a 5-minute explicitly unplugged anchor."""
+    proof = PaidAgileUnpluggedContinuity()
+    assert not proof.assess(_snapshot(), now=NOW)
+    initial = NOW + timedelta(seconds=20)
+    assert proof.assess(_cloud_outage(initial), now=initial)
+    # Even after the original 90s the verified-unplugged cloud outage may
+    # continue if fresh FoxESS grid and house telemetry contradict no charging.
+    at = NOW + timedelta(seconds=seconds)
+    result = proof.assess(_cloud_outage(at), now=at)
+    assert result is allowed
+    plan, report = _guard(_cloud_outage(at), proof, when=at)
+    assert (plan.desired_battery_export_power_kw > 0) is allowed
+    assert (report["status"] == "permitted_with_physical_house_budget") is allowed
+
+
+def test_alpha9122_connected_idle_never_uses_longer_unplugged_allowance() -> None:
+    """A plugged-in but idle EV retains the original short connected refresh."""
+    proof = PaidAgileUnpluggedContinuity()
+    last = NOW + timedelta(seconds=30)
+    proof.assess(_snapshot(), now=NOW)
+    # A genuine connected status clears previously unplugged evidence.
+    assert not proof.assess(
+        _snapshot(last, ev_connected=True, ev_charging=False),
+        now=last,
+    )
+    assert proof.status["last_confirmed_unplugged_at"] is None
+    unknown = _cloud_outage(NOW + timedelta(seconds=60))
+    assert not proof.assess(unknown, now=unknown.timestamp)
+    assert (
+        _guard(unknown, proof, when=unknown.timestamp)[
+            0
+        ].desired_battery_export_power_kw
+        == 0
+    )
+
+
+@pytest.mark.parametrize(
+    "changes",
+    [
+        {"ev_connected": True, "ev_charging": False},
+        {"ev_connected": True, "ev_charging": True},
+        {"ev_charging": True},
+        {"ev_power_kw": 0.5},
+        {"ev_power_kw": 7.0},
+        {"house_load_kw": 3.0},
+        {"grid_import_kw": 0.6},
+        {"source_age_seconds": {"house_load_kw": 60.0, "grid_import_kw": 9.0}},
+    ],
+)
+def test_alpha9122_new_positive_or_bad_physical_evidence_vetoes_5min_grace(
+    changes: dict[str, object],
+) -> None:
+    proof = PaidAgileUnpluggedContinuity()
+    assert not proof.assess(_snapshot(), now=NOW)
+    at = NOW + timedelta(seconds=240)
+    bad = _cloud_outage(at, **changes)
+    assert not proof.assess(bad, now=at)
+    assert _guard(bad, proof, when=at)[0].desired_battery_export_power_kw == 0.0
+
+
+def test_alpha9122_unknown_never_rearms_expired_unplugged_evidence() -> None:
+    proof = PaidAgileUnpluggedContinuity()
+    assert not proof.assess(_snapshot(), now=NOW)
+    # Mid-outage checks cannot refresh last explicit unplugged anchor.
+    for seconds in (15, 90, 165, 240, 299):
+        at = NOW + timedelta(seconds=seconds)
+        assert proof.assess(_cloud_outage(at), now=at)
+    at = NOW + timedelta(seconds=301)
+    assert not proof.assess(_cloud_outage(at), now=at)
+    assert proof.status["last_confirmed_unplugged_at"] is None
+    later = NOW + timedelta(seconds=302)
+    assert not proof.assess(_cloud_outage(later), now=later)
+    recovered = NOW + timedelta(seconds=330)
+    assert not proof.assess(_snapshot(recovered), now=recovered)
+    assert proof.assess(
+        _cloud_outage(recovered + timedelta(seconds=1)),
+        now=recovered + timedelta(seconds=1),
+    )

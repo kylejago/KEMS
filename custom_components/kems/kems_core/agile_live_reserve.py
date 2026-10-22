@@ -31,7 +31,10 @@ _MAX_COHORT_SOC_AGE_SECONDS = 3600.0
 _MIN_CONSERVATIVE_DISCHARGE_KW = 10.0
 # Grace applies only to a *previously verified unplugged* EV with live zero
 # charging power. Never carry this across restart or a positive EV observation.
-_AGILE_EV_UNPLUGGED_GRACE_SECONDS = 90.0
+# A recently confirmed UNPLUGGED EV can bridge up to five minutes of Ohme
+# reporting loss. The previous connected/charging state never arms this grace.
+# Fresh positive EV evidence or physical-site anomalies always veto export.
+_AGILE_EV_UNPLUGGED_GRACE_SECONDS = 300.0
 _AGILE_EV_MAX_POWER_REPORT_AGE_SECONDS = 180.0
 # Plugged-in EVs may start charging without another status transition. A
 # zero-power sample from a cloud charger must be very recent before export.
@@ -319,7 +322,7 @@ class PaidAgileUnpluggedContinuity:
         aged zero alone must never authorise EV-outage export. Require the
         separate-source contract, raw split, and same-device fresh AC/CT/load
         coherence to reject the ~6 kW post-mode-change KH7 anomalies.
-        The normal explicit-unplugged, 90 s grace and EV/house vetoes still
+        The bounded explicit-unplugged grace and EV/house vetoes still
         apply. This is only a redundant-site-meter evidence path, not a new
         source of grid export authority or physical export proof.
         """
@@ -429,8 +432,9 @@ class PaidAgileUnpluggedContinuity:
             <= now - self._outage_started_at
             <= timedelta(seconds=_AGILE_EV_UNPLUGGED_GRACE_SECONDS)
             and timedelta(0)
-            <= self._outage_started_at - self._last_unplugged_at
+            <= now - self._last_unplugged_at
             <= timedelta(seconds=_AGILE_EV_UNPLUGGED_GRACE_SECONDS)
+            and timedelta(0) <= self._outage_started_at - self._last_unplugged_at
         ):
             return False
         house = self._site_meter(snapshot, "house_load_kw")

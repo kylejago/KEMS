@@ -102,7 +102,7 @@ def test_simultaneously_unavailable_after_fresh_disconnection_has_bounded_grace(
     missing = _snapshot(at, ev_connected=None, ev_charging=None)
     assert proof.assess(missing, now=at)
     assert _export(missing, proof, at)[0].desired_battery_export_power_kw > 0
-    expired = NOW + timedelta(seconds=91)
+    expired = NOW + timedelta(seconds=301)
     assert not proof.assess(
         _snapshot(expired, ev_connected=None, ev_charging=None), now=expired
     )
