@@ -357,8 +357,9 @@ def test_alpha9119_ct_without_prior_disconnection_does_not_authorise_unknown_ev(
     assert _guard(untrusted, proof, when=at)[0].desired_battery_export_power_kw == 0.0
 
 
-
-@pytest.mark.parametrize("seconds,allowed", [(60, True), (180, True), (299, True), (300, True), (301, False)])
+@pytest.mark.parametrize(
+    "seconds,allowed", [(60, True), (180, True), (299, True), (300, True), (301, False)]
+)
 def test_alpha9122_five_minute_unplugged_unknown_grace_is_absolute(
     seconds: int, allowed: bool
 ) -> None:
@@ -390,7 +391,12 @@ def test_alpha9122_connected_idle_never_uses_longer_unplugged_allowance() -> Non
     assert proof.status["last_confirmed_unplugged_at"] is None
     unknown = _cloud_outage(NOW + timedelta(seconds=60))
     assert not proof.assess(unknown, now=unknown.timestamp)
-    assert _guard(unknown, proof, when=unknown.timestamp)[0].desired_battery_export_power_kw == 0
+    assert (
+        _guard(unknown, proof, when=unknown.timestamp)[
+            0
+        ].desired_battery_export_power_kw
+        == 0
+    )
 
 
 @pytest.mark.parametrize(
@@ -431,4 +437,7 @@ def test_alpha9122_unknown_never_rearms_expired_unplugged_evidence() -> None:
     assert not proof.assess(_cloud_outage(later), now=later)
     recovered = NOW + timedelta(seconds=330)
     assert not proof.assess(_snapshot(recovered), now=recovered)
-    assert proof.assess(_cloud_outage(recovered + timedelta(seconds=1)), now=recovered + timedelta(seconds=1))
+    assert proof.assess(
+        _cloud_outage(recovered + timedelta(seconds=1)),
+        now=recovered + timedelta(seconds=1),
+    )
