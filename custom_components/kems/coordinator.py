@@ -818,13 +818,9 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                         selected_export_tariff == EXPORT_TARIFF_TYPE_AGILE
                     ),
                 )
-                publish_solar_routing_shadow(
-                    self._agile_smart_export, solar_shadow
-                )
+                publish_solar_routing_shadow(self._agile_smart_export, solar_shadow)
             except Exception:
-                LOGGER.exception(
-                    "Read-only Alpha9.123 solar-routing shadow failed"
-                )
+                LOGGER.exception("Read-only Alpha9.123 solar-routing shadow failed")
 
             # Reward-hour import cannot use a five-minute cached ledger near
             # the strict hourly cap. Refresh only the physical event budget
