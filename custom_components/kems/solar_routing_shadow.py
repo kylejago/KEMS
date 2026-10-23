@@ -186,6 +186,39 @@ def evaluate_solar_routing_shadow(
     surplus = max(solar - house, 0.0)
     if surplus <= _EPSILON:
         return verdict("no_surplus", "No surplus solar")
+    if battery_kw is None:
+        return verdict(
+            "insufficient_evidence", "Battery power direction is unavailable"
+        )
+    # The financial opportunity is *divertible PV charging*, not all PV surplus.
+    # Solar already exported to the CT would otherwise be valued twice.
+    # FoxESS sign convention: negative battery power means charging.
+    divertible_kw = min(surplus, max(-battery_kw, 0.0))
+    actual_ac_kw = max(solar + battery_kw, 0.0)
+    physical_residual_kw = actual_ac_kw - (house + grid_export - grid_import)
+    observed_basis = {
+        "divertible_solar_charge_kw": round(divertible_kw, 3),
+        "physical_ac_balance_residual_kw": round(physical_residual_kw, 3),
+        "physical_inverter_ac_kw": round(actual_ac_kw, 3),
+    }
+    if abs(physical_residual_kw) > 0.5:
+        return verdict(
+            "insufficient_evidence",
+            "Solar/battery/CT readings are not physically coherent",
+            **observed_basis,
+        )
+    if grid_import > 0.1:
+        return verdict(
+            "insufficient_evidence",
+            "Observed day-rate grid import prevents an export-mode proposal",
+            **observed_basis,
+        )
+    if divertible_kw <= 0.05:
+        return verdict(
+            "no_divertible_charge",
+            "No measured solar charging that Feed-in First could redirect",
+            **observed_basis,
+        )
     slot = _slot(agile_state.get("today_slots"), now)
     price = _num(slot.get("rate_pence")) if slot else None
     if price is None or price <= 0:
@@ -258,15 +291,38 @@ def evaluate_solar_routing_shadow(
             physical_soc_lower_bound_percent=_num(plan.get("planning_soc_percent")),
         )
     remaining_h = max((_time(slot.get("valid_to")) - now).total_seconds() / 3600.0, 0.0)
-    extra_kwh = min(surplus, max_charge, export_limit, inverter_limit) * min(
-        remaining_h, 0.5
+    export_headroom_kw = max(export_limit - grid_export, 0.0)
+    inverter_headroom_kw = max(inverter_limit - actual_ac_kw, 0.0)
+    # A mode change may only redirect presently observed battery charging,
+    # within both independently metered export and shared KH7 AC headroom.
+    # No dedicated PV export register exists; this is still shadow evidence.
+    redirect_kw = min(
+        divertible_kw, max_charge, export_headroom_kw, inverter_headroom_kw
     )
-    extra_kwh = min(extra_kwh, max(capacity * (100 - soc) / 100, 0.0) / eta_charge)
+    headroom_basis = {
+        **observed_basis,
+        "metered_export_headroom_kw": round(export_headroom_kw, 3),
+        "physical_inverter_headroom_kw": round(inverter_headroom_kw, 3),
+        "bounded_redirectable_solar_kw": round(redirect_kw, 3),
+    }
+    if redirect_kw <= 0.05:
+        return verdict(
+            "no_export_headroom",
+            "No independent grid/inverter headroom for solar redirection",
+            **headroom_basis,
+        )
+    redirect_kwh = redirect_kw * min(remaining_h, 0.5)
+    extra_kwh = min(
+        redirect_kwh,
+        max(capacity * (100 - soc) / 100, 0.0) / eta_charge,
+    )
     if extra_kwh <= _EPSILON:
         return verdict(
             "feed_in_first_candidate",
-            "Battery full; no useful storage headroom",
+            "Battery has no confirmed storage headroom; metered PV is charging",
             current_rate_pence=price,
+            metered_redirectable_solar_kwh=round(redirect_kwh, 3),
+            **headroom_basis,
         )
     later_rate, spare, label = _future_marginal_rate(
         plan, now, extra_kwh * eta_charge * eta_discharge
@@ -301,6 +357,7 @@ def evaluate_solar_routing_shadow(
         future_spare_capacity_kwh=round(spare, 3),
         future_price_slot=label,
         decision_margin_pence_per_kwh=_MARGIN_PENCE,
+        **headroom_basis,
     )
 
 
