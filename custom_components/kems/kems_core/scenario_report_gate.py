@@ -7,6 +7,7 @@ never depend on this optional reporting value or await its computation.
 from __future__ import annotations
 
 from datetime import datetime, timedelta
+
 REPORT_REFRESH = timedelta(minutes=5)
 
 
