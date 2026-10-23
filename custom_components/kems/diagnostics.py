@@ -195,7 +195,8 @@ async def async_get_config_entry_diagnostics(
         "agile_budget_reconciliation": reconcile_agile_budget(
             coordinator.agile_smart_export_state,
             getattr(
-                coordinator, "_agile_live_reserve_status",
+                coordinator,
+                "_agile_live_reserve_status",
                 {"status": "not_yet_evaluated"},
             ),
         ),

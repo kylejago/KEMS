@@ -74,9 +74,7 @@ def reconcile_agile_budget(
         "extra_guard_house_protection_kwh": round(
             max(guard_house - planner_house, 0.0), 3
         ),
-        "current_permitted_export_kw": physical_reserve.get(
-            "permitted_export_kw"
-        ),
+        "current_permitted_export_kw": physical_reserve.get("permitted_export_kw"),
         "physical_guard_status": physical_reserve.get("status"),
         "note": (
             "Full-window plan energy is advisory; the instantaneous FoxESS "

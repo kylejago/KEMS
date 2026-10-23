@@ -63,8 +63,13 @@ class EfficientAgileSmartExportManager(AgileSmartExportManager):
         """Reuse only exact-input historical replay, never live or future results."""
         if not records:
             return super()._compare_day(
-                records, config, tariff, agile_soc, full_soc,
-                learned_forecast, projection,
+                records,
+                config,
+                tariff,
+                agile_soc,
+                full_soc,
+                learned_forecast,
+                projection,
             )
         day = records[0].timestamp.astimezone(LONDON).date()
         last_analysis = getattr(self, "_last_analysis", None)
@@ -78,9 +83,15 @@ class EfficientAgileSmartExportManager(AgileSmartExportManager):
             today=today,
             projection=projection,
             inputs=(
-                records, config, tariff, agile_soc, full_soc,
-                learned_forecast, self._day_rates(day),
-                self._product_code, self._tariff_code,
+                records,
+                config,
+                tariff,
+                agile_soc,
+                full_soc,
+                learned_forecast,
+                self._day_rates(day),
+                self._product_code,
+                self._tariff_code,
             ),
             calculate=lambda: super(
                 EfficientAgileSmartExportManager, self
