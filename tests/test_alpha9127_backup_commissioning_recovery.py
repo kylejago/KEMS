@@ -9,7 +9,6 @@ from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 
 import pytest
-
 from kems_core.commissioning_evidence import (
     _released_backup_ct_recovery,
     _released_backup_distinct_readbacks,
