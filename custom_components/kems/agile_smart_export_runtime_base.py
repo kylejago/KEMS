@@ -77,7 +77,21 @@ class EfficientAgileSmartExportManager(AgileSmartExportManager):
             if isinstance(last_analysis, datetime)
             else None
         )
-        return self._historical_replay_cache.evaluate(
+        cache = getattr(self, "_historical_replay_cache", None)
+        if cache is None:
+            # Some historical regression wrappers construct a manager without
+            # calling the efficient base initialiser. Keep their exact
+            # pre-Alpha9.128 replay semantics instead of requiring a cache.
+            return super()._compare_day(
+                records,
+                config,
+                tariff,
+                agile_soc,
+                full_soc,
+                learned_forecast,
+                projection,
+            )
+        return cache.evaluate(
             day=day,
             today=today,
             projection=projection,
