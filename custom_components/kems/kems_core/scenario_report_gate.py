@@ -7,13 +7,10 @@ never depend on this optional reporting value or await its computation.
 from __future__ import annotations
 
 from datetime import datetime, timedelta
-from typing import Generic, TypeVar
-
-T = TypeVar("T")
 REPORT_REFRESH = timedelta(minutes=5)
 
 
-class ScenarioReportGate(Generic[T]):
+class ScenarioReportGate[T]:
     """Allow one optional reporting replay at a time, with a bounded cadence."""
 
     def __init__(self, refresh: timedelta = REPORT_REFRESH) -> None:
