@@ -175,6 +175,7 @@ async def async_get_config_entry_diagnostics(
             coordinator,
         ),
         "foxess_control": coordinator.foxess_control_state,
+        "coordinator_performance": coordinator.coordinator_performance_state,
         "export_commissioning_test": coordinator.export_commissioning_test_state,
         "learning": asdict(data.learned),
         "gas": asdict(data.gas),
