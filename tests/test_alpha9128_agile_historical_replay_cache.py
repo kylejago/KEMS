@@ -155,7 +155,7 @@ def test_integration_preserves_per_scan_rolling_analysis_and_hardware_writes() -
     runtime = (ROOT / "agile_smart_export_runtime_base.py").read_text()
     rolling = (ROOT / "agile_rolling_replan_runtime.py").read_text()
     diagnostics = (ROOT / "diagnostics.py").read_text()
-    assert "self._historical_replay_cache.evaluate(" in runtime
+    assert "return cache.evaluate(" in runtime
     assert "runtime.ANALYSIS_REFRESH = timedelta(0)" in rolling
     assert "async def _async_update_with_rolling(" in rolling
     assert '"agile_budget_reconciliation": reconcile_agile_budget(' in diagnostics
