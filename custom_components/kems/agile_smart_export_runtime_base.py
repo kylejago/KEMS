@@ -3,8 +3,6 @@
 from __future__ import annotations
 
 from datetime import UTC, date, datetime, time, timedelta
-
-from .kems_core.agile_historical_replay_cache import HistoricalReplayCache
 from typing import Any
 
 from homeassistant.core import HomeAssistant
@@ -28,6 +26,7 @@ from .kems_core import (
     Snapshot,
     SolarForecastState,
 )
+from .kems_core.agile_historical_replay_cache import HistoricalReplayCache
 from .tariff import TariffSettings
 
 ANALYSIS_REFRESH = timedelta(minutes=5)
