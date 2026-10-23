@@ -45,7 +45,9 @@ class ScenarioReportGate[T]:
         """Only publish the result for the active request and reporting mode."""
         if self._running and detailed == self._mode:
             self._result = result
-            self._result_date = now.date()
+            # A job started before midnight is yesterday's report even if
+            # the executor returns after the date rolls over.
+            self._result_date = self._started.date() if self._started else None
             self._result_mode = detailed
             self._completed = now
             self._last_error = None
