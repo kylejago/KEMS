@@ -6,6 +6,7 @@ import logging
 from dataclasses import replace
 from datetime import date, datetime, timedelta
 from math import isfinite
+from time import perf_counter
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import Event, HomeAssistant, callback
@@ -65,6 +66,7 @@ from .kems_core import (
     LifetimeLedger,
     ROIEngine,
     ScenarioComparisonEngine,
+    ScenarioComparisonState,
     SimulationEngine,
     WholeHomeEngine,
     assess_quality,
@@ -83,6 +85,7 @@ from .kems_core.control_event_refresh import (
     meaningful_ev_power_transition,
 )
 from .kems_core.control_write_authority import active_joined_power_down_window
+from .kems_core.scenario_report_gate import ScenarioReportGate
 from .kems_core.shared_bus_balance import (
     assess_shared_bus_balance,
     summarise_shared_bus_audits,
@@ -163,6 +166,13 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
         self._advice = AdviceEngine()
         self._simulation = SimulationEngine()
         self._scenarios = ScenarioComparisonEngine()
+        # Optional 30-day what-if replay must not block the event loop or
+        # delay FoxESS decisions. Only immutable captured inputs enter executor.
+        self._scenario_report_gate = ScenarioReportGate[ScenarioComparisonState]()
+        self._scenario_report_task = None
+        self._scenario_report_runtime: dict[str, object] = {}
+        self._coordinator_performance: dict[str, object] = {}
+        self._coordinator_slow_scans: list[dict[str, object]] = []
         self._agile_history_backfill = AgileHistoryBackfill(hass, entities)
         self._agile_smart_export = EfficientAgileSmartExportManager(
             hass,
@@ -557,8 +567,80 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                 # grant/revoke inverter control. Leave uncertain days untouched.
                 LOGGER.warning("Historical Loyal tariff replay skipped: %s", err)
 
+    @property
+    def coordinator_performance_state(self) -> dict[str, object]:
+        """Read-only performance evidence for the diagnostic download."""
+        return {
+            **self._coordinator_performance,
+            "recent_slow_scans": list(self._coordinator_slow_scans),
+            "scenario_replay": {
+                **self._scenario_report_gate.status,
+                **self._scenario_report_runtime,
+            },
+        }
+
+    async def _async_refresh_scenario_reporting(
+        self,
+        records,
+        now: datetime,
+        config,
+        forecast_energy: float | None,
+        snapshot,
+        detailed: bool,
+    ) -> None:
+        """Run only pure what-if comparisons in HA's executor.
+
+        No HA state, live control backend, mutable coordinator setting or
+        physical write is accessed inside the worker. At most one job can be
+        outstanding; report errors never fail a safety-critical coordinator scan.
+        """
+        started = perf_counter()
+        try:
+            if detailed:
+                result = await self.hass.async_add_executor_job(
+                    self._scenarios.compare,
+                    records,
+                    now,
+                    config,
+                    forecast_energy,
+                    snapshot,
+                )
+            else:
+                result = await self.hass.async_add_executor_job(
+                    self._scenarios.baseline_only,
+                    records,
+                    now,
+                    config,
+                    snapshot,
+                )
+        except Exception as err:
+            self._scenario_report_gate.fail(err)
+            LOGGER.exception("Read-only KEMS scenario replay failed")
+        else:
+            self._scenario_report_gate.complete(
+                result, now=dt_util.now(), detailed=detailed
+            )
+        finally:
+            self._scenario_report_runtime = {
+                "last_duration_seconds": round(perf_counter() - started, 3),
+                "worker": "home_assistant_executor",
+                "live_control_waits_for_replay": False,
+                "live_control_writer_changed": False,
+            }
+            self._scenario_report_task = None
+
     async def _async_update_data(self) -> KEMSData:
-        """Run the complete read-only KEMS analysis pipeline."""
+        """Refresh physical control first; run optional what-if work separately."""
+        scan_started = perf_counter()
+        checkpoint_at = scan_started
+        stage_seconds: dict[str, float] = {}
+
+        def checkpoint(name: str) -> None:
+            nonlocal checkpoint_at
+            current = perf_counter()
+            stage_seconds[name] = round(current - checkpoint_at, 3)
+            checkpoint_at = current
+
         try:
             snapshot = self._collector.collect()
             # Read-only timing correlation for commissioning outliers. This
@@ -710,6 +792,7 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                 await self._forecast_validation.async_save()
 
             await self._history.async_record(snapshot)
+            checkpoint("physical_snapshot_forecast_history")
             # Dedicated short, restart-safe physical meter trace for booked
             # reward hours. Never substitute a digital-twin estimate for an
             # unknown section of the 16kWh per-hour import allowance.
@@ -737,24 +820,40 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                 learned.predicted_energy_until_offpeak_kwh,
                 current_snapshot=snapshot,
             )
-            # Alpha9.100: expensive multi-scenario replay is reporting-only.
-            # Keep the same live simulation, planning, paid Agile, ROI, history
-            # and hardware authority paths untouched on either setting.
-            if self.entry.options.get(CONF_DETAILED_COMPARISONS_ENABLED, True):
-                scenarios = self._scenarios.compare(
-                    records,
-                    now,
-                    self.settings.simulation,
-                    learned.predicted_energy_until_offpeak_kwh,
-                    current_snapshot=snapshot,
-                )
-            else:
-                scenarios = self._scenarios.baseline_only(
-                    records,
-                    now,
-                    self.settings.simulation,
-                    current_snapshot=snapshot,
-                )
+            checkpoint("live_simulation_and_learning")
+            # Alpha9.125: 30-day multi-scenario and baseline-only replay are
+            # reporting-only. Schedule a bounded executor run without awaiting
+            # it: the live planner, physical SOC, Agile export and FoxESS writes
+            # must never wait on a comparison that may take 25+ seconds.
+            # Create a shallow immutable observation slice; scenario engines
+            # read history only. Live snapshot is a separate dataclass copy
+            # because later financial revaluation changes its export rate.
+            detailed = bool(
+                self.entry.options.get(CONF_DETAILED_COMPARISONS_ENABLED, True)
+            )
+            if self._scenario_report_gate.claim(now, detailed=detailed):
+                try:
+                    report_records = list(records)
+                    report_snapshot = replace(snapshot)
+                    if report_records and report_records[-1] is snapshot:
+                        report_records[-1] = report_snapshot
+                    self._scenario_report_task = self.hass.async_create_task(
+                        self._async_refresh_scenario_reporting(
+                            report_records,
+                            now,
+                            self.settings.simulation,
+                            learned.predicted_energy_until_offpeak_kwh,
+                            report_snapshot,
+                            detailed,
+                        )
+                    )
+                except Exception as err:
+                    self._scenario_report_gate.fail(err)
+                    LOGGER.exception("Could not start read-only scenario replay")
+            scenarios = self._scenario_report_gate.cached(
+                now, detailed=detailed
+            ) or ScenarioComparisonState(generated_at=now)
+            checkpoint("scenario_reporting_schedule")
             agile_records = await self._agile_history_backfill.async_records(
                 native_records=records,
                 now=now,
@@ -801,6 +900,7 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                 forecast_plan=forecast_plan,
                 tariff=self.settings.tariff,
             )
+            checkpoint("agile_rolling_price_optimisation")
 
             # Alpha9.123 financial solar-routing SHADOW. This is deliberately
             # outside the FoxESS write-authority and ControlState paths.
@@ -1124,6 +1224,7 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                 config=self.settings.control,
                 agile_state=agile_state,
             )
+            checkpoint("control_and_physical_safety_planning")
             # Capture any half-hour that settled during this scan, then rebuild
             # the published headline simulation from the same authoritative
             # current-day ledger. Dashboard, Pi/API consumers and financial
@@ -1195,6 +1296,7 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                 phase=phase,
                 alpha969_shadow_plan=alpha969_shadow_plan,
             )
+            checkpoint("financial_and_reporting_ledgers")
             commissioning = build_commissioning_snapshot(
                 self.hass,
                 self,
@@ -1279,9 +1381,38 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                     else control.blocked_reason
                 ),
             )
+            checkpoint("commissioning_foxess_and_ev_actions")
             return replace(provisional, control=control)
         except Exception as err:
             raise UpdateFailed(f"KEMS analysis failed: {err}") from err
+        finally:
+            checkpoint("other_and_finalisation")
+            elapsed = round(perf_counter() - scan_started, 3)
+            biggest = max(stage_seconds, key=stage_seconds.get)
+            self._coordinator_performance = {
+                "scan_elapsed_seconds": elapsed,
+                "stage_seconds": dict(stage_seconds),
+                "longest_stage": biggest,
+                "longest_stage_seconds": stage_seconds[biggest],
+                "timing_clock": "monotonic_perf_counter",
+                "control_execution_model": "unchanged",
+                "reporting_replay_blocks_control": False,
+            }
+            if elapsed >= 5.0:
+                record = {
+                    "at": dt_util.now().isoformat(),
+                    "seconds": elapsed,
+                    "longest_stage": biggest,
+                    "longest_stage_seconds": stage_seconds[biggest],
+                }
+                self._coordinator_slow_scans.append(record)
+                self._coordinator_slow_scans = self._coordinator_slow_scans[-12:]
+                LOGGER.warning(
+                    "KEMS refresh %.2fs; slowest stage %s %.2fs",
+                    elapsed,
+                    biggest,
+                    stage_seconds[biggest],
+                )
 
     def _cheap_window_hours(self) -> float:
         """Return configured normal overnight cheap-window duration."""
@@ -1331,6 +1462,11 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
         if callable(export_cancel):
             export_cancel()
             self._export_commissioning_timeout_cancel = None
+        # The queued report is optional. Cancel the HA coroutine and keep
+        # workers away from HA state; a running pure executor may finish later.
+        task = self._scenario_report_task
+        if task is not None and not task.done():
+            task.cancel()
         await self._export_commissioning_test.async_shutdown()
         await self._foxess_control.async_shutdown(self)
         await self._ev_soc_sync.async_shutdown()
