@@ -187,7 +187,9 @@ def evaluate_solar_routing_shadow(
     if surplus <= _EPSILON:
         return verdict("no_surplus", "No surplus solar")
     if battery_kw is None:
-        return verdict("insufficient_evidence", "Battery power direction is unavailable")
+        return verdict(
+            "insufficient_evidence", "Battery power direction is unavailable"
+        )
     # The financial opportunity is *divertible PV charging*, not all PV surplus.
     # Solar already exported to the CT would otherwise be valued twice.
     # FoxESS sign convention: negative battery power means charging.
