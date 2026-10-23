@@ -131,15 +131,9 @@ def _physical_live_slot_outlook(
             and ledger["allocations"]
         ):
             return {}
-        unallocated = _finite_nonnegative(
-            ledger.get("unallocated_total_discharge_kwh")
-        )
-        required = _finite_nonnegative(
-            ledger.get("required_total_discharge_kwh")
-        )
-        allocated = _finite_nonnegative(
-            ledger.get("allocated_total_discharge_kwh")
-        )
+        unallocated = _finite_nonnegative(ledger.get("unallocated_total_discharge_kwh"))
+        required = _finite_nonnegative(ledger.get("required_total_discharge_kwh"))
+        allocated = _finite_nonnegative(ledger.get("allocated_total_discharge_kwh"))
         target_soc = _finite_nonnegative(
             plan.get("effective_precheap_target_soc_percent")
         )
