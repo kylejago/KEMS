@@ -698,17 +698,11 @@ def _released_backup_distinct_readbacks(previous: Any, current: Any) -> bool:
             age = float(ages["battery_power_kw"])
         except (KeyError, ValueError, TypeError, OverflowError):
             return None
-        return (
-            at - timedelta(seconds=age)
-            if isfinite(age) and age >= 0
-            else None
-        )
+        return at - timedelta(seconds=age) if isfinite(age) and age >= 0 else None
 
     first, last = battery_reported(previous), battery_reported(current)
     return bool(
-        first is not None
-        and last is not None
-        and (last - first).total_seconds() >= 1.0
+        first is not None and last is not None and (last - first).total_seconds() >= 1.0
     )
 
 
