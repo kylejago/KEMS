@@ -68,8 +68,9 @@ class ScenarioReportGate(Generic[T]):
     def status(self) -> dict[str, object]:
         return {
             "mode": (
-                "detailed" if self._mode else "baseline_only"
-                if self._mode is not None else "not_started"
+                "detailed"
+                if self._mode
+                else "baseline_only" if self._mode is not None else "not_started"
             ),
             "running": self._running,
             "last_started": self._started.isoformat() if self._started else None,
