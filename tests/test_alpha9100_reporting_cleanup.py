@@ -34,9 +34,9 @@ def test_scenario_switch_has_no_inverter_or_ev_control_authority() -> None:
     begin = coordinator.index("if self._scenario_report_gate.claim(")
     end = coordinator.index("agile_records = await", begin)
     block = coordinator[begin:end]
-    worker = coordinator.split(
-        "async def _async_refresh_scenario_reporting(", 1
-    )[1].split("async def _async_update_data(", 1)[0]
+    worker = coordinator.split("async def _async_refresh_scenario_reporting(", 1)[
+        1
+    ].split("async def _async_update_data(", 1)[0]
     assert "self._scenario_report_gate.cached(" in block
     assert "self._async_refresh_scenario_reporting(" in block
     assert "self._scenarios.compare," in worker
