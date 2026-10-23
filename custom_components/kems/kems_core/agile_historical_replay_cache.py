@@ -7,10 +7,11 @@ no prices, export dispatch, physical energy authority, or hardware writes.
 from __future__ import annotations
 
 from collections import OrderedDict
+from collections.abc import Callable
 from copy import deepcopy
 from datetime import date
 from hashlib import sha256
-from typing import Any, Callable
+from typing import Any
 
 
 class HistoricalReplayCache:
