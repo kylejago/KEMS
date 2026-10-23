@@ -104,12 +104,64 @@ def _physical_live_slot_outlook(
         not isinstance(proof, dict)
         or proof.get("available") is not True
         or plan.get("planning_soc_source") != "verified FoxESS physical lower bound"
-        or not isinstance(schedule, dict)
-        or schedule.get("available") is not True
-        or schedule.get("active") is not True
-        or schedule.get("future_solar_borrowing") is not False
     ):
         return {}
+
+    # An inactive high-confidence solar scheduler must not hide a *different*
+    # verified physical discharge-only path. The ledger already schedules
+    # home/battery energy without borrowing speculative future solar. Never
+    # import the digital-twin SOC or its solar recharge into the live card.
+    forecast_chronological = bool(
+        isinstance(schedule, dict)
+        and schedule.get("available") is True
+        and schedule.get("active") is True
+    )
+    if forecast_chronological:
+        if schedule.get("future_solar_borrowing") is not False:
+            return {}
+        basis = "verified physical SOC + forecast scheduler chronological replay"
+    else:
+        if isinstance(schedule, dict) and schedule.get("active") is True:
+            return {}  # An active but invalid solar schedule is not fallback.
+        ledger = plan.get("total_discharge_ledger")
+        if not (
+            plan.get("total_discharge_ledger_active") is True
+            and isinstance(ledger, dict)
+            and isinstance(ledger.get("allocations"), list)
+            and ledger["allocations"]
+        ):
+            return {}
+        unallocated = _finite_nonnegative(
+            ledger.get("unallocated_total_discharge_kwh")
+        )
+        required = _finite_nonnegative(
+            ledger.get("required_total_discharge_kwh")
+        )
+        allocated = _finite_nonnegative(
+            ledger.get("allocated_total_discharge_kwh")
+        )
+        target_soc = _finite_nonnegative(
+            plan.get("effective_precheap_target_soc_percent")
+        )
+        if (
+            unallocated is None
+            or unallocated > 0.05
+            or required is None
+            or allocated is None
+            or abs(allocated - required) > 0.05
+            or target_soc is None
+            or target_soc > 100.0
+        ):
+            return {}
+        schedule = {
+            "allocations": ledger["allocations"],
+            "forecast_solar_stored_kwh": 0.0,
+            "ending_soc_percent": target_soc,
+        }
+        basis = (
+            "verified physical SOC + chronological total-discharge ledger; "
+            "no speculative solar charging credited"
+        )
     generated = _utc_time(plan.get("generated_at"))
     now = datetime.now(UTC)
     if generated is None or not timedelta(0) <= now - generated <= timedelta(minutes=5):
@@ -180,7 +232,7 @@ def _physical_live_slot_outlook(
         result[str(allocation["valid_from"])] = {
             "estimated_soc_percent": round(soc, 1),
             "action": action,
-            "basis": "verified physical SOC + forecast scheduler chronological replay",
+            "basis": basis,
             "reporting_only": True,
         }
     expected_end = _finite_nonnegative(schedule.get("ending_soc_percent"))
@@ -233,7 +285,7 @@ def _attributes(coordinator: Any) -> dict[str, Any]:
         "physical_live_slot_outlook": live_outlook,
         "physical_live_slot_outlook_available": bool(live_outlook),
         "physical_live_slot_outlook_basis": (
-            "verified FoxESS lower bound + chronological solar SOC replay"
+            next(iter(live_outlook.values())).get("basis")
             if live_outlook
             else "unavailable: verified chronological physical SOC path absent or stale"
         ),
