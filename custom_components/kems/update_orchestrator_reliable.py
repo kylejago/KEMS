@@ -16,9 +16,9 @@ from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from . import update_orchestrator as base
-from .kems_core.github_release_assets import download_release_asset
 from .const import DOMAIN
 from .dashboard import _combined_master_dashboard_bytes, _sync_dashboard_bytes
+from .kems_core.github_release_assets import download_release_asset
 
 _UPDATE_DASHBOARD_MARKER = (
     "          **Automatic updates are opt-in.** Turn them on below when you are happy "
