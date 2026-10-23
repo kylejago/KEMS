@@ -207,3 +207,77 @@ def test_publication_writes_only_separate_shadow_sensor() -> None:
     assert len(mgr.published) == 1
     assert mgr.published[0][0] == "sensor.kems_solar_routing_shadow"
     assert mgr.published[0][2]["hardware_writes"] == "forbidden"
+
+
+
+def test_already_exported_solar_is_not_a_new_feed_in_benefit() -> None:
+    """PV surplus alone is not evidence that mode switching can sell more."""
+    args = _inputs(current_rate=45.0, future_rate=10.0)
+    args["snapshot"].battery_power_kw = 0.0
+    args["snapshot"].grid_export_kw = 3.3
+    result = evaluate_solar_routing_shadow(**args)
+    assert result["status"] == "no_divertible_charge"
+    assert result["divertible_solar_charge_kw"] == 0.0
+
+
+def test_discharge_even_without_planned_export_is_not_solar_storage() -> None:
+    args = _inputs(current_rate=45.0, future_rate=10.0)
+    args["snapshot"].battery_power_kw = 1.0
+    args["snapshot"].grid_export_kw = 4.3
+    result = evaluate_solar_routing_shadow(**args)
+    assert result["status"] == "no_divertible_charge"
+    assert result["divertible_solar_charge_kw"] == 0.0
+
+
+def test_partial_solar_charging_limits_incremental_economic_quantity() -> None:
+    args = _inputs(current_rate=25.0, future_rate=15.0)
+    args["snapshot"].battery_power_kw = -1.0
+    args["snapshot"].grid_export_kw = 2.3
+    result = evaluate_solar_routing_shadow(**args)
+    assert result["status"] == "feed_in_first_candidate"
+    assert result["divertible_solar_charge_kw"] == 1.0
+    assert result["bounded_redirectable_solar_kw"] == 1.0
+    assert 0 < result["marginal_solar_kwh"] <= 0.5
+
+
+def test_no_inverter_headroom_does_not_offer_feed_in_candidate() -> None:
+    args = _inputs(current_rate=35.0, future_rate=12.0)
+    # 7.2 kW DC PV, 0.2 kW DC battery charging, 7.0kW AC.
+    args["snapshot"].solar_power_kw = 7.2
+    args["snapshot"].battery_power_kw = -0.2
+    args["snapshot"].house_load_kw = 0.1
+    args["snapshot"].grid_export_kw = 6.9
+    result = evaluate_solar_routing_shadow(**args)
+    assert result["status"] == "no_export_headroom"
+    assert result["physical_inverter_headroom_kw"] == 0.0
+    assert result["hardware_writes"] == "forbidden"
+
+
+def test_inconsistent_grid_ct_blocks_economic_proposal() -> None:
+    args = _inputs(current_rate=35.0, future_rate=12.0)
+    args["snapshot"].grid_export_kw = 2.0
+    result = evaluate_solar_routing_shadow(**args)
+    assert result["status"] == "insufficient_evidence"
+    assert "physically coherent" in result["reason"]
+    assert abs(result["physical_ac_balance_residual_kw"]) > 0.5
+
+
+def test_material_day_rate_import_blocks_feed_in_even_if_pv_charges() -> None:
+    args = _inputs(current_rate=35.0, future_rate=12.0)
+    args["snapshot"].grid_import_kw = 0.75
+    args["snapshot"].house_load_kw = 0.95
+    # PV 3.5 - 3.3 charging = 0.2 AC, so this grid import is coherent:
+    # 0.2 + 0.75 grid = 0.95 house.
+    result = evaluate_solar_routing_shadow(**args)
+    assert result["status"] == "insufficient_evidence"
+    assert "grid import" in result["reason"]
+
+
+def test_shadow_cannot_manipulate_live_control_state_on_inconsistent_sources() -> None:
+    args = _inputs(current_rate=35.0, future_rate=12.0)
+    original_plan = deepcopy(args["agile_state"]["rolling_export_plan"])
+    args["snapshot"].grid_export_kw = 5.0
+    result = evaluate_solar_routing_shadow(**args)
+    assert result["status"] == "insufficient_evidence"
+    assert args["agile_state"]["rolling_export_plan"] == original_plan
+    assert result["hardware_writes"] == "forbidden"
