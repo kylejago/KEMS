@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 import logging
-from time import perf_counter
 from dataclasses import replace
 from datetime import date, datetime, timedelta
 from math import isfinite
+from time import perf_counter
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import Event, HomeAssistant, callback
