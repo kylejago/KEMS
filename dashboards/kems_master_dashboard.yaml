@@ -120,7 +120,7 @@ views:
           {% set slots = slots + tomorrow[:6 - (slots | count)] %}
           {% endif %}
           **Today's published plan:** {{ today | count }}/48 slots · **Tomorrow:** {{ tomorrow | count }}/48 slots  
-          **Current Agile export price:** {{ (state_attr('sensor.kems_agile_slots', 'current_rate_pence') ~ ' p/kWh') if state_attr('sensor.kems_agile_slots', 'current_rate_pence') is not none else '—' }}  
+          **Current Agile export price:** {{ (slots[0].get('rate_pence') ~ ' p/kWh') if slots and idx < (today | count) and slots[0].get('rate_pence') is not none else '—' }}  
           **Physical planning SOC:** {{ ('%.1f%%' | format(live_soc | float)) if live_soc is not none else 'Awaiting verified physical evidence' }}
 
           {% if slots %}
@@ -137,7 +137,7 @@ views:
           The upcoming Agile plan has not been published yet.
           {% endif %}
 
-          _Live SOC outlook uses verified physical FoxESS evidence and the forecast scheduler's chronological solar and discharge replay. Unavailable values are shown as — rather than simulated SOC. The separate Agile Plan tab retains digital-twin forecasts. All actions can change as conditions change._
+          _Live SOC outlook uses verified physical FoxESS evidence: chronological forecast replay when proven, otherwise the conservative discharge-only physical ledger (no unverified future solar credit). Unavailable evidence is shown as — rather than substituted from simulated SOC. All actions can change as conditions change._
 
       - type: grid
         columns: 2
