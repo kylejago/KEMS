@@ -72,7 +72,12 @@ def _backup(
 
 
 def _ordinary(now: datetime) -> SimpleNamespace:
-    r = _backup(int((now - RELEASE).total_seconds()), grid_import=0.2, house_load=0.2, battery=0.0)
+    r = _backup(
+        int((now - RELEASE).total_seconds()),
+        grid_import=0.2,
+        house_load=0.2,
+        battery=0.0,
+    )
     r.foxess_balance_probe["inverter_ac_output"] = _probe_power(
         0.0, now - timedelta(seconds=8)
     )
@@ -94,20 +99,15 @@ def _transient() -> SimpleNamespace:
     p["last_applied_action"] = "self_use"
     p["last_write_result"] = "Alpha9.67 bounded FoxESS command applied"
     p["last_write_at"] = write_at.isoformat()
-    p["inverter_ac_output"] = _probe_power(
-        3.589, write_at + timedelta(seconds=1)
-    )
+    p["inverter_ac_output"] = _probe_power(3.589, write_at + timedelta(seconds=1))
     p["grid_ct"] = _probe_power(1.439, write_at + timedelta(seconds=1))
-    p["inverter_reported_load"] = _probe_power(
-        3.588, write_at + timedelta(seconds=1)
-    )
+    p["inverter_reported_load"] = _probe_power(3.588, write_at + timedelta(seconds=1))
     return r
 
 
 def _replay(last: SimpleNamespace, second: SimpleNamespace):
     earlier = [
-        _ordinary(RELEASE - timedelta(minutes=30 - index))
-        for index in range(28)
+        _ordinary(RELEASE - timedelta(minutes=30 - index)) for index in range(28)
     ]
     return assess_foxess_power_balance(
         [*earlier, _transient(), last, second],
