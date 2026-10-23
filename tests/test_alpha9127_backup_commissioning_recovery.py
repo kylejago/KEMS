@@ -11,9 +11,9 @@ from types import SimpleNamespace
 import pytest
 
 from kems_core.commissioning_evidence import (
-    assess_foxess_power_balance,
     _released_backup_ct_recovery,
     _released_backup_distinct_readbacks,
+    assess_foxess_power_balance,
 )
 from kems_core.foxess_ac_balance import assess_foxess_ac_side_sample
 
