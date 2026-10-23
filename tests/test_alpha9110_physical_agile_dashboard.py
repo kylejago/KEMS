@@ -135,3 +135,85 @@ def test_live_card_uses_physical_action_and_soc_not_simulated_fields() -> None:
     assert "flow_estimated_soc_percent" not in card
     assert "rolling_action" not in card
     assert "unavailable" in card.lower()
+
+
+
+def _inactive_forecast_with_ledger(*, verified: bool = True):
+    state, items = _data(verified=verified)
+    plan = state["rolling_export_plan"]
+    plan["forecast_path_scheduler"] = {
+        "available": False,
+        "active": False,
+        "reason": "waiting for high-confidence hourly solar forecast",
+    }
+    plan["total_discharge_ledger_active"] = True
+    plan["effective_precheap_target_soc_percent"] = 30.0
+    plan["total_discharge_ledger"] = {
+        "allocations": items,
+        "required_total_discharge_kwh": 15.0,
+        "allocated_total_discharge_kwh": 15.0,
+        "unallocated_total_discharge_kwh": 0.0,
+    }
+    return state, items
+
+
+def test_alpha9127_low_confidence_solar_uses_verified_discharge_only_ledger() -> None:
+    state, items = _inactive_forecast_with_ledger()
+    outlook = _outlook()(_coordinator(), state)
+    assert list(outlook) == [item["valid_from"] for item in items]
+    assert outlook[items[0]["valid_from"]]["estimated_soc_percent"] == 50.0
+    assert outlook[items[1]["valid_from"]]["estimated_soc_percent"] == 30.0
+    assert "no speculative solar charging credited" in outlook[
+        items[0]["valid_from"]
+    ]["basis"]
+    assert all(item["reporting_only"] for item in outlook.values())
+
+
+def test_alpha9127_no_live_physical_proof_never_uses_ledger_or_digital_twin() -> None:
+    state, _ = _inactive_forecast_with_ledger(verified=False)
+    assert _outlook()(_coordinator(), state) == {}
+
+
+def test_alpha9127_missing_validated_ledger_remains_unavailable() -> None:
+    state, _ = _inactive_forecast_with_ledger()
+    del state["rolling_export_plan"]["total_discharge_ledger_active"]
+    assert _outlook()(_coordinator(), state) == {}
+
+
+def test_alpha9127_unknown_future_discharge_cannot_be_hidden_by_ledger() -> None:
+    state, _ = _inactive_forecast_with_ledger()
+    state["rolling_export_plan"]["total_discharge_ledger"][
+        "unallocated_total_discharge_kwh"
+    ] = 0.2
+    assert _outlook()(_coordinator(), state) == {}
+
+
+def test_alpha9127_ledger_must_agree_with_physical_discharge_target() -> None:
+    state, _ = _inactive_forecast_with_ledger()
+    state["rolling_export_plan"]["effective_precheap_target_soc_percent"] = 40.0
+    assert _outlook()(_coordinator(), state) == {}
+
+
+def test_alpha9127_active_unsafe_solar_scheduler_cannot_fallback_to_ledger() -> None:
+    state, _ = _inactive_forecast_with_ledger()
+    state["rolling_export_plan"]["forecast_path_scheduler"] = {
+        "available": True,
+        "active": True,
+        "future_solar_borrowing": True,
+    }
+    assert _outlook()(_coordinator(), state) == {}
+
+
+def test_alpha9127_live_rate_matches_visible_current_half_hour_slot() -> None:
+    for rel in (
+        "custom_components/kems/kems_master_dashboard.yaml",
+        "dashboards/kems_master_dashboard.yaml",
+    ):
+        source = (ROOT / rel).read_text(encoding="utf-8")
+        card = source.split("title: Today's Agile plan — now and next", 1)[1].split(
+            "      - type: grid", 1
+        )[0]
+        assert "slots[0].get('rate_pence')" in card
+        assert "idx < (today | count)" in card
+        assert "conservative discharge-only physical ledger" in card
+        assert "current_rate_pence" not in card
