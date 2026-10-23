@@ -294,7 +294,7 @@ def test_current_release_identity_and_scope() -> None:
     reason = str(bundle["maintenance"]["reason"])
 
     assert manifest["version"] == "0.9.0-alpha9.130"
-    assert reason.startswith("Alpha9.129")
+    assert reason.startswith("Alpha9.130")
     assert "Self Use" in reason
     assert "confirmed-cheap Force Charge" in reason
     assert "Min SoC-on-grid" in reason
