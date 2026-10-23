@@ -21,19 +21,27 @@ def test_optional_replay_is_disabled_only_after_explicit_operator_choice() -> No
     assert (
         "self.entry.options.get(CONF_DETAILED_COMPARISONS_ENABLED, True)" in coordinator
     )
-    assert "scenarios = self._scenarios.baseline_only(" in coordinator
-    assert "scenarios = self._scenarios.compare(" in coordinator
+    # Alpha9.125 retains both explicitly selected replay modes, but they now
+    # execute only in a throttled reporting worker, never in the live scan.
+    assert "self._scenarios.baseline_only," in coordinator
+    assert "self._scenarios.compare," in coordinator
+    assert "self._scenario_report_gate.claim(now, detailed=detailed)" in coordinator
+    assert "async_add_executor_job" in coordinator
 
 
 def test_scenario_switch_has_no_inverter_or_ev_control_authority() -> None:
     coordinator = (KEMS / "coordinator.py").read_text(encoding="utf-8")
-    begin = coordinator.index(
-        "if self.entry.options.get(CONF_DETAILED_COMPARISONS_ENABLED"
-    )
+    begin = coordinator.index("if self._scenario_report_gate.claim(")
     end = coordinator.index("agile_records = await", begin)
     block = coordinator[begin:end]
-    assert "self._scenarios.compare(" in block
-    assert "self._scenarios.baseline_only(" in block
+    worker = coordinator.split(
+        "async def _async_refresh_scenario_reporting(", 1
+    )[1].split("async def _async_update_data(", 1)[0]
+    assert "self._scenario_report_gate.cached(" in block
+    assert "self._async_refresh_scenario_reporting(" in block
+    assert "self._scenarios.compare," in worker
+    assert "self._scenarios.baseline_only," in worker
+    assert "async_add_executor_job" in worker
     for forbidden in (
         "self._control.plan(",
         "self._foxess_control.async_update(",
