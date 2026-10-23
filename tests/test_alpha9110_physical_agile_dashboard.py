@@ -137,7 +137,6 @@ def test_live_card_uses_physical_action_and_soc_not_simulated_fields() -> None:
     assert "unavailable" in card.lower()
 
 
-
 def _inactive_forecast_with_ledger(*, verified: bool = True):
     state, items = _data(verified=verified)
     plan = state["rolling_export_plan"]
@@ -163,9 +162,10 @@ def test_alpha9127_low_confidence_solar_uses_verified_discharge_only_ledger() ->
     assert list(outlook) == [item["valid_from"] for item in items]
     assert outlook[items[0]["valid_from"]]["estimated_soc_percent"] == 50.0
     assert outlook[items[1]["valid_from"]]["estimated_soc_percent"] == 30.0
-    assert "no speculative solar charging credited" in outlook[
-        items[0]["valid_from"]
-    ]["basis"]
+    assert (
+        "no speculative solar charging credited"
+        in outlook[items[0]["valid_from"]]["basis"]
+    )
     assert all(item["reporting_only"] for item in outlook.values())
 
 
