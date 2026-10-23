@@ -103,23 +103,26 @@ def test_executor_could_run_reporting_while_event_loop_continues() -> None:
 def test_coordinator_never_calls_scenario_compare_inline_in_refresh() -> None:
     coordinator = ast.parse((ROOT / "coordinator.py").read_text())
     klass = next(
-        node for node in coordinator.body
+        node
+        for node in coordinator.body
         if isinstance(node, ast.ClassDef) and node.name == "KEMSCoordinator"
     )
     scan = next(
-        node for node in klass.body
-        if isinstance(node, ast.AsyncFunctionDef)
-        and node.name == "_async_update_data"
+        node
+        for node in klass.body
+        if isinstance(node, ast.AsyncFunctionDef) and node.name == "_async_update_data"
     )
     called = [
-        node for node in ast.walk(scan)
+        node
+        for node in ast.walk(scan)
         if isinstance(node, ast.Call)
         and isinstance(node.func, ast.Attribute)
         and node.func.attr in {"compare", "baseline_only"}
     ]
     assert not called
     separate = next(
-        node for node in klass.body
+        node
+        for node in klass.body
         if isinstance(node, ast.AsyncFunctionDef)
         and node.name == "_async_refresh_scenario_reporting"
     )
@@ -133,5 +136,8 @@ def test_performance_telemetry_is_read_only_not_hardware_authority() -> None:
     diagnostics = (ROOT / "diagnostics.py").read_text()
     assert 'checkpoint("agile_rolling_price_optimisation")' in coord
     assert 'checkpoint("commissioning_foxess_and_ev_actions")' in coord
-    assert '"coordinator_performance": coordinator.coordinator_performance_state' in diagnostics
+    assert (
+        '"coordinator_performance": coordinator.coordinator_performance_state'
+        in diagnostics
+    )
     assert '"recent_slow_scans": list(self._coordinator_slow_scans)' in coord
