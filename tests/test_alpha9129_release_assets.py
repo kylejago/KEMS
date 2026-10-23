@@ -13,7 +13,9 @@ ROOT = Path(__file__).parents[1] / "custom_components" / "kems"
 
 
 class _Response:
-    def __init__(self, body: bytes, *, status: int = 200, media: str = "application/octet-stream") -> None:
+    def __init__(
+        self, body: bytes, *, status: int = 200, media: str = "application/octet-stream"
+    ) -> None:
         self.status = status
         self.headers = {"Content-Type": media}
         self.body = body
@@ -50,7 +52,9 @@ def _asset(body: bytes) -> dict:
 def _download(session: _Session, asset: dict) -> bytes:
     return asyncio.run(
         download_release_asset(
-            session, asset, repository="kylejago/KEMS",
+            session,
+            asset,
+            repository="kylejago/KEMS",
             user_agent="KEMS-Home-Assistant-Update-Orchestrator",
         )
     )
@@ -60,14 +64,16 @@ def test_binary_download_via_github_rest_not_browser_page() -> None:
     body = b'{"bundle":"0.9.0-alpha9.129"}'
     session = _Session(_Response(body))
     assert _download(session, _asset(body)) == body
-    assert session.calls == [(
-        "https://api.github.com/repos/kylejago/KEMS/releases/assets/670363823",
-        {
-            "Accept": "application/octet-stream",
-            "User-Agent": "KEMS-Home-Assistant-Update-Orchestrator",
-        },
-        15,
-    )]
+    assert session.calls == [
+        (
+            "https://api.github.com/repos/kylejago/KEMS/releases/assets/670363823",
+            {
+                "Accept": "application/octet-stream",
+                "User-Agent": "KEMS-Home-Assistant-Update-Orchestrator",
+            },
+            15,
+        )
+    ]
 
 
 def test_metadata_json_fails_closed_with_no_browser_fallback() -> None:
@@ -114,4 +120,4 @@ def test_unchanged_updater_gate_and_maintenance_contracts() -> None:
     assert "maintenance_energy_blockers(" in guard
     assert "self._energy_maintenance_blockers()" in base
     assert "await self._defer_for_energy_activity(blockers)" in base
-    assert 'self.hass.services.async_call(' in base
+    assert "self.hass.services.async_call(" in base

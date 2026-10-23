@@ -59,10 +59,7 @@ async def download_release_asset(
                 f"KEMS GitHub API asset download returned HTTP {response.status}"
             )
         content_type = str(response.headers.get("Content-Type", "")).lower()
-        if (
-            "application/json" in content_type
-            or "text/html" in content_type
-        ):
+        if "application/json" in content_type or "text/html" in content_type:
             raise ValueError(
                 "GitHub returned asset metadata/HTML instead of a binary "
                 "release bundle; refusing unsafe fallback"
