@@ -10,7 +10,7 @@ from __future__ import annotations
 from collections import Counter
 from collections.abc import Mapping
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from math import isfinite
 from typing import Any
 
@@ -685,18 +685,24 @@ def _released_backup_distinct_readbacks(previous: Any, current: Any) -> bool:
 
     # Battery source is captured by the collector as a physical report age.
     # Reconstruct its reported time rather than accepting two coordinator polls.
-    from datetime import timedelta
-
     def battery_reported(record: Any) -> datetime | None:
         at = getattr(record, "timestamp", None)
         ages = getattr(record, "source_age_seconds", None)
-        if not isinstance(at, datetime) or at.tzinfo is None or not isinstance(ages, dict):
+        if (
+            not isinstance(at, datetime)
+            or at.tzinfo is None
+            or not isinstance(ages, dict)
+        ):
             return None
         try:
             age = float(ages["battery_power_kw"])
         except (KeyError, ValueError, TypeError, OverflowError):
             return None
-        return at - timedelta(seconds=age) if isfinite(age) and age >= 0 else None
+        return (
+            at - timedelta(seconds=age)
+            if isfinite(age) and age >= 0
+            else None
+        )
 
     first, last = battery_reported(previous), battery_reported(current)
     return bool(
@@ -1062,8 +1068,10 @@ def assess_foxess_power_balance(
         settled_current_samples.get(last_index, False)
         and settled_current_samples.get(last_index - 1, False)
         and (
-            (last_index not in safe_release_samples
-             and last_index - 1 not in safe_release_samples)
+            (
+                last_index not in safe_release_samples
+                and last_index - 1 not in safe_release_samples
+            )
             or backup_pair_distinct
         )
     )
