@@ -621,6 +621,91 @@ def _self_use_register_settling_conflict(
     )
 
 
+def _released_backup_site_load_is_safe(
+    record: Any, grid_import: float, house_load: float
+) -> bool:
+    """Recovery-only Back-up idle load proof; never permission to export.
+
+    A house legitimately consuming ~2 kW can be supplied entirely by grid when
+    KH is released to Back-up. The legacy 1.5 kW bound deadlocked commissioning
+    even with balanced physical observations. Higher loads need extra EV and
+    site-source proof, not a blanket wider idle threshold.
+    """
+    if not (0.0 <= grid_import <= 3.0 and 0.0 <= house_load <= 3.0):
+        return False
+    if grid_import <= 1.5 and house_load <= 1.5:
+        return True
+    # Above the legacy idle envelope the house must be consuming the import,
+    # with no charging EV, solar surplus or unaccounted physical flow.
+    try:
+        ev_kw = float(record.ev_power_kw)
+        ev_age = float(record.ev_power_age_seconds)
+        solar_kw = float(record.solar_power_kw)
+    except (AttributeError, TypeError, ValueError, OverflowError):
+        return False
+    return bool(
+        record.ev_connected is False
+        and record.ev_charging is False
+        and all(isfinite(v) for v in (ev_kw, ev_age, solar_kw))
+        and 0.0 <= ev_kw <= 0.05
+        and 0.0 <= ev_age <= 30.0
+        and 0.0 <= solar_kw <= 0.05
+        and abs(grid_import - house_load) <= 0.25
+    )
+
+
+def _released_backup_distinct_readbacks(previous: Any, current: Any) -> bool:
+    """Prove two recovery scans observed *new* CT, load and battery reports.
+
+    Distinct coordinator timestamps alone cannot turn one cached Modbus cohort
+    into two independent current physical observations (audit issue #361).
+    """
+    prior_probe = getattr(previous, "foxess_balance_probe", None)
+    current_probe = getattr(current, "foxess_balance_probe", None)
+    if not isinstance(prior_probe, dict) or not isinstance(current_probe, dict):
+        return False
+
+    def reported(probe: dict[str, Any], field: str) -> datetime | None:
+        entry = probe.get(field)
+        if not isinstance(entry, dict):
+            return None
+        raw = entry.get("last_reported")
+        if not isinstance(raw, str):
+            return None
+        try:
+            timestamp = datetime.fromisoformat(raw)
+        except ValueError:
+            return None
+        return timestamp if timestamp.tzinfo is not None else None
+
+    for field in ("grid_ct", "inverter_reported_load"):
+        earlier, later = reported(prior_probe, field), reported(current_probe, field)
+        if earlier is None or later is None or (later - earlier).total_seconds() < 1.0:
+            return False
+
+    # Battery source is captured by the collector as a physical report age.
+    # Reconstruct its reported time rather than accepting two coordinator polls.
+    from datetime import timedelta
+
+    def battery_reported(record: Any) -> datetime | None:
+        at = getattr(record, "timestamp", None)
+        ages = getattr(record, "source_age_seconds", None)
+        if not isinstance(at, datetime) or at.tzinfo is None or not isinstance(ages, dict):
+            return None
+        try:
+            age = float(ages["battery_power_kw"])
+        except (KeyError, ValueError, TypeError, OverflowError):
+            return None
+        return at - timedelta(seconds=age) if isfinite(age) and age >= 0 else None
+
+    first, last = battery_reported(previous), battery_reported(current)
+    return bool(
+        first is not None
+        and last is not None
+        and (last - first).total_seconds() >= 1.0
+    )
+
+
 def _released_backup_ct_recovery(
     record: Any, *, ac_cross_check: dict[str, Any]
 ) -> bool:
@@ -723,8 +808,7 @@ def _released_backup_ct_recovery(
         and abs(raw_export - grid_export) <= 0.05
         and abs(reported_house_kw - actual_house) <= 0.10
         and 0.0 <= grid_export <= 0.10
-        and 0.0 <= grid_import <= 1.5
-        and 0.0 <= actual_house <= 1.5
+        and _released_backup_site_load_is_safe(record, grid_import, actual_house)
         and abs(battery) <= 0.6
         and 0.0 <= battery_age <= 45.0
         and 0.0 <= load_age <= 45.0
@@ -760,6 +844,7 @@ def assess_foxess_power_balance(
     previous_eligible: Any = None
     settling_quarantined: list[dict[str, Any]] = []
     settled_current_samples: dict[int, bool] = {}
+    safe_release_samples: dict[int, Any] = {}
     safe_release_idle_proof_count = 0
     balanced = 0
     invalid = 0
@@ -872,6 +957,7 @@ def assess_foxess_power_balance(
         )
         if idle_release_verified:
             safe_release_idle_proof_count += 1
+            safe_release_samples[record_index] = record
         settled_current_samples[record_index] = (
             not settling
             and abs(residual) <= tolerance
@@ -961,6 +1047,26 @@ def assess_foxess_power_balance(
     # when a transition has actually been excluded from the rolling score.
     # Applying it on every fresh restart wrongly blocked commissioning at
     # 14/14 genuinely balanced samples with zero quarantined transitions.
+    last_index = len(recent) - 1
+    backup_pair_distinct = (
+        last_index in safe_release_samples
+        and last_index - 1 in safe_release_samples
+        and _released_backup_distinct_readbacks(
+            safe_release_samples[last_index - 1], safe_release_samples[last_index]
+        )
+    )
+    # Ordinary independent fresh AC cross-checks retain their original rule.
+    # If either latest sample relies on frozen-AC Back-up recovery, require
+    # both latest samples to be safe-released AND physically distinct.
+    latest_pair_verified = (
+        settled_current_samples.get(last_index, False)
+        and settled_current_samples.get(last_index - 1, False)
+        and (
+            (last_index not in safe_release_samples
+             and last_index - 1 not in safe_release_samples)
+            or backup_pair_distinct
+        )
+    )
     settling_verified = (
         not quarantine_self_use_settling
         or not settling_quarantined
@@ -968,8 +1074,7 @@ def assess_foxess_power_balance(
             len(settling_quarantined) <= 8
             and eligible >= max(minimum_samples, 30)
             and len(recent) >= 2
-            and settled_current_samples.get(len(recent) - 1, False)
-            and settled_current_samples.get(len(recent) - 2, False)
+            and latest_pair_verified
         )
     )
     if len(recent) < minimum_samples:
@@ -1015,6 +1120,7 @@ def assess_foxess_power_balance(
             "post_command_settling_examples": settling_quarantined[-8:],
             "post_command_settling_verified": settling_verified,
             "post_safe_release_idle_proofs": safe_release_idle_proof_count,
+            "post_safe_release_latest_pair_distinct": backup_pair_distinct,
             "observed_grid_export_limit_violations": observed_export_limit_violations,
             "status_counts": dict(sorted(ac_statuses.items())),
             "transition_status_counts": dict(sorted(transition_statuses.items())),
