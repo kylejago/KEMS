@@ -26,6 +26,7 @@ from .kems_core import (
     Snapshot,
     SolarForecastState,
 )
+from .kems_core.agile_historical_replay_cache import HistoricalReplayCache
 from .tariff import TariffSettings
 
 ANALYSIS_REFRESH = timedelta(minutes=5)
@@ -46,6 +47,77 @@ class EfficientAgileSmartExportManager(AgileSmartExportManager):
         self._panel_config: SimulationConfig | None = None
         self._panel_today_records: list[Snapshot] = []
         self._panel_tomorrow_records: list[Snapshot] = []
+        self._historical_replay_cache = HistoricalReplayCache()
+
+    def _compare_day(
+        self,
+        records: list[Snapshot],
+        config: SimulationConfig,
+        tariff: TariffSettings,
+        agile_soc: float,
+        full_soc: float,
+        learned_forecast: float | None,
+        projection: bool = False,
+    ) -> dict[str, Any]:
+        """Reuse only exact-input historical replay, never live or future results."""
+        if not records:
+            return super()._compare_day(
+                records,
+                config,
+                tariff,
+                agile_soc,
+                full_soc,
+                learned_forecast,
+                projection,
+            )
+        day = records[0].timestamp.astimezone(LONDON).date()
+        last_analysis = getattr(self, "_last_analysis", None)
+        today = (
+            last_analysis.astimezone(LONDON).date()
+            if isinstance(last_analysis, datetime)
+            else None
+        )
+        cache = getattr(self, "_historical_replay_cache", None)
+        if cache is None:
+            # Some historical regression wrappers construct a manager without
+            # calling the efficient base initialiser. Keep their exact
+            # pre-Alpha9.128 replay semantics instead of requiring a cache.
+            return super()._compare_day(
+                records,
+                config,
+                tariff,
+                agile_soc,
+                full_soc,
+                learned_forecast,
+                projection,
+            )
+        return cache.evaluate(
+            day=day,
+            today=today,
+            projection=projection,
+            inputs=(
+                records,
+                config,
+                tariff,
+                agile_soc,
+                full_soc,
+                learned_forecast,
+                self._day_rates(day),
+                self._product_code,
+                self._tariff_code,
+            ),
+            calculate=lambda: super(
+                EfficientAgileSmartExportManager, self
+            )._compare_day(
+                records,
+                config,
+                tariff,
+                agile_soc,
+                full_soc,
+                learned_forecast,
+                projection,
+            ),
+        )
 
     async def async_update(
         self,
