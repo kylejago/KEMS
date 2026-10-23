@@ -96,8 +96,13 @@ class EfficientAgileSmartExportManager(AgileSmartExportManager):
             calculate=lambda: super(
                 EfficientAgileSmartExportManager, self
             )._compare_day(
-                records, config, tariff, agile_soc, full_soc,
-                learned_forecast, projection,
+                records,
+                config,
+                tariff,
+                agile_soc,
+                full_soc,
+                learned_forecast,
+                projection,
             ),
         )
 
