@@ -18,6 +18,7 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from . import update_orchestrator as base
 from .const import DOMAIN
 from .dashboard import _combined_master_dashboard_bytes, _sync_dashboard_bytes
+from .kems_core.github_release_assets import download_release_asset
 
 _UPDATE_DASHBOARD_MARKER = (
     "          **Automatic updates are opt-in.** Turn them on below when you are happy "
@@ -211,21 +212,15 @@ class ReliableKEMSUpdateOrchestrator(base.KEMSUpdateOrchestrator):
                 selected_version, selected, manifest_asset, checksum_asset = candidate
 
         async def download(asset: dict[str, Any]) -> bytes:
-            url = str(asset.get("browser_download_url") or "")
-            if not url:
-                raise HomeAssistantError(
-                    "KEMS bundle release asset has no download URL"
+            try:
+                return await download_release_asset(
+                    session,
+                    asset,
+                    repository=base.BUNDLE_REPOSITORY,
+                    user_agent=headers["User-Agent"],
                 )
-            async with session.get(
-                url,
-                headers={"User-Agent": headers["User-Agent"]},
-                timeout=15,
-            ) as response:
-                if response.status >= 400:
-                    raise HomeAssistantError(
-                        f"KEMS bundle asset download returned HTTP {response.status}"
-                    )
-                return await response.read()
+            except ValueError as error:
+                raise HomeAssistantError(str(error)) from error
 
         manifest_bytes, checksum_bytes = await asyncio.gather(
             download(manifest_asset),
