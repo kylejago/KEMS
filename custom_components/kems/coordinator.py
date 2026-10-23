@@ -1409,7 +1409,9 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                 self._coordinator_slow_scans = self._coordinator_slow_scans[-12:]
                 LOGGER.warning(
                     "KEMS refresh %.2fs; slowest stage %s %.2fs",
-                    elapsed, biggest, stage_seconds[biggest],
+                    elapsed,
+                    biggest,
+                    stage_seconds[biggest],
                 )
 
     def _cheap_window_hours(self) -> float:
