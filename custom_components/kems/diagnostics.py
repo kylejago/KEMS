@@ -11,6 +11,7 @@ from homeassistant.helpers import entity_registry as er
 from homeassistant.util import dt as dt_util
 
 from .commissioning import build_commissioning_snapshot
+from .kems_core.agile_plan_budget_reconciliation import reconcile_agile_budget
 from .coordinator import KEMSCoordinator
 from .foxess_command_shadow import build_foxess_command_shadow_snapshot
 from .foxess_modbus_contract import foxess_modbus_contract_snapshot
@@ -176,6 +177,9 @@ async def async_get_config_entry_diagnostics(
         ),
         "foxess_control": coordinator.foxess_control_state,
         "coordinator_performance": coordinator.coordinator_performance_state,
+        "agile_historical_replay_cache": (
+            coordinator._agile_smart_export._historical_replay_cache.status
+        ),
         "export_commissioning_test": coordinator.export_commissioning_test_state,
         "learning": asdict(data.learned),
         "gas": asdict(data.gas),
@@ -187,6 +191,13 @@ async def async_get_config_entry_diagnostics(
         "agile_smart_export": coordinator.agile_smart_export_state,
         "agile_physical_export_reserve": getattr(
             coordinator, "_agile_live_reserve_status", {"status": "not_yet_evaluated"}
+        ),
+        "agile_budget_reconciliation": reconcile_agile_budget(
+            coordinator.agile_smart_export_state,
+            getattr(
+                coordinator, "_agile_live_reserve_status",
+                {"status": "not_yet_evaluated"},
+            ),
         ),
         "agile_physical_energy_evidence": (
             coordinator._paid_agile_energy_evidence.as_dict()
