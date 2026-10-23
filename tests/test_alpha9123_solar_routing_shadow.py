@@ -209,7 +209,6 @@ def test_publication_writes_only_separate_shadow_sensor() -> None:
     assert mgr.published[0][2]["hardware_writes"] == "forbidden"
 
 
-
 def test_already_exported_solar_is_not_a_new_feed_in_benefit() -> None:
     """PV surplus alone is not evidence that mode switching can sell more."""
     args = _inputs(current_rate=45.0, future_rate=10.0)
