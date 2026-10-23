@@ -27,6 +27,7 @@ from homeassistant.util import dt as dt_util
 
 from .const import DOMAIN
 from .entity import KEMSEntity
+from .kems_core.github_release_assets import download_release_asset
 from .update_maintenance_guard import maintenance_energy_blockers
 from .versioning import version_is_newer, version_relation
 
@@ -387,19 +388,15 @@ class KEMSUpdateOrchestrator:
             return None
 
         async def download(asset: dict[str, Any]) -> bytes:
-            url = str(asset.get("browser_download_url") or "")
-            if not url:
-                raise HomeAssistantError(
-                    "KEMS bundle release asset has no download URL"
+            try:
+                return await download_release_asset(
+                    session,
+                    asset,
+                    repository=BUNDLE_REPOSITORY,
+                    user_agent=headers["User-Agent"],
                 )
-            async with session.get(
-                url, headers={"User-Agent": headers["User-Agent"]}, timeout=15
-            ) as response:
-                if response.status >= 400:
-                    raise HomeAssistantError(
-                        f"KEMS bundle asset download returned HTTP {response.status}"
-                    )
-                return await response.read()
+            except ValueError as error:
+                raise HomeAssistantError(str(error)) from error
 
         manifest_bytes, checksum_bytes = await asyncio.gather(
             download(manifest_asset),
