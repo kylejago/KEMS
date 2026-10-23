@@ -53,6 +53,16 @@ def test_midnight_cannot_reuse_yesterday_reporting_as_today() -> None:
     assert gate.claim(midnight, detailed=True)
 
 
+def test_late_executor_completion_never_mislabels_yesterday_as_today() -> None:
+    gate = ScenarioReportGate[str]()
+    evening = datetime(2026, 10, 22, 23, 59, tzinfo=UTC)
+    assert gate.claim(evening, detailed=True)
+    morning = evening + timedelta(minutes=3)
+    gate.complete("previous-day-replay", now=morning, detailed=True)
+    assert gate.cached(morning, detailed=True) is None
+    assert gate.claim(morning, detailed=True)
+
+
 def test_failed_executor_job_keeps_valid_report_and_throttles_retry() -> None:
     gate = ScenarioReportGate[str]()
     assert gate.claim(NOW, detailed=True)
