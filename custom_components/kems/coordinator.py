@@ -4,9 +4,10 @@ from __future__ import annotations
 
 import logging
 from dataclasses import replace
-from datetime import date, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from math import isfinite
 from time import perf_counter
+from zoneinfo import ZoneInfo
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import Event, HomeAssistant, callback
@@ -89,10 +90,6 @@ from .kems_core.scenario_report_gate import ScenarioReportGate
 from .kems_core.shared_bus_balance import (
     assess_shared_bus_balance,
     summarise_shared_bus_audits,
-)
-from .kems_core.tomorrow_soc_handoff import (
-    _cheap_window_hours as _real_elapsed_cheap_window_hours,
-    LONDON,
 )
 from .lifetime import LifetimeLedgerRecorder
 from .power_down import PowerDownHistoryRecorder
@@ -1457,13 +1454,19 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                     )
 
     def _cheap_window_hours(self, now: datetime | None = None) -> float:
-        """Actual elapsed hours in the upcoming local cheap window, including DST."""
-        local_date = (now or dt_util.now()).astimezone(LONDON).date()
+        """Physical elapsed normal cheap-window hours, not clock-face hours."""
+        london = ZoneInfo("Europe/London")
+        local_date = (now or dt_util.now()).astimezone(london).date()
+        start = self.settings.tariff.offpeak_start
+        end = self.settings.tariff.offpeak_end
+        start_at = datetime.combine(local_date, start, tzinfo=london)
+        end_day = local_date + (timedelta(days=1) if end <= start else timedelta())
+        end_at = datetime.combine(end_day, end, tzinfo=london)
         return round(
-            _real_elapsed_cheap_window_hours(
-                self.settings.tariff.offpeak_start,
-                self.settings.tariff.offpeak_end,
-                on_date=local_date,
+            max(
+                (end_at.astimezone(UTC) - start_at.astimezone(UTC)).total_seconds()
+                / 3600.0,
+                0.0,
             ),
             3,
         )

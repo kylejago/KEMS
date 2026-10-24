@@ -152,7 +152,7 @@ def test_controller_run_order_does_not_move_hardware_or_settlement() -> None:
     assert "agile_manager_update_seconds" in coordinator
     assert "agile_history_backfill_seconds" in coordinator
     assert "cheap_window_hours=self._cheap_window_hours(now)" in coordinator
-    assert "_real_elapsed_cheap_window_hours(" in coordinator
+    assert "end_at.astimezone(UTC) - start_at.astimezone(UTC)" in coordinator
 
 
 def test_release_version_and_read_only_scope() -> None:
