@@ -73,13 +73,21 @@ def _budget(
             "current_battery_export_target_kw": target_kw,
             "required_in_current_slot_kwh": required_now,
             "selected_slots": (
-                [{"valid_from": "2026-10-24T09:30:00+01:00",
-                  "valid_to": "2026-10-24T10:00:00+01:00",
-                  "planned_battery_export_kwh": scheduled}]
-                if scheduled else
-                [{"valid_from": "2026-10-24T16:00:00+01:00",
-                  "valid_to": "2026-10-24T16:30:00+01:00",
-                  "planned_battery_export_kwh": 2.8}]
+                [
+                    {
+                        "valid_from": "2026-10-24T09:30:00+01:00",
+                        "valid_to": "2026-10-24T10:00:00+01:00",
+                        "planned_battery_export_kwh": scheduled,
+                    }
+                ]
+                if scheduled
+                else [
+                    {
+                        "valid_from": "2026-10-24T16:00:00+01:00",
+                        "valid_to": "2026-10-24T16:30:00+01:00",
+                        "planned_battery_export_kwh": 2.8,
+                    }
+                ]
             ),
         }
     }
@@ -105,7 +113,10 @@ def test_actual_morning_mismatch_is_visible_but_does_not_change_authority() -> N
     assert outcome["extra_guard_house_protection_kwh"] == 8.625
     assert outcome["planner_solar_house_credit_kwh"] == 5.41
     assert outcome["guard_conservative_solar_credit_kwh"] == 1.503
-    assert outcome["current_slot_dispatch_alignment"]["status"] == "export_target_outside_selected_slot"
+    assert (
+        outcome["current_slot_dispatch_alignment"]["status"]
+        == "export_target_outside_selected_slot"
+    )
     assert outcome["hardware_writes"] == "blocked"
     assert outcome["dispatch_authority"] == "unchanged_independent_physical_guard"
     assert state == prior_state and guard == prior_guard
@@ -140,8 +151,11 @@ def test_release_scope_keeps_existing_hardware_and_auto_update_code() -> None:
     assert bundle["maintenance"]["reason"].startswith(
         "Alpha9.131: Fix misleading shadow recorder"
     )
-    assert "all live hardware control logic unchanged" in bundle["maintenance"]["reason"]
-    assert "current_guard_limited_ceiling_is_schedule" in (
-        KEMS / "kems_core/agile_plan_budget_reconciliation.py"
-    ).read_text()
+    assert (
+        "all live hardware control logic unchanged" in bundle["maintenance"]["reason"]
+    )
+    assert (
+        "current_guard_limited_ceiling_is_schedule"
+        in (KEMS / "kems_core/agile_plan_budget_reconciliation.py").read_text()
+    )
     assert "real_backend_scope" in (KEMS / "shadow_validation.py").read_text()
