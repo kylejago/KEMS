@@ -6,7 +6,6 @@ import ast
 import json
 from datetime import datetime, time
 from pathlib import Path
-from types import SimpleNamespace
 from zoneinfo import ZoneInfo
 
 import pytest
