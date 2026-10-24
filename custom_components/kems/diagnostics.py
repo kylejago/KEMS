@@ -14,6 +14,7 @@ from .commissioning import build_commissioning_snapshot
 from .coordinator import KEMSCoordinator
 from .foxess_command_shadow import build_foxess_command_shadow_snapshot
 from .foxess_modbus_contract import foxess_modbus_contract_snapshot
+from .happy_hour_auto_join import happy_hour_auto_join_state
 from .kems_core.agile_plan_budget_reconciliation import reconcile_agile_budget
 from .panel import panel_health_snapshot
 from .providers.octopus import DEFAULT_INTELLIGENT_STALE_DATA_SECONDS
@@ -205,6 +206,7 @@ async def async_get_config_entry_diagnostics(
             if coordinator._paid_agile_energy_evidence is not None
             else {"status": "not_yet_observed"}
         ),
+        "happy_hour_auto_join": happy_hour_auto_join_state(coordinator),
         "happy_hour_import_ledger": coordinator._happy_hour_import_ledger.status,
         "happy_hour_ohme_control": coordinator.happy_hour_ohme_control_state,
         "agile_history_backfill": coordinator.agile_history_backfill_state,

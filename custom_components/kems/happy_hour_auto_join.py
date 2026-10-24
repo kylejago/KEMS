@@ -816,8 +816,31 @@ def select_reward_booking_codes(
     Booking earned rewards takes priority over an incomplete price forecast.
     When prices are published, rank complete pairs by combined modelled value.
     """
-    eligible = [item for item in candidates if item.code not in booked_codes]
-    remaining = max(min(target_count, 2) - len(booked_codes), 0)
+    # Octopus joined events have an ID but often no event code. Treat their
+    # confirmed *time windows* as bookings for both duplicate detection and
+    # the two-reward/day limit, never as eligible join-service candidates.
+    confirmed_intervals = [
+        (start, end)
+        for window in booked_windows
+        if (start := _dt(window.get("start"))) is not None
+        and (end := _dt(window.get("end"))) is not None
+    ]
+    confirmed_hours = sum(
+        len(window.get("event_codes") or ()) for window in booked_windows
+    )
+    eligible = [
+        item
+        for item in candidates
+        if item.code not in booked_codes
+        and not any(
+            item.start < end and item.end > start for start, end in confirmed_intervals
+        )
+    ]
+    remaining = max(
+        min(target_count, HAPPY_HOUR_MAX_REWARDS_PER_EVENT_DAY)
+        - max(len(booked_codes), confirmed_hours),
+        0,
+    )
     if remaining <= 0 or not eligible:
         return []
     by_code = {item.code: item for item in eligible}
@@ -1014,6 +1037,15 @@ class HappyHourAutoJoinController:
             str(item["event_id"]) for item in booked if item.get("event_id")
         ]
         state["booked_reward_hours"] = len(booked)
+        state["externally_confirmed_reward_hours"] = len(externally_joined)
+        state["confirmed_booked_windows"] = [
+            {
+                "start": window["start"].isoformat(),
+                "end": window["end"].isoformat(),
+                "reward_hours": len(window["event_codes"]),
+            }
+            for window in windows
+        ]
         if windows:
             current_or_next = next(
                 (window for window in windows if window["end"] > now),
@@ -1073,6 +1105,7 @@ class HappyHourAutoJoinController:
         state["target_day"] = pending_day.isoformat()
         state["target_reward_hours"] = target_count
         state["booked_target_day_hours"] = len(day_booked)
+        state["booking_limit_reached"] = len(day_booked) >= target_count
         if len(day_booked) >= target_count:
             self.state = state
             return
@@ -1160,8 +1193,13 @@ class HappyHourAutoJoinController:
                 scores.append(score)
         state["evaluated_candidates"] = [item.to_dict() for item in scores]
         scored = {item.candidate.code: item for item in scores}
-        booked_codes = {str(item["event_code"]) for item in day_booked}
+        booked_codes = {
+            str(code) for item in day_booked if (code := item.get("event_code"))
+        }
         day_windows = confirmed_booking_windows({"bookings": day_booked})
+        # The Octopus API can momentarily list an already-joined hour as
+        # available too. The candidate selector excludes overlapping windows
+        # regardless of whether Octopus supplied a booking event code.
         preferred = self._persisted.get("preferred_event_codes")
         choices = select_reward_booking_codes(
             candidates=day_candidates,
