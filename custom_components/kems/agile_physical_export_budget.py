@@ -3,6 +3,7 @@
 Preserves the independent FoxESS command guard and protected home reserve.
 The 15% SOC arrival target is aspirational, never an export entitlement.
 """
+
 from __future__ import annotations
 
 from datetime import UTC, datetime
@@ -116,7 +117,8 @@ def cap_physical_ac_export(
     total = round(sum(_num(row["planned_battery_export_kwh"]) for row in selected), 3)
     original = _num(plan.get("planned_battery_export_kwh"))
     house_kw = _num(plan.get("current_house_battery_kw"))
-    plan.update({
+    plan.update(
+        {
         "selected_slots": selected,
         "next_export_slot": next(
             (dict(row) for row in selected
@@ -129,7 +131,8 @@ def cap_physical_ac_export(
         "physical_ac_export_budget_applied": True,
         "physical_ac_export_budget_kwh": round(ac, 3),
         "physical_ac_export_budget_removed_kwh": round(max(original - total, 0), 3),
-    })
+        }
+    )
     house_total = plan.get("predicted_house_battery_discharge_kwh")
     if house_total is not None:
         plan["planned_total_battery_discharge_kwh"] = round(_num(house_total) + total, 3)
