@@ -56,12 +56,15 @@ def _case(budget=8.491):
         "available": True,
         "physical_planning_evidence": {"available": True},
         "physical_house_budget_evidence": {
-            "available": True, "exportable_stored_kwh": 8.938,
-            "exportable_ac_kwh": budget
+            "available": True,
+            "exportable_stored_kwh": 8.938,
+            "exportable_ac_kwh": budget,
         },
         "selected_slots": rows,
         "total_discharge_selected_slots": [dict(row) for row in rows],
-        "planned_battery_export_kwh": sum(row["planned_battery_export_kwh"] for row in rows),
+        "planned_battery_export_kwh": sum(
+            row["planned_battery_export_kwh"] for row in rows
+        ),
         "current_house_battery_kw": 0.88,
         "current_battery_export_target_kw": 5.984,
         "current_battery_discharge_target_kw": 6.864,
@@ -78,8 +81,10 @@ def test_caps_total_and_keeps_best_prices_before_lower_slots():
     assert result["physical_ac_export_budget_applied"]
     assert result["planned_battery_export_kwh"] <= 8.491
     assert result["physical_ac_export_budget_removed_kwh"] > 4
-    by_rate = {row["rate_pence"]: row["planned_battery_export_kwh"]
-               for row in result["selected_slots"]}
+    by_rate = {
+        row["rate_pence"]: row["planned_battery_export_kwh"]
+        for row in result["selected_slots"]
+    }
     assert by_rate[16.94] == 3.016
     assert by_rate[16.61] == 3.016
     assert 16.34 not in by_rate
@@ -89,14 +94,17 @@ def test_caps_total_and_keeps_best_prices_before_lower_slots():
     assert result["current_battery_discharge_target_kw"] == 0.88
     assert all(
         row["rolling_planned_battery_export_kwh"] == 0
-        for row in state["today_slots"] if row["rate_pence"] == 8.73
+        for row in state["today_slots"]
+        if row["rate_pence"] == 8.73
     )
 
 
 def test_target_never_increases_export_and_home_remains():
     plan, state = _case(budget=2.5)
-    before = {row["valid_from"]: row["planned_battery_export_kwh"]
-              for row in plan["selected_slots"]}
+    before = {
+        row["valid_from"]: row["planned_battery_export_kwh"]
+        for row in plan["selected_slots"]
+    }
     result = mod.cap_physical_ac_export(
         state, plan, now=datetime.fromisoformat("2026-10-24T17:50:00+01:00")
     )
