@@ -124,7 +124,8 @@ def test_failed_update_is_durable_visible_and_pauses_unattended_retries() -> Non
     assert "self.policy.automatic_updates = False" in content
     assert "def _active_error" in content
     assert '"last_error": self._active_error()' in content
-    assert '"error": pending.get("error")' in content
+    assert '"error": compact(' in content
+    assert '"error": pending.get("error")' not in content
     assert "**Last error:**" in dashboard
     assert "u.attributes.last_error" in dashboard
     assert "| Completed | Bundle | Result |" in dashboard
