@@ -43,9 +43,7 @@ def test_enormous_legacy_reason_and_event_data_are_bounded() -> None:
         "_maintenance_payload",
         {
             "Any": Any,
-            "dt_util": SimpleNamespace(
-                now=lambda: datetime(2026, 10, 24, tzinfo=UTC)
-            ),
+            "dt_util": SimpleNamespace(now=lambda: datetime(2026, 10, 24, tzinfo=UTC)),
         },
     )
     instance.last_error = None
@@ -99,15 +97,12 @@ def test_floor_matches_original_lookahead_and_uses_linear_load_reads() -> None:
     def old_floor(index, sequence):
         demand = 0.0
         reached_cheap = False
-        for future, following in zip(
-            sequence[index + 1 :], sequence[index + 2 :]
-        ):
+        for future, following in zip(sequence[index + 1 :], sequence[index + 2 :]):
             if future.cheap_period_confirmed:
                 reached_cheap = True
                 break
             hours = min(
-                max((following.timestamp - future.timestamp).total_seconds(), 0)
-                / 3600,
+                max((following.timestamp - future.timestamp).total_seconds(), 0) / 3600,
                 0.5,
             )
             if future.house_load_kw is not None:
@@ -124,9 +119,7 @@ def test_floor_matches_original_lookahead_and_uses_linear_load_reads() -> None:
     assert observed["reads"] <= len(records)
 
     altered = list(records)
-    altered[150] = SimpleNamespace(
-        **{**vars(records[150]), "house_load_kw": 5.0}
-    )
+    altered[150] = SimpleNamespace(**{**vars(records[150]), "house_load_kw": 5.0})
     assert manager._floor(altered, 0, altered[0], config, 5.642, 56.42) != (
         manager._floor(records, 0, records[0], config, 5.642, 56.42)
     )
