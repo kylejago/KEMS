@@ -21,8 +21,6 @@ def _number(value: object) -> float | None:
     return number if isfinite(number) else None
 
 
-
-
 def _current_slot_export_alignment(plan: dict[str, Any]) -> dict[str, Any]:
     """Spot a current export request not represented by selected Agile slots.
 
