@@ -6,6 +6,7 @@ import contextlib
 import math
 from dataclasses import dataclass, replace
 from datetime import UTC, date, datetime, time, timedelta
+from functools import partial
 from typing import Any
 from zoneinfo import ZoneInfo
 
@@ -221,7 +222,7 @@ class AgileSmartExportManager:
             executor = getattr(self._hass, "async_add_executor_job", None)
             if callable(executor):
                 tomorrow = await executor(
-                    self._compare_day, *tomorrow_args, projection=True
+                    partial(self._compare_day, *tomorrow_args, projection=True)
                 )
             else:
                 tomorrow = self._compare_day(*tomorrow_args, projection=True)
