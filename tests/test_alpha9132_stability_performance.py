@@ -59,6 +59,8 @@ def test_enormous_legacy_reason_and_event_data_are_bounded() -> None:
     assert len(event["reason"]) <= 512
     assert len(event["error"]) <= 256
     assert len(event["affected_components"]) <= 12
+    updater = (KEMS / "update_orchestrator.py").read_text()
+    assert 'error = notice.get("error") or reason' in updater
     assert json.dumps(legacy) == before
 
 

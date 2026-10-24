@@ -1095,7 +1095,7 @@ class KEMSUpdateOrchestrator:
             )
         elif phase == "failed":
             title = "KEMS maintenance needs attention"
-            error = pending.get("error") or self.last_error or reason
+            error = notice.get("error") or reason
             message = f"The coordinated update did not complete: {error}"
         elif phase == "restart_required":
             title = "KEMS update staged — restart approval required"
