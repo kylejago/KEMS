@@ -160,6 +160,6 @@ def test_release_version_and_read_only_scope() -> None:
     bundle = json.loads((ROOT / "release/kems-bundle.template.json").read_text())
     assert manifest["version"] == "0.9.0-alpha9.135"
     reason = bundle["maintenance"]["reason"]
-    assert reason.startswith("Alpha9.134:")
+    assert reason.startswith("Alpha9.135:")
     assert "Alpha9.132: Run pure Agile day replays" in reason
     assert "No live FoxESS" in reason

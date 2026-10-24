@@ -145,7 +145,7 @@ def test_alpha937_release_identity_and_scope() -> None:
     reason = str(bundle["maintenance"]["reason"])
 
     assert manifest["version"] == "0.9.0-alpha9.135"
-    assert reason.startswith("Alpha9.134:")
+    assert reason.startswith("Alpha9.135:")
     assert "Alpha9.37" in reason
     assert "canonical current-day KEMS cost" in reason
     assert "presentation/reporting only" in reason
