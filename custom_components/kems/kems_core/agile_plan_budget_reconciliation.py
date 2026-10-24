@@ -118,7 +118,11 @@ def reconcile_agile_budget(
         if isinstance(evidence, dict) and evidence.get("available")
         else None
     )
-    conversion = ac / stored if stored is not None and stored > 0 and ac is not None else None
+    conversion = (
+        ac / stored
+        if stored is not None and stored > 0 and ac is not None
+        else None
+    )
     guarded_ac = guarded * conversion if conversion is not None else None
     compared_guard = guarded_ac if guarded_ac is not None else guarded
     gap = max(planned - compared_guard, 0.0)
@@ -126,13 +130,19 @@ def reconcile_agile_budget(
         **result,
         "status": "physical_guard_tighter" if gap > 0.05 else "aligned",
         "source": "same_scan_verified_physical_lower_bound",
-        "comparison_units": "AC_kWh" if guarded_ac is not None else "legacy_unconverted_kWh",
+        "comparison_units": (
+            "AC_kWh" if guarded_ac is not None else "legacy_unconverted_kWh"
+        ),
         "generated_at": plan["generated_at"],
         "planned_battery_export_kwh": round(planned, 3),
         "guard_exportable_physical_energy_kwh": round(guarded, 3),
-        "guard_exportable_ac_energy_kwh": round(guarded_ac, 3) if guarded_ac is not None else None,
+        "guard_exportable_ac_energy_kwh": (
+            round(guarded_ac, 3) if guarded_ac is not None else None
+        ),
         "plan_above_physical_budget_kwh": round(gap, 3),
-        "current_guard_limited_export_ceiling_kwh": round(min(planned, compared_guard), 3),
+        "current_guard_limited_export_ceiling_kwh": round(
+            min(planned, compared_guard), 3
+        ),
         "current_guard_limited_ceiling_is_schedule": False,
         "current_slot_dispatch_alignment": _current_slot_export_alignment(plan),
         "planner_solar_house_credit_kwh": _number(
