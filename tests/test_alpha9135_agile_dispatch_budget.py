@@ -22,7 +22,7 @@ def _pure_functions(source, names, extra=None):
     assert len(selected) == len(names)
     context = {"datetime": datetime}
     context.update(extra or {})
-    source_text = "from __future__ import annotations\\n" + "\\n\\n".join(
+    source_text = "from __future__ import annotations\n" + "\n\n".join(
         ast.unparse(node) for node in selected
     )
     exec(compile(source_text, source, "exec"), context)
