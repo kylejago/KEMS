@@ -100,8 +100,8 @@ def test_explicit_mandatory_deadline_keeps_independent_path():
 
 
 def test_conservative_forecast_budget_matches_live_guard(monkeypatch):
-    monkeypatch.setattr(
-        planning,
+    monkeypatch.setitem(
+        planning.conservative_physical_export_budget.__globals__,
         "physical_planning_soc",
         lambda manager, now, config: (
             60.662,
@@ -132,8 +132,8 @@ def test_conservative_forecast_budget_matches_live_guard(monkeypatch):
 
 
 def test_missing_physical_house_forecast_never_grants_budget(monkeypatch):
-    monkeypatch.setattr(
-        planning,
+    monkeypatch.setitem(
+        planning.conservative_physical_export_budget.__globals__,
         "physical_planning_soc",
         lambda manager, now, config: (
             60.662,
