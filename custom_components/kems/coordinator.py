@@ -91,8 +91,8 @@ from .kems_core.shared_bus_balance import (
     summarise_shared_bus_audits,
 )
 from .kems_core.tomorrow_soc_handoff import (
-    LONDON,
     _cheap_window_hours as _real_elapsed_cheap_window_hours,
+    LONDON,
 )
 from .lifetime import LifetimeLedgerRecorder
 from .power_down import PowerDownHistoryRecorder
