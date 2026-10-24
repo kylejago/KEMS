@@ -833,8 +833,7 @@ def select_reward_booking_codes(
         for item in candidates
         if item.code not in booked_codes
         and not any(
-            item.start < end and item.end > start
-            for start, end in confirmed_intervals
+            item.start < end and item.end > start for start, end in confirmed_intervals
         )
     ]
     remaining = max(
@@ -1195,9 +1194,7 @@ class HappyHourAutoJoinController:
         state["evaluated_candidates"] = [item.to_dict() for item in scores]
         scored = {item.candidate.code: item for item in scores}
         booked_codes = {
-            str(code)
-            for item in day_booked
-            if (code := item.get("event_code"))
+            str(code) for item in day_booked if (code := item.get("event_code"))
         }
         day_windows = confirmed_booking_windows({"bookings": day_booked})
         # The Octopus API can momentarily list an already-joined hour as
