@@ -9,6 +9,7 @@ or settled-day simulation ledger. Real hardware writes remain blocked.
 from __future__ import annotations
 
 from dataclasses import replace
+from datetime import datetime
 from typing import Any
 
 from .kems_core import ControlConfig, ControlState, SimulationState
@@ -87,6 +88,40 @@ def _replace_known(
     return replace(simulation, **supplied) if supplied else simulation
 
 
+def _price_slot_export_limit(plan: dict[str, Any]) -> float | None:
+    """Limit deliberate export to allocated active price slots only."""
+    try:
+        now = datetime.fromisoformat(str(plan["generated_at"]))
+    except (KeyError, ValueError, TypeError):
+        return None
+    if now.tzinfo is None:
+        return None
+    selected = plan.get("selected_slots")
+    if not isinstance(selected, list):
+        return None
+    slot_kw = 0.0
+    for item in selected:
+        if not isinstance(item, dict):
+            continue
+        try:
+            start = datetime.fromisoformat(str(item["valid_from"]))
+            end = datetime.fromisoformat(str(item["valid_to"]))
+        except (ValueError, KeyError, TypeError):
+            continue
+        if start.tzinfo is None or end.tzinfo is None or not start <= now < end:
+            continue
+        hours = (end - now).total_seconds() / 3600.0
+        allocated = _number(item.get("planned_battery_export_kwh"))
+        if hours > 0 and allocated is not None:
+            slot_kw += max(allocated, 0.0) / hours
+    # Explicit deadline discharge remains separately authorised and guarded.
+    if (_number(plan.get("required_in_current_slot_kwh")) or 0.0) > 0:
+        return max(
+            slot_kw, _number(plan.get("current_battery_export_target_kw")) or 0.0
+        )
+    return slot_kw
+
+
 def _rolling_target(
     simulation: SimulationState,
     agile_state: dict[str, Any],
@@ -132,7 +167,10 @@ def _rolling_target(
 
     target_home = max(target_home, 0.0)
     target_export = max(target_export, 0.0)
-    target_discharge = max(target_discharge, target_home + target_export, 0.0)
+    current_price_limit = _price_slot_export_limit(plan)
+    if current_price_limit is not None:
+        target_export = min(target_export, current_price_limit)
+    target_discharge = max(target_home + target_export, 0.0)
     return (
         {
             "charge_kw": 0.0,

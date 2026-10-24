@@ -14,6 +14,11 @@ from typing import Any
 
 from .kems_core import SimulationConfig
 from .kems_core.agile_live_reserve import (
+    _HOUSE_BUFFER_FRACTION,
+    _MAX_FORECAST_SOLAR_CREDIT_FRACTION,
+    _MIN_HOUSE_BUFFER_KWH,
+    _MIN_PLANNING_RESERVE_PERCENT,
+    _SOLAR_CREDIT_MIN_CONFIDENCE,
     physical_energy_evidence_matches_snapshot,
 )
 
@@ -84,4 +89,76 @@ def physical_planning_soc(
         "pessimistic_discharge_kwh": round(evidence.pessimistic_discharge_kwh, 3),
         "replay_simulation_soc_preserved": True,
         "scope": "paid_agile_live_control_only",
+    }
+
+
+def conservative_physical_export_budget(
+    manager: Any,
+    *,
+    now: datetime,
+    config: SimulationConfig,
+) -> tuple[float | None, dict[str, object]]:
+    """Use the exact conservative house-reserve arithmetic of the live guard.
+
+    The result is stored battery energy, not delivered AC energy. Missing
+    inputs cannot be used to authorise planned paid export.
+    """
+    soc, proof = physical_planning_soc(manager, now=now, config=config)
+    if soc is None or not proof.get("available"):
+        return None, {"available": False, "reason": "physical proof unavailable"}
+    context = getattr(manager, "_kems_physical_planning_context", None)
+    forecast_plan = context.get("forecast_plan") if isinstance(context, dict) else None
+    if forecast_plan is None or not getattr(forecast_plan, "ready", False):
+        return None, {
+            "available": False,
+            "reason": "physical house forecast unavailable",
+        }
+    expected_house = _number(
+        getattr(forecast_plan, "expected_house_remaining_today_kwh", None)
+    )
+    efficiency = _number(config.discharge_efficiency)
+    capacity = _number(config.battery_capacity_kwh)
+    stored = _number(proof.get("physical_energy_lower_bound_kwh"))
+    if (
+        expected_house is None
+        or expected_house < 0
+        or efficiency is None
+        or not 0 < efficiency <= 1
+        or capacity is None
+        or capacity <= 0
+        or stored is None
+    ):
+        return None, {"available": False, "reason": "invalid physical budget inputs"}
+    confidence = _number(getattr(forecast_plan, "confidence_percent", None))
+    expected_solar = _number(
+        getattr(forecast_plan, "expected_solar_remaining_today_kwh", None)
+    )
+    credit = 0.0
+    if (
+        confidence is not None
+        and confidence >= _SOLAR_CREDIT_MIN_CONFIDENCE
+        and expected_solar is not None
+        and expected_solar > 0
+    ):
+        credit = min(
+            expected_house, expected_solar * _MAX_FORECAST_SOLAR_CREDIT_FRACTION
+        )
+    net_home = max(expected_house - credit, 0.0)
+    buffer = max(_MIN_HOUSE_BUFFER_KWH, net_home * _HOUSE_BUFFER_FRACTION)
+    protected = net_home / efficiency + buffer
+    reserve_percent = max(
+        _MIN_PLANNING_RESERVE_PERCENT,
+        _number(config.battery_reserve_percent) or 0.0,
+    )
+    reserve = capacity * reserve_percent / 100.0
+    budget = max(stored - reserve - protected, 0.0)
+    return budget, {
+        "available": True,
+        "basis": "same-scan physical guard house forecast and buffers",
+        "physical_energy_lower_bound_kwh": round(stored, 3),
+        "minimum_reserve_kwh": round(reserve, 3),
+        "protected_house_stored_kwh": round(protected, 3),
+        "solar_credit_kwh": round(credit, 3),
+        "exportable_stored_kwh": round(budget, 3),
+        "exportable_ac_kwh": round(budget * efficiency, 3),
     }
