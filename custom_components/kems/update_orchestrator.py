@@ -1033,9 +1033,7 @@ class KEMSUpdateOrchestrator:
             "bundle": compact(pending.get("bundle"), 120),
             "target": compact(pending.get("target"), 120),
             "scheduled_for": compact(pending.get("scheduled_for"), 80),
-            "reason": compact(
-                pending.get("reason") or maintenance.get("reason"), 512
-            ),
+            "reason": compact(pending.get("reason") or maintenance.get("reason"), 512),
             "expected_downtime_minutes": maintenance.get(
                 "expected_downtime_minutes", 5
             ),

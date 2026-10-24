@@ -1401,7 +1401,9 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                 "longest_stage": biggest,
                 "longest_stage_seconds": stage_seconds[biggest],
                 "recent_sample_count": len(sorted_samples),
-                "recent_mean_seconds": round(sum(sorted_samples) / len(sorted_samples), 3),
+                "recent_mean_seconds": round(
+                    sum(sorted_samples) / len(sorted_samples), 3
+                ),
                 "recent_p95_seconds": sorted_samples[p95_index],
                 "recent_max_seconds": sorted_samples[-1],
                 "agile_optimisation_seconds": stage_seconds.get(
