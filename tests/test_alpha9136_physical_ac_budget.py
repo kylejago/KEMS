@@ -36,20 +36,20 @@ def _case(budget=8.491):
     rows[1]["valid_to"] = "2026-10-24T18:00:00+01:00"
     rows.extend(
         [
-        {
-            "valid_from": "2026-10-24T17:45:00+01:00",
-            "valid_to": "2026-10-24T18:15:00+01:00",
-            "rate_pence": 16.94,
-            "planned_battery_to_home_kwh": 0.45,
-            "planned_battery_export_kwh": 3.016,
-        },
-        {
-            "valid_from": "2026-10-24T18:15:00+01:00",
-            "valid_to": "2026-10-24T18:45:00+01:00",
-            "rate_pence": 16.61,
-            "planned_battery_to_home_kwh": 0.45,
-            "planned_battery_export_kwh": 3.016,
-        },
+            {
+                "valid_from": "2026-10-24T17:45:00+01:00",
+                "valid_to": "2026-10-24T18:15:00+01:00",
+                "rate_pence": 16.94,
+                "planned_battery_to_home_kwh": 0.45,
+                "planned_battery_export_kwh": 3.016,
+            },
+            {
+                "valid_from": "2026-10-24T18:15:00+01:00",
+                "valid_to": "2026-10-24T18:45:00+01:00",
+                "rate_pence": 16.61,
+                "planned_battery_to_home_kwh": 0.45,
+                "planned_battery_export_kwh": 3.016,
+            },
         ]
     )
     p = {
