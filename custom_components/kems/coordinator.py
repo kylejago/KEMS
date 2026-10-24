@@ -856,11 +856,15 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                 now, detailed=detailed
             ) or ScenarioComparisonState(generated_at=now)
             checkpoint("scenario_reporting_schedule")
+            agile_backfill_started = perf_counter()
             agile_records = await self._agile_history_backfill.async_records(
                 native_records=records,
                 now=now,
                 tariff=self.settings.tariff,
                 config=self.settings.simulation,
+            )
+            agile_backfill_seconds = round(
+                perf_counter() - agile_backfill_started, 3
             )
             # Alpha9.96: bind one scan-scoped verified physical battery
             # energy lower bound before price/deadline plan construction.
@@ -893,6 +897,7 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                 )
                 else None
             )
+            agile_planning_started = perf_counter()
             await self._agile_smart_export.async_update(
                 records=agile_records,
                 now=now,
@@ -901,6 +906,9 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                 forecast=forecast,
                 forecast_plan=forecast_plan,
                 tariff=self.settings.tariff,
+            )
+            agile_planning_seconds = round(
+                perf_counter() - agile_planning_started, 3
             )
             checkpoint("agile_rolling_price_optimisation")
 
@@ -1383,6 +1391,12 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                     else control.blocked_reason
                 ),
             )
+            # Shadow half-hour settlement ran before hardware control by design.
+            # Reconcile only its UI status with the actual controller result.
+            self._shadow_validation.sync_live_backend_status(
+                control=control,
+                emergency_stop=bool(self.settings.control.emergency_stop),
+            )
             checkpoint("commissioning_foxess_and_ev_actions")
             return replace(provisional, control=control)
         except Exception as err:
@@ -1409,6 +1423,8 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                 "agile_optimisation_seconds": stage_seconds.get(
                     "agile_rolling_price_optimisation", 0.0
                 ),
+                "agile_history_backfill_seconds": agile_backfill_seconds,
+                "agile_manager_update_seconds": agile_planning_seconds,
                 "timing_clock": "monotonic_perf_counter",
                 "control_execution_model": "unchanged",
                 "reporting_replay_blocks_control": False,

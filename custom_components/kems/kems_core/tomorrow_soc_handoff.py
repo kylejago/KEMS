@@ -6,7 +6,7 @@ at local midnight, not from the SOC observed when the dashboard is viewed.
 
 from __future__ import annotations
 
-from datetime import datetime, time, timedelta
+from datetime import UTC, date, datetime, time, timedelta
 from typing import Any
 from zoneinfo import ZoneInfo
 
@@ -81,14 +81,21 @@ def project_cheap_window_charge_capability(
     }
 
 
-def _cheap_window_hours(start: time, end: time) -> float:
+def _elapsed_hours(start: datetime, end: datetime) -> float:
+    """Measure actual elapsed time across London clock changes (not wall time)."""
+    return max(
+        (end.astimezone(UTC) - start.astimezone(UTC)).total_seconds() / 3600.0,
+        0.0,
+    )
+
+
+def _cheap_window_hours(start: time, end: time, *, on_date: date | None = None) -> float:
     """Return configured cheap-window duration in hours, including midnight wrap."""
-    anchor = datetime(2000, 1, 1)
-    start_dt = datetime.combine(anchor.date(), start)
-    end_dt = datetime.combine(anchor.date(), end)
-    if end_dt <= start_dt:
-        end_dt += timedelta(days=1)
-    return max((end_dt - start_dt).total_seconds() / 3600.0, 0.0)
+    anchor_date = on_date or date(2000, 1, 1)
+    start_dt = datetime.combine(anchor_date, start, tzinfo=LONDON)
+    end_date = anchor_date + (timedelta(days=1) if end <= start else timedelta())
+    end_dt = datetime.combine(end_date, end, tzinfo=LONDON)
+    return _elapsed_hours(start_dt, end_dt)
 
 
 def reconcile_precheap_projection(
@@ -229,7 +236,7 @@ def project_tomorrow_midnight_soc(
             else current_soc
         )
         charge_from = cheap_start
-        capability_hours = _cheap_window_hours(offpeak_start, offpeak_end)
+        capability_hours = _cheap_window_hours(offpeak_start, offpeak_end, on_date=local_now.date())
         basis = (
             "forecast projected SOC at cheap start"
             if projected_precheap is not None
@@ -247,17 +254,17 @@ def project_tomorrow_midnight_soc(
             tzinfo=LONDON,
         )
         capability_hours = max(
-            (cheap_end - local_now).total_seconds() / 3600.0,
+            _elapsed_hours(local_now, cheap_end),
             0.0,
         )
         basis = "current SOC inside active cheap window"
     else:
         start_soc = current_soc
         charge_from = midnight
-        capability_hours = _cheap_window_hours(offpeak_start, offpeak_end)
+        capability_hours = _cheap_window_hours(offpeak_start, offpeak_end, on_date=local_now.date())
         basis = "current SOC at/after midnight"
 
-    hours = max((midnight - charge_from).total_seconds() / 3600.0, 0.0)
+    hours = max(_elapsed_hours(charge_from, midnight), 0.0)
     capacity = max(float(battery_capacity_kwh), 0.1)
     efficiency = min(max(float(charge_efficiency), 0.01), 1.0)
     charge_kw = max(float(max_charge_kw), 0.0)
