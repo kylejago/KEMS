@@ -88,17 +88,17 @@ def _replace_known(
     return replace(simulation, **supplied) if supplied else simulation
 
 
-def _price_slot_export_limit(plan: dict[str, Any]) -> float:
+def _price_slot_export_limit(plan: dict[str, Any]) -> float | None:
     """Limit deliberate export to allocated active price slots only."""
     try:
         now = datetime.fromisoformat(str(plan["generated_at"]))
     except (KeyError, ValueError, TypeError):
-        return 0.0
+        return None
     if now.tzinfo is None:
-        return 0.0
+        return None
     selected = plan.get("selected_slots")
     if not isinstance(selected, list):
-        return 0.0
+        return None
     slot_kw = 0.0
     for item in selected:
         if not isinstance(item, dict):
@@ -166,7 +166,10 @@ def _rolling_target(
         return None
 
     target_home = max(target_home, 0.0)
-    target_export = min(max(target_export, 0.0), _price_slot_export_limit(plan))
+    target_export = max(target_export, 0.0)
+    current_price_limit = _price_slot_export_limit(plan)
+    if current_price_limit is not None:
+        target_export = min(target_export, current_price_limit)
     target_discharge = max(target_home + target_export, 0.0)
     return (
         {
