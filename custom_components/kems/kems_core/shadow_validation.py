@@ -190,3 +190,34 @@ def shadow_plan_vs_outcome(
         "tracking_score_percent": score,
         "available": bool(scored),
     }
+
+
+def shadow_recorder_status(
+    *,
+    operating_mode: str,
+    emergency_stop: bool,
+    shadow_safety_passed: bool,
+    ready: bool,
+    real_backend_available: bool,
+    commands_permitted: bool,
+) -> str:
+    """Label the *comparison recorder*, not the independent FoxESS controller.
+
+    The recorder has no hardware backend by design. It must never claim live
+    control is blocked solely because its own hardware writes are forbidden.
+    """
+    if emergency_stop:
+        return "Emergency stop"
+    if not shadow_safety_passed:
+        return "Shadow safety check failed — live control status separate"
+    if operating_mode == "shadow":
+        return "Shadow active"
+    if operating_mode == "control":
+        if not real_backend_available:
+            return "Shadow comparison — live backend unavailable"
+        if not commands_permitted:
+            return "Shadow comparison — live controller not permitted"
+        return "Shadow comparison active — live control permitted"
+    if operating_mode == "simulate":
+        return "Ready for shadow" if ready else "Simulation validation"
+    return "Observe only"

@@ -16,6 +16,7 @@ from .const import DOMAIN
 from .kems_core import ControlConfig, ControlState, SimulationState, Snapshot
 from .kems_core.shadow_validation import (
     shadow_plan_vs_outcome,
+    shadow_recorder_status,
     validate_shadow_command,
 )
 
@@ -128,18 +129,14 @@ class ShadowValidationRecorder:
             and simulation.ready
             and not config.emergency_stop
         )
-        if config.emergency_stop:
-            status = "Emergency stop"
-        elif not safety.get("passed"):
-            status = "Blocked — shadow safety validation"
-        elif control.operating_mode == "shadow":
-            status = "Shadow active"
-        elif control.operating_mode == "control":
-            status = "Live control blocked — no real backend"
-        elif control.operating_mode == "simulate":
-            status = "Ready for shadow" if ready else "Simulation validation"
-        else:
-            status = "Observe only"
+        status = shadow_recorder_status(
+            operating_mode=control.operating_mode,
+            emergency_stop=config.emergency_stop,
+            shadow_safety_passed=bool(safety.get("passed")),
+            ready=ready,
+            real_backend_available=bool(control.real_backend_available),
+            commands_permitted=bool(control.commands_permitted),
+        )
 
         current_agile = agile_state.get("current_action")
         dispatch_mode = self._state_value(
@@ -171,7 +168,10 @@ class ShadowValidationRecorder:
             "recent_half_hours": self._settled[-12:],
             "recent_decisions": self._decisions[-20:],
             "generated_at": now.isoformat(),
-            "real_backend_available": False,
+            "real_backend_available": False,  # Recorder module only.
+            "live_backend_available": bool(control.real_backend_available),
+            "live_control_commands_permitted": bool(control.commands_permitted),
+            "real_backend_scope": "shadow_recorder_only; see foxess_control",
             "hardware_writes": "blocked",
         }
         self._publish()
