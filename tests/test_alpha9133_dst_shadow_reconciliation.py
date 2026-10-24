@@ -143,7 +143,9 @@ def test_shadow_reporting_reconciles_only_after_live_backend_result() -> None:
 def test_controller_run_order_does_not_move_hardware_or_settlement() -> None:
     coordinator = (KEMS / "coordinator.py").read_text()
     a = coordinator.index("await self._shadow_validation.async_update(")
-    b = coordinator.index("self._agile_smart_export.reconcile_current_day_settlements(", a)
+    b = coordinator.index(
+        "self._agile_smart_export.reconcile_current_day_settlements(", a
+    )
     c = coordinator.index("foxess_control = await self._foxess_control.async_update(")
     d = coordinator.index("self._shadow_validation.sync_live_backend_status(")
     assert a < b < c < d
