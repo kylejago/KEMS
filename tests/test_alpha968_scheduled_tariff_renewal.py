@@ -71,7 +71,7 @@ def test_alpha968_release_identity_and_scope() -> None:
     reason = str(bundle["maintenance"]["reason"])
 
     assert manifest["version"] == "0.9.0-alpha9.135"
-    assert reason.startswith("Alpha9.134:")
+    assert reason.startswith("Alpha9.135:")
     assert "Alpha9.68 adds date-aware electricity tariff fallbacks" in reason
     assert "1 October 2026" in reason
     assert "4 October 2026" in reason
