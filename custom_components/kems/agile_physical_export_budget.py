@@ -36,8 +36,10 @@ def cap_physical_ac_export(
     rows = plan.get("selected_slots")
     if (
         not plan.get("available")
-        or not isinstance(proof, dict) or not proof.get("available")
-        or not isinstance(evidence, dict) or not evidence.get("available")
+        or not isinstance(proof, dict)
+        or not proof.get("available")
+        or not isinstance(evidence, dict)
+        or not evidence.get("available")
         or not isinstance(rows, list)
     ):
         return plan
@@ -138,9 +140,7 @@ def cap_physical_ac_export(
             "current_battery_discharge_target_kw": round(house_kw + export_kw, 3),
             "physical_ac_export_budget_applied": True,
             "physical_ac_export_budget_kwh": round(ac, 3),
-            "physical_ac_export_budget_removed_kwh": round(
-                max(original - total, 0), 3
-            ),
+            "physical_ac_export_budget_removed_kwh": round(max(original - total, 0), 3),
         }
     )
     house_total = plan.get("predicted_house_battery_discharge_kwh")
