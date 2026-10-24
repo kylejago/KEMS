@@ -1,8 +1,9 @@
 """Alpha9.136 pure scheduling regressions: conservative physical AC energy."""
+
 from __future__ import annotations
 
 import importlib.util
-from datetime import datetime, timezone
+from datetime import datetime
 from pathlib import Path
 
 ROOT = Path(__file__).parents[1] / "custom_components" / "kems"
@@ -33,7 +34,8 @@ def _case(budget=8.491):
     ]
     rows[1]["valid_from"] = "2026-10-24T17:30:00+01:00"
     rows[1]["valid_to"] = "2026-10-24T18:00:00+01:00"
-    rows.extend([
+    rows.extend(
+        [
         {
             "valid_from": "2026-10-24T17:45:00+01:00",
             "valid_to": "2026-10-24T18:15:00+01:00",
@@ -48,7 +50,8 @@ def _case(budget=8.491):
             "planned_battery_to_home_kwh": 0.45,
             "planned_battery_export_kwh": 3.016,
         },
-    ])
+        ]
+    )
     p = {
         "available": True,
         "physical_planning_evidence": {"available": True},
