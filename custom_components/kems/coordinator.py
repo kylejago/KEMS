@@ -86,13 +86,13 @@ from .kems_core.control_event_refresh import (
 )
 from .kems_core.control_write_authority import active_joined_power_down_window
 from .kems_core.scenario_report_gate import ScenarioReportGate
-from .kems_core.tomorrow_soc_handoff import (
-    LONDON,
-    _cheap_window_hours as _real_elapsed_cheap_window_hours,
-)
 from .kems_core.shared_bus_balance import (
     assess_shared_bus_balance,
     summarise_shared_bus_audits,
+)
+from .kems_core.tomorrow_soc_handoff import (
+    LONDON,
+    _cheap_window_hours as _real_elapsed_cheap_window_hours,
 )
 from .lifetime import LifetimeLedgerRecorder
 from .power_down import PowerDownHistoryRecorder
