@@ -4,9 +4,10 @@ from __future__ import annotations
 
 import logging
 from dataclasses import replace
-from datetime import date, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from math import isfinite
 from time import perf_counter
+from zoneinfo import ZoneInfo
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import Event, HomeAssistant, callback
@@ -634,6 +635,8 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
     async def _async_update_data(self) -> KEMSData:
         """Refresh physical control first; run optional what-if work separately."""
         scan_started = perf_counter()
+        agile_backfill_seconds = 0.0
+        agile_planning_seconds = 0.0
         checkpoint_at = scan_started
         stage_seconds: dict[str, float] = {}
 
@@ -781,7 +784,7 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                 forecast=forecast,
                 simulation_config=self.settings.simulation,
                 forecast_config=self.settings.forecast,
-                cheap_window_hours=self._cheap_window_hours(),
+                cheap_window_hours=self._cheap_window_hours(now),
             )
             self._annotate_snapshot_with_forecast(snapshot, forecast_plan)
             captured = await self._forecast_validation.async_capture(
@@ -856,12 +859,14 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                 now, detailed=detailed
             ) or ScenarioComparisonState(generated_at=now)
             checkpoint("scenario_reporting_schedule")
+            agile_backfill_started = perf_counter()
             agile_records = await self._agile_history_backfill.async_records(
                 native_records=records,
                 now=now,
                 tariff=self.settings.tariff,
                 config=self.settings.simulation,
             )
+            agile_backfill_seconds = round(perf_counter() - agile_backfill_started, 3)
             # Alpha9.96: bind one scan-scoped verified physical battery
             # energy lower bound before price/deadline plan construction.
             # The independent settled digital twin remains unchanged.
@@ -893,6 +898,7 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                 )
                 else None
             )
+            agile_planning_started = perf_counter()
             await self._agile_smart_export.async_update(
                 records=agile_records,
                 now=now,
@@ -902,6 +908,7 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                 forecast_plan=forecast_plan,
                 tariff=self.settings.tariff,
             )
+            agile_planning_seconds = round(perf_counter() - agile_planning_started, 3)
             checkpoint("agile_rolling_price_optimisation")
 
             # Alpha9.123 financial solar-routing SHADOW. This is deliberately
@@ -1383,6 +1390,12 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                     else control.blocked_reason
                 ),
             )
+            # Shadow half-hour settlement ran before hardware control by design.
+            # Reconcile only its UI status with the actual controller result.
+            self._shadow_validation.sync_live_backend_status(
+                control=control,
+                emergency_stop=bool(self.settings.control.emergency_stop),
+            )
             checkpoint("commissioning_foxess_and_ev_actions")
             return replace(provisional, control=control)
         except Exception as err:
@@ -1409,6 +1422,8 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                 "agile_optimisation_seconds": stage_seconds.get(
                     "agile_rolling_price_optimisation", 0.0
                 ),
+                "agile_history_backfill_seconds": agile_backfill_seconds,
+                "agile_manager_update_seconds": agile_planning_seconds,
                 "timing_clock": "monotonic_perf_counter",
                 "control_execution_model": "unchanged",
                 "reporting_replay_blocks_control": False,
@@ -1438,14 +1453,23 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                         stage_seconds[biggest],
                     )
 
-    def _cheap_window_hours(self) -> float:
-        """Return configured normal overnight cheap-window duration."""
+    def _cheap_window_hours(self, now: datetime | None = None) -> float:
+        """Physical elapsed normal cheap-window hours, not clock-face hours."""
+        london = ZoneInfo("Europe/London")
+        local_date = (now or dt_util.now()).astimezone(london).date()
         start = self.settings.tariff.offpeak_start
         end = self.settings.tariff.offpeak_end
-        start_minutes = start.hour * 60 + start.minute + start.second / 60.0
-        end_minutes = end.hour * 60 + end.minute + end.second / 60.0
-        minutes = (end_minutes - start_minutes) % (24 * 60)
-        return round((minutes or 24 * 60) / 60.0, 3)
+        start_at = datetime.combine(local_date, start, tzinfo=london)
+        end_day = local_date + (timedelta(days=1) if end <= start else timedelta())
+        end_at = datetime.combine(end_day, end, tzinfo=london)
+        return round(
+            max(
+                (end_at.astimezone(UTC) - start_at.astimezone(UTC)).total_seconds()
+                / 3600.0,
+                0.0,
+            ),
+            3,
+        )
 
     @staticmethod
     def _annotate_snapshot_with_forecast(snapshot, plan) -> None:

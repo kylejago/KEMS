@@ -178,6 +178,33 @@ class ShadowValidationRecorder:
         await self._save_if_due(now)
         return self.state
 
+    def sync_live_backend_status(
+        self, *, control: ControlState, emergency_stop: bool
+    ) -> None:
+        """Refresh reporting using *post-write* FoxESS commissioning evidence.
+
+        The shadow recorder has already settled its half-hour before live
+        control executes; this only updates user-facing status. Never changes
+        any plan, write authority, or hardware state.
+        """
+        if not self._state:
+            return
+        safety = self._state.get("command_safety", {})
+        self._state["status"] = shadow_recorder_status(
+            operating_mode=control.operating_mode,
+            emergency_stop=emergency_stop,
+            shadow_safety_passed=bool(safety.get("passed")),
+            ready=bool(self._state.get("ready_for_shadow")),
+            real_backend_available=bool(control.real_backend_available),
+            commands_permitted=bool(control.commands_permitted),
+        )
+        self._state["live_backend_available"] = bool(control.real_backend_available)
+        self._state["live_control_commands_permitted"] = bool(
+            control.commands_permitted
+        )
+        self._state["blocked_reason"] = control.blocked_reason
+        self._publish()
+
     def _update_half_hour(
         self,
         now: datetime,
