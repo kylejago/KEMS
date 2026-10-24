@@ -147,10 +147,8 @@ def test_unverified_or_unsynchronised_data_never_gets_a_credible_ceiling() -> No
 def test_release_scope_keeps_existing_hardware_and_auto_update_code() -> None:
     manifest = json.loads((KEMS / "manifest.json").read_text())
     bundle = json.loads((ROOT / "release/kems-bundle.template.json").read_text())
-    assert manifest["version"] == "0.9.0-alpha9.133"
-    assert bundle["maintenance"]["reason"].startswith(
-        "Alpha9.133: Correct London autumn/spring DST"
-    )
+    assert manifest["version"] == "0.9.0-alpha9.134"
+    assert bundle["maintenance"]["reason"].startswith("Alpha9.134:")
     assert (
         "all live hardware control logic unchanged" in bundle["maintenance"]["reason"]
     )

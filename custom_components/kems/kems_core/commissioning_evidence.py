@@ -55,6 +55,7 @@ class TelemetryStabilityEvidence:
     allowed_gap_seconds: float
     missing_fields: tuple[str, ...]
     stale_fields: tuple[str, ...]
+    startup_empty_samples_excluded: int = 0
 
     def to_dict(self) -> dict[str, Any]:
         """Return a stable serialisable commissioning payload."""
@@ -69,6 +70,7 @@ class TelemetryStabilityEvidence:
             "allowed_gap_seconds": self.allowed_gap_seconds,
             "missing_fields": list(self.missing_fields),
             "stale_fields": list(self.stale_fields),
+            "startup_empty_samples_excluded": self.startup_empty_samples_excluded,
         }
 
 
@@ -300,12 +302,32 @@ def assess_foxess_telemetry_stability(
     """
     expected_interval = max(float(expected_interval_seconds), 1.0)
     allowed_gap = round(expected_interval * 3.0, 3)
-    recent = list(records)[-max(int(recent_sample_limit), minimum_samples, 1) :]
+    recent_limit = max(int(recent_sample_limit), minimum_samples, 1)
+    all_records = list(records)
+    recent = all_records[-recent_limit:]
     required_fields = set(
         FOXESS_REQUIRED_TELEMETRY_FIELDS
         if battery_required
         else FOXESS_SITE_TELEMETRY_FIELDS
     )
+
+    # HA can emit one all-empty physical snapshot when this commissioning
+    # session starts, before the first FoxESS readings populate. That
+    # snapshot is not valid evidence and must not poison a subsequent
+    # physically complete 12+ sample qualification. This exception applies
+    # ONLY to the first record of the actual session, NEVER to the first
+    # record of a rolling 60-sample slice or a later telemetry dropout.
+    # Partial and stale first observations are not exempt. The ordinary
+    # minimum-sample, 95% completeness and timing gates still apply.
+    startup_empty_samples_excluded = 0
+    if (
+        len(all_records) <= recent_limit
+        and recent
+        and all(getattr(recent[0], field, None) is None for field in required_fields)
+        and not (set(getattr(recent[0], "stale_fields", ()) or ()) & required_fields)
+    ):
+        recent = recent[1:]
+        startup_empty_samples_excluded = 1
 
     complete_samples = 0
     missing: set[str] = set()
@@ -368,6 +390,7 @@ def assess_foxess_telemetry_stability(
         allowed_gap_seconds=allowed_gap,
         missing_fields=tuple(sorted(missing)),
         stale_fields=tuple(sorted(stale)),
+        startup_empty_samples_excluded=startup_empty_samples_excluded,
     )
 
 
