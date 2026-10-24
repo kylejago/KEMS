@@ -19,6 +19,7 @@ from typing import Any
 
 from . import agile_deadline_guard, agile_rolling_planning
 from . import agile_smart_export as agile
+from .agile_physical_export_budget import cap_physical_ac_export
 from .kems_core import SimulationConfig
 from .kems_core.deadline_dominance import maximum_discharge_targets
 from .tariff import TariffSettings
@@ -277,7 +278,7 @@ def _rolling_plan_with_deadline_dominance(
     )
     if not isinstance(plan, dict):
         return plan
-    return _apply_deadline_dominance(
+    resolved = _apply_deadline_dominance(
         self,
         state,
         plan,
@@ -285,6 +286,7 @@ def _rolling_plan_with_deadline_dominance(
         config=config,
         tariff=tariff,
     )
+    return cap_physical_ac_export(state, resolved, now=now)
 
 
 def install_deadline_dominance() -> None:
