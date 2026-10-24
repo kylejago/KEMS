@@ -516,7 +516,7 @@ class KEMSUpdateOrchestrator:
         reason = str(
             maintenance.get("reason")
             or f"Install KEMS {target} and restart Home Assistant"
-        )
+        )[:512]
         disruptive = bool(
             maintenance.get("required")
             or maintenance.get("home_assistant_restart_required", True)
@@ -1012,24 +1012,43 @@ class KEMSUpdateOrchestrator:
     ) -> dict[str, Any]:
         """Build the same notice shape used by every KEMS user surface."""
         maintenance = pending.get("maintenance") or {}
+        if not isinstance(maintenance, dict):
+            maintenance = {}
+
+        def compact(value: object, limit: int = 512) -> str | None:
+            if value is None:
+                return None
+            value = str(value)
+            return value if len(value) <= limit else value[: limit - 1] + "…"
+
+        components = maintenance.get("affected_components")
+        if not isinstance(components, list):
+            components = ["kems_core"]
+        # Recorder's event_data ceiling is 32KiB. Older release bundles
+        # accidentally appended 40KiB+ of prior changelog text to the
+        # maintenance reason; never put the entire release bundle in HA's
+        # event bus or persistent_notification.create service data.
         return {
-            "status": status,
-            "bundle": pending.get("bundle"),
-            "target": pending.get("target"),
-            "scheduled_for": pending.get("scheduled_for"),
-            "reason": pending.get("reason") or maintenance.get("reason"),
+            "status": compact(status, 40),
+            "bundle": compact(pending.get("bundle"), 120),
+            "target": compact(pending.get("target"), 120),
+            "scheduled_for": compact(pending.get("scheduled_for"), 80),
+            "reason": compact(
+                pending.get("reason") or maintenance.get("reason"), 512
+            ),
             "expected_downtime_minutes": maintenance.get(
                 "expected_downtime_minutes", 5
             ),
-            "affected_components": list(
-                maintenance.get("affected_components") or ["kems_core"]
-            ),
+            "affected_components": [compact(item, 64) for item in components[:12]],
             "home_assistant_restart_required": bool(
                 maintenance.get("home_assistant_restart_required", True)
             ),
             "reboot_required": bool(maintenance.get("reboot_required", False)),
-            "error": pending.get("error")
-            or (self.last_error if status == "failed" else None),
+            "error": compact(
+                pending.get("error")
+                or (self.last_error if status == "failed" else None),
+                256,
+            ),
             "updated_at": dt_util.now().isoformat(),
         }
 

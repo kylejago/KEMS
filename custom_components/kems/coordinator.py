@@ -173,6 +173,8 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
         self._scenario_report_runtime: dict[str, object] = {}
         self._coordinator_performance: dict[str, object] = {}
         self._coordinator_slow_scans: list[dict[str, object]] = []
+        self._coordinator_scan_samples: list[float] = []
+        self._coordinator_slow_log_at: datetime | None = None
         self._agile_history_backfill = AgileHistoryBackfill(hass, entities)
         self._agile_smart_export = EfficientAgileSmartExportManager(
             hass,
@@ -1389,11 +1391,22 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
             checkpoint("other_and_finalisation")
             elapsed = round(perf_counter() - scan_started, 3)
             biggest = max(stage_seconds, key=stage_seconds.get)
+            self._coordinator_scan_samples.append(elapsed)
+            self._coordinator_scan_samples = self._coordinator_scan_samples[-60:]
+            sorted_samples = sorted(self._coordinator_scan_samples)
+            p95_index = max(0, (95 * len(sorted_samples) + 99) // 100 - 1)
             self._coordinator_performance = {
                 "scan_elapsed_seconds": elapsed,
                 "stage_seconds": dict(stage_seconds),
                 "longest_stage": biggest,
                 "longest_stage_seconds": stage_seconds[biggest],
+                "recent_sample_count": len(sorted_samples),
+                "recent_mean_seconds": round(sum(sorted_samples) / len(sorted_samples), 3),
+                "recent_p95_seconds": sorted_samples[p95_index],
+                "recent_max_seconds": sorted_samples[-1],
+                "agile_optimisation_seconds": stage_seconds.get(
+                    "agile_rolling_price_optimisation", 0.0
+                ),
                 "timing_clock": "monotonic_perf_counter",
                 "control_execution_model": "unchanged",
                 "reporting_replay_blocks_control": False,
@@ -1407,12 +1420,21 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                 }
                 self._coordinator_slow_scans.append(record)
                 self._coordinator_slow_scans = self._coordinator_slow_scans[-12:]
-                LOGGER.warning(
-                    "KEMS refresh %.2fs; slowest stage %s %.2fs",
-                    elapsed,
-                    biggest,
-                    stage_seconds[biggest],
-                )
+                # Preserve every slow scan in diagnostics, but do not flood
+                # Core logs while a long user-visible reporting replay settles.
+                current_log_at = dt_util.now()
+                if (
+                    self._coordinator_slow_log_at is None
+                    or current_log_at - self._coordinator_slow_log_at
+                    >= timedelta(minutes=10)
+                ):
+                    self._coordinator_slow_log_at = current_log_at
+                    LOGGER.warning(
+                        "KEMS refresh %.2fs; slowest stage %s %.2fs",
+                        elapsed,
+                        biggest,
+                        stage_seconds[biggest],
+                    )
 
     def _cheap_window_hours(self) -> float:
         """Return configured normal overnight cheap-window duration."""

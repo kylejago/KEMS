@@ -155,7 +155,7 @@ class AgileSmartExportManager:
         for day, day_records in sorted(grouped.items()):
             if len(day_records) < 2:
                 continue
-            result = self._compare_day(
+            compare_args = (
                 day_records,
                 config,
                 tariff,
@@ -167,6 +167,14 @@ class AgileSmartExportManager:
                     else None
                 ),
             )
+            # The optimiser is a pure numerical replay. Keep its exact
+            # arguments and result but run it in HA's executor to avoid
+            # starving Home Assistant's event loop for large histories.
+            executor = getattr(self._hass, "async_add_executor_job", None)
+            if callable(executor):
+                result = await executor(self._compare_day, *compare_args)
+            else:
+                result = self._compare_day(*compare_args)
             calculated[day.isoformat()] = result
             agile_soc = float(
                 result["agile_smart_export"].get("ending_soc_percent") or agile_soc
@@ -192,7 +200,7 @@ class AgileSmartExportManager:
         )
         tomorrow = None
         if len(tomorrow_records) >= 2:
-            tomorrow = self._compare_day(
+            tomorrow_args = (
                 tomorrow_records,
                 config,
                 tariff,
@@ -209,8 +217,14 @@ class AgileSmartExportManager:
                     or full_soc
                 ),
                 None,
-                projection=True,
             )
+            executor = getattr(self._hass, "async_add_executor_job", None)
+            if callable(executor):
+                tomorrow = await executor(
+                    self._compare_day, *tomorrow_args, projection=True
+                )
+            else:
+                tomorrow = self._compare_day(*tomorrow_args, projection=True)
 
         all_days = dict(self._daily)
         all_days.update(
@@ -960,27 +974,35 @@ class AgileSmartExportManager:
                 )
                 / 100
             )
-        needed_ac = 0.0
-        reached_cheap = False
-        for future, following in zip(
-            records[index + 1 :],
-            records[index + 2 :],
-            strict=False,
-        ):
-            if future.cheap_period_confirmed:
-                reached_cheap = True
-                break
-            hours = min(
-                max(
-                    (following.timestamp - future.timestamp).total_seconds(),
-                    0,
+        # The former forward scan made every half-hour/day replay quadratic
+        # as the history grew. Compute the *same* future interval summation
+        # once per replay, with an O(1) lookup for each subsequent slot.
+        # Cache identity, not hash: snapshots are mutable and must never be
+        # silently reused across a different replay/day.
+        cached = getattr(self, "_kems_floor_future_cache", None)
+        if cached is None or cached[0] is not records:
+            future_ac = [0.0] * len(records)
+            future_cheap = [False] * len(records)
+            for offset in range(len(records) - 3, -1, -1):
+                future = records[offset + 1]
+                following = records[offset + 2]
+                if future.cheap_period_confirmed:
+                    future_cheap[offset] = True
+                    continue
+                hours = min(
+                    max((following.timestamp - future.timestamp).total_seconds(), 0)
+                    / 3600,
+                    0.5,
                 )
-                / 3600,
-                0.5,
-            )
-            load = _load(future)
-            if load is not None:
-                needed_ac += load * hours
+                load = _load(future)
+                future_ac[offset] = future_ac[offset + 1] + (
+                    load * hours if load is not None else 0.0
+                )
+                future_cheap[offset] = future_cheap[offset + 1]
+            cached = (records, future_ac, future_cheap)
+            self._kems_floor_future_cache = cached
+        needed_ac = cached[1][index]
+        reached_cheap = cached[2][index]
         if (
             not reached_cheap
             and current.forecast_expected_house_remaining_today_kwh is not None
