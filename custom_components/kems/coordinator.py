@@ -634,6 +634,8 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
     async def _async_update_data(self) -> KEMSData:
         """Refresh physical control first; run optional what-if work separately."""
         scan_started = perf_counter()
+        agile_backfill_seconds = 0.0
+        agile_planning_seconds = 0.0
         checkpoint_at = scan_started
         stage_seconds: dict[str, float] = {}
 
