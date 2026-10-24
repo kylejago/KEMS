@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import ast
 from datetime import datetime
+from math import isfinite
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -20,7 +21,7 @@ def _pure_functions(source, names, extra=None):
         and node.name in names
     ]
     assert len(selected) == len(names)
-    context = {"datetime": datetime}
+    context = {"datetime": datetime, "isfinite": isfinite}
     context.update(extra or {})
     source_text = "from __future__ import annotations\n" + "\n\n".join(
         ast.unparse(node) for node in selected
