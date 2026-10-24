@@ -100,9 +100,13 @@ def cap_physical_ac_export(
 
     current = now.astimezone(UTC)
     active = next(
-        (row for row in selected
-         if (_time(row.get("valid_from")) or current) <= current
-         < (_time(row.get("valid_to")) or current)),
+        (
+            row
+            for row in selected
+            if (_time(row.get("valid_from")) or current)
+            <= current
+            < (_time(row.get("valid_to")) or current)
+        ),
         None,
     )
     export_kw = 0.0
@@ -119,21 +123,29 @@ def cap_physical_ac_export(
     house_kw = _num(plan.get("current_house_battery_kw"))
     plan.update(
         {
-        "selected_slots": selected,
-        "next_export_slot": next(
-            (dict(row) for row in selected
-             if (_time(row.get("valid_to")) or current) > current), None,
-        ),
-        "planned_battery_export_kwh": total,
-        "exportable_battery_energy_kwh": total,
-        "current_battery_export_target_kw": round(export_kw, 3),
-        "current_battery_discharge_target_kw": round(house_kw + export_kw, 3),
-        "physical_ac_export_budget_applied": True,
-        "physical_ac_export_budget_kwh": round(ac, 3),
-        "physical_ac_export_budget_removed_kwh": round(max(original - total, 0), 3),
+            "selected_slots": selected,
+            "next_export_slot": next(
+                (
+                    dict(row)
+                    for row in selected
+                    if (_time(row.get("valid_to")) or current) > current
+                ),
+                None,
+            ),
+            "planned_battery_export_kwh": total,
+            "exportable_battery_energy_kwh": total,
+            "current_battery_export_target_kw": round(export_kw, 3),
+            "current_battery_discharge_target_kw": round(house_kw + export_kw, 3),
+            "physical_ac_export_budget_applied": True,
+            "physical_ac_export_budget_kwh": round(ac, 3),
+            "physical_ac_export_budget_removed_kwh": round(
+                max(original - total, 0), 3
+            ),
         }
     )
     house_total = plan.get("predicted_house_battery_discharge_kwh")
     if house_total is not None:
-        plan["planned_total_battery_discharge_kwh"] = round(_num(house_total) + total, 3)
+        plan["planned_total_battery_discharge_kwh"] = round(
+            _num(house_total) + total, 3
+        )
     return plan
