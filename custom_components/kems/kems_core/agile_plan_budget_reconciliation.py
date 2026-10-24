@@ -119,9 +119,7 @@ def reconcile_agile_budget(
         else None
     )
     conversion = (
-        ac / stored
-        if stored is not None and stored > 0 and ac is not None
-        else None
+        ac / stored if stored is not None and stored > 0 and ac is not None else None
     )
     guarded_ac = guarded * conversion if conversion is not None else None
     compared_guard = guarded_ac if guarded_ac is not None else guarded
