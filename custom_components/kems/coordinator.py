@@ -888,6 +888,7 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                     "snapshot": snapshot,
                     "evidence": self._paid_agile_energy_evidence,
                     "control": self.settings.control,
+                    "forecast_plan": forecast_plan,
                 }
                 if (
                     selected_export_tariff == EXPORT_TARIFF_TYPE_AGILE

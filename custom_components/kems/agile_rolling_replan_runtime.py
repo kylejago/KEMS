@@ -17,7 +17,10 @@ from . import agile_smart_export as agile
 from . import agile_smart_export_runtime_base as runtime
 from . import history as history_module
 from .agile_deadline_dispatch import _effective_deadline_kw, _target_percent
-from .agile_physical_planning import physical_planning_soc
+from .agile_physical_planning import (
+    conservative_physical_export_budget,
+    physical_planning_soc,
+)
 from .kems_core import SimulationConfig
 from .tariff import TariffSettings
 
@@ -247,6 +250,20 @@ def _rolling_plan(
         100.0,
     )
     exportable_ac = max(battery_kwh - protected_stored_kwh, 0.0) * efficiency
+    physical_house_budget: dict[str, Any] = {"available": False}
+    if physical_planning.get("available"):
+        stored_budget, physical_house_budget = conservative_physical_export_budget(
+            self, now=now, config=config
+        )
+        if stored_budget is None:
+            exportable_ac = 0.0
+        else:
+            exportable_ac = min(exportable_ac, stored_budget * efficiency)
+            protected_house_ac = max(
+                protected_house_ac,
+                float(physical_house_budget["protected_house_stored_kwh"])
+                * efficiency,
+            )
 
     slots = state.get("today_slots")
     if not isinstance(slots, list):
@@ -370,6 +387,7 @@ def _rolling_plan(
         "planning_soc_percent": round(soc, 3),
         "planning_soc_source": soc_source,
         "physical_planning_evidence": physical_planning,
+        "physical_house_budget_evidence": physical_house_budget,
         "protected_house_energy_kwh": round(protected_house_ac, 3),
         "exportable_battery_energy_kwh": round(exportable_ac, 3),
         "planned_battery_export_kwh": round(planned, 3),
