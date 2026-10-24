@@ -2,11 +2,48 @@
 
 from __future__ import annotations
 
+import ast
 from datetime import datetime
+from pathlib import Path
 from types import SimpleNamespace
 
-from custom_components.kems import agile_control_alignment as alignment
-from custom_components.kems import agile_physical_planning as planning
+ROOT = Path(__file__).parents[1] / "custom_components" / "kems"
+
+
+def _pure_functions(source, names, extra=None):
+    """Load actual source function bodies without importing Home Assistant."""
+    tree = ast.parse((ROOT / source).read_text())
+    selected = [
+        node
+        for node in tree.body
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+        and node.name in names
+    ]
+    assert len(selected) == len(names)
+    context = {"datetime": datetime}
+    context.update(extra or {})
+    source_text = "from __future__ import annotations\\n" + "\\n\\n".join(
+        ast.unparse(node) for node in selected
+    )
+    exec(compile(source_text, source, "exec"), context)
+    return SimpleNamespace(**{name: context[name] for name in names})
+
+
+alignment = _pure_functions(
+    "agile_control_alignment.py",
+    ("_number", "_price_slot_export_limit", "_rolling_target"),
+)
+planning = _pure_functions(
+    "agile_physical_planning.py",
+    ("_number", "conservative_physical_export_budget"),
+    {
+        "_HOUSE_BUFFER_FRACTION": 0.20,
+        "_MAX_FORECAST_SOLAR_CREDIT_FRACTION": 0.25,
+        "_MIN_HOUSE_BUFFER_KWH": 2.0,
+        "_MIN_PLANNING_RESERVE_PERCENT": 15.0,
+        "_SOLAR_CREDIT_MIN_CONFIDENCE": 80.0,
+    },
+)
 
 NOW = "2026-10-24T15:51:30+01:00"
 
