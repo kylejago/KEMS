@@ -148,3 +148,32 @@ def test_dst_slots_are_distinct_physical_instants():
 def test_budget_contract_executes_after_deadline_priority():
     source = (ROOT / "agile_deadline_dominance.py").read_text()
     assert "return cap_physical_ac_export(state, resolved, now=now)" in source
+
+def test_real_guard_stored_kwh_converts_to_ac_before_reconciliation():
+    from kems_core.agile_plan_budget_reconciliation import reconcile_agile_budget
+
+    at = "2026-10-24T17:18:20+01:00"
+    state = {"rolling_export_plan": {
+        "available": True, "generated_at": at,
+        "physical_planning_evidence": {"available": True},
+        "physical_house_budget_evidence": {
+            "available": True,
+            "exportable_stored_kwh": 8.938,
+            "exportable_ac_kwh": 8.491,
+        },
+        "planned_battery_export_kwh": 8.491,
+        "protected_house_energy_kwh": 10.763,
+        "current_battery_export_target_kw": 0.0,
+        "required_in_current_slot_kwh": 0.0,
+        "selected_slots": [],
+    }}
+    physical = {
+        "physical_energy_evidence": {"observed_at": at},
+        "exportable_physical_energy_kwh": 8.937,
+        "protected_home_energy_kwh": 11.329,
+    }
+    result = reconcile_agile_budget(state, physical)
+    assert result["status"] == "aligned"
+    assert result["comparison_units"] == "AC_kWh"
+    assert 8.48 < result["guard_exportable_ac_energy_kwh"] < 8.50
+    assert result["plan_above_physical_budget_kwh"] < 0.01
