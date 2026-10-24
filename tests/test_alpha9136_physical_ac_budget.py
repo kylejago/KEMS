@@ -137,20 +137,30 @@ def test_zero_budget_blocks_paid_export_but_not_house():
 
 def test_dst_slots_are_distinct_physical_instants():
     now = datetime.fromisoformat("2026-10-25T00:45:00+01:00")
-    first = {"valid_from": "2026-10-25T01:00:00+01:00",
-             "valid_to": "2026-10-25T01:30:00+01:00",
-             "rate_pence": 8, "planned_battery_export_kwh": 1}
-    second = {"valid_from": "2026-10-25T01:00:00+00:00",
-              "valid_to": "2026-10-25T01:30:00+00:00",
-              "rate_pence": 9, "planned_battery_export_kwh": 1}
-    plan = {"available": True,
-            "physical_planning_evidence": {"available": True},
-            "physical_house_budget_evidence": {
-                "available": True, "exportable_ac_kwh": 1.0},
-            "selected_slots": [first, second],
-            "current_house_battery_kw": 0.3,
-            "current_battery_export_target_kw": 0,
-            "planned_battery_export_kwh": 2}
+    first = {
+        "valid_from": "2026-10-25T01:00:00+01:00",
+        "valid_to": "2026-10-25T01:30:00+01:00",
+        "rate_pence": 8,
+        "planned_battery_export_kwh": 1,
+    }
+    second = {
+        "valid_from": "2026-10-25T01:00:00+00:00",
+        "valid_to": "2026-10-25T01:30:00+00:00",
+        "rate_pence": 9,
+        "planned_battery_export_kwh": 1,
+    }
+    plan = {
+        "available": True,
+        "physical_planning_evidence": {"available": True},
+        "physical_house_budget_evidence": {
+            "available": True,
+            "exportable_ac_kwh": 1.0,
+        },
+        "selected_slots": [first, second],
+        "current_house_battery_kw": 0.3,
+        "current_battery_export_target_kw": 0,
+        "planned_battery_export_kwh": 2,
+    }
     result = mod.cap_physical_ac_export({"today_slots": []}, plan, now=now)
     assert len(result["selected_slots"]) == 1
     assert result["selected_slots"][0]["valid_from"].endswith("+00:00")
