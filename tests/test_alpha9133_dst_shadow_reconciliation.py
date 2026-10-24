@@ -45,9 +45,7 @@ def test_elapsed_cheap_charge_hours_across_dst(
     )
     capability = projection["cheap_window_charge_capability"]
     assert capability["charge_hours_available"] == elapsed_hours
-    assert capability["maximum_charge_input_kwh"] == pytest.approx(
-        7.0 * elapsed_hours
-    )
+    assert capability["maximum_charge_input_kwh"] == pytest.approx(7.0 * elapsed_hours)
     assert capability["maximum_achievable_soc_percent"] == pytest.approx(
         final_soc, abs=0.002
     )
@@ -56,9 +54,10 @@ def test_elapsed_cheap_charge_hours_across_dst(
     assert midnight_soc == 20.893
     assert projection["hardware_writes"] == "blocked"
     assert capability["hardware_writes"] == "blocked"
-    assert _cheap_window_hours(
-        time(23, 30), time(5, 30), on_date=local_day.date()
-    ) == elapsed_hours
+    assert (
+        _cheap_window_hours(time(23, 30), time(5, 30), on_date=local_day.date())
+        == elapsed_hours
+    )
 
 
 def test_active_pre_midnight_after_start_does_not_recharge_elapsed_minutes() -> None:
@@ -75,7 +74,9 @@ def test_active_pre_midnight_after_start_does_not_recharge_elapsed_minutes() -> 
     assert projection["basis"] == "current SOC inside active cheap window"
     assert projection["starting_soc_percent"] == 20.0
     assert projection["charge_hours_before_midnight"] == 0.25
-    assert projection["cheap_window_charge_capability"]["charge_hours_available"] == 6.75
+    assert (
+        projection["cheap_window_charge_capability"]["charge_hours_available"] == 6.75
+    )
 
 
 def test_shadow_reporting_reconciles_only_after_live_backend_result() -> None:
@@ -88,13 +89,15 @@ def test_shadow_reporting_reconciles_only_after_live_backend_result() -> None:
     method = next(
         x
         for x in cls.body
-        if isinstance(x, ast.FunctionDef)
-        and x.name == "sync_live_backend_status"
+        if isinstance(x, ast.FunctionDef) and x.name == "sync_live_backend_status"
     )
     wrapper = ast.ClassDef(
         name="Recorder", bases=[], keywords=[], body=[method], decorator_list=[]
     )
-    ns = {"ControlState": ControlState, "shadow_recorder_status": shadow_recorder_status}
+    ns = {
+        "ControlState": ControlState,
+        "shadow_recorder_status": shadow_recorder_status,
+    }
     exec(
         compile(
             ast.fix_missing_locations(ast.Module(body=[wrapper], type_ignores=[])),

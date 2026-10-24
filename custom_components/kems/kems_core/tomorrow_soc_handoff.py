@@ -89,7 +89,9 @@ def _elapsed_hours(start: datetime, end: datetime) -> float:
     )
 
 
-def _cheap_window_hours(start: time, end: time, *, on_date: date | None = None) -> float:
+def _cheap_window_hours(
+    start: time, end: time, *, on_date: date | None = None
+) -> float:
     """Return configured cheap-window duration in hours, including midnight wrap."""
     anchor_date = on_date or date(2000, 1, 1)
     start_dt = datetime.combine(anchor_date, start, tzinfo=LONDON)
@@ -236,7 +238,9 @@ def project_tomorrow_midnight_soc(
             else current_soc
         )
         charge_from = cheap_start
-        capability_hours = _cheap_window_hours(offpeak_start, offpeak_end, on_date=local_now.date())
+        capability_hours = _cheap_window_hours(
+            offpeak_start, offpeak_end, on_date=local_now.date()
+        )
         basis = (
             "forecast projected SOC at cheap start"
             if projected_precheap is not None
@@ -261,7 +265,9 @@ def project_tomorrow_midnight_soc(
     else:
         start_soc = current_soc
         charge_from = midnight
-        capability_hours = _cheap_window_hours(offpeak_start, offpeak_end, on_date=local_now.date())
+        capability_hours = _cheap_window_hours(
+            offpeak_start, offpeak_end, on_date=local_now.date()
+        )
         basis = "current SOC at/after midnight"
 
     hours = max(_elapsed_hours(charge_from, midnight), 0.0)

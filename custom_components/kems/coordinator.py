@@ -865,9 +865,7 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                 tariff=self.settings.tariff,
                 config=self.settings.simulation,
             )
-            agile_backfill_seconds = round(
-                perf_counter() - agile_backfill_started, 3
-            )
+            agile_backfill_seconds = round(perf_counter() - agile_backfill_started, 3)
             # Alpha9.96: bind one scan-scoped verified physical battery
             # energy lower bound before price/deadline plan construction.
             # The independent settled digital twin remains unchanged.
@@ -909,9 +907,7 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                 forecast_plan=forecast_plan,
                 tariff=self.settings.tariff,
             )
-            agile_planning_seconds = round(
-                perf_counter() - agile_planning_started, 3
-            )
+            agile_planning_seconds = round(perf_counter() - agile_planning_started, 3)
             checkpoint("agile_rolling_price_optimisation")
 
             # Alpha9.123 financial solar-routing SHADOW. This is deliberately

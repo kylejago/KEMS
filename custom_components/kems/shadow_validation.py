@@ -198,9 +198,7 @@ class ShadowValidationRecorder:
             real_backend_available=bool(control.real_backend_available),
             commands_permitted=bool(control.commands_permitted),
         )
-        self._state["live_backend_available"] = bool(
-            control.real_backend_available
-        )
+        self._state["live_backend_available"] = bool(control.real_backend_available)
         self._state["live_control_commands_permitted"] = bool(
             control.commands_permitted
         )
