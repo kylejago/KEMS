@@ -84,13 +84,16 @@ def test_two_external_id_only_bookings_exhaust_daily_allowance():
     assert len(booked[0]["event_codes"]) == 2
     assert booked[0]["start"].isoformat() == "2026-10-25T11:00:00+00:00"
     assert booked[0]["end"].isoformat() == "2026-10-25T13:00:00+00:00"
-    assert hh.select_reward_booking_codes(
-        candidates=[_candidate(11), _candidate(12), _candidate(13)],
-        booked_codes=set(),
-        booked_windows=booked,
-        scored={},
-        target_count=2,
-    ) == []
+    assert (
+        hh.select_reward_booking_codes(
+            candidates=[_candidate(11), _candidate(12), _candidate(13)],
+            booked_codes=set(),
+            booked_windows=booked,
+            scored={},
+            target_count=2,
+        )
+        == []
+    )
 
 
 @pytest.mark.parametrize("second,expected_calls", [(False, 1), (True, 0)])
@@ -194,9 +197,9 @@ def test_release_diagnostics_expose_booking_control_and_error_state():
     from pathlib import Path
 
     root = Path(__file__).parents[1]
-    diagnostics = (
-        root / "custom_components" / "kems" / "diagnostics.py"
-    ).read_text(encoding="utf-8")
+    diagnostics = (root / "custom_components" / "kems" / "diagnostics.py").read_text(
+        encoding="utf-8"
+    )
     assert '"happy_hour_auto_join": happy_hour_auto_join_state(coordinator)' in (
         diagnostics
     )
