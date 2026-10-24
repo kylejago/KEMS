@@ -24,9 +24,7 @@ def _sample(n: int, *, missing: tuple[str, ...] = (), stale: tuple[str, ...] = (
 
 
 def _assess(records):
-    return assess_foxess_telemetry_stability(
-        records, expected_interval_seconds=60
-    )
+    return assess_foxess_telemetry_stability(records, expected_interval_seconds=60)
 
 
 def test_single_all_empty_startup_sample_does_not_block_valid_proof() -> None:

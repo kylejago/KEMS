@@ -324,9 +324,7 @@ def assess_foxess_telemetry_stability(
         len(all_records) <= recent_limit
         and recent
         and all(getattr(recent[0], field, None) is None for field in required_fields)
-        and not (
-            set(getattr(recent[0], "stale_fields", ()) or ()) & required_fields
-        )
+        and not (set(getattr(recent[0], "stale_fields", ()) or ()) & required_fields)
     ):
         recent = recent[1:]
         startup_empty_samples_excluded = 1
