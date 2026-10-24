@@ -48,7 +48,7 @@ def test_enormous_legacy_reason_and_event_data_are_bounded() -> None:
     )
     instance.last_error = None
     legacy = {
-        "target": "0.9.0-alpha9.133",
+        "target": "0.9.0-alpha9.134",
         "reason": "release notes " * 5000,
         "error": "HACS failed " * 5000,
         "maintenance": {"affected_components": ["a" * 200] * 400},
