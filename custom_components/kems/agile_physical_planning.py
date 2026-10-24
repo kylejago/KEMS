@@ -109,7 +109,10 @@ def conservative_physical_export_budget(
     context = getattr(manager, "_kems_physical_planning_context", None)
     forecast_plan = context.get("forecast_plan") if isinstance(context, dict) else None
     if forecast_plan is None or not getattr(forecast_plan, "ready", False):
-        return None, {"available": False, "reason": "physical house forecast unavailable"}
+        return None, {
+            "available": False,
+            "reason": "physical house forecast unavailable",
+        }
     expected_house = _number(
         getattr(forecast_plan, "expected_house_remaining_today_kwh", None)
     )

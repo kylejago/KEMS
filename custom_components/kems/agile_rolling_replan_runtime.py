@@ -261,8 +261,7 @@ def _rolling_plan(
             exportable_ac = min(exportable_ac, stored_budget * efficiency)
             protected_house_ac = max(
                 protected_house_ac,
-                float(physical_house_budget["protected_house_stored_kwh"])
-                * efficiency,
+                float(physical_house_budget["protected_house_stored_kwh"]) * efficiency,
             )
 
     slots = state.get("today_slots")

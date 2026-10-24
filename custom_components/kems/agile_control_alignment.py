@@ -116,7 +116,9 @@ def _price_slot_export_limit(plan: dict[str, Any]) -> float:
             slot_kw += max(allocated, 0.0) / hours
     # Explicit deadline discharge remains separately authorised and guarded.
     if (_number(plan.get("required_in_current_slot_kwh")) or 0.0) > 0:
-        return max(slot_kw, _number(plan.get("current_battery_export_target_kw")) or 0.0)
+        return max(
+            slot_kw, _number(plan.get("current_battery_export_target_kw")) or 0.0
+        )
     return slot_kw
 
 
@@ -164,9 +166,7 @@ def _rolling_target(
         return None
 
     target_home = max(target_home, 0.0)
-    target_export = min(
-        max(target_export, 0.0), _price_slot_export_limit(plan)
-    )
+    target_export = min(max(target_export, 0.0), _price_slot_export_limit(plan))
     target_discharge = max(target_home + target_export, 0.0)
     return (
         {
