@@ -12,9 +12,9 @@ KEMS = ROOT / "custom_components" / "kems"
 def test_canary_targets_only_update_version_and_preserves_energy_safety() -> None:
     manifest = json.loads((KEMS / "manifest.json").read_text())
     bundle = json.loads((ROOT / "release" / "kems-bundle.template.json").read_text())
-    assert manifest["version"] == "0.9.0-alpha9.130"
+    assert manifest["version"] == "0.9.0-alpha9.131"
     reason = bundle["maintenance"]["reason"]
-    assert reason.startswith("Alpha9.130: Update-only release canary")
+    assert reason.startswith("Alpha9.131: Fix misleading shadow recorder")
     assert "No FoxESS, EV, charging, Agile" in reason
     assert "Maintain all safety deferrals" in reason
 

@@ -6,6 +6,7 @@ physical reserve guard and all FoxESS commissioning gates remain authoritative.
 
 from __future__ import annotations
 
+from datetime import datetime
 from math import isfinite
 from typing import Any
 
@@ -18,6 +19,50 @@ def _number(value: object) -> float | None:
     except (TypeError, ValueError):
         return None
     return number if isfinite(number) else None
+
+
+def _current_slot_export_alignment(plan: dict[str, Any]) -> dict[str, Any]:
+    """Spot a current export request not represented by selected Agile slots.
+
+    Diagnostic only. Mandatory deadline discharge remains an explicit escape;
+    no planning commands are modified by this comparison.
+    """
+    try:
+        now = datetime.fromisoformat(str(plan["generated_at"]))
+    except (KeyError, TypeError, ValueError):
+        return {"status": "unknown", "reason": "missing_timestamp"}
+    if now.tzinfo is None:
+        return {"status": "unknown", "reason": "naive_timestamp"}
+    selections = plan.get("selected_slots")
+    if not isinstance(selections, list):
+        return {"status": "unknown", "reason": "selected_slots_unavailable"}
+    scheduled = 0.0
+    for item in selections:
+        if not isinstance(item, dict):
+            continue
+        try:
+            begin = datetime.fromisoformat(str(item["valid_from"]))
+            end = datetime.fromisoformat(str(item["valid_to"]))
+        except (KeyError, ValueError, TypeError):
+            continue
+        if begin.tzinfo is None or end.tzinfo is None or not begin <= now < end:
+            continue
+        amount = _number(item.get("planned_battery_export_kwh"))
+        if amount is not None and amount > 0:
+            scheduled += amount
+    requested = _number(plan.get("current_battery_export_target_kw"))
+    forced = _number(plan.get("required_in_current_slot_kwh"))
+    if requested is None or forced is None:
+        return {"status": "unknown", "reason": "current_dispatch_not_available"}
+    conflict = requested > 0.15 and scheduled <= 0.001 and forced <= 0.001
+    return {
+        "status": ("export_target_outside_selected_slot" if conflict else "consistent"),
+        "current_requested_export_kw": round(max(requested, 0.0), 3),
+        "selected_current_export_kwh": round(scheduled, 3),
+        "required_deadline_current_kwh": round(max(forced, 0.0), 3),
+        "source": "advisory_plan_internal_comparison",
+        "hardware_writes": "blocked",
+    }
 
 
 def reconcile_agile_budget(
@@ -69,6 +114,15 @@ def reconcile_agile_budget(
         "planned_battery_export_kwh": round(planned, 3),
         "guard_exportable_physical_energy_kwh": round(guarded, 3),
         "plan_above_physical_budget_kwh": round(gap, 3),
+        "current_guard_limited_export_ceiling_kwh": round(min(planned, guarded), 3),
+        "current_guard_limited_ceiling_is_schedule": False,
+        "current_slot_dispatch_alignment": _current_slot_export_alignment(plan),
+        "planner_solar_house_credit_kwh": _number(
+            plan.get("forecast_solar_to_house_credit_kwh")
+        ),
+        "guard_conservative_solar_credit_kwh": _number(
+            physical_reserve.get("conservative_solar_credit_kwh")
+        ),
         "planner_protected_house_energy_kwh": round(planner_house, 3),
         "guard_protected_home_energy_kwh": round(guard_house, 3),
         "extra_guard_house_protection_kwh": round(
