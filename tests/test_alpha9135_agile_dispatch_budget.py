@@ -146,3 +146,10 @@ def test_missing_physical_house_forecast_never_grants_budget(monkeypatch):
     )
     assert budget is None
     assert proof["available"] is False
+
+
+def test_rolling_selected_slot_exports_include_end_time() -> None:
+    """Real rolling slots must include the bound used by live dispatch."""
+    source = (ROOT / "agile_rolling_replan_runtime.py").read_text()
+    assert '"valid_from": slot.get("valid_from")' in source
+    assert '"valid_to": slot.get("valid_to")' in source

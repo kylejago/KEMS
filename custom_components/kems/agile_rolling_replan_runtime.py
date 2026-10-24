@@ -348,6 +348,7 @@ def _rolling_plan(
             selected.append(
                 {
                     "valid_from": slot.get("valid_from"),
+                    "valid_to": slot.get("valid_to"),
                     "label": slot.get("label"),
                     "rate_pence": round(float(item["rate"]), 5),
                     "planned_battery_export_kwh": allocation,
