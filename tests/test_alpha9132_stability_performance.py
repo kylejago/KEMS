@@ -97,7 +97,9 @@ def test_floor_matches_original_lookahead_and_uses_linear_load_reads() -> None:
     def old_floor(index, sequence):
         demand = 0.0
         reached_cheap = False
-        for future, following in zip(sequence[index + 1 :], sequence[index + 2 :], strict=False):
+        for future, following in zip(
+            sequence[index + 1 :], sequence[index + 2 :], strict=False
+        ):
             if future.cheap_period_confirmed:
                 reached_cheap = True
                 break
