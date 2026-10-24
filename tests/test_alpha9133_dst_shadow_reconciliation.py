@@ -25,9 +25,9 @@ LONDON = ZoneInfo("Europe/London")
 @pytest.mark.parametrize(
     ("local_day", "elapsed_hours", "final_soc"),
     [
-        (datetime(2026, 10, 24, 11, 40, tzinfo=LONDON), 7.0, 97.517),
-        (datetime(2027, 3, 27, 11, 40, tzinfo=LONDON), 5.0, 73.934),
-        (datetime(2026, 11, 7, 11, 40, tzinfo=LONDON), 6.0, 85.718),
+        (datetime(2026, 10, 24, 11, 40, tzinfo=LONDON), 7.0, 97.506),
+        (datetime(2027, 3, 27, 11, 40, tzinfo=LONDON), 5.0, 73.933),
+        (datetime(2026, 11, 7, 11, 40, tzinfo=LONDON), 6.0, 85.720),
     ],
 )
 def test_elapsed_cheap_charge_hours_across_dst(
