@@ -86,6 +86,10 @@ from .kems_core.control_event_refresh import (
 )
 from .kems_core.control_write_authority import active_joined_power_down_window
 from .kems_core.scenario_report_gate import ScenarioReportGate
+from .kems_core.tomorrow_soc_handoff import (
+    LONDON,
+    _cheap_window_hours as _real_elapsed_cheap_window_hours,
+)
 from .kems_core.shared_bus_balance import (
     assess_shared_bus_balance,
     summarise_shared_bus_audits,
@@ -783,7 +787,7 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                 forecast=forecast,
                 simulation_config=self.settings.simulation,
                 forecast_config=self.settings.forecast,
-                cheap_window_hours=self._cheap_window_hours(),
+                cheap_window_hours=self._cheap_window_hours(now),
             )
             self._annotate_snapshot_with_forecast(snapshot, forecast_plan)
             captured = await self._forecast_validation.async_capture(
@@ -1452,14 +1456,17 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                         stage_seconds[biggest],
                     )
 
-    def _cheap_window_hours(self) -> float:
-        """Return configured normal overnight cheap-window duration."""
-        start = self.settings.tariff.offpeak_start
-        end = self.settings.tariff.offpeak_end
-        start_minutes = start.hour * 60 + start.minute + start.second / 60.0
-        end_minutes = end.hour * 60 + end.minute + end.second / 60.0
-        minutes = (end_minutes - start_minutes) % (24 * 60)
-        return round((minutes or 24 * 60) / 60.0, 3)
+    def _cheap_window_hours(self, now: datetime | None = None) -> float:
+        """Actual elapsed hours in the upcoming local cheap window, including DST."""
+        local_date = (now or dt_util.now()).astimezone(LONDON).date()
+        return round(
+            _real_elapsed_cheap_window_hours(
+                self.settings.tariff.offpeak_start,
+                self.settings.tariff.offpeak_end,
+                on_date=local_date,
+            ),
+            3,
+        )
 
     @staticmethod
     def _annotate_snapshot_with_forecast(snapshot, plan) -> None:
