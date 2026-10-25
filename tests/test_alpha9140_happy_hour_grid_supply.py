@@ -194,14 +194,23 @@ def test_25_oct_full_battery_still_holds_household_battery_discharge():
     "change",
     [
         {"booking": {"status": "evaluating", "bookings": []}},
-        {"booking": {"status": "booked", "bookings": [
-            {"start": START.isoformat(),
-             "end": (START + timedelta(hours=1)).isoformat(),
-             "booking_source": "local_unverified"},
-            {"start": (START + timedelta(hours=1)).isoformat(),
-             "end": (START + timedelta(hours=2)).isoformat(),
-             "booking_source": "octopus_joined_events"},
-        ]}},
+        {
+            "booking": {
+                "status": "booked",
+                "bookings": [
+                    {
+                        "start": START.isoformat(),
+                        "end": (START + timedelta(hours=1)).isoformat(),
+                        "booking_source": "local_unverified",
+                    },
+                    {
+                        "start": (START + timedelta(hours=1)).isoformat(),
+                        "end": (START + timedelta(hours=2)).isoformat(),
+                        "booking_source": "octopus_joined_events",
+                    },
+                ],
+            }
+        },
         {"snapshot": {"house_load_kw": None}},
         {"snapshot": {"solar_power_kw": None}},
         {"context": {"happy_hour_import_authority_active": False}},
