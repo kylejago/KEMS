@@ -1045,7 +1045,7 @@ class AgileSmartExportManager:
 
     def _day_rates(self, day: date) -> list[AgileRate]:
         """Preserve ordered published prices; never infer missing slots."""
-        if self._day_rate_index_source is self._rates:
+        if getattr(self, "_day_rate_index_source", None) is self._rates:
             return list(self._day_rate_index.get(day, ()))
         # Direct-call and fresh-file compatibility before the next replay.
         return [
