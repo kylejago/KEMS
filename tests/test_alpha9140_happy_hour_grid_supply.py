@@ -21,7 +21,6 @@ from custom_components.kems.kems_core.control_write_authority import (
 )
 from custom_components.kems.kems_core.models import ControlState, Snapshot
 
-
 START = datetime(2026, 10, 25, 11, tzinfo=UTC)
 NOW = START + timedelta(minutes=30)
 
@@ -130,12 +129,15 @@ def test_25_oct_full_battery_still_holds_household_battery_discharge():
     assert decision.commands_permitted
     assert decision.action == "self_use"
     assert decision.min_soc_on_grid_percent == 100.0
-    assert resolve_live_min_soc_on_grid(
-        decision,
-        cheap_period_confirmed=False,
-        previous_min_soc_on_grid=15.0,
-        happy_hour_house_grid_hold_authorised=True,
-    ) == 100.0
+    assert (
+        resolve_live_min_soc_on_grid(
+            decision,
+            cheap_period_confirmed=False,
+            previous_min_soc_on_grid=15.0,
+            happy_hour_house_grid_hold_authorised=True,
+        )
+        == 100.0
+    )
 
 
 @pytest.mark.parametrize(
@@ -153,7 +155,11 @@ def test_25_oct_full_battery_still_holds_household_battery_discharge():
         {"control": {"site_import_limit_exceeded": True}},
         {"control": {"alpha969_routing_shadow_only": True}},
         {"snapshot": {"stale_fields": ("house_load_kw",)}},
-        {"snapshot": {"source_age_seconds": {"house_load_kw": 180, "solar_power_kw": 10}}},
+        {
+            "snapshot": {
+                "source_age_seconds": {"house_load_kw": 180, "solar_power_kw": 10}
+            }
+        },
     ],
 )
 def test_household_grid_hold_fails_closed_without_each_independent_proof(change):
@@ -181,12 +187,15 @@ def test_event_end_cannot_leave_high_min_soc_at_expensive_tariff():
     # A remembered high planner value is not independent event authority.
     decision = _decision(overlaid, hold=False)
     assert decision.action == "self_use"
-    assert resolve_live_min_soc_on_grid(
-        decision,
-        cheap_period_confirmed=False,
-        previous_min_soc_on_grid=15.0,
-        happy_hour_house_grid_hold_authorised=False,
-    ) == 15.0
+    assert (
+        resolve_live_min_soc_on_grid(
+            decision,
+            cheap_period_confirmed=False,
+            previous_min_soc_on_grid=15.0,
+            happy_hour_house_grid_hold_authorised=False,
+        )
+        == 15.0
+    )
 
 
 def test_physical_charge_remains_separately_authorised_and_not_fabricated():
@@ -215,7 +224,9 @@ def test_unverified_flag_cannot_escape_preflight_and_restart_safety():
     control = apply_happy_hour_control(args["control"], args["snapshot"], context)
     failed = replace(control, preflight_passed=26)
     assert not _decision(failed, hold=True).commands_permitted
-    assert _decision(replace(control, grid_available=False), hold=True).action == "release"
+    assert (
+        _decision(replace(control, grid_available=False), hold=True).action == "release"
+    )
     assert _decision(control, hold=False).reason != (
         "Verified Happy Hour household battery discharge hold"
     )
