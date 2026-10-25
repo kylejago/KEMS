@@ -14,7 +14,6 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
-
 from kems_core import ControlState, Snapshot
 from kems_core.control_write_authority import (
     assess_foxess_control_write_authority,
