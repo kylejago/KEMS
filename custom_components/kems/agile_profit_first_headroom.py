@@ -104,7 +104,9 @@ def _retime_for_profit_first_solar_headroom(
 
     slots = forecast_runtime._slot_map(state)
     spill_rate = forecast_runtime._spill_reference_rate(state, projection)
-    floor_pence = forecast_runtime._economic_export_floor_pence(tariff)
+    floor_pence = forecast_runtime._economic_export_floor_pence(
+        tariff, now=now, config=config
+    )
     evidence["spill_reference_rate_pence"] = (
         round(spill_rate, 5) if spill_rate is not None else None
     )

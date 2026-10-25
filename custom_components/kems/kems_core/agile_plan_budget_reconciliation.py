@@ -90,6 +90,59 @@ def reconcile_agile_budget(
         result["reason"] = "planning_and_guard_not_from_same_scan"
         return result
 
+    # When no deliberate export was requested, the real-time physical reserve
+    # correctly returns before calculating an exportable stored-kWh budget.
+    # Reporting "missing_or_invalid_energy_budget" in that idle state is a
+    # false diagnostic alarm. Never fabricate an independently checked budget
+    # or call a skipped safety guard "aligned".
+    requested = _number(physical_reserve.get("requested_export_kw"))
+    permitted = _number(physical_reserve.get("permitted_export_kw"))
+    if (
+        physical_reserve.get("status") == "no_deliberate_export_requested"
+        and requested is not None
+        and permitted is not None
+        and 0.0 <= requested <= 0.001
+        and 0.0 <= permitted <= 0.001
+    ):
+        planned_idle = _number(plan.get("planned_battery_export_kwh"))
+        evidence_idle = plan.get("physical_house_budget_evidence")
+        planned_ac = (
+            _number(evidence_idle.get("exportable_ac_kwh"))
+            if isinstance(evidence_idle, dict) and evidence_idle.get("available")
+            else None
+        )
+        protected = (
+            _number(evidence_idle.get("protected_house_stored_kwh"))
+            if isinstance(evidence_idle, dict) and evidence_idle.get("available")
+            else None
+        )
+        if (
+            planned_idle is None
+            or planned_ac is None
+            or protected is None
+            or min(planned_idle, planned_ac, protected) < 0
+        ):
+            result["reason"] = "idle_without_verified_planner_budget"
+            return result
+        return {
+            **result,
+            "status": "idle_no_export_requested",
+            "reason": "independent_export_energy_guard_not_required_at_zero_request",
+            "generated_at": plan.get("generated_at"),
+            "planner_proposed_export_ac_kwh": round(planned_idle, 3),
+            "planner_verified_ac_export_budget_kwh": round(planned_ac, 3),
+            "planner_protected_house_stored_kwh": round(protected, 3),
+            "guard_budget_evaluated": False,
+            "guard_exportable_physical_energy_kwh": None,
+            "current_permitted_export_kw": 0.0,
+            "current_slot_dispatch_alignment": _current_slot_export_alignment(plan),
+            "physical_guard_status": physical_reserve.get("status"),
+            "note": (
+                "Physical guard intentionally skipped export-energy calculations "
+                "because no export was requested. Planner budget is advisory only."
+            ),
+        }
+
     planned = _number(plan.get("planned_battery_export_kwh"))
     guarded = _number(physical_reserve.get("exportable_physical_energy_kwh"))
     planner_house = _number(plan.get("protected_house_energy_kwh"))

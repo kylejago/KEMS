@@ -33,7 +33,7 @@ from .kems_core import (
     SimulationConfig,
     SolarForecastState,
 )
-from .tariff import TariffSettings
+from .tariff import TariffSettings, effective_tariff_rates
 
 rolling = agile_rolling_planning.rolling_runtime
 dispatch = agile_settlement_dispatch.dispatch_runtime
@@ -85,9 +85,38 @@ def _effective_precheap_target(
     return normal, effective
 
 
-def _economic_export_floor_pence(tariff: TariffSettings) -> float:
-    """Use the configured overnight import rate as the ordinary export floor."""
-    return max(float(tariff.offpeak_rate_pence), 0.0)
+def _economic_export_floor_pence(
+    tariff: TariffSettings,
+    *,
+    now: datetime | None = None,
+    config: SimulationConfig | None = None,
+) -> float:
+    """Minimum sale price to replace exported AC energy without losing money.
+
+    Live planning uses the *effective next overnight tariff*, not the original
+    manually entered tariff that might have expired following a scheduled
+    Octopus rate change. Replacing one exported AC kWh requires more than one
+    purchased kWh after both charging and discharging losses; battery wear is
+    an additional explicit cost. Historical pure helpers without a planning
+    timestamp/config retain their legacy base-rate floor.
+    """
+    base = max(float(tariff.offpeak_rate_pence), 0.0)
+    if now is None or config is None or not hasattr(tariff, "scheduled_changes"):
+        return base
+    next_cheap = agile._next_cheap(now, tariff)
+    # A tariff change at local midnight can fall inside the 23:30-05:30
+    # charge period; be conservative across both parts of that period.
+    replacement = max(
+        effective_tariff_rates(tariff, next_cheap).offpeak_rate_pence,
+        effective_tariff_rates(
+            tariff, next_cheap + timedelta(hours=3)
+        ).offpeak_rate_pence,
+    )
+    charge_eff = min(max(float(config.charge_efficiency), 0.01), 1.0)
+    discharge_eff = min(max(float(config.discharge_efficiency), 0.01), 1.0)
+    return max(replacement, 0.0) / (charge_eff * discharge_eff) + max(
+        float(agile.BATTERY_WEAR_PENCE_PER_KWH), 0.0
+    )
 
 
 def _forecast_confidence(
@@ -255,11 +284,12 @@ def _apply_floor_and_forecast_target(
     config: SimulationConfig,
     tariff: TariffSettings,
     forecast_plan: ForecastPlanState | None,
+    now: datetime | None = None,
 ) -> tuple[dict[str, float], dict[str, Any]]:
     """Trim the inherited plan to the replacement-price and forecast SOC floors."""
     allocations = _selected_allocations(plan)
     slots = _slot_map(state)
-    floor_pence = _economic_export_floor_pence(tariff)
+    floor_pence = _economic_export_floor_pence(tariff, now=now, config=config)
     normal_target, effective_target = _effective_precheap_target(config, forecast_plan)
     inherited_target = _number(plan.get("target_soc_percent"))
     inherited_target = normal_target if inherited_target is None else inherited_target
@@ -396,7 +426,7 @@ def _retime_for_solar_headroom(
 
     slots = _slot_map(state)
     spill_rate = _spill_reference_rate(state, projection)
-    floor_pence = _economic_export_floor_pence(tariff)
+    floor_pence = _economic_export_floor_pence(tariff, now=now, config=config)
     if spill_rate is None:
         evidence["reason"] = "no Agile price evidence overlaps forecast spill"
         return allocations, {}, evidence
@@ -793,7 +823,7 @@ def install_forecast_arbitrage() -> None:
                 config,
                 forecast_plan,
             )
-            floor_pence = _economic_export_floor_pence(tariff)
+            floor_pence = _economic_export_floor_pence(tariff, now=now, config=config)
             targets["normal_target_soc_percent"] = round(normal_target, 1)
             targets["target_soc_percent"] = round(effective_target, 1)
             targets["economic_export_floor_pence"] = round(floor_pence, 5)
@@ -950,6 +980,7 @@ def install_forecast_arbitrage() -> None:
                 config=config,
                 tariff=tariff,
                 forecast_plan=forecast_plan,
+                now=now,
             )
             plan.update(policy)
             plan["target_soc_percent"] = policy["effective_precheap_target_soc_percent"]
