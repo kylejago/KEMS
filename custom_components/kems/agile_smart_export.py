@@ -91,6 +91,11 @@ class AgileSmartExportManager:
         )
         self._simulation = SimulationEngine()
         self._rates: list[AgileRate] = []
+        # Alpha9.139: one ordered day-rate index per numerical replay pass.
+        # Publishing/fetching always replaces _rates; no rate is invented.
+        self._day_rate_index_source: list[AgileRate] | None = None
+        self._day_rate_index: dict[date, list[AgileRate]] = {}
+        self._day_rate_index_builds = 0
         self._daily: dict[str, dict[str, Any]] = {}
         self._product_code: str | None = None
         self._tariff_code: str | None = None
@@ -141,6 +146,12 @@ class AgileSmartExportManager:
     ) -> dict[str, Any]:
         """Refresh prices and calculate every requested comparison period."""
         await self._refresh(records, now)
+        # The earlier per-day filter traversed *every* retained Octopus price
+        # for each historical day (85+ days in live diagnostics). Rebuild once
+        # after any possible fetch, then use O(1) day lookups for the entire
+        # replay. Refresh on every numerical pass, including in-place input
+        # changes from injected/test providers; no five-minute live gate added.
+        self._index_day_rates()
         local_now = now.astimezone(LONDON)
         grouped: dict[date, list[Snapshot]] = {}
         for item in sorted(records, key=lambda value: value.timestamp):
@@ -1021,7 +1032,22 @@ class AgileSmartExportManager:
             capacity,
         )
 
+    def _index_day_rates(self) -> None:
+        """Group the current exact price list once per numerical comparison."""
+        grouped: dict[date, list[AgileRate]] = {}
+        for item in self._rates:
+            grouped.setdefault(item.valid_from.astimezone(LONDON).date(), []).append(
+                item
+            )
+        self._day_rate_index = grouped
+        self._day_rate_index_source = self._rates
+        self._day_rate_index_builds += 1
+
     def _day_rates(self, day: date) -> list[AgileRate]:
+        """Preserve ordered published prices; never infer missing slots."""
+        if getattr(self, "_day_rate_index_source", None) is self._rates:
+            return list(self._day_rate_index.get(day, ()))
+        # Direct-call and fresh-file compatibility before the next replay.
         return [
             item
             for item in self._rates

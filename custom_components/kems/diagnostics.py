@@ -178,9 +178,15 @@ async def async_get_config_entry_diagnostics(
         ),
         "foxess_control": coordinator.foxess_control_state,
         "coordinator_performance": coordinator.coordinator_performance_state,
-        "agile_historical_replay_cache": (
-            coordinator._agile_smart_export._historical_replay_cache.status
-        ),
+        "agile_historical_replay_cache": {
+            **coordinator._agile_smart_export._historical_replay_cache.status,
+            "day_rate_index_builds": getattr(
+                coordinator._agile_smart_export, "_day_rate_index_builds", 0
+            ),
+            "indexed_price_days": len(
+                getattr(coordinator._agile_smart_export, "_day_rate_index", {})
+            ),
+        },
         "export_commissioning_test": coordinator.export_commissioning_test_state,
         "learning": asdict(data.learned),
         "gas": asdict(data.gas),
