@@ -789,7 +789,6 @@ def verified_live_happy_hour_charge_kw(
     return round(safe_target, 3) if safe else 0.0
 
 
-
 def verified_live_happy_hour_house_grid_hold(
     *,
     booking: dict[str, Any],
