@@ -208,7 +208,8 @@ def test_non_picklable_historical_provider_uses_legacy_fingerprint():
         counter["calls"] += 1
         return {"count": counter["calls"]}
 
-    source = lambda: 1
+    def source():
+        return 1
     for _ in range(2):
         result = cache.evaluate(
             day=date(2026, 10, 20),
