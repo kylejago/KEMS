@@ -287,9 +287,7 @@ def apply_verified_happy_hour_preparation(
             desired_total_discharge_power_kw=round(total, 3),
             desired_charge_power_kw=0.0,
             total_kh7_ac_output_kw=round(solar_kw + total, 3),
-            kh7_output_headroom_kw=round(
-                max(max_inverter - solar_kw - total, 0.0), 3
-            ),
+            kh7_output_headroom_kw=round(max(max_inverter - solar_kw - total, 0.0), 3),
             next_action=(
                 "Confirmed Octopus Happy Hour — create verified physical "
                 "battery headroom under existing paid-Agile safety guards"

@@ -13,7 +13,6 @@ from custom_components.kems.happy_hour_physical_preparation import (
 )
 from custom_components.kems.kems_core.models import ControlState, Snapshot
 
-
 START = datetime(2026, 10, 25, 11, tzinfo=UTC)
 END = START + timedelta(hours=2)
 NOW = datetime(2026, 10, 25, 9, 24, tzinfo=UTC)
@@ -96,8 +95,7 @@ def _case():
             {
                 "valid_from": datetime(2026, 10, 25, h, m, tzinfo=UTC).isoformat(),
                 "valid_to": (
-                    datetime(2026, 10, 25, h, m, tzinfo=UTC)
-                    + timedelta(minutes=30)
+                    datetime(2026, 10, 25, h, m, tzinfo=UTC) + timedelta(minutes=30)
                 ).isoformat(),
                 "rate_pence": rate,
             }
@@ -202,9 +200,10 @@ def test_household_budget_remains_hard_cap_on_preparation_schedule():
     ] = 1.0
     control, report = apply_verified_happy_hour_preparation(**args)
     assert report["physically_budgeted_preparation_kwh"] == 1.0
-    assert sum(
-        item["planned_battery_export_kwh"] for item in report["selected_slots"]
-    ) <= 1.001
+    assert (
+        sum(item["planned_battery_export_kwh"] for item in report["selected_slots"])
+        <= 1.001
+    )
     assert control.desired_battery_export_power_kw >= 0.0
 
 
@@ -212,17 +211,17 @@ def test_original_agile_and_happy_hour_safety_gates_remain_authoritative():
     from pathlib import Path
 
     root = Path(__file__).parents[1]
-    coordinator = (
-        root / "custom_components" / "kems" / "coordinator.py"
-    ).read_text(encoding="utf-8")
+    coordinator = (root / "custom_components" / "kems" / "coordinator.py").read_text(
+        encoding="utf-8"
+    )
     a = coordinator.index("control = align_agile_control_state(")
     b = coordinator.index("apply_verified_happy_hour_preparation(")
     c = coordinator.index("guard_paid_agile_physical_export(")
     d = coordinator.index("self._foxess_control.async_update(")
     assert a < b < c < d
-    diagnostics = (
-        root / "custom_components" / "kems" / "diagnostics.py"
-    ).read_text(encoding="utf-8")
+    diagnostics = (root / "custom_components" / "kems" / "diagnostics.py").read_text(
+        encoding="utf-8"
+    )
     assert '"happy_hour_preparation_dispatch"' in diagnostics
     assert '"no_upcoming_confirmed_eligible_event"' not in coordinator
 
