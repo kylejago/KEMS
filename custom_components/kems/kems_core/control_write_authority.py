@@ -82,6 +82,7 @@ def resolve_live_min_soc_on_grid(
     cheap_period_confirmed: bool,
     previous_min_soc_on_grid: float | None,
     pending_intelligent_ev_hold_active: bool = False,
+    happy_hour_house_grid_hold_authorised: bool = False,
 ) -> float | None:
     """Return the physically safe MinSOC target for the reviewed live write.
 
@@ -97,6 +98,12 @@ def resolve_live_min_soc_on_grid(
     if (
         cheap_period_confirmed
         or pending_intelligent_ev_hold_active
+        or (
+            happy_hour_house_grid_hold_authorised
+            and decision.action == "self_use"
+            and decision.reason == "Verified Happy Hour household battery discharge hold"
+            and requested == 100.0
+        )
         or decision.action != "self_use"
     ):
         return requested
@@ -272,6 +279,7 @@ def assess_foxess_control_write_authority(
     effective_export_limit_kw: float | None = None,
     power_down_export_authorised: bool = False,
     happy_hour_charge_authorised: bool = False,
+    happy_hour_house_grid_hold_authorised: bool = False,
 ) -> FoxESSControlDecision:
     """Return the bounded hardware action for the current physical policy.
 
@@ -408,6 +416,26 @@ def assess_foxess_control_write_authority(
             force_discharge_power_kw=round(force_discharge, 3),
             export_power_limit_kw=round(export_ceiling, 3),
             min_soc_on_grid_percent=min_soc,
+        )
+
+    if (
+        happy_hour_house_grid_hold_authorised
+        and control.operating_reason == "happy_hour_reward_hour"
+        and control.desired_work_mode == "Self Use"
+        and not control.desired_grid_export_allowed
+        and desired_export <= _EPSILON_KW
+        and not control.site_import_limit_exceeded
+        and abs(min_soc - 100.0) <= 0.05
+    ):
+        # A full battery has no charging headroom but can still be protected
+        # from household discharge. This is a verified event-scoped Self Use
+        # MinSOC hold, not permission for unbounded Force Charge/import.
+        return FoxESSControlDecision(
+            backend_available=True,
+            commands_permitted=True,
+            action="self_use",
+            reason="Verified Happy Hour household battery discharge hold",
+            min_soc_on_grid_percent=100.0,
         )
 
     if control.desired_work_mode in {"Self Use", "Feed-in First"}:
