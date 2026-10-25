@@ -73,6 +73,7 @@ def _floor():
         {"effective_tariff_rates"},
         {
             "EffectiveTariffRates": SimpleNamespace,
+            "datetime": datetime,
         },
     )
     namespace["effective_tariff_rates"] = tariff_module.effective_tariff_rates
