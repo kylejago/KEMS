@@ -11,7 +11,7 @@ from collections.abc import Callable
 from copy import deepcopy
 from datetime import date
 from hashlib import sha256
-from pickle import HIGHEST_PROTOCOL, dumps
+from pickle import HIGHEST_PROTOCOL, PicklingError, dumps
 from time import perf_counter
 from typing import Any
 
@@ -76,7 +76,7 @@ class HistoricalReplayCache:
         try:
             fingerprint = sha256(dumps(inputs, protocol=HIGHEST_PROTOCOL)).digest()
             self._pickle_fingerprints += 1
-        except (TypeError, AttributeError, ValueError, OverflowError):
+        except (PicklingError, TypeError, AttributeError, ValueError, OverflowError):
             # A provider/test may supply a non-picklable object; retain the
             # previously proven repr fingerprint rather than skipping
             # invalidation or affecting the live safety path.
