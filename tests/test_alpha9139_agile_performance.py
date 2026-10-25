@@ -106,9 +106,7 @@ def test_rate_index_preserves_order_price_changes_and_per_pass_invalidation():
     obj._rates[1] = updated
     obj._index_day_rates()
     assert obj._day_rates(initial.date())[0].value_inc_vat == 99
-    obj._rates = [
-        SimpleNamespace(valid_from=initial, value_inc_vat=1.5)
-    ]
+    obj._rates = [SimpleNamespace(valid_from=initial, value_inc_vat=1.5)]
     # If fetched rates are replaced between passes, never use the old index.
     assert obj._day_rates(initial.date())[0].value_inc_vat == 1.5
 
@@ -127,9 +125,7 @@ def test_price_index_avoids_repeated_full_rate_scans():
             return self.start
 
     start = datetime(2026, 1, 1, tzinfo=UTC)
-    obj._rates = [
-        Rate(start + timedelta(hours=n)) for n in range(24 * 85)
-    ]
+    obj._rates = [Rate(start + timedelta(hours=n)) for n in range(24 * 85)]
     obj._index_day_rates()
     assert seen["count"] == len(obj._rates)
     for n in range(85):
@@ -154,8 +150,12 @@ def test_exact_historical_reuse_invalidates_on_nested_input_changes():
 
     def run(**extra):
         return cache.evaluate(
-            day=day, today=today, projection=False, inputs=inputs,
-            calculate=calculate, **extra,
+            day=day,
+            today=today,
+            projection=False,
+            inputs=inputs,
+            calculate=calculate,
+            **extra,
         )
 
     first = run()
@@ -186,8 +186,11 @@ def test_today_and_tomorrow_remain_completely_uncached():
 
     def run(day, projection=False):
         return cache.evaluate(
-            day=day, today=date(2026, 10, 25),
-            projection=projection, inputs=({"state": 1},), calculate=calc,
+            day=day,
+            today=date(2026, 10, 25),
+            projection=projection,
+            inputs=({"state": 1},),
+            calculate=calc,
         )
 
     assert run(date(2026, 10, 25)) == {"scan": 1}
@@ -223,15 +226,13 @@ def test_never_substitute_reporting_cache_for_control_gate():
     source = (CORE / "kems_core" / "agile_historical_replay_cache.py").read_text(
         encoding="utf-8"
     )
-    rolling = (CORE / "agile_rolling_replan_runtime.py").read_text(
-        encoding="utf-8"
-    )
+    rolling = (CORE / "agile_rolling_replan_runtime.py").read_text(encoding="utf-8")
     coordinator = (CORE / "coordinator.py").read_text(encoding="utf-8")
     assert "if today is None or day >= today or projection:" in source
     assert "runtime.ANALYSIS_REFRESH = timedelta(0)" in rolling
     assert "guard_paid_agile_physical_export(" in coordinator
     assert "apply_verified_happy_hour_preparation(" in coordinator
     assert "self._foxess_control.async_update(" in coordinator
-    assert '"day_rate_index_builds"' in (
-        CORE / "diagnostics.py"
-    ).read_text(encoding="utf-8")
+    assert '"day_rate_index_builds"' in (CORE / "diagnostics.py").read_text(
+        encoding="utf-8"
+    )

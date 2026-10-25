@@ -1036,9 +1036,9 @@ class AgileSmartExportManager:
         """Group the current exact price list once per numerical comparison."""
         grouped: dict[date, list[AgileRate]] = {}
         for item in self._rates:
-            grouped.setdefault(
-                item.valid_from.astimezone(LONDON).date(), []
-            ).append(item)
+            grouped.setdefault(item.valid_from.astimezone(LONDON).date(), []).append(
+                item
+            )
         self._day_rate_index = grouped
         self._day_rate_index_source = self._rates
         self._day_rate_index_builds += 1
