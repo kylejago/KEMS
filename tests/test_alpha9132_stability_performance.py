@@ -48,7 +48,7 @@ def test_enormous_legacy_reason_and_event_data_are_bounded() -> None:
     )
     instance.last_error = None
     legacy = {
-        "target": "0.9.0-alpha9.137",
+        "target": "0.9.0-alpha9.138",
         "reason": "release notes " * 5000,
         "error": "HACS failed " * 5000,
         "maintenance": {"affected_components": ["a" * 200] * 400},
@@ -66,7 +66,7 @@ def test_enormous_legacy_reason_and_event_data_are_bounded() -> None:
 
 def test_release_note_no_longer_embeds_old_changelog() -> None:
     release = json.loads((ROOT / "release/kems-bundle.template.json").read_text())
-    assert release["maintenance"]["reason"].startswith("Alpha9.137:")
+    assert release["maintenance"]["reason"].startswith("Alpha9.138:")
     assert (
         "Alpha9.131: Fix misleading shadow recorder" in release["maintenance"]["reason"]
     )
