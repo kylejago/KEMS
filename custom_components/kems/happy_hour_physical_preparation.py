@@ -218,7 +218,10 @@ def apply_verified_happy_hour_preparation(
     max_export = _number(getattr(config, "export_limit_kw", None))
     max_inverter = _number(getattr(config, "inverter_limit_kw", None))
     max_battery = _number(getattr(simulation_config, "max_discharge_kw", None))
-    if any(x is None or x <= 0.0 for x in (max_discharge, max_export, max_inverter, max_battery)):
+    if any(
+        x is None or x <= 0.0
+        for x in (max_discharge, max_export, max_inverter, max_battery)
+    ):
         return stop("physical_power_limit_unknown")
     physical_kw = min(max_discharge, max_export, max_inverter, max_battery)
     selected = _physical_prep_slots(

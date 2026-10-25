@@ -5,7 +5,6 @@ from __future__ import annotations
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
-from unittest.mock import patch
 
 import pytest
 
@@ -158,11 +157,26 @@ def test_real_morning_regression_exports_only_verified_physical_headroom():
         ({"agile_selected": False}, "no_upcoming_confirmed_eligible_event"),
         ({"power_down_active": True}, "higher_priority_event_or_cheap_period"),
         ({"context": {"source": "manual"}}, "no_upcoming_confirmed_eligible_event"),
-        ({"context": {"physical_soc_verified": False}}, "no_verified_same_scan_physical_soc"),
-        ({"context": {"physical_required_headroom_export_kwh": None}}, "invalid_physical_headroom_or_house_budget"),
-        ({"context": {"current_physical_soc_percent": 91}}, "no_verified_same_scan_physical_soc"),
-        ({"rolling": {"physical_house_budget_evidence": {"available": False}}}, "same_scan_physical_house_budget_unverified"),
-        ({"rolling": {"generated_at": "2026-10-25T08:00:00+00:00"}}, "same_scan_physical_house_budget_unverified"),
+        (
+            {"context": {"physical_soc_verified": False}},
+            "no_verified_same_scan_physical_soc",
+        ),
+        (
+            {"context": {"physical_required_headroom_export_kwh": None}},
+            "invalid_physical_headroom_or_house_budget",
+        ),
+        (
+            {"context": {"current_physical_soc_percent": 91}},
+            "no_verified_same_scan_physical_soc",
+        ),
+        (
+            {"rolling": {"physical_house_budget_evidence": {"available": False}}},
+            "same_scan_physical_house_budget_unverified",
+        ),
+        (
+            {"rolling": {"generated_at": "2026-10-25T08:00:00+00:00"}},
+            "same_scan_physical_house_budget_unverified",
+        ),
     ],
 )
 def test_missing_join_or_physical_proof_cannot_authorise_export(change, blocked):
