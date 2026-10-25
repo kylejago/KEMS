@@ -827,6 +827,18 @@ def verified_live_happy_hour_house_grid_hold(
         or not 0.5 < remaining <= float(HAPPY_HOUR_FAIR_USE_KWH_PER_REWARD)
     ):
         return False
+    # Stored local booking metadata cannot alone authorise daytime importing.
+    # Match the *current individual reward hour* to a fresh joined Octopus
+    # observation, not merely to the parent two-hour planned window.
+    joined_hours = booking.get("bookings")
+    if not isinstance(joined_hours, list) or not any(
+        isinstance(item, dict)
+        and item.get("booking_source") == "octopus_joined_events"
+        and _dt(item.get("start")) == begin
+        and _dt(item.get("end")) == end
+        for item in joined_hours
+    ):
+        return False
     if (
         getattr(control, "operating_mode", None) != "control"
         or not getattr(control, "grid_available", False)
@@ -845,7 +857,13 @@ def verified_live_happy_hour_house_grid_hold(
     # Require fresh physical house and PV signals on the same live device.
     for key in ("house_load_kw", "solar_power_kw"):
         age = _number(ages.get(key))
-        if age is None or not 0.0 <= age <= 90.0:
+        value = _number(getattr(snapshot, key, None))
+        if (
+            age is None
+            or not 0.0 <= age <= 90.0
+            or value is None
+            or value < 0.0
+        ):
             return False
     return True
 
