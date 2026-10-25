@@ -11,6 +11,8 @@ from collections.abc import Callable
 from copy import deepcopy
 from datetime import date
 from hashlib import sha256
+from pickle import HIGHEST_PROTOCOL, dumps
+from time import perf_counter
 from typing import Any
 
 
@@ -25,6 +27,9 @@ class HistoricalReplayCache:
         self._hits = 0
         self._misses = 0
         self._live_evaluations = 0
+        self._fingerprint_seconds = 0.0
+        self._pickle_fingerprints = 0
+        self._legacy_fingerprints = 0
 
     @property
     def status(self) -> dict[str, int | str]:
@@ -36,6 +41,10 @@ class HistoricalReplayCache:
             "misses": self._misses,
             "live_evaluations": self._live_evaluations,
             "hardware_writes": "unchanged",
+            "fingerprint_method": "binary_pickle_sha256_with_legacy_fallback",
+            "fingerprint_seconds_total": round(self._fingerprint_seconds, 3),
+            "pickle_fingerprints": self._pickle_fingerprints,
+            "legacy_fingerprints": self._legacy_fingerprints,
         }
 
     def evaluate(
@@ -58,7 +67,23 @@ class HistoricalReplayCache:
             self._live_evaluations += 1
             return calculate()
 
-        fingerprint = sha256(repr(inputs).encode("utf-8")).hexdigest()
+        # repr() recursively formats every dataclass, datetime and dict into
+        # a large temporary string on every cache hit. Binary serialisation
+        # preserves the exact input values while avoiding that formatting
+        # cost. Only settled historical comparisons use this optimisation:
+        # today's physical dispatch and tomorrow's projection always replay.
+        started = perf_counter()
+        try:
+            fingerprint = sha256(dumps(inputs, protocol=HIGHEST_PROTOCOL)).digest()
+            self._pickle_fingerprints += 1
+        except (TypeError, AttributeError, ValueError, OverflowError):
+            # A provider/test may supply a non-picklable object; retain the
+            # previously proven repr fingerprint rather than skipping
+            # invalidation or affecting the live safety path.
+            fingerprint = sha256(repr(inputs).encode("utf-8")).digest()
+            self._legacy_fingerprints += 1
+        finally:
+            self._fingerprint_seconds += perf_counter() - started
         key = day.isoformat()
         cached = self._entries.get(key)
         if cached is not None and cached[0] == fingerprint:
