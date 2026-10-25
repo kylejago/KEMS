@@ -101,7 +101,8 @@ def resolve_live_min_soc_on_grid(
         or (
             happy_hour_house_grid_hold_authorised
             and decision.action == "self_use"
-            and decision.reason == "Verified Happy Hour household battery discharge hold"
+            and decision.reason
+            == "Verified Happy Hour household battery discharge hold"
             and requested == 100.0
         )
         or decision.action != "self_use"
