@@ -98,9 +98,7 @@ def test_midnight_rate_change_inside_cheap_window_is_conservative():
     result = _floor()(
         _tariff(rate_at_midnight=9.0),
         now=datetime(2026, 10, 25, 20, tzinfo=UTC),
-        config=SimpleNamespace(
-            charge_efficiency=0.95, discharge_efficiency=0.95
-        ),
+        config=SimpleNamespace(charge_efficiency=0.95, discharge_efficiency=0.95),
     )
     assert result == pytest.approx(9.0 / (0.95 * 0.95) + 2.0)
 
