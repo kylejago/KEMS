@@ -207,6 +207,9 @@ async def async_get_config_entry_diagnostics(
             else {"status": "not_yet_observed"}
         ),
         "happy_hour_auto_join": happy_hour_auto_join_state(coordinator),
+        "happy_hour_preparation_dispatch": getattr(
+            coordinator, "_happy_hour_preparation_dispatch", {}
+        ),
         "happy_hour_import_ledger": coordinator._happy_hour_import_ledger.status,
         "happy_hour_ohme_control": coordinator.happy_hour_ohme_control_state,
         "agile_history_backfill": coordinator.agile_history_backfill_state,
