@@ -49,8 +49,8 @@ from .happy_hour_auto_join import (
 )
 from .happy_hour_budget import (
     apply_happy_hour_control,
-    verified_live_happy_hour_house_grid_hold,
     verified_live_happy_hour_charge_kw,
+    verified_live_happy_hour_house_grid_hold,
 )
 from .happy_hour_import_ledger import HappyHourImportLedgerRecorder
 from .happy_hour_ohme_control import OhmeHappyHourController
