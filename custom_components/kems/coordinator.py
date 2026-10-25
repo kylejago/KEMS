@@ -53,6 +53,9 @@ from .happy_hour_budget import (
 )
 from .happy_hour_import_ledger import HappyHourImportLedgerRecorder
 from .happy_hour_ohme_control import OhmeHappyHourController
+from .happy_hour_physical_preparation import (
+    apply_verified_happy_hour_preparation,
+)
 from .historical_tariff_revaluation import financial_replay_records
 from .history import HistoryRecorder
 from .kems_core import (
@@ -159,6 +162,9 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
         # SoC replacement for charging, No Paid Export or simulation.
         self._paid_agile_physical_energy = PaidAgilePhysicalEnergyTracker()
         self._paid_agile_energy_evidence = None
+        self._happy_hour_preparation_dispatch: dict[str, object] = {
+            "status": "not_evaluated"
+        }
         self._learning = LearningEngine()
         self._forecast = SolarForecastCoordinator(hass, settings.forecast)
         self._forecast_planning = ForecastPlanningEngine()
@@ -1118,6 +1124,30 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
             )
             happy_hour_plan["physical_charge_target_kw"] = happy_hour_live_charge_kw
             control = apply_happy_hour_control(control, snapshot, happy_hour_plan)
+            # Alpha9.138: physical Happy Hour preparation must use a separately
+            # confirmed joined window, physical FoxESS charge-space evidence,
+            # and the SAME-SCAN conservative household export budget. Never
+            # promote the independent simulated headroom forecast to a writer.
+            # This only forms intent; the paid-Agile physical reserve guard and
+            # downstream FoxESS EV/SOC/DNO/commissioning checks still decide.
+            control, self._happy_hour_preparation_dispatch = (
+                apply_verified_happy_hour_preparation(
+                    control,
+                    booking=_controller_for(self).state,
+                    context=happy_hour_plan,
+                    agile_state=agile_state,
+                    snapshot=snapshot,
+                    now=now,
+                    config=self.settings.control,
+                    simulation_config=self.settings.simulation,
+                    power_down_active=bool(
+                        snapshot.saving_session_active
+                        or power_down_plan.get("active")
+                        or power_down_plan.get("reserve_required_before_next_cheap")
+                    ),
+                    agile_selected=tariff_type == EXPORT_TARIFF_TYPE_AGILE,
+                )
+            )
             # An Octopus Power Down must be both joined and inside its actual
             # event window. Mere simulation intent never grants live authority.
             power_down_export_authorised = bool(
@@ -1172,6 +1202,15 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                         ),
                         unplugged_continuity=self._paid_agile_unplugged_continuity,
                     )
+                )
+                self._happy_hour_preparation_dispatch["authorised_final_export_kw"] = (
+                    control.desired_battery_export_power_kw
+                )
+                self._happy_hour_preparation_dispatch["physical_guard_status"] = (
+                    self._agile_live_reserve_status.get("status")
+                )
+                self._happy_hour_preparation_dispatch["physical_guard_reason"] = (
+                    self._agile_live_reserve_status.get("reason")
                 )
             else:
                 self._paid_agile_last_unplugged_at = None
