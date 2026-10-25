@@ -836,8 +836,6 @@ def verified_live_happy_hour_house_grid_hold(
         or not getattr(control, "data_fresh", False)
         or not getattr(control, "plan_safe", False)
         or getattr(control, "alpha969_routing_shadow_only", False)
-        or (_number(getattr(control, "desired_battery_export_power_kw", None)) or 0.0)
-        > 0.001
     ):
         return False
     stale = set(getattr(snapshot, "stale_fields", ()) or ())
