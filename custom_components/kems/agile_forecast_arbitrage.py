@@ -108,13 +108,14 @@ def _economic_export_floor_pence(
     # charge period; be conservative across both parts of that period.
     replacement = max(
         effective_tariff_rates(tariff, next_cheap).offpeak_rate_pence,
-        effective_tariff_rates(tariff, next_cheap + timedelta(hours=3)).offpeak_rate_pence,
+        effective_tariff_rates(
+            tariff, next_cheap + timedelta(hours=3)
+        ).offpeak_rate_pence,
     )
     charge_eff = min(max(float(config.charge_efficiency), 0.01), 1.0)
     discharge_eff = min(max(float(config.discharge_efficiency), 0.01), 1.0)
-    return (
-        max(replacement, 0.0) / (charge_eff * discharge_eff)
-        + max(float(agile.BATTERY_WEAR_PENCE_PER_KWH), 0.0)
+    return max(replacement, 0.0) / (charge_eff * discharge_eff) + max(
+        float(agile.BATTERY_WEAR_PENCE_PER_KWH), 0.0
     )
 
 
