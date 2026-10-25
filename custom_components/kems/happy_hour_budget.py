@@ -789,6 +789,80 @@ def verified_live_happy_hour_charge_kw(
     return round(safe_target, 3) if safe else 0.0
 
 
+def verified_live_happy_hour_house_grid_hold(
+    *,
+    booking: dict[str, Any],
+    context: dict[str, Any],
+    snapshot: Any,
+    control: Any,
+    now: datetime,
+    power_down_active: bool,
+) -> bool:
+    """Allow a bounded *battery-discharge hold*, independently of charge space.
+
+    A full battery must not turn a verified free reward hour into daytime
+    Self Use discharge. This is not grid-charge authority: only the existing
+    physical charge guard may command Force Charge. The ordinary site, EV,
+    island, commissioning and FoxESS gates still own every actual write.
+    """
+    if not booked_happy_hour_matches_plan(booking, context, now):
+        return False
+    if (
+        context.get("mode") != "charging"
+        or context.get("happy_hour_import_authority_active") is not True
+        or context.get("current_reward_hour_ledger_complete") is not True
+        or context.get("current_reward_hour_cap_reached") is True
+        or power_down_active
+        or getattr(snapshot, "saving_session_active", False)
+    ):
+        return False
+    begin = _dt(context.get("current_reward_hour_start"))
+    end = _dt(context.get("current_reward_hour_end"))
+    remaining = _number(context.get("current_reward_hour_remaining_kwh"))
+    if (
+        begin is None
+        or end is None
+        or not begin <= now.astimezone(UTC) < end
+        or remaining is None
+        or not 0.5 < remaining <= float(HAPPY_HOUR_FAIR_USE_KWH_PER_REWARD)
+    ):
+        return False
+    # Stored local booking metadata cannot alone authorise daytime importing.
+    # Match the *current individual reward hour* to a fresh joined Octopus
+    # observation, not merely to the parent two-hour planned window.
+    joined_hours = booking.get("bookings")
+    if not isinstance(joined_hours, list) or not any(
+        isinstance(item, dict)
+        and item.get("booking_source") == "octopus_joined_events"
+        and _dt(item.get("start")) == begin
+        and _dt(item.get("end")) == end
+        for item in joined_hours
+    ):
+        return False
+    if (
+        getattr(control, "operating_mode", None) != "control"
+        or not getattr(control, "grid_available", False)
+        or getattr(control, "island_mode_active", False)
+        or getattr(control, "site_import_limit_exceeded", False)
+        or not getattr(control, "data_fresh", False)
+        or not getattr(control, "plan_safe", False)
+        or getattr(control, "alpha969_routing_shadow_only", False)
+    ):
+        return False
+    stale = set(getattr(snapshot, "stale_fields", ()) or ())
+    ages = getattr(snapshot, "source_age_seconds", None)
+    if not isinstance(ages, dict) or {"house_load_kw", "solar_power_kw"} & stale:
+        return False
+    # An unchanged zero grid-import entity is not by itself a stale meter.
+    # Require fresh physical house and PV signals on the same live device.
+    for key in ("house_load_kw", "solar_power_kw"):
+        age = _number(ages.get(key))
+        value = _number(getattr(snapshot, key, None))
+        if age is None or not 0.0 <= age <= 90.0 or value is None or value < 0.0:
+            return False
+    return True
+
+
 def apply_happy_hour_control(control: Any, snapshot: Any, context: dict[str, Any]):
     """Overlay Happy Hour EV permission without widening normal cheap authority."""
     if not context.get("happy_hour_import_authority_active"):
@@ -798,19 +872,24 @@ def apply_happy_hour_control(control: Any, snapshot: Any, context: dict[str, Any
         and context.get("ev_happy_hour_allowed")
     )
     live_charge_kw = _number(context.get("physical_charge_target_kw")) or 0.0
+    hold = context.get("physical_house_grid_hold_authorised") is True
     return replace(
         control,
         operating_reason="happy_hour_reward_hour",
         desired_work_mode=(
-            "Force Charge" if live_charge_kw > 0.001 else control.desired_work_mode
+            "Force Charge"
+            if live_charge_kw > 0.001
+            else ("Self Use" if hold else control.desired_work_mode)
         ),
-        desired_charge_power_kw=max(
-            (
-                live_charge_kw
-                if live_charge_kw > 0.001
-                else (_number(context.get("charge_target_kw")) or 0.0)
-            ),
-            0.0,
+        # In Self Use, FoxESS otherwise discharges the battery into house
+        # loads, regardless of this plan's zero battery-to-home target.
+        # The backend may honour 100% only with a separately verified,
+        # currently active Happy Hour household hold.
+        desired_min_soc_percent=(100.0 if hold else control.desired_min_soc_percent),
+        desired_charge_power_kw=(
+            max(live_charge_kw, 0.0)
+            if hold or live_charge_kw > 0.001
+            else max(_number(context.get("charge_target_kw")) or 0.0, 0.0)
         ),
         desired_ev_charging_allowed=ev_allowed,
         desired_battery_to_home_power_kw=0.0,

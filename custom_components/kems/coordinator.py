@@ -50,6 +50,7 @@ from .happy_hour_auto_join import (
 from .happy_hour_budget import (
     apply_happy_hour_control,
     verified_live_happy_hour_charge_kw,
+    verified_live_happy_hour_house_grid_hold,
 )
 from .happy_hour_import_ledger import HappyHourImportLedgerRecorder
 from .happy_hour_ohme_control import OhmeHappyHourController
@@ -1123,6 +1124,19 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                 happy_hour_live_charge_kw > 0.001
             )
             happy_hour_plan["physical_charge_target_kw"] = happy_hour_live_charge_kw
+            happy_hour_house_grid_hold = verified_live_happy_hour_house_grid_hold(
+                booking=_controller_for(self).state,
+                context=happy_hour_plan,
+                snapshot=snapshot,
+                control=control,
+                now=now,
+                power_down_active=bool(
+                    snapshot.saving_session_active or power_down_plan.get("active")
+                ),
+            )
+            happy_hour_plan["physical_house_grid_hold_authorised"] = (
+                happy_hour_house_grid_hold
+            )
             control = apply_happy_hour_control(control, snapshot, happy_hour_plan)
             # Alpha9.138: physical Happy Hour preparation must use a separately
             # confirmed joined window, physical FoxESS charge-space evidence,
@@ -1374,6 +1388,7 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                 force_restore=self._export_commissioning_test.restore_requested,
                 power_down_export_authorised=power_down_export_authorised,
                 happy_hour_charge_authorised=happy_hour_live_charge_kw > 0.001,
+                happy_hour_house_grid_hold_authorised=happy_hour_house_grid_hold,
             )
             # Never start Ohme Max Charge before the *physical* FoxESS
             # command is applied and reported. Safe order: battery/grid first,

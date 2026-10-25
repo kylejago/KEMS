@@ -883,6 +883,7 @@ class FoxESSControlBackend:
         force_restore: bool = False,
         power_down_export_authorised: bool = False,
         happy_hour_charge_authorised: bool = False,
+        happy_hour_house_grid_hold_authorised: bool = False,
     ) -> dict[str, Any]:
         """Apply the authoritative bounded command for this scan."""
         shadow = build_foxess_command_shadow_snapshot(
@@ -1064,6 +1065,9 @@ class FoxESSControlBackend:
             effective_export_limit_kw=effective_export_limit_kw,
             power_down_export_authorised=power_down_export_authorised,
             happy_hour_charge_authorised=happy_hour_charge_authorised,
+            happy_hour_house_grid_hold_authorised=(
+                happy_hour_house_grid_hold_authorised
+            ),
         )
 
         if (
@@ -1286,6 +1290,9 @@ class FoxESSControlBackend:
                         previous_min_soc_on_grid=self._previous_min_soc_on_grid,
                         pending_intelligent_ev_hold_active=(
                             pending_intelligent_ev_hold_active
+                        ),
+                        happy_hour_house_grid_hold_authorised=(
+                            happy_hour_house_grid_hold_authorised
                         ),
                     )
                     if effective_min_soc is None:
@@ -1522,6 +1529,15 @@ class FoxESSControlBackend:
             "cheap_period_confirmed": bool(cheap_period_confirmed),
             "power_down_export_authorised": bool(power_down_export_authorised),
             "happy_hour_charge_authorised": bool(happy_hour_charge_authorised),
+            "happy_hour_house_grid_hold_authorised": bool(
+                happy_hour_house_grid_hold_authorised
+            ),
+            "happy_hour_house_grid_hold_requested": bool(
+                happy_hour_house_grid_hold_authorised
+                and decision.action == "self_use"
+                and decision.reason
+                == "Verified Happy Hour household battery discharge hold"
+            ),
             "happy_hour_charge_setpoint_kw": (
                 decision.force_charge_power_kw
                 if happy_hour_charge_authorised and decision.action == "force_charge"
@@ -1582,6 +1598,9 @@ class FoxESSControlBackend:
                         previous_min_soc_on_grid=self._previous_min_soc_on_grid,
                         pending_intelligent_ev_hold_active=(
                             pending_intelligent_ev_hold_active
+                        ),
+                        happy_hour_house_grid_hold_authorised=(
+                            happy_hour_house_grid_hold_authorised
                         ),
                     )
                     if decision.commands_permitted
