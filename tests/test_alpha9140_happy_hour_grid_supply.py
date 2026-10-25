@@ -8,18 +8,69 @@ from __future__ import annotations
 
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
+import importlib.util
+from pathlib import Path
+import sys
+import types
 
 import pytest
 
-from custom_components.kems.happy_hour_budget import (
-    apply_happy_hour_control,
-    verified_live_happy_hour_house_grid_hold,
-)
-from custom_components.kems.kems_core.control_write_authority import (
+from kems_core import ControlState, Snapshot
+from kems_core.control_write_authority import (
     assess_foxess_control_write_authority,
     resolve_live_min_soc_on_grid,
 )
-from custom_components.kems.kems_core.models import ControlState, Snapshot
+
+# CI intentionally does not install Home Assistant; use the same isolated
+# integration module stubs as test_alpha9_2_happy_hour.py.
+INTEGRATION_DIR = Path(__file__).parents[1] / "custom_components" / "kems"
+
+
+def _load_budget():
+    custom_components = sys.modules.setdefault(
+        "custom_components", types.ModuleType("custom_components")
+    )
+    custom_components.__path__ = [str(INTEGRATION_DIR.parent)]
+    package = sys.modules.setdefault(
+        "custom_components.kems", types.ModuleType("custom_components.kems")
+    )
+    package.__path__ = [str(INTEGRATION_DIR)]
+    homeassistant = sys.modules.setdefault(
+        "homeassistant", types.ModuleType("homeassistant")
+    )
+    helpers = sys.modules.setdefault(
+        "homeassistant.helpers", types.ModuleType("homeassistant.helpers")
+    )
+    entity_registry = sys.modules.setdefault(
+        "homeassistant.helpers.entity_registry",
+        types.ModuleType("homeassistant.helpers.entity_registry"),
+    )
+    storage = sys.modules.setdefault(
+        "homeassistant.helpers.storage",
+        types.ModuleType("homeassistant.helpers.storage"),
+    )
+    storage.Store = object
+    helpers.entity_registry = entity_registry
+    helpers.storage = storage
+    homeassistant.helpers = helpers
+
+    name = "custom_components.kems.happy_hour_budget"
+    spec = importlib.util.spec_from_file_location(
+        name, INTEGRATION_DIR / "happy_hour_budget.py"
+    )
+    if spec is None or spec.loader is None:
+        raise RuntimeError("Cannot load isolated Happy Hour budget")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+_budget = _load_budget()
+apply_happy_hour_control = _budget.apply_happy_hour_control
+verified_live_happy_hour_house_grid_hold = (
+    _budget.verified_live_happy_hour_house_grid_hold
+)
 
 START = datetime(2026, 10, 25, 11, tzinfo=UTC)
 NOW = START + timedelta(minutes=30)
