@@ -8,10 +8,11 @@ The independent digital-twin schedule is not rewritten.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import replace
 from datetime import UTC, datetime
 from math import isfinite
-from typing import Any, Mapping
+from typing import Any
 
 from .happy_hour_auto_join import confirmed_booking_windows
 
