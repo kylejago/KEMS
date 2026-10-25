@@ -873,7 +873,11 @@ def apply_happy_hour_control(control: Any, snapshot: Any, context: dict[str, Any
         # The backend may honour 100% only with a separately verified,
         # currently active Happy Hour household hold.
         desired_min_soc_percent=(100.0 if hold else control.desired_min_soc_percent),
-        desired_charge_power_kw=max(live_charge_kw, 0.0),
+        desired_charge_power_kw=(
+            max(live_charge_kw, 0.0)
+            if hold or live_charge_kw > 0.001
+            else max(_number(context.get("charge_target_kw")) or 0.0, 0.0)
+        ),
         desired_ev_charging_allowed=ev_allowed,
         desired_battery_to_home_power_kw=0.0,
         desired_battery_export_power_kw=0.0,
