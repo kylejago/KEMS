@@ -858,12 +858,7 @@ def verified_live_happy_hour_house_grid_hold(
     for key in ("house_load_kw", "solar_power_kw"):
         age = _number(ages.get(key))
         value = _number(getattr(snapshot, key, None))
-        if (
-            age is None
-            or not 0.0 <= age <= 90.0
-            or value is None
-            or value < 0.0
-        ):
+        if age is None or not 0.0 <= age <= 90.0 or value is None or value < 0.0:
             return False
     return True
 
