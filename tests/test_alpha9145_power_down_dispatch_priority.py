@@ -20,7 +20,7 @@ def _plan(
     export_limit: float = 7.0,
     battery_limit: float = 7.0,
     emergency_stop: bool = False,
-) :
+):
     now = datetime(2026, 10, 26, 18, 47, tzinfo=UTC)
     snapshot = Snapshot(
         timestamp=now,
