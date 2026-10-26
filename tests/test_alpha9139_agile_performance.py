@@ -172,9 +172,9 @@ def test_exact_historical_reuse_invalidates_on_nested_input_changes():
     assert run()["number"] == 4
     assert cache.status["hits"] == 1
     assert cache.status["misses"] == 4
-    # The single unchanged replay hit now bypasses pickle entirely.
-    assert cache.status["pickle_fingerprints"] == 4
-    assert cache.status["input_snapshot_hits"] == 1
+    # Each bounded SHA-256 check validates changed nested values; no deep walk.
+    assert cache.status["pickle_fingerprints"] == 5
+    assert cache.status["input_snapshot_hits"] == 0
     assert cache.status["legacy_fingerprints"] == 0
 
 
