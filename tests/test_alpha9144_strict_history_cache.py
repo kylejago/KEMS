@@ -151,9 +151,12 @@ def test_current_day_and_tomorrow_never_use_snapshot_fast_path():
             inputs=("unchanged",),
             calculate=lambda: {"new": True},
         )
-        assert cache.get_cached(
-            day=day, today=today, projection=projection, inputs=("unchanged",)
-        ) is None
+        assert (
+            cache.get_cached(
+                day=day, today=today, projection=projection, inputs=("unchanged",)
+            )
+            is None
+        )
     assert cache.status["input_snapshot_days"] == 0
 
 
