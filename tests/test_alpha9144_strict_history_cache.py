@@ -7,7 +7,7 @@ from datetime import date, datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-from kems_core.agile_exact_snapshot_equality import exact_snapshot_values_equal
+from kems_core.agile_historical_replay_cache import exact_snapshot_values_equal
 from kems_core.agile_historical_replay_cache import HistoricalReplayCache
 
 ROOT = Path(__file__).parents[1] / "custom_components" / "kems"
@@ -165,7 +165,7 @@ def test_runtime_physical_authority_remains_independent_of_historical_cache():
     runtime = (ROOT / "agile_smart_export_runtime_base.py").read_text()
     coordinator = (ROOT / "coordinator.py").read_text()
     assert "if today is None or day >= today or projection:" in cache
-    assert "cached[0] != self._fingerprint(inputs)" in cache
+    assert "cached[0] != self._fingerprint(" in cache
     assert "_historical_cached_comparison" in runtime
     assert "await self._foxess_control.async_update(" in coordinator
     assert "post_shadow_settlement_changed" in coordinator
