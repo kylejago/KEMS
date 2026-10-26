@@ -6,7 +6,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from custom_components.kems.kems_core import PowerDownResult, Snapshot
-from custom_components.kems.power_down import (
+from kems_core.power_down_physical_evidence import (
     _observe_physical_grid,
     _physical_event_result,
 )
