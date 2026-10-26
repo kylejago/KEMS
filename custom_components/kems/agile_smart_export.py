@@ -179,14 +179,27 @@ class AgileSmartExportManager:
                     else None
                 ),
             )
-            # The optimiser is a pure numerical replay. Keep its exact
-            # arguments and result but run it in HA's executor to avoid
-            # starving Home Assistant's event loop for large histories.
-            executor = getattr(self._hass, "async_add_executor_job", None)
-            if callable(executor):
-                result = await executor(self._compare_day, *compare_args)
+            # Settled historical results with identical records/rates/SOC and
+            # configuration need no executor round-trip. Cache misses and all
+            # live-day comparisons still use the existing numerical replay.
+            # This is read-only; the separate rolling physical planner and
+            # inverter writer continue executing on every coordinator scan.
+            historical_lookup = getattr(
+                self, "_historical_cached_comparison", None
+            )
+            cached_result = (
+                historical_lookup(*compare_args, today=local_now.date())
+                if callable(historical_lookup)
+                else None
+            )
+            if cached_result is not None:
+                result = cached_result
             else:
-                result = self._compare_day(*compare_args)
+                executor = getattr(self._hass, "async_add_executor_job", None)
+                if callable(executor):
+                    result = await executor(self._compare_day, *compare_args)
+                else:
+                    result = self._compare_day(*compare_args)
             calculated[day.isoformat()] = result
             agile_soc = float(
                 result["agile_smart_export"].get("ending_soc_percent") or agile_soc

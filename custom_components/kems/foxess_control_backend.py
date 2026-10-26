@@ -231,6 +231,44 @@ def _paid_agile_contaminated_baseline_verified(
     return len(selected_devices) == 1
 
 
+def _idle_pending_restore_safe(
+    *,
+    pending: bool,
+    owned: bool,
+    last_action: str | None,
+    commands_permitted: bool,
+    decision_action: str,
+    requested_export_kw: float | None,
+    cheap_period_confirmed: bool,
+    commissioning_export_test: bool,
+    ev_hold_active: bool,
+    happy_hour_active: bool,
+    power_down_active: bool,
+) -> bool:
+    """Retry persisted FoxESS rollback only in a genuine idle Self Use window.
+
+    Never interrupt Force Charge, Force Discharge, confirmed-cheap charging,
+    EV protection or a booked reward/Power Down control action. A pending
+    restore can otherwise remain latched forever after normal control resumes.
+    Actual release still requires the existing distinct physical readback scan.
+    """
+    export = _number(requested_export_kw)
+    return bool(
+        pending
+        and owned
+        and last_action == "self_use"
+        and commands_permitted
+        and decision_action == "self_use"
+        and export is not None
+        and export <= 0.001
+        and not cheap_period_confirmed
+        and not commissioning_export_test
+        and not ev_hold_active
+        and not happy_hour_active
+        and not power_down_active
+    )
+
+
 class FoxESSControlBackend:
     """Own only the reviewed non-Agile FoxESS command surface."""
 
@@ -1200,6 +1238,54 @@ class FoxESSControlBackend:
             reason = (
                 f"{reason}; source uncertainty grace retained without writes "
                 "because the latched EV hold is not physically verified"
+            )
+        elif _idle_pending_restore_safe(
+            pending=self._commissioning_restore_pending,
+            owned=self._owned,
+            last_action=self._last_applied_action,
+            commands_permitted=decision.commands_permitted,
+            decision_action=decision.action,
+            requested_export_kw=control.desired_battery_export_power_kw,
+            cheap_period_confirmed=cheap_period_confirmed,
+            commissioning_export_test=commissioning_export_test,
+            ev_hold_active=bool(
+                ev_hold_floor_percent is not None
+                or ev_hold_source_grace_active
+                or pending_intelligent_ev_hold_active
+            ),
+            happy_hour_active=bool(
+                happy_hour_charge_authorised
+                or happy_hour_house_grid_hold_authorised
+            ),
+            power_down_active=bool(
+                power_down_export_authorised
+                or getattr(snapshot, "saving_session_active", False)
+            ),
+        ):
+            # Restoration previously started (e.g. at the end of a physical
+            # Force Discharge), but commissioning resumed normal Self Use before
+            # a second distinct readback scan. Complete that original rollback
+            # safely instead of indefinitely blocking the update orchestrator.
+            # Do not take new ownership or issue the next planned command in
+            # the same scan, even if the existing restoration succeeds.
+            restored = await self._async_restore(
+                entities,
+                writes,
+                verify_physical_baseline=True,
+            )
+            applied = restored
+            reason = (
+                "Pending FoxESS restoration verified; defer new control until "
+                "the next scan"
+                if restored
+                else "Pending FoxESS restoration awaits physical baseline readback"
+            )
+            decision = FoxESSControlDecision(
+                backend_available=decision.backend_available,
+                commands_permitted=False,
+                action="release",
+                reason=reason,
+                min_soc_on_grid_percent=decision.min_soc_on_grid_percent,
             )
         elif not decision.commands_permitted:
             if self._owned:

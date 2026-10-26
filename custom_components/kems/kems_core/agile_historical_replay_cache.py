@@ -47,6 +47,43 @@ class HistoricalReplayCache:
             "legacy_fingerprints": self._legacy_fingerprints,
         }
 
+    def _fingerprint(self, inputs: tuple[Any, ...]) -> bytes:
+        """Fingerprint exact immutable-in-time values of historical inputs."""
+        started = perf_counter()
+        try:
+            fingerprint = sha256(dumps(inputs, protocol=HIGHEST_PROTOCOL)).digest()
+            self._pickle_fingerprints += 1
+        except (PicklingError, TypeError, AttributeError, ValueError, OverflowError):
+            fingerprint = sha256(repr(inputs).encode("utf-8")).digest()
+            self._legacy_fingerprints += 1
+        finally:
+            self._fingerprint_seconds += perf_counter() - started
+        return fingerprint
+
+    def get_cached(
+        self,
+        *,
+        day: date,
+        today: date | None,
+        projection: bool,
+        inputs: tuple[Any, ...],
+    ) -> dict[str, Any] | None:
+        """Return an exact settled-day hit without scheduling an executor job.
+
+        A miss leaves the normal executor-based evaluation untouched. The
+        live day and tomorrow are never served from cache, and changed prices,
+        SOC, tariff, configuration or late backfill never reuse stale output.
+        """
+        if today is None or day >= today or projection:
+            return None
+        key = day.isoformat()
+        cached = self._entries.get(key)
+        if cached is None or cached[0] != self._fingerprint(inputs):
+            return None
+        self._hits += 1
+        self._entries.move_to_end(key)
+        return deepcopy(cached[1])
+
     def evaluate(
         self,
         *,
@@ -72,18 +109,7 @@ class HistoricalReplayCache:
         # preserves the exact input values while avoiding that formatting
         # cost. Only settled historical comparisons use this optimisation:
         # today's physical dispatch and tomorrow's projection always replay.
-        started = perf_counter()
-        try:
-            fingerprint = sha256(dumps(inputs, protocol=HIGHEST_PROTOCOL)).digest()
-            self._pickle_fingerprints += 1
-        except (PicklingError, TypeError, AttributeError, ValueError, OverflowError):
-            # A provider/test may supply a non-picklable object; retain the
-            # previously proven repr fingerprint rather than skipping
-            # invalidation or affecting the live safety path.
-            fingerprint = sha256(repr(inputs).encode("utf-8")).digest()
-            self._legacy_fingerprints += 1
-        finally:
-            self._fingerprint_seconds += perf_counter() - started
+        fingerprint = self._fingerprint(inputs)
         key = day.isoformat()
         cached = self._entries.get(key)
         if cached is not None and cached[0] == fingerprint:

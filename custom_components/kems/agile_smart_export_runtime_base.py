@@ -119,6 +119,42 @@ class EfficientAgileSmartExportManager(AgileSmartExportManager):
             ),
         )
 
+    def _historical_cached_comparison(
+        self,
+        records: list[Snapshot],
+        config: SimulationConfig,
+        tariff: TariffSettings,
+        agile_soc: float,
+        full_soc: float,
+        learned_forecast: float | None,
+        *,
+        today: date,
+    ) -> dict[str, Any] | None:
+        """Short-circuit exact historical hits before creating executor jobs.
+
+        Cache misses still run through the original _compare_day path, which
+        performs the full replay and populates the same replay cache.
+        """
+        if not records:
+            return None
+        day = records[0].timestamp.astimezone(LONDON).date()
+        return self._historical_replay_cache.get_cached(
+            day=day,
+            today=today,
+            projection=False,
+            inputs=(
+                records,
+                config,
+                tariff,
+                agile_soc,
+                full_soc,
+                learned_forecast,
+                self._day_rates(day),
+                self._product_code,
+                self._tariff_code,
+            ),
+        )
+
     async def async_update(
         self,
         *,
