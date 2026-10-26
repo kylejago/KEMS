@@ -123,9 +123,8 @@ class HistoricalReplayCache:
         if cached is None:
             return None
         # On changed/unsupported input, preserve the original SHA-256 gate.
-        if (
-            not self._unchanged_snapshot(key, inputs)
-            and cached[0] != self._fingerprint(inputs)
+        if not self._unchanged_snapshot(key, inputs) and cached[0] != self._fingerprint(
+            inputs
         ):
             return None
         self._hits += 1
