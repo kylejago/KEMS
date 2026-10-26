@@ -258,14 +258,7 @@ def _install_binary_sensor_patch() -> None:
                     2,
                 ),
                 "confirmed_supplier_credit_today_pence": None,
-                "estimated_bonus_today_pence": round(
-                sum(
-                    max(float(item.bonus_pence or 0.0), 0.0) for item in completed_today
-                ),
-                2,
-            ),
-            "confirmed_supplier_credit_today_pence": None,
-            "completed_bonus_today_pence": round(
+                "completed_bonus_today_pence": round(
                     sum(max(float(item.bonus_pence or 0.0), 0.0) for item in completed),
                     2,
                 ),
@@ -345,6 +338,13 @@ def _install_diagnostics_patch() -> None:
             "retained_count": len(history),
             "completed_today_count": len(completed_today),
             "completed_today": [_result_dict(item) for item in completed_today],
+            "estimated_bonus_today_pence": round(
+                sum(
+                    max(float(item.bonus_pence or 0.0), 0.0) for item in completed_today
+                ),
+                2,
+            ),
+            "confirmed_supplier_credit_today_pence": None,
             "completed_bonus_today_pence": round(
                 sum(
                     max(float(item.bonus_pence or 0.0), 0.0) for item in completed_today

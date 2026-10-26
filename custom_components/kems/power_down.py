@@ -127,13 +127,11 @@ def _observe_physical_grid(
             )
             pending["_physical_export_kwh"] = (
                 float(pending.get("_physical_export_kwh", 0.0))
-                + max(float(pending.get("_physical_last_export_kw", 0.0)), 0.0)
-                * hours
+                + max(float(pending.get("_physical_last_export_kw", 0.0)), 0.0) * hours
             )
             pending["_physical_import_kwh"] = (
                 float(pending.get("_physical_import_kwh", 0.0))
-                + max(float(pending.get("_physical_last_import_kw", 0.0)), 0.0)
-                * hours
+                + max(float(pending.get("_physical_last_import_kw", 0.0)), 0.0) * hours
             )
     pending["_physical_last_at"] = now.isoformat()
     pending["_physical_last_export_kw"] = exported
@@ -535,7 +533,9 @@ class PowerDownHistoryRecorder:
                 if completed is True and physical["physical_export_verified"] is None:
                     completed = None
                     reason = "physical_export_evidence_incomplete"
-                elif completed is True and physical["physical_export_verified"] is False:
+                elif (
+                    completed is True and physical["physical_export_verified"] is False
+                ):
                     completed = False
                     reason = "physical_export_not_observed"
                 evidence_available = audit.active_samples_observed > 0
