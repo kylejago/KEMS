@@ -223,9 +223,7 @@ class AgileSmartExportManager:
                     self._daily[day.isoformat()] = compact
                     self._dirty = True
 
-        day_comparison_seconds = round(
-            perf_counter() - historical_compare_started, 3
-        )
+        day_comparison_seconds = round(perf_counter() - historical_compare_started, 3)
         today = calculated.get(local_now.date().isoformat())
         tomorrow_started = perf_counter()
         tomorrow_records = self._tomorrow_records(
@@ -263,9 +261,7 @@ class AgileSmartExportManager:
             else:
                 tomorrow = self._compare_day(*tomorrow_args, projection=True)
 
-        tomorrow_comparison_seconds = round(
-            perf_counter() - tomorrow_started, 3
-        )
+        tomorrow_comparison_seconds = round(perf_counter() - tomorrow_started, 3)
         reporting_started = perf_counter()
         all_days = dict(self._daily)
         all_days.update(
@@ -318,9 +314,7 @@ class AgileSmartExportManager:
             "generated_at": now.isoformat(),
             "ready": bool(today and today["ready"] and quality["today_complete"]),
         }
-        state_aggregation_seconds = round(
-            perf_counter() - reporting_started, 3
-        )
+        state_aggregation_seconds = round(perf_counter() - reporting_started, 3)
         publish_started = perf_counter()
         self._publish(self._state)
         publication_seconds = round(perf_counter() - publish_started, 3)
@@ -334,9 +328,7 @@ class AgileSmartExportManager:
             "tomorrow_projection_seconds": tomorrow_comparison_seconds,
             "period_and_state_aggregation_seconds": state_aggregation_seconds,
             "state_publication_seconds": publication_seconds,
-            "total_manager_base_seconds": round(
-                perf_counter() - profiler_started, 3
-            ),
+            "total_manager_base_seconds": round(perf_counter() - profiler_started, 3),
             "scope": "read_only_agile_comparison_not_hardware_dispatch",
         }
         return self.state

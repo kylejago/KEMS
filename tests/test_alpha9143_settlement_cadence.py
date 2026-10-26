@@ -49,7 +49,7 @@ def test_removed_half_hour_forces_same_scan_reconciliation() -> None:
 def test_precontrol_settlement_always_happens_before_control_planning() -> None:
     source = (KEMS / "coordinator.py").read_text()
     before = source.index("settled_before_shadow = settled_half_hour_snapshot(")
-    first = source.index("detail_seconds[\"precontrol_settlement_reconciliation\"]")
+    first = source.index('detail_seconds["precontrol_settlement_reconciliation"]')
     plan = source.index("control = self._control.plan(")
     shadow = source.index("await self._shadow_validation.async_update(")
     second = source.index("if post_shadow_settlement_changed:")
@@ -59,11 +59,11 @@ def test_precontrol_settlement_always_happens_before_control_planning() -> None:
 
 def test_only_optional_second_publication_is_gated() -> None:
     source = (KEMS / "coordinator.py").read_text()
-    assert source.count(
-        "self._agile_smart_export.reconcile_current_day_settlements("
-    ) == 2
+    assert (
+        source.count("self._agile_smart_export.reconcile_current_day_settlements(") == 2
+    )
     assert "if post_shadow_settlement_changed:" in source
-    assert "detail_seconds[\"postshadow_settlement_reconciliation\"] = 0.0" in source
+    assert 'detail_seconds["postshadow_settlement_reconciliation"] = 0.0' in source
     assert "self._agile_smart_export.async_update(" in source
     assert "self._foxess_control.async_update(" in source
     guard = (KEMS / "update_maintenance_guard.py").read_text()
