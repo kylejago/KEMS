@@ -122,11 +122,12 @@ class HistoricalReplayCache:
         cached = self._entries.get(key)
         if cached is None:
             return None
-        if not self._unchanged_snapshot(key, inputs):
-            # On every changed/unsupported input, retain the authoritative
-            # prior full binary fingerprint check; never serve stale history.
-            if cached[0] != self._fingerprint(inputs):
-                return None
+        # On changed/unsupported input, preserve the original SHA-256 gate.
+        if (
+            not self._unchanged_snapshot(key, inputs)
+            and cached[0] != self._fingerprint(inputs)
+        ):
+            return None
         self._hits += 1
         self._entries.move_to_end(key)
         return deepcopy(cached[1])
