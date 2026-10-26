@@ -107,5 +107,3 @@ def _physical_event_result(pending: dict[str, Any]) -> dict[str, Any]:
         ),
         "supplier_settled": False,
     }
-
-
