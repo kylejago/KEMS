@@ -7,6 +7,7 @@ import math
 from dataclasses import dataclass, replace
 from datetime import UTC, date, datetime, time, timedelta
 from functools import partial
+from time import perf_counter
 from typing import Any
 from zoneinfo import ZoneInfo
 
@@ -145,7 +146,9 @@ class AgileSmartExportManager:
         tariff: TariffSettings,
     ) -> dict[str, Any]:
         """Refresh prices and calculate every requested comparison period."""
+        profiler_started = perf_counter()
         await self._refresh(records, now)
+        rate_refresh_seconds = round(perf_counter() - profiler_started, 3)
         # The earlier per-day filter traversed *every* retained Octopus price
         # for each historical day (85+ days in live diagnostics). Rebuild once
         # after any possible fetch, then use O(1) day lookups for the entire
@@ -164,6 +167,9 @@ class AgileSmartExportManager:
             config.battery_reserve_percent,
         )
         calculated: dict[str, dict[str, Any]] = {}
+        historical_compare_started = perf_counter()
+        historical_day_comparisons = 0
+        live_day_comparisons = 0
         for day, day_records in sorted(grouped.items()):
             if len(day_records) < 2:
                 continue
@@ -199,6 +205,10 @@ class AgileSmartExportManager:
                 else:
                     result = self._compare_day(*compare_args)
             calculated[day.isoformat()] = result
+            if day < local_now.date():
+                historical_day_comparisons += 1
+            else:
+                live_day_comparisons += 1
             agile_soc = float(
                 result["agile_smart_export"].get("ending_soc_percent") or agile_soc
             )
@@ -213,7 +223,11 @@ class AgileSmartExportManager:
                     self._daily[day.isoformat()] = compact
                     self._dirty = True
 
+        day_comparison_seconds = round(
+            perf_counter() - historical_compare_started, 3
+        )
         today = calculated.get(local_now.date().isoformat())
+        tomorrow_started = perf_counter()
         tomorrow_records = self._tomorrow_records(
             local_now,
             learned,
@@ -249,6 +263,10 @@ class AgileSmartExportManager:
             else:
                 tomorrow = self._compare_day(*tomorrow_args, projection=True)
 
+        tomorrow_comparison_seconds = round(
+            perf_counter() - tomorrow_started, 3
+        )
+        reporting_started = perf_counter()
         all_days = dict(self._daily)
         all_days.update(
             {
@@ -300,9 +318,27 @@ class AgileSmartExportManager:
             "generated_at": now.isoformat(),
             "ready": bool(today and today["ready"] and quality["today_complete"]),
         }
+        state_aggregation_seconds = round(
+            perf_counter() - reporting_started, 3
+        )
+        publish_started = perf_counter()
         self._publish(self._state)
+        publication_seconds = round(perf_counter() - publish_started, 3)
         if self._dirty:
             await self.async_save()
+        self._performance_detail = {
+            "rate_refresh_seconds": rate_refresh_seconds,
+            "historical_and_live_day_comparisons_seconds": day_comparison_seconds,
+            "historical_days_computed_or_cached": historical_day_comparisons,
+            "live_days_evaluated": live_day_comparisons,
+            "tomorrow_projection_seconds": tomorrow_comparison_seconds,
+            "period_and_state_aggregation_seconds": state_aggregation_seconds,
+            "state_publication_seconds": publication_seconds,
+            "total_manager_base_seconds": round(
+                perf_counter() - profiler_started, 3
+            ),
+            "scope": "read_only_agile_comparison_not_hardware_dispatch",
+        }
         return self.state
 
     async def async_save(self) -> None:
