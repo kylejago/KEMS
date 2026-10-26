@@ -19,6 +19,10 @@ from .kems_core import (
     Snapshot,
     finalise_power_down_audit,
 )
+from .kems_core.power_down_physical_evidence import (
+    _observe_physical_grid,
+    _physical_event_result,
+)
 
 STORAGE_VERSION = 1
 
@@ -417,6 +421,7 @@ class PowerDownHistoryRecorder:
             )
 
         if self._pending is not None:
+            _observe_physical_grid(self._pending, snapshot, now)
             _update_reconciled_accounting(
                 self._pending,
                 snapshot,
@@ -441,10 +446,21 @@ class PowerDownHistoryRecorder:
                     ),
                 )
                 completed, reason = finalise_power_down_audit(audit)
-                evidence_available = completed is not None
+                physical = _physical_event_result(self._pending)
+                # A safe virtual plan is not proof of metered Power Down export.
+                if completed is True and physical["physical_export_verified"] is None:
+                    completed = None
+                    reason = "physical_export_evidence_incomplete"
+                elif (
+                    completed is True and physical["physical_export_verified"] is False
+                ):
+                    completed = False
+                    reason = "physical_export_not_observed"
+                evidence_available = audit.active_samples_observed > 0
                 self._last = PowerDownResult.from_dict(
                     {
                         **self._pending,
+                        **physical,
                         "available": True,
                         "active_samples_observed": audit.active_samples_observed,
                         "ev_successfully_blocked": (

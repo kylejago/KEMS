@@ -75,9 +75,6 @@ class HistoricalReplayCache:
             raise ValueError("max_days must be positive")
         self._max_days = max_days
         self._entries: OrderedDict[str, tuple[str, dict[str, Any]]] = OrderedDict()
-        # Copies of only the bounded historical inputs, never live or future.
-        # No shared mutable references may survive an input mutation.
-        self._input_snapshots: dict[str, tuple[Any, ...]] = {}
         self._snapshot_hits = 0
         self._snapshot_checks = 0
         self._snapshot_comparison_seconds = 0.0
@@ -108,9 +105,9 @@ class HistoricalReplayCache:
             "input_snapshot_comparison_seconds_total": round(
                 self._snapshot_comparison_seconds, 3
             ),
-            "input_snapshot_days": len(self._input_snapshots),
+            "input_snapshot_days": 0,
             "input_snapshot_capture_failures": self._snapshot_capture_failures,
-            "input_snapshot_policy": "strict_value_then_original_sha256_fallback",
+            "input_snapshot_policy": "binary_sha256_only_per_historical_day",
         }
 
     def _fingerprint(self, inputs: tuple[Any, ...]) -> bytes:
@@ -125,31 +122,6 @@ class HistoricalReplayCache:
         finally:
             self._fingerprint_seconds += perf_counter() - started
         return fingerprint
-
-    def _unchanged_snapshot(self, key: str, inputs: tuple[Any, ...]) -> bool:
-        """Cheap exact-value hit; unsupported types fall back to SHA-256."""
-        previous = self._input_snapshots.get(key)
-        if previous is None:
-            return False
-        started = perf_counter()
-        self._snapshot_checks += 1
-        try:
-            matches = exact_snapshot_values_equal(previous, inputs)
-        except (AttributeError, TypeError, ValueError, OverflowError, RecursionError):
-            matches = False
-        finally:
-            self._snapshot_comparison_seconds += perf_counter() - started
-        if matches:
-            self._snapshot_hits += 1
-        return matches
-
-    def _capture_snapshot(self, key: str, inputs: tuple[Any, ...]) -> None:
-        """Capture only historical inputs, preserving late-backfill invalidation."""
-        try:
-            self._input_snapshots[key] = deepcopy(inputs)
-        except (AttributeError, TypeError, ValueError, OverflowError, RecursionError):
-            self._input_snapshots.pop(key, None)
-            self._snapshot_capture_failures += 1
 
     def get_cached(
         self,
@@ -171,10 +143,9 @@ class HistoricalReplayCache:
         cached = self._entries.get(key)
         if cached is None:
             return None
-        # On changed/unsupported input, preserve the original SHA-256 gate.
-        if not self._unchanged_snapshot(key, inputs) and cached[0] != self._fingerprint(
-            inputs
-        ):
+        # Preserve full SHA-256 validation on every historical cache hit;
+        # this is cheaper than the recursive deep-snapshot comparison.
+        if cached[0] != self._fingerprint(inputs):
             return None
         self._hits += 1
         self._entries.move_to_end(key)
@@ -207,10 +178,6 @@ class HistoricalReplayCache:
         # today's physical dispatch and tomorrow's projection always replay.
         key = day.isoformat()
         cached = self._entries.get(key)
-        if cached is not None and self._unchanged_snapshot(key, inputs):
-            self._hits += 1
-            self._entries.move_to_end(key)
-            return deepcopy(cached[1])
         fingerprint = self._fingerprint(inputs)
         if cached is not None and cached[0] == fingerprint:
             self._hits += 1
@@ -220,9 +187,7 @@ class HistoricalReplayCache:
         self._misses += 1
         result = calculate()
         self._entries[key] = (fingerprint, deepcopy(result))
-        self._capture_snapshot(key, inputs)
         self._entries.move_to_end(key)
         while len(self._entries) > self._max_days:
-            removed_day, _ = self._entries.popitem(last=False)
-            self._input_snapshots.pop(removed_day, None)
+            self._entries.popitem(last=False)
         return result

@@ -1001,6 +1001,14 @@ class PowerDownResult:
     active_samples_observed: int = 0
     plan_safe_throughout: bool | None = None
     island_override_observed: bool | None = None
+    # Modelled reward and routing are not measured delivery or paid settlement.
+    physical_grid_export_kwh: float | None = None
+    physical_grid_import_kwh: float | None = None
+    physical_coverage_hours: float = 0.0
+    physical_samples_observed: int = 0
+    physical_export_verified: bool | None = None
+    physical_evidence_status: str = "unavailable"
+    supplier_settled: bool = False
     completed_successfully: bool | None = False
     completion_reason: str = "unavailable"
 
@@ -1015,6 +1023,16 @@ class PowerDownResult:
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> PowerDownResult:
         values = dict(data)
+        # Earlier releases could mark a model-only event as physically
+        # successful. Preserve estimated energy/credit but revoke unsupported
+        # success assertions when restoring historical persisted records.
+        if (
+            "physical_export_verified" not in values
+            and values.get("completed_successfully") is True
+        ):
+            values["completed_successfully"] = None
+            values["completion_reason"] = "historical_physical_evidence_unavailable"
+            values["physical_evidence_status"] = "legacy_modelled_only"
         for key in ("session_start", "session_end"):
             value = values.get(key)
             if isinstance(value, str):

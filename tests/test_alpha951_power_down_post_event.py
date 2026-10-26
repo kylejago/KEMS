@@ -70,7 +70,7 @@ def test_dashboard_surfaces_completed_sessions_and_event_credit() -> None:
     assert "Completed sessions today" in card
     assert "completed_sessions_today" in card
     assert "supplier-settled" in card
-    assert "Power Down event credit" in patch
+    assert "Modelled Power Down bonus (unsettled)" in patch
     assert "power_down_credit_today_pence" in patch
 
 

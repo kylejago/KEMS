@@ -32,7 +32,7 @@ def _evaluate(cache, values, *, day=date(2026, 10, 25), now=date(2026, 10, 26)):
     )
 
 
-def test_unchanged_historical_inputs_skip_all_repeat_pickle_fingerprints():
+def test_unchanged_historical_inputs_use_binary_digest_without_deep_walk():
     cache = HistoricalReplayCache()
     values = (
         [ObservedSample(datetime(2026, 10, 24, 16), 25.0, {"a": [2, 3]})],
@@ -51,9 +51,10 @@ def test_unchanged_historical_inputs_skip_all_repeat_pickle_fingerprints():
         )
         assert result is not None
         result["slots"][0]["value"] = 99
-    assert cache.status["pickle_fingerprints"] == baseline
-    assert cache.status["input_snapshot_hits"] == 12
-    assert cache.status["input_snapshot_days"] == 1
+    assert cache.status["pickle_fingerprints"] == baseline + 12
+    assert cache.status["input_snapshot_hits"] == 0
+    assert cache.status["input_snapshot_checks"] == 0
+    assert cache.status["input_snapshot_days"] == 0
     assert (
         cache.get_cached(
             day=date(2026, 10, 25),
@@ -86,7 +87,7 @@ def test_nested_source_mutation_uses_sha256_and_invalidates_old_result():
     assert cache.status["input_snapshot_hits"] == 0
     _evaluate(cache, values)
     assert cache.status["misses"] == 2
-    assert cache.status["input_snapshot_days"] == 1
+    assert cache.status["input_snapshot_days"] == 0
 
 
 def test_time_fold_requires_full_fingerprint_on_bst_gmt_transition():
@@ -138,8 +139,8 @@ def test_input_snapshots_bounded_to_same_lru_day_capacity():
     for d in [date(2026, 10, 20), date(2026, 10, 21), date(2026, 10, 22)]:
         _evaluate(cache, (str(d),), day=d)
     assert cache.status["cached_days"] == 2
-    assert cache.status["input_snapshot_days"] == 2
-    assert "2026-10-20" not in cache._input_snapshots
+    assert cache.status["input_snapshot_days"] == 0
+    assert not hasattr(cache, "_input_snapshots")
 
 
 def test_current_day_and_tomorrow_never_use_snapshot_fast_path():
