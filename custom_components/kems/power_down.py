@@ -10,10 +10,6 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.storage import Store
 
 from .const import DOMAIN, STORAGE_NAMESPACE
-from .kems_core.power_down_physical_evidence import (
-    _observe_physical_grid,
-    _physical_event_result,
-)
 from .kems_core import (
     ControlState,
     PowerDownAccountingState,
@@ -22,6 +18,10 @@ from .kems_core import (
     SimulationState,
     Snapshot,
     finalise_power_down_audit,
+)
+from .kems_core.power_down_physical_evidence import (
+    _observe_physical_grid,
+    _physical_event_result,
 )
 
 STORAGE_VERSION = 1

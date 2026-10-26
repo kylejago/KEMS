@@ -5,11 +5,12 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
-from custom_components.kems.kems_core import PowerDownResult, Snapshot
 from kems_core.power_down_physical_evidence import (
     _observe_physical_grid,
     _physical_event_result,
 )
+
+from custom_components.kems.kems_core import PowerDownResult, Snapshot
 
 
 def _pending() -> dict:
