@@ -87,7 +87,7 @@ def test_nested_source_mutation_uses_sha256_and_invalidates_old_result():
     assert cache.status["input_snapshot_hits"] == 0
     _evaluate(cache, values)
     assert cache.status["misses"] == 2
-    assert cache.status["input_snapshot_days"] == 1
+    assert cache.status["input_snapshot_days"] == 0
 
 
 def test_time_fold_requires_full_fingerprint_on_bst_gmt_transition():
