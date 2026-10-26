@@ -184,9 +184,7 @@ class AgileSmartExportManager:
             # live-day comparisons still use the existing numerical replay.
             # This is read-only; the separate rolling physical planner and
             # inverter writer continue executing on every coordinator scan.
-            historical_lookup = getattr(
-                self, "_historical_cached_comparison", None
-            )
+            historical_lookup = getattr(self, "_historical_cached_comparison", None)
             cached_result = (
                 historical_lookup(*compare_args, today=local_now.date())
                 if callable(historical_lookup)

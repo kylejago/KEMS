@@ -1254,8 +1254,7 @@ class FoxESSControlBackend:
                 or pending_intelligent_ev_hold_active
             ),
             happy_hour_active=bool(
-                happy_hour_charge_authorised
-                or happy_hour_house_grid_hold_authorised
+                happy_hour_charge_authorised or happy_hour_house_grid_hold_authorised
             ),
             power_down_active=bool(
                 power_down_export_authorised
