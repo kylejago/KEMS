@@ -415,10 +415,15 @@ class ControlEngine:
             battery_output_limit,
         )
         if inputs.saving_session_active:
+            # Alpha9.145: Power Down is event-owned, not the ordinary Agile
+            # rolling simulation. A near-zero *present* rolling value must
+            # never replace the independently reserved Power Down target.
+            # Downstream physical SOC/home-energy, EV, EPS, inverter/DNO and
+            # staged direction-proof guards remain authoritative for writes.
             requested_session_export = (
-                simulation.current_simulated_battery_export_power_kw
-                if simulation.current_simulated_battery_export_power_kw is not None
-                else simulation.saving_session_export_target_kw
+                simulation.saving_session_export_target_kw
+                if simulation.saving_session_export_target_kw is not None
+                else simulation.current_simulated_battery_export_power_kw
             )
             export = max(requested_session_export or 0.0, 0.0)
             reason = "power_down_session"
