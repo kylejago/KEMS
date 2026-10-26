@@ -17,6 +17,7 @@ from struct import pack
 from time import perf_counter
 from typing import Any
 
+
 def exact_snapshot_values_equal(previous: Any, current: Any) -> bool:
     """Return True only for recursively identical supported replay values."""
     if type(previous) is not type(current):
