@@ -91,6 +91,10 @@ from .kems_core.control_event_refresh import (
 )
 from .kems_core.control_write_authority import active_joined_power_down_window
 from .kems_core.scenario_report_gate import ScenarioReportGate
+from .kems_core.settlement_reconciliation_cadence import (
+    settled_half_hour_snapshot,
+    settled_half_hours_changed,
+)
 from .kems_core.shared_bus_balance import (
     assess_shared_bus_balance,
     summarise_shared_bus_audits,
@@ -646,6 +650,8 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
         agile_planning_seconds = 0.0
         checkpoint_at = scan_started
         stage_seconds: dict[str, float] = {}
+        detail_seconds: dict[str, float] = {}
+        post_shadow_settlement_changed = False
 
         def checkpoint(name: str) -> None:
             nonlocal checkpoint_at
@@ -991,13 +997,19 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                 # never present the legacy fixed benchmark as a live Agile rate.
                 snapshot.current_export_rate = None
 
-            # Settle retained completed outcomes before the rolling target,
-            # ControlState and shadow candidate are built. This prevents those
-            # layers from validating against the older replay SOC after a real
-            # simulated export has already spent that battery energy.
+            # Retain the authoritative pre-control settlement pass on every
+            # scan. Capture settled evidence BEFORE the shadow recorder can
+            # append or correct a half-hour during this scan.
+            settled_before_shadow = settled_half_hour_snapshot(
+                self._shadow_validation._settled
+            )
+            pre_settlement_started = perf_counter()
             self._agile_smart_export.reconcile_current_day_settlements(
                 settled_half_hours=list(self._shadow_validation._settled),
                 now=now,
+            )
+            detail_seconds["precontrol_settlement_reconciliation"] = round(
+                perf_counter() - pre_settlement_started, 3
             )
             agile_state = self._agile_smart_export.state
             simulation = reconciled_current_day_simulation(
@@ -1279,6 +1291,7 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
             )
             if stress_started:
                 self._schedule_export_commissioning_timeout()
+            shadow_started = perf_counter()
             await self._shadow_validation.async_update(
                 snapshot=snapshot,
                 simulation=shadow_simulation,
@@ -1287,21 +1300,36 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                 config=self.settings.control,
                 agile_state=agile_state,
             )
-            checkpoint("control_and_physical_safety_planning")
-            # Capture any half-hour that settled during this scan, then rebuild
-            # the published headline simulation from the same authoritative
-            # current-day ledger. Dashboard, Pi/API consumers and financial
-            # summaries therefore all receive one coherent KEMS/Agile basis.
-            self._agile_smart_export.reconcile_current_day_settlements(
-                settled_half_hours=list(self._shadow_validation._settled),
-                now=now,
+            detail_seconds["shadow_recorder"] = round(
+                perf_counter() - shadow_started, 3
             )
+            checkpoint("control_and_physical_safety_planning")
+            # The authoritative pre-control settlement pass already rebuilt
+            # and republished today's state. Avoid a redundant second publish
+            # unless the recorder appended or corrected a settled half-hour.
+            # Deep copying the pre-shadow evidence also detects nested edits.
+            post_shadow_settlement_changed = settled_half_hours_changed(
+                settled_before_shadow,
+                self._shadow_validation._settled,
+            )
+            if post_shadow_settlement_changed:
+                post_settlement_started = perf_counter()
+                self._agile_smart_export.reconcile_current_day_settlements(
+                    settled_half_hours=list(self._shadow_validation._settled),
+                    now=now,
+                )
+                detail_seconds["postshadow_settlement_reconciliation"] = round(
+                    perf_counter() - post_settlement_started, 3
+                )
+            else:
+                detail_seconds["postshadow_settlement_reconciliation"] = 0.0
             agile_state = self._agile_smart_export.state
             simulation = reconciled_current_day_simulation(
                 base_simulation,
                 agile_state,
             )
 
+            reporting_started = perf_counter()
             advice = self._advice.evaluate(
                 snapshot,
                 learned,
@@ -1313,6 +1341,10 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                 simulation,
                 now,
             )
+            detail_seconds["financial_snapshot_advice"] = round(
+                perf_counter() - reporting_started, 3
+            )
+            lifetime_started = perf_counter()
             stored_lifetime = await self._lifetime.async_update(
                 roi_simulation,
                 gas,
@@ -1327,12 +1359,19 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                 now,
                 self.settings.roi,
             )
+            detail_seconds["lifetime_periods_and_roi"] = round(
+                perf_counter() - lifetime_started, 3
+            )
+            power_down_started = perf_counter()
             last_power_down = await self._power_down.async_update(
                 snapshot,
                 simulation,
                 control,
                 now,
                 agile_state=agile_state,
+            )
+            detail_seconds["power_down_reporting"] = round(
+                perf_counter() - power_down_started, 3
             )
             phase = self._phase(
                 learned.ready,
@@ -1479,6 +1518,11 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                 ),
                 "agile_history_backfill_seconds": agile_backfill_seconds,
                 "agile_manager_update_seconds": agile_planning_seconds,
+                "agile_manager_internal_seconds": dict(
+                    getattr(self._agile_smart_export, "_performance_detail", {})
+                ),
+                "stage_detail_seconds": detail_seconds,
+                "post_shadow_settlement_changed": post_shadow_settlement_changed,
                 "timing_clock": "monotonic_perf_counter",
                 "control_execution_model": "unchanged",
                 "reporting_replay_blocks_control": False,
