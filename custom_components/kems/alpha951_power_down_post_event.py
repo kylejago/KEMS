@@ -9,6 +9,7 @@ hardware-write authority.
 
 from __future__ import annotations
 
+from copy import deepcopy
 from dataclasses import replace
 from datetime import date
 from typing import Any
@@ -70,7 +71,11 @@ def _results_for_date(recorder: Any, target: date) -> list[PowerDownResult]:
 def _result_dict(result: PowerDownResult) -> dict[str, Any]:
     """Return one dashboard-safe completed result payload."""
     payload = result.to_dict()
-    payload["authority"] = "KEMS retained completed-event result"
+    payload["authority"] = (
+        "KEMS modelled event estimate; physical meter evidence is separate"
+    )
+    payload["estimated_bonus_pence"] = result.bonus_pence
+    payload["physical_export_status"] = result.physical_evidence_status
     payload["supplier_settled"] = False
     return payload
 
@@ -83,7 +88,7 @@ def _today_completed_results() -> list[PowerDownResult]:
 
 
 def _authoritative_today_bonus(simulation: SimulationState) -> float | None:
-    """Return same-day completed credit plus any distinct live event estimate."""
+    """Return *modelled* bonus for the simulated KEMS accounting view only."""
     completed = _today_completed_results()
     if not completed:
         return None
@@ -100,7 +105,7 @@ def _authoritative_today_bonus(simulation: SimulationState) -> float | None:
 
 
 def _reconcile_completed_credit(simulation: SimulationState) -> SimulationState:
-    """Replace stale event estimate with retained completed same-day evidence."""
+    """Reconcile simulated KEMS bonus; never present it as supplier credit."""
     authoritative = _authoritative_today_bonus(simulation)
     if authoritative is None:
         return simulation
@@ -141,6 +146,8 @@ def _install_history_patch() -> None:
         global _ACTIVE_RECORDER
         original_init(self, *args, **kwargs)
         self._completed_history = []
+        self._alpha9146_last_saved_payload = None
+        self._alpha9146_store_writes_skipped = 0
         _ACTIVE_RECORDER = self
 
     async def patched_load(self):
@@ -153,6 +160,7 @@ def _install_history_patch() -> None:
         if not history and self._last.available and self._last.session_id:
             history = [self._last]
         self._completed_history = history
+        self._alpha9146_last_saved_payload = deepcopy(stored)
         _ACTIVE_RECORDER = self
 
     async def patched_update(self, *args, **kwargs):
@@ -174,16 +182,22 @@ def _install_history_patch() -> None:
         return result
 
     async def patched_save(self):
-        await self._store.async_save(
-            {
-                "last_result": self._last.to_dict(),
-                "pending": self._pending,
-                "completed_history": [
-                    item.to_dict()
-                    for item in getattr(self, "_completed_history", [])[-_MAX_HISTORY:]
-                ],
-            }
-        )
+        # The recorder is polled each 60s, even when there is no event.
+        # The previous patch wrote the same 13+ history rows twice a scan.
+        # Skip identical persisted payloads to reduce HA recorder disk I/O.
+        payload = {
+            "last_result": self._last.to_dict(),
+            "pending": self._pending,
+            "completed_history": [
+                item.to_dict()
+                for item in getattr(self, "_completed_history", [])[-_MAX_HISTORY:]
+            ],
+        }
+        if payload == getattr(self, "_alpha9146_last_saved_payload", None):
+            self._alpha9146_store_writes_skipped += 1
+            return
+        await self._store.async_save(payload)
+        self._alpha9146_last_saved_payload = deepcopy(payload)
 
     def results_for_local_date(self, target: date) -> list[PowerDownResult]:
         return _results_for_date(self, target)
@@ -239,7 +253,19 @@ def _install_binary_sensor_patch() -> None:
             {
                 "completed_sessions_today": [_result_dict(item) for item in completed],
                 "completed_session_count_today": len(completed),
-                "completed_bonus_today_pence": round(
+                "estimated_bonus_today_pence": round(
+                    sum(max(float(item.bonus_pence or 0.0), 0.0) for item in completed),
+                    2,
+                ),
+                "confirmed_supplier_credit_today_pence": None,
+                "estimated_bonus_today_pence": round(
+                sum(
+                    max(float(item.bonus_pence or 0.0), 0.0) for item in completed_today
+                ),
+                2,
+            ),
+            "confirmed_supplier_credit_today_pence": None,
+            "completed_bonus_today_pence": round(
                     sum(max(float(item.bonus_pence or 0.0), 0.0) for item in completed),
                     2,
                 ),
@@ -250,11 +276,7 @@ def _install_binary_sensor_patch() -> None:
                     ),
                     2,
                 ),
-                "credit_authority": (
-                    "KEMS retained completed-event result"
-                    if completed
-                    else "current KEMS event estimate"
-                ),
+                "credit_authority": "modelled estimate; not supplier settled",
                 "supplier_settled": False,
             }
         )
@@ -277,7 +299,7 @@ def _install_dashboard_patch() -> None:
     )
     replacement = (
         "              | Export income | −£{{ '%.2f' | format(export / 100) }} |\n"
-        "              | Power Down event credit | −£{{ '%.2f' | "
+        "              | Modelled Power Down bonus (unsettled) | −£{{ '%.2f' | "
         "format((state_attr("
         "'binary_sensor.kems_last_power_down_result_available', "
         "'power_down_credit_today_pence') | float(0)) / 100) }} |\n"
@@ -337,10 +359,14 @@ def _install_diagnostics_patch() -> None:
                 2,
             ),
             "supplier_settled": False,
+            "historical_store_writes_skipped": getattr(
+                recorder, "_alpha9146_store_writes_skipped", 0
+            ),
             "authority_note": (
-                "Completed same-day KEMS event results are authoritative for the "
-                "published KEMS Power Down credit; Octopus supplier "
-                "settlement may differ."
+                "Power Down bonus/credit fields are KEMS modelled estimates, "
+                "not physically metered rewards or Octopus supplier settlement. "
+                "Check physical_export_verified and physical meter coverage "
+                "separately; confirmed supplier credit is unknown."
             ),
         }
         return payload
