@@ -65,7 +65,7 @@ def test_alpha959_release_identity_and_safety_scope() -> None:
     reason = str(bundle["maintenance"]["reason"])
 
     assert manifest["version"] == "0.9.0-alpha9.142"
-    assert reason.startswith("Alpha9.139:")
+    assert reason.startswith("Alpha9.142:")
     assert "Alpha9.59 fixes the final opt-in reload loop" in reason
     assert "Commissioned for control ON" in reason
     assert "Master control enable ON" in reason
