@@ -98,15 +98,16 @@ def test_batched_history_matches_soc_chaining_and_corrected_backfill() -> None:
 
     obj = Manager()
     config, tariff = {"reserve": 15}, {"export_rate": 20.0}
-    call = lambda: batch(
-        obj,
-        days,
-        config,
-        tariff,
-        90.0,
-        85.0,
-        date(2026, 10, 27),
-    )
+    def call():
+        return batch(
+            obj,
+            days,
+            config,
+            tariff,
+            90.0,
+            85.0,
+            date(2026, 10, 27),
+        )
     first = call()
     assert list(first) == [d1.isoformat(), d2.isoformat()]
     assert obj.inputs == [(90.0, 85.0), (89.0, 84.5)]
