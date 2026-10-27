@@ -139,7 +139,7 @@ views:
           The upcoming Agile plan has not been published yet.
           {% endif %}
 
-          _Actions marked as an advisory Agile plan are not inverter commands. During Power Down, event export has priority and KEMS may deliberately withhold the normal physical SOC forecast. Future SOC is shown only when a verified chronological physical replay exists; “—” never represents simulated SOC. FoxESS SOC is a separate observed reading. Physical guards and live conditions always determine actual export._
+          _Actions marked as an advisory Agile plan are not inverter commands. During Power Down, event export has priority and KEMS may deliberately withhold the normal physical SOC forecast. Physical SOC uses verified chronological replay or the conservative discharge-only physical ledger when available; “—” never represents simulated SOC. FoxESS SOC is a separate observed reading. Physical guards and live conditions always determine actual export._
 
       - type: grid
         columns: 2
