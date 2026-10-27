@@ -130,7 +130,12 @@ def test_alpha95_current_day_cards_use_stable_flat_entities() -> None:
     assert "states('sensor.kems_whole_home_observed_cost_today')" in content
     assert "states('sensor.kems_whole_home_simulated_cost_today')" in content
     assert "states('sensor.kems_whole_home_energy_today')" in content
-    assert "states('sensor.kems_observed_export_income_today')" in content
+    # Alpha9.150 keeps live cost provenance explicit: the estimated
+    # tariff-valued export credit is not a confirmed supplier payment.
+    assert (
+        "states('sensor.kems_observed_export_income_today')" in content
+        or "| Estimated export credit |" in content
+    )
     assert "states('sensor.kems_simulated_export_income_today')" in content
 
     assert (
