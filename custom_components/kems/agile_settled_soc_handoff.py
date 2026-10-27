@@ -234,10 +234,24 @@ def refresh_tomorrow_handoff_from_settled_soc(
         "tomorrow",
         "Tomorrow forecast",
     )
+    # The settlement caller has *already* republished its updated live
+    # rolling plan. Preserve that first pass unconditionally: it feeds the
+    # physical control scan. Only a materially different Tomorrow handoff
+    # needs another (expensive) publication through every reporting wrapper.
+    prior_tomorrow_slots = state.get("tomorrow_slots")
+    prior_tomorrow_handoff = state.get("tomorrow_soc_handoff")
     existing_tomorrow = periods.get("tomorrow")
     if not isinstance(existing_tomorrow, dict):
         existing_tomorrow = {}
         periods["tomorrow"] = existing_tomorrow
+    published_keys = (
+        "ready",
+        "days_included",
+        "full_kems_forecast",
+        "agile_smart_export",
+        "comparison",
+    )
+    prior_tomorrow_period = {key: existing_tomorrow.get(key) for key in published_keys}
     for key in (
         "ready",
         "days_included",
@@ -255,6 +269,7 @@ def refresh_tomorrow_handoff_from_settled_soc(
     state["tomorrow_slots"] = tomorrow_slots
     quality = state.get("price_quality")
     quality = quality if isinstance(quality, dict) else {}
+    prior_quality = dict(quality)
     quality.update(
         agile._quality(
             local_now,
@@ -300,7 +315,20 @@ def refresh_tomorrow_handoff_from_settled_soc(
     state["settled_soc_handoff_reconciliation"] = diagnostic
     manager._state = state
 
-    # Re-run the existing publication wrappers so dashboards, rolling sensors,
-    # current routing and shadow evidence all observe the rebuilt handoff.
-    manager._publish(manager._state)
+    # The first, mandatory settlement publication already refreshed today's
+    # rolling/live control route. Do not repeat it simply because this method
+    # was called; repeat only when Tomorrow's actual reported values changed.
+    # A new rate, forecast, SOC, DST rollover or corrected half-hour that
+    # changes any published Tomorrow value still triggers a same-scan refresh.
+    second_publication_needed = (
+        prior_tomorrow_slots != state["tomorrow_slots"]
+        or prior_tomorrow_handoff != state["tomorrow_soc_handoff"]
+        or prior_quality != state["price_quality"]
+        or prior_tomorrow_period
+        != {key: existing_tomorrow.get(key) for key in published_keys}
+    )
+    diagnostic["second_publication_needed"] = second_publication_needed
+    diagnostic["unchanged_tomorrow_publication_skipped"] = not second_publication_needed
+    if second_publication_needed:
+        manager._publish(manager._state)
     return diagnostic

@@ -169,7 +169,7 @@ def test_per_scan_rolling_and_live_hardware_paths_remain_unchanged():
     runtime = (ROOT / "agile_smart_export_runtime_base.py").read_text()
     rolling = (ROOT / "agile_rolling_replan_runtime.py").read_text()
     coordinator = (ROOT / "coordinator.py").read_text()
-    assert "cached_result = (" in source
+    assert "cached_result = await executor(" in source
     assert "await executor(self._compare_day, *compare_args)" in source
     assert "_historical_cached_comparison" in runtime
     assert "runtime.ANALYSIS_REFRESH = timedelta(0)" in rolling
