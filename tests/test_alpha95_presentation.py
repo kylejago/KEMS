@@ -138,10 +138,21 @@ def test_alpha95_current_day_cards_use_stable_flat_entities() -> None:
     )
     assert "states('sensor.kems_simulated_export_income_today')" in content
 
-    assert (
-        "{% set live = p.get('live_data', {}) or {} %}\n"
-        "              | Cost | Live Data |"
-    ) not in content
+    # Legacy Alpha9.5 rewrote the earlier flat daily card. The new canonical
+    # Live Data tab deliberately retains its measured-input live_data ledger
+    # (including gas/standing charges); it must label export as an estimate.
+    if "| Estimated export credit |" in content:
+        assert "{% set live = p.get('live_data', {}) or {} %}" in content
+        live_tab = content.split("  - title: Live Data", 1)[1].split(
+            "  - title: KEMS", 1
+        )[0]
+        assert "simulated_battery_state_of_charge" not in live_tab
+        assert "simulated_grid_export_power" not in live_tab
+    else:
+        assert (
+            "{% set live = p.get('live_data', {}) or {} %}\\n"
+            "              | Cost | Live Data |"
+        ) not in content
     assert (
         "{% set kems = p.get('kems', {}) or {} %}\n" "              | Cost | KEMS |"
     ) not in content
