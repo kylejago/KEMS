@@ -42,7 +42,7 @@ def test_live_faceplate_uses_real_home_assistant_solar_house_and_soc():
     assert "id(ha_live_house_load).state" in source
     assert "battery_charge_from_solar =" in source
     assert "battery_charging && solar_producing" in source
-    assert "        solar_producing = false;\n        solar_to_home_active = false;" not in source
+    assert (\n        "        solar_producing = false;\n        solar_to_home_active = false;"\n        not in source\n    )
     assert "id(ha_live_battery_soc).state" in source
     assert "scenario_soc >= 0.0f" in source  # KEMS face remains separate
 
