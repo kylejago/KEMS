@@ -79,10 +79,10 @@ def test_alpha926_versions_and_bundle_are_coordinated() -> None:
     panel = PANEL.read_text(encoding="utf-8")
     panel_health = PANEL_HEALTH.read_text(encoding="utf-8")
 
-    assert manifest["version"] == "0.9.0-alpha9.150"
-    assert bundle["components"]["panel"]["version"] == "0.9.0-alpha9-panel.3"
-    assert 'panel_config_version: "0.9.0-alpha9-panel.3"' in panel
-    assert 'PANEL_CONFIG_VERSION = "0.9.0-alpha9-panel.3"' in panel_health
+    assert manifest["version"] == "0.9.0-alpha9.151"
+    assert bundle["components"]["panel"]["version"] == "0.9.0-alpha9-panel.4"
+    assert 'panel_config_version: "0.9.0-alpha9-panel.4"' in panel
+    assert 'PANEL_CONFIG_VERSION = "0.9.0-alpha9-panel.4"' in panel_health
 
 
 def test_alpha926_dashboard_source_and_packaged_copy_remain_identical() -> None:

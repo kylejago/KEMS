@@ -207,9 +207,9 @@ def test_alpha930_versions_core_only_panel_remains_alpha9_panel3() -> None:
     bundle = json.loads(BUNDLE.read_text(encoding="utf-8"))
     panel = PANEL.read_text(encoding="utf-8")
 
-    assert manifest["version"] == "0.9.0-alpha9.150"
+    assert manifest["version"] == "0.9.0-alpha9.151"
     assert bundle["bundle"] == "__RELEASE_VERSION__"
     assert bundle["components"]["kems_core"]["version"] == "__RELEASE_VERSION__"
-    assert bundle["components"]["panel"]["version"] == "0.9.0-alpha9-panel.3"
+    assert bundle["components"]["panel"]["version"] == "0.9.0-alpha9-panel.4"
     assert "Alpha9.30" in bundle["maintenance"]["reason"]
-    assert 'PANEL_CONFIG_VERSION = "0.9.0-alpha9-panel.3"' in panel
+    assert 'PANEL_CONFIG_VERSION = "0.9.0-alpha9-panel.4"' in panel
