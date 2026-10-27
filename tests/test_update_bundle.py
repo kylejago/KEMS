@@ -22,7 +22,7 @@ def test_release_bundle_renders_exact_coordinated_alpha9_targets() -> None:
     assert bundle["bundle"] == "0.9.0-alpha9.0"
     assert bundle["components"]["kems_core"]["version"] == "0.9.0-alpha9.0"
     assert bundle["components"]["dashboard"]["version"] == "0.9.0-alpha9.0"
-    assert bundle["components"]["panel"]["version"] == "0.9.0-alpha9-panel.3"
+    assert bundle["components"]["panel"]["version"] == "0.9.0-alpha9-panel.4"
     assert bundle["components"]["property_web"]["version"] == "0.9.0-alpha9-web.0"
     assert bundle["components"]["pi_agent"]["version"] == "0.9.0-alpha9-web.0"
     assert bundle["components"]["public_web"]["version"] == "0.9.0-alpha9-public.0"

@@ -9,7 +9,7 @@ PACKAGED = ROOT / "custom_components" / "kems" / "kems16x16.yaml"
 
 
 def test_managed_panel_keeps_known_working_hardware_and_simple_product_modes() -> None:
-    """The shipped panel must retain hardware while exposing only four products."""
+    """The shipped panel must retain hardware and offer only two display faces."""
     assert PACKAGED.exists()
     content = PACKAGED.read_text(encoding="utf-8")
     assert content.startswith("# KEMS-MANAGED-ESPHOME-PANEL")
@@ -19,7 +19,7 @@ def test_managed_panel_keeps_known_working_hardware_and_simple_product_modes() -
     assert "rgb_order: GRB" in content
     assert "int mx = 15 - x;" in content
     assert 'initial_option: "Live Data"' in content
-    for option in ("Live Data", "Battery & Solar", "Full KEMS", "Full KEMS Agile"):
+    for option in ("Live Data", "KEMS"):
         assert f'- "{option}"' in content
     for obsolete in (
         "No system",
@@ -36,15 +36,15 @@ def test_managed_panel_keeps_known_working_hardware_and_simple_product_modes() -
 def test_alpha8_panel_uses_current_agile_routing_snapshot_feed() -> None:
     """Full KEMS Agile keeps the final coherent routing feed in Alpha8."""
     content = PACKAGED.read_text(encoding="utf-8")
-    assert 'panel_config_version: "0.9.0-alpha9-panel.3"' in content
+    assert 'panel_config_version: "0.9.0-alpha9-panel.4"' in content
     sync = (ROOT / "custom_components" / "kems" / "dashboard.py").read_text(
         encoding="utf-8"
     )
     assert "PANEL6_VERSION_LINE" not in sync
     assert "PANEL7_VERSION_LINE" not in sync
     assert "return PACKAGED_PANEL_PATH.read_bytes()" in sync
-    assert 'display_mode == "Full KEMS Agile"' in content
-    assert "selected_scenario = 7;" in content
+    assert 'const bool live_mode = display_mode != "KEMS";' in content
+    assert "const int selected_scenario = live_mode ? -1 : 7;" in content
     assert "scenario_agile_flow: sensor.kems_panel_full_kems_agile_flow_now" in content
     assert "id: ha_agile_flow" in content
     assert "flow_state = &id(ha_agile_flow).state;" in content
@@ -52,20 +52,13 @@ def test_alpha8_panel_uses_current_agile_routing_snapshot_feed() -> None:
 
 
 def test_panel_subscribes_only_to_reachable_scenario_feeds() -> None:
-    """The four display modes must not subscribe to retired scenario entities."""
+    """Only the live measurements and KEMS Agile display are subscribed."""
     content = PACKAGED.read_text(encoding="utf-8")
     for active in (
-        "scenario_solar_battery: sensor.kems_compare_solar_and_battery_cost_today",
-        (
-            "scenario_full_kems_forecast: "
-            "sensor.kems_compare_full_kems_forecast_cost_today"
-        ),
+        "live_solar_power: sensor.kems_solar_power",
+        "live_house_load: sensor.kems_house_load",
+        "live_battery_soc: sensor.kems_battery_state_of_charge",
         "scenario_agile: sensor.kems_agile_smart_export_cost_today",
-        "scenario_solar_battery_flow: sensor.kems_compare_solar_and_battery_flow_now",
-        (
-            "scenario_full_kems_forecast_flow: "
-            "sensor.kems_compare_full_kems_forecast_flow_now"
-        ),
         "scenario_agile_flow: sensor.kems_panel_full_kems_agile_flow_now",
     ):
         assert active in content
@@ -91,9 +84,9 @@ def test_panel_subscribes_only_to_reachable_scenario_feeds() -> None:
         "scenario_cost[8]",
     ):
         assert retired not in content
-    assert "selected_scenario = 2;" in content
-    assert "selected_scenario = 5;" in content
-    assert "selected_scenario = 7;" in content
+    assert "selected_scenario = 2;" not in content
+    assert "selected_scenario = 5;" not in content
+    assert "const int selected_scenario = live_mode ? -1 : 7;" in content
 
 
 def test_panel_routes_battery_export_visually_through_house_bus() -> None:
@@ -184,7 +177,7 @@ def test_managed_panel_reports_alpha8_firmware_for_ota_verification() -> None:
     panel_health = (ROOT / "custom_components" / "kems" / "panel.py").read_text(
         encoding="utf-8"
     )
-    assert 'PANEL_CONFIG_VERSION = "0.9.0-alpha9-panel.3"' in panel_health
+    assert 'PANEL_CONFIG_VERSION = "0.9.0-alpha9-panel.4"' in panel_health
 
 
 def test_managed_panel_ota_tracks_queue_and_reconnect_health() -> None:
@@ -197,5 +190,5 @@ def test_managed_panel_ota_tracks_queue_and_reconnect_health() -> None:
     )
     assert 'last_ota_result="queued"' in sync
     assert "async_verify_panel_firmware" in sync
-    assert 'PANEL_CONFIG_VERSION = "0.9.0-alpha9-panel.3"' in panel_health
+    assert 'PANEL_CONFIG_VERSION = "0.9.0-alpha9-panel.4"' in panel_health
     assert 'status="Success"' in panel_health
