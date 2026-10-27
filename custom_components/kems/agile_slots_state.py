@@ -350,6 +350,73 @@ def _observed_foxess_soc(coordinator: Any) -> float | None:
     return round(soc, 1) if soc is not None and soc <= 100 else None
 
 
+def _guarded_live_summary(coordinator: Any, state: dict[str, Any]) -> dict[str, Any]:
+    """Show real *final control* and conservative physical budget, not the twin.
+
+    Values are reporting-only. The final control object already passed EV,
+    Power Down, physical reserve and hardware-readiness gates. A plan's AC
+    export budget is shown only when it has verified physical SOC and the
+    explicit physical AC budget cap was applied. Ineligible/old proof stays
+    unavailable; do not substitute simulated proposal fields.
+    """
+    result: dict[str, Any] = {
+        "final_control_export_target_kw": None,
+        "physical_budget_exportable_ac_kwh": None,
+        "verified_physical_soc_lower_bound_percent": None,
+        "physical_guard_status": "unavailable",
+        "control_authority": "unavailable",
+        "reporting_only": True,
+        "hardware_writes": "blocked",
+    }
+    data = getattr(coordinator, "data", None)
+    snapshot = getattr(data, "snapshot", None)
+    control = getattr(data, "control", None)
+    timestamp = getattr(snapshot, "timestamp", None)
+    now = datetime.now(UTC)
+    if (
+        snapshot is None
+        or not isinstance(timestamp, datetime)
+        or timestamp.tzinfo is None
+        or not timedelta(0) <= now - timestamp <= timedelta(seconds=120)
+    ):
+        return result
+
+    result["physical_guard_status"] = str(
+        getattr(coordinator, "_agile_live_reserve_status", {}).get(
+            "status", "unavailable"
+        )
+    )
+    if control is not None and getattr(control, "commands_permitted", False) is True:
+        target = _finite_nonnegative(
+            getattr(control, "desired_battery_export_power_kw", None)
+        )
+        if target is not None:
+            result["final_control_export_target_kw"] = round(target, 3)
+            result["control_authority"] = "final guarded KEMS physical control"
+
+    plan = state.get("rolling_export_plan")
+    if not isinstance(plan, dict) or plan.get("available") is not True:
+        return result
+    proof = plan.get("physical_planning_evidence")
+    generated = _utc_time(plan.get("generated_at"))
+    if (
+        not isinstance(proof, dict)
+        or proof.get("available") is not True
+        or plan.get("planning_soc_source") != "verified FoxESS physical lower bound"
+        or plan.get("physical_ac_export_budget_applied") is not True
+        or generated is None
+        or not timedelta(0) <= now - generated <= timedelta(minutes=5)
+    ):
+        return result
+    budget = _finite_nonnegative(plan.get("physical_ac_export_budget_kwh"))
+    soc = _finite_nonnegative(plan.get("planning_soc_percent"))
+    if budget is None or soc is None or soc > 100:
+        return result
+    result["physical_budget_exportable_ac_kwh"] = round(budget, 3)
+    result["verified_physical_soc_lower_bound_percent"] = round(soc, 2)
+    return result
+
+
 def _attributes(coordinator: Any) -> dict[str, Any]:
     """Return the slot payload used by the rebuilt dashboard and Pi/Web."""
     state = _agile_state(coordinator)
@@ -361,6 +428,7 @@ def _attributes(coordinator: Any) -> dict[str, Any]:
     tomorrow_slots = _presentation_slots(state.get("tomorrow_slots"))
     live_outlook = _physical_live_slot_outlook(coordinator, state)
     advisory_outlook = _advisory_live_slot_outlook(state) if not live_outlook else {}
+    live_control_summary = _guarded_live_summary(coordinator, state)
 
     periods = state.get("periods")
     periods = periods if isinstance(periods, dict) else {}
@@ -397,6 +465,7 @@ def _attributes(coordinator: Any) -> dict[str, Any]:
         "published_plan_slot_outlook": advisory_outlook,
         "published_plan_slot_outlook_available": bool(advisory_outlook),
         "observed_foxess_soc_percent": _observed_foxess_soc(coordinator),
+        "live_control_summary": live_control_summary,
         "physical_live_slot_outlook_basis": (
             next(iter(live_outlook.values())).get("basis")
             if live_outlook

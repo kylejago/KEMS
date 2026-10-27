@@ -50,22 +50,26 @@ views:
             content: |
               {% set bad = ['unknown','unavailable','none',''] %}
               {% set import_rate = states('sensor.kems_current_import_rate') %}
-              {% set export_rate = state_attr('sensor.kems_agile_slots', 'current_rate_pence') %}
-              {% set reserve = states('sensor.kems_exportable_battery_energy_remaining') %}
-              {% set target = states('sensor.kems_target_battery_export_power') %}
+              {% set export_rate = states('sensor.kems_current_export_rate') %}
+              {% set live_guard = state_attr('sensor.kems_agile_slots', 'live_control_summary') or {} %}
+              {% set reserve = live_guard.get('physical_budget_exportable_ac_kwh') %}
+              {% set target = live_guard.get('final_control_export_target_kw') %}
+              {% set lower_soc = live_guard.get('verified_physical_soc_lower_bound_percent') %}
               | Right now | Value |
               |:---|---:|
               | Import price | {{ (import_rate ~ ' p/kWh') if import_rate | lower not in bad else '—' }} |
-              | Agile export price | {{ (export_rate ~ ' p/kWh') if export_rate is not none else '—' }} |
+              | Selected export price | {{ (export_rate ~ ' p/kWh') if export_rate | lower not in bad else '—' }} |
               | Cheap period | {{ 'Active' if is_state('binary_sensor.kems_cheap_period_confirmed', 'on') else 'Not active' }} |
               | Export permitted | {{ 'Yes' if is_state('binary_sensor.kems_grid_export_allowed_by_control', 'on') else 'No' }} |
-              | Battery export target | {{ (target ~ ' kW') if target | lower not in bad else '—' }} |
-              | Exportable battery energy | {{ (reserve ~ ' kWh') if reserve | lower not in bad else '—' }} |
+              | Final guarded battery-export request | {{ ('%.2f kW' | format(target | float)) if target is not none else '—' }} |
+              | Physical-budget AC export allowance | {{ ('%.2f kWh' | format(reserve | float)) if reserve is not none else '—' }} |
+              | Physical planning SOC lower bound | {{ ('%.1f%%' | format(lower_soc | float)) if lower_soc is not none else '—' }} |
+              | Physical export guard | {{ live_guard.get('physical_guard_status', 'unavailable') | replace('_', ' ') }} |
 
               **Next import rate:** {{ states('sensor.kems_next_import_rate') }} p/kWh  
               **Solar forecast tomorrow:** {{ states('sensor.kems_forecast_solar_tomorrow') }} kWh
 
-              _Charge towards 100% when worthwhile: 100% is an optimisation preference, not a mandatory overnight constraint._
+              _Export request comes from the final physically guarded control decision, not the simulation. AC budget and lower-bound SOC require current verified physical planner proof. Missing evidence is shown as —, not synthetic SOC. Charge towards 100% when worthwhile; it is not mandatory._
 
       - type: markdown
         title: Today's actual costs
@@ -83,12 +87,12 @@ views:
           |:---|---:|
           | Electricity import | {{ ('£%.2f' | format(imported | float / 100)) if imported is not none else '—' }} |
           | Electricity standing charge | {{ ('£%.2f' | format(standing | float / 100)) if standing is not none else '—' }} |
-          | Agile export income | {{ ('£%.2f earned' | format(exported | float / 100)) if exported is not none else '—' }} |
+          | Estimated Agile export credit | {{ ('£%.2f' | format(exported | float / 100)) if exported is not none else '—' }} |
           | Net electricity cost | {{ ('£%.2f' | format(electricity | float / 100)) if electricity is not none else '—' }} |
           | Gas including charges | {{ ('£%.2f' | format(gas | float / 100)) if gas is not none else '—' }} |
           | **TOTAL ENERGY COST** | **{{ ('£%.2f' | format(total | float / 100)) if total is not none else '—' }}** |
 
-          _Negative totals represent a net credit. The canonical live bill calculation includes the applicable charges and supplier credits; unavailable figures remain unavailable, never an assumed £0._
+          _Estimated bill-equivalent calculated from observed energy and configured tariffs—not confirmed Octopus settlement. Negative totals indicate estimated credit; unavailable figures are not assumed £0._
 
       - type: entities
         title: Today's measured energy
@@ -287,7 +291,7 @@ views:
               |---|---:|
               | Electricity import | {{ ('£%.2f' | format((live.get('electricity_import_cost_pence') | float) / 100)) if live.get('electricity_import_cost_pence') is not none else '—' }} |
               | Standing charge | {{ ('£%.2f' | format((live.get('electricity_standing_charge_pence') | float) / 100)) if live.get('electricity_standing_charge_pence') is not none else '—' }} |
-              | Export income | {{ ('−£%.2f' | format((live.get('electricity_export_income_pence') | float) / 100)) if live.get('electricity_export_income_pence') is not none else '—' }} |
+              | Estimated export credit | {{ ('−£%.2f' | format((live.get('electricity_export_income_pence') | float) / 100)) if live.get('electricity_export_income_pence') is not none else '—' }} |
               | **Electricity total** | **{{ ('£%.2f' | format((live.get('electricity_total_cost_pence') | float) / 100)) if live.get('electricity_total_cost_pence') is not none else '—' }}** |
               | Gas | {{ ('£%.2f' | format((live.get('gas_total_cost_pence') | float) / 100)) if live.get('gas_total_cost_pence') is not none else '—' }} |
               | **TOTAL ENERGY COST** | **{{ ('£%.2f' | format((live.get('total_energy_cost_pence') | float) / 100)) if live.get('total_energy_cost_pence') is not none else '—' }}** |
