@@ -261,7 +261,13 @@ def _advisory_live_slot_outlook(state: dict[str, Any]) -> dict[str, Any]:
         end = _utc_time(slot.get("valid_to"))
         exported = _finite_nonnegative(slot.get("planned_battery_export_kwh"))
         house = _finite_nonnegative(slot.get("planned_battery_to_home_kwh"))
-        if start is None or end is None or end <= start or exported is None or house is None:
+        if (
+            start is None
+            or end is None
+            or end <= start
+            or exported is None
+            or house is None
+        ):
             return {}
         allocations[start.isoformat()] = slot
 
@@ -282,7 +288,13 @@ def _advisory_live_slot_outlook(state: dict[str, Any]) -> dict[str, Any]:
         if start is None or end is None or end <= now:
             continue
         selected_slot = allocations.get(start.isoformat())
-        if pd_joined and pd_start is not None and pd_end is not None and start < pd_end and end > pd_start:
+        if (
+            pd_joined
+            and pd_start is not None
+            and pd_end is not None
+            and start < pd_end
+            and end > pd_start
+        ):
             action = "Power Down priority — safe export"
         elif selected_slot and selected_slot["planned_battery_export_kwh"] > 0.01:
             action = "Agile battery export planned"
@@ -318,9 +330,17 @@ def _observed_foxess_soc(coordinator: Any) -> float | None:
     if "battery_soc" in (stale_fields or ()):
         return None
     source_ages = getattr(snapshot, "source_age_seconds", {})
-    age = _finite_nonnegative(source_ages.get("battery_soc")) if isinstance(source_ages, dict) else None
+    age = (
+        _finite_nonnegative(source_ages.get("battery_soc"))
+        if isinstance(source_ages, dict)
+        else None
+    )
     max_age = _finite_nonnegative(
-        getattr(getattr(getattr(coordinator, "settings", None), "control", None), "stale_data_seconds", None)
+        getattr(
+            getattr(getattr(coordinator, "settings", None), "control", None),
+            "stale_data_seconds",
+            None,
+        )
     )
     if age is None or max_age is None or age > max_age:
         return None
