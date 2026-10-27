@@ -1071,7 +1071,7 @@ views:
 
       - type: markdown
         content: |
-          _These are **ESPHome panel display controls only**. Keep Product = **KEMS** and Mode = **Control** to allow KEMS to manage FoxESS. Display **Live Data** reads physical power/SOC; display **KEMS** shows the Full KEMS Agile comparison. The automatic window defaults to 06:00–22:00 (Europe/London, including BST); equal on/off times mean always on, and overnight windows are supported. If panel time is unavailable the LEDs stay on. Changing these settings does **not** restart KEMS or change inverter control._
+          _These are **ESPHome panel display controls only**. Keep Product = **KEMS** and Mode = **Control** to allow KEMS to manage FoxESS. Display **Live Data** reads physical power/SOC; display **KEMS** shows the KEMS Agile export comparison. The automatic window defaults to 06:00–22:00 (Europe/London, including BST); equal on/off times mean always on, and overnight windows are supported. If panel time is unavailable the LEDs stay on. Changing these settings does **not** restart KEMS or change inverter control._
 
       - type: grid
         columns: 2
