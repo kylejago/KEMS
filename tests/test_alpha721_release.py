@@ -21,7 +21,7 @@ def test_managed_panel_packaged_source_matches_current_health_version() -> None:
     assert health_match is not None
     source_version = panel_match.group(1)
     health_version = health_match.group(1)
-    assert source_version == "0.9.0-alpha9-panel.3"
+    assert source_version == "0.9.0-alpha9-panel.4"
     assert health_version == source_version
     assert not (KEMS / "panel_ev_policy.py").exists()
     assert "PANEL6_VERSION_LINE" not in dashboard
@@ -43,7 +43,7 @@ def test_alpha721_preserves_agile_panel_capability() -> None:
     """Later panel UX may rename Agile, but the Agile routing capability remains."""
     panel = (KEMS / "kems16x16.yaml").read_text(encoding="utf-8")
 
-    assert '- "Full KEMS Agile"' in panel
+    assert '- "KEMS"' in panel
     assert "sensor.kems_agile_smart_export_cost_today" in panel
     assert "sensor.kems_panel_full_kems_agile_flow_now" in panel
-    assert "sensor.kems_compare_solar_and_battery_flow_now" in panel
+    assert "sensor.kems_solar_power" in panel
