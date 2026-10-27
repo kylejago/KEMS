@@ -320,13 +320,27 @@ def refresh_tomorrow_handoff_from_settled_soc(
     # was called; repeat only when Tomorrow's actual reported values changed.
     # A new rate, forecast, SOC, DST rollover or corrected half-hour that
     # changes any published Tomorrow value still triggers a same-scan refresh.
-    second_publication_needed = (
-        prior_tomorrow_slots != state["tomorrow_slots"]
-        or prior_tomorrow_handoff != state["tomorrow_soc_handoff"]
-        or prior_quality != state["price_quality"]
-        or prior_tomorrow_period
-        != {key: existing_tomorrow.get(key) for key in published_keys}
-    )
+    publication_changes = [
+        name
+        for name, changed in (
+            ("tomorrow_slots", prior_tomorrow_slots != state["tomorrow_slots"]),
+            (
+                "tomorrow_soc_handoff",
+                prior_tomorrow_handoff != state["tomorrow_soc_handoff"],
+            ),
+            ("price_quality", prior_quality != state["price_quality"]),
+            (
+                "tomorrow_period",
+                prior_tomorrow_period
+                != {key: existing_tomorrow.get(key) for key in published_keys},
+            ),
+        )
+        if changed
+    ]
+    second_publication_needed = bool(publication_changes)
+    # Alpha9.148: show *which* exact published Tomorrow values changed.
+    # No relaxed equality, time-based reuse, or stale-data suppression.
+    diagnostic["second_publication_change_reasons"] = publication_changes
     diagnostic["second_publication_needed"] = second_publication_needed
     diagnostic["unchanged_tomorrow_publication_skipped"] = not second_publication_needed
     if second_publication_needed:
