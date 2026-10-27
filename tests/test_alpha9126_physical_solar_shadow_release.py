@@ -15,7 +15,7 @@ def test_alpha9126_release_description_is_coordinated_and_shadow_only() -> None:
         (ROOT / "release" / "kems-bundle.template.json").read_text(encoding="utf-8")
     )
     reason = str(bundle["maintenance"]["reason"]).lower()
-    assert manifest["version"] == "0.9.0-alpha9.146"
+    assert manifest["version"] == "0.9.0-alpha9.147"
     assert reason.startswith("alpha9.146:")
     assert "shadow-only" in reason
     assert "no change to live inverter work-mode commands" in reason

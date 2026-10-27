@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import ast
 import json
-from datetime import UTC, datetime, time
+from datetime import UTC, datetime, time, timedelta
 from pathlib import Path
 from types import SimpleNamespace
 from zoneinfo import ZoneInfo
@@ -78,6 +78,7 @@ def _handoff_function():
 
     ns = {
         "datetime": datetime,
+        "timedelta": timedelta,
         "LONDON": ZoneInfo("Europe/London"),
         "LearnedState": LearnedState,
         "SolarForecastState": SolarForecastState,
