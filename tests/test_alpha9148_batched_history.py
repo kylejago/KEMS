@@ -37,7 +37,10 @@ def _batch_method():
         type_ignores=[],
     )
     namespace = {}
-    exec(compile(ast.fix_missing_locations(module), "<historical-batch>", "exec"), namespace)
+    exec(
+        compile(ast.fix_missing_locations(module), "<historical-batch>", "exec"),
+        namespace,
+    )
     return namespace["_historical_comparison_batch"]
 
 
@@ -77,9 +80,7 @@ def test_batched_history_matches_soc_chaining_and_corrected_backfill() -> None:
                 return deepcopy(self.cache[key])
             return None
 
-        def _compare_day(
-            self, records, config, tariff, agile_soc, full_soc, learned
-        ):
+        def _compare_day(self, records, config, tariff, agile_soc, full_soc, learned):
             self.calculations += 1
             self.inputs.append((agile_soc, full_soc))
             result = {
@@ -144,7 +145,9 @@ def test_batched_worker_does_not_replace_live_or_tomorrow_executor() -> None:
 def test_second_handoff_publication_retains_exact_change_gate() -> None:
     source = (KEMS / "agile_settled_soc_handoff.py").read_text()
     assert '"second_publication_change_reasons"' in source
-    assert '("tomorrow_slots", prior_tomorrow_slots != state["tomorrow_slots"])' in source
+    assert (
+        '("tomorrow_slots", prior_tomorrow_slots != state["tomorrow_slots"])' in source
+    )
     assert '"tomorrow_soc_handoff"' in source
     assert '"price_quality"' in source
     assert '"tomorrow_period"' in source
