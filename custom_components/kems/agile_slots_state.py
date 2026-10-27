@@ -235,6 +235,121 @@ def _physical_live_slot_outlook(
     return result
 
 
+def _advisory_live_slot_outlook(state: dict[str, Any]) -> dict[str, Any]:
+    """Show the published economic plan when physical SOC replay is unavailable.
+
+    Power Down intentionally suspends physical *Agile optimisation* proof. That
+    must never erase the operator-facing planned actions. This fallback has no
+    estimated SOC, never authorises export, and does not feed the optimizer,
+    physical reserve guard or inverter control.
+    """
+    plan = state.get("rolling_export_plan")
+    if not isinstance(plan, dict) or plan.get("available") is not True:
+        return {}
+    generated = _utc_time(plan.get("generated_at"))
+    now = datetime.now(UTC)
+    if generated is None or not timedelta(0) <= now - generated <= timedelta(minutes=5):
+        return {}
+    selected = plan.get("selected_slots")
+    if not isinstance(selected, list):
+        return {}
+    allocations: dict[str, dict[str, Any]] = {}
+    for slot in selected:
+        if not isinstance(slot, dict):
+            return {}
+        start = _utc_time(slot.get("valid_from"))
+        end = _utc_time(slot.get("valid_to"))
+        exported = _finite_nonnegative(slot.get("planned_battery_export_kwh"))
+        house = _finite_nonnegative(slot.get("planned_battery_to_home_kwh"))
+        if (
+            start is None
+            or end is None
+            or end <= start
+            or exported is None
+            or house is None
+        ):
+            return {}
+        allocations[start.isoformat()] = slot
+
+    priority = state.get("power_down_priority")
+    priority = priority if isinstance(priority, dict) else {}
+    pd_start = _utc_time(priority.get("start"))
+    pd_end = _utc_time(priority.get("end"))
+    pd_joined = priority.get("joined") is True
+    today = state.get("today_slots")
+    if not isinstance(today, list):
+        return {}
+    result: dict[str, Any] = {}
+    for slot in today:
+        if not isinstance(slot, dict):
+            continue
+        start = _utc_time(slot.get("valid_from"))
+        end = _utc_time(slot.get("valid_to"))
+        if start is None or end is None or end <= now:
+            continue
+        selected_slot = allocations.get(start.isoformat())
+        if (
+            pd_joined
+            and pd_start is not None
+            and pd_end is not None
+            and start < pd_end
+            and end > pd_start
+        ):
+            action = "Power Down priority — safe export"
+        elif selected_slot and selected_slot["planned_battery_export_kwh"] > 0.01:
+            action = "Agile battery export planned"
+        elif selected_slot and selected_slot["planned_battery_to_home_kwh"] > 0.01:
+            action = "Battery supplies house"
+        else:
+            action = "Hold — no battery export planned"
+        result[slot["valid_from"]] = {
+            "action": action,
+            "estimated_soc_percent": None,
+            "basis": (
+                "advisory Agile schedule; physical guard controls actual dispatch"
+            ),
+            "reporting_only": True,
+            "advisory": True,
+        }
+    return result
+
+
+def _observed_foxess_soc(coordinator: Any) -> float | None:
+    """Publish *observed* physical SOC, never a replayed or simulated forecast."""
+    data = getattr(coordinator, "data", None)
+    snapshot = getattr(data, "snapshot", None)
+    if snapshot is None:
+        return None
+    now = datetime.now(UTC)
+    observed_at = getattr(snapshot, "timestamp", None)
+    if (
+        not isinstance(observed_at, datetime)
+        or observed_at.tzinfo is None
+        or not timedelta(0) <= now - observed_at <= timedelta(seconds=120)
+    ):
+        return None
+    stale_fields = getattr(snapshot, "stale_fields", ())
+    if "battery_soc" in (stale_fields or ()):
+        return None
+    source_ages = getattr(snapshot, "source_age_seconds", {})
+    age = (
+        _finite_nonnegative(source_ages.get("battery_soc"))
+        if isinstance(source_ages, dict)
+        else None
+    )
+    max_age = _finite_nonnegative(
+        getattr(
+            getattr(getattr(coordinator, "settings", None), "control", None),
+            "stale_data_seconds",
+            None,
+        )
+    )
+    if age is None or max_age is None or age > max_age:
+        return None
+    soc = _finite_nonnegative(getattr(snapshot, "battery_soc", None))
+    return round(soc, 1) if soc is not None and soc <= 100 else None
+
+
 def _attributes(coordinator: Any) -> dict[str, Any]:
     """Return the slot payload used by the rebuilt dashboard and Pi/Web."""
     state = _agile_state(coordinator)
@@ -245,6 +360,7 @@ def _attributes(coordinator: Any) -> dict[str, Any]:
     today_slots = _presentation_slots(state.get("today_slots"))
     tomorrow_slots = _presentation_slots(state.get("tomorrow_slots"))
     live_outlook = _physical_live_slot_outlook(coordinator, state)
+    advisory_outlook = _advisory_live_slot_outlook(state) if not live_outlook else {}
 
     periods = state.get("periods")
     periods = periods if isinstance(periods, dict) else {}
@@ -278,6 +394,9 @@ def _attributes(coordinator: Any) -> dict[str, Any]:
         "today_slots": today_slots,
         "physical_live_slot_outlook": live_outlook,
         "physical_live_slot_outlook_available": bool(live_outlook),
+        "published_plan_slot_outlook": advisory_outlook,
+        "published_plan_slot_outlook_available": bool(advisory_outlook),
+        "observed_foxess_soc_percent": _observed_foxess_soc(coordinator),
         "physical_live_slot_outlook_basis": (
             next(iter(live_outlook.values())).get("basis")
             if live_outlook

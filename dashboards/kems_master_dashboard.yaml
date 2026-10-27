@@ -113,7 +113,9 @@ views:
           {% set today = state_attr('sensor.kems_agile_slots', 'today_slots') or [] %}
           {% set tomorrow = state_attr('sensor.kems_agile_slots', 'tomorrow_slots') or [] %}
           {% set physical_slots = state_attr('sensor.kems_agile_slots', 'physical_live_slot_outlook') or {} %}
+          {% set advisory_slots = state_attr('sensor.kems_agile_slots', 'published_plan_slot_outlook') or {} %}
           {% set live_soc = state_attr('sensor.kems_agile_slots', 'physical_live_slot_outlook_current_soc_percent') %}
+          {% set observed_soc = state_attr('sensor.kems_agile_slots', 'observed_foxess_soc_percent') %}
           {% set idx = now().hour * 2 + (1 if now().minute >= 30 else 0) %}
           {% set slots = today[idx:idx + 6] %}
           {% if slots | count < 6 %}
@@ -121,15 +123,15 @@ views:
           {% endif %}
           **Today's published plan:** {{ today | count }}/48 slots · **Tomorrow:** {{ tomorrow | count }}/48 slots  
           **Current Agile export price:** {{ (slots[0].get('rate_pence') ~ ' p/kWh') if slots and idx < (today | count) and slots[0].get('rate_pence') is not none else '—' }}  
-          **Physical planning SOC:** {{ ('%.1f%%' | format(live_soc | float)) if live_soc is not none else 'Awaiting verified physical evidence' }}
+          **FoxESS SOC:** {{ ('%.1f%%' | format(observed_soc | float)) if observed_soc is not none else 'Awaiting fresh reading' }} · **Projected physical SOC:** {{ ('%.1f%%' | format(live_soc | float)) if live_soc is not none else 'Unavailable during priority/uncertainty' }}
 
           {% if slots %}
           | Time | Export rate | Planned action | Est. SOC |
           |:---|---:|:---|---:|
           {% for p in slots %}
           {% set is_tomorrow = loop.index0 + idx >= 48 %}
-          {% set physical = physical_slots.get(p.get('valid_from'), {}) if not is_tomorrow else {} %}
-          {% set action = physical.get('action') or ('Physical SOC path unavailable — see Agile Plan' if not is_tomorrow else 'Tomorrow forecast — see Agile Plan') %}
+          {% set physical = (physical_slots.get(p.get('valid_from')) or advisory_slots.get(p.get('valid_from')) or {}) if not is_tomorrow else {} %}
+          {% set action = physical.get('action') or ('Agile plan unavailable' if not is_tomorrow else 'Tomorrow — provisional') %}
           {% set soc = physical.get('estimated_soc_percent') %}
           | {{ ('Tomorrow ' if is_tomorrow else '') ~ p.get('label', '—') }}{{ ' · NOW' if loop.first else '' }} | {{ ('%.2fp' | format(p.get('rate_pence') | float)) if p.get('rate_pence') is not none else '—' }} | {{ action }} | {{ ('%.1f%%' | format(soc | float)) if soc is not none else '—' }} |
           {% endfor %}
@@ -137,7 +139,7 @@ views:
           The upcoming Agile plan has not been published yet.
           {% endif %}
 
-          _Live SOC outlook uses verified physical FoxESS evidence: chronological forecast replay when proven, otherwise the conservative discharge-only physical ledger (no unverified future solar credit). Unavailable evidence is shown as — rather than substituted from simulated SOC. All actions can change as conditions change._
+          _Actions marked as an advisory Agile plan are not inverter commands. During Power Down, event export has priority and KEMS may deliberately withhold the normal physical SOC forecast. Physical SOC uses verified chronological replay or the conservative discharge-only physical ledger when available; “—” never represents simulated SOC. FoxESS SOC is a separate observed reading. Physical guards and live conditions always determine actual export._
 
       - type: grid
         columns: 2
