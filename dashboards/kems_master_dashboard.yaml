@@ -1054,6 +1054,25 @@ views:
                 entity: sensor.kems_control_preflight
                 name: Control preflight
 
+      - type: entities
+        title: ESPHome panel — display only
+        show_header_toggle: false
+        entities:
+          - entity: select.kems16x16_display_mode
+            name: Display (Live Data / KEMS)
+          - entity: switch.kems16x16_panel_automatic_schedule
+            name: Automatic LED on/off schedule
+          - entity: select.kems16x16_panel_on_time
+            name: LEDs on (UK local time)
+          - entity: select.kems16x16_panel_off_time
+            name: LEDs off (UK local time)
+          - entity: light.kems16x16_panel_brightness
+            name: Panel brightness
+
+      - type: markdown
+        content: |
+          _These are **ESPHome panel display controls only**. Keep Product = **KEMS** and Mode = **Control** to allow KEMS to manage FoxESS. Display **Live Data** reads physical power/SOC; display **KEMS** shows the Full KEMS Agile comparison. The automatic window defaults to 06:00–22:00 (Europe/London, including BST); equal on/off times mean always on, and overnight windows are supported. If panel time is unavailable the LEDs stay on. Changing these settings does **not** restart KEMS or change inverter control._
+
       - type: grid
         columns: 2
         square: false
