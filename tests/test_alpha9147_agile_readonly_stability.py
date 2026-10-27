@@ -92,7 +92,12 @@ def _handoff_function():
         ),
         "reconcile_precheap_projection": lambda **kw: (
             kw["projected_precheap_soc_percent"],
-            {"soc_authority": "test"},
+            {
+                "soc_authority": "test",
+                "projected_precheap_soc_percent": kw[
+                    "projected_precheap_soc_percent"
+                ],
+            },
         ),
         "project_tomorrow_midnight_soc": lambda **kw: (
             kw["current_soc_percent"],

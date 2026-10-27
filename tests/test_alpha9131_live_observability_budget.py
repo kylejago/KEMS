@@ -148,7 +148,7 @@ def test_release_scope_keeps_existing_hardware_and_auto_update_code() -> None:
     manifest = json.loads((KEMS / "manifest.json").read_text())
     bundle = json.loads((ROOT / "release/kems-bundle.template.json").read_text())
     assert manifest["version"] == "0.9.0-alpha9.147"
-    assert bundle["maintenance"]["reason"].startswith("Alpha9.146:")
+    assert bundle["maintenance"]["reason"].startswith("Alpha9.147:")
     assert (
         "all live hardware control logic unchanged" in bundle["maintenance"]["reason"]
     )
