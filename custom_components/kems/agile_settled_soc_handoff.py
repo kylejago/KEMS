@@ -251,9 +251,7 @@ def refresh_tomorrow_handoff_from_settled_soc(
         "agile_smart_export",
         "comparison",
     )
-    prior_tomorrow_period = {
-        key: existing_tomorrow.get(key) for key in published_keys
-    }
+    prior_tomorrow_period = {key: existing_tomorrow.get(key) for key in published_keys}
     for key in (
         "ready",
         "days_included",
@@ -330,9 +328,7 @@ def refresh_tomorrow_handoff_from_settled_soc(
         != {key: existing_tomorrow.get(key) for key in published_keys}
     )
     diagnostic["second_publication_needed"] = second_publication_needed
-    diagnostic["unchanged_tomorrow_publication_skipped"] = (
-        not second_publication_needed
-    )
+    diagnostic["unchanged_tomorrow_publication_skipped"] = not second_publication_needed
     if second_publication_needed:
         manager._publish(manager._state)
     return diagnostic
