@@ -129,9 +129,7 @@ def test_fresh_observed_soc_is_separate_from_future_projection() -> None:
     )
     coordinator = SimpleNamespace(
         data=SimpleNamespace(snapshot=snap),
-        settings=SimpleNamespace(
-            control=SimpleNamespace(stale_data_seconds=180.0)
-        ),
+        settings=SimpleNamespace(control=SimpleNamespace(stale_data_seconds=180.0)),
     )
     assert observed(coordinator) == 64.0
     snap.source_age_seconds["battery_soc"] = 185.0
