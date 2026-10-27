@@ -61,7 +61,7 @@ def test_alpha736_panel_flow_comes_from_final_current_routing_snapshot() -> None
 def test_alpha736_panel_selector_matches_two_display_faces() -> None:
     """Live Data is measured, KEMS retains the Agile comparison feed."""
     source = (KEMS / "kems16x16.yaml").read_text(encoding="utf-8")
-    options = re.search(r"    options:\\n(?P<body>(?:      - .*\\n)+)", source)
+    options = re.search(r"    options:\n(?P<body>(?:      - .*\n)+)", source)
     assert options is not None
     assert options.group("body").splitlines() == [
         '      - "Live Data"',
