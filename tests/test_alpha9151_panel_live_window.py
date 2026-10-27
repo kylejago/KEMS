@@ -6,7 +6,6 @@ import json
 import re
 from pathlib import Path
 
-
 ROOT = Path(__file__).parents[1]
 KEMS = ROOT / "custom_components" / "kems"
 PANEL = KEMS / "kems16x16.yaml"
@@ -112,8 +111,9 @@ def test_manifest_panel_release_and_existing_web_contract():
     assert bundle["components"]["panel"]["version"] == "0.9.0-alpha9-panel.4"
     assert bundle["components"]["property_web"]["version"] == "0.9.0-alpha9-web.0"
     assert bundle["components"]["pi_agent"]["version"] == "0.9.0-alpha9-web.0"
-    assert 'PANEL_CONFIG_VERSION = "0.9.0-alpha9-panel.4"' in (
-        KEMS / "panel.py"
-    ).read_text()
+    assert (
+        'PANEL_CONFIG_VERSION = "0.9.0-alpha9-panel.4"'
+        in (KEMS / "panel.py").read_text()
+    )
     assert 'panel_config_version: "0.9.0-alpha9-panel.4"' in PANEL.read_text()
     assert bundle["maintenance"]["reason"].startswith("Alpha9.151:")
