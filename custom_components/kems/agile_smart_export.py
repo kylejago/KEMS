@@ -170,6 +170,7 @@ class AgileSmartExportManager:
         historical_compare_started = perf_counter()
         historical_day_comparisons = 0
         live_day_comparisons = 0
+        historical_lookup_executor_jobs = 0
         for day, day_records in sorted(grouped.items()):
             if len(day_records) < 2:
                 continue
@@ -191,15 +192,29 @@ class AgileSmartExportManager:
             # This is read-only; the separate rolling physical planner and
             # inverter writer continue executing on every coordinator scan.
             historical_lookup = getattr(self, "_historical_cached_comparison", None)
-            cached_result = (
-                historical_lookup(*compare_args, today=local_now.date())
-                if callable(historical_lookup)
-                else None
-            )
+            executor = getattr(self._hass, "async_add_executor_job", None)
+            if callable(historical_lookup):
+                if day < local_now.date() and callable(executor):
+                    # This strict pickle/SHA-256 input check and its result copy
+                    # are historical reporting work, not physical dispatch.
+                    # Await a single bounded lookup before advancing the SOC
+                    # chain; late rate/backfill corrections still invalidate the
+                    # exact cache on *every* scan, without blocking HA's loop.
+                    cached_result = await executor(
+                        partial(
+                            historical_lookup, *compare_args, today=local_now.date()
+                        )
+                    )
+                    historical_lookup_executor_jobs += 1
+                else:
+                    cached_result = historical_lookup(
+                        *compare_args, today=local_now.date()
+                    )
+            else:
+                cached_result = None
             if cached_result is not None:
                 result = cached_result
             else:
-                executor = getattr(self._hass, "async_add_executor_job", None)
                 if callable(executor):
                     result = await executor(self._compare_day, *compare_args)
                 else:
@@ -324,6 +339,10 @@ class AgileSmartExportManager:
             "rate_refresh_seconds": rate_refresh_seconds,
             "historical_and_live_day_comparisons_seconds": day_comparison_seconds,
             "historical_days_computed_or_cached": historical_day_comparisons,
+            "historical_lookup_executor_jobs": historical_lookup_executor_jobs,
+            "historical_lookup_event_loop_offloaded": bool(
+                historical_lookup_executor_jobs
+            ),
             "live_days_evaluated": live_day_comparisons,
             "tomorrow_projection_seconds": tomorrow_comparison_seconds,
             "period_and_state_aggregation_seconds": state_aggregation_seconds,
