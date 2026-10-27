@@ -4,10 +4,12 @@ substitutions:
   device_name: kems16x16
   friendly_name: "KEMS16x16"
   led_pin: GPIO21
-  panel_config_version: "0.9.0-alpha9-panel.3"
+  panel_config_version: "0.9.0-alpha9-panel.4"
   kems_status: sensor.kems_status
   live_battery_soc: sensor.kems_battery_state_of_charge
   live_battery_power: sensor.kems_battery_power
+  live_solar_power: sensor.kems_solar_power
+  live_house_load: sensor.kems_house_load
   live_grid_import: sensor.kems_grid_import
   live_grid_export: sensor.kems_grid_export
   ev_connected: binary_sensor.kems_ev_connected
@@ -69,6 +71,70 @@ globals:
     type: bool
     restore_value: yes
     initial_value: 'false'
+  - id: panel_schedule_dimmed
+    type: bool
+    restore_value: no
+    initial_value: 'false'
+  - id: panel_saved_brightness
+    type: float
+    restore_value: no
+    initial_value: '0.35'
+
+# Device-local display clock. It is separate from KEMS tariff and control modes.
+# Home Assistant supplies the clock; Europe/London handles BST/GMT changes.
+time:
+  - platform: homeassistant
+    id: panel_local_time
+    timezone: Europe/London
+
+# Blank the actual LEDs outside the configured window, not the KEMS controller.
+# If HA time is unavailable, leave the display ON rather than enforcing an
+# unverified schedule. Start == end means always ON; overnight windows wrap.
+interval:
+  - interval: 10s
+    then:
+      - lambda: |-
+          const bool enabled = id(panel_schedule_enabled).state;
+          const auto now = id(panel_local_time).now();
+          bool should_blank = false;
+          if (enabled && now.is_valid()) {
+            int on_hour = -1, on_minute = -1;
+            int off_hour = -1, off_minute = -1;
+            const std::string start = id(panel_on_time).current_option().c_str();
+            const std::string end = id(panel_off_time).current_option().c_str();
+            if (sscanf(start.c_str(), "%d:%d", &on_hour, &on_minute) == 2 &&
+                sscanf(end.c_str(), "%d:%d", &off_hour, &off_minute) == 2 &&
+                on_hour >= 0 && on_hour < 24 && off_hour >= 0 && off_hour < 24 &&
+                (on_minute == 0 || on_minute == 30) &&
+                (off_minute == 0 || off_minute == 30)) {
+              const int start_of_day = on_hour * 60 + on_minute;
+              const int end_of_day = off_hour * 60 + off_minute;
+              const int minute_of_day = now.hour * 60 + now.minute;
+              if (start_of_day < end_of_day) {
+                should_blank = minute_of_day < start_of_day ||
+                               minute_of_day >= end_of_day;
+              } else if (start_of_day > end_of_day) {
+                should_blank = minute_of_day >= end_of_day &&
+                               minute_of_day < start_of_day;
+              }
+            }
+          }
+          if (should_blank) {
+            if (id(matrix_light).current_values.is_on()) {
+              id(panel_saved_brightness) =
+                  id(matrix_light).current_values.get_brightness();
+              auto call = id(matrix_light).turn_off();
+              call.perform();
+            }
+            id(panel_schedule_dimmed) = true;
+          } else if (id(panel_schedule_dimmed)) {
+            id(panel_schedule_dimmed) = false;
+            if (!id(matrix_light).current_values.is_on()) {
+              auto call = id(matrix_light).turn_on();
+              call.set_brightness(id(panel_saved_brightness));
+              call.perform();
+            }
+          }
 
 select:
   - platform: template
@@ -80,9 +146,130 @@ select:
     initial_option: "Live Data"
     options:
       - "Live Data"
-      - "Battery & Solar"
-      - "Full KEMS"
-      - "Full KEMS Agile"
+      - "KEMS"
+
+  - platform: template
+    id: panel_on_time
+    name: "Panel On Time"
+    icon: mdi:clock-start
+    optimistic: true
+    restore_value: true
+    initial_option: "06:00"
+    options:
+      - "00:00"
+      - "00:30"
+      - "01:00"
+      - "01:30"
+      - "02:00"
+      - "02:30"
+      - "03:00"
+      - "03:30"
+      - "04:00"
+      - "04:30"
+      - "05:00"
+      - "05:30"
+      - "06:00"
+      - "06:30"
+      - "07:00"
+      - "07:30"
+      - "08:00"
+      - "08:30"
+      - "09:00"
+      - "09:30"
+      - "10:00"
+      - "10:30"
+      - "11:00"
+      - "11:30"
+      - "12:00"
+      - "12:30"
+      - "13:00"
+      - "13:30"
+      - "14:00"
+      - "14:30"
+      - "15:00"
+      - "15:30"
+      - "16:00"
+      - "16:30"
+      - "17:00"
+      - "17:30"
+      - "18:00"
+      - "18:30"
+      - "19:00"
+      - "19:30"
+      - "20:00"
+      - "20:30"
+      - "21:00"
+      - "21:30"
+      - "22:00"
+      - "22:30"
+      - "23:00"
+      - "23:30"
+
+  - platform: template
+    id: panel_off_time
+    name: "Panel Off Time"
+    icon: mdi:clock-end
+    optimistic: true
+    restore_value: true
+    initial_option: "22:00"
+    options:
+      - "00:00"
+      - "00:30"
+      - "01:00"
+      - "01:30"
+      - "02:00"
+      - "02:30"
+      - "03:00"
+      - "03:30"
+      - "04:00"
+      - "04:30"
+      - "05:00"
+      - "05:30"
+      - "06:00"
+      - "06:30"
+      - "07:00"
+      - "07:30"
+      - "08:00"
+      - "08:30"
+      - "09:00"
+      - "09:30"
+      - "10:00"
+      - "10:30"
+      - "11:00"
+      - "11:30"
+      - "12:00"
+      - "12:30"
+      - "13:00"
+      - "13:30"
+      - "14:00"
+      - "14:30"
+      - "15:00"
+      - "15:30"
+      - "16:00"
+      - "16:30"
+      - "17:00"
+      - "17:30"
+      - "18:00"
+      - "18:30"
+      - "19:00"
+      - "19:30"
+      - "20:00"
+      - "20:30"
+      - "21:00"
+      - "21:30"
+      - "22:00"
+      - "22:30"
+      - "23:00"
+      - "23:30"
+
+switch:
+  - platform: template
+    id: panel_schedule_enabled
+    name: "Panel Automatic Schedule"
+    icon: mdi:power-sleep
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_ON
+
 text_sensor:
   - platform: template
     id: panel_firmware_version
@@ -117,6 +304,12 @@ sensor:
   - platform: homeassistant
     id: ha_live_battery_power
     entity_id: ${live_battery_power}
+  - platform: homeassistant
+    id: ha_live_solar_power
+    entity_id: ${live_solar_power}
+  - platform: homeassistant
+    id: ha_live_house_load
+    entity_id: ${live_house_load}
   - platform: homeassistant
     id: ha_live_grid_import
     entity_id: ${live_grid_import}
@@ -536,15 +729,10 @@ display:
 
       std::string display_mode =
         id(panel_display_mode).current_option().c_str();
-      const bool live_mode = display_mode == "Live Data";
-      int selected_scenario = -1;
-      if (display_mode == "Battery & Solar") {
-        selected_scenario = 2;
-      } else if (display_mode == "Full KEMS") {
-        selected_scenario = 5;
-      } else if (display_mode == "Full KEMS Agile") {
-        selected_scenario = 7;
-      }
+      // This setting changes the faceplate only. "KEMS" shows the former
+      // "Full KEMS Agile" simulation; KEMS's HA Control mode is independent.
+      const bool live_mode = display_mode != "KEMS";
+      const int selected_scenario = live_mode ? -1 : 7;
       const bool ev_connected = id(ha_ev_connected).state;
       const bool ev_charging = id(ha_ev_charging).state;
       const bool ev_allowed_by_kems = id(ha_ev_allowed).state;
@@ -582,8 +770,15 @@ display:
         grid_exporting =
           !isnan(live_grid_export_power) &&
           live_grid_export_power > POWER_DEADBAND_KW;
-        solar_producing = false;
-        solar_to_home_active = false;
+        const float live_solar_power = id(ha_live_solar_power).state;
+        const float live_house_power = id(ha_live_house_load).state;
+        solar_producing =
+          !isnan(live_solar_power) && live_solar_power > POWER_DEADBAND_KW;
+        // These are observed source-presence indications, not a fabricated
+        // exact per-appliance solar allocation.
+        solar_to_home_active =
+          solar_producing && !isnan(live_house_power) &&
+          live_house_power > POWER_DEADBAND_KW;
         battery_discharging =
           !isnan(battery_power) &&
           battery_power > POWER_DEADBAND_KW;
@@ -605,7 +800,8 @@ display:
         }
         battery_charge_from_grid =
           battery_charging && grid_importing;
-        battery_charge_from_solar = false;
+        battery_charge_from_solar =
+          battery_charging && solar_producing;
       } else {
         const float POWER_DEADBAND_KW = 0.03f;
         const int s = selected_scenario;
