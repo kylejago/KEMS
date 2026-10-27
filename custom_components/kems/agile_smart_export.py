@@ -149,7 +149,7 @@ class AgileSmartExportManager:
         Full-KEMS SOC. Never parallelise these days or serve a stale key: each
         lookup still fingerprints its complete records/config/tariff/SOC/rates,
         and every miss uses the existing numerical replay + cache population.
-        This helper is read-only with respect to physical FoxESS/EV control.
+        This helper is read-only with respect to physical inverter/EV control.
         """
         calculated: dict[str, dict[str, Any]] = {}
         lookup = getattr(self, "_historical_cached_comparison", None)
