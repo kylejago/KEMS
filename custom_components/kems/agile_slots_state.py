@@ -305,7 +305,9 @@ def _advisory_live_slot_outlook(state: dict[str, Any]) -> dict[str, Any]:
         result[slot["valid_from"]] = {
             "action": action,
             "estimated_soc_percent": None,
-            "basis": "advisory published Agile schedule; physical guard controls actual dispatch",
+            "basis": (
+                "advisory Agile schedule; physical guard controls actual dispatch"
+            ),
             "reporting_only": True,
             "advisory": True,
         }
