@@ -6,7 +6,6 @@ import json
 import re
 from pathlib import Path
 
-import yaml
 
 ROOT = Path(__file__).parents[1]
 KEMS = ROOT / "custom_components" / "kems"
