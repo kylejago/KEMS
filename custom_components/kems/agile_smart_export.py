@@ -134,6 +134,39 @@ class AgileSmartExportManager:
                 if isinstance(value, dict)
             }
 
+    def _historical_comparison_batch(
+        self,
+        ordered_days: list[tuple[date, list[Snapshot]]],
+        config: SimulationConfig,
+        tariff: TariffSettings,
+        agile_soc: float,
+        full_soc: float,
+        today: date,
+    ) -> dict[str, dict[str, Any]]:
+        """Replay settled days sequentially inside *one* HA executor call.
+
+        Historical results depend on the previous day's independent Agile and
+        Full-KEMS SOC. Never parallelise these days or serve a stale key: each
+        lookup still fingerprints its complete records/config/tariff/SOC/rates,
+        and every miss uses the existing numerical replay + cache population.
+        This helper is read-only with respect to physical inverter/EV control.
+        """
+        calculated: dict[str, dict[str, Any]] = {}
+        lookup = getattr(self, "_historical_cached_comparison", None)
+        for day, day_records in ordered_days:
+            compare_args = (day_records, config, tariff, agile_soc, full_soc, None)
+            result = lookup(*compare_args, today=today) if callable(lookup) else None
+            if result is None:
+                result = self._compare_day(*compare_args)
+            calculated[day.isoformat()] = result
+            agile_soc = float(
+                result["agile_smart_export"].get("ending_soc_percent") or agile_soc
+            )
+            full_soc = float(
+                result["full_kems_forecast"].get("ending_soc_percent") or full_soc
+            )
+        return calculated
+
     async def async_update(
         self,
         *,
@@ -171,6 +204,33 @@ class AgileSmartExportManager:
         historical_day_comparisons = 0
         live_day_comparisons = 0
         historical_lookup_executor_jobs = 0
+        historical_batch_executor_jobs = 0
+        historical_batch_days = 0
+        today_date = local_now.date()
+        # Historical comparisons form an ordered, SOC-dependent sequence. The
+        # Alpha9.147 one-executor-per-day lookup caused 87 event-loop handoffs
+        # per scan despite a fully warm cache. Batch those settled days into a
+        # single awaited worker without caching today's or tomorrow's replay.
+        historical_days = [
+            (day, day_records)
+            for day, day_records in sorted(grouped.items())
+            if day < today_date and len(day_records) >= 2
+        ]
+        batch_runner = getattr(self, "_historical_comparison_batch", None)
+        executor = getattr(self._hass, "async_add_executor_job", None)
+        batched_results: dict[str, dict[str, Any]] = {}
+        if historical_days and callable(batch_runner) and callable(executor):
+            batched_results = await executor(
+                batch_runner,
+                historical_days,
+                config,
+                tariff,
+                agile_soc,
+                full_soc,
+                today_date,
+            )
+            historical_batch_executor_jobs = 1
+            historical_batch_days = len(historical_days)
         for day, day_records in sorted(grouped.items()):
             if len(day_records) < 2:
                 continue
@@ -193,7 +253,9 @@ class AgileSmartExportManager:
             # inverter writer continue executing on every coordinator scan.
             historical_lookup = getattr(self, "_historical_cached_comparison", None)
             executor = getattr(self._hass, "async_add_executor_job", None)
-            if callable(historical_lookup):
+            if day < today_date and day.isoformat() in batched_results:
+                cached_result = batched_results[day.isoformat()]
+            elif callable(historical_lookup):
                 if day < local_now.date() and callable(executor):
                     # This strict pickle/SHA-256 input check and its result copy
                     # are historical reporting work, not physical dispatch.
@@ -340,8 +402,13 @@ class AgileSmartExportManager:
             "historical_and_live_day_comparisons_seconds": day_comparison_seconds,
             "historical_days_computed_or_cached": historical_day_comparisons,
             "historical_lookup_executor_jobs": historical_lookup_executor_jobs,
+            "historical_batch_executor_jobs": historical_batch_executor_jobs,
+            "historical_batch_days": historical_batch_days,
+            "historical_executor_jobs_total": (
+                historical_lookup_executor_jobs + historical_batch_executor_jobs
+            ),
             "historical_lookup_event_loop_offloaded": bool(
-                historical_lookup_executor_jobs
+                historical_lookup_executor_jobs or historical_batch_executor_jobs
             ),
             "live_days_evaluated": live_day_comparisons,
             "tomorrow_projection_seconds": tomorrow_comparison_seconds,
