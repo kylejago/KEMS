@@ -58,21 +58,20 @@ def test_alpha736_panel_flow_comes_from_final_current_routing_snapshot() -> None
     assert ".services.async_call(" not in source
 
 
-def test_alpha736_panel_selector_matches_four_user_product_types() -> None:
-    """The retained panel renderer exposes only the four user product types."""
+def test_alpha736_panel_selector_matches_two_display_faces() -> None:
+    """Live Data is measured, KEMS retains the Agile comparison feed."""
     source = (KEMS / "kems16x16.yaml").read_text(encoding="utf-8")
-    options = re.search(r"    options:\n(?P<body>(?:      - .*\n)+)", source)
+    options = re.search(r"    options:\\n(?P<body>(?:      - .*\\n)+)", source)
     assert options is not None
     assert options.group("body").splitlines() == [
         '      - "Live Data"',
-        '      - "Battery & Solar"',
-        '      - "Full KEMS"',
-        '      - "Full KEMS Agile"',
+        '      - "KEMS"',
     ]
-    assert 'display_mode == "Battery & Solar"' in source
-    assert 'display_mode == "Full KEMS"' in source
-    assert 'display_mode == "Full KEMS Agile"' in source
+    assert 'const bool live_mode = display_mode != "KEMS";' in source
+    assert "const int selected_scenario = live_mode ? -1 : 7;" in source
     assert "scenario_agile_flow: sensor.kems_panel_full_kems_agile_flow_now" in source
+    assert "scenario_solar_battery_flow:" not in source
+    assert "scenario_full_kems_forecast_flow:" not in source
 
 
 def test_alpha736_dashboard_repairs_missing_compare_values_and_adds_finance() -> None:
