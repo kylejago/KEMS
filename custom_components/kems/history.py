@@ -1,9 +1,9 @@
 """Persistent rolling observation history for KEMS.
 
-Alpha9.154 keeps the 5-minute observation cadence and every-third-record
-checkpoint, but never makes an ordinary inverter-control scan wait for the
-multi-second Home Assistant storage write. Only one checkpoint may run at a
-time; a clean integration unload awaits it and flushes the final tail.
+Alpha9.155 retains the five-minute cadence, three-record checkpoint and
+version-one Store schema. Restored/previously encoded observations are reused
+without recursing through the whole history every save; only new observations
+are encoded in the executor. Normal unload awaits and flushes the final tail.
 """
 
 from __future__ import annotations
@@ -11,7 +11,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from contextlib import suppress
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 from time import perf_counter
 from typing import Any
 
@@ -44,6 +44,9 @@ class HistoryRecorder:
         )
         self._history_days = max(history_days, 1)
         self._records: list[Snapshot] = []
+        # Parallel JSON-ready objects: only newly appended observations are None.
+        # Historical records are observations; never mutate them after capture.
+        self._encoded_records: list[dict[str, Any] | None] = []
         self._unsaved_records = 0
         self._record_revision = 0
         self._saved_revision = 0
@@ -54,6 +57,10 @@ class HistoryRecorder:
         self._last_serialize_seconds = 0.0
         self._last_store_seconds = 0.0
         self._last_total_seconds = 0.0
+        self._last_reused_records = 0
+        self._last_encoded_records = 0
+        self._last_checkpoint_started_at: str | None = None
+        self._last_checkpoint_finished_at: str | None = None
 
     @property
     def records(self) -> list[Snapshot]:
@@ -75,6 +82,13 @@ class HistoryRecorder:
             "last_serialize_worker_seconds": self._last_serialize_seconds,
             "last_store_await_seconds": self._last_store_seconds,
             "last_checkpoint_total_seconds": self._last_total_seconds,
+            "last_checkpoint_started_at": self._last_checkpoint_started_at,
+            "last_checkpoint_finished_at": self._last_checkpoint_finished_at,
+            "last_reused_encoded_records": self._last_reused_records,
+            "last_newly_encoded_records": self._last_encoded_records,
+            "encoded_cache_records": sum(
+                item is not None for item in self._encoded_records
+            ),
             "live_control_waits_for_checkpoint": False,
             "shutdown_flushes_pending_checkpoint": True,
             "storage_schema_version": STORAGE_VERSION,
@@ -85,15 +99,20 @@ class HistoryRecorder:
         data = await self._store.async_load()
         if not data:
             self._records = []
+            self._encoded_records = []
             return
 
-        records: list[Snapshot] = []
+        pairs: list[tuple[Snapshot, dict[str, Any]]] = []
         for item in data.get("records", []):
             try:
-                records.append(Snapshot.from_dict(item))
+                if not isinstance(item, dict):
+                    continue
+                pairs.append((Snapshot.from_dict(item), item))
             except (TypeError, ValueError):
                 continue
-        self._records = sorted(records, key=lambda record: record.timestamp)
+        pairs.sort(key=lambda pair: pair[0].timestamp)
+        self._records = [record for record, _ in pairs]
+        self._encoded_records = [encoded for _, encoded in pairs]
         self._prune()
 
     async def async_record(self, snapshot: Snapshot) -> bool:
@@ -104,6 +123,7 @@ class HistoryRecorder:
                 return False
 
         self._records.append(snapshot)
+        self._encoded_records.append(None)
         self._prune()
         self._record_revision += 1
         self._unsaved_records = self._record_revision - self._saved_revision
@@ -134,22 +154,49 @@ class HistoryRecorder:
     @staticmethod
     def _encode_records(
         records: list[Snapshot],
-    ) -> tuple[dict[str, Any], float]:
-        """Serialise detached observation references in an HA executor worker."""
+        cached: list[dict[str, Any] | None],
+    ) -> tuple[dict[str, Any], float, dict[int, dict[str, Any]], int]:
+        """Encode only new observations; reuse detached JSON-ready history."""
         started = perf_counter()
-        payload = {"records": [record.to_dict() for record in records]}
-        return payload, round(perf_counter() - started, 3)
+        encoded: list[dict[str, Any]] = []
+        new: dict[int, dict[str, Any]] = {}
+        reused = 0
+        for record, previous in zip(records, cached, strict=True):
+            if previous is None:
+                item = record.to_dict()
+                new[id(record)] = item
+            else:
+                item = previous
+                reused += 1
+            encoded.append(item)
+        return {"records": encoded}, round(perf_counter() - started, 3), new, reused
 
     async def _write_checkpoint(self) -> None:
         """Persist one coherent revision; never acknowledge failed writes."""
         revision = self._record_revision
         started = perf_counter()
+        self._last_checkpoint_started_at = datetime.now(UTC).isoformat()
+        records = list(self._records)
+        cached = list(self._encoded_records)
         try:
-            payload, self._last_serialize_seconds = (
-                await self._hass.async_add_executor_job(
-                    self._encode_records, list(self._records)
-                )
+            (
+                payload,
+                self._last_serialize_seconds,
+                newly_encoded,
+                self._last_reused_records,
+            ) = await self._hass.async_add_executor_job(
+                self._encode_records, records, cached
             )
+            self._last_encoded_records = len(newly_encoded)
+            # The coordinator may append/prune during executor encoding.
+            # Merge by object identity only for the exact captured records.
+            # Newly appended observations remain None until the next save.
+            if newly_encoded:
+                for index, record in enumerate(self._records):
+                    if self._encoded_records[index] is None:
+                        item = newly_encoded.get(id(record))
+                        if item is not None:
+                            self._encoded_records[index] = item
             stored_at = perf_counter()
             await self._store.async_save(payload)
             self._last_store_seconds = round(perf_counter() - stored_at, 3)
@@ -164,6 +211,7 @@ class HistoryRecorder:
             self._last_error = None
         finally:
             self._last_total_seconds = round(perf_counter() - started, 3)
+            self._last_checkpoint_finished_at = datetime.now(UTC).isoformat()
 
     async def _async_checkpoint_batch(self) -> None:
         """Coalesce any snapshots arriving while a checkpoint is in flight."""
@@ -186,6 +234,11 @@ class HistoryRecorder:
         if not self._records:
             return
         cutoff = self._records[-1].timestamp - timedelta(days=self._history_days)
-        self._records = [
-            record for record in self._records if record.timestamp >= cutoff
-        ]
+        expired = 0
+        for record in self._records:
+            if record.timestamp >= cutoff:
+                break
+            expired += 1
+        if expired:
+            del self._records[:expired]
+            del self._encoded_records[:expired]

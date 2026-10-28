@@ -1,4 +1,4 @@
-"""Alpha9.154: nonblocking history durability and physical-only solar evidence."""
+"""Alpha9.155: nonblocking history durability and physical-only solar evidence."""
 
 from __future__ import annotations
 
@@ -83,6 +83,8 @@ def _history():
         "Store": FakeStore,
         "Snapshot": FakeSnapshot,
         "timedelta": timedelta,
+        "datetime": datetime,
+        "UTC": UTC,
         "perf_counter": perf_counter,
         "asyncio": asyncio,
         "suppress": suppress,
@@ -181,6 +183,62 @@ def test_history_respects_sampling_and_prunes_after_restart() -> None:
     asyncio.run(exercise())
 
 
+def test_incremental_history_checkpoints_reuse_encodings_across_restart() -> None:
+    async def exercise():
+        FakeSnapshot.thread_ids = []
+        recorder = _history()(FakeHass(), "entry", 90)
+        begin = datetime(2026, 10, 28, 12, tzinfo=UTC)
+        for index in range(6):
+            await recorder.async_record(
+                FakeSnapshot(begin + timedelta(minutes=index * 5), index)
+            )
+            if index in (2, 5):
+                await recorder.async_save()
+
+        store = FakeStore.saved
+        assert len(store.writes) >= 2
+        assert len(FakeSnapshot.thread_ids) == 6
+        assert recorder.status["last_newly_encoded_records"] == 3
+        assert recorder.status["last_reused_encoded_records"] == 3
+        assert recorder.status["encoded_cache_records"] == 6
+        assert recorder.status["last_checkpoint_started_at"]
+        assert recorder.status["last_checkpoint_finished_at"]
+
+        persisted = json.loads(json.dumps(store.writes[-1]))
+        restarted = _history()(FakeHass(), "entry", 90)
+        FakeStore.saved.writes.append(persisted)
+        await restarted.async_load()
+        FakeSnapshot.thread_ids = []
+        assert restarted.status["samples"] == 6
+        await restarted.async_record(FakeSnapshot(begin + timedelta(minutes=30), 6))
+        await restarted.async_save()
+        assert len(FakeSnapshot.thread_ids) == 1
+        assert restarted.status["last_newly_encoded_records"] == 1
+        assert restarted.status["last_reused_encoded_records"] == 6
+        assert restarted.status["pending_records"] == 0
+        assert len(FakeStore.saved.writes[-1]["records"]) == 7
+        assert FakeStore.saved.writes[-1]["records"][0] == persisted["records"][0]
+        assert FakeStore.saved.writes[-1]["records"][-1]["power"] == 6
+
+    asyncio.run(exercise())
+
+
+def test_pruning_removes_encoded_and_unencoded_records_together() -> None:
+    async def exercise():
+        recorder = _history()(FakeHass(), "entry", 1)
+        begin = datetime(2026, 10, 25, 12, tzinfo=UTC)
+        for i in range(3):
+            await recorder.async_record(FakeSnapshot(begin + timedelta(minutes=i * 5)))
+        await recorder.async_save()
+        await recorder.async_record(FakeSnapshot(begin + timedelta(days=3)))
+        assert recorder.status["samples"] == 1
+        assert recorder.status["encoded_cache_records"] == 0
+        await recorder.async_save()
+        assert len(FakeStore.saved.writes[-1]["records"]) == 1
+
+    asyncio.run(exercise())
+
+
 def _solar_flow():
     source = ast.parse((KEMS / "solar_routing_shadow.py").read_text())
     methods = {"_num", "_physical_solar_flow"}
@@ -265,6 +323,6 @@ def test_dashboard_and_diagnostics_never_confuse_twin_with_physical_flow() -> No
 def test_release_identity_and_unchanged_hardware_versions() -> None:
     manifest = json.loads((KEMS / "manifest.json").read_text())
     bundle = json.loads((ROOT / "release" / "kems-bundle.template.json").read_text())
-    assert manifest["version"] == "0.9.0-alpha9.154"
-    assert bundle["maintenance"]["reason"].startswith("Alpha9.154:")
+    assert manifest["version"] == "0.9.0-alpha9.155"
+    assert bundle["maintenance"]["reason"].startswith("Alpha9.155:")
     assert bundle["components"]["panel"]["version"] == "0.9.0-alpha9-panel.4"
