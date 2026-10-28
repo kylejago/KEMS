@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from contextlib import suppress
 from datetime import timedelta
 from time import perf_counter
 from typing import Any
@@ -173,12 +174,10 @@ class HistoryRecorder:
         """Flush in-flight and remaining history on clean integration unload."""
         pending = self._save_task
         if pending is not None:
-            try:
+            # The failed background checkpoint is already logged. Retry the
+            # full retained state synchronously during clean unload.
+            with suppress(Exception):
                 await pending
-            except Exception:
-                # The failed background checkpoint is already logged. Retry the
-                # full retained state synchronously during clean unload.
-                pass
         if self._record_revision > self._saved_revision:
             await self._write_checkpoint()
 
