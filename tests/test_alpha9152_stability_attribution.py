@@ -41,7 +41,9 @@ def test_historical_worker_and_executor_wait_are_recorded_separately() -> None:
     assert "historical_batch_worker_seconds" in source
     assert "historical_batch_await_seconds" in source
     assert "historical_batch_wait_overhead_seconds" in source
-    assert "batched_results, historical_batch_worker_seconds = await executor(" in source
+    assert (
+        "batched_results, historical_batch_worker_seconds = await executor(" in source
+    )
     assert "self._timed_historical_comparison_batch" in source
     assert "historical_batch_executor_jobs = 1" in source
     assert "if day < today_date and day.isoformat() in batched_results:" in source
