@@ -6,6 +6,7 @@ import ast
 import asyncio
 import json
 import logging
+from contextlib import suppress
 from datetime import UTC, datetime, timedelta
 from math import isfinite
 from pathlib import Path
@@ -84,6 +85,7 @@ def _history():
         "timedelta": timedelta,
         "perf_counter": perf_counter,
         "asyncio": asyncio,
+        "suppress": suppress,
         "_LOGGER": logging.getLogger(__name__),
         "STORAGE_VERSION": 1,
         "SAVE_EVERY_RECORDS": 3,
@@ -247,7 +249,7 @@ def test_dashboard_and_diagnostics_never_confuse_twin_with_physical_flow() -> No
     assert "Solar → site" in dashboard
     assert "PV → battery (bounded estimate)" in dashboard
     assert "solar-only export is **not** separately metered" in dashboard
-    assert "sensor.kems_solar_routing_shadow" in dashboard
+    assert "sensor.kems_physical_solar_to_battery_estimate" in dashboard
     shadow = (KEMS / "solar_routing_shadow.py").read_text()
     assert '"physical_solar_flow": _physical_solar_flow(snapshot)' in shadow
     assert '"reporting_only": True' in shadow
