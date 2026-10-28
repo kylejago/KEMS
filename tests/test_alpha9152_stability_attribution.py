@@ -90,7 +90,6 @@ def test_dashboard_never_presents_overnight_projection_as_measured_soc() -> None
     assert "100% preference is a target" in home
     assert "name: Next cheap-window model ceiling" in source
     assert "name: Overnight charge target" not in source
-    assert "No" not in ""  # pure presentation checks do not touch control code
 
 
 def test_release_does_not_force_panel_or_pi_update() -> None:
