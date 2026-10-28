@@ -1,4 +1,4 @@
-"""Alpha9.151: historical batches retain chronological SOC and strict invalidation."""
+"""Alpha9.152: historical batches retain chronological SOC and strict invalidation."""
 
 from __future__ import annotations
 
@@ -160,8 +160,8 @@ def test_second_handoff_publication_retains_exact_change_gate() -> None:
 def test_alpha9148_manifest_and_safety_scope() -> None:
     manifest = json.loads((KEMS / "manifest.json").read_text())
     bundle = json.loads((ROOT / "release/kems-bundle.template.json").read_text())
-    assert manifest["version"] == "0.9.0-alpha9.151"
-    assert bundle["maintenance"]["reason"].startswith("Alpha9.151:")
+    assert manifest["version"] == "0.9.0-alpha9.152"
+    assert bundle["maintenance"]["reason"].startswith("Alpha9.152:")
     coordinator = (KEMS / "coordinator.py").read_text()
     assert "guard_paid_agile_physical_export(" in coordinator
     assert "self._foxess_control.async_update(" in coordinator
