@@ -14,7 +14,7 @@ Home Assistant is stable and there are no watchdog-forced Core restarts since 22
 
 ## Forecast and dashboard presentation
 
-The prior projected overnight maximum was **85.7%** from an assumed **15%** starting SOC. Actual FoxESS SOC reached **91%**. These are not contradictory: the assumed starting SOC is not a measured starting level. The Home tab now shows measured physical SOC, advisory simulated SOC, percentage-point difference, morning requirement, and a **hypothetical next cheap-window ceiling**. The Tomorrow tab no longer labels that value as an overnight *charge target*. This is a presentation correction only.
+The prior projected overnight maximum was **85.7%** from an assumed **15%** starting SOC. Actual FoxESS SOC reached **91%**. These are not contradictory: the assumed starting SOC is not a measured starting level. The physical **Home** and **Live Data** tabs remain strictly physical, with no simulated entity references. The **KEMS comparison** tab now shows measured physical SOC, advisory simulated SOC, percentage-point difference, morning requirement, and a **hypothetical next cheap-window ceiling**. The Tomorrow tab no longer labels that value as an overnight *charge target*. This is a presentation correction only.
 
 **Simulated SOC intentionally differs from physical SOC**, as a counterfactual operating-policy model. A model mismatch must not be repaired by seeding the physical controller from simulation, or by forcing simulation to the physical meter. Live Data and physical reserve guards remain authoritative.
 
