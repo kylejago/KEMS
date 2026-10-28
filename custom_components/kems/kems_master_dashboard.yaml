@@ -387,13 +387,15 @@ views:
           {% set model = states('sensor.kems_simulated_battery_state_of_charge') %}
           {% set required = states('sensor.kems_forecast_required_morning_soc') %}
           {% set ceiling = states('sensor.kems_forecast_maximum_overnight_soc') %}
-          | Battery assessment | Value |
-          |:---|---:|
-          | **Measured FoxESS battery SOC now** | **{{ ('%.1f%%' | format(physical | float)) if physical | lower not in bad else '—' }}** |
-          | Advisory KEMS simulation SOC | {{ ('%.1f%%' | format(model | float)) if model | lower not in bad else '—' }} |
-          | Difference (physical − advisory) | {{ ('%+.1f percentage points' | format((physical | float) - (model | float))) if physical | lower not in bad and model | lower not in bad else '—' }} |
-          | Modelled required morning SOC | {{ (required ~ '%') if required | lower not in bad else '—' }} |
-          | Hypothetical next cheap-window SOC ceiling | {{ (ceiling ~ '%') if ceiling | lower not in bad else '—' }} |
+          **Measured FoxESS battery SOC now:** {{ ('%.1f%%' | format(physical | float)) if physical | lower not in bad else '—' }}
+
+          **Advisory KEMS simulation SOC:** {{ ('%.1f%%' | format(model | float)) if model | lower not in bad else '—' }}
+
+          **Difference (physical − advisory):** {{ ('%+.1f percentage points' | format((physical | float) - (model | float))) if physical | lower not in bad and model | lower not in bad else '—' }}
+
+          **Modelled required morning SOC:** {{ (required ~ '%') if required | lower not in bad else '—' }}
+
+          **Hypothetical next cheap-window SOC ceiling:** {{ (ceiling ~ '%') if ceiling | lower not in bad else '—' }}
 
           _The simulated SOC is a **counterfactual scenario**, not a second meter. Its difference from physical SOC is not an inverter error. The overnight ceiling is a **forecast based on projected starting SOC**, not an observed charge result or a battery charge limit. Actual SOC can exceed that old projection if the battery starts charging at a higher SOC. The 100% preference is a target, not a requirement._
 
