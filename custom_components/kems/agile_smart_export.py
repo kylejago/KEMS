@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import contextlib
 import math
+from hashlib import sha256
+from pickle import HIGHEST_PROTOCOL, PicklingError, dumps
 from dataclasses import dataclass, replace
 from datetime import UTC, date, datetime, time, timedelta
 from functools import partial
@@ -156,6 +158,51 @@ class AgileSmartExportManager:
         and every miss uses the existing numerical replay + cache population.
         This helper is read-only with respect to physical inverter/EV control.
         """
+        # Fingerprint the entire *exact* settled-day input set in a single
+        # binary pass. A matching digest AND unchanged per-day cache revision
+        # proves that the previously verified chronological results are still
+        # current. This avoids serialising the same 88 settled days separately
+        # on every normal scan. Do not rely on identities, timestamps or count:
+        # nested backfills, rates, configuration and initial SOC are all hashed.
+        cache = getattr(self, "_historical_replay_cache", None)
+        day_rates = getattr(self, "_day_rates", None)
+        signature: bytes | None = None
+        if (
+            cache is not None
+            and callable(day_rates)
+            and hasattr(cache, "revision")
+            and callable(getattr(cache, "reuse_fully_verified_batch", None))
+        ):
+            try:
+                signature = sha256(
+                    dumps(
+                        (
+                            ordered_days,
+                            config,
+                            tariff,
+                            agile_soc,
+                            full_soc,
+                            today,
+                            self._product_code,
+                            self._tariff_code,
+                            tuple((day, day_rates(day)) for day, _ in ordered_days),
+                        ),
+                        protocol=HIGHEST_PROTOCOL,
+                    )
+                ).digest()
+            except (PicklingError, TypeError, AttributeError, ValueError, OverflowError, RecursionError):
+                # Custom unpicklable providers remain on the original strict
+                # per-day fingerprint/legacy-fallback path, never a fast hit.
+                signature = None
+            if signature is not None and getattr(
+                self, "_historical_batch_signature", None
+            ) == (signature, cache.revision):
+                reused = cache.reuse_fully_verified_batch(
+                    [day for day, _ in ordered_days]
+                )
+                if reused is not None:
+                    return reused
+
         calculated: dict[str, dict[str, Any]] = {}
         lookup = getattr(self, "_historical_cached_comparison", None)
         for day, day_records in ordered_days:
@@ -170,6 +217,11 @@ class AgileSmartExportManager:
             full_soc = float(
                 result["full_kems_forecast"].get("ending_soc_percent") or full_soc
             )
+        # Only the current exact batch can authorise later fast reuse. Store
+        # after any per-day miss has incremented the cache revision.
+        self._historical_batch_signature = (
+            (signature, cache.revision) if signature is not None else None
+        )
         return calculated
 
     def _timed_historical_comparison_batch(
