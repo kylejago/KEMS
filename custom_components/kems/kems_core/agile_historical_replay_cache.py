@@ -93,6 +93,9 @@ class HistoricalReplayCache:
         self._legacy_fingerprints = 0
         self._persist_dirty = False
         self._restored_days = 0
+        self._revision = 0
+        self._verified_batch_hits = 0
+        self._verified_batch_days = 0
 
     @property
     def status(self) -> dict[str, int | str]:
@@ -118,7 +121,32 @@ class HistoricalReplayCache:
             "input_snapshot_days": 0,
             "input_snapshot_capture_failures": self._snapshot_capture_failures,
             "input_snapshot_policy": "binary_sha256_only_per_historical_day",
+            "verified_batch_hits": self._verified_batch_hits,
+            "verified_batch_days": self._verified_batch_days,
         }
+
+    @property
+    def revision(self) -> int:
+        """Invalidate batch-level reuse whenever the per-day result set changes."""
+        return self._revision
+
+    def reuse_fully_verified_batch(self, days: list[date]) -> dict[str, dict[str, Any]] | None:
+        """Copy settled results only after the caller hashes ALL batch inputs.
+
+        This deliberately does not validate inputs itself. The caller must check
+        its full exact-input SHA-256 signature and this cache revision first.
+        Missing entries fail closed to the normal per-day verification path.
+        """
+        keys = [day.isoformat() for day in days]
+        if any(key not in self._entries for key in keys):
+            return None
+        results = {key: deepcopy(self._entries[key][1]) for key in keys}
+        for key in keys:
+            self._entries.move_to_end(key)
+        self._hits += len(keys)
+        self._verified_batch_hits += 1
+        self._verified_batch_days += len(keys)
+        return results
 
     @property
     def needs_persist(self) -> bool:
@@ -155,6 +183,7 @@ class HistoricalReplayCache:
         full exact-input SHA-256 fingerprint and only settled days are eligible.
         """
         self._entries.clear()
+        self._revision += 1
         self._restored_days = 0
         self._persist_dirty = False
         if (
@@ -263,6 +292,7 @@ class HistoricalReplayCache:
         self._misses += 1
         result = calculate()
         self._entries[key] = (fingerprint, deepcopy(result))
+        self._revision += 1
         self._persist_dirty = True
         self._entries.move_to_end(key)
         while len(self._entries) > self._max_days:
