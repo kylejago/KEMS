@@ -83,13 +83,15 @@ def test_dashboard_never_presents_overnight_projection_as_measured_soc() -> None
     packaged = (KEMS / "kems_master_dashboard.yaml").read_text()
     assert source == packaged
     home = source.split("  - title: Live Data", 1)[0]
-    assert "Battery reality vs planning" in home
-    assert "sensor.kems_battery_state_of_charge" in home
-    assert "sensor.kems_simulated_battery_state_of_charge" in home
-    assert "physical − advisory" in home
-    assert "Hypothetical next cheap-window SOC ceiling" in home
-    assert "counterfactual scenario" in home
-    assert "100% preference is a target" in home
+    kems = source.split("  - title: KEMS", 1)[1]
+    assert "sensor.kems_simulated_" not in home
+    assert "Battery reality vs planning" in kems
+    assert "sensor.kems_battery_state_of_charge" in kems
+    assert "sensor.kems_simulated_battery_state_of_charge" in kems
+    assert "physical − advisory" in kems
+    assert "Hypothetical next cheap-window SOC ceiling" in kems
+    assert "counterfactual scenario" in kems
+    assert "100% preference is a target" in kems
     assert "name: Next cheap-window model ceiling" in source
     assert "name: Overnight charge target" not in source
 
