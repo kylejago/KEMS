@@ -125,9 +125,10 @@ def test_15_minute_checkpoint_does_not_block_next_control_decision() -> None:
         assert recorder.status["pending_records"] >= 4
         store.release.set()
         await recorder.async_save()
-        assert store.writes[-1]["records"][-1]["timestamp"] == (
-            start + timedelta(minutes=15)
-        ).isoformat()
+        assert (
+            store.writes[-1]["records"][-1]["timestamp"]
+            == (start + timedelta(minutes=15)).isoformat()
+        )
         assert recorder.status["pending_records"] == 0
         assert recorder.status["checkpoint_failures"] == 0
         assert recorder.status["checkpoint_count"] >= 2
@@ -164,13 +165,16 @@ def test_history_respects_sampling_and_prunes_after_restart() -> None:
         recorder = _history()(FakeHass(), "entry", 1)
         start = datetime(2026, 10, 28, 12, tzinfo=UTC)
         assert await recorder.async_record(FakeSnapshot(start))
-        assert not await recorder.async_record(FakeSnapshot(start + timedelta(seconds=1)))
+        assert not await recorder.async_record(
+            FakeSnapshot(start + timedelta(seconds=1))
+        )
         assert await recorder.async_record(FakeSnapshot(start + timedelta(days=2)))
         await recorder.async_save()
         assert len(FakeStore.saved.writes[-1]["records"]) == 1
-        assert FakeStore.saved.writes[-1]["records"][0]["timestamp"] == (
-            start + timedelta(days=2)
-        ).isoformat()
+        assert (
+            FakeStore.saved.writes[-1]["records"][0]["timestamp"]
+            == (start + timedelta(days=2)).isoformat()
+        )
 
     asyncio.run(exercise())
 
