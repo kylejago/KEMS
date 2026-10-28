@@ -1599,18 +1599,20 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                         elapsed,
                         biggest,
                         stage_seconds[biggest],
-                        max(detail_seconds, key=detail_seconds.get)
-                        if detail_seconds
-                        else "not_recorded",
-                        float(
-                            getattr(self._agile_smart_export, "_performance_detail", {}).get(
-                                "historical_batch_worker_seconds", 0.0
-                            )
+                        (
+                            max(detail_seconds, key=detail_seconds.get)
+                            if detail_seconds
+                            else "not_recorded"
                         ),
                         float(
-                            getattr(self._agile_smart_export, "_performance_detail", {}).get(
-                                "historical_batch_wait_overhead_seconds", 0.0
-                            )
+                            getattr(
+                                self._agile_smart_export, "_performance_detail", {}
+                            ).get("historical_batch_worker_seconds", 0.0)
+                        ),
+                        float(
+                            getattr(
+                                self._agile_smart_export, "_performance_detail", {}
+                            ).get("historical_batch_wait_overhead_seconds", 0.0)
                         ),
                     )
 
