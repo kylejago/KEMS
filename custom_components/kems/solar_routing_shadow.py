@@ -46,7 +46,7 @@ def _physical_solar_flow(snapshot: Any) -> dict[str, Any]:
         "measured_total_grid_import_kw": grid_import,
         "estimated_pv_to_battery_kw": None,
         "metered_pv_to_grid_kw": None,
-        "measurement_basis": "PV, house, battery and grid metered; PV-only export unmetered",
+        "measurement_basis": "FoxESS physical flows; PV-only export not metered",
         "reporting_only": True,
         "hardware_writes": "forbidden",
     }
