@@ -384,6 +384,11 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
         }
 
     @property
+    def history_persistence_state(self) -> dict[str, object]:
+        """Read-only background checkpoint timing and outstanding durability."""
+        return self._history.status
+
+    @property
     def ev_soc_sync_state(self) -> dict[str, object]:
         """Return the narrow EV SOC sync audit state."""
         return self._ev_soc_sync.status

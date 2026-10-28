@@ -246,6 +246,7 @@ async def async_get_config_entry_diagnostics(
         "last_power_down": data.last_power_down.to_dict(),
         "quality": asdict(data.quality),
         "history_samples": data.history_samples,
+        "history_persistence": coordinator.history_persistence_state,
         "last_update_success": coordinator.last_update_success,
         "last_exception": (
             str(last_exception)
