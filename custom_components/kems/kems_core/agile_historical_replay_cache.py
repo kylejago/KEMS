@@ -67,6 +67,12 @@ def exact_snapshot_values_equal(previous: Any, current: Any) -> bool:
     return False
 
 
+# A release-scoped format identifier prevents replay results produced by earlier
+# simulation code from silently becoming authoritative after an integration upgrade.
+# Bump this whenever the historical comparison algorithm changes.
+PERSISTED_REPLAY_FORMAT = "alpha9.153-historical-replay-v1"
+
+
 class HistoricalReplayCache:
     """Cache historical day results only when every explicit input is unchanged."""
 
@@ -74,7 +80,7 @@ class HistoricalReplayCache:
         if max_days < 1:
             raise ValueError("max_days must be positive")
         self._max_days = max_days
-        self._entries: OrderedDict[str, tuple[str, dict[str, Any]]] = OrderedDict()
+        self._entries: OrderedDict[str, tuple[bytes, dict[str, Any]]] = OrderedDict()
         self._snapshot_hits = 0
         self._snapshot_checks = 0
         self._snapshot_comparison_seconds = 0.0
@@ -85,12 +91,16 @@ class HistoricalReplayCache:
         self._fingerprint_seconds = 0.0
         self._pickle_fingerprints = 0
         self._legacy_fingerprints = 0
+        self._persist_dirty = False
+        self._restored_days = 0
 
     @property
     def status(self) -> dict[str, int | str]:
         return {
             "scope": "historical_day_comparison_only",
             "cached_days": len(self._entries),
+            "restored_days": self._restored_days,
+            "pending_persist": self._persist_dirty,
             "max_days": self._max_days,
             "hits": self._hits,
             "misses": self._misses,
@@ -109,6 +119,69 @@ class HistoricalReplayCache:
             "input_snapshot_capture_failures": self._snapshot_capture_failures,
             "input_snapshot_policy": "binary_sha256_only_per_historical_day",
         }
+
+    @property
+    def needs_persist(self) -> bool:
+        """Whether new historical calculations require a storage checkpoint."""
+        return self._persist_dirty
+
+    def mark_persisted(self) -> None:
+        """Acknowledge persistence only after Home Assistant's store saves."""
+        self._persist_dirty = False
+
+    def export_state(self) -> dict[str, Any]:
+        """Save only bounded historical results and SHA-256 digests, never pickle.
+
+        The stored result is read-only advisory reporting. A restored entry is
+        never trusted without recomputing its exact current input fingerprint.
+        """
+        return {
+            "format": PERSISTED_REPLAY_FORMAT,
+            "entries": [
+                {
+                    "day": day,
+                    "sha256": fingerprint.hex(),
+                    "result": deepcopy(result),
+                }
+                for day, (fingerprint, result) in self._entries.items()
+            ],
+        }
+
+    def restore_state(self, payload: Any) -> None:
+        """Restore a bounded, validated warm cache after an HA/KEMS restart.
+
+        Corrupt, foreign-version, or malformed entries are ignored. Entries
+        cannot authorise physical dispatch: every cache hit still verifies the
+        full exact-input SHA-256 fingerprint and only settled days are eligible.
+        """
+        self._entries.clear()
+        self._restored_days = 0
+        self._persist_dirty = False
+        if not isinstance(payload, dict) or payload.get("format") != PERSISTED_REPLAY_FORMAT:
+            return
+        records = payload.get("entries")
+        if not isinstance(records, list):
+            return
+        for item in records[-self._max_days :]:
+            if not isinstance(item, dict):
+                continue
+            day = item.get("day")
+            digest = item.get("sha256")
+            result = item.get("result")
+            if not isinstance(day, str) or not isinstance(digest, str):
+                continue
+            if not isinstance(result, dict) or len(digest) != 64:
+                continue
+            try:
+                parsed_day = date.fromisoformat(day)
+                fingerprint = bytes.fromhex(digest)
+            except ValueError:
+                continue
+            if parsed_day.isoformat() != day or len(fingerprint) != 32:
+                continue
+            self._entries[day] = (fingerprint, deepcopy(result))
+            self._entries.move_to_end(day)
+        self._restored_days = len(self._entries)
 
     def _fingerprint(self, inputs: tuple[Any, ...]) -> bytes:
         """Fingerprint exact immutable-in-time values of historical inputs."""
@@ -187,6 +260,7 @@ class HistoricalReplayCache:
         self._misses += 1
         result = calculate()
         self._entries[key] = (fingerprint, deepcopy(result))
+        self._persist_dirty = True
         self._entries.move_to_end(key)
         while len(self._entries) > self._max_days:
             self._entries.popitem(last=False)
