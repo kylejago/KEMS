@@ -157,7 +157,10 @@ class HistoricalReplayCache:
         self._entries.clear()
         self._restored_days = 0
         self._persist_dirty = False
-        if not isinstance(payload, dict) or payload.get("format") != PERSISTED_REPLAY_FORMAT:
+        if (
+            not isinstance(payload, dict)
+            or payload.get("format") != PERSISTED_REPLAY_FORMAT
+        ):
             return
         records = payload.get("entries")
         if not isinstance(records, list):
