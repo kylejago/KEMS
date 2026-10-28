@@ -173,7 +173,7 @@ def test_second_handoff_publication_skips_only_identical_tomorrow() -> None:
 def test_release_scope_preserves_control_safety() -> None:
     manifest = json.loads((KEMS / "manifest.json").read_text())
     bundle = json.loads((ROOT / "release" / "kems-bundle.template.json").read_text())
-    assert manifest["version"] == "0.9.0-alpha9.152"
+    assert manifest["version"] == "0.9.0-alpha9.153"
     assert "Alpha9.147" in bundle["maintenance"]["reason"]
     coordinator = (KEMS / "coordinator.py").read_text()
     assert "guard_paid_agile_physical_export(" in coordinator

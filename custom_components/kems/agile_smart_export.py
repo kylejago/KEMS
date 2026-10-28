@@ -133,6 +133,11 @@ class AgileSmartExportManager:
                 for key, value in data["daily"].items()
                 if isinstance(value, dict)
             }
+        # The cache is advisory-only, release-scoped, and every restored hit
+        # is revalidated against the complete current input SHA-256 digest.
+        cache = getattr(self, "_historical_replay_cache", None)
+        if cache is not None:
+            cache.restore_state(data.get("historical_replay_cache"))
 
     def _historical_comparison_batch(
         self,
@@ -426,6 +431,9 @@ class AgileSmartExportManager:
         publish_started = perf_counter()
         self._publish(self._state)
         publication_seconds = round(perf_counter() - publish_started, 3)
+        cache = getattr(self, "_historical_replay_cache", None)
+        if cache is not None and cache.needs_persist:
+            self._dirty = True
         if self._dirty:
             await self.async_save()
         self._performance_detail = {
@@ -472,8 +480,16 @@ class AgileSmartExportManager:
                 ),
                 "rates": [item.to_dict() for item in self._rates],
                 "daily": self._daily,
+                "historical_replay_cache": (
+                    self._historical_replay_cache.export_state()
+                    if getattr(self, "_historical_replay_cache", None) is not None
+                    else None
+                ),
             }
         )
+        cache = getattr(self, "_historical_replay_cache", None)
+        if cache is not None:
+            cache.mark_persisted()
         self._dirty = False
 
     async def async_shutdown(self) -> None:
