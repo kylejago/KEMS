@@ -23,6 +23,70 @@ def _num(value: Any) -> float | None:
     return number if isfinite(number) else None
 
 
+def _physical_solar_flow(snapshot: Any) -> dict[str, Any]:
+    """Report physical solar/battery/grid evidence separately from the twin.
+
+    There is no independent solar-to-grid submeter. Infer a bounded possible
+    PV-to-battery contribution only if all physical sensors are fresh, no EV
+    is connected, grid import is negligible, and the same-sample power
+    balance agrees. Never feed these reporting estimates into dispatch.
+    """
+    solar = _num(getattr(snapshot, "solar_power_kw", None))
+    house = _num(getattr(snapshot, "house_load_kw", None))
+    battery = _num(getattr(snapshot, "battery_power_kw", None))
+    grid_import = _num(getattr(snapshot, "grid_import_kw", None))
+    grid_export = _num(getattr(snapshot, "grid_export_kw", None))
+    charging = round(max(-battery, 0.0), 3) if battery is not None else None
+    evidence: dict[str, Any] = {
+        "status": "measured_only",
+        "measured_pv_kw": solar,
+        "measured_house_kw": house,
+        "measured_battery_charging_kw": charging,
+        "measured_total_grid_export_kw": grid_export,
+        "measured_total_grid_import_kw": grid_import,
+        "estimated_pv_to_battery_kw": None,
+        "metered_pv_to_grid_kw": None,
+        "measurement_basis": "FoxESS PV, load, battery and total grid; no solar-only export meter",
+        "reporting_only": True,
+        "hardware_writes": "forbidden",
+    }
+    if any(
+        value is None or value < 0
+        for value in (solar, house, grid_import, grid_export, charging)
+    ):
+        return evidence
+    ages = getattr(snapshot, "source_age_seconds", None)
+    if not isinstance(ages, dict):
+        return evidence
+    for key in (
+        "solar_power_kw",
+        "house_load_kw",
+        "battery_power_kw",
+        "grid_import_kw",
+        "grid_export_kw",
+    ):
+        age = _num(ages.get(key))
+        if age is None or age < 0 or age > 180:
+            return evidence
+    if getattr(snapshot, "ev_connected", True):
+        return evidence
+    # For a fresh near-zero grid import, the PV surplus is the conservative
+    # maximum possible source of observed battery charging. Require the entire
+    # metered power balance to agree within a small sensor-timing tolerance.
+    balance = solar + grid_import - house - charging - grid_export
+    if (
+        grid_import <= 0.15
+        and charging > 0.0
+        and solar >= house
+        and abs(balance) <= 0.25
+    ):
+        evidence["status"] = "bounded_physical_inference"
+        evidence["estimated_pv_to_battery_kw"] = round(
+            min(charging, max(solar - house, 0.0)), 3
+        )
+    return evidence
+
+
 def _time(value: Any) -> datetime | None:
     try:
         dt = datetime.fromisoformat(str(value))
@@ -131,6 +195,7 @@ def evaluate_solar_routing_shadow(
         "scope": "shadow_only",
         "reporting_only": True,
         "hardware_writes": "forbidden",
+        "physical_solar_flow": _physical_solar_flow(snapshot),
         "observed_solar_kw": solar,
         "observed_house_kw": house,
         "observed_battery_power_kw": battery_kw,
