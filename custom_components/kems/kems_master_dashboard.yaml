@@ -31,14 +31,13 @@ views:
               {% set batt = states('sensor.kems_battery_power') %}
               {% set ev = states('sensor.kems_ev_charging_power') %}
               {% set soc = states('sensor.kems_battery_state_of_charge') %}
-              {% set solar_flow = state_attr('sensor.kems_solar_routing_shadow', 'physical_solar_flow') or {} %}
-              {% set solar_to_battery = solar_flow.get('estimated_pv_to_battery_kw') %}
+              {% set solar_to_battery = states('sensor.kems_physical_solar_to_battery_estimate') %}
               ## 🏠 {{ (home ~ ' kW') if home | lower not in invalid else '—' }} home load
 
               | Live path | Power |
               |:---|---:|
               | ☀️ Solar → site | {{ (pv ~ ' kW') if pv | lower not in invalid else '—' }} |
-              | ☀️ PV → battery (bounded estimate) | {{ ('%.2f kW' | format(solar_to_battery | float)) if solar_to_battery is not none else '—' }} |
+              | ☀️ PV → battery (bounded estimate) | {{ ('%.2f kW' | format(solar_to_battery | float)) if solar_to_battery | lower not in invalid else '—' }} |
               | ⚡ Grid → site | {{ (imp ~ ' kW') if imp | lower not in invalid else '—' }} |
               | ⚡ Site → grid | {{ (exp ~ ' kW') if exp | lower not in invalid else '—' }} |
               | 🔋 {{ 'Battery → site' if batt | float(0) > 0 else 'Site → battery' if batt | float(0) < 0 else 'Battery idle' }} | {{ ('%.2f kW' | format(batt | float | abs)) if batt | lower not in invalid else '—' }} |
