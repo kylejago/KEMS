@@ -185,6 +185,9 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
         self._scenario_report_runtime: dict[str, object] = {}
         self._coordinator_performance: dict[str, object] = {}
         self._coordinator_slow_scans: list[dict[str, object]] = []
+        # Preserve early-morning outliers after the rolling 12 slow scans
+        # have expired. Diagnostics only; never schedule or authorise control.
+        self._coordinator_slow_hourly: dict[str, dict[str, object]] = {}
         self._coordinator_scan_samples: list[float] = []
         self._coordinator_slow_log_at: datetime | None = None
         self._agile_history_backfill = AgileHistoryBackfill(hass, entities)
@@ -587,6 +590,7 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
         return {
             **self._coordinator_performance,
             "recent_slow_scans": list(self._coordinator_slow_scans),
+            "slow_hourly": dict(self._coordinator_slow_hourly),
             "scenario_replay": {
                 **self._scenario_report_gate.status,
                 **self._scenario_report_runtime,
@@ -790,7 +794,11 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                 planning_learned.predicted_energy_until_offpeak_kwh,
                 current_snapshot=snapshot,
             )
+            forecast_started = perf_counter()
             forecast = await self._forecast.async_update(now)
+            detail_seconds["forecast_refresh"] = round(
+                perf_counter() - forecast_started, 3
+            )
             forecast_plan = self._forecast_planning.plan(
                 simulation=planning_simulation,
                 learned=planning_learned,
@@ -809,7 +817,11 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
             if captured:
                 await self._forecast_validation.async_save()
 
+            history_record_started = perf_counter()
             await self._history.async_record(snapshot)
+            detail_seconds["history_record"] = round(
+                perf_counter() - history_record_started, 3
+            )
             checkpoint("physical_snapshot_forecast_history")
             # Dedicated short, restart-safe physical meter trace for booked
             # reward hours. Never substitute a digital-twin estimate for an
@@ -1053,6 +1065,7 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                     "basis": "fixed export uses fixed-rate KEMS simulation",
                     "hardware_writes": "separate bounded backend authority",
                 }
+            control_plan_started = perf_counter()
             control = self._control.plan(
                 snapshot,
                 control_simulation,
@@ -1187,6 +1200,10 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                     now=now,
                 )
             )
+            detail_seconds["control_plan_and_event_overlays"] = round(
+                perf_counter() - control_plan_started, 3
+            )
+            physical_guard_started = perf_counter()
             # Physically constrain paid Agile before any FoxESS writes. The
             # simulation / financial / shadow plan remains unchanged.
             if tariff_type == EXPORT_TARIFF_TYPE_AGILE:
@@ -1249,6 +1266,10 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                     "permitted_export_kw": 0.0,
                 }
 
+            detail_seconds["physical_export_reserve_guard"] = round(
+                perf_counter() - physical_guard_started, 3
+            )
+            ev_hold_started = perf_counter()
             # Paid Agile's confirmed-cheap Force Charge may need the same
             # already-reviewed EV/MinSOC hold as No paid export. This never
             # grants Force Charge on an unconfirmed Intelligent slot.
@@ -1291,6 +1312,9 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
             )
             if stress_started:
                 self._schedule_export_commissioning_timeout()
+            detail_seconds["ev_hold_and_export_commissioning"] = round(
+                perf_counter() - ev_hold_started, 3
+            )
             shadow_started = perf_counter()
             await self._shadow_validation.async_update(
                 snapshot=snapshot,
@@ -1533,9 +1557,32 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                     "seconds": elapsed,
                     "longest_stage": biggest,
                     "longest_stage_seconds": stage_seconds[biggest],
+                    "stage_seconds": dict(stage_seconds),
+                    "stage_detail_seconds": dict(detail_seconds),
+                    "agile_manager_internal_seconds": dict(
+                        getattr(self._agile_smart_export, "_performance_detail", {})
+                    ),
                 }
                 self._coordinator_slow_scans.append(record)
                 self._coordinator_slow_scans = self._coordinator_slow_scans[-12:]
+                # Retain each UTC hour's most severe outlier until the next
+                # day, even after the last-12-scan ring buffer rotates away.
+                # A slow scan is elapsed wall time, NOT event-loop block time.
+                if elapsed >= 10.0:
+                    hour = dt_util.now().strftime("%Y-%m-%dT%H:00Z")
+                    prev = self._coordinator_slow_hourly.get(hour)
+                    sample_count = int(prev.get("count", 0)) if prev else 0
+                    if prev is None or elapsed > float(prev.get("max_seconds", 0.0)):
+                        self._coordinator_slow_hourly[hour] = {
+                            "count": sample_count + 1,
+                            "max_seconds": elapsed,
+                            "example": record,
+                        }
+                    else:
+                        prev["count"] = sample_count + 1
+                    self._coordinator_slow_hourly = dict(
+                        sorted(self._coordinator_slow_hourly.items())[-24:]
+                    )
                 # Preserve every slow scan in diagnostics, but do not flood
                 # Core logs while a long user-visible reporting replay settles.
                 current_log_at = dt_util.now()
@@ -1546,10 +1593,27 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                 ):
                     self._coordinator_slow_log_at = current_log_at
                     LOGGER.warning(
-                        "KEMS refresh %.2fs; slowest stage %s %.2fs",
+                        "KEMS refresh %.2fs; slowest stage %s %.2fs; "
+                        "substage=%s; Agile historical worker=%.2fs, "
+                        "executor overhead=%.2fs",
                         elapsed,
                         biggest,
                         stage_seconds[biggest],
+                        (
+                            max(detail_seconds, key=detail_seconds.get)
+                            if detail_seconds
+                            else "not_recorded"
+                        ),
+                        float(
+                            getattr(
+                                self._agile_smart_export, "_performance_detail", {}
+                            ).get("historical_batch_worker_seconds", 0.0)
+                        ),
+                        float(
+                            getattr(
+                                self._agile_smart_export, "_performance_detail", {}
+                            ).get("historical_batch_wait_overhead_seconds", 0.0)
+                        ),
                     )
 
     def _cheap_window_hours(self, now: datetime | None = None) -> float:

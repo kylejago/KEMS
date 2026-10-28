@@ -167,6 +167,20 @@ class AgileSmartExportManager:
             )
         return calculated
 
+    def _timed_historical_comparison_batch(
+        self,
+        *args: Any,
+    ) -> tuple[dict[str, dict[str, Any]], float]:
+        """Measure actual worker computation separately from executor waiting.
+
+        This historical-only wrapper preserves exact SHA-256 invalidation,
+        sequential carried SOC, and all numerical replay outputs. The caller
+        continues awaiting the same result before advancing to today's plan.
+        """
+        worker_started = perf_counter()
+        result = self._historical_comparison_batch(*args)
+        return result, round(perf_counter() - worker_started, 3)
+
     async def async_update(
         self,
         *,
@@ -206,6 +220,9 @@ class AgileSmartExportManager:
         historical_lookup_executor_jobs = 0
         historical_batch_executor_jobs = 0
         historical_batch_days = 0
+        historical_batch_worker_seconds = 0.0
+        historical_batch_await_seconds = 0.0
+        historical_batch_wait_overhead_seconds = 0.0
         today_date = local_now.date()
         # Historical comparisons form an ordered, SOC-dependent sequence. The
         # Alpha9.147 one-executor-per-day lookup caused 87 event-loop handoffs
@@ -220,14 +237,28 @@ class AgileSmartExportManager:
         executor = getattr(self._hass, "async_add_executor_job", None)
         batched_results: dict[str, dict[str, Any]] = {}
         if historical_days and callable(batch_runner) and callable(executor):
-            batched_results = await executor(
-                batch_runner,
+            batch_wait_started = perf_counter()
+            batched_results, historical_batch_worker_seconds = await executor(
+                self._timed_historical_comparison_batch,
                 historical_days,
                 config,
                 tariff,
                 agile_soc,
                 full_soc,
                 today_date,
+            )
+            historical_batch_await_seconds = round(
+                perf_counter() - batch_wait_started, 3
+            )
+            # Includes scheduling, executor backlog, result transfer and
+            # contention; it is not automatically evidence of event-loop
+            # blocking or of slow computation inside KEMS.
+            historical_batch_wait_overhead_seconds = round(
+                max(
+                    0.0,
+                    historical_batch_await_seconds - historical_batch_worker_seconds,
+                ),
+                3,
             )
             historical_batch_executor_jobs = 1
             historical_batch_days = len(historical_days)
@@ -404,6 +435,11 @@ class AgileSmartExportManager:
             "historical_lookup_executor_jobs": historical_lookup_executor_jobs,
             "historical_batch_executor_jobs": historical_batch_executor_jobs,
             "historical_batch_days": historical_batch_days,
+            "historical_batch_worker_seconds": historical_batch_worker_seconds,
+            "historical_batch_await_seconds": historical_batch_await_seconds,
+            "historical_batch_wait_overhead_seconds": (
+                historical_batch_wait_overhead_seconds
+            ),
             "historical_executor_jobs_total": (
                 historical_lookup_executor_jobs + historical_batch_executor_jobs
             ),

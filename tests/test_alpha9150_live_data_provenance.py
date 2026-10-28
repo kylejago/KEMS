@@ -1,4 +1,4 @@
-"""Alpha9.151: live dashboard never presents the twin as physical authority."""
+"""Alpha9.152: live dashboard never presents the twin as physical authority."""
 
 from __future__ import annotations
 
@@ -124,5 +124,5 @@ def test_sensor_live_fields_read_snapshot_not_simulated_soc() -> None:
     assert "value_fn=lambda data: data.simulation.simulated_battery_soc" in sensors
     assert "physical_ac_export_budget_applied" in SOURCE.read_text()
     assert json.loads((KEMS / "manifest.json").read_text())["version"] == (
-        "0.9.0-alpha9.151"
+        "0.9.0-alpha9.152"
     )
