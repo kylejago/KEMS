@@ -42,6 +42,7 @@ from .const import (
 )
 from .entity import KEMSEntity
 from .kems_core import FOXHOLE_PROPOSAL_PROFILE, KEMSData
+from .solar_routing_shadow import _physical_solar_flow
 from .update_orchestrator import build_update_sensor_entities
 
 ValueFn = Callable[[KEMSData], Any]
@@ -745,6 +746,25 @@ SENSORS: tuple[KEMSSensorEntityDescription, ...] = (
         source_key=CONF_BATTERY_POWER,
         source_all_keys=(CONF_BATTERY_VOLTAGE, CONF_BATTERY_CURRENT),
         value_fn=lambda data: data.snapshot.battery_power_kw,
+    ),
+    KEMSSensorEntityDescription(
+        key="physical_solar_to_battery_estimate",
+        name="PV to battery bounded physical estimate",
+        icon="mdi:solar-power-variant-outline",
+        device_class=SensorDeviceClass.POWER,
+        native_unit_of_measurement=UnitOfPower.KILO_WATT,
+        suggested_display_precision=2,
+        source_key=CONF_SOLAR_POWER,
+        source_all_keys=(
+            CONF_HOUSE_LOAD,
+            CONF_BATTERY_POWER,
+            CONF_GRID_IMPORT,
+            CONF_GRID_EXPORT,
+        ),
+        value_fn=lambda data: _physical_solar_flow(data.snapshot).get(
+            "estimated_pv_to_battery_kw"
+        ),
+        attributes_fn=lambda data: _physical_solar_flow(data.snapshot),
     ),
     KEMSSensorEntityDescription(
         key="solar_power",
