@@ -144,8 +144,10 @@ class HistoryRecorder:
         revision = self._record_revision
         started = perf_counter()
         try:
-            payload, self._last_serialize_seconds = await self._hass.async_add_executor_job(
-                self._encode_records, list(self._records)
+            payload, self._last_serialize_seconds = (
+                await self._hass.async_add_executor_job(
+                    self._encode_records, list(self._records)
+                )
             )
             stored_at = perf_counter()
             await self._store.async_save(payload)
