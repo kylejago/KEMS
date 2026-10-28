@@ -24,8 +24,7 @@ def _historical(cache, *, day=date(2026, 10, 25), inputs=None):
             "ready": True,
             "agile_smart_export": {"ending_soc_percent": 72.0},
             "slot_plan": [
-                {"battery_export_kwh": 0.1, "actions": ["export"]}
-                for _ in range(48)
+                {"battery_export_kwh": 0.1, "actions": ["export"]} for _ in range(48)
             ],
         },
     )
@@ -63,12 +62,15 @@ def test_mutable_nested_input_change_still_invalidates_same_scan():
     inputs = (data, {"tariff": 6.6}, 75.0)
     _historical(cache, inputs=inputs)
     data[0]["energy"][1] = 4.0
-    assert cache.get_cached(
-        day=date(2026, 10, 25),
-        today=date(2026, 10, 28),
-        projection=False,
-        inputs=inputs,
-    ) is None
+    assert (
+        cache.get_cached(
+            day=date(2026, 10, 25),
+            today=date(2026, 10, 28),
+            projection=False,
+            inputs=inputs,
+        )
+        is None
+    )
     assert cache.status["pickle_fingerprints"] == 2
     assert cache.status["hits"] == 0
     _historical(cache, inputs=inputs)
