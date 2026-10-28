@@ -183,6 +183,6 @@ def test_alpha9153_version_and_no_auto_install() -> None:
     assert bundle["maintenance"]["reason"].startswith("Alpha9.153:")
     assert bundle["components"]["panel"]["version"] == "0.9.0-alpha9-panel.4"
     assert (
-        "no changes to chronological SOC carry"
+        "no changes to chronological soc carry"
         in bundle["maintenance"]["reason"].lower()
     )
