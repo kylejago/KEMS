@@ -136,7 +136,9 @@ def test_batched_history_matches_soc_chaining_and_corrected_backfill() -> None:
 def test_batched_worker_does_not_replace_live_or_tomorrow_executor() -> None:
     source = (KEMS / "agile_smart_export.py").read_text()
     assert "if day < today_date and len(day_records) >= 2" in source
-    assert "batched_results, historical_batch_worker_seconds = await executor(" in source
+    assert (
+        "batched_results, historical_batch_worker_seconds = await executor(" in source
+    )
     assert "historical_batch_executor_jobs = 1" in source
     assert '"historical_executor_jobs_total"' in source
     assert "historical_lookup_event_loop_offloaded" in source
