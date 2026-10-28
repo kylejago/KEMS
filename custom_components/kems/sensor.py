@@ -749,7 +749,7 @@ SENSORS: tuple[KEMSSensorEntityDescription, ...] = (
     ),
     KEMSSensorEntityDescription(
         key="physical_solar_to_battery_estimate",
-        name="PV to battery bounded physical estimate",
+        name="Physical solar to battery estimate",
         icon="mdi:solar-power-variant-outline",
         device_class=SensorDeviceClass.POWER,
         native_unit_of_measurement=UnitOfPower.KILO_WATT,
