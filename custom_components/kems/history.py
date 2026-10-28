@@ -86,7 +86,9 @@ class HistoryRecorder:
             "last_checkpoint_finished_at": self._last_checkpoint_finished_at,
             "last_reused_encoded_records": self._last_reused_records,
             "last_newly_encoded_records": self._last_encoded_records,
-            "encoded_cache_records": sum(item is not None for item in self._encoded_records),
+            "encoded_cache_records": sum(
+                item is not None for item in self._encoded_records
+            ),
             "live_control_waits_for_checkpoint": False,
             "shutdown_flushes_pending_checkpoint": True,
             "storage_schema_version": STORAGE_VERSION,
