@@ -12,7 +12,7 @@ from copy import deepcopy
 from dataclasses import fields, is_dataclass
 from datetime import date, datetime, time, timedelta
 from hashlib import sha256
-from pickle import HIGHEST_PROTOCOL, PicklingError, dumps
+from pickle import HIGHEST_PROTOCOL, PicklingError, dumps, loads
 from struct import pack
 from time import perf_counter
 from typing import Any
@@ -81,6 +81,13 @@ class HistoricalReplayCache:
             raise ValueError("max_days must be positive")
         self._max_days = max_days
         self._entries: OrderedDict[str, tuple[bytes, dict[str, Any]]] = OrderedDict()
+        # Binary copies are produced from verified, local JSON-like replay
+        # results; persisted cache remains normal JSON, never pickle bytes.
+        # Keeping a private serialized representation makes read isolation much
+        # cheaper than recursively deepcopying every historic slot per scan.
+        self._encoded_results: dict[str, bytes] = {}
+        self._fast_result_copies = 0
+        self._fallback_result_copies = 0
         self._snapshot_hits = 0
         self._snapshot_checks = 0
         self._snapshot_comparison_seconds = 0.0
@@ -93,9 +100,6 @@ class HistoricalReplayCache:
         self._legacy_fingerprints = 0
         self._persist_dirty = False
         self._restored_days = 0
-        self._revision = 0
-        self._verified_batch_hits = 0
-        self._verified_batch_days = 0
 
     @property
     def status(self) -> dict[str, int | str]:
@@ -109,6 +113,10 @@ class HistoricalReplayCache:
             "misses": self._misses,
             "live_evaluations": self._live_evaluations,
             "hardware_writes": "unchanged",
+            "result_copy_method": "local_pickle_loads_with_deepcopy_fallback",
+            "encoded_result_days": len(self._encoded_results),
+            "fast_result_copies": self._fast_result_copies,
+            "fallback_result_copies": self._fallback_result_copies,
             "fingerprint_method": "binary_pickle_sha256_with_legacy_fallback",
             "fingerprint_seconds_total": round(self._fingerprint_seconds, 3),
             "pickle_fingerprints": self._pickle_fingerprints,
@@ -121,32 +129,29 @@ class HistoricalReplayCache:
             "input_snapshot_days": 0,
             "input_snapshot_capture_failures": self._snapshot_capture_failures,
             "input_snapshot_policy": "binary_sha256_only_per_historical_day",
-            "verified_batch_hits": self._verified_batch_hits,
-            "verified_batch_days": self._verified_batch_days,
         }
 
-    @property
-    def revision(self) -> int:
-        """Invalidate batch-level reuse whenever the per-day result set changes."""
-        return self._revision
+    def _remember_encoded_result(self, day: str, value: dict[str, Any]) -> None:
+        """Encode only a privately owned result; failure retains deep-copy path."""
+        try:
+            self._encoded_results[day] = dumps(value, protocol=HIGHEST_PROTOCOL)
+        except (PicklingError, TypeError, AttributeError, ValueError, OverflowError):
+            self._encoded_results.pop(day, None)
 
-    def reuse_fully_verified_batch(self, days: list[date]) -> dict[str, dict[str, Any]] | None:
-        """Copy settled results only after the caller hashes ALL batch inputs.
-
-        This deliberately does not validate inputs itself. The caller must check
-        its full exact-input SHA-256 signature and this cache revision first.
-        Missing entries fail closed to the normal per-day verification path.
-        """
-        keys = [day.isoformat() for day in days]
-        if any(key not in self._entries for key in keys):
-            return None
-        results = {key: deepcopy(self._entries[key][1]) for key in keys}
-        for key in keys:
-            self._entries.move_to_end(key)
-        self._hits += len(keys)
-        self._verified_batch_hits += 1
-        self._verified_batch_days += len(keys)
-        return results
+    def _isolated_result(self, day: str, result: dict[str, Any]) -> dict[str, Any]:
+        """Never hand callers the cached result or a shared mutable child."""
+        encoded = self._encoded_results.get(day)
+        if encoded is not None:
+            try:
+                isolated = loads(encoded)
+                if isinstance(isolated, dict):
+                    self._fast_result_copies += 1
+                    return isolated
+            except (TypeError, ValueError, EOFError, ImportError, AttributeError):
+                # Result copy only. Cached SHA-256 verification stays intact.
+                self._encoded_results.pop(day, None)
+        self._fallback_result_copies += 1
+        return deepcopy(result)
 
     @property
     def needs_persist(self) -> bool:
@@ -183,7 +188,7 @@ class HistoricalReplayCache:
         full exact-input SHA-256 fingerprint and only settled days are eligible.
         """
         self._entries.clear()
-        self._revision += 1
+        self._encoded_results.clear()
         self._restored_days = 0
         self._persist_dirty = False
         if (
@@ -212,6 +217,7 @@ class HistoricalReplayCache:
             if parsed_day.isoformat() != day or len(fingerprint) != 32:
                 continue
             self._entries[day] = (fingerprint, deepcopy(result))
+            self._remember_encoded_result(day, self._entries[day][1])
             self._entries.move_to_end(day)
         self._restored_days = len(self._entries)
 
@@ -254,7 +260,7 @@ class HistoricalReplayCache:
             return None
         self._hits += 1
         self._entries.move_to_end(key)
-        return deepcopy(cached[1])
+        return self._isolated_result(key, cached[1])
 
     def evaluate(
         self,
@@ -287,14 +293,15 @@ class HistoricalReplayCache:
         if cached is not None and cached[0] == fingerprint:
             self._hits += 1
             self._entries.move_to_end(key)
-            return deepcopy(cached[1])
+            return self._isolated_result(key, cached[1])
 
         self._misses += 1
         result = calculate()
         self._entries[key] = (fingerprint, deepcopy(result))
-        self._revision += 1
+        self._remember_encoded_result(key, self._entries[key][1])
         self._persist_dirty = True
         self._entries.move_to_end(key)
         while len(self._entries) > self._max_days:
-            self._entries.popitem(last=False)
+            evicted_day, _ = self._entries.popitem(last=False)
+            self._encoded_results.pop(evicted_day, None)
         return result
