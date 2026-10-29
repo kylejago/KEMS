@@ -212,9 +212,7 @@ def test_planner_uses_identical_house_horizon_and_does_not_change_twin(
     budget, report = planning.conservative_physical_export_budget(
         manager, now=NOW, config=SIM
     )
-    assert report["forecast_house_until_cheap_kwh"] == pytest.approx(
-        1.954, abs=0.001
-    )
+    assert report["forecast_house_until_cheap_kwh"] == pytest.approx(1.954, abs=0.001)
     assert report["independent_house_buffer_kwh"] == 2.0
     assert report["minimum_reserve_kwh"] == pytest.approx(8.463)
     assert 0.0 < budget < 0.5

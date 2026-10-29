@@ -119,7 +119,6 @@ def physical_energy_evidence_matches_snapshot(
     )
 
 
-
 def house_forecast_to_cheap_deadline(
     remaining_calendar_day_kwh: float,
     *,
