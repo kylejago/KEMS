@@ -8,7 +8,7 @@ export; never alter the accounting, history or no-paid-export control path.
 from __future__ import annotations
 
 from dataclasses import replace
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from math import isfinite
 from typing import Any
 
@@ -117,6 +117,62 @@ def physical_energy_evidence_matches_snapshot(
         and "battery_power_kw" not in snapshot.stale_fields
         and _finite(snapshot.battery_power_kw) is not None
     )
+
+
+
+def house_forecast_to_cheap_deadline(
+    remaining_calendar_day_kwh: float,
+    *,
+    now: datetime,
+    deadline: datetime | None,
+    house_load_kw: float | None,
+    house_age_seconds: float | None,
+    house_stale: bool = False,
+) -> tuple[float, str]:
+    """Restrict the remaining-calendar-day forecast to verified precheap demand.
+
+    Never drop the independent 2 kWh/20% house buffer or the 15% battery
+    reserve. On absent/old physical load, ambiguous timestamps, or a deadline
+    across midnight, retain the full-day forecast and fail conservatively.
+    """
+    expected = _finite(remaining_calendar_day_kwh)
+    if expected is None or expected < 0.0:
+        return 0.0, "invalid_calendar_day_forecast"
+    observed = _finite(house_load_kw)
+    age = _finite(house_age_seconds)
+    if (
+        deadline is None
+        or now.tzinfo is None
+        or deadline.tzinfo is None
+        or observed is None
+        or observed < 0.0
+        or age is None
+        or not 0.0 <= age <= 90.0
+        or house_stale
+    ):
+        return expected, "full_calendar_day_missing_verified_house_or_deadline"
+
+    # Limit this correction to earlier same-UTC-calendar-day cheap windows.
+    # Ambiguous local-midnight/DST windows retain the full-day reserve.
+    now_utc = now.astimezone(UTC)
+    deadline_utc = deadline.astimezone(UTC)
+    midnight_utc = now_utc.replace(
+        hour=0, minute=0, second=0, microsecond=0
+    ) + timedelta(days=1)
+    if not now_utc < deadline_utc < midnight_utc:
+        return expected, "full_calendar_day_deadline_outside_verified_horizon"
+
+    full_hours = (midnight_utc - now_utc).total_seconds() / 3600.0
+    deadline_hours = (deadline_utc - now_utc).total_seconds() / 3600.0
+    if not 0.0 < deadline_hours < full_hours:
+        return expected, "full_calendar_day_invalid_horizon"
+
+    # Maintain the fresh measured house load as a physical short-horizon
+    # floor, even when the learned calendar-day forecast is smaller.
+    proportional = expected * (deadline_hours / full_hours)
+    live_floor = observed * deadline_hours
+    bounded = min(expected, max(proportional, live_floor))
+    return bounded, "verified_earlier_cheap_deadline_with_live_house_floor"
 
 
 # Cloud Ohme periodically reports unavailable for ~40 seconds. This is an
@@ -820,6 +876,22 @@ def guard_paid_agile_physical_export(
     ):
         return reduce("reliable remaining-house forecast unavailable")
 
+    # Exclude only verifiable post-cheap calendar-day demand, retaining
+    # the complete independent safety buffer and stale-source fallback.
+    house_age = (
+        _finite(snapshot.source_age_seconds.get("house_load_kw"))
+        if isinstance(snapshot.source_age_seconds, dict)
+        else None
+    )
+    house_to_cheap, house_basis = house_forecast_to_cheap_deadline(
+        expected_house,
+        now=now,
+        deadline=deadline,
+        house_load_kw=snapshot.house_load_kw,
+        house_age_seconds=house_age,
+        house_stale="house_load_kw" in snapshot.stale_fields,
+    )
+
     # Solar cannot be counted on when weather confidence is modest. Even at
     # high confidence, conservatively credit at most 25% of solar forecast.
     confidence = _finite(getattr(forecast_plan, "confidence_percent", None))
@@ -834,9 +906,9 @@ def guard_paid_agile_physical_export(
         and expected_solar > 0.0
     ):
         solar_credit = min(
-            expected_house, expected_solar * _MAX_FORECAST_SOLAR_CREDIT_FRACTION
+            house_to_cheap, expected_solar * _MAX_FORECAST_SOLAR_CREDIT_FRACTION
         )
-    net_home = max(expected_house - solar_credit, 0.0)
+    net_home = max(house_to_cheap - solar_credit, 0.0)
     buffer_kwh = max(_MIN_HOUSE_BUFFER_KWH, _HOUSE_BUFFER_FRACTION * net_home)
     reserve_percent = max(
         _MIN_PLANNING_RESERVE_PERCENT,
@@ -883,6 +955,9 @@ def guard_paid_agile_physical_export(
             "pessimistic_soc_aging_discharge_kwh": round(pessimistic_discharge_kwh, 3),
             "minimum_battery_reserve_kwh": round(reserve_kwh, 3),
             "forecast_house_energy_kwh": round(expected_house, 3),
+            "forecast_house_until_cheap_kwh": round(house_to_cheap, 3),
+            "forecast_house_horizon_basis": house_basis,
+            "independent_house_buffer_kwh": round(buffer_kwh, 3),
             "conservative_solar_credit_kwh": round(solar_credit, 3),
             "protected_home_energy_kwh": round(protected_home_kwh, 3),
             "exportable_physical_energy_kwh": round(surplus_kwh, 3),
