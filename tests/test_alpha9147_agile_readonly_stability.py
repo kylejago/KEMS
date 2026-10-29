@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import ast
+import asyncio
 import json
 from datetime import UTC, datetime, time, timedelta
+from functools import partial
 from pathlib import Path
 from time import perf_counter, thread_time
 from types import SimpleNamespace
@@ -33,7 +35,7 @@ def _handoff_function():
     method = next(
         node
         for node in ast.parse(source).body
-        if isinstance(node, ast.FunctionDef)
+        if isinstance(node, ast.AsyncFunctionDef)
         and node.name == "refresh_tomorrow_handoff_from_settled_soc"
     )
     module = ast.Module(
@@ -81,6 +83,7 @@ def _handoff_function():
         "datetime": datetime,
         "perf_counter": perf_counter,
         "thread_time": thread_time,
+        "partial": partial,
         "timedelta": timedelta,
         "LONDON": ZoneInfo("Europe/London"),
         "LearnedState": LearnedState,
@@ -151,24 +154,24 @@ def test_second_handoff_publication_skips_only_identical_tomorrow() -> None:
     )
     now = datetime(2026, 10, 27, 8, 15, tzinfo=UTC)
 
-    first = fn(manager, now=now, config=config)
+    first = asyncio.run(fn(manager, now=now, config=config))
     assert first["applied"] is True
     assert first["second_publication_needed"] is True
     assert len(publications) == 1
 
-    second = fn(manager, now=now, config=config)
+    second = asyncio.run(fn(manager, now=now, config=config))
     assert second["unchanged_tomorrow_publication_skipped"] is True
     assert len(publications) == 1
 
     # Any changed Tomorrow slot still republishes during this same scan.
     manager._slot_payload = lambda *args: [{"slot": "corrected-price"}]
-    corrected = fn(manager, now=now, config=config)
+    corrected = asyncio.run(fn(manager, now=now, config=config))
     assert corrected["second_publication_needed"] is True
     assert len(publications) == 2
 
     # A new cheap-period SOC forecast also invalidates the skip gate.
     manager._kems_forecast_arbitrage_plan.projected_soc_at_cheap_start_percent = 73
-    changed_forecast = fn(manager, now=now, config=config)
+    changed_forecast = asyncio.run(fn(manager, now=now, config=config))
     assert changed_forecast["second_publication_needed"] is True
     assert len(publications) == 3
 
@@ -182,3 +185,52 @@ def test_release_scope_preserves_control_safety() -> None:
     assert "guard_paid_agile_physical_export(" in coordinator
     assert "self._foxess_control.async_update(" in coordinator
     assert "if post_shadow_settlement_changed:" in coordinator
+
+
+def test_tomorrow_comparison_uses_awaited_executor_when_available() -> None:
+    fn, Learned, Solar, Forecast, Tariff = _handoff_function()
+    compares = []
+
+    async def run_worker(work):
+        compares.append("executor")
+        return work()
+
+    manager = SimpleNamespace(
+        _state={
+            "periods": {
+                "today": {
+                    "agile_smart_export": {"ending_soc_percent": 80},
+                    "full_kems_forecast": {"ending_soc_percent": 82},
+                },
+                "tomorrow": {},
+            },
+            "rolling_export_plan": {"simulated_soc_percent": 75.0},
+            "price_quality": {},
+            "today_slots": [],
+        },
+        _kems_forecast_arbitrage_learned=Learned(),
+        _kems_forecast_arbitrage_forecast=Solar(),
+        _kems_forecast_arbitrage_plan=Forecast(),
+        _rolling_tariff=Tariff(),
+        _tomorrow_records=lambda *args: [1, 2],
+        _compare_day=lambda *args, **kwargs: (
+            compares.append("compare") or {"ready": True}
+        ),
+        _slot_payload=lambda *args: [{"slot": "tomorrow"}],
+        _hass=SimpleNamespace(async_add_executor_job=run_worker),
+    )
+    manager._publish = lambda state: compares.append("publish")
+    config = SimpleNamespace(
+        battery_initial_percent=70,
+        battery_reserve_percent=15,
+        battery_capacity_kwh=56.42,
+        max_charge_kw=7,
+        discharge_efficiency=0.95,
+        charge_efficiency=0.95,
+    )
+    diagnostic = asyncio.run(
+        fn(manager, now=datetime(2026, 10, 29, 8, 15, tzinfo=UTC), config=config)
+    )
+    assert compares == ["executor", "compare", "publish"]
+    assert diagnostic["tomorrow_compare_executor_offloaded"] is True
+    assert diagnostic["second_publication_needed"] is True
