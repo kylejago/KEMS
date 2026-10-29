@@ -940,6 +940,14 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                 tariff=self.settings.tariff,
             )
             agile_planning_seconds = round(perf_counter() - agile_planning_started, 3)
+            manager_base_seconds = float(
+                getattr(self._agile_smart_export, "_performance_detail", {}).get(
+                    "total_manager_base_seconds", agile_planning_seconds
+                )
+            )
+            detail_seconds["agile_manager_wrapper_seconds"] = round(
+                max(agile_planning_seconds - manager_base_seconds, 0.0), 3
+            )
             checkpoint("agile_rolling_price_optimisation")
 
             # Alpha9.123 financial solar-routing SHADOW. This is deliberately
@@ -1021,10 +1029,20 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                 self._shadow_validation._settled
             )
             pre_settlement_started = perf_counter()
-            self._agile_smart_export.reconcile_current_day_settlements(
+            pre_settlement = self._agile_smart_export.reconcile_current_day_settlements(
                 settled_half_hours=list(self._shadow_validation._settled),
                 now=now,
             )
+            pre_detail = (
+                pre_settlement.get("current_day_settlement_reconciliation", {})
+                if isinstance(pre_settlement, dict)
+                else {}
+            )
+            pre_timing = pre_detail.get("performance", {})
+            if isinstance(pre_timing, dict):
+                for key, value in pre_timing.items():
+                    if isinstance(value, (int, float)) and not isinstance(value, bool):
+                        detail_seconds[f"precontrol_{key}"] = value
             detail_seconds["precontrol_settlement_reconciliation"] = round(
                 perf_counter() - pre_settlement_started, 3
             )
@@ -1343,10 +1361,24 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
             )
             if post_shadow_settlement_changed:
                 post_settlement_started = perf_counter()
-                self._agile_smart_export.reconcile_current_day_settlements(
-                    settled_half_hours=list(self._shadow_validation._settled),
-                    now=now,
+                post_settlement = (
+                    self._agile_smart_export.reconcile_current_day_settlements(
+                        settled_half_hours=list(self._shadow_validation._settled),
+                        now=now,
+                    )
                 )
+                post_detail = (
+                    post_settlement.get("current_day_settlement_reconciliation", {})
+                    if isinstance(post_settlement, dict)
+                    else {}
+                )
+                post_timing = post_detail.get("performance", {})
+                if isinstance(post_timing, dict):
+                    for key, value in post_timing.items():
+                        if isinstance(value, (int, float)) and not isinstance(
+                            value, bool
+                        ):
+                            detail_seconds[f"postshadow_{key}"] = value
                 detail_seconds["postshadow_settlement_reconciliation"] = round(
                     perf_counter() - post_settlement_started, 3
                 )

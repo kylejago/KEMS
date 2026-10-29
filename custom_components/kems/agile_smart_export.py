@@ -434,9 +434,12 @@ class AgileSmartExportManager:
         cache = getattr(self, "_historical_replay_cache", None)
         if cache is not None and cache.needs_persist:
             self._dirty = True
+        persistence_started = perf_counter()
         if self._dirty:
             await self.async_save()
+        persistence_await_seconds = round(perf_counter() - persistence_started, 3)
         self._performance_detail = {
+            "persistence_await_seconds": persistence_await_seconds,
             "rate_refresh_seconds": rate_refresh_seconds,
             "historical_and_live_day_comparisons_seconds": day_comparison_seconds,
             "historical_days_computed_or_cached": historical_day_comparisons,

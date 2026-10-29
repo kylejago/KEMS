@@ -6,6 +6,7 @@ import ast
 import json
 from datetime import UTC, datetime, time, timedelta
 from pathlib import Path
+from time import perf_counter, thread_time
 from types import SimpleNamespace
 from zoneinfo import ZoneInfo
 
@@ -78,6 +79,8 @@ def _handoff_function():
 
     ns = {
         "datetime": datetime,
+        "perf_counter": perf_counter,
+        "thread_time": thread_time,
         "timedelta": timedelta,
         "LONDON": ZoneInfo("Europe/London"),
         "LearnedState": LearnedState,
@@ -173,7 +176,7 @@ def test_second_handoff_publication_skips_only_identical_tomorrow() -> None:
 def test_release_scope_preserves_control_safety() -> None:
     manifest = json.loads((KEMS / "manifest.json").read_text())
     bundle = json.loads((ROOT / "release" / "kems-bundle.template.json").read_text())
-    assert manifest["version"] == "0.9.0-alpha9.156"
+    assert manifest["version"] == "0.9.0-alpha9.157"
     assert "Alpha9.147" in bundle["maintenance"]["reason"]
     coordinator = (KEMS / "coordinator.py").read_text()
     assert "guard_paid_agile_physical_export(" in coordinator
