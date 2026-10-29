@@ -900,7 +900,8 @@ def guard_paid_agile_physical_export(
     )
     solar_credit = 0.0
     if (
-        confidence is not None
+        house_basis.startswith("full_calendar_day")
+        and confidence is not None
         and confidence >= _SOLAR_CREDIT_MIN_CONFIDENCE
         and expected_solar is not None
         and expected_solar > 0.0
