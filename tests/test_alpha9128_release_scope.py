@@ -15,7 +15,7 @@ def test_alpha9128_manifest_bundle_and_replay_scope() -> None:
         (ROOT / "release" / "kems-bundle.template.json").read_text(encoding="utf-8")
     )
     reason = str(bundle["maintenance"]["reason"]).lower()
-    assert manifest["version"] == "0.9.0-alpha9.156"
+    assert manifest["version"] == "0.9.0-alpha9.157"
     assert reason.startswith("alpha9.156:")
     assert "current and tomorrow" in reason
     assert "physical/ev/dno/export safety authority unchanged" in reason
