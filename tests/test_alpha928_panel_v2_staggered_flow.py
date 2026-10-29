@@ -42,7 +42,7 @@ def test_alpha928_versions_coordinate_core_and_panel2() -> None:
     panel_health = PANEL_HEALTH.read_text(encoding="utf-8")
     reason = str(bundle["maintenance"]["reason"]).lower()
 
-    assert manifest["version"] == "0.9.0-alpha9.158"
+    assert manifest["version"] == "0.9.0-alpha9.159"
     assert bundle["components"]["panel"]["version"] == "0.9.0-alpha9-panel.4"
     assert 'panel_config_version: "0.9.0-alpha9-panel.4"' in panel
     assert 'PANEL_CONFIG_VERSION = "0.9.0-alpha9-panel.4"' in panel_health

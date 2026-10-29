@@ -12,7 +12,6 @@ blocked.
 from __future__ import annotations
 
 from datetime import UTC, datetime, time, timedelta
-from functools import partial
 from time import perf_counter, thread_time
 from typing import Any
 
@@ -79,7 +78,7 @@ def _today_display_midnight_soc(
     return None
 
 
-async def refresh_tomorrow_handoff_from_settled_soc(
+def refresh_tomorrow_handoff_from_settled_soc(
     manager,
     *,
     now: datetime,
@@ -224,24 +223,15 @@ async def refresh_tomorrow_handoff_from_settled_soc(
 
     compare_started = perf_counter()
     compare_cpu_started = thread_time()
-    # Await the pure simulation in the same HA executor used by the base
-    # manager; keep the exact comparison and all same-scan safety ordering.
-    compare_args = (
+    tomorrow = manager._compare_day(
         tomorrow_records,
         config,
         tariff,
         agile_midnight,
         full_midnight,
         None,
+        projection=True,
     )
-    executor = getattr(getattr(manager, "_hass", None), "async_add_executor_job", None)
-    tomorrow_compare_offloaded = callable(executor)
-    if tomorrow_compare_offloaded:
-        tomorrow = await executor(
-            partial(manager._compare_day, *compare_args, projection=True)
-        )
-    else:
-        tomorrow = manager._compare_day(*compare_args, projection=True)
     tomorrow_compare_seconds = round(perf_counter() - compare_started, 3)
     tomorrow_compare_cpu_seconds = round(thread_time() - compare_cpu_started, 3)
     corrected_period = agile._aggregate(
@@ -367,7 +357,6 @@ async def refresh_tomorrow_handoff_from_settled_soc(
         second_publication_seconds = round(perf_counter() - publish_started, 3)
         second_publication_cpu_seconds = round(thread_time() - publish_cpu_started, 3)
     diagnostic["tomorrow_compare_seconds"] = tomorrow_compare_seconds
-    diagnostic["tomorrow_compare_executor_offloaded"] = tomorrow_compare_offloaded
     diagnostic["tomorrow_compare_thread_cpu_seconds"] = tomorrow_compare_cpu_seconds
     diagnostic["second_publication_seconds"] = second_publication_seconds
     diagnostic["second_publication_thread_cpu_seconds"] = second_publication_cpu_seconds
