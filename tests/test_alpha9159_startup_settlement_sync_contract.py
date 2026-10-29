@@ -13,9 +13,18 @@ OWNER_METHODS = (
     ("agile_current_day_settlement.py", "SettledCurrentDayAgileSmartExportManager"),
     ("agile_midnight_rollover.py", "MidnightRolloverAgileSmartExportManager"),
     ("agile_flow_presentation.py", "FlowPresentationAgileSmartExportManager"),
-    ("agile_canonical_flow_accounting.py", "CanonicalFlowAccountingAgileSmartExportManager"),
-    ("agile_live_solar_soc_continuity.py", "LiveSolarSocContinuityAgileSmartExportManager"),
-    ("agile_deadline_settlement_consistency.py", "DeadlineSettlementConsistencyAgileSmartExportManager"),
+    (
+        "agile_canonical_flow_accounting.py",
+        "CanonicalFlowAccountingAgileSmartExportManager",
+    ),
+    (
+        "agile_live_solar_soc_continuity.py",
+        "LiveSolarSocContinuityAgileSmartExportManager",
+    ),
+    (
+        "agile_deadline_settlement_consistency.py",
+        "DeadlineSettlementConsistencyAgileSmartExportManager",
+    ),
 )
 
 
@@ -24,17 +33,19 @@ def test_every_settlement_owner_has_a_synchronous_override() -> None:
     for filename, classname in OWNER_METHODS:
         module = ast.parse((KEMS / filename).read_text(encoding="utf-8"))
         cls = next(
-            node for node in module.body
+            node
+            for node in module.body
             if isinstance(node, ast.ClassDef) and node.name == classname
         )
         method = next(
-            node for node in cls.body
+            node
+            for node in cls.body
             if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
             and node.name == "reconcile_current_day_settlements"
         )
-        assert isinstance(method, ast.FunctionDef), (
-            f"{filename}:{classname} must preserve the synchronous MRO contract"
-        )
+        assert isinstance(
+            method, ast.FunctionDef
+        ), f"{filename}:{classname} must preserve the synchronous MRO contract"
         assert not any(isinstance(n, ast.Await) for n in ast.walk(method))
 
 
@@ -42,7 +53,8 @@ def test_settlement_handoff_and_coordinator_preserve_sync_calls() -> None:
     helper = (KEMS / "agile_settled_soc_handoff.py").read_text(encoding="utf-8")
     tree = ast.parse(helper)
     handoff = next(
-        node for node in tree.body
+        node
+        for node in tree.body
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
         and node.name == "refresh_tomorrow_handoff_from_settled_soc"
     )
@@ -50,8 +62,14 @@ def test_settlement_handoff_and_coordinator_preserve_sync_calls() -> None:
     assert "tomorrow = manager._compare_day(" in helper
     assert "manager._publish(manager._state)" in helper
     coordinator = (KEMS / "coordinator.py").read_text(encoding="utf-8")
-    assert "pre_settlement = self._agile_smart_export.reconcile_current_day_settlements(" in coordinator
-    assert "await self._agile_smart_export.reconcile_current_day_settlements(" not in coordinator
+    assert (
+        "pre_settlement = self._agile_smart_export.reconcile_current_day_settlements("
+        in coordinator
+    )
+    assert (
+        "await self._agile_smart_export.reconcile_current_day_settlements("
+        not in coordinator
+    )
     assert "if post_shadow_settlement_changed:" in coordinator
     assert "guard_paid_agile_physical_export(" in coordinator
 
