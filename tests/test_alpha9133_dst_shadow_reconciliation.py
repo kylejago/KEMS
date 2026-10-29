@@ -158,8 +158,8 @@ def test_controller_run_order_does_not_move_hardware_or_settlement() -> None:
 def test_release_version_and_read_only_scope() -> None:
     manifest = json.loads((KEMS / "manifest.json").read_text())
     bundle = json.loads((ROOT / "release/kems-bundle.template.json").read_text())
-    assert manifest["version"] == "0.9.0-alpha9.158"
+    assert manifest["version"] == "0.9.0-alpha9.159"
     reason = bundle["maintenance"]["reason"]
-    assert reason.startswith("Alpha9.158:")
+    assert reason.startswith("Alpha9.159:")
     assert "Alpha9.132: Run pure Agile day replays" in reason
     assert "No live FoxESS" in reason
