@@ -132,21 +132,25 @@ def conservative_physical_export_budget(
         return None, {"available": False, "reason": "invalid physical budget inputs"}
     snapshot = context.get("snapshot")
     if snapshot is None:
-        return None, {"available": False, "reason": "physical snapshot missing"}
-    house_ages = getattr(snapshot, "source_age_seconds", None)
-    house_age = (
-        _number(house_ages.get("house_load_kw"))
-        if isinstance(house_ages, dict)
-        else None
-    )
-    house_to_cheap, house_basis = house_forecast_to_cheap_deadline(
-        expected_house,
-        now=now,
-        deadline=getattr(snapshot, "next_offpeak_start", None),
-        house_load_kw=getattr(snapshot, "house_load_kw", None),
-        house_age_seconds=house_age,
-        house_stale="house_load_kw" in getattr(snapshot, "stale_fields", ()),
-    )
+        # Diagnostic-only simulations have no physical snapshot. Keep the
+        # full calendar forecast, not an unverified shortened horizon.
+        house_to_cheap = expected_house
+        house_basis = "full_calendar_day_missing_physical_snapshot"
+    else:
+        house_ages = getattr(snapshot, "source_age_seconds", None)
+        house_age = (
+            _number(house_ages.get("house_load_kw"))
+            if isinstance(house_ages, dict)
+            else None
+        )
+        house_to_cheap, house_basis = house_forecast_to_cheap_deadline(
+            expected_house,
+            now=now,
+            deadline=getattr(snapshot, "next_offpeak_start", None),
+            house_load_kw=getattr(snapshot, "house_load_kw", None),
+            house_age_seconds=house_age,
+            house_stale="house_load_kw" in getattr(snapshot, "stale_fields", ()),
+        )
     confidence = _number(getattr(forecast_plan, "confidence_percent", None))
     expected_solar = _number(
         getattr(forecast_plan, "expected_solar_remaining_today_kwh", None)

@@ -166,6 +166,11 @@ def house_forecast_to_cheap_deadline(
     if not 0.0 < deadline_hours < full_hours:
         return expected, "full_calendar_day_invalid_horizon"
 
+    # Use only a short near-cheap horizon. Over longer windows, a linear
+    # daily mean is not reliable enough to reduce the physical reserve.
+    if deadline_hours > 4.0:
+        return expected, "full_calendar_day_cheap_window_too_far_away"
+
     # Maintain the fresh measured house load as a physical short-horizon
     # floor, even when the learned calendar-day forecast is smaller.
     proportional = expected * (deadline_hours / full_hours)

@@ -143,6 +143,18 @@ def test_no_horizon_shortcut_for_midnight_or_after_cheap() -> None:
         assert basis.startswith("full_calendar_day")
 
 
+def test_long_remaining_horizon_keeps_full_day_forecast() -> None:
+    house, reason = house_forecast_to_cheap_deadline(
+        5.0,
+        now=NOW - timedelta(hours=5),
+        deadline=CHEAP,
+        house_load_kw=0.64,
+        house_age_seconds=5.0,
+    )
+    assert house == 5.0
+    assert reason == "full_calendar_day_cheap_window_too_far_away"
+
+
 def test_measured_house_floor_prevents_optimistic_shortening() -> None:
     bounded, _ = house_forecast_to_cheap_deadline(
         2.512,
