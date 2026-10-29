@@ -1361,9 +1361,11 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
             )
             if post_shadow_settlement_changed:
                 post_settlement_started = perf_counter()
-                post_settlement = self._agile_smart_export.reconcile_current_day_settlements(
-                    settled_half_hours=list(self._shadow_validation._settled),
-                    now=now,
+                post_settlement = (
+                    self._agile_smart_export.reconcile_current_day_settlements(
+                        settled_half_hours=list(self._shadow_validation._settled),
+                        now=now,
+                    )
                 )
                 post_detail = (
                     post_settlement.get("current_day_settlement_reconciliation", {})
@@ -1373,7 +1375,9 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                 post_timing = post_detail.get("performance", {})
                 if isinstance(post_timing, dict):
                     for key, value in post_timing.items():
-                        if isinstance(value, (int, float)) and not isinstance(value, bool):
+                        if isinstance(value, (int, float)) and not isinstance(
+                            value, bool
+                        ):
                             detail_seconds[f"postshadow_{key}"] = value
                 detail_seconds["postshadow_settlement_reconciliation"] = round(
                     perf_counter() - post_settlement_started, 3

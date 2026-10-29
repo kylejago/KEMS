@@ -57,12 +57,21 @@ def _isolate_settlement_manager(applied: bool):
         "refresh_tomorrow_handoff_from_settled_soc": refresh,
         "_number": lambda value: value,
     }
-    exec(compile(ast.fix_missing_locations(ast.Module(body=[isolated], type_ignores=[])),
-                 "<isolated-settlement>", "exec"), ns)
+    exec(
+        compile(
+            ast.fix_missing_locations(ast.Module(body=[isolated], type_ignores=[])),
+            "<isolated-settlement>",
+            "exec",
+        ),
+        ns,
+    )
 
     class Runtime(ns["Isolated"]):
         def __init__(self):
-            self._state = {"today_slots": [], "rolling_export_plan": {"available": True}}
+            self._state = {
+                "today_slots": [],
+                "rolling_export_plan": {"available": True},
+            }
             self._rolling_config = SimpleNamespace(
                 battery_capacity_kwh=30.0, discharge_efficiency=0.9
             )
@@ -120,7 +129,7 @@ def test_same_scan_corrected_settlement_and_tomorrow_change_guards_remain() -> N
     assert "settled_half_hours_changed(" in coordinator
     assert "if second_publication_needed:" in handoff
     assert "prior_tomorrow_period" in handoff
-    assert "prior_tomorrow_slots != state[\"tomorrow_slots\"]" in handoff
+    assert 'prior_tomorrow_slots != state["tomorrow_slots"]' in handoff
     assert "manager._publish(manager._state)" in handoff
     for name in ("precontrol_", "postshadow_", "agile_manager_wrapper_seconds"):
         assert name in coordinator

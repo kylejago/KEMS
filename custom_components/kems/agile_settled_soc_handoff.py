@@ -355,13 +355,9 @@ def refresh_tomorrow_handoff_from_settled_soc(
         publish_cpu_started = thread_time()
         manager._publish(manager._state)
         second_publication_seconds = round(perf_counter() - publish_started, 3)
-        second_publication_cpu_seconds = round(
-            thread_time() - publish_cpu_started, 3
-        )
+        second_publication_cpu_seconds = round(thread_time() - publish_cpu_started, 3)
     diagnostic["tomorrow_compare_seconds"] = tomorrow_compare_seconds
     diagnostic["tomorrow_compare_thread_cpu_seconds"] = tomorrow_compare_cpu_seconds
     diagnostic["second_publication_seconds"] = second_publication_seconds
-    diagnostic["second_publication_thread_cpu_seconds"] = (
-        second_publication_cpu_seconds
-    )
+    diagnostic["second_publication_thread_cpu_seconds"] = second_publication_cpu_seconds
     return diagnostic
