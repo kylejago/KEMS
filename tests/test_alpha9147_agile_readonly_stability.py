@@ -6,6 +6,7 @@ import ast
 import json
 from datetime import UTC, datetime, time, timedelta
 from pathlib import Path
+from time import perf_counter, thread_time
 from types import SimpleNamespace
 from zoneinfo import ZoneInfo
 
@@ -78,6 +79,8 @@ def _handoff_function():
 
     ns = {
         "datetime": datetime,
+        "perf_counter": perf_counter,
+        "thread_time": thread_time,
         "timedelta": timedelta,
         "LONDON": ZoneInfo("Europe/London"),
         "LearnedState": LearnedState,
