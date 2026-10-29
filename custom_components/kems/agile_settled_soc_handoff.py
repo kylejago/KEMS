@@ -12,6 +12,7 @@ blocked.
 from __future__ import annotations
 
 from datetime import UTC, datetime, time, timedelta
+from time import perf_counter, thread_time
 from typing import Any
 
 from . import agile_smart_export as agile
@@ -220,6 +221,8 @@ def refresh_tomorrow_handoff_from_settled_soc(
     else:
         agile_handoff["today_to_tomorrow_continuity_applied"] = False
 
+    compare_started = perf_counter()
+    compare_cpu_started = thread_time()
     tomorrow = manager._compare_day(
         tomorrow_records,
         config,
@@ -229,6 +232,8 @@ def refresh_tomorrow_handoff_from_settled_soc(
         None,
         projection=True,
     )
+    tomorrow_compare_seconds = round(perf_counter() - compare_started, 3)
+    tomorrow_compare_cpu_seconds = round(thread_time() - compare_cpu_started, 3)
     corrected_period = agile._aggregate(
         [tomorrow],
         "tomorrow",
@@ -343,6 +348,20 @@ def refresh_tomorrow_handoff_from_settled_soc(
     diagnostic["second_publication_change_reasons"] = publication_changes
     diagnostic["second_publication_needed"] = second_publication_needed
     diagnostic["unchanged_tomorrow_publication_skipped"] = not second_publication_needed
+    second_publication_seconds = 0.0
+    second_publication_cpu_seconds = 0.0
     if second_publication_needed:
+        publish_started = perf_counter()
+        publish_cpu_started = thread_time()
         manager._publish(manager._state)
+        second_publication_seconds = round(perf_counter() - publish_started, 3)
+        second_publication_cpu_seconds = round(
+            thread_time() - publish_cpu_started, 3
+        )
+    diagnostic["tomorrow_compare_seconds"] = tomorrow_compare_seconds
+    diagnostic["tomorrow_compare_thread_cpu_seconds"] = tomorrow_compare_cpu_seconds
+    diagnostic["second_publication_seconds"] = second_publication_seconds
+    diagnostic["second_publication_thread_cpu_seconds"] = (
+        second_publication_cpu_seconds
+    )
     return diagnostic

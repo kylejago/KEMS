@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from time import perf_counter, thread_time
 from typing import Any
 
 from .agile_settled_soc_handoff import refresh_tomorrow_handoff_from_settled_soc
@@ -386,6 +387,8 @@ class SettledCurrentDayAgileSmartExportManager(
         now: datetime,
     ) -> dict[str, Any]:
         """Reconcile and republish Today's completed digital-twin outcomes."""
+        started = perf_counter()
+        cpu_started = thread_time()
         config = getattr(self, "_rolling_config", None)
         diagnostic = reconcile_current_day_settlements(
             self._state,
@@ -394,19 +397,56 @@ class SettledCurrentDayAgileSmartExportManager(
             battery_capacity_kwh=_number(getattr(config, "battery_capacity_kwh", None)),
             discharge_efficiency=_number(getattr(config, "discharge_efficiency", None)),
         )
+        math_seconds = round(perf_counter() - started, 3)
+        math_cpu_seconds = round(thread_time() - cpu_started, 3)
+        first_publish_seconds = 0.0
+        first_publish_cpu_seconds = 0.0
+        handoff_seconds = 0.0
+        handoff_detail: dict[str, Any] = {}
         if diagnostic.get("applied"):
             # Re-publishing regenerates the rolling plan from the corrected SOC.
             # Suppress only historical panel enrichment during this publication.
             panel_config = self._panel_config
             self._panel_config = None
             try:
+                publish_started = perf_counter()
+                publish_cpu_started = thread_time()
                 self._publish(self._state)
+                first_publish_seconds = round(perf_counter() - publish_started, 3)
+                first_publish_cpu_seconds = round(
+                    thread_time() - publish_cpu_started, 3
+                )
                 if config is not None:
-                    refresh_tomorrow_handoff_from_settled_soc(
+                    handoff_started = perf_counter()
+                    handoff_detail = refresh_tomorrow_handoff_from_settled_soc(
                         self,
                         now=now,
                         config=config,
                     )
+                    handoff_seconds = round(perf_counter() - handoff_started, 3)
             finally:
                 self._panel_config = panel_config
+        # Live dispatch never branches on these read-only counters.
+        diagnostic["performance"] = {
+            "settlement_math_seconds": math_seconds,
+            "settlement_math_thread_cpu_seconds": math_cpu_seconds,
+            "first_publication_seconds": first_publish_seconds,
+            "first_publication_thread_cpu_seconds": first_publish_cpu_seconds,
+            "tomorrow_handoff_seconds": handoff_seconds,
+            "tomorrow_compare_seconds": handoff_detail.get(
+                "tomorrow_compare_seconds", 0.0
+            ),
+            "tomorrow_compare_thread_cpu_seconds": handoff_detail.get(
+                "tomorrow_compare_thread_cpu_seconds", 0.0
+            ),
+            "second_publication_seconds": handoff_detail.get(
+                "second_publication_seconds", 0.0
+            ),
+            "second_publication_thread_cpu_seconds": handoff_detail.get(
+                "second_publication_thread_cpu_seconds", 0.0
+            ),
+            "total_seconds": round(perf_counter() - started, 3),
+            "total_thread_cpu_seconds": round(thread_time() - cpu_started, 3),
+            "scope": "read_only_reporting_no_hardware_writes",
+        }
         return self.state
