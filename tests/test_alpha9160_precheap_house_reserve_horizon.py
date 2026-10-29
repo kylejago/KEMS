@@ -13,7 +13,6 @@ from pathlib import Path
 from types import ModuleType, SimpleNamespace
 
 import pytest
-
 from kems_core import ControlConfig, ControlState, SimulationConfig, Snapshot
 from kems_core.agile_live_reserve import (
     guard_paid_agile_physical_export,
