@@ -4,10 +4,7 @@ from __future__ import annotations
 
 import ast
 import json
-from datetime import UTC, datetime
 from pathlib import Path
-from time import perf_counter, thread_time
-from types import SimpleNamespace
 
 KEMS = Path(__file__).parents[1] / "custom_components" / "kems"
 ROOT = KEMS.parents[1]
