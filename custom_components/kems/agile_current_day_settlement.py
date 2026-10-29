@@ -380,7 +380,7 @@ class SettledCurrentDayAgileSmartExportManager(
 ):
     """Make completed rolling outcomes authoritative for Today's export ledger."""
 
-    def reconcile_current_day_settlements(
+    async def reconcile_current_day_settlements(
         self,
         *,
         settled_half_hours: list[dict[str, Any]],
@@ -418,7 +418,7 @@ class SettledCurrentDayAgileSmartExportManager(
                 )
                 if config is not None:
                     handoff_started = perf_counter()
-                    handoff_detail = refresh_tomorrow_handoff_from_settled_soc(
+                    handoff_detail = await refresh_tomorrow_handoff_from_settled_soc(
                         self,
                         now=now,
                         config=config,
@@ -433,6 +433,9 @@ class SettledCurrentDayAgileSmartExportManager(
             "first_publication_seconds": first_publish_seconds,
             "first_publication_thread_cpu_seconds": first_publish_cpu_seconds,
             "tomorrow_handoff_seconds": handoff_seconds,
+            "tomorrow_compare_executor_offloaded": handoff_detail.get(
+                "tomorrow_compare_executor_offloaded", False
+            ),
             "tomorrow_compare_seconds": handoff_detail.get(
                 "tomorrow_compare_seconds", 0.0
             ),
