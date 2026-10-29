@@ -1029,9 +1029,11 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                 self._shadow_validation._settled
             )
             pre_settlement_started = perf_counter()
-            pre_settlement = await self._agile_smart_export.reconcile_current_day_settlements(
-                settled_half_hours=list(self._shadow_validation._settled),
-                now=now,
+            pre_settlement = (
+                await self._agile_smart_export.reconcile_current_day_settlements(
+                    settled_half_hours=list(self._shadow_validation._settled),
+                    now=now,
+                )
             )
             pre_detail = (
                 pre_settlement.get("current_day_settlement_reconciliation", {})

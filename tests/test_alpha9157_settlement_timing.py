@@ -94,10 +94,12 @@ def _isolate_settlement_manager(applied: bool):
 def test_live_settlement_publishes_and_handoff_stays_authoritative() -> None:
     manager, calls = _isolate_settlement_manager(True)
     before = dict(manager._state)
-    result = asyncio.run(manager.reconcile_current_day_settlements(
-        settled_half_hours=[{"slot": "2026-10-29T01:00:00+00:00"}],
-        now=datetime(2026, 10, 29, 7, 35, tzinfo=UTC),
-    ))
+    result = asyncio.run(
+        manager.reconcile_current_day_settlements(
+            settled_half_hours=[{"slot": "2026-10-29T01:00:00+00:00"}],
+            now=datetime(2026, 10, 29, 7, 35, tzinfo=UTC),
+        )
+    )
     assert calls == ["reconcile", "publish", "handoff"]
     assert manager._panel_config == "panel"
     assert result["today_slots"] == before["today_slots"]
@@ -114,9 +116,11 @@ def test_live_settlement_publishes_and_handoff_stays_authoritative() -> None:
 
 def test_unapplied_settlement_does_not_publish_or_refresh() -> None:
     manager, calls = _isolate_settlement_manager(False)
-    result = asyncio.run(manager.reconcile_current_day_settlements(
-        settled_half_hours=[], now=datetime(2026, 10, 29, tzinfo=UTC)
-    ))
+    result = asyncio.run(
+        manager.reconcile_current_day_settlements(
+            settled_half_hours=[], now=datetime(2026, 10, 29, tzinfo=UTC)
+        )
+    )
     assert calls == ["reconcile"]
     assert manager._panel_config == "panel"
     detail = result["current_day_settlement_reconciliation"]["performance"]
