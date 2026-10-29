@@ -19,6 +19,7 @@ from .kems_core.agile_live_reserve import (
     _MIN_HOUSE_BUFFER_KWH,
     _MIN_PLANNING_RESERVE_PERCENT,
     _SOLAR_CREDIT_MIN_CONFIDENCE,
+    house_forecast_to_cheap_deadline,
     physical_energy_evidence_matches_snapshot,
 )
 
@@ -129,21 +130,43 @@ def conservative_physical_export_budget(
         or stored is None
     ):
         return None, {"available": False, "reason": "invalid physical budget inputs"}
+    snapshot = context.get("snapshot")
+    if snapshot is None:
+        # Diagnostic-only simulations have no physical snapshot. Keep the
+        # full calendar forecast, not an unverified shortened horizon.
+        house_to_cheap = expected_house
+        house_basis = "full_calendar_day_missing_physical_snapshot"
+    else:
+        house_ages = getattr(snapshot, "source_age_seconds", None)
+        house_age = (
+            _number(house_ages.get("house_load_kw"))
+            if isinstance(house_ages, dict)
+            else None
+        )
+        house_to_cheap, house_basis = house_forecast_to_cheap_deadline(
+            expected_house,
+            now=now,
+            deadline=getattr(snapshot, "next_offpeak_start", None),
+            house_load_kw=getattr(snapshot, "house_load_kw", None),
+            house_age_seconds=house_age,
+            house_stale="house_load_kw" in getattr(snapshot, "stale_fields", ()),
+        )
     confidence = _number(getattr(forecast_plan, "confidence_percent", None))
     expected_solar = _number(
         getattr(forecast_plan, "expected_solar_remaining_today_kwh", None)
     )
     credit = 0.0
     if (
-        confidence is not None
+        house_basis.startswith("full_calendar_day")
+        and confidence is not None
         and confidence >= _SOLAR_CREDIT_MIN_CONFIDENCE
         and expected_solar is not None
         and expected_solar > 0
     ):
         credit = min(
-            expected_house, expected_solar * _MAX_FORECAST_SOLAR_CREDIT_FRACTION
+            house_to_cheap, expected_solar * _MAX_FORECAST_SOLAR_CREDIT_FRACTION
         )
-    net_home = max(expected_house - credit, 0.0)
+    net_home = max(house_to_cheap - credit, 0.0)
     buffer = max(_MIN_HOUSE_BUFFER_KWH, net_home * _HOUSE_BUFFER_FRACTION)
     protected = net_home / efficiency + buffer
     reserve_percent = max(
@@ -158,6 +181,10 @@ def conservative_physical_export_budget(
         "physical_energy_lower_bound_kwh": round(stored, 3),
         "minimum_reserve_kwh": round(reserve, 3),
         "protected_house_stored_kwh": round(protected, 3),
+        "calendar_day_house_forecast_kwh": round(expected_house, 3),
+        "forecast_house_until_cheap_kwh": round(house_to_cheap, 3),
+        "forecast_house_horizon_basis": house_basis,
+        "independent_house_buffer_kwh": round(buffer, 3),
         "solar_credit_kwh": round(credit, 3),
         "exportable_stored_kwh": round(budget, 3),
         "exportable_ac_kwh": round(budget * efficiency, 3),
