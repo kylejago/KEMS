@@ -60,6 +60,41 @@ def _finite(value: Any) -> float | None:
     return number if isfinite(number) else None
 
 
+def physically_exportable_paid_agile_energy_kwh(
+    *,
+    stored_kwh: float,
+    capacity_kwh: float,
+    export_reserve_percent: float,
+    protected_house_kwh: float,
+) -> float:
+    """Respect *both* independent battery discharge policies.
+
+    Paid export stops at the configured 15%-or-higher export reserve. House
+    demand can subsequently use the battery down to its independent 10% hard
+    floor. Export must leave enough energy for the predicted home load plus
+    the existing safety buffer, without double-counting that load above 15%.
+    Invalid inputs cannot authorise extra export.
+    """
+    stored = _finite(stored_kwh)
+    capacity = _finite(capacity_kwh)
+    export_percent = _finite(export_reserve_percent)
+    home = _finite(protected_house_kwh)
+    if (
+        stored is None
+        or capacity is None
+        or capacity <= 0.0
+        or not 0.0 <= stored <= capacity
+        or export_percent is None
+        or not 0.0 <= export_percent <= 100.0
+        or home is None
+        or home < 0.0
+    ):
+        return 0.0
+    export_floor = capacity * max(_MIN_PLANNING_RESERVE_PERCENT, export_percent) / 100.0
+    home_floor = capacity * 0.10
+    return max(min(stored - export_floor, stored - home_floor - home), 0.0)
+
+
 def physical_energy_evidence_matches_snapshot(
     evidence: PhysicalEnergyEvidence | None,
     snapshot: Snapshot,
@@ -951,7 +986,12 @@ def guard_paid_agile_physical_export(
         )
         measured_energy_kwh = capacity * soc_lower_bound / 100.0
     protected_home_kwh = net_home / efficiency + buffer_kwh
-    surplus_kwh = max(measured_energy_kwh - reserve_kwh - protected_home_kwh, 0.0)
+    surplus_kwh = physically_exportable_paid_agile_energy_kwh(
+        stored_kwh=measured_energy_kwh,
+        capacity_kwh=capacity,
+        export_reserve_percent=reserve_percent,
+        protected_house_kwh=protected_home_kwh,
+    )
     max_export_kw = surplus_kwh / _EXPORT_PROOF_HORIZON_HOURS
     report.update(
         {
@@ -959,6 +999,9 @@ def guard_paid_agile_physical_export(
             "physical_soc_lower_bound_percent": round(soc_lower_bound, 3),
             "pessimistic_soc_aging_discharge_kwh": round(pessimistic_discharge_kwh, 3),
             "minimum_battery_reserve_kwh": round(reserve_kwh, 3),
+            "house_safety_floor_kwh": round(capacity * 0.10, 3),
+            "export_floor_soc_percent": reserve_percent,
+            "house_floor_soc_percent": 10.0,
             "forecast_house_energy_kwh": round(expected_house, 3),
             "forecast_house_until_cheap_kwh": round(house_to_cheap, 3),
             "forecast_house_horizon_basis": house_basis,
