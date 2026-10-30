@@ -71,7 +71,7 @@ def allow_paid_agile_house_discharge_to_ten_percent(
 
     Keep the inverter MinSOC at its configured export reserve while a paid
     battery-export command is active. Only lower it once Self Use is selected
-    with fresh explicit unplugged and zero-power EV evidence. Never affect
+    with an explicit unplugged EV status and no contradictory EV power. Never affect
     cheap charging, Power Down, island mode, an EV hold, or unverified control.
     """
     ev_power = _finite(snapshot.ev_power_kw)
@@ -90,11 +90,18 @@ def allow_paid_agile_house_discharge_to_ten_percent(
         or not ev_export_safe
         or snapshot.ev_connected is not False
         or snapshot.ev_charging is not False
-        or ev_power is None
-        or not 0.0 <= ev_power <= _AGILE_EV_IDLE_POWER_KW
-        or ev_age is None
-        or not 0.0 <= ev_age <= _AGILE_EV_MAX_POWER_REPORT_AGE_SECONDS
-        or "ev_power_kw" in snapshot.stale_fields
+        or (
+            ev_power is not None
+            and not 0.0 <= ev_power <= _AGILE_EV_IDLE_POWER_KW
+        )
+        or (
+            ev_power is not None
+            and (
+                ev_age is None
+                or not 0.0 <= ev_age <= _AGILE_EV_MAX_POWER_REPORT_AGE_SECONDS
+                or "ev_power_kw" in snapshot.stale_fields
+            )
+        )
     ):
         return control, False
     return replace(control, desired_min_soc_percent=10.0), True
