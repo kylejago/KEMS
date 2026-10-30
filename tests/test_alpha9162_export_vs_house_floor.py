@@ -5,12 +5,14 @@ Use the real pure-core budget and final physical guard without HA hardware write
 
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 
 import pytest
 from kems_core import ControlConfig, ControlState, SimulationConfig, Snapshot
 from kems_core.agile_live_reserve import (
+    allow_paid_agile_house_discharge_to_ten_percent,
     guard_paid_agile_physical_export,
     physically_exportable_paid_agile_energy_kwh,
 )
@@ -153,3 +155,65 @@ def test_live_guard_can_still_veto_with_large_house_demand() -> None:
     control, report = _dispatch(25.0, forecast_kwh=20.0)
     assert control.desired_battery_export_power_kw == 0.0
     assert report["status"] == "blocked"
+
+
+def _house_only_control() -> ControlState:
+    return replace(
+        _dispatch_control(),
+        desired_work_mode="Self Use",
+        desired_battery_export_power_kw=0.0,
+        desired_total_discharge_power_kw=0.88,
+        desired_min_soc_percent=15.0,
+    )
+
+
+def _confirmed_unplugged_snapshot() -> Snapshot:
+    return replace(
+        _dispatch_snapshot(15.0),
+        ev_power_kw=0.0,
+        ev_power_age_seconds=2.0,
+    )
+
+
+def test_verified_house_only_self_use_requests_ten_percent_hardware_min_soc() -> None:
+    control, applied = allow_paid_agile_house_discharge_to_ten_percent(
+        _house_only_control(),
+        _confirmed_unplugged_snapshot(),
+        ev_export_safe=True,
+        power_down_active=False,
+    )
+    assert applied is True
+    assert control.desired_min_soc_percent == 10.0
+    assert control.desired_work_mode == "Self Use"
+    assert control.desired_battery_to_home_power_kw == 0.88
+
+
+def test_active_export_retains_fifteen_percent_inverter_fail_safe() -> None:
+    exporting = replace(_house_only_control(), desired_battery_export_power_kw=2.0)
+    control, applied = allow_paid_agile_house_discharge_to_ten_percent(
+        exporting, _confirmed_unplugged_snapshot(),
+        ev_export_safe=True, power_down_active=False,
+    )
+    assert applied is False
+    assert control.desired_min_soc_percent == 15.0
+
+
+def test_ev_uncertainty_and_higher_priority_sessions_do_not_lower_hardware_min_soc() -> None:
+    safe = _confirmed_unplugged_snapshot()
+    cases = (
+        (replace(safe, ev_connected=True), True, False),
+        (replace(safe, ev_connected=None), True, False),
+        (replace(safe, ev_charging=True), True, False),
+        (replace(safe, ev_power_kw=3.0), True, False),
+        (replace(safe, ev_power_age_seconds=300.0), True, False),
+        (safe, False, False),
+        (safe, True, True),
+    )
+    for snapshot, ev_safe, power_down in cases:
+        result, applied = allow_paid_agile_house_discharge_to_ten_percent(
+            _house_only_control(), snapshot,
+            ev_export_safe=ev_safe,
+            power_down_active=power_down,
+        )
+        assert applied is False
+        assert result.desired_min_soc_percent == 15.0
