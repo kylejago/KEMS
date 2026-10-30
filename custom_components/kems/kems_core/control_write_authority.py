@@ -86,12 +86,11 @@ def resolve_live_min_soc_on_grid(
 ) -> float | None:
     """Return the physically safe MinSOC target for the reviewed live write.
 
-    The normal KEMS reserve is a planning/discharge target, not permission to
-    buy daytime grid energy. Outside confirmed cheap periods, Self Use preserves the baseline except
-    when the planner explicitly requests the 10% household-only absolute floor. The only exception is the Alpha9.76 hold-only pending Intelligent
-    EV state, which may retain its requested MinSOC without granting cheap or
-    Force Charge authority. Confirmed-cheap Self Use/Force Charge paths retain
-    their requested MinSOC, including the Alpha9.70 EV battery-hold floor.
+    The normal reserve is not permission to buy daytime grid energy.
+    Outside cheap periods, Self Use preserves the captured MinSOC baseline,
+    except for an explicit 10% household-only request. Pending Intelligent EV
+    holds may retain their requested floor without Force Charge authority.
+    Confirmed cheap periods retain their requested MinSOC, including EV holds.
     """
     requested = decision.min_soc_on_grid_percent
     if (
