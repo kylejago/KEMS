@@ -62,10 +62,7 @@ def test_settlement_handoff_and_coordinator_preserve_sync_calls() -> None:
     assert "tomorrow = manager._compare_day(" in helper
     assert "manager._publish(manager._state)" in helper
     coordinator = (KEMS / "coordinator.py").read_text(encoding="utf-8")
-    assert (
-        "self._agile_smart_export.reconcile_current_day_settlements("
-        in coordinator
-    )
+    assert "self._agile_smart_export.reconcile_current_day_settlements(" in coordinator
     assert (
         "await self._agile_smart_export.reconcile_current_day_settlements("
         not in coordinator
