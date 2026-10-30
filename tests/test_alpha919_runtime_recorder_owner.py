@@ -8,6 +8,10 @@ import json
 import types
 from pathlib import Path
 
+from kems_core.settlement_publication_coalescing import (
+    coalesce_identical_settlement_publications,
+)
+
 ROOT = Path(__file__).resolve().parents[1]
 KEMS = ROOT / "custom_components" / "kems"
 HYGIENE = KEMS / "recorder_hygiene.py"
@@ -197,3 +201,109 @@ def test_alpha919_release_scope_is_recorder_only() -> None:
     assert "providers.foxess" not in hygiene
     assert "commands_permitted = True" not in hygiene
     assert "safe_to_write_hardware = True" not in hygiene
+
+
+def test_alpha9162_effective_recorder_publisher_honours_settlement_scope() -> None:
+    """Exercise the real installer rather than only the overridden base setter."""
+
+    class RuntimeManager:
+        def _set(self, entity_id, value, attributes):
+            raise AssertionError("obsolete base setter must not be called")
+
+    class Shadow:
+        def _set(self, entity_id, value, attributes):
+            pass
+
+    class Updater:
+        def _write_legacy_states(self):
+            pass
+
+    class States:
+        def __init__(self):
+            self.data = {}
+            self.writes = []
+
+        def get(self, entity_id):
+            return self.data.get(entity_id)
+
+    states = States()
+    hass = types.SimpleNamespace(states=states)
+
+    def publisher(hass, entity_id, value, attributes):
+        raw = str(value)
+        hass.states.writes.append((entity_id, raw, dict(attributes)))
+        hass.states.data[entity_id] = types.SimpleNamespace(
+            state=raw,
+            attributes=dict(attributes),
+        )
+
+    installer = _load_manual_hygiene_installer(
+        types.SimpleNamespace(EfficientAgileSmartExportManager=RuntimeManager),
+        types.SimpleNamespace(ShadowValidationRecorder=Shadow),
+        types.SimpleNamespace(KEMSUpdateOrchestrator=Updater),
+        publisher,
+    )
+    installer()
+    manager = RuntimeManager()
+    manager._hass = hass
+    with coalesce_identical_settlement_publications(manager) as counters:
+        manager._set("sensor.today", "Ready", {"soc": 75, "rate": 20})
+        manager._set("sensor.today", "Ready", {"soc": 75, "rate": 20})
+        manager._set("sensor.today", "Ready", {"soc": 74, "rate": 20})
+        manager._set("sensor.today", "Ready", {"soc": 74, "rate": 20})
+        manager._set("sensor.tomorrow", "Ready", {"rate": 22})
+    assert counters.summary()["attempted"] == 5
+    assert counters.summary()["compared"] == 3
+    assert counters.summary()["skipped_identical"] == 2
+    assert counters.summary()["written"] == 3
+    assert [x[0] for x in states.writes] == [
+        "sensor.today",
+        "sensor.today",
+        "sensor.tomorrow",
+    ]
+    assert states.get("sensor.today").attributes["soc"] == 74
+    assert manager._kems_settlement_publication_scope is None
+    # A new scan does not inherit seen entities; ordinary publication is intact.
+    manager._set("sensor.today", "Ready", {"soc": 74, "rate": 20})
+    assert len(states.writes) == 4
+
+
+def test_alpha9162_effective_recorder_coalescer_fails_open_on_lookup_fault() -> None:
+    """A bad HA state comparison must not suppress an updated price or SOC."""
+
+    class RuntimeManager:
+        def _set(self, entity_id, value, attributes):
+            pass
+
+    class Shadow:
+        def _set(self, entity_id, value, attributes):
+            pass
+
+    class Updater:
+        def _write_legacy_states(self):
+            pass
+
+    writes = []
+    states = types.SimpleNamespace(get=lambda entity_id: (_ for _ in ()).throw(
+        ValueError("state lookup unavailable")
+    ))
+    hass = types.SimpleNamespace(states=states)
+
+    def publisher(hass, entity_id, value, attributes):
+        writes.append((entity_id, value, dict(attributes)))
+
+    installer = _load_manual_hygiene_installer(
+        types.SimpleNamespace(EfficientAgileSmartExportManager=RuntimeManager),
+        types.SimpleNamespace(ShadowValidationRecorder=Shadow),
+        types.SimpleNamespace(KEMSUpdateOrchestrator=Updater),
+        publisher,
+    )
+    installer()
+    manager = RuntimeManager()
+    manager._hass = hass
+    with coalesce_identical_settlement_publications(manager) as counters:
+        manager._set("sensor.agile_rate", 20, {"soc": 17})
+        manager._set("sensor.agile_rate", 21, {"soc": 16})
+    assert counters.summary()["skipped_identical"] == 0
+    assert counters.summary()["written"] == 2
+    assert len(writes) == 2
