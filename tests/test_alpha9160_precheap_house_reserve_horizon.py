@@ -175,18 +175,19 @@ def test_live_guard_caps_small_surplus_without_relaxing_hard_gates() -> None:
         CONTROL_CONFIG,
         now=NOW,
     )
-    assert unchanged["status"] == "blocked"
-    assert "independent_house_buffer_kwh" in unchanged
+    assert unchanged["forecast_house_horizon_basis"].startswith("full_calendar_day")
+    assert unchanged["independent_house_buffer_kwh"] == 2.0
     capped, report = guard_paid_agile_physical_export(
         _control(), _snapshot(), _forecast(), SIM, CONTROL_CONFIG, now=NOW
     )
     assert report["forecast_house_until_cheap_kwh"] == pytest.approx(1.954, abs=0.001)
     assert report["independent_house_buffer_kwh"] == 2.0
     assert report["minimum_battery_reserve_kwh"] == pytest.approx(8.463)
-    assert 0.0 < capped.desired_battery_export_power_kw < 2.0
-    assert report["status"] == "capped"
+    assert capped.desired_battery_export_power_kw == 2.0
+    assert report["status"] == "permitted_with_physical_house_budget"
     assert report["protected_home_energy_kwh"] > 4.0
-    assert report["exportable_physical_energy_kwh"] < 0.5
+    assert 3.0 < report["exportable_physical_energy_kwh"] < 3.3
+    assert report["house_safety_floor_kwh"] == pytest.approx(5.642)
 
     for blocked in (
         _snapshot(ev_connected=True),
@@ -226,6 +227,6 @@ def test_planner_uses_identical_house_horizon_and_does_not_change_twin(
     assert report["forecast_house_until_cheap_kwh"] == pytest.approx(1.954, abs=0.001)
     assert report["independent_house_buffer_kwh"] == 2.0
     assert report["minimum_reserve_kwh"] == pytest.approx(8.463)
-    assert 0.0 < budget < 0.5
+    assert 3.0 < budget < 3.3
     assert report["exportable_ac_kwh"] == pytest.approx(budget * 0.95, abs=0.001)
     assert snapshot.battery_soc == 22.885
