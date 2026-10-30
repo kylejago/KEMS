@@ -34,7 +34,9 @@ def needs_full_tomorrow_republication(changes: list[str]) -> bool:
     expression = ast.Expression(body=assign.value)
     return bool(
         eval(
-            compile(ast.fix_missing_locations(expression), "<publication-rule>", "eval"),
+            compile(
+                ast.fix_missing_locations(expression), "<publication-rule>", "eval"
+            ),
             {"publication_changes": changes},
         )
     )
