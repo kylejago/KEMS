@@ -91,6 +91,9 @@ from .kems_core.control_event_refresh import (
 )
 from .kems_core.control_write_authority import active_joined_power_down_window
 from .kems_core.scenario_report_gate import ScenarioReportGate
+from .kems_core.settlement_publication_coalescing import (
+    coalesce_identical_settlement_publications,
+)
 from .kems_core.settlement_reconciliation_cadence import (
     settled_half_hour_snapshot,
     settled_half_hours_changed,
@@ -661,6 +664,7 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
         stage_seconds: dict[str, float] = {}
         detail_seconds: dict[str, float] = {}
         post_shadow_settlement_changed = False
+        settlement_publication_stats: dict[str, dict[str, float | int]] = {}
 
         def checkpoint(name: str) -> None:
             nonlocal checkpoint_at
@@ -1029,10 +1033,16 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                 self._shadow_validation._settled
             )
             pre_settlement_started = perf_counter()
-            pre_settlement = self._agile_smart_export.reconcile_current_day_settlements(
-                settled_half_hours=list(self._shadow_validation._settled),
-                now=now,
-            )
+            with coalesce_identical_settlement_publications(
+                self._agile_smart_export
+            ) as pre_publication_stats:
+                pre_settlement = (
+                    self._agile_smart_export.reconcile_current_day_settlements(
+                        settled_half_hours=list(self._shadow_validation._settled),
+                        now=now,
+                    )
+                )
+            settlement_publication_stats["precontrol"] = pre_publication_stats.summary()
             pre_detail = (
                 pre_settlement.get("current_day_settlement_reconciliation", {})
                 if isinstance(pre_settlement, dict)
@@ -1361,11 +1371,17 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
             )
             if post_shadow_settlement_changed:
                 post_settlement_started = perf_counter()
-                post_settlement = (
-                    self._agile_smart_export.reconcile_current_day_settlements(
-                        settled_half_hours=list(self._shadow_validation._settled),
-                        now=now,
+                with coalesce_identical_settlement_publications(
+                    self._agile_smart_export
+                ) as post_publication_stats:
+                    post_settlement = (
+                        self._agile_smart_export.reconcile_current_day_settlements(
+                            settled_half_hours=list(self._shadow_validation._settled),
+                            now=now,
+                        )
                     )
+                settlement_publication_stats["postshadow"] = (
+                    post_publication_stats.summary()
                 )
                 post_detail = (
                     post_settlement.get("current_day_settlement_reconciliation", {})
@@ -1583,6 +1599,7 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                     getattr(self._agile_smart_export, "_performance_detail", {})
                 ),
                 "stage_detail_seconds": detail_seconds,
+                "settlement_publication_coalescing": settlement_publication_stats,
                 "post_shadow_settlement_changed": post_shadow_settlement_changed,
                 "timing_clock": "monotonic_perf_counter",
                 "control_execution_model": "unchanged",

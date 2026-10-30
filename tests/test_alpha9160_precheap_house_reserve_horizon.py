@@ -1,4 +1,4 @@
-"""Alpha9.160: do not protect consumption occurring after cheap import starts.
+"""Alpha9.161: do not protect consumption occurring after cheap import starts.
 
 Safety tests keep the full independent 2 kWh house buffer, both the 15% target
 and the 10% physical hard floor, and conservative source-quality fallbacks.
