@@ -157,6 +157,34 @@ def _install_manual_state_hygiene() -> None:
             value: Any,
             attributes: dict[str, Any],
         ) -> None:
+            # Alpha9.161's original _set coalescing was replaced by this
+            # Recorder-safe final runtime publisher during setup. Coalesce
+            # here, at the effective HA state-write boundary, while keeping
+            # live-only Recorder state_info unchanged. Outside settlement all
+            # writes continue exactly as before.
+            scope = getattr(self, "_kems_settlement_publication_scope", None)
+            if scope is not None:
+                scope["attempted"] += 1
+                if entity_id in scope["seen"]:
+                    from time import perf_counter
+
+                    started = perf_counter()
+                    try:
+                        prior = self._hass.states.get(entity_id)
+                        identical = (
+                            prior is not None
+                            and prior.state == str(value)
+                            and prior.attributes == attributes
+                        )
+                    except Exception:
+                        identical = False
+                    scope["comparison_seconds"] += perf_counter() - started
+                    scope["compared"] += 1
+                    if identical:
+                        scope["skipped_identical"] += 1
+                        return
+                scope["seen"].add(entity_id)
+                scope["written"] += 1
             _async_set_live_only_attributes(
                 self._hass,
                 entity_id,
