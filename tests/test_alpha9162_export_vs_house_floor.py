@@ -220,3 +220,21 @@ def test_unverified_ev_or_power_down_cannot_lower_min_soc() -> None:
         )
         assert applied is False
         assert result.desired_min_soc_percent == 15.0
+
+
+def test_confirmed_unplugged_home_floor_survives_missing_ohme_power() -> None:
+    """Unavailable Ohme power must not hold a confirmed unplugged home at 15%."""
+    confirmed = replace(
+        _confirmed_unplugged_snapshot(),
+        ev_power_kw=None,
+        ev_power_age_seconds=None,
+        stale_fields=("ev_power_kw",),
+    )
+    control, applied = allow_paid_agile_house_discharge_to_ten_percent(
+        _house_only_control(),
+        confirmed,
+        ev_export_safe=True,
+        power_down_active=False,
+    )
+    assert applied is True
+    assert control.desired_min_soc_percent == 10.0
