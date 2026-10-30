@@ -76,13 +76,18 @@ def test_higher_configured_export_floor_still_wins() -> None:
         (CAPACITY + 1.0, CAPACITY, 15.0, 1.0),
     ],
 )
-def test_bad_physical_budget_inputs_fail_closed(stored, capacity, reserve, home) -> None:
-    assert physically_exportable_paid_agile_energy_kwh(
-        stored_kwh=stored,
-        capacity_kwh=capacity,
-        export_reserve_percent=reserve,
-        protected_house_kwh=home,
-    ) == 0.0
+def test_bad_physical_budget_inputs_fail_closed(
+    stored, capacity, reserve, home
+) -> None:
+    assert (
+        physically_exportable_paid_agile_energy_kwh(
+            stored_kwh=stored,
+            capacity_kwh=capacity,
+            export_reserve_percent=reserve,
+            protected_house_kwh=home,
+        )
+        == 0.0
+    )
 
 
 def _dispatch_control() -> ControlState:
