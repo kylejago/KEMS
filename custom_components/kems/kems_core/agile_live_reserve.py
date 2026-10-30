@@ -60,6 +60,46 @@ def _finite(value: Any) -> float | None:
     return number if isfinite(number) else None
 
 
+def allow_paid_agile_house_discharge_to_ten_percent(
+    control: ControlState,
+    snapshot: Snapshot,
+    *,
+    ev_export_safe: bool,
+    power_down_active: bool,
+) -> tuple[ControlState, bool]:
+    """After paid export ends, allow *house only* Self Use down to 10%.
+
+    Keep the inverter MinSOC at its configured export reserve while a paid
+    battery-export command is active. Only lower it once Self Use is selected
+    with fresh explicit unplugged and zero-power EV evidence. Never affect
+    cheap charging, Power Down, island mode, an EV hold, or unverified control.
+    """
+    ev_power = _finite(snapshot.ev_power_kw)
+    ev_age = _finite(snapshot.ev_power_age_seconds)
+    if (
+        control.operating_mode != "control"
+        or control.desired_work_mode != "Self Use"
+        or control.desired_battery_export_power_kw > 0.001
+        or control.desired_min_soc_percent <= 10.0
+        or not control.plan_safe
+        or not control.grid_available
+        or control.island_mode_active
+        or snapshot.cheap_period_confirmed
+        or snapshot.saving_session_active
+        or power_down_active
+        or not ev_export_safe
+        or snapshot.ev_connected is not False
+        or snapshot.ev_charging is not False
+        or ev_power is None
+        or not 0.0 <= ev_power <= _AGILE_EV_IDLE_POWER_KW
+        or ev_age is None
+        or not 0.0 <= ev_age <= _AGILE_EV_MAX_POWER_REPORT_AGE_SECONDS
+        or "ev_power_kw" in snapshot.stale_fields
+    ):
+        return control, False
+    return replace(control, desired_min_soc_percent=10.0), True
+
+
 def physically_exportable_paid_agile_energy_kwh(
     *,
     stored_kwh: float,
