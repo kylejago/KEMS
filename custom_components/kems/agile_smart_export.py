@@ -1519,7 +1519,33 @@ class AgileSmartExportManager:
         value: Any,
         attributes: dict[str, Any],
     ) -> None:
-        self._hass.states.async_set(entity_id, str(value), attributes)
+        state_value = str(value)
+        scope = getattr(self, "_kems_settlement_publication_scope", None)
+        if scope is not None:
+            scope["attempted"] += 1
+            if entity_id in scope["seen"]:
+                # Only suppress an *exact* repeated write inside this one
+                # synchronous settlement pass. Read the real HA state, not a
+                # cached copy: wrappers can consume earlier published values.
+                # Any equality/lookup problem fails open to the normal write.
+                checked_at = perf_counter()
+                try:
+                    previous = self._hass.states.get(entity_id)
+                    identical = (
+                        previous is not None
+                        and previous.state == state_value
+                        and previous.attributes == attributes
+                    )
+                except Exception:
+                    identical = False
+                scope["comparison_seconds"] += perf_counter() - checked_at
+                scope["compared"] += 1
+                if identical:
+                    scope["skipped_identical"] += 1
+                    return
+            scope["seen"].add(entity_id)
+            scope["written"] += 1
+        self._hass.states.async_set(entity_id, state_value, attributes)
 
 
 def _aggregate(
