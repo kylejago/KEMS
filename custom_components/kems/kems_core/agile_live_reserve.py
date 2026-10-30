@@ -90,10 +90,7 @@ def allow_paid_agile_house_discharge_to_ten_percent(
         or not ev_export_safe
         or snapshot.ev_connected is not False
         or snapshot.ev_charging is not False
-        or (
-            ev_power is not None
-            and not 0.0 <= ev_power <= _AGILE_EV_IDLE_POWER_KW
-        )
+        or (ev_power is not None and not 0.0 <= ev_power <= _AGILE_EV_IDLE_POWER_KW)
         or (
             ev_power is not None
             and (
