@@ -191,14 +191,18 @@ def test_verified_house_only_self_use_requests_ten_percent_hardware_min_soc() ->
 def test_active_export_retains_fifteen_percent_inverter_fail_safe() -> None:
     exporting = replace(_house_only_control(), desired_battery_export_power_kw=2.0)
     control, applied = allow_paid_agile_house_discharge_to_ten_percent(
-        exporting, _confirmed_unplugged_snapshot(),
-        ev_export_safe=True, power_down_active=False,
+        exporting,
+        _confirmed_unplugged_snapshot(),
+        ev_export_safe=True,
+        power_down_active=False,
     )
     assert applied is False
     assert control.desired_min_soc_percent == 15.0
 
 
-def test_ev_uncertainty_and_higher_priority_sessions_do_not_lower_hardware_min_soc() -> None:
+def test_ev_uncertainty_and_higher_priority_sessions_do_not_lower_hardware_min_soc() -> (
+    None
+):
     safe = _confirmed_unplugged_snapshot()
     cases = (
         (replace(safe, ev_connected=True), True, False),
@@ -211,7 +215,8 @@ def test_ev_uncertainty_and_higher_priority_sessions_do_not_lower_hardware_min_s
     )
     for snapshot, ev_safe, power_down in cases:
         result, applied = allow_paid_agile_house_discharge_to_ten_percent(
-            _house_only_control(), snapshot,
+            _house_only_control(),
+            snapshot,
             ev_export_safe=ev_safe,
             power_down_active=power_down,
         )
