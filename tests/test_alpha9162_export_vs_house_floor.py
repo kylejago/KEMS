@@ -200,9 +200,7 @@ def test_active_export_retains_fifteen_percent_inverter_fail_safe() -> None:
     assert control.desired_min_soc_percent == 15.0
 
 
-def test_ev_uncertainty_and_higher_priority_sessions_do_not_lower_hardware_min_soc() -> (
-    None
-):
+def test_unverified_ev_or_power_down_cannot_lower_min_soc() -> None:
     safe = _confirmed_unplugged_snapshot()
     cases = (
         (replace(safe, ev_connected=True), True, False),
