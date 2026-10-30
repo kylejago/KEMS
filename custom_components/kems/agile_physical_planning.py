@@ -21,6 +21,7 @@ from .kems_core.agile_live_reserve import (
     _SOLAR_CREDIT_MIN_CONFIDENCE,
     house_forecast_to_cheap_deadline,
     physical_energy_evidence_matches_snapshot,
+    physically_exportable_paid_agile_energy_kwh,
 )
 
 
@@ -174,12 +175,20 @@ def conservative_physical_export_budget(
         _number(config.battery_reserve_percent) or 0.0,
     )
     reserve = capacity * reserve_percent / 100.0
-    budget = max(stored - reserve - protected, 0.0)
+    budget = physically_exportable_paid_agile_energy_kwh(
+        stored_kwh=stored,
+        capacity_kwh=capacity,
+        export_reserve_percent=reserve_percent,
+        protected_house_kwh=protected,
+    )
     return budget, {
         "available": True,
         "basis": "same-scan physical guard house forecast and buffers",
         "physical_energy_lower_bound_kwh": round(stored, 3),
         "minimum_reserve_kwh": round(reserve, 3),
+        "house_safety_floor_kwh": round(capacity * 0.10, 3),
+        "export_floor_soc_percent": reserve_percent,
+        "house_floor_soc_percent": 10.0,
         "protected_house_stored_kwh": round(protected, 3),
         "calendar_day_house_forecast_kwh": round(expected_house, 3),
         "forecast_house_until_cheap_kwh": round(house_to_cheap, 3),
