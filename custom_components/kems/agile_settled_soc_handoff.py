@@ -16,6 +16,9 @@ from time import perf_counter, thread_time
 from typing import Any
 
 from . import agile_smart_export as agile
+from .kems_core.settlement_reconciliation_cadence import (
+    needs_full_tomorrow_republication,
+)
 from .kems_core import (
     ForecastPlanState,
     LearnedState,
@@ -342,11 +345,24 @@ def refresh_tomorrow_handoff_from_settled_soc(
         )
         if changed
     ]
-    second_publication_needed = bool(publication_changes)
+    # The final synchronous settlement owner republishes after all post-handoff
+    # flow and deadline overlays. A handoff-only metadata change is already in
+    # _state and does not justify one extra intermediate full publication.
+    # Every changed actual Tomorrow slot, rate, quality or period still forces
+    # this same-scan publication; never use a timer or fuzzy comparison.
+    second_publication_needed = needs_full_tomorrow_republication(
+        publication_changes
+    )
+    handoff_only_publication_skipped = (
+        publication_changes == ["tomorrow_soc_handoff"]
+    )
     # Alpha9.148: show *which* exact published Tomorrow values changed.
     # No relaxed equality, time-based reuse, or stale-data suppression.
     diagnostic["second_publication_change_reasons"] = publication_changes
     diagnostic["second_publication_needed"] = second_publication_needed
+    diagnostic["handoff_only_publication_skipped"] = (
+        handoff_only_publication_skipped
+    )
     diagnostic["unchanged_tomorrow_publication_skipped"] = not second_publication_needed
     second_publication_seconds = 0.0
     second_publication_cpu_seconds = 0.0
