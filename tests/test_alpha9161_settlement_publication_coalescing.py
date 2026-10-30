@@ -6,6 +6,7 @@ import ast
 from pathlib import Path
 from time import perf_counter
 from types import SimpleNamespace
+from typing import Any
 
 from kems_core.settlement_publication_coalescing import (
     coalesce_identical_settlement_publications,
@@ -17,17 +18,17 @@ KEMS = Path(__file__).parents[1] / "custom_components" / "kems"
 def _isolated_setter():
     module = ast.parse((KEMS / "agile_smart_export.py").read_text())
     owner = next(
-        n for n in module.body
+        n
+        for n in module.body
         if isinstance(n, ast.ClassDef) and n.name == "AgileSmartExportManager"
     )
     method = next(
-        n for n in owner.body
-        if isinstance(n, ast.FunctionDef) and n.name == "_set"
+        n for n in owner.body if isinstance(n, ast.FunctionDef) and n.name == "_set"
     )
     isolated = ast.ClassDef(
         name="Setter", bases=[], keywords=[], body=[method], decorator_list=[]
     )
-    namespace = {"perf_counter": perf_counter}
+    namespace = {"perf_counter": perf_counter, "Any": Any}
     exec(
         compile(
             ast.fix_missing_locations(ast.Module(body=[isolated], type_ignores=[])),
