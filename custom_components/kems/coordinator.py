@@ -81,6 +81,7 @@ from .kems_core import (
 from .kems_core.agile_live_reserve import (
     PaidAgileConnectedIdleContinuity,
     PaidAgileUnpluggedContinuity,
+    allow_paid_agile_house_discharge_to_ten_percent,
     assess_paid_agile_ev_continuity,
     guard_paid_agile_physical_export,
 )
@@ -1345,6 +1346,26 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
             )
             if stress_started:
                 self._schedule_export_commissioning_timeout()
+            # The 15% floor protects deliberate export; once the FoxESS
+            # decision is genuinely house-only Self Use, the battery can
+            # serve the house down to the independent 10% hard floor. Do
+            # this after higher-priority EV, event and commissioning overlays.
+            if tariff_type == EXPORT_TARIFF_TYPE_AGILE:
+                control, house_floor_applied = (
+                    allow_paid_agile_house_discharge_to_ten_percent(
+                        control,
+                        snapshot,
+                        ev_export_safe=ev_export_safe,
+                        power_down_active=bool(
+                            snapshot.saving_session_active
+                            or power_down_plan.get("active")
+                            or power_down_plan.get("reserve_required_before_next_cheap")
+                        ),
+                    )
+                )
+                self._agile_live_reserve_status["house_only_min_soc_ten_applied"] = (
+                    house_floor_applied
+                )
             detail_seconds["ev_hold_and_export_commissioning"] = round(
                 perf_counter() - ev_hold_started, 3
             )

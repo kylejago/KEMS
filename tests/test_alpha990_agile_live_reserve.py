@@ -78,8 +78,9 @@ def test_replans_using_actual_soc_and_house_forecast() -> None:
         snapshot=_snapshot(battery_soc=65.0),
         forecast=_forecast(expected_house_remaining_today_kwh=24.0),
     )
-    assert low.desired_battery_export_power_kw == 0.0
-    assert low_report["status"] == "blocked"
+    assert 0.0 < low.desired_battery_export_power_kw < 6.4
+    assert low_report["status"] == "capped"
+    assert low_report["house_safety_floor_kwh"] > 0.0
 
 
 def test_small_remaining_surplus_caps_physical_kw() -> None:
