@@ -6,9 +6,9 @@ import ast
 from datetime import datetime
 from math import isfinite
 from pathlib import Path
+from types import SimpleNamespace
 
 from kems_core.agile_live_reserve import physically_exportable_paid_agile_energy_kwh
-from types import SimpleNamespace
 
 ROOT = Path(__file__).parents[1] / "custom_components" / "kems"
 
@@ -45,7 +45,9 @@ planning = _pure_functions(
         "_MIN_HOUSE_BUFFER_KWH": 2.0,
         "_MIN_PLANNING_RESERVE_PERCENT": 15.0,
         "_SOLAR_CREDIT_MIN_CONFIDENCE": 80.0,
-        "physically_exportable_paid_agile_energy_kwh": physically_exportable_paid_agile_energy_kwh,
+        "physically_exportable_paid_agile_energy_kwh": (
+            physically_exportable_paid_agile_energy_kwh
+        ),
     },
 )
 
