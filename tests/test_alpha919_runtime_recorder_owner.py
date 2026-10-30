@@ -284,9 +284,11 @@ def test_alpha9162_effective_recorder_coalescer_fails_open_on_lookup_fault() -> 
             pass
 
     writes = []
-    states = types.SimpleNamespace(get=lambda entity_id: (_ for _ in ()).throw(
-        ValueError("state lookup unavailable")
-    ))
+    states = types.SimpleNamespace(
+        get=lambda entity_id: (_ for _ in ()).throw(
+            ValueError("state lookup unavailable")
+        )
+    )
     hass = types.SimpleNamespace(states=states)
 
     def publisher(hass, entity_id, value, attributes):
