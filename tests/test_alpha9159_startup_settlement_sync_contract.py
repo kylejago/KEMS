@@ -1,4 +1,4 @@
-"""Alpha9.160: preserve the synchronous settlement MRO after 9.158 regression."""
+"""Alpha9.161: preserve the synchronous settlement MRO after 9.158 regression."""
 
 from __future__ import annotations
 
@@ -76,9 +76,9 @@ def test_hotfix_release_explains_reversion_and_preserves_safety() -> None:
     bundle = json.loads(
         (ROOT / "release" / "kems-bundle.template.json").read_text(encoding="utf-8")
     )
-    assert manifest["version"] == "0.9.0-alpha9.160"
+    assert manifest["version"] == "0.9.0-alpha9.161"
     reason = bundle["maintenance"]["reason"]
-    assert reason.startswith("Alpha9.160:")
+    assert reason.startswith("Alpha9.161:")
     assert "Alpha9.158" in reason
     assert "7 kW" in reason
     assert "10%" in reason
