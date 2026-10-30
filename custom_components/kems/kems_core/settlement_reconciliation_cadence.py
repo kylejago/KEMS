@@ -23,15 +23,3 @@ def settled_half_hours_changed(
 ) -> bool:
     """Detect new half-hours, revisions, and nested in-place corrections."""
     return previous != current
-
-
-def needs_full_tomorrow_republication(changes: list[str]) -> bool:
-    """Require an expensive republish only for changes to published plans.
-
-    A handoff-only change already lives in the manager's authoritative state.
-    The synchronous settlement owner will issue the final full publication
-    after its remaining flow and deadline overlays run. Re-running every
-    publishing wrapper merely to expose interim handoff metadata is redundant.
-    Unknown/future change kinds deliberately require a full publication.
-    """
-    return any(change != "tomorrow_soc_handoff" for change in changes)

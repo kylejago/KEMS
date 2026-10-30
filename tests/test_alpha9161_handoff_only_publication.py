@@ -7,13 +7,37 @@ changed after the first publication, so a second full publication consumed
 
 from __future__ import annotations
 
+import ast
 from pathlib import Path
 
-from kems_core.settlement_reconciliation_cadence import (
-    needs_full_tomorrow_republication,
-)
-
 KEMS = Path(__file__).parents[1] / "custom_components" / "kems"
+
+
+def needs_full_tomorrow_republication(changes: list[str]) -> bool:
+    """Execute the production predicate directly from its parsed source."""
+    tree = ast.parse((KEMS / "agile_settled_soc_handoff.py").read_text())
+    method = next(
+        node
+        for node in tree.body
+        if isinstance(node, ast.FunctionDef)
+        and node.name == "refresh_tomorrow_handoff_from_settled_soc"
+    )
+    assign = next(
+        node
+        for node in ast.walk(method)
+        if isinstance(node, ast.Assign)
+        and any(
+            isinstance(target, ast.Name) and target.id == "second_publication_needed"
+            for target in node.targets
+        )
+    )
+    expression = ast.Expression(body=assign.value)
+    return bool(
+        eval(
+            compile(ast.fix_missing_locations(expression), "<publication-rule>", "eval"),
+            {"publication_changes": changes},
+        )
+    )
 
 
 def test_only_handoff_metadata_does_not_republish_all_agile_entities() -> None:
@@ -39,7 +63,7 @@ def test_handoff_state_written_even_when_second_publish_is_skipped() -> None:
     assert "manager._state = state" in source
     assert "if second_publication_needed:" in source
     assert "manager._publish(manager._state)" in source
-    assert "needs_full_tomorrow_republication(" in source
+    assert "second_publication_needed = any(" in source
 
 
 def test_full_synchronous_settlement_chain_and_live_writer_preserved() -> None:

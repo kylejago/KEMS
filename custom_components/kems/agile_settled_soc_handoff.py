@@ -22,9 +22,6 @@ from .kems_core import (
     SimulationConfig,
     SolarForecastState,
 )
-from .kems_core.settlement_reconciliation_cadence import (
-    needs_full_tomorrow_republication,
-)
 from .kems_core.tomorrow_soc_handoff import (
     project_tomorrow_midnight_soc,
     reconcile_precheap_projection,
@@ -350,7 +347,9 @@ def refresh_tomorrow_handoff_from_settled_soc(
     # _state and does not justify one extra intermediate full publication.
     # Every changed actual Tomorrow slot, rate, quality or period still forces
     # this same-scan publication; never use a timer or fuzzy comparison.
-    second_publication_needed = needs_full_tomorrow_republication(publication_changes)
+    second_publication_needed = any(
+        change != "tomorrow_soc_handoff" for change in publication_changes
+    )
     handoff_only_publication_skipped = publication_changes == ["tomorrow_soc_handoff"]
     # Alpha9.148: show *which* exact published Tomorrow values changed.
     # No relaxed equality, time-based reuse, or stale-data suppression.
