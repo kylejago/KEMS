@@ -63,7 +63,7 @@ def test_settlement_handoff_and_coordinator_preserve_sync_calls() -> None:
     assert "manager._publish(manager._state)" in helper
     coordinator = (KEMS / "coordinator.py").read_text(encoding="utf-8")
     assert (
-        "pre_settlement = self._agile_smart_export.reconcile_current_day_settlements("
+        "self._agile_smart_export.reconcile_current_day_settlements("
         in coordinator
     )
     assert (
