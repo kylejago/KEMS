@@ -1042,9 +1042,7 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                         now=now,
                     )
                 )
-            settlement_publication_stats["precontrol"] = (
-                pre_publication_stats.summary()
-            )
+            settlement_publication_stats["precontrol"] = pre_publication_stats.summary()
             pre_detail = (
                 pre_settlement.get("current_day_settlement_reconciliation", {})
                 if isinstance(pre_settlement, dict)
