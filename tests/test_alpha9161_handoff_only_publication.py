@@ -29,10 +29,7 @@ def test_any_actual_tomorrow_change_still_triggers_same_scan_republish() -> None
         "future_unknown_new_field",
     ):
         assert needs_full_tomorrow_republication([kind]) is True
-        assert (
-            needs_full_tomorrow_republication(["tomorrow_soc_handoff", kind])
-            is True
-        )
+        assert needs_full_tomorrow_republication(["tomorrow_soc_handoff", kind]) is True
 
 
 def test_handoff_state_written_even_when_second_publish_is_skipped() -> None:
