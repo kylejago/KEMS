@@ -1068,6 +1068,13 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
             detail_seconds["precontrol_settlement_unattributed_seconds"] = round(
                 max(pre_settlement_wall_seconds - accounted, 0.0), 3
             )
+            flow_timing = getattr(
+                self._agile_smart_export, "_kems_flow_settlement_performance", {}
+            )
+            if isinstance(flow_timing, dict):
+                for name, duration in flow_timing.items():
+                    if isinstance(duration, (int, float)) and isfinite(duration):
+                        detail_seconds[f"precontrol_flow_{name}"] = duration
             agile_state = self._agile_smart_export.state
             simulation = reconciled_current_day_simulation(
                 base_simulation,

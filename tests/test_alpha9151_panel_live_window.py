@@ -110,7 +110,7 @@ def test_system_page_controls_panel_only_and_keeps_kems_control():
 def test_manifest_panel_release_and_existing_web_contract():
     manifest = json.loads((KEMS / "manifest.json").read_text())
     bundle = json.loads((ROOT / "release" / "kems-bundle.template.json").read_text())
-    assert manifest["version"] == "0.9.0-alpha9.163"
+    assert manifest["version"] == "0.9.0-alpha9.164"
     assert bundle["components"]["panel"]["version"] == "0.9.0-alpha9-panel.4"
     assert bundle["components"]["property_web"]["version"] == "0.9.0-alpha9-web.0"
     assert bundle["components"]["pi_agent"]["version"] == "0.9.0-alpha9-web.0"
@@ -119,4 +119,4 @@ def test_manifest_panel_release_and_existing_web_contract():
         in (KEMS / "panel.py").read_text()
     )
     assert 'panel_config_version: "0.9.0-alpha9-panel.4"' in PANEL.read_text()
-    assert bundle["maintenance"]["reason"].startswith("Alpha9.162:")
+    assert bundle["maintenance"]["reason"].startswith("Alpha9.164:")
