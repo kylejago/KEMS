@@ -720,9 +720,7 @@ class FlowPresentationAgileSmartExportManager(MidnightRolloverAgileSmartExportMa
         self._publish(self._state)
         publication_seconds = perf_counter() - publication_started
         final_writes = getattr(scope, "written", 0) - final_writes_before
-        final_skipped = (
-            getattr(scope, "skipped_identical", 0) - final_skipped_before
-        )
+        final_skipped = getattr(scope, "skipped_identical", 0) - final_skipped_before
         self._kems_flow_settlement_performance = {
             "base_seconds": round(base_seconds, 3),
             "base_publication_writes": base_writes,
