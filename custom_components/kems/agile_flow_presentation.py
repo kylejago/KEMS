@@ -653,10 +653,13 @@ class FlowPresentationAgileSmartExportManager(MidnightRolloverAgileSmartExportMa
     ) -> dict[str, Any]:
         phase_started = perf_counter()
         cpu_started = thread_time()
+        scope = getattr(self, "_kems_settlement_publication_scope", None)
+        base_writes_before = getattr(scope, "written", 0)
         super().reconcile_current_day_settlements(
             settled_half_hours=settled_half_hours,
             now=now,
         )
+        base_writes = getattr(scope, "written", 0) - base_writes_before
         base_seconds = perf_counter() - phase_started
         base_cpu_seconds = thread_time() - cpu_started
         solar_started = perf_counter()
@@ -712,16 +715,25 @@ class FlowPresentationAgileSmartExportManager(MidnightRolloverAgileSmartExportMa
         _attach_flow_contract(self._state, now=now, future_today=future)
         contract_seconds = perf_counter() - contract_started
         publication_started = perf_counter()
+        final_writes_before = getattr(scope, "written", 0)
+        final_skipped_before = getattr(scope, "skipped_identical", 0)
         self._publish(self._state)
         publication_seconds = perf_counter() - publication_started
+        final_writes = getattr(scope, "written", 0) - final_writes_before
+        final_skipped = (
+            getattr(scope, "skipped_identical", 0) - final_skipped_before
+        )
         self._kems_flow_settlement_performance = {
             "base_seconds": round(base_seconds, 3),
+            "base_publication_writes": base_writes,
             "base_thread_cpu_seconds": round(base_cpu_seconds, 3),
             "solar_accounting_seconds": round(solar_seconds, 3),
             "future_projection_seconds": round(projection_seconds, 3),
             "panel_routing_seconds": round(panel_seconds, 3),
             "flow_contract_seconds": round(contract_seconds, 3),
             "publication_seconds": round(publication_seconds, 3),
+            "publication_actual_writes": final_writes,
+            "publication_identical_suppressed": final_skipped,
             "total_seconds": round(perf_counter() - phase_started, 3),
             "total_thread_cpu_seconds": round(thread_time() - cpu_started, 3),
         }
