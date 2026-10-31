@@ -159,7 +159,7 @@ def test_dashboard_references_advisory_plans_without_simulated_soc_fallback() ->
 
 def test_release_version_and_physical_control_stays_separate() -> None:
     manifest = json.loads((KEMS / "manifest.json").read_text())
-    assert manifest["version"] == "0.9.0-alpha9.164"
+    assert manifest["version"] == "0.9.0-alpha9.165"
     slots = SLOTS.read_text()
     assert '"physical_live_slot_outlook_available": bool(live_outlook)' in slots
     assert "advisory_outlook = _advisory_live_slot_outlook" in slots
