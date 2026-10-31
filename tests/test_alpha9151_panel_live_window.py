@@ -119,4 +119,4 @@ def test_manifest_panel_release_and_existing_web_contract():
         in (KEMS / "panel.py").read_text()
     )
     assert 'panel_config_version: "0.9.0-alpha9-panel.4"' in PANEL.read_text()
-    assert bundle["maintenance"]["reason"].startswith("Alpha9.162:")
+    assert bundle["maintenance"]["reason"].startswith("Alpha9.164:")

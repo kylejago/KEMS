@@ -103,4 +103,4 @@ def test_release_does_not_force_panel_or_pi_update() -> None:
     assert bundle["components"]["panel"]["version"] == "0.9.0-alpha9-panel.4"
     assert bundle["components"]["property_web"]["version"] == "0.9.0-alpha9-web.0"
     assert bundle["components"]["pi_agent"]["version"] == "0.9.0-alpha9-web.0"
-    assert bundle["maintenance"]["reason"].startswith("Alpha9.162:")
+    assert bundle["maintenance"]["reason"].startswith("Alpha9.164:")

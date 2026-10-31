@@ -163,7 +163,7 @@ def test_alpha9148_manifest_and_safety_scope() -> None:
     manifest = json.loads((KEMS / "manifest.json").read_text())
     bundle = json.loads((ROOT / "release/kems-bundle.template.json").read_text())
     assert manifest["version"] == "0.9.0-alpha9.164"
-    assert bundle["maintenance"]["reason"].startswith("Alpha9.162:")
+    assert bundle["maintenance"]["reason"].startswith("Alpha9.164:")
     coordinator = (KEMS / "coordinator.py").read_text()
     assert "guard_paid_agile_physical_export(" in coordinator
     assert "self._foxess_control.async_update(" in coordinator
