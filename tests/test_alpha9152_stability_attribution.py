@@ -99,7 +99,7 @@ def test_dashboard_never_presents_overnight_projection_as_measured_soc() -> None
 def test_release_does_not_force_panel_or_pi_update() -> None:
     manifest = json.loads((KEMS / "manifest.json").read_text())
     bundle = json.loads((ROOT / "release" / "kems-bundle.template.json").read_text())
-    assert manifest["version"] == "0.9.0-alpha9.163"
+    assert manifest["version"] == "0.9.0-alpha9.164"
     assert bundle["components"]["panel"]["version"] == "0.9.0-alpha9-panel.4"
     assert bundle["components"]["property_web"]["version"] == "0.9.0-alpha9-web.0"
     assert bundle["components"]["pi_agent"]["version"] == "0.9.0-alpha9-web.0"
