@@ -707,6 +707,22 @@ class FlowPresentationAgileSmartExportManager(MidnightRolloverAgileSmartExportMa
                 panel_config,
                 self._simulation,
             )
+        panel_seconds = perf_counter() - panel_started
+        contract_started = perf_counter()
         _attach_flow_contract(self._state, now=now, future_today=future)
+        contract_seconds = perf_counter() - contract_started
+        publication_started = perf_counter()
         self._publish(self._state)
+        publication_seconds = perf_counter() - publication_started
+        self._kems_flow_settlement_performance = {
+            "base_seconds": round(base_seconds, 3),
+            "base_thread_cpu_seconds": round(base_cpu_seconds, 3),
+            "solar_accounting_seconds": round(solar_seconds, 3),
+            "future_projection_seconds": round(projection_seconds, 3),
+            "panel_routing_seconds": round(panel_seconds, 3),
+            "flow_contract_seconds": round(contract_seconds, 3),
+            "publication_seconds": round(publication_seconds, 3),
+            "total_seconds": round(perf_counter() - phase_started, 3),
+            "total_thread_cpu_seconds": round(thread_time() - cpu_started, 3),
+        }
         return self.state
