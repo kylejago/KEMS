@@ -6,7 +6,7 @@ import logging
 from dataclasses import replace
 from datetime import UTC, date, datetime, timedelta
 from math import isfinite
-from time import perf_counter
+from time import perf_counter, thread_time
 from zoneinfo import ZoneInfo
 
 from homeassistant.config_entries import ConfigEntry
@@ -1034,6 +1034,7 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                 self._shadow_validation._settled
             )
             pre_settlement_started = perf_counter()
+            pre_settlement_cpu_started = thread_time()
             with coalesce_identical_settlement_publications(
                 self._agile_smart_export
             ) as pre_publication_stats:
@@ -1054,8 +1055,18 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                 for key, value in pre_timing.items():
                     if isinstance(value, (int, float)) and not isinstance(value, bool):
                         detail_seconds[f"precontrol_{key}"] = value
+            pre_settlement_wall_seconds = perf_counter() - pre_settlement_started
             detail_seconds["precontrol_settlement_reconciliation"] = round(
-                perf_counter() - pre_settlement_started, 3
+                pre_settlement_wall_seconds, 3
+            )
+            detail_seconds["precontrol_settlement_thread_cpu_seconds"] = round(
+                thread_time() - pre_settlement_cpu_started, 3
+            )
+            accounted = pre_timing.get("total_seconds", 0.0)
+            if not isinstance(accounted, (int, float)) or not isfinite(accounted):
+                accounted = 0.0
+            detail_seconds["precontrol_settlement_unattributed_seconds"] = round(
+                max(pre_settlement_wall_seconds - accounted, 0.0), 3
             )
             agile_state = self._agile_smart_export.state
             simulation = reconciled_current_day_simulation(
