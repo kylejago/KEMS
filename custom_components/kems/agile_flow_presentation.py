@@ -11,6 +11,7 @@ Real FoxESS writes remain blocked.  This module publishes reporting data only.
 from __future__ import annotations
 
 import math
+from time import perf_counter, thread_time
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -640,8 +641,24 @@ class FlowPresentationAgileSmartExportManager(MidnightRolloverAgileSmartExportMa
             forecast_plan=forecast_plan,
             tariff=tariff,
         )
+        panel_seconds = perf_counter() - panel_started
+        contract_started = perf_counter()
         _attach_flow_contract(self._state, now=now, future_today=future)
+        contract_seconds = perf_counter() - contract_started
+        publication_started = perf_counter()
         self._publish(self._state)
+        publication_seconds = perf_counter() - publication_started
+        self._kems_flow_settlement_performance = {
+            "base_seconds": round(base_seconds, 3),
+            "base_thread_cpu_seconds": round(base_cpu_seconds, 3),
+            "solar_accounting_seconds": round(solar_seconds, 3),
+            "future_projection_seconds": round(projection_seconds, 3),
+            "panel_routing_seconds": round(panel_seconds, 3),
+            "flow_contract_seconds": round(contract_seconds, 3),
+            "publication_seconds": round(publication_seconds, 3),
+            "total_seconds": round(perf_counter() - phase_started, 3),
+            "total_thread_cpu_seconds": round(thread_time() - cpu_started, 3),
+        }
         return self.state
 
     def reconcile_current_day_settlements(
@@ -650,17 +667,24 @@ class FlowPresentationAgileSmartExportManager(MidnightRolloverAgileSmartExportMa
         settled_half_hours: list[dict[str, Any]],
         now: datetime,
     ) -> dict[str, Any]:
+        phase_started = perf_counter()
+        cpu_started = thread_time()
         super().reconcile_current_day_settlements(
             settled_half_hours=settled_half_hours,
             now=now,
         )
+        base_seconds = perf_counter() - phase_started
+        base_cpu_seconds = thread_time() - cpu_started
+        solar_started = perf_counter()
         _live_replay_solar_accounting(self._state, now=now)
+        solar_seconds = perf_counter() - solar_started
 
         config = getattr(self, "_rolling_config", None)
         learned = getattr(self, "_kems_forecast_arbitrage_learned", None)
         forecast = getattr(self, "_kems_forecast_arbitrage_forecast", None)
         forecast_plan = getattr(self, "_kems_forecast_arbitrage_plan", None)
         tariff = getattr(self, "_rolling_tariff", None)
+        projection_started = perf_counter()
         future: dict[str, dict[str, Any]] = {}
         if (
             isinstance(config, SimulationConfig)
@@ -683,6 +707,8 @@ class FlowPresentationAgileSmartExportManager(MidnightRolloverAgileSmartExportMa
         # Refresh the panel-derived raw routing before rebuilding flow_* fields,
         # otherwise a cheap slot may gain grid_to_battery_kwh only after its
         # Battery action was already frozen as IDLE.
+        projection_seconds = perf_counter() - projection_started
+        panel_started = perf_counter()
         panel_config = getattr(self, "_panel_config", None)
         if isinstance(panel_config, SimulationConfig):
             _enrich_slot_routing(
