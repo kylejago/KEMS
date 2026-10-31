@@ -16,7 +16,7 @@ def test_alpha9128_manifest_bundle_and_replay_scope() -> None:
     )
     reason = str(bundle["maintenance"]["reason"]).lower()
     assert manifest["version"] == "0.9.0-alpha9.165"
-    assert reason.startswith("alpha9.164:")
+    assert reason.startswith("alpha9.165:")
     assert "current and tomorrow" in reason
     assert "physical/ev/dno/export safety authority unchanged" in reason
 
