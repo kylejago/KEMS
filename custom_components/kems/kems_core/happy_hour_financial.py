@@ -162,7 +162,7 @@ def estimate_happy_hour_credit(
             "start": start.isoformat(),
             "end": end.isoformat(),
             "import_kwh": round(energy, 3),
-            "credit_pence": round(energy * locked_rate, 3),
+            "credit_pence": round(energy * locked_rate, 6),
             "rate_pence": locked_rate,
             "completed": end <= now,
         }
