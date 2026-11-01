@@ -63,6 +63,13 @@ class LifetimeLedgerRecorder:
         self._simulation_ledger_version = SIMULATION_LEDGER_VERSION
         self._historical_tariff_corrections: dict[str, dict[str, Any]] = {}
         self._historical_tariff_skipped: dict[str, str] = {}
+        # Read-only financial proof, never live import/charge authority.
+        self._happy_hour_verified_receipts: list[dict[str, Any]] = []
+
+    @property
+    def happy_hour_verified_receipts(self) -> list[dict[str, Any]]:
+        """Return retained per-hour credit estimates, not supplier settlement."""
+        return [dict(item) for item in self._happy_hour_verified_receipts]
 
     @property
     def ledger(self) -> LifetimeLedger:
@@ -90,6 +97,11 @@ class LifetimeLedgerRecorder:
         if not data:
             return
         self._loaded_existing = True
+        stored_receipts = data.get("happy_hour_verified_receipts", [])
+        if isinstance(stored_receipts, list):
+            self._happy_hour_verified_receipts = [
+                dict(item) for item in stored_receipts[-128:] if isinstance(item, dict)
+            ]
         saved_corrections = data.get("historical_tariff_corrections", {})
         if isinstance(saved_corrections, dict):
             self._historical_tariff_corrections = {
@@ -206,6 +218,7 @@ class LifetimeLedgerRecorder:
         *,
         happy_hour_estimated_credit_pence: float | None = None,
         happy_hour_credited_import_kwh: float | None = None,
+        happy_hour_verified_receipts: list[dict[str, Any]] | None = None,
     ) -> LifetimeLedger:
         """Apply changes in current-day cumulative metrics to the ledger."""
         if (
@@ -224,6 +237,17 @@ class LifetimeLedgerRecorder:
             self._tracking_values["actual_system_value_pence"] = (
                 simulation.actual_system_value_pence or 0.0
             )
+        old_receipts = self._happy_hour_verified_receipts
+        if happy_hour_verified_receipts is not None:
+            self._happy_hour_verified_receipts = [
+                dict(item)
+                for item in happy_hour_verified_receipts[-128:]
+                if isinstance(item, dict)
+            ]
+        verified_completion_changed = any(
+            item.get("completed") and item not in old_receipts
+            for item in self._happy_hour_verified_receipts
+        )
         self._apply_cumulative_day(
             now,
             simulation,
@@ -249,7 +273,10 @@ class LifetimeLedgerRecorder:
         self._check_payback(now.date(), config)
 
         self._updates_since_save += 1
-        if self._updates_since_save >= SAVE_EVERY_UPDATES:
+        if (
+            verified_completion_changed
+            or self._updates_since_save >= SAVE_EVERY_UPDATES
+        ):
             await self.async_save()
         return self._ledger
 
@@ -344,6 +371,7 @@ class LifetimeLedgerRecorder:
                     self._tracking_date.isoformat() if self._tracking_date else None
                 ),
                 "tracking_values": self._tracking_values,
+                "happy_hour_verified_receipts": self._happy_hour_verified_receipts,
                 "daily_records": self._daily_records,
                 "historical_tariff_corrections": self._historical_tariff_corrections,
                 "maintenance_date": (
@@ -379,10 +407,13 @@ class LifetimeLedgerRecorder:
             ("happy_hour_estimated_credit_pence", happy_hour_estimated_credit_pence),
             ("happy_hour_credited_import_kwh", happy_hour_credited_import_kwh),
         ):
+            previous_verified = (
+                float(self._tracking_values.get(key, 0.0)) if same_day else 0.0
+            )
             values[key] = (
-                max(float(observed), 0.0)
+                max(float(observed), previous_verified, 0.0)
                 if observed is not None
-                else float(self._tracking_values.get(key, 0.0)) if same_day else 0.0
+                else previous_verified
             )
 
         if self._ledger.first_observation is None:

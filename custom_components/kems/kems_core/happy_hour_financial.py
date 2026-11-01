@@ -46,81 +46,137 @@ def estimate_happy_hour_credit(
     now: datetime,
     import_rate_pence: float | None,
     gross_import_cost_pence: float | None,
+    persisted_confirmed_windows: list[Mapping[str, Any]] | None = None,
+    verified_receipts: list[Mapping[str, Any]] | None = None,
 ) -> dict[str, Any]:
-    """Estimate only independently booked, continuously metered reward import.
+    """Estimate read-only credits from verified, independent one-hour rewards.
 
-    None means there is no fresh verified estimate, not an assertion of zero
-    supplier credit. A previous verified daily estimate can be retained in the
-    persisted reporting ledger if the completed event drops out of planning.
+    The physical import ledger's persisted windows are historical confirmation
+    evidence ONLY: they cannot authorise current or future grid import, charging,
+    or FoxESS control. Each completed hour retains its verification, measured
+    energy, and indicative rate after Octopus removes it from its joined feed.
     """
     unavailable: dict[str, Any] = {
         "estimated_credit_pence": None,
         "credited_import_kwh": None,
         "supplier_settled": False,
-        "rate_basis": "current observed import unit rate (indicative)",
+        "rate_basis": "rate captured with verified reward hour (indicative)",
+        "verified_hour_receipts": [],
     }
     rate = _positive_number(import_rate_pence)
     gross = _positive_number(gross_import_cost_pence)
-    hours = plan.get("reward_hours")
-    entries = bookings.get("bookings")
     if (
         rate is None
         or gross is None
-        or not isinstance(hours, list)
-        or not isinstance(entries, list)
         or not isinstance(now, datetime)
         or now.tzinfo is None
     ):
         return unavailable
 
-    # A published/available event alone is not authority for free power.
-    # Only individually confirmed joined bookings count.
+    day = now.astimezone(_LONDON).date()
     confirmed: set[tuple[datetime, datetime]] = set()
-    for item in entries:
+    entries = bookings.get("bookings")
+    for item in entries if isinstance(entries, list) else []:
         if not isinstance(item, Mapping):
             continue
         start, end = _datetime(item.get("start")), _datetime(item.get("end"))
         if (
             start is not None
             and end is not None
-            and start < end
-            and (end - start).total_seconds() <= 3600
+            and 0 < (end - start).total_seconds() <= 3600
             and (item.get("event_id") or item.get("event_code"))
         ):
             confirmed.add((start, end))
 
-    if not confirmed:
-        return unavailable
+    # Only use windows saved by HappyHourImportLedgerRecorder while Octopus
+    # booking authority was independently verified. Exact ONE-hour matches
+    # are financial evidence after completion, never future booking authority.
+    for item in persisted_confirmed_windows or []:
+        if not isinstance(item, Mapping):
+            continue
+        start, end = _datetime(item.get("start")), _datetime(item.get("end"))
+        if (
+            start is not None
+            and end is not None
+            and 0 < (end - start).total_seconds() <= 3600
+            and end <= now
+        ):
+            confirmed.add((start, end))
 
-    day = now.astimezone(_LONDON).date()
-    counted: set[tuple[datetime, datetime]] = set()
-    energy = 0.0
-    for hour in hours:
+    receipts: dict[tuple[datetime, datetime], dict[str, Any]] = {}
+    for item in verified_receipts or []:
+        if not isinstance(item, Mapping):
+            continue
+        start, end = _datetime(item.get("start")), _datetime(item.get("end"))
+        energy = _positive_number(item.get("import_kwh"))
+        credit = _positive_number(item.get("credit_pence"))
+        saved_rate = _positive_number(item.get("rate_pence"))
+        if (
+            start is None
+            or end is None
+            or not 0 < (end - start).total_seconds() <= 3600
+            or start.astimezone(_LONDON).date() != day
+            or energy is None
+            or energy > 16.0
+            or credit is None
+            or saved_rate is None
+        ):
+            continue
+        receipts[(start, end)] = {
+            "start": start.isoformat(),
+            "end": end.isoformat(),
+            "import_kwh": energy,
+            "credit_pence": credit,
+            "rate_pence": saved_rate,
+            "completed": bool(item.get("completed")),
+        }
+
+    hours = plan.get("reward_hours")
+    for hour in hours if isinstance(hours, list) else []:
         if not isinstance(hour, Mapping) or hour.get("coverage_complete") is not True:
             continue
         start, end = _datetime(hour.get("start")), _datetime(hour.get("end"))
         if (
             start is None
             or end is None
-            or (start, end) not in confirmed
-            or (start, end) in counted
+            or not 0 < (end - start).total_seconds() <= 3600
             or start.astimezone(_LONDON).date() != day
             or start > now
         ):
             continue
+        key = (start, end)
+        previous = receipts.get(key)
+        if key not in confirmed and previous is None:
+            continue  # Publicly advertised events are never free-import proof.
+        if previous is not None and previous["completed"]:
+            continue  # A settled-in-ledger hour is never repriced by live rates.
         measured = _positive_number(hour.get("import_kwh"))
         cap = _positive_number(hour.get("cap_kwh"))
         if measured is None or cap is None:
             continue
-        counted.add((start, end))
-        energy += min(measured, cap, 16.0)
+        energy = min(measured, cap, 16.0)
+        if previous is not None:
+            energy = max(energy, previous["import_kwh"])
+        locked_rate = previous["rate_pence"] if previous is not None else rate
+        receipts[key] = {
+            "start": start.isoformat(),
+            "end": end.isoformat(),
+            "import_kwh": round(energy, 3),
+            "credit_pence": round(energy * locked_rate, 6),
+            "rate_pence": locked_rate,
+            "completed": end <= now,
+        }
 
-    if not counted:
+    if not receipts:
         return unavailable
+    saved = [receipts[key] for key in sorted(receipts)]
     return {
-        "estimated_credit_pence": round(min(energy * rate, gross), 3),
-        "credited_import_kwh": round(energy, 3),
+        "estimated_credit_pence": round(
+            min(sum(item["credit_pence"] for item in saved), gross), 3
+        ),
+        "credited_import_kwh": round(sum(item["import_kwh"] for item in saved), 3),
         "supplier_settled": False,
-        "rate_basis": "current observed import unit rate (indicative)",
-        "verified_reward_hours": len(counted),
+        "rate_basis": "rate captured with verified reward hour (indicative)",
+        "verified_reward_hours": len(saved),
+        "verified_hour_receipts": saved,
     }
