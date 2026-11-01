@@ -53,7 +53,6 @@ from .happy_hour_budget import (
     verified_live_happy_hour_house_grid_hold,
 )
 from .happy_hour_import_ledger import HappyHourImportLedgerRecorder
-from .kems_core.happy_hour_financial import estimate_happy_hour_credit
 from .happy_hour_ohme_control import OhmeHappyHourController
 from .happy_hour_physical_preparation import (
     apply_verified_happy_hour_preparation,
@@ -92,6 +91,7 @@ from .kems_core.control_event_refresh import (
     meaningful_ev_power_transition,
 )
 from .kems_core.control_write_authority import active_joined_power_down_window
+from .kems_core.happy_hour_financial import estimate_happy_hour_credit
 from .kems_core.scenario_report_gate import ScenarioReportGate
 from .kems_core.settlement_publication_coalescing import (
     coalesce_identical_settlement_publications,
