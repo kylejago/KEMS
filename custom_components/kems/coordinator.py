@@ -91,6 +91,7 @@ from .kems_core.control_event_refresh import (
     meaningful_ev_power_transition,
 )
 from .kems_core.control_write_authority import active_joined_power_down_window
+from .kems_core.happy_hour_financial import estimate_happy_hour_credit
 from .kems_core.scenario_report_gate import ScenarioReportGate
 from .kems_core.settlement_publication_coalescing import (
     coalesce_identical_settlement_publications,
@@ -1464,11 +1465,26 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                 perf_counter() - reporting_started, 3
             )
             lifetime_started = perf_counter()
+            # Read-only settlement estimate; never changes FoxESS authority,
+            # quoted import tariff, meter energy or supplier payment status.
+            happy_hour_credit = estimate_happy_hour_credit(
+                plan=happy_hour_plan,
+                bookings=_controller_for(self).state,
+                now=now,
+                import_rate_pence=snapshot.current_import_rate,
+                gross_import_cost_pence=simulation.actual_import_cost_pence,
+            )
             stored_lifetime = await self._lifetime.async_update(
                 roi_simulation,
                 gas,
                 now,
                 self.settings.roi,
+                happy_hour_estimated_credit_pence=(
+                    happy_hour_credit["estimated_credit_pence"]
+                ),
+                happy_hour_credited_import_kwh=(
+                    happy_hour_credit["credited_import_kwh"]
+                ),
             )
             lifetime = LifetimeLedger.from_dict(stored_lifetime.to_dict())
             periods = self._lifetime.period_summaries(now)

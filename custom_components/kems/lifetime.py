@@ -203,6 +203,9 @@ class LifetimeLedgerRecorder:
         gas: GasSummary,
         now: datetime,
         config: ROIConfig,
+        *,
+        happy_hour_estimated_credit_pence: float | None = None,
+        happy_hour_credited_import_kwh: float | None = None,
     ) -> LifetimeLedger:
         """Apply changes in current-day cumulative metrics to the ledger."""
         if (
@@ -221,7 +224,14 @@ class LifetimeLedgerRecorder:
             self._tracking_values["actual_system_value_pence"] = (
                 simulation.actual_system_value_pence or 0.0
             )
-        self._apply_cumulative_day(now, simulation, gas, config)
+        self._apply_cumulative_day(
+            now,
+            simulation,
+            gas,
+            config,
+            happy_hour_estimated_credit_pence=happy_hour_estimated_credit_pence,
+            happy_hour_credited_import_kwh=happy_hour_credited_import_kwh,
+        )
         self._ledger.last_updated = now
         self._ledger.commissioning_date = config.commissioning_date
         self._ledger.observed_days = self._inclusive_days(
@@ -355,10 +365,25 @@ class LifetimeLedgerRecorder:
         config: ROIConfig,
         *,
         include_commissioned_value: bool = True,
+        happy_hour_estimated_credit_pence: float | None = None,
+        happy_hour_credited_import_kwh: float | None = None,
     ) -> None:
         """Apply one day's current cumulative values using delta accounting."""
         current_date = now.date()
         values = self._current_values(simulation, gas)
+        # A completed reward can disappear from the live planner. Preserve
+        # only today's last *verified* estimate through that transition and
+        # across HA restart; never zero a refund simply because the event ended.
+        same_day = self._tracking_date == current_date
+        for key, observed in (
+            ("happy_hour_estimated_credit_pence", happy_hour_estimated_credit_pence),
+            ("happy_hour_credited_import_kwh", happy_hour_credited_import_kwh),
+        ):
+            values[key] = (
+                max(float(observed), 0.0)
+                if observed is not None
+                else float(self._tracking_values.get(key, 0.0)) if same_day else 0.0
+            )
 
         if self._ledger.first_observation is None:
             self._ledger.first_observation = now
