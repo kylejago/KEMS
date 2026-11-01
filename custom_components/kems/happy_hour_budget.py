@@ -241,9 +241,7 @@ def restore_completed_financial_reward_receipts(
             timestamp = _dt(getattr(item, "timestamp", None))
             if timestamp is None or not start <= timestamp < end:
                 continue
-            if "current_import_rate" in (
-                getattr(item, "stale_fields", ()) or ()
-            ):
+            if "current_import_rate" in (getattr(item, "stale_fields", ()) or ()):
                 continue
             rate = _number(getattr(item, "current_import_rate", None))
             if rate is not None and rate >= 0:
