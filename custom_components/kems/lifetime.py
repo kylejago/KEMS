@@ -100,8 +100,7 @@ class LifetimeLedgerRecorder:
         stored_receipts = data.get("happy_hour_verified_receipts", [])
         if isinstance(stored_receipts, list):
             self._happy_hour_verified_receipts = [
-                dict(item) for item in stored_receipts[-128:]
-                if isinstance(item, dict)
+                dict(item) for item in stored_receipts[-128:] if isinstance(item, dict)
             ]
         saved_corrections = data.get("historical_tariff_corrections", {})
         if isinstance(saved_corrections, dict):
@@ -241,7 +240,8 @@ class LifetimeLedgerRecorder:
         old_receipts = self._happy_hour_verified_receipts
         if happy_hour_verified_receipts is not None:
             self._happy_hour_verified_receipts = [
-                dict(item) for item in happy_hour_verified_receipts[-128:]
+                dict(item)
+                for item in happy_hour_verified_receipts[-128:]
                 if isinstance(item, dict)
             ]
         verified_completion_changed = any(
@@ -273,7 +273,10 @@ class LifetimeLedgerRecorder:
         self._check_payback(now.date(), config)
 
         self._updates_since_save += 1
-        if verified_completion_changed or self._updates_since_save >= SAVE_EVERY_UPDATES:
+        if (
+            verified_completion_changed
+            or self._updates_since_save >= SAVE_EVERY_UPDATES
+        ):
             await self.async_save()
         return self._ledger
 
