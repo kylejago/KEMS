@@ -57,7 +57,6 @@ def test_unbooked_hours_never_get_free_import() -> None:
     )
 
 
-
 def test_completed_joined_hours_survive_octopus_live_feed_expiry() -> None:
     """1 Nov: two physically measured hours remain credited after joined expiry."""
     start = datetime(2026, 11, 1, 12, tzinfo=UTC)
@@ -90,7 +89,8 @@ def test_completed_joined_hours_survive_octopus_live_feed_expiry() -> None:
     # Completed receipts are immutable even when joined bookings, plan rows,
     # and observed tariff subsequently change or HA restarts.
     restored = estimate_happy_hour_credit(
-        plan={}, bookings={"bookings": []},
+        plan={},
+        bookings={"bookings": []},
         verified_receipts=result["verified_hour_receipts"],
         now=start + timedelta(hours=9),
         import_rate_pence=6.6,
@@ -118,9 +118,11 @@ def test_expired_joined_hour_does_not_erase_another_verified_hour() -> None:
     }
     result = estimate_happy_hour_credit(
         plan={"reward_hours": [hour_one, hour_two]},
-        bookings={"bookings": [
-            {"start": hour_two["start"], "end": hour_two["end"], "event_id": "8068"}
-        ]},
+        bookings={
+            "bookings": [
+                {"start": hour_two["start"], "end": hour_two["end"], "event_id": "8068"}
+            ]
+        },
         persisted_confirmed_windows=[
             {"start": hour_one["start"], "end": hour_one["end"]}
         ],
@@ -149,17 +151,19 @@ def test_public_event_or_unfinished_saved_window_cannot_grant_credit() -> None:
         gross_import_cost_pence=739.76,
     )
     assert estimate_happy_hour_credit(**kwargs)["estimated_credit_pence"] is None
-    assert estimate_happy_hour_credit(
-        **kwargs,
-        persisted_confirmed_windows=[
-            {"start": hour["start"], "end": hour["end"]}
-        ],
-    )["estimated_credit_pence"] is None
+    assert (
+        estimate_happy_hour_credit(
+            **kwargs,
+            persisted_confirmed_windows=[{"start": hour["start"], "end": hour["end"]}],
+        )["estimated_credit_pence"]
+        is None
+    )
     kwargs["now"] = start + timedelta(hours=3)
     hour["coverage_complete"] = False
-    assert estimate_happy_hour_credit(
-        **kwargs,
-        persisted_confirmed_windows=[
-            {"start": hour["start"], "end": hour["end"]}
-        ],
-    )["estimated_credit_pence"] is None
+    assert (
+        estimate_happy_hour_credit(
+            **kwargs,
+            persisted_confirmed_windows=[{"start": hour["start"], "end": hour["end"]}],
+        )["estimated_credit_pence"]
+        is None
+    )
