@@ -211,7 +211,6 @@ class LifetimeLedgerRecorder:
         self._ledger.accumulator_status = "healthy"
         await self.async_save()
 
-
     def _merge_verified_happy_hour_receipts(
         self, incoming: list[dict[str, Any]]
     ) -> bool:
@@ -243,14 +242,14 @@ class LifetimeLedgerRecorder:
                 continue
             key = (start.isoformat(), end.isoformat())
             prior = merged.get(key)
-            if prior is not None and prior.get("completed") and (
-                float(prior.get("import_kwh", 0.0)) >= energy
+            if (
+                prior is not None
+                and prior.get("completed")
+                and (float(prior.get("import_kwh", 0.0)) >= energy)
             ):
                 continue
             merged[key] = dict(item)
-        self._happy_hour_verified_receipts = [
-            merged[k] for k in sorted(merged)[-128:]
-        ]
+        self._happy_hour_verified_receipts = [merged[k] for k in sorted(merged)[-128:]]
         return merged != old
 
     async def async_reconcile_completed_happy_hour_receipts(
@@ -297,9 +296,7 @@ class LifetimeLedgerRecorder:
                     hours.append(item)
             energy = round(sum(float(h["import_kwh"]) for h in hours), 3)
             gross = max(float(row.get("import_cost_pence", 0.0)), 0.0)
-            credit = round(
-                min(sum(float(h["credit_pence"]) for h in hours), gross), 3
-            )
+            credit = round(min(sum(float(h["credit_pence"]) for h in hours), gross), 3)
             for key, value in (
                 ("happy_hour_credited_import_kwh", energy),
                 ("happy_hour_estimated_credit_pence", credit),
