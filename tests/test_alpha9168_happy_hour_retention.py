@@ -46,16 +46,23 @@ class _FakeHass:
 def _recorder_class():
     """Load the pure recorder body without importing Home Assistant in CI."""
     root = ast.parse(SOURCE.read_text(encoding="utf-8"))
-    allowed = {"_STORAGE_VERSION", "_PRE_EVENT_SEED", "_RETENTION",
-               "_MAX_SAMPLES", "_MAX_METER_AGE_SECONDS",
-               "_MAX_SNAPSHOT_CLOCK_SKEW_SECONDS", "_utc", "_number",
-               "GridImportReading", "HappyHourImportLedgerRecorder"}
+    allowed = {
+        "_STORAGE_VERSION",
+        "_PRE_EVENT_SEED",
+        "_RETENTION",
+        "_MAX_SAMPLES",
+        "_MAX_METER_AGE_SECONDS",
+        "_MAX_SNAPSHOT_CLOCK_SKEW_SECONDS",
+        "_utc",
+        "_number",
+        "GridImportReading",
+        "HappyHourImportLedgerRecorder",
+    }
     nodes = [
-        node for node in root.body
-        if (
-            isinstance(node, (ast.FunctionDef, ast.ClassDef))
-            and node.name in allowed
-        ) or (
+        node
+        for node in root.body
+        if (isinstance(node, (ast.FunctionDef, ast.ClassDef)) and node.name in allowed)
+        or (
             isinstance(node, ast.Assign)
             and any(
                 isinstance(target, ast.Name) and target.id in allowed
@@ -64,9 +71,15 @@ def _recorder_class():
         )
     ]
     ns = {
-        "UTC": UTC, "datetime": datetime, "timedelta": timedelta,
-        "isfinite": isfinite, "Any": Any, "dataclass": dataclass,
-        "Store": _FakeStore, "DOMAIN": "kems",
+        "__name__": "test_alpha9168_happy_hour_retention",
+        "UTC": UTC,
+        "datetime": datetime,
+        "timedelta": timedelta,
+        "isfinite": isfinite,
+        "Any": Any,
+        "dataclass": dataclass,
+        "Store": _FakeStore,
+        "DOMAIN": "kems",
         "STORAGE_NAMESPACE": "regression",
     }
     exec(compile(ast.Module(body=nodes, type_ignores=[]), str(SOURCE), "exec"), ns)
@@ -110,11 +123,7 @@ def test_pre_168_verified_store_survives_next_morning_restart() -> None:
     # No new live confirmed booking exists, so ledger cannot record new
     # physical readings or issue writes after a completed session.
     assert (
-        asyncio.run(
-            recorder.async_observe(
-                object(), now=anchor, confirmed_windows=[]
-            )
-        )
+        asyncio.run(recorder.async_observe(object(), now=anchor, confirmed_windows=[]))
         is False
     )
     assert hass.data[store.key] is before
@@ -137,9 +146,7 @@ def test_pre_168_verified_store_survives_next_morning_restart() -> None:
     credit = estimate_happy_hour_credit(
         plan={"reward_hours": hours},
         bookings={"bookings": []},
-        persisted_confirmed_windows=recorder.status[
-            "persisted_reward_windows"
-        ],
+        persisted_confirmed_windows=recorder.status["persisted_reward_windows"],
         now=anchor,
         import_rate_pence=35.8828,
         gross_import_cost_pence=739.72,
@@ -155,10 +162,12 @@ def test_source_rebinding_never_reuses_old_physical_meter_history() -> None:
     recorder = Recorder(hass, "another-entry", grid_import_entity="sensor.new")
     hass.data[recorder._store.key] = {
         "source_entity": "sensor.old",
-        "samples": [{
-            "timestamp": datetime.now(UTC).isoformat(),
-            "grid_import_kw": 3.0,
-        }],
+        "samples": [
+            {
+                "timestamp": datetime.now(UTC).isoformat(),
+                "grid_import_kw": 3.0,
+            }
+        ],
         "windows": [],
     }
     asyncio.run(recorder.async_load())
@@ -175,14 +184,18 @@ def test_retention_still_bounded_and_expires_old_evidence() -> None:
     old_end = now - retention - timedelta(hours=1)
     hass.data[recorder._store.key] = {
         "source_entity": "sensor.site_import",
-        "samples": [{
-            "timestamp": (old_end - timedelta(minutes=15)).isoformat(),
-            "grid_import_kw": 2.0,
-        }],
-        "windows": [{
-            "start": (old_end - timedelta(hours=1)).isoformat(),
-            "end": old_end.isoformat(),
-        }],
+        "samples": [
+            {
+                "timestamp": (old_end - timedelta(minutes=15)).isoformat(),
+                "grid_import_kw": 2.0,
+            }
+        ],
+        "windows": [
+            {
+                "start": (old_end - timedelta(hours=1)).isoformat(),
+                "end": old_end.isoformat(),
+            }
+        ],
     }
     asyncio.run(recorder.async_load())
     assert recorder.status["retained_samples"] == 0
