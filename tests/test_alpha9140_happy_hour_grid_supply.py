@@ -299,3 +299,86 @@ def test_unverified_flag_cannot_escape_preflight_and_restart_safety():
     assert _decision(control, hold=False).reason != (
         "Verified Happy Hour household battery discharge hold"
     )
+
+
+def test_alpha9168_historical_recovery_uses_sundays_rate_not_mondays_cheap_rate():
+    """Retain two one-hour receipts after joined events expire at 06:00 Monday."""
+    start = datetime(2026, 11, 1, 12, tzinfo=UTC)
+    middle = start + timedelta(hours=1)
+    end = middle + timedelta(hours=1)
+    readings = [
+        types.SimpleNamespace(
+            timestamp=start + timedelta(minutes=i * 5),
+            grid_import_kw=7.294 if i < 12 else 3.655,
+        )
+        for i in range(-1, 25)
+    ]
+    history = [
+        types.SimpleNamespace(
+            timestamp=start + timedelta(minutes=i),
+            current_import_rate=35.8828,
+            stale_fields=(),
+        )
+        for i in (12, 43, 72, 104)
+    ]
+    records = _budget.restore_completed_financial_reward_receipts(
+        confirmed_windows=[
+            {"start": start.isoformat(), "end": middle.isoformat()},
+            {"start": middle.isoformat(), "end": end.isoformat()},
+            {"start": start.isoformat(), "end": end.isoformat()},
+        ],
+        physical_samples=readings,
+        historical_snapshots=history,
+        now=start + timedelta(hours=18),
+    )
+    assert len(records) == 2
+    assert [r["import_kwh"] for r in records] == [7.294, 3.655]
+    assert round(sum(r["credit_pence"] for r in records), 3) == 392.881
+    assert all(r["rate_pence"] == 35.8828 for r in records)
+    assert all(r["completed"] for r in records)
+
+
+def test_alpha9168_incomplete_coverage_and_mixed_historical_tariffs_fail_closed():
+    """Do not invent supplier credits when historical source proof is missing."""
+    start = datetime(2026, 11, 1, 12, tzinfo=UTC)
+    end = start + timedelta(hours=1)
+    readings = [
+        types.SimpleNamespace(
+            timestamp=start + timedelta(minutes=i * 5),
+            grid_import_kw=7.294,
+        )
+        for i in range(-1, 13)
+    ]
+    bad_rates = [
+        types.SimpleNamespace(
+            timestamp=start + timedelta(minutes=i),
+            current_import_rate=rate,
+            stale_fields=(),
+        )
+        for i, rate in ((12, 35.8828), (40, 6.6))
+    ]
+    kwargs = dict(
+        confirmed_windows=[{"start": start.isoformat(), "end": end.isoformat()}],
+        physical_samples=readings,
+        historical_snapshots=bad_rates,
+        now=start + timedelta(hours=18),
+    )
+    assert _budget.restore_completed_financial_reward_receipts(**kwargs) == []
+    kwargs["historical_snapshots"] = [
+        types.SimpleNamespace(
+            timestamp=start + timedelta(minutes=12),
+            current_import_rate=35.8828,
+            stale_fields=(),
+        )
+    ]
+    assert _budget.restore_completed_financial_reward_receipts(**kwargs) == []
+    kwargs["historical_snapshots"] = [
+        types.SimpleNamespace(
+            timestamp=start + timedelta(minutes=i),
+            current_import_rate=35.8828,
+            stale_fields=(),
+        )
+        for i in (12, 40)
+    ]
+    kwargs["physical_samples"] = readings[:3]
+    assert _budget.restore_completed_financial_reward_receipts(**kwargs) == []
