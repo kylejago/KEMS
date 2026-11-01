@@ -1,257 +1,323 @@
 title: KEMS
-
 views:
   - title: Home
     path: home
     icon: mdi:home-lightning-bolt
     cards:
-      - type: markdown
-        title: Live KEMS — at a glance
-        content: |
-          # ⚡ KEMS Live
-          **{{ states('sensor.kems_status') }}** · **{{ states('select.kems_operating_mode') }} mode** · {{ states('select.kems_export_tariff') }} export
-
-          **Current advice:** {{ states('sensor.kems_advice') }}  
-          {{ state_attr('sensor.kems_advice', 'message') or 'Waiting for the next KEMS update.' }}
-
-          **Control:** {{ 'Enabled' if is_state('binary_sensor.kems_control_enabled', 'on') else 'Not enabled' }} · **Data:** {{ 'Fresh' if is_state('binary_sensor.kems_control_data_fresh', 'on') else 'Check freshness' }} · **Commands:** {{ 'Permitted' if is_state('binary_sensor.kems_control_commands_permitted', 'on') else 'Blocked / read-only' }}
-
-      - type: grid
-        columns: 2
-        square: false
+    - type: markdown
+      title: Live KEMS — at a glance
+      content: "# ⚡ KEMS Live\n**{{ states('sensor.kems_status') }}** · **{{ states('select.kems_operating_mode') }} mode** · {{ states('select.kems_export_tariff') }} export\n\n**Current advice:** {{ states('sensor.kems_advice') }}  \n{{ state_attr('sensor.kems_advice', 'message') or 'Waiting for the next KEMS update.' }}\n\n**Control:** {{ 'Enabled' if is_state('binary_sensor.kems_control_enabled', 'on') else 'Not enabled' }} · **Data:** {{ 'Fresh' if is_state('binary_sensor.kems_control_data_fresh', 'on') else 'Check freshness' }} · **Commands:** {{ 'Permitted' if is_state('binary_sensor.kems_control_commands_permitted', 'on') else 'Blocked / read-only' }}  \n**Control plan safe:** {{ 'Safe' if is_state('binary_sensor.kems_control_plan_safe', 'on') else 'Not safe' if is_state('binary_sensor.kems_control_plan_safe', 'off') else 'Unavailable' }}  \n**Intelligent status fresh:** {{ 'Fresh' if is_state('binary_sensor.kems_intelligent_slot_source_fresh', 'on') else 'Not fresh' if is_state('binary_sensor.kems_intelligent_slot_source_fresh', 'off') else 'Unavailable' }}  \n**KEMS update status:** {{ states('sensor.kems_update_status') if states('sensor.kems_update_status') not in ['unknown', 'unavailable', 'none', ''] else 'Unavailable' }}  \n"
+    - type: markdown
+      title: Today's actual costs
+      content: |
+        {% set periods = state_attr('sensor.kems_energy_cost_comparison', 'periods') or {} %}
+        {% set today = periods.get('today', {}) or {} %}
+        {% set live = today.get('live_data', {}) or {} %}
+        {% set imported = live.get('electricity_import_cost_pence') %}
+        {% set standing = live.get('electricity_standing_charge_pence') %}
+        {% set exported = live.get('electricity_export_income_pence') %}
+        {% set electricity = live.get('electricity_total_cost_pence') %}
+        {% set gas = live.get('gas_total_cost_pence') %}
+        {% set total = live.get('total_energy_cost_pence') %}
+        | Actual bill-equivalent costs | Today |
+        |:---|---:|
+        | Electricity import | {{ ('£%.2f' | format(imported | float / 100)) if imported is not none else '—' }} |
+        | Electricity standing charge | {{ ('£%.2f' | format(standing | float / 100)) if standing is not none else '—' }} |
+        | Estimated Agile export credit | {{ ('£%.2f' | format(exported | float / 100)) if exported is not none else '—' }} |
+        | Net electricity cost | {{ ('£%.2f' | format(electricity | float / 100)) if electricity is not none else '—' }} |
+        | Gas including charges | {{ ('£%.2f' | format(gas | float / 100)) if gas is not none else '—' }} |
+        | **TOTAL ENERGY COST** | **{{ ('£%.2f' | format(total | float / 100)) if total is not none else '—' }}** |
+  
+        _Estimated bill-equivalent calculated from observed energy and configured tariffs—not confirmed Octopus settlement. Negative totals indicate estimated credit; unavailable figures are not assumed £0._
+    - type: markdown
+      title: Tariffs & battery now
+      content: |
+        {% set bad = ['unknown','unavailable','none',''] %}
+        {% set import_rate = states('sensor.kems_current_import_rate') %}
+        {% set export_rate = states('sensor.kems_current_export_rate') %}
+        {% set live_guard = state_attr('sensor.kems_agile_slots', 'live_control_summary') or {} %}
+        {% set reserve = live_guard.get('physical_budget_exportable_ac_kwh') %}
+        {% set target = live_guard.get('final_control_export_target_kw') %}
+        {% set lower_soc = live_guard.get('verified_physical_soc_lower_bound_percent') %}
+        | Right now | Value |
+        |:---|---:|
+        | Import price | {{ (import_rate ~ ' p/kWh') if import_rate | lower not in bad else '—' }} |
+        | Selected export price | {{ (export_rate ~ ' p/kWh') if export_rate | lower not in bad else '—' }} |
+        | Cheap period | {{ 'Active' if is_state('binary_sensor.kems_cheap_period_confirmed', 'on') else 'Not active' }} |
+        | Export permitted | {{ 'Yes' if is_state('binary_sensor.kems_grid_export_allowed_by_control', 'on') else 'No' }} |
+        | Final guarded battery-export request | {{ ('%.2f kW' | format(target | float)) if target is not none else '—' }} |
+        | Physical-budget AC export allowance | {{ ('%.2f kWh' | format(reserve | float)) if reserve is not none else '—' }} |
+        | Physical planning SOC lower bound | {{ ('%.1f%%' | format(lower_soc | float)) if lower_soc is not none else '—' }} |
+        | Physical export guard | {{ live_guard.get('physical_guard_status', 'unavailable') | replace('_', ' ') }} |
+  
+        **Next import rate:** {{ states('sensor.kems_next_import_rate') }} p/kWh  
+        **Solar forecast tomorrow:** {{ states('sensor.kems_forecast_solar_tomorrow') }} kWh
+  
+        _Export request comes from the final physically guarded control decision, not the simulation. AC budget and lower-bound SOC require current verified physical planner proof. Missing evidence is shown as —, not synthetic SOC. Charge towards 100% when worthwhile; it is not mandatory._
+  
+    - type: grid
+      columns: 1
+      square: false
+      cards:
+      - type: vertical-stack
         cards:
-          - type: markdown
-            title: Live energy flow
-            content: |
-              {% set invalid = ['unknown', 'unavailable', 'none', ''] %}
-              {% set home = states('sensor.kems_house_load') %}
-              {% set pv = states('sensor.kems_solar_power') %}
-              {% set imp = states('sensor.kems_grid_import') %}
-              {% set exp = states('sensor.kems_grid_export') %}
-              {% set batt = states('sensor.kems_battery_power') %}
-              {% set ev = states('sensor.kems_ev_charging_power') %}
-              {% set soc = states('sensor.kems_battery_state_of_charge') %}
-              {% set solar_to_battery = states('sensor.kems_physical_solar_to_battery_estimate') %}
-              ## 🏠 {{ (home ~ ' kW') if home | lower not in invalid else '—' }} home load
-
-              | Live path | Power |
-              |:---|---:|
-              | ☀️ Solar → site | {{ (pv ~ ' kW') if pv | lower not in invalid else '—' }} |
-              | ☀️ PV → battery (bounded estimate) | {{ ('%.2f kW' | format(solar_to_battery | float)) if solar_to_battery | lower not in invalid else '—' }} |
-              | ⚡ Grid → site | {{ (imp ~ ' kW') if imp | lower not in invalid else '—' }} |
-              | ⚡ Site → grid | {{ (exp ~ ' kW') if exp | lower not in invalid else '—' }} |
-              | 🔋 {{ 'Battery → site' if batt | float(0) > 0 else 'Site → battery' if batt | float(0) < 0 else 'Battery idle' }} | {{ ('%.2f kW' | format(batt | float | abs)) if batt | lower not in invalid else '—' }} |
-              | 🚗 Site → EV | {{ (ev ~ ' kW') if ev | lower not in invalid else '—' }} |
-
-              **Battery:** {{ (soc ~ '%') if soc | lower not in invalid else '—' }} · **EV:** {{ 'Connected' if is_state('binary_sensor.kems_ev_connected', 'on') else 'Not connected' if is_state('binary_sensor.kems_ev_connected', 'off') else 'Unknown' }}
-
-              _Physical readings, not the simulated digital twin. Grid, battery and solar are metered site flows. PV → battery is a **conditional bounded estimate** shown only when fresh measurements balance with negligible grid import and the EV unplugged. Total site export is metered; solar-only export is **not** separately metered. The digital twin's solar-export projection is not a live export reading._
-
-          - type: markdown
-            title: Tariffs & battery now
-            content: |
-              {% set bad = ['unknown','unavailable','none',''] %}
-              {% set import_rate = states('sensor.kems_current_import_rate') %}
-              {% set export_rate = states('sensor.kems_current_export_rate') %}
-              {% set live_guard = state_attr('sensor.kems_agile_slots', 'live_control_summary') or {} %}
-              {% set reserve = live_guard.get('physical_budget_exportable_ac_kwh') %}
-              {% set target = live_guard.get('final_control_export_target_kw') %}
-              {% set lower_soc = live_guard.get('verified_physical_soc_lower_bound_percent') %}
-              | Right now | Value |
-              |:---|---:|
-              | Import price | {{ (import_rate ~ ' p/kWh') if import_rate | lower not in bad else '—' }} |
-              | Selected export price | {{ (export_rate ~ ' p/kWh') if export_rate | lower not in bad else '—' }} |
-              | Cheap period | {{ 'Active' if is_state('binary_sensor.kems_cheap_period_confirmed', 'on') else 'Not active' }} |
-              | Export permitted | {{ 'Yes' if is_state('binary_sensor.kems_grid_export_allowed_by_control', 'on') else 'No' }} |
-              | Final guarded battery-export request | {{ ('%.2f kW' | format(target | float)) if target is not none else '—' }} |
-              | Physical-budget AC export allowance | {{ ('%.2f kWh' | format(reserve | float)) if reserve is not none else '—' }} |
-              | Physical planning SOC lower bound | {{ ('%.1f%%' | format(lower_soc | float)) if lower_soc is not none else '—' }} |
-              | Physical export guard | {{ live_guard.get('physical_guard_status', 'unavailable') | replace('_', ' ') }} |
-
-              **Next import rate:** {{ states('sensor.kems_next_import_rate') }} p/kWh  
-              **Solar forecast tomorrow:** {{ states('sensor.kems_forecast_solar_tomorrow') }} kWh
-
-              _Export request comes from the final physically guarded control decision, not the simulation. AC budget and lower-bound SOC require current verified physical planner proof. Missing evidence is shown as —, not synthetic SOC. Charge towards 100% when worthwhile; it is not mandatory._
-
-      - type: markdown
-        title: Today's actual costs
-        content: |
-          {% set periods = state_attr('sensor.kems_energy_cost_comparison', 'periods') or {} %}
-          {% set today = periods.get('today', {}) or {} %}
-          {% set live = today.get('live_data', {}) or {} %}
-          {% set imported = live.get('electricity_import_cost_pence') %}
-          {% set standing = live.get('electricity_standing_charge_pence') %}
-          {% set exported = live.get('electricity_export_income_pence') %}
-          {% set electricity = live.get('electricity_total_cost_pence') %}
-          {% set gas = live.get('gas_total_cost_pence') %}
-          {% set total = live.get('total_energy_cost_pence') %}
-          | Actual bill-equivalent costs | Today |
-          |:---|---:|
-          | Electricity import | {{ ('£%.2f' | format(imported | float / 100)) if imported is not none else '—' }} |
-          | Electricity standing charge | {{ ('£%.2f' | format(standing | float / 100)) if standing is not none else '—' }} |
-          | Estimated Agile export credit | {{ ('£%.2f' | format(exported | float / 100)) if exported is not none else '—' }} |
-          | Net electricity cost | {{ ('£%.2f' | format(electricity | float / 100)) if electricity is not none else '—' }} |
-          | Gas including charges | {{ ('£%.2f' | format(gas | float / 100)) if gas is not none else '—' }} |
-          | **TOTAL ENERGY COST** | **{{ ('£%.2f' | format(total | float / 100)) if total is not none else '—' }}** |
-
-          _Estimated bill-equivalent calculated from observed energy and configured tariffs—not confirmed Octopus settlement. Negative totals indicate estimated credit; unavailable figures are not assumed £0._
-
-      - type: entities
-        title: Today's measured energy
-        show_header_toggle: false
-        entities:
-          - entity: sensor.kems_whole_home_energy_today
-            name: Whole-home consumption
-          - entity: sensor.kems_observed_grid_import_today
-            name: Grid imported
-          - entity: sensor.kems_observed_grid_export_today
-            name: Grid exported
-          - entity: sensor.kems_observed_solar_generation_today
-            name: Solar generated
-          - entity: sensor.kems_gas_usage_today
-            name: Gas consumed
-          - entity: sensor.kems_observed_export_income_today
-            name: Export income (pence)
-
-      - type: markdown
-        title: Today's Agile plan — now and next
-        content: |
-          {% set today = state_attr('sensor.kems_agile_slots', 'today_slots') or [] %}
-          {% set tomorrow = state_attr('sensor.kems_agile_slots', 'tomorrow_slots') or [] %}
-          {% set physical_slots = state_attr('sensor.kems_agile_slots', 'physical_live_slot_outlook') or {} %}
-          {% set advisory_slots = state_attr('sensor.kems_agile_slots', 'published_plan_slot_outlook') or {} %}
-          {% set live_soc = state_attr('sensor.kems_agile_slots', 'physical_live_slot_outlook_current_soc_percent') %}
-          {% set observed_soc = state_attr('sensor.kems_agile_slots', 'observed_foxess_soc_percent') %}
-          {% set idx = now().hour * 2 + (1 if now().minute >= 30 else 0) %}
-          {% set slots = today[idx:idx + 6] %}
-          {% if slots | count < 6 %}
-          {% set slots = slots + tomorrow[:6 - (slots | count)] %}
-          {% endif %}
-          **Today's published plan:** {{ today | count }}/48 slots · **Tomorrow:** {{ tomorrow | count }}/48 slots  
-          **Current Agile export price:** {{ (slots[0].get('rate_pence') ~ ' p/kWh') if slots and idx < (today | count) and slots[0].get('rate_pence') is not none else '—' }}  
-          **FoxESS SOC:** {{ ('%.1f%%' | format(observed_soc | float)) if observed_soc is not none else 'Awaiting fresh reading' }} · **Projected physical SOC:** {{ ('%.1f%%' | format(live_soc | float)) if live_soc is not none else 'Unavailable during priority/uncertainty' }}
-
-          {% if slots %}
-          | Time | Export rate | Planned action | Est. SOC |
-          |:---|---:|:---|---:|
-          {% for p in slots %}
-          {% set is_tomorrow = loop.index0 + idx >= 48 %}
-          {% set physical = (physical_slots.get(p.get('valid_from')) or advisory_slots.get(p.get('valid_from')) or {}) if not is_tomorrow else {} %}
-          {% set action = physical.get('action') or ('Agile plan unavailable' if not is_tomorrow else 'Tomorrow — provisional') %}
-          {% set soc = physical.get('estimated_soc_percent') %}
-          | {{ ('Tomorrow ' if is_tomorrow else '') ~ p.get('label', '—') }}{{ ' · NOW' if loop.first else '' }} | {{ ('%.2fp' | format(p.get('rate_pence') | float)) if p.get('rate_pence') is not none else '—' }} | {{ action }} | {{ ('%.1f%%' | format(soc | float)) if soc is not none else '—' }} |
-          {% endfor %}
-          {% else %}
-          The upcoming Agile plan has not been published yet.
-          {% endif %}
-
-          _Actions marked as an advisory Agile plan are not inverter commands. During Power Down, event export has priority and KEMS may deliberately withhold the normal physical SOC forecast. Physical SOC uses verified chronological replay or the conservative discharge-only physical ledger when available; “—” never represents simulated SOC. FoxESS SOC is a separate observed reading. Physical guards and live conditions always determine actual export._
-
-      - type: grid
-        columns: 2
-        square: false
+        - type: custom:power-flow-card-plus
+          title: Live Energy Flow
+          entities:
+            grid:
+              entity:
+                consumption: sensor.kems_grid_import
+                production: sensor.kems_grid_export
+            battery:
+              entity: sensor.kems_battery_power
+              state_of_charge: sensor.kems_battery_state_of_charge
+            solar:
+              entity: sensor.kems_solar_power
+            home:
+              entity: sensor.kems_house_load
+          w_decimals: 0
+          kw_decimals: 2
+          min_flow_rate: 0.75
+          max_expected_power: 8
+          watt_threshold: 0
+          clickable_entities: true
+          disable_dots: false
+          display_zero_lines:
+            mode: show
+            transparency: 50
+          use_new_flow_rate_model: true
+        - type: grid
+          columns: 6
+          square: false
+          cards:
+          - type: button
+            entity: sensor.kems_solar_power
+            name: Solar Power
+            icon: mdi:solar-power
+            show_state: true
+            tap_action:
+              action: more-info
+          - type: button
+            entity: sensor.kems_house_load
+            name: Home Load
+            icon: mdi:home-lightning-bolt
+            show_state: true
+            tap_action:
+              action: more-info
+          - type: button
+            entity: sensor.kems_grid_import
+            name: Grid Import
+            icon: mdi:transmission-tower-import
+            show_state: true
+            tap_action:
+              action: more-info
+          - type: button
+            entity: sensor.kems_grid_export
+            name: Grid Export
+            icon: mdi:transmission-tower-export
+            show_state: true
+            tap_action:
+              action: more-info
+          - type: button
+            entity: sensor.kems_desired_battery_charge_power
+            name: Battery Charge
+            icon: mdi:battery-arrow-up
+            show_state: true
+            tap_action:
+              action: more-info
+          - type: button
+            entity: sensor.kems_desired_total_battery_discharge_power
+            name: Battery Discharge
+            icon: mdi:battery-arrow-down
+            show_state: true
+            tap_action:
+              action: more-info
+        - type: markdown
+          content: |
+            {% set pv_to_battery = states('sensor.kems_physical_solar_to_battery_estimate') %}
+            _Physical readings, not the simulated digital twin. Solar → site is observed PV generation. PV → battery (bounded estimate): {{ (pv_to_battery ~ ' kW') if pv_to_battery not in ['unknown', 'unavailable', 'none', ''] else '—' }}. Total grid export is measured; solar-only export is **not** separately metered._
+      - type: vertical-stack
         cards:
-          - type: markdown
-            title: Power Down — session & preparation
-            content: |
-              {% set ref = 'sensor.kems_export_tariff_status' %}
-              {% set active = state_attr(ref, 'saving_session_active') | default(false, true) %}
-              {% set joined = state_attr(ref, 'saving_session_joined') | default(false, true) %}
-              {% set start_raw = state_attr(ref, 'saving_session_start') %}
-              {% set end_raw = state_attr(ref, 'saving_session_end') %}
-              {% set start = as_datetime(start_raw) if start_raw else none %}
-              {% set finish = as_datetime(end_raw) if end_raw else none %}
-              {% set next_raw = states('sensor.kems_next_power_down_session_start') %}
-              {% set next_start = as_datetime(next_raw) if next_raw not in ['unknown','unavailable','none',''] else none %}
-              {% set next_end_raw = states('sensor.kems_next_power_down_session_end') %}
-              {% set next_end = as_datetime(next_end_raw) if next_end_raw not in ['unknown','unavailable','none',''] else none %}
-              {% if active %}
-              **🔴 Session active**
-              {% elif joined and start and as_local(start) > now() %}
-              **🗓 Joined — preparing**
-              {% elif next_start and as_local(next_start) > now() %}
-              **🗓 Upcoming session — not confirmed joined**
-              {% else %}
-              **No upcoming Power Down session**
-              {% endif %}
-
-              {% if (active or (joined and start and as_local(start) > now())) and start %}
-              **Session:** {{ as_local(start).strftime('%a %d %b %H:%M') }}{% if finish %}–{{ as_local(finish).strftime('%H:%M') }}{% endif %}
-              {% elif next_start and as_local(next_start) > now() %}
-              **Next published:** {{ as_local(next_start).strftime('%a %d %b %H:%M') }}{% if next_end %}–{{ as_local(next_end).strftime('%H:%M') }}{% endif %}
-              {% else %}
-              **Next published:** None currently available
-              {% endif %}
-
-              {% if active or (joined and start and as_local(start) > now()) %}
-              **Planned export:** {{ state_attr(ref, 'saving_session_export_target_kw') if state_attr(ref, 'saving_session_export_target_kw') is not none else '—' }} kW  
-              **Battery reserve:** {{ state_attr(ref, 'saving_session_battery_reserve_kwh') if state_attr(ref, 'saving_session_battery_reserve_kwh') is not none else '—' }} kWh  
-              **Reward estimate:** {{ ('£%.2f' | format((state_attr(ref, 'estimated_saving_session_bonus_pence') | float) / 100)) if state_attr(ref, 'estimated_saving_session_bonus_pence') is not none else '—' }}  
-              **EV hold:** {{ 'Enabled for event' if is_state('binary_sensor.kems_battery_reserved_for_power_down_session', 'on') else 'Not currently active' }}
-              {% else %}
-              _Export and battery-reserve plans will appear once a session is joined and verified._
-              {% endif %}
-
-              {% if is_state('binary_sensor.kems_last_power_down_result_available', 'on') %}
-              **Last event outcome:** {{ states('sensor.kems_last_power_down_result') | replace('_', ' ') }}
-              {% endif %}
-
-          - type: markdown
-            title: Happy Hour — booking & charging plan
-            content: |
-              {% set hh = 'switch.kems_weekend_happy_hour_auto_join' %}
-              {% set plan = 'sensor.kems_agile_happy_hour_plan' %}
-              {% set status = state_attr(hh, 'status') or 'waiting for an update' %}
-              {% set booked_raw = state_attr(hh, 'booked_start') %}
-              {% set booked_end_raw = state_attr(hh, 'booked_end') %}
-              {% set rec_raw = state_attr(hh, 'recommended_start') %}
-              {% set rec_end_raw = state_attr(hh, 'recommended_end') %}
-              {% set booked = as_datetime(booked_raw) if booked_raw else none %}
-              {% set booked_end = as_datetime(booked_end_raw) if booked_end_raw else none %}
-              {% set recommended = as_datetime(rec_raw) if rec_raw else none %}
-              {% set rec_end = as_datetime(rec_end_raw) if rec_end_raw else none %}
-              {% set rec = state_attr(hh, 'recommendation') or {} %}
-              **Auto join:** {{ 'ON' if is_state(hh, 'on') else 'OFF' }} · **Ohme control:** {{ 'ON' if is_state('switch.kems_happy_hour_ohme_control', 'on') else 'OFF' }}  
-              **Planner:** {{ status | replace('_', ' ') | title }}  
-              **Octopus verification:** {{ state_attr(plan, 'automatic_status') or 'Awaiting data' }}
-
-              {% if booked and booked_end and as_local(booked_end) > now() %}
-              **✅ {{ 'Active booking' if as_local(booked) <= now() else 'Next booked session' }}:** {{ as_local(booked).strftime('%a %d %b %H:%M') }}–{{ as_local(booked_end).strftime('%H:%M') }}
-              {% elif recommended and as_local(recommended) > now() %}
-              **💡 Recommended, not booked:** {{ as_local(recommended).strftime('%a %d %b %H:%M') }}{% if rec_end %}–{{ as_local(rec_end).strftime('%H:%M') }}{% endif %}
-              {% else %}
-              **No booked or recommended upcoming session**
-              {% endif %}
-
-              {% if (booked and booked_end and as_local(booked_end) > now()) or (recommended and as_local(recommended) > now()) %}
-              **Planned free battery import:** {{ rec.get('expected_battery_free_import_kwh', '—') }} kWh  
-              **Pre-event export:** {{ state_attr(hh, 'planned_pre_event_export_kwh') if state_attr(hh, 'planned_pre_event_export_kwh') is not none else rec.get('planned_pre_event_export_kwh', '—') }} kWh  
-              **Expected net benefit:** {{ ('£%.2f' | format((state_attr(hh, 'estimated_net_benefit_pence') | float) / 100)) if state_attr(hh, 'estimated_net_benefit_pence') is not none else '—' }}
-              {% else %}
-              _Battery, household and EV allowances will appear when an automatic event is verified and a plan is available._
-              {% endif %}
-
-              **Verified FoxESS SOC:** {{ (state_attr(plan, 'current_physical_soc_percent') ~ '%') if state_attr(plan, 'physical_soc_verified') else '— (awaiting verified physical evidence)' }}  
-              **Physical battery charging headroom:** {{ (state_attr(plan, 'physical_battery_headroom_kwh') ~ ' kWh') if state_attr(plan, 'physical_soc_verified') else '—' }}  
-              **Physical pre-event export requirement:** {{ (state_attr(plan, 'physical_required_headroom_export_kwh') ~ ' kWh') if state_attr(plan, 'physical_required_headroom_export_kwh') is not none else '— (re-evaluate after cheap recharge)' }}  
-              **Ohme charge mode:** {{ states('select.ohme_epod_charge_mode') }}  
-              **Reward-hour import remaining:** {{ state_attr(plan, 'current_reward_hour_remaining_kwh') if state_attr(plan, 'current_reward_hour_remaining_kwh') is not none else '—' }} kWh  
-              **EV allowance remaining:** {{ state_attr(plan, 'ev_allowance_kwh_remaining') if state_attr(plan, 'ev_allowance_kwh_remaining') is not none else '—' }} kWh
-
-      - type: grid
-        columns: 3
-        square: false
-        cards:
-          - type: entity
-            entity: binary_sensor.kems_control_plan_safe
-            name: Control plan safe
-          - type: entity
-            entity: binary_sensor.kems_intelligent_slot_source_fresh
-            name: Intelligent source fresh
-          - type: entity
-            entity: sensor.kems_update_status
-            name: KEMS update status
-
+        - type: markdown
+          title: Today
+          content: Energy totals since midnight
+        - type: grid
+          columns: 6
+          square: false
+          cards:
+          - type: button
+            entity: sensor.kems_observed_solar_generation_today
+            name: Solar Generated
+            icon: mdi:solar-power
+            show_state: true
+            tap_action:
+              action: more-info
+          - type: button
+            entity: sensor.kems_whole_home_energy_today
+            name: Home Used
+            icon: mdi:home-lightning-bolt
+            show_state: true
+            tap_action:
+              action: more-info
+          - type: button
+            entity: sensor.kems_observed_grid_import_today
+            name: Grid Imported
+            icon: mdi:transmission-tower-import
+            show_state: true
+            tap_action:
+              action: more-info
+          - type: button
+            entity: sensor.kems_observed_grid_export_today
+            name: Grid Exported
+            icon: mdi:transmission-tower-export
+            show_state: true
+            tap_action:
+              action: more-info
+          - type: button
+            entity: sensor.kh7_battery_charge_today
+            name: Battery Charged
+            icon: mdi:battery-plus
+            show_state: true
+            tap_action:
+              action: more-info
+          - type: button
+            entity: sensor.kh7_battery_discharge_today
+            name: Battery Discharged
+            icon: mdi:battery-minus
+            show_state: true
+            tap_action:
+              action: more-info
+          - type: button
+            entity: sensor.kems_battery_state_of_charge
+            name: Battery SoC
+            icon: mdi:battery
+            show_state: true
+            tap_action:
+              action: more-info
+          - type: button
+            entity: sensor.kems_desired_inverter_work_mode
+            name: Work Mode
+            icon: mdi:cog-transfer
+            show_state: true
+            tap_action:
+              action: more-info
+    - type: markdown
+      title: Today's Agile plan — now and next
+      content: |
+        {% set today = state_attr('sensor.kems_agile_slots', 'today_slots') or [] %}
+        {% set tomorrow = state_attr('sensor.kems_agile_slots', 'tomorrow_slots') or [] %}
+        {% set physical_slots = state_attr('sensor.kems_agile_slots', 'physical_live_slot_outlook') or {} %}
+        {% set advisory_slots = state_attr('sensor.kems_agile_slots', 'published_plan_slot_outlook') or {} %}
+        {% set live_soc = state_attr('sensor.kems_agile_slots', 'physical_live_slot_outlook_current_soc_percent') %}
+        {% set observed_soc = state_attr('sensor.kems_agile_slots', 'observed_foxess_soc_percent') %}
+        {% set idx = now().hour * 2 + (1 if now().minute >= 30 else 0) %}
+        {% set slots = today[idx:idx + 6] %}
+        {% if slots | count < 6 %}
+        {% set slots = slots + tomorrow[:6 - (slots | count)] %}
+        {% endif %}
+        {% set ns = namespace(rows=['| Time | Export rate | Planned action | Est. SOC |', '|:---|---:|:---|---:|']) %}
+        {% for p in slots %}
+        {% set is_tomorrow = loop.index0 + idx >= 48 %}
+        {% set physical = (physical_slots.get(p.get('valid_from')) or advisory_slots.get(p.get('valid_from')) or {}) if not is_tomorrow else {} %}
+        {% set action = physical.get('action') or ('Agile plan unavailable' if not is_tomorrow else 'Tomorrow — provisional') %}
+        {% set soc = physical.get('estimated_soc_percent') %}
+        {% set time_label = ('Tomorrow ' if is_tomorrow else '') ~ p.get('label', '—') ~ (' · NOW' if loop.first else '') %}
+        {% set rate_label = ('%.2fp' | format(p.get('rate_pence') | float)) if p.get('rate_pence') is not none else '—' %}
+        {% set soc_label = ('%.1f%%' | format(soc | float)) if soc is not none else '—' %}
+        {% set ns.rows = ns.rows + ['| ' ~ time_label ~ ' | ' ~ rate_label ~ ' | ' ~ (action | string | replace('|', ' / ') | replace('\n', ' ')) ~ ' | ' ~ soc_label ~ ' |'] %}
+        {% endfor %}
+        **Today's published plan:** {{ today | count }}/48 slots · **Tomorrow:** {{ tomorrow | count }}/48 slots  
+        **Current Agile export price:** {{ (slots[0].get('rate_pence') ~ ' p/kWh') if slots and idx < (today | count) and slots[0].get('rate_pence') is not none else '—' }}  
+        **FoxESS SOC:** {{ ('%.1f%%' | format(observed_soc | float)) if observed_soc is not none else 'Awaiting fresh reading' }} · **Projected physical SOC:** {{ ('%.1f%%' | format(live_soc | float)) if live_soc is not none else 'Unavailable during priority/uncertainty' }}
+  
+        {% if slots %}
+        {{ ns.rows | join('\n') }}
+        {% else %}
+        The upcoming Agile plan has not been published yet.
+        {% endif %}
+  
+        _Actions marked as an advisory Agile plan are not inverter commands. During Power Down, event export has priority and KEMS may deliberately withhold the normal physical SOC forecast. Physical SOC uses verified chronological replay or the conservative discharge-only physical ledger when available; “—” never represents simulated SOC. FoxESS SOC is a separate observed reading. Physical guards and live conditions always determine actual export._
+    - type: markdown
+      title: Top 5 Agile export prices today
+      content: |
+        {% set slots = state_attr('sensor.kems_agile_slots', 'today_slots') or [] %}
+        {% set ns = namespace(ranked=[], rows=['| # | Time | Export price | Status |', '|---:|:---|---:|:---|']) %}
+        {% for slot in slots %}
+        {% set price = slot.get('rate_pence') %}
+        {% if price is not none and is_number(price) %}
+        {% set ns.ranked = ns.ranked + [{'rate': price | float, 'slot': slot}] %}
+        {% endif %}
+        {% endfor %}
+        {% set top = (ns.ranked | sort(attribute='rate', reverse=true))[:5] %}
+        {% for item in top %}
+        {% set slot = item.slot %}
+        {% set start = as_datetime(slot.get('valid_from')) if slot.get('valid_from') else none %}
+        {% set finish = as_datetime(slot.get('valid_to')) if slot.get('valid_to') else none %}
+        {% set begin_label = as_local(start).strftime('%H:%M') if start else slot.get('label', '—') %}
+        {% set end_label = as_local(finish).strftime('%H:%M') if finish else '—' %}
+        {% set status = 'Finished' if finish and as_local(finish) <= now() else 'NOW' if start and as_local(start) <= now() else 'Upcoming' if start else '—' %}
+        {% set ns.rows = ns.rows + ['| ' ~ loop.index ~ ' | ' ~ begin_label ~ '–' ~ end_label ~ ' | ' ~ ('%.2fp/kWh' | format(item.rate)) ~ ' | ' ~ status ~ ' |'] %}
+        {% endfor %}
+        **Published today:** {{ slots | count }}/48 slots · **Priced:** {{ ns.ranked | count }}  
+        _Ranked by Agile Outgoing export price, highest first. Includes earlier slots today._
+  
+        {% if top %}
+        {{ ns.rows | join('\n') }}
+        {% else %}
+        No valid Agile export prices are available yet.
+        {% endif %}
+    - type: markdown
+      title: Power Down — session & preparation
+      content: "{% set ref = 'sensor.kems_export_tariff_status' %}\n{% set active = state_attr(ref, 'saving_session_active') | default(false, true) %}\n{% set joined = state_attr(ref, 'saving_session_joined') | default(false, true) %}\n{% set start_raw = state_attr(ref, 'saving_session_start') %}\n{% set end_raw = state_attr(ref, 'saving_session_end') %}\n{% set start = as_datetime(start_raw) if start_raw else none %}\n{% set finish = as_datetime(end_raw) if end_raw else none %}\n{% set next_raw = states('sensor.kems_next_power_down_session_start') %}\n{% set next_start = as_datetime(next_raw) if next_raw not in ['unknown','unavailable','none',''] else none %}\n{% set next_end_raw = states('sensor.kems_next_power_down_session_end') %}\n{% set next_end = as_datetime(next_end_raw) if next_end_raw not in ['unknown','unavailable','none',''] else none %}\n{% if active %}\n**🔴 Session active**\n{% elif joined and start and as_local(start) > now() %}\n**🗓 Joined — preparing**\n{% elif next_start and as_local(next_start) > now() %}\n**🗓 Upcoming session — not confirmed joined**\n{% else %}\n**No upcoming Power Down session**\n{% endif %}\n\n{% if (active or (joined and start and as_local(start) > now())) and start %}\n**Session:** {{ as_local(start).strftime('%a %d %b %H:%M') }}{% if finish %}–{{ as_local(finish).strftime('%H:%M') }}{% endif %}\n{% elif next_start and as_local(next_start) > now() %}\n**Next published:** {{ as_local(next_start).strftime('%a %d %b %H:%M') }}{% if next_end %}–{{ as_local(next_end).strftime('%H:%M') }}{% endif %}\n{% else %}\n**Next published:** None currently available\n{% endif %}\n\n{% if active or (joined and start and as_local(start) > now()) %}\n**Planned export:** {{ state_attr(ref, 'saving_session_export_target_kw') if state_attr(ref, 'saving_session_export_target_kw') is not none else '—' }} kW  \n**Battery reserve:** {{ state_attr(ref, 'saving_session_battery_reserve_kwh') if state_attr(ref, 'saving_session_battery_reserve_kwh') is not none else '—' }} kWh  \n**Reward estimate:** {{ ('£%.2f' | format((state_attr(ref, 'estimated_saving_session_bonus_pence') | float) / 100)) if state_attr(ref, 'estimated_saving_session_bonus_pence') is not none else '—' }}  \n**EV hold:** {{ 'Enabled for event' if is_state('binary_sensor.kems_battery_reserved_for_power_down_session', 'on') else 'Not currently active' }}\n{% else %}\n_Export and battery-reserve plans will appear once a session is joined and verified._\n{% endif %}\n\n{% if is_state('binary_sensor.kems_last_power_down_result_available', 'on') %}\n**Last event outcome:** {{ states('sensor.kems_last_power_down_result') | replace('_', ' ') }}\n{% endif %}\n"
+    - type: markdown
+      title: EV — status & charging plan
+      content: |
+        {% set ohme = states('sensor.ohme_epod_status') %}
+        {% set power = states('sensor.kems_ev_charging_power') %}
+        {% set ev_soc = states('sensor.kems_ev_state_of_charge') %}
+        {% set vehicle_soc = states('sensor.vxkukzkxzmw065492_battery') %}
+        {% set bad = ['unknown', 'unavailable', 'none', ''] %}
+        **Ohme:** {{ ohme | replace('_', ' ') | title if ohme | lower not in bad else 'Status unavailable' }} · **KEMS:** {{ 'Charging' if is_state('binary_sensor.kems_ev_charging', 'on') else 'Connected, idle' if is_state('binary_sensor.kems_ev_connected', 'on') else 'Not connected' if is_state('binary_sensor.kems_ev_connected', 'off') else 'Connection unknown' }}  
+        **Charging power:** {{ (power ~ ' kW') if power | lower not in bad else '—' }}  
+        **EV SOC (Ohme/KEMS):** {{ (ev_soc ~ '%') if ev_soc | lower not in bad else '—' }} · **Vehicle-reported SOC:** {{ (vehicle_soc ~ '%') if vehicle_soc | lower not in bad else '—' }}  
+        **Ohme charge mode:** {{ states('select.ohme_epod_charge_mode') | replace('_', ' ') }}  
+  
+        **Charging plan & safeguards**
+  
+        **KEMS policy:** {{ states('select.kems_ev_charging_policy') if states('select.kems_ev_charging_policy') | lower not in bad else 'Unavailable' }}  
+        **Cheap period:** {{ 'Confirmed active' if is_state('binary_sensor.kems_cheap_period_confirmed', 'on') else 'Not confirmed active' }} · **Intelligent slot:** {{ 'Active' if is_state('binary_sensor.kems_intelligent_slot', 'on') else 'Inactive' if is_state('binary_sensor.kems_intelligent_slot', 'off') else 'Unknown' }}  
+        **Charging permitted by KEMS:** {{ 'Yes' if is_state('binary_sensor.kems_ev_charging_allowed_by_control', 'on') else 'No' if is_state('binary_sensor.kems_ev_charging_allowed_by_control', 'off') else 'Unavailable' }}  
+        **EV battery protection:** {{ states('sensor.kems_ev_grid_protection') | replace('_', ' ') if states('sensor.kems_ev_grid_protection') | lower not in bad else 'Unavailable' }}  
+        **Intelligent data:** {{ 'Fresh' if is_state('binary_sensor.kems_intelligent_slot_source_fresh', 'on') else 'Stale' if is_state('binary_sensor.kems_intelligent_slot_source_fresh', 'off') else 'Unavailable' }}  
+        {% set offpeak = states('sensor.octopus_intelligent_tariff_octopus_intelligent_next_offpeak_start') %}
+        {% set offpeak_end = states('sensor.octopus_intelligent_tariff_octopus_intelligent_offpeak_end') %}
+        **Next regular off-peak start:** {{ as_local(as_datetime(offpeak)).strftime('%a %d %b %H:%M') if offpeak | lower not in bad else 'Not published' }}  
+        **Current off-peak end:** {{ as_local(as_datetime(offpeak_end)).strftime('%a %d %b %H:%M') if offpeak_end | lower not in bad else '—' }}  
+  
+        **Upcoming Intelligent Octopus dispatch slots**
+  
+        {% set src = 'binary_sensor.octopus_intelligent_tariff_octopus_intelligent_slot' %}
+        {% set legacy = state_attr(src, 'plannedDispatches') %}
+        {% set modern = state_attr(src, 'planned_dispatches') %}
+        {% set slots = legacy if legacy is sequence and legacy is not string else modern if modern is sequence and modern is not string else none %}
+        {% if slots is none %}
+        _Dispatch schedule not exposed by the configured Intelligent slot entity._
+        {% elif slots | count == 0 %}
+        _No upcoming smart dispatches currently published._
+        {% else %}
+        {% for slot in slots[:6] %}
+        {% set begin = slot.get('startDtUtc') or slot.get('start') or slot.get('start_time') %}
+        {% set finish = slot.get('endDtUtc') or slot.get('end') or slot.get('end_time') %}
+        {% set source_type = slot.get('source') or slot.get('type') %}
+        - **{{ as_local(as_datetime(begin)).strftime('%a %d %b %H:%M') if begin else 'Start unavailable' }}–{{ as_local(as_datetime(finish)).strftime('%H:%M') if finish else '—' }}**{% if source_type %} · {{ source_type | replace('_', ' ') | title }}{% endif %}
+        {% endfor %}
+        {% if slots | count > 6 %}_Plus {{ slots | count - 6 }} further published dispatches._{% endif %}
+        {% endif %}
+  
+        _These are published/observed slots, not new charger commands. Charging follows KEMS cheap-period policy, confirmed live charging conditions and physical battery-protection rules. A 100% target is a preference, not a requirement._
+    - type: markdown
+      title: Happy Hour — booking & charging plan
+      content: "{% set hh = 'switch.kems_weekend_happy_hour_auto_join' %}\n{% set plan = 'sensor.kems_agile_happy_hour_plan' %}\n{% set status = state_attr(hh, 'status') or 'waiting for an update' %}\n{% set booked_raw = state_attr(hh, 'booked_start') %}\n{% set booked_end_raw = state_attr(hh, 'booked_end') %}\n{% set rec_raw = state_attr(hh, 'recommended_start') %}\n{% set rec_end_raw = state_attr(hh, 'recommended_end') %}\n{% set booked = as_datetime(booked_raw) if booked_raw else none %}\n{% set booked_end = as_datetime(booked_end_raw) if booked_end_raw else none %}\n{% set recommended = as_datetime(rec_raw) if rec_raw else none %}\n{% set rec_end = as_datetime(rec_end_raw) if rec_end_raw else none %}\n{% set rec = state_attr(hh, 'recommendation') or {} %}\n**Auto join:** {{ 'ON' if is_state(hh, 'on') else 'OFF' }} · **Ohme control:** {{ 'ON' if is_state('switch.kems_happy_hour_ohme_control', 'on') else 'OFF' }}  \n**Planner:** {{ status | replace('_', ' ') | title }}  \n**Octopus verification:** {{ state_attr(plan, 'automatic_status') or 'Awaiting data' }}\n\n{% if booked and booked_end and as_local(booked_end) > now() %}\n**✅ {{ 'Active booking' if as_local(booked) <= now() else 'Next booked session' }}:** {{ as_local(booked).strftime('%a %d %b %H:%M') }}–{{ as_local(booked_end).strftime('%H:%M') }}\n{% elif recommended and as_local(recommended) > now() %}\n**💡 Recommended, not booked:** {{ as_local(recommended).strftime('%a %d %b %H:%M') }}{% if rec_end %}–{{ as_local(rec_end).strftime('%H:%M') }}{% endif %}\n{% else %}\n**No booked or recommended upcoming session**\n{% endif %}\n\n{% if (booked and booked_end and as_local(booked_end) > now()) or (recommended and as_local(recommended) > now()) %}\n**Planned free battery import:** {{ rec.get('expected_battery_free_import_kwh', '—') }} kWh  \n**Pre-event export:** {{ state_attr(hh, 'planned_pre_event_export_kwh') if state_attr(hh, 'planned_pre_event_export_kwh') is not none else rec.get('planned_pre_event_export_kwh', '—') }} kWh  \n**Expected net benefit:** {{ ('£%.2f' | format((state_attr(hh, 'estimated_net_benefit_pence') | float) / 100)) if state_attr(hh, 'estimated_net_benefit_pence') is not none else '—' }}\n{% else %}\n_Battery, household and EV allowances will appear when an automatic event is verified and a plan is available._\n{% endif %}\n\n**Verified FoxESS SOC:** {{ (state_attr(plan, 'current_physical_soc_percent') ~ '%') if state_attr(plan, 'physical_soc_verified') else '— (awaiting verified physical evidence)' }}  \n**Physical battery charging headroom:** {{ (state_attr(plan, 'physical_battery_headroom_kwh') ~ ' kWh') if state_attr(plan, 'physical_soc_verified') else '—' }}  \n**Physical pre-event export requirement:** {{ (state_attr(plan, 'physical_required_headroom_export_kwh') ~ ' kWh') if state_attr(plan, 'physical_required_headroom_export_kwh') is not none else '— (re-evaluate after cheap recharge)' }}  \n**Ohme charge mode:** {{ states('select.ohme_epod_charge_mode') }}  \n**Reward-hour import remaining:** {{ state_attr(plan, 'current_reward_hour_remaining_kwh') if state_attr(plan, 'current_reward_hour_remaining_kwh') is not none else '—' }} kWh  \n**EV allowance remaining:** {{ state_attr(plan, 'ev_allowance_kwh_remaining') if state_attr(plan, 'ev_allowance_kwh_remaining') is not none else '—' }} kWh\n"
   - title: Live Data
     path: live-data
     icon: mdi:flash
