@@ -6,6 +6,9 @@ Every usable physical meter sample is persisted during a confirmed reward
 window (including the preceding ten minutes), avoiding the much slower
 five-minute KEMS financial-history checkpoint after a Home Assistant restart.
 Unknown meter intervals still fail the strict reward ledger coverage gate.
+Completed hours are retained long enough for the following morning's guarded
+maintenance restart to recover stored proof and seal a per-hour financial receipt.
+Retention NEVER authorises live charge, export or a future Octopus booking.
 """
 
 from __future__ import annotations
@@ -21,7 +24,11 @@ from .const import DOMAIN, STORAGE_NAMESPACE
 
 _STORAGE_VERSION = 1
 _PRE_EVENT_SEED = timedelta(minutes=10)
-_RETENTION = timedelta(hours=6)
+# Archive physical proof for the next safe maintenance window and delayed
+# HA restarts. Previously six hours meant complete reward hours vanished from
+# in-memory financial evidence *before* the next morning, although the last
+# physically persisted file still contained the original samples.
+_RETENTION = timedelta(days=7)
 _MAX_SAMPLES = 1500
 _MAX_METER_AGE_SECONDS = 30.0
 _MAX_SNAPSHOT_CLOCK_SKEW_SECONDS = 60.0
@@ -68,6 +75,8 @@ class HappyHourImportLedgerRecorder:
         )
         self._samples: list[GridImportReading] = []
         self._windows: list[tuple[datetime, datetime]] = []
+        self._load_status = "not_loaded"
+        self._last_saved_at: datetime | None = None
 
     @property
     def samples(self) -> list[GridImportReading]:
@@ -77,6 +86,9 @@ class HappyHourImportLedgerRecorder:
     def status(self) -> dict[str, Any]:
         return {
             "source_entity": self._grid_import_entity,
+            "load_status": self._load_status,
+            "retention_days": _RETENTION.days,
+            "last_saved_sample": self._last_saved_at.isoformat() if self._last_saved_at else None,
             "retained_samples": len(self._samples),
             "first_sample": (
                 self._samples[0].timestamp.isoformat() if self._samples else None
@@ -106,7 +118,11 @@ class HappyHourImportLedgerRecorder:
 
     async def async_load(self) -> None:
         data = await self._store.async_load() or {}
+        if not data:
+            self._load_status = "no_saved_evidence"
+            return
         if data.get("source_entity") != self._grid_import_entity:
+            self._load_status = "different_meter_source"
             # A changed/rebound physical source cannot reuse an earlier
             # meter's reward allowance after a restart.
             self._samples = []
@@ -122,6 +138,8 @@ class HappyHourImportLedgerRecorder:
             if at is not None and power is not None and power >= 0.0:
                 recovered[at] = GridImportReading(at, power)
         self._samples = [recovered[at] for at in sorted(recovered)]
+        self._last_saved_at = self._samples[-1].timestamp if self._samples else None
+        self._load_status = "restored" if self._samples else "empty_saved_store"
         self._windows = []
         for item in data.get("windows", []):
             if not isinstance(item, dict):
@@ -204,4 +222,6 @@ class HappyHourImportLedgerRecorder:
             # after a subsequent restart. Keep the last durable timeline.
             self._samples.pop()
             return False
+        self._load_status = "recording"
+        self._last_saved_at = timestamp
         return True
