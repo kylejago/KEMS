@@ -88,7 +88,9 @@ class HappyHourImportLedgerRecorder:
             "source_entity": self._grid_import_entity,
             "load_status": self._load_status,
             "retention_days": _RETENTION.days,
-            "last_saved_sample": self._last_saved_at.isoformat() if self._last_saved_at else None,
+            "last_saved_sample": (
+                self._last_saved_at.isoformat() if self._last_saved_at else None
+            ),
             "retained_samples": len(self._samples),
             "first_sample": (
                 self._samples[0].timestamp.isoformat() if self._samples else None
