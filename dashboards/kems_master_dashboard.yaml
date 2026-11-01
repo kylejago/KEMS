@@ -35,7 +35,7 @@ views:
         | Gas including charges | {{ ('£%.2f' | format(gas | float / 100)) if gas is not none else '—' }} |
         | **TOTAL ENERGY COST (after est. refund)** | **{{ ('£%.2f' | format(effective_total / 100)) if effective_total is not none else '—' }}** |
 
-        _Gross import and standing charges remain recorded normally. Weekend Happy Hours refund up to 16 kWh per booked hour via a later Octopus account credit. This is an estimate based on verified import and the currently observed import rate, not confirmed supplier settlement. Unavailable credit data is not assumed £0._
+        _Gross import and standing charges remain recorded normally. Weekend Happy Hours refund up to 16 kWh per booked hour via a later Octopus account credit. This is an estimate based on verified import and the currently observed import rate, not confirmed Octopus settlement. Unavailable credit data is not assumed £0._
     - type: markdown
       title: Tariffs & battery now
       content: |
