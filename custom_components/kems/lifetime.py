@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from collections import defaultdict
 from datetime import date, datetime
-from zoneinfo import ZoneInfo
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.storage import Store
