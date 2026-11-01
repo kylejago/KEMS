@@ -918,6 +918,42 @@ SENSORS: tuple[KEMSSensorEntityDescription, ...] = (
         value_fn=lambda data: data.simulation.actual_cost_pence,
     ),
     KEMSSensorEntityDescription(
+        key="happy_hour_estimated_import_credit_today",
+        name="Happy Hour estimated import credit today",
+        icon="mdi:cash-refund",
+        native_unit_of_measurement="p",
+        suggested_display_precision=2,
+        value_fn=lambda data: (
+            data.periods["today"].happy_hour_estimated_credit_pence
+            if "today" in data.periods
+            else None
+        ),
+        attributes_fn=lambda data: {
+            "supplier_settled": False,
+            "rate_basis": "currently observed import unit rate (indicative)",
+            "credited_import_kwh": (
+                data.periods["today"].happy_hour_credited_import_kwh
+                if "today" in data.periods
+                else None
+            ),
+            "gross_import_cost_unchanged": True,
+            "note": "Estimated Octopus credit; half-hour supplier settlement pending",
+        },
+    ),
+    KEMSSensorEntityDescription(
+        key="happy_hour_eligible_import_today",
+        name="Happy Hour eligible import today",
+        icon="mdi:transmission-tower-import",
+        device_class=SensorDeviceClass.ENERGY,
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        suggested_display_precision=3,
+        value_fn=lambda data: (
+            data.periods["today"].happy_hour_credited_import_kwh
+            if "today" in data.periods
+            else None
+        ),
+    ),
+    KEMSSensorEntityDescription(
         key="simulated_cost_today",
         name="Simulated electricity net cost today",
         icon="mdi:calculator-variant-outline",
