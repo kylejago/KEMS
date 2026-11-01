@@ -14,6 +14,7 @@ import math
 from collections.abc import Iterable
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
+from statistics import median
 from typing import Any
 
 from .happy_hour import HAPPY_HOUR_FAIR_USE_KWH_PER_REWARD
@@ -197,6 +198,72 @@ def reward_hour_ledger(
             }
         )
     return output
+
+
+def restore_completed_financial_reward_receipts(
+    *,
+    confirmed_windows: Iterable[dict[str, Any]],
+    physical_samples: Iterable[Any],
+    historical_snapshots: Iterable[Any],
+    now: datetime,
+) -> list[dict[str, Any]]:
+    """Recover previous-day receipts from independently verified physical proof.
+
+    Financial reporting ONLY. Old windows and samples never authorise an
+    Octopus booking, grid import, charge or FoxESS write. Never fabricate
+    missing physical coverage or a historical import rate from today's tariff.
+    A merged two-hour confirmation is not an independent 16 kWh allowance.
+    """
+    now_utc = now.astimezone(UTC)
+    samples = list(physical_samples)
+    history = list(historical_snapshots)
+    receipts: dict[tuple[datetime, datetime], dict[str, Any]] = {}
+    for raw in list(confirmed_windows)[:64]:
+        if not isinstance(raw, dict):
+            continue
+        start, end = _dt(raw.get("start")), _dt(raw.get("end"))
+        if (
+            start is None
+            or end is None
+            or abs((end - start).total_seconds() - 3600.0) > 60.0
+            or end > now_utc
+            or end < now_utc - timedelta(days=7)
+        ):
+            continue
+        hour = reward_hour_ledger(samples, start=start, end=end, now=now_utc)[0]
+        if not hour.get("coverage_complete"):
+            continue
+        energy = _number(hour.get("import_kwh"))
+        if energy is None or energy < 0 or energy > 16.0:
+            continue
+        historical_rates: list[float] = []
+        for item in history:
+            timestamp = _dt(getattr(item, "timestamp", None))
+            if timestamp is None or not start <= timestamp < end:
+                continue
+            if "current_import_rate" in (getattr(item, "stale_fields", ()) or ()):
+                continue
+            rate = _number(getattr(item, "current_import_rate", None))
+            if rate is not None and rate >= 0:
+                historical_rates.append(rate)
+        # A single stale observation or mixed Intelligent dispatch tariff is
+        # insufficient to infer a completed hour's financial credit.
+        if (
+            len(historical_rates) < 2
+            or max(historical_rates) - min(historical_rates) > 0.01
+        ):
+            continue
+        rate = float(median(historical_rates))
+        receipts[(start, end)] = {
+            "start": start.isoformat(),
+            "end": end.isoformat(),
+            "import_kwh": energy,
+            "credit_pence": round(energy * rate, 6),
+            "rate_pence": rate,
+            "completed": True,
+            "source": "persisted_confirmed_physical_hour_historical_rate",
+        }
+    return [receipts[key] for key in sorted(receipts)]
 
 
 def allocate_reward_hour(

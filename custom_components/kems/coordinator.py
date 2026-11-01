@@ -49,6 +49,7 @@ from .happy_hour_auto_join import (
 )
 from .happy_hour_budget import (
     apply_happy_hour_control,
+    restore_completed_financial_reward_receipts,
     verified_live_happy_hour_charge_kw,
     verified_live_happy_hour_house_grid_hold,
 )
@@ -1465,6 +1466,46 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                 perf_counter() - reporting_started, 3
             )
             lifetime_started = perf_counter()
+            # Alpha9.168: once confirmed one-hour physical meter windows are
+            # recovered after a guarded restart, restore their original-day
+            # financial receipts using retained historical import rates only.
+            # No historical observation grants live charge/export authority.
+            stored_windows = self._happy_hour_import_ledger.status[
+                "persisted_reward_windows"
+            ]
+            retained_receipts = self._lifetime.happy_hour_verified_receipts
+            incomplete_windows = [
+                window
+                for window in stored_windows
+                if (str(window.get("start")), str(window.get("end")))
+                not in {
+                    (str(item.get("start")), str(item.get("end")))
+                    for item in retained_receipts
+                    if item.get("completed")
+                }
+            ]
+            recovery_key = (
+                tuple(
+                    (str(w.get("start")), str(w.get("end"))) for w in incomplete_windows
+                ),
+                len(records),
+                len(self._happy_hour_import_ledger.samples),
+            )
+            if incomplete_windows and recovery_key != getattr(
+                self, "_last_happy_hour_financial_recovery_key", None
+            ):
+                recovered = restore_completed_financial_reward_receipts(
+                    confirmed_windows=incomplete_windows,
+                    physical_samples=self._happy_hour_import_ledger.samples,
+                    historical_snapshots=records,
+                    now=now,
+                )
+                if recovered:
+                    await self._lifetime.async_reconcile_completed_happy_hour_receipts(
+                        recovered, now=now
+                    )
+                self._last_happy_hour_financial_recovery_key = recovery_key
+
             # Read-only settlement estimate; never changes FoxESS authority,
             # quoted import tariff, meter energy or supplier payment status.
             happy_hour_credit = estimate_happy_hour_credit(

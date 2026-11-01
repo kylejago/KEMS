@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections import defaultdict
 from datetime import date, datetime
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.storage import Store
@@ -39,6 +40,7 @@ STORAGE_VERSION = 1
 LEDGER_SCHEMA_VERSION = 2
 SAVE_EVERY_UPDATES = 5
 SIGNED_VALUE_KEYS = SIGNED_LIFETIME_KEYS
+_LONDON = ZoneInfo("Europe/London")
 
 
 class LifetimeLedgerRecorder:
@@ -209,6 +211,104 @@ class LifetimeLedgerRecorder:
         self._ledger.accumulator_status = "healthy"
         await self.async_save()
 
+    def _merge_verified_happy_hour_receipts(
+        self, incoming: list[dict[str, Any]]
+    ) -> bool:
+        """Keep completed reward receipts for prior dates when today's plan changes."""
+        old = {
+            (str(r.get("start")), str(r.get("end"))): dict(r)
+            for r in self._happy_hour_verified_receipts
+            if r.get("start") and r.get("end")
+        }
+        merged = dict(old)
+        for item in incoming:
+            if not isinstance(item, dict):
+                continue
+            try:
+                start = datetime.fromisoformat(str(item["start"]))
+                end = datetime.fromisoformat(str(item["end"]))
+                energy = float(item["import_kwh"])
+                credit = float(item["credit_pence"])
+                rate = float(item["rate_pence"])
+            except (KeyError, ValueError, TypeError, OverflowError):
+                continue
+            if (
+                start.tzinfo is None
+                or end.tzinfo is None
+                or not 0 < (end - start).total_seconds() <= 3600
+                or not all(0 <= v < float("inf") for v in (energy, credit, rate))
+                or energy > 16.0
+            ):
+                continue
+            key = (start.isoformat(), end.isoformat())
+            prior = merged.get(key)
+            if (
+                prior is not None
+                and prior.get("completed")
+                and (float(prior.get("import_kwh", 0.0)) >= energy)
+            ):
+                continue
+            merged[key] = dict(item)
+        self._happy_hour_verified_receipts = [merged[k] for k in sorted(merged)[-128:]]
+        return merged != old
+
+    async def async_reconcile_completed_happy_hour_receipts(
+        self, receipts: list[dict[str, Any]], *, now: datetime
+    ) -> bool:
+        """Reconcile archived reward credit to the original billing date only.
+
+        Does not create historical meter readings or alter physical control.
+        Only previously recorded daily financial rows may be updated.
+        """
+        if not receipts:
+            return False
+        changed = self._merge_verified_happy_hour_receipts(receipts)
+        days: set[str] = set()
+        for item in receipts:
+            if not item.get("completed"):
+                continue
+            try:
+                t = datetime.fromisoformat(str(item["start"]))
+            except (KeyError, ValueError, TypeError):
+                continue
+            if t.tzinfo is not None:
+                days.add(t.astimezone(_LONDON).date().isoformat())
+        for day in days:
+            row = (
+                self._tracking_values
+                if self._tracking_date is not None
+                and self._tracking_date.isoformat() == day
+                else self._daily_records.get(day)
+            )
+            if row is None:
+                continue
+            hours = []
+            for item in self._happy_hour_verified_receipts:
+                if not item.get("completed"):
+                    continue
+                try:
+                    t = datetime.fromisoformat(str(item["start"]))
+                except (KeyError, ValueError, TypeError):
+                    continue
+                if t.tzinfo is not None and (
+                    t.astimezone(_LONDON).date().isoformat() == day
+                ):
+                    hours.append(item)
+            energy = round(sum(float(h["import_kwh"]) for h in hours), 3)
+            gross = max(float(row.get("import_cost_pence", 0.0)), 0.0)
+            credit = round(min(sum(float(h["credit_pence"]) for h in hours), gross), 3)
+            for key, value in (
+                ("happy_hour_credited_import_kwh", energy),
+                ("happy_hour_estimated_credit_pence", credit),
+            ):
+                prior = float(row.get(key, 0.0))
+                if value > prior + 0.0005:
+                    row[key] = value
+                    changed = True
+        if changed:
+            await self.async_save()
+        return changed
+
     async def async_update(
         self,
         simulation: SimulationState,
@@ -237,16 +337,10 @@ class LifetimeLedgerRecorder:
             self._tracking_values["actual_system_value_pence"] = (
                 simulation.actual_system_value_pence or 0.0
             )
-        old_receipts = self._happy_hour_verified_receipts
-        if happy_hour_verified_receipts is not None:
-            self._happy_hour_verified_receipts = [
-                dict(item)
-                for item in happy_hour_verified_receipts[-128:]
-                if isinstance(item, dict)
-            ]
-        verified_completion_changed = any(
-            item.get("completed") and item not in old_receipts
-            for item in self._happy_hour_verified_receipts
+        verified_completion_changed = (
+            self._merge_verified_happy_hour_receipts(happy_hour_verified_receipts)
+            if happy_hour_verified_receipts is not None
+            else False
         )
         self._apply_cumulative_day(
             now,
