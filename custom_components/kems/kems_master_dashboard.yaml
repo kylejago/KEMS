@@ -132,6 +132,10 @@ views:
             show_state: true
             tap_action:
               action: more-info
+        - type: markdown
+          content: |
+            {% set pv_to_battery = states('sensor.kems_physical_solar_to_battery_estimate') %}
+            _Physical readings, not the simulated digital twin. Solar → site is observed PV generation. PV → battery (bounded estimate): {{ (pv_to_battery ~ ' kW') if pv_to_battery not in ['unknown', 'unavailable', 'none', ''] else '—' }}. Total grid export is measured; solar-only export is **not** separately metered._
       - type: vertical-stack
         cards:
         - type: markdown
