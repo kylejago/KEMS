@@ -45,10 +45,13 @@ def test_confirmed_rewards_preserve_gross_bill() -> None:
 
 
 def test_unbooked_hours_never_get_free_import() -> None:
-    assert estimate_happy_hour_credit(
-        plan={"reward_hours": []},
-        bookings={"bookings": []},
-        now=datetime(2026, 11, 1, 13, tzinfo=UTC),
-        import_rate_pence=35.8828,
-        gross_import_cost_pence=1000.0,
-    )["estimated_credit_pence"] is None
+    assert (
+        estimate_happy_hour_credit(
+            plan={"reward_hours": []},
+            bookings={"bookings": []},
+            now=datetime(2026, 11, 1, 13, tzinfo=UTC),
+            import_rate_pence=35.8828,
+            gross_import_cost_pence=1000.0,
+        )["estimated_credit_pence"]
+        is None
+    )
