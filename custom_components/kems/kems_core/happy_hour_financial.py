@@ -66,7 +66,9 @@ def estimate_happy_hour_credit(
     rate = _positive_number(import_rate_pence)
     gross = _positive_number(gross_import_cost_pence)
     if (
-        rate is None or gross is None or not isinstance(now, datetime)
+        rate is None
+        or gross is None
+        or not isinstance(now, datetime)
         or now.tzinfo is None
     ):
         return unavailable
@@ -79,7 +81,8 @@ def estimate_happy_hour_credit(
             continue
         start, end = _datetime(item.get("start")), _datetime(item.get("end"))
         if (
-            start is not None and end is not None
+            start is not None
+            and end is not None
             and 0 < (end - start).total_seconds() <= 3600
             and (item.get("event_id") or item.get("event_code"))
         ):
@@ -93,7 +96,8 @@ def estimate_happy_hour_credit(
             continue
         start, end = _datetime(item.get("start")), _datetime(item.get("end"))
         if (
-            start is not None and end is not None
+            start is not None
+            and end is not None
             and 0 < (end - start).total_seconds() <= 3600
             and end <= now
         ):
@@ -108,17 +112,23 @@ def estimate_happy_hour_credit(
         credit = _positive_number(item.get("credit_pence"))
         saved_rate = _positive_number(item.get("rate_pence"))
         if (
-            start is None or end is None
+            start is None
+            or end is None
             or not 0 < (end - start).total_seconds() <= 3600
             or start.astimezone(_LONDON).date() != day
-            or energy is None or energy > 16.0
-            or credit is None or saved_rate is None
+            or energy is None
+            or energy > 16.0
+            or credit is None
+            or saved_rate is None
         ):
             continue
         receipts[(start, end)] = {
-            "start": start.isoformat(), "end": end.isoformat(),
-            "import_kwh": energy, "credit_pence": credit,
-            "rate_pence": saved_rate, "completed": bool(item.get("completed")),
+            "start": start.isoformat(),
+            "end": end.isoformat(),
+            "import_kwh": energy,
+            "credit_pence": credit,
+            "rate_pence": saved_rate,
+            "completed": bool(item.get("completed")),
         }
 
     hours = plan.get("reward_hours")
@@ -127,7 +137,8 @@ def estimate_happy_hour_credit(
             continue
         start, end = _datetime(hour.get("start")), _datetime(hour.get("end"))
         if (
-            start is None or end is None
+            start is None
+            or end is None
             or not 0 < (end - start).total_seconds() <= 3600
             or start.astimezone(_LONDON).date() != day
             or start > now
@@ -148,7 +159,8 @@ def estimate_happy_hour_credit(
             energy = max(energy, previous["import_kwh"])
         locked_rate = previous["rate_pence"] if previous is not None else rate
         receipts[key] = {
-            "start": start.isoformat(), "end": end.isoformat(),
+            "start": start.isoformat(),
+            "end": end.isoformat(),
             "import_kwh": round(energy, 3),
             "credit_pence": round(energy * locked_rate, 3),
             "rate_pence": locked_rate,
@@ -162,9 +174,7 @@ def estimate_happy_hour_credit(
         "estimated_credit_pence": round(
             min(sum(item["credit_pence"] for item in saved), gross), 3
         ),
-        "credited_import_kwh": round(
-            sum(item["import_kwh"] for item in saved), 3
-        ),
+        "credited_import_kwh": round(sum(item["import_kwh"] for item in saved), 3),
         "supplier_settled": False,
         "rate_basis": "rate captured with verified reward hour (indicative)",
         "verified_reward_hours": len(saved),
