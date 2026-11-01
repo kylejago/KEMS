@@ -64,12 +64,26 @@ def test_live_home_shows_agile_power_down_and_happy_hour_plans() -> None:
     assert "ev_allowance_kwh_remaining" in text
 
 
-def test_live_home_avoids_custom_cards_and_hardware_actions() -> None:
-    text = str(_home())
-    assert "custom:" not in text
+def test_live_home_limits_custom_cards_and_keeps_actions_read_only() -> None:
+    """The approved power-flow diagram is the only optional custom Home card."""
+    home = _home()
+    text = str(home)
     assert "perform-action" not in text
     assert "call-service" not in text
-    assert "tap_action" not in text
+
+    def visit(cards: list[dict]) -> list[str]:
+        custom = []
+        for card in cards:
+            kind = card["type"]
+            if kind.startswith("custom:"):
+                custom.append(kind)
+            if "tap_action" in card:
+                assert card["tap_action"] == {"action": "more-info"}
+            if kind in ("grid", "vertical-stack"):
+                custom.extend(visit(card["cards"]))
+        return custom
+
+    assert visit(home["cards"]) == ["custom:power-flow-card-plus"]
 
 
 def test_home_markdown_templates_have_valid_jinja_syntax() -> None:
@@ -80,7 +94,7 @@ def test_home_markdown_templates_have_valid_jinja_syntax() -> None:
         for card in cards:
             if card["type"] == "markdown":
                 env.parse(card["content"])
-            elif card["type"] == "grid":
+            elif card["type"] in ("grid", "vertical-stack"):
                 check(card["cards"])
 
     check(home["cards"])
