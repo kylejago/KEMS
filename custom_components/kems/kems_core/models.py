@@ -836,6 +836,8 @@ class PeriodTotals:
     import_cost_pence: float = 0.0
     export_income_pence: float = 0.0
     gas_cost_pence: float = 0.0
+    happy_hour_estimated_credit_pence: float = 0.0
+    happy_hour_credited_import_kwh: float = 0.0
     actual_avoided_import_value_pence: float = 0.0
     actual_system_value_pence: float = 0.0
 
@@ -857,6 +859,11 @@ class PeriodTotals:
         """Return electricity and gas cost after export income."""
         return self.import_cost_pence + self.gas_cost_pence - self.export_income_pence
 
+    @property
+    def actual_net_after_estimated_happy_hour_credit_pence(self) -> float:
+        """Bill-equivalent estimate, not an Octopus-settled or metered cost."""
+        return self.actual_net_cost_pence - self.happy_hour_estimated_credit_pence
+
     def to_dict(self) -> dict[str, Any]:
         """Return a JSON-compatible reporting payload."""
         data = asdict(self)
@@ -865,6 +872,9 @@ class PeriodTotals:
             if isinstance(value, date):
                 data[key] = value.isoformat()
         data["actual_net_cost_pence"] = round(self.actual_net_cost_pence, 2)
+        data["actual_net_after_estimated_happy_hour_credit_pence"] = round(
+            self.actual_net_after_estimated_happy_hour_credit_pence, 2
+        )
         return data
 
 
