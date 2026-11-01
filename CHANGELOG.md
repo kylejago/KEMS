@@ -1,3 +1,13 @@
+## 0.9.0-alpha9.168 — historical Happy Hour refund recovery after restart
+
+- Fix the second observed 1 November regression: the independently verified physical meter recorder pruned completed reward-hour windows and samples only six hours after the event. The earlier proof was removed from memory before Alpha9.167 could persist the first-hour financial receipt.
+- Retain the confirmed physical reward-hour timeline for seven days (bounded to 1,500 samples) across normal Home Assistant restarts. Existing storage path and schema remain unchanged so the previously saved meter data can potentially be rehydrated during the next safe update.
+- Reconstruct **completed one-hour reward receipts only** from independently confirmed persisted windows, *complete measured* physical import coverage, and consistent historical KEMS import tariff readings from the original hour. Do not reprice yesterday's Happy Hour using today's 6.6p/kWh cheap rate, extrapolate missing meter intervals, or treat publicly advertised events as booking proof.
+- Preserve recovered receipts across subsequent days and attribute historic reward credit to the original day's existing bill-equivalent ledger (not tomorrow's usage). Leave gross import, export, gas and supplier-settled status untouched. If old storage or historical tariff evidence is missing, mark recovery incomplete rather than invent a payment.
+- Record physical ledger load status and configured retention days for diagnostic verification. New tests cover morning restoration, independent hour caps, mixed or missing tariff evidence, missed meter samples, source rebinding and seven-day expiry.
+- **Physical safety unchanged:** no modification to FoxESS writes, charging, EV policy, export planning, DNO 7 kW limit, 15% paid-export cutoff, 10% household floor, Power Down or Happy Hour live authorisation. Simulated SOC differs from physical SOC by design; read-only reporting needs separate review.
+- Publish only after pytest, Black, Ruff, HACS, hassfest and ESPHome validation. Auto installation must be deferred to the configured **06:00–06:30** safe-first window and vetoed while export or other guarded activity is active.
+
 ## 0.9.0-alpha9.167 — completed Happy Hour receipt durability
 
 - Fix the observed 1 November 2026 regression where **two confirmed Weekend Happy Hours (7.294 + 3.655 kWh)** were initially worth approximately **£3.93** but fell to **£1.31** when the 12:00 booking aged out of Octopus's live joined-event feed.
