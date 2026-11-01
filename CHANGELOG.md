@@ -1,3 +1,12 @@
+## 0.9.0-alpha9.167 — completed Happy Hour receipt durability
+
+- Fix the observed 1 November 2026 regression where **two confirmed Weekend Happy Hours (7.294 + 3.655 kWh)** were initially worth approximately **£3.93** but fell to **£1.31** when the 12:00 booking aged out of Octopus's live joined-event feed.
+- Financial reporting can now use independently confirmed **one-hour** reward windows already persisted by the physical grid-import recorder. These windows are strictly financial evidence for **completed** hours; they cannot authorise future Octopus booking, live charging, control commands, or any inverter write.
+- Persist per-hour verified import, indicative rate and estimated credit in the lifetime store; retain completed receipts through disappearance of the live booking/plan and Home Assistant restart. Keep a same-day high-water safeguard on previously verified cumulative credit and energy. Never rewrite gross smart-meter import or claim supplier settlement.
+- Test the 1 November two-hour regression, joined-feed expiry, restart/rate-change receipt restoration, and rejection of unconfirmed, future or incomplete reward windows.
+- **No physical export/control policy changes.** A separate 17:27 observation (2.015 kW metered grid export with zero planned deliberate export while FoxESS reports Self Use and a retained 7 kW Force Discharge setpoint) needs time-aligned physical verification before changing command semantics. DNO export ceiling, 15% paid export cutoff, 10% house floor, EV hold, Power Down and maintenance safety remain unchanged.
+- Release/install only after CI validation, and defer the actual Home Assistant restart to the configured **06:00–06:30 safe window** with no active export.
+
 ## 0.9.0-alpha9.117 — safer unplugged Ohme continuity and commissioning diagnostics
 
 - Stop unnecessary paid-Agile pauses while Ohme **freshly confirms unplugged** but its zero-power field is missing or old and FoxESS grid-import reads remain unchanged. A non-stale grid-import value may be up to 180 seconds old for this explicit-unplugged proof only, matching the existing control data freshness contract; household load still needs a recent reading, grid import must remain low, and the final export guard independently rechecks the session-only physical proof.
