@@ -1473,6 +1473,10 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                 now=now,
                 import_rate_pence=snapshot.current_import_rate,
                 gross_import_cost_pence=simulation.actual_import_cost_pence,
+                persisted_confirmed_windows=(
+                    self._happy_hour_import_ledger.status["persisted_reward_windows"]
+                ),
+                verified_receipts=self._lifetime.happy_hour_verified_receipts,
             )
             stored_lifetime = await self._lifetime.async_update(
                 roi_simulation,
@@ -1484,6 +1488,9 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                 ),
                 happy_hour_credited_import_kwh=(
                     happy_hour_credit["credited_import_kwh"]
+                ),
+                happy_hour_verified_receipts=(
+                    happy_hour_credit["verified_hour_receipts"]
                 ),
             )
             lifetime = LifetimeLedger.from_dict(stored_lifetime.to_dict())
