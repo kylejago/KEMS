@@ -19,16 +19,23 @@ views:
         {% set electricity = live.get('electricity_total_cost_pence') %}
         {% set gas = live.get('gas_total_cost_pence') %}
         {% set total = live.get('total_energy_cost_pence') %}
+        {% set credit_raw = states('sensor.kems_happy_hour_estimated_import_credit_today') %}
+        {% set credit = (credit_raw | float) if is_number(credit_raw) else none %}
+        {% set effective_import = (imported | float - credit) if imported is not none and credit is not none else none %}
+        {% set net_electricity = (electricity | float - credit) if electricity is not none and credit is not none else none %}
+        {% set effective_total = (total | float - credit) if total is not none and credit is not none else none %}
         | Actual bill-equivalent costs | Today |
         |:---|---:|
-        | Electricity import | {{ ('£%.2f' | format(imported | float / 100)) if imported is not none else '—' }} |
+        | Electricity import (gross, before rewards) | {{ ('£%.2f' | format(imported | float / 100)) if imported is not none else '—' }} |
+        | Estimated Happy Hour refund (pending) | {{ ('−£%.2f' | format(credit / 100)) if credit is not none else '—' }} |
+        | **Effective electricity import** | **{{ ('£%.2f' | format(effective_import / 100)) if effective_import is not none else '—' }}** |
         | Electricity standing charge | {{ ('£%.2f' | format(standing | float / 100)) if standing is not none else '—' }} |
-        | Estimated Agile export credit | {{ ('£%.2f' | format(exported | float / 100)) if exported is not none else '—' }} |
-        | Net electricity cost | {{ ('£%.2f' | format(electricity | float / 100)) if electricity is not none else '—' }} |
+        | Estimated Agile export credit | {{ ('−£%.2f' | format(exported | float / 100)) if exported is not none else '—' }} |
+        | Net electricity cost (after est. refund) | {{ ('£%.2f' | format(net_electricity / 100)) if net_electricity is not none else '—' }} |
         | Gas including charges | {{ ('£%.2f' | format(gas | float / 100)) if gas is not none else '—' }} |
-        | **TOTAL ENERGY COST** | **{{ ('£%.2f' | format(total | float / 100)) if total is not none else '—' }}** |
-  
-        _Estimated bill-equivalent calculated from observed energy and configured tariffs—not confirmed Octopus settlement. Negative totals indicate estimated credit; unavailable figures are not assumed £0._
+        | **TOTAL ENERGY COST (after est. refund)** | **{{ ('£%.2f' | format(effective_total / 100)) if effective_total is not none else '—' }}** |
+
+        _Gross import and standing charges remain recorded normally. Weekend Happy Hours refund up to 16 kWh per booked hour via a later Octopus account credit. This is an estimate based on verified import and the currently observed import rate, not confirmed supplier settlement. Unavailable credit data is not assumed £0._
     - type: markdown
       title: Tariffs & battery now
       content: |
