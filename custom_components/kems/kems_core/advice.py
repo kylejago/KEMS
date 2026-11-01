@@ -40,6 +40,8 @@ class AdviceEngine:
         learned: LearnedState,
         config: SimulationConfig,
         gas: GasSummary | None = None,
+        *,
+        happy_hour_reward_active: bool = False,
     ) -> AdviceState:
         """Return ordered advice without calling any device service."""
         items: list[AdviceItem] = []
@@ -102,8 +104,24 @@ class AdviceEngine:
                     )
                 )
         else:
+            if happy_hour_reward_active:
+                # This must come from same-scan, verified joined-session
+                # authority, never from the unadjusted Octopus import rate.
+                items.append(
+                    _item(
+                        "happy_hour_reward_import",
+                        "Happy Hour active — reward-hour import",
+                        "Grid import during the confirmed Octopus Happy Hour is "
+                        "intentional. The ordinary import tariff still shows "
+                        "the day rate; the free-import reward is credited "
+                        "separately under Octopus terms, subject to settlement.",
+                        96,
+                        confidence,
+                    )
+                )
             if (
-                snapshot.grid_import_kw is not None
+                not happy_hour_reward_active
+                and snapshot.grid_import_kw is not None
                 and snapshot.grid_import_kw > 0.1
                 and snapshot.current_import_rate is not None
             ):
