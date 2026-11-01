@@ -1477,9 +1477,8 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
             incomplete_windows = [
                 window
                 for window in stored_windows
-                if (
-                    str(window.get("start")), str(window.get("end"))
-                ) not in {
+                if (str(window.get("start")), str(window.get("end")))
+                not in {
                     (str(item.get("start")), str(item.get("end")))
                     for item in retained_receipts
                     if item.get("completed")
@@ -1487,8 +1486,7 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
             ]
             recovery_key = (
                 tuple(
-                    (str(w.get("start")), str(w.get("end")))
-                    for w in incomplete_windows
+                    (str(w.get("start")), str(w.get("end"))) for w in incomplete_windows
                 ),
                 len(records),
                 len(self._happy_hour_import_ledger.samples),
