@@ -1451,6 +1451,9 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                 learned,
                 self.settings.simulation,
                 gas,
+                happy_hour_reward_active=bool(
+                    happy_hour_house_grid_hold or happy_hour_live_charge_kw > 0.001
+                ),
             )
             whole_home = self._whole_home.summarise(snapshot, simulation, gas)
             roi_simulation = self._export_commissioning_test.roi_adjusted_simulation(
