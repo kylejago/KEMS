@@ -92,7 +92,8 @@ def test_pre_168_verified_store_survives_next_morning_restart() -> None:
     Recorder, retention = _recorder_class()
     assert retention >= timedelta(days=2)
     hass = _FakeHass()
-    anchor = datetime.now(UTC)
+    # Anchor at 06:00 UTC so the preceding reward sits on one local billing day.
+    anchor = datetime.now(UTC).replace(hour=6, minute=0, second=0, microsecond=0)
     # Yesterday's two-hour Happy Hour at least 16 hours before this restart.
     start = (anchor - timedelta(hours=18)).replace(microsecond=0)
     middle = start + timedelta(hours=1)
@@ -148,7 +149,7 @@ def test_pre_168_verified_store_survives_next_morning_restart() -> None:
         plan={"reward_hours": hours},
         bookings={"bookings": []},
         persisted_confirmed_windows=recorder.status["persisted_reward_windows"],
-        now=anchor,
+        now=end + timedelta(minutes=30),
         import_rate_pence=35.8828,
         gross_import_cost_pence=739.72,
     )
