@@ -112,6 +112,9 @@ def test_alpha9171_paid_export_and_ev_hold_never_lower_hardware_floor():
                 cheap_period_confirmed=False,
                 previous_min_soc_on_grid=15.0,
                 paid_idle_household_10_percent_authorised=True,
+                happy_hour_house_grid_hold_authorised=(
+                    reason == "Verified Happy Hour household battery discharge hold"
+                ),
             )
             == soc
         )
