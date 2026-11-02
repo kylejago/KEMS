@@ -218,18 +218,28 @@ def test_alpha9169_two_joined_hours_keep_independent_financial_windows():
         ("2026-10-25T11:00:00+00:00", "2026-10-25T12:00:00+00:00"),
         ("2026-10-25T12:00:00+00:00", "2026-10-25T13:00:00+00:00"),
     ]
-    assert hh.independently_confirmed_reward_hours(
-        {"bookings": [
-            {"start": "2026-10-25T11:00:00+00:00",
-             "end": "2026-10-25T12:00:00+00:00"}
-        ]}
-    ) == []  # Missing independent confirmation cannot create proof.
+    assert (
+        hh.independently_confirmed_reward_hours(
+            {
+                "bookings": [
+                    {
+                        "start": "2026-10-25T11:00:00+00:00",
+                        "end": "2026-10-25T12:00:00+00:00",
+                    }
+                ]
+            }
+        )
+        == []
+    )  # Missing independent confirmation cannot create proof.
 
 
 def test_alpha9169_independent_reward_window_rejects_two_hour_aggregate():
     bookings = [
-        {"start": "2026-10-25T11:00:00+00:00",
-         "end": "2026-10-25T13:00:00+00:00",
-         "event_id": "7723", "booking_source": "octopus_joined_events"},
+        {
+            "start": "2026-10-25T11:00:00+00:00",
+            "end": "2026-10-25T13:00:00+00:00",
+            "event_id": "7723",
+            "booking_source": "octopus_joined_events",
+        },
     ]
     assert hh.independently_confirmed_reward_hours({"bookings": bookings}) == []
