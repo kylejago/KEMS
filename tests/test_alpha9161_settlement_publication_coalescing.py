@@ -176,7 +176,8 @@ def test_alpha9171_tomorrow_handoff_duplicate_write_is_replaced_by_final_flow():
     flow = (KEMS / "agile_flow_presentation.py").read_text()
     # Only the synchronous FlowPresentation owner can defer this publication.
     assert 'getattr(manager, "_kems_defer_settled_tomorrow_publish", False)' in handoff
-    assert "if second_publication_needed and not defer_to_final_flow:" in handoff
+    assert "if second_publication_needed:" in handoff
+    assert "if not defer_to_final_flow:" in handoff
     assert "manager._publish(manager._state)" in handoff
     # The owner always restores its marker, including when base reconciliation
     # fails, and the final _publish remains before return self.state.
