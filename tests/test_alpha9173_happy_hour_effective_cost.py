@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import importlib.util
 import sys
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from types import ModuleType, SimpleNamespace
 
@@ -129,7 +129,7 @@ def test_no_reward_never_changes_regular_bill() -> None:
 
 
 def test_evidence_audit_exposes_merges_and_missing_physical_proof() -> None:
-    start = datetime(2026, 11, 1, 12, tzinfo=timezone.utc)
+    start = datetime(2026, 11, 1, 12, tzinfo=UTC)
     second = start + timedelta(hours=1)
     end = second + timedelta(hours=1)
     status = {

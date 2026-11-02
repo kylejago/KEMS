@@ -216,7 +216,10 @@ def _live(
         "happy_hour_estimated_credit_pence": credit,
         "happy_hour_credited_import_kwh": credited_energy,
         "happy_hour_supplier_settled": False,
-        "happy_hour_credit_basis": "verified physical import and saved hour rate; estimated Octopus refund",
+        "happy_hour_credit_basis": (
+            "verified physical import and saved hour rate; "
+            "estimated Octopus refund"
+        ),
         "electricity_effective_import_cost_pence": effective_import,
         "electricity_effective_total_cost_pence": effective_electricity,
         "total_energy_effective_cost_pence": effective_total,
@@ -472,8 +475,9 @@ def build_energy_cost_comparison(
         "basis": "bill_equivalent",
         "formula": (
             "gross electricity import + electricity standing charge - electricity "
-            "export income - settled Power Down rewards + gas usage + gas standing charge; "
-            "estimated Happy Hour refund shown separately as effective cost, not settled"
+            "export income - settled Power Down rewards + gas usage + gas "
+            "standing charge; estimated Happy Hour refund shown separately as "
+            "effective cost, not settled"
         ),
         "battery_wear_included": False,
         "gas_included": True,
