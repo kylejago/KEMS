@@ -45,6 +45,7 @@ from .foxess_control_backend import FoxESSControlBackend
 from .happy_hour_auto_join import (
     _controller_for,
     confirmed_booking_windows,
+    independently_confirmed_reward_hours,
     verified_octopus_joined_bookings,
 )
 from .happy_hour_budget import (
@@ -839,13 +840,30 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
             # reward hours. Never substitute a digital-twin estimate for an
             # unknown section of the 16kWh per-hour import allowance.
             joined_windows = confirmed_booking_windows(_controller_for(self).state)
+            external_bookings = verified_octopus_joined_bookings(
+                self.hass, now=now
+            )
             external_windows = confirmed_booking_windows(
-                {"bookings": verified_octopus_joined_bookings(self.hass, now=now)}
+                {"bookings": external_bookings}
+            )
+            # Reporting proof: retain every independently joined one-hour
+            # receipt before the controller aggregates adjacent sessions.
+            # This changes no live charge or export authority.
+            independent_hours = independently_confirmed_reward_hours(
+                _controller_for(self).state
+            )
+            external_hours = independently_confirmed_reward_hours(
+                {"bookings": external_bookings}
             )
             await self._happy_hour_import_ledger.async_observe(
                 snapshot,
                 now=now,
-                confirmed_windows=[*joined_windows, *external_windows],
+                confirmed_windows=[
+                    *joined_windows,
+                    *external_windows,
+                    *independent_hours,
+                    *external_hours,
+                ],
             )
             self._agile_smart_export._verified_happy_hour_grid_samples = (
                 self._happy_hour_import_ledger.samples
