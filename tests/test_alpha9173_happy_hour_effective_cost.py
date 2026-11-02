@@ -69,14 +69,16 @@ def test_verified_day_rate_import_is_effectively_free_but_gross_remains() -> Non
 
 
 def test_partial_refund_keeps_non_reward_import_and_export_earnings() -> None:
-    result = _live([
-        {
-            "import_cost_pence": 600.0,
-            "happy_hour_estimated_credit_pence": 261.729,
-            "happy_hour_credited_import_kwh": 7.294,
-            "export_income_pence": 100.0,
-        }
-    ])
+    result = _live(
+        [
+            {
+                "import_cost_pence": 600.0,
+                "happy_hour_estimated_credit_pence": 261.729,
+                "happy_hour_credited_import_kwh": 7.294,
+                "export_income_pence": 100.0,
+            }
+        ]
+    )
     assert result["electricity_import_cost_pence"] == 600.0
     assert result["electricity_effective_import_cost_pence"] == 338.27
     assert result["electricity_effective_total_cost_pence"] == 278.27
@@ -84,22 +86,34 @@ def test_partial_refund_keeps_non_reward_import_and_export_earnings() -> None:
 
 
 def test_period_aggregate_sums_daily_receipts_without_double_credit() -> None:
-    result = _live([
-        {"import_cost_pence": 200, "happy_hour_estimated_credit_pence": 120,
-         "happy_hour_credited_import_kwh": 5.0},
-        {"import_cost_pence": 300, "happy_hour_estimated_credit_pence": 150,
-         "happy_hour_credited_import_kwh": 6.0},
-    ])
+    result = _live(
+        [
+            {
+                "import_cost_pence": 200,
+                "happy_hour_estimated_credit_pence": 120,
+                "happy_hour_credited_import_kwh": 5.0,
+            },
+            {
+                "import_cost_pence": 300,
+                "happy_hour_estimated_credit_pence": 150,
+                "happy_hour_credited_import_kwh": 6.0,
+            },
+        ]
+    )
     assert result["happy_hour_estimated_credit_pence"] == 270.0
     assert result["happy_hour_credited_import_kwh"] == 11.0
     assert result["electricity_effective_import_cost_pence"] == 230.0
 
 
 def test_bad_or_excess_credit_cannot_make_import_negative() -> None:
-    result = _live([{
-        "import_cost_pence": 100.0,
-        "happy_hour_estimated_credit_pence": 999.0,
-    }])
+    result = _live(
+        [
+            {
+                "import_cost_pence": 100.0,
+                "happy_hour_estimated_credit_pence": 999.0,
+            }
+        ]
+    )
     assert result["electricity_effective_import_cost_pence"] == 0.0
     assert result["happy_hour_estimated_credit_pence"] == 100.0
 
@@ -108,9 +122,10 @@ def test_no_reward_never_changes_regular_bill() -> None:
     result = _live([{"import_cost_pence": 100.0, "export_income_pence": 50.0}])
     assert result["happy_hour_estimated_credit_pence"] == 0.0
     assert result["electricity_effective_import_cost_pence"] == 100.0
-    assert result["electricity_effective_total_cost_pence"] == result[
-        "electricity_total_cost_pence"
-    ]
+    assert (
+        result["electricity_effective_total_cost_pence"]
+        == result["electricity_total_cost_pence"]
+    )
 
 
 def test_evidence_audit_exposes_merges_and_missing_physical_proof() -> None:
@@ -120,17 +135,24 @@ def test_evidence_audit_exposes_merges_and_missing_physical_proof() -> None:
     status = {
         "last_sample": (second + timedelta(minutes=48)).isoformat(),
         "persisted_reward_windows": [
-            {"start": start.isoformat(), "end": second.isoformat(),
-             "event_id": "first"},
-            {"start": second.isoformat(), "end": end.isoformat(),
-             "event_id": "second"},
+            {
+                "start": start.isoformat(),
+                "end": second.isoformat(),
+                "event_id": "first",
+            },
+            {"start": second.isoformat(), "end": end.isoformat(), "event_id": "second"},
             {"start": start.isoformat(), "end": end.isoformat()},
         ],
     }
-    saved = [{
-        "start": start.isoformat(), "end": second.isoformat(),
-        "import_kwh": 7.294, "credit_pence": 261.729, "completed": True,
-    }]
+    saved = [
+        {
+            "start": start.isoformat(),
+            "end": second.isoformat(),
+            "import_kwh": 7.294,
+            "credit_pence": 261.729,
+            "completed": True,
+        }
+    ]
     result = audit.build_happy_hour_accounting_audit(status, saved)
     states = {item["status"] for item in result["hour_evidence"]}
     assert states == {
@@ -142,10 +164,10 @@ def test_evidence_audit_exposes_merges_and_missing_physical_proof() -> None:
     assert result["recorded_unverified_windows"] == 2
     assert result["supplier_credit_settled"] is False
     assert result["physical_meter_last_saved_sample"] == status["last_sample"]
-    assert sum(
-        item["saved_credit_pence"] or 0
-        for item in result["hour_evidence"]
-    ) == 261.729
+    assert (
+        sum(item["saved_credit_pence"] or 0 for item in result["hour_evidence"])
+        == 261.729
+    )
 
 
 def test_dashboard_and_bill_views_use_shared_effective_cost_without_repricing() -> None:
@@ -157,6 +179,4 @@ def test_dashboard_and_bill_views_use_shared_effective_cost_without_repricing() 
     assert "live.get('total_energy_effective_cost_pence')" in presentation
     assert "happy_hour_accounting_audit" in diagnostics
     assert "sensor.kems_happy_hour_estimated_import_credit_today')" not in dash
-    assert "0.9.0-alpha9.173" in (
-        KEMS_ROOT / "manifest.json"
-    ).read_text()
+    assert "0.9.0-alpha9.173" in (KEMS_ROOT / "manifest.json").read_text()

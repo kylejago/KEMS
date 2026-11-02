@@ -110,13 +110,13 @@ def build_happy_hour_accounting_audit(
         "hour_evidence_omitted": max(len(evidence) - 24, 0),
         "completed_verified_receipts": len(receipts),
         "recorded_unverified_windows": sum(
-            1 for row in evidence if "incomplete" in row["status"]
+            1
+            for row in evidence
+            if "incomplete" in row["status"]
             or "not_independent" in row["status"]
             or "missing_independent" in row["status"]
         ),
-        "physical_meter_last_saved_sample": persisted_ledger_status.get(
-            "last_sample"
-        ),
+        "physical_meter_last_saved_sample": persisted_ledger_status.get("last_sample"),
         "supplier_credit_settled": False,
         "explanation": (
             "Saved credits are estimates, not Octopus settlement. A grouped booking "

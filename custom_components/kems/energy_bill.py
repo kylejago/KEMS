@@ -206,9 +206,7 @@ def _live(
         ),
         2,
     )
-    credited_energy = round(
-        max(_sum(rows, "happy_hour_credited_import_kwh"), 0.0), 3
-    )
+    credited_energy = round(max(_sum(rows, "happy_hour_credited_import_kwh"), 0.0), 3)
     effective_import = round(imported - credit, 2)
     effective_electricity = round(electricity_total - credit, 2)
     effective_total = round(total - credit, 2) if total is not None else None
