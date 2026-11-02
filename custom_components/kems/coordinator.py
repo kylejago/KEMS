@@ -44,7 +44,6 @@ from .foxess_command_shadow import build_foxess_command_shadow_snapshot
 from .foxess_control_backend import FoxESSControlBackend
 from .happy_hour_auto_join import (
     _controller_for,
-    confirmed_booking_windows,
     independently_confirmed_reward_hours,
     verified_octopus_joined_bookings,
 )
