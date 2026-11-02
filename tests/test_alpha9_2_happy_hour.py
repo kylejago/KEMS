@@ -810,7 +810,16 @@ def test_alpha9115_happy_hour_import_recorder_survives_restart_and_separates_hou
     monkeypatch.setattr(_import_ledger, "Store", FakeStore)
     start = datetime.now(UTC).replace(microsecond=0) - timedelta(hours=2)
     windows = [
-        {"start": start.isoformat(), "end": (start + timedelta(hours=2)).isoformat()}
+        {
+            "start": start.isoformat(),
+            "end": (start + timedelta(hours=1)).isoformat(),
+            "event_id": "reward-hour-1",
+        },
+        {
+            "start": (start + timedelta(hours=1)).isoformat(),
+            "end": (start + timedelta(hours=2)).isoformat(),
+            "event_id": "reward-hour-2",
+        },
     ]
 
     async def exercise() -> None:
@@ -891,7 +900,11 @@ def test_alpha9115_missing_meter_data_and_restart_gap_fail_closed(
     monkeypatch.setattr(_import_ledger, "Store", FakeStore)
     start = datetime.now(UTC).replace(microsecond=0) - timedelta(hours=2)
     windows = [
-        {"start": start.isoformat(), "end": (start + timedelta(hours=1)).isoformat()}
+        {
+            "start": start.isoformat(),
+            "end": (start + timedelta(hours=1)).isoformat(),
+            "event_id": "meter-gap-hour-1",
+        }
     ]
 
     async def exercise() -> None:
