@@ -76,6 +76,7 @@ class HappyHourImportLedgerRecorder:
         )
         self._samples: list[GridImportReading] = []
         self._windows: list[tuple[datetime, datetime]] = []
+        self._confirmation_sources: dict[tuple[datetime, datetime], dict[str, Any]] = {}
         self._load_status = "not_loaded"
         self._last_saved_at: datetime | None = None
 
@@ -100,7 +101,11 @@ class HappyHourImportLedgerRecorder:
                 self._samples[-1].timestamp.isoformat() if self._samples else None
             ),
             "persisted_reward_windows": [
-                {"start": start.isoformat(), "end": end.isoformat()}
+                {
+                    "start": start.isoformat(),
+                    "end": end.isoformat(),
+                    **self._confirmation_sources.get((start, end), {}),
+                }
                 for start, end in self._windows
             ],
             "policy": "physical readings only; missing coverage fails closed",
@@ -118,6 +123,11 @@ class HappyHourImportLedgerRecorder:
             for start, end in self._windows
             if end >= cutoff and start <= now + timedelta(days=7)
         ]
+        self._confirmation_sources = {
+            window: details
+            for window, details in self._confirmation_sources.items()
+            if window in self._windows
+        }
 
     async def async_load(self) -> None:
         data = await self._store.async_load() or {}
@@ -130,6 +140,7 @@ class HappyHourImportLedgerRecorder:
             # meter's reward allowance after a restart.
             self._samples = []
             self._windows = []
+            self._confirmation_sources = {}
             return
         now = datetime.now(UTC)
         recovered: dict[datetime, GridImportReading] = {}
@@ -144,13 +155,31 @@ class HappyHourImportLedgerRecorder:
         self._last_saved_at = self._samples[-1].timestamp if self._samples else None
         self._load_status = "restored" if self._samples else "empty_saved_store"
         self._windows = []
+        self._confirmation_sources = {}
         for item in data.get("windows", []):
             if not isinstance(item, dict):
                 continue
             start = _utc(item.get("start"))
             end = _utc(item.get("end"))
             if start is not None and end is not None and start < end:
-                self._windows.append((start, end))
+                window = (start, end)
+                if window not in self._windows:
+                    self._windows.append(window)
+                # Legacy two-hour merged windows may remain for diagnostics,
+                # but they never become an independently verified reward.
+                if 55 <= (end - start).total_seconds() / 60 <= 65:
+                    details = {
+                        key: item[key]
+                        for key in (
+                            "event_id",
+                            "event_code",
+                            "booking_source",
+                            "source_entity",
+                        )
+                        if item.get(key)
+                    }
+                    if details:
+                        self._confirmation_sources[window] = details
         self._prune(now)
 
     async def async_observe(
@@ -160,26 +189,57 @@ class HappyHourImportLedgerRecorder:
         now: datetime,
         confirmed_windows: list[dict[str, Any]],
     ) -> bool:
-        """Persist each fresh scan near a confirmed reward period.
+        """Durably save individual booking proof even if the meter is stale.
 
-        A write failure prevents using the new sample for live authority;
-        a later scan may try again. Saving is intentionally per control scan
-        so a normal Home Assistant restart does not lose 15 minutes of meter
-        readings as the financial history would.
+        The joined-event feed can expire before the next fresh grid reading.
+        A confirmed one-hour receipt is independent of a physical meter sample:
+        save its provenance immediately, and separately fail closed on missing
+        meter continuity. Neither action authorises live Happy Hour dispatch.
         """
         now_utc = now.astimezone(UTC)
+        old_windows = list(self._windows)
+        old_sources = dict(self._confirmation_sources)
+        old_samples = list(self._samples)
+        newly_confirmed = False
         for item in confirmed_windows:
+            if not isinstance(item, dict):
+                continue
             start = _utc(item.get("start"))
             end = _utc(item.get("end"))
-            if start is not None and end is not None and start < end:
-                window = (start, end)
-                if window not in self._windows:
-                    self._windows.append(window)
+            if (
+                start is None
+                or end is None
+                or not 55 <= (end - start).total_seconds() / 60 <= 65
+                or not (
+                    item.get("event_code")
+                    or item.get("event_id")
+                    or item.get("booking_source") == "octopus_joined_events"
+                )
+            ):
+                # Never turn an aggregate 12:00–14:00 session (or a bare
+                # advertised event) into two fictional booked allowances.
+                continue
+            window = (start, end)
+            if window in self._windows:
+                continue
+            self._windows.append(window)
+            self._confirmation_sources[window] = {
+                key: str(item[key])
+                for key in (
+                    "event_id",
+                    "event_code",
+                    "booking_source",
+                    "source_entity",
+                )
+                if item.get(key)
+            }
+            newly_confirmed = True
         self._prune(now_utc)
-        if not any(
+        within_window = any(
             start - _PRE_EVENT_SEED <= now_utc < end + _POST_EVENT_EVIDENCE_GRACE
             for start, end in self._windows
-        ):
+        )
+        if not within_window and not newly_confirmed:
             return False
 
         timestamp = _utc(getattr(snapshot, "timestamp", None))
@@ -188,28 +248,35 @@ class HappyHourImportLedgerRecorder:
         source_age = _number(
             ages.get("grid_import_kw") if isinstance(ages, dict) else None
         )
-        if (
-            not self._grid_import_entity
-            or timestamp is None
-            or abs((now_utc - timestamp).total_seconds())
-            > _MAX_SNAPSHOT_CLOCK_SKEW_SECONDS
-            or power is None
-            or power < 0.0
-            or source_age is None
-            or not 0.0 <= source_age <= _MAX_METER_AGE_SECONDS
-            or "grid_import_kw" in (getattr(snapshot, "stale_fields", ()) or ())
-            or (self._samples and timestamp <= self._samples[-1].timestamp)
-        ):
+        sample_valid = bool(
+            within_window
+            and self._grid_import_entity
+            and timestamp is not None
+            and abs((now_utc - timestamp).total_seconds())
+            <= _MAX_SNAPSHOT_CLOCK_SKEW_SECONDS
+            and power is not None
+            and power >= 0.0
+            and source_age is not None
+            and 0.0 <= source_age <= _MAX_METER_AGE_SECONDS
+            and "grid_import_kw" not in (getattr(snapshot, "stale_fields", ()) or ())
+            and (not self._samples or timestamp > self._samples[-1].timestamp)
+        )
+        if sample_valid:
+            self._samples.append(GridImportReading(timestamp, power))
+            self._prune(now_utc)
+        if not newly_confirmed and not sample_valid:
             return False
 
-        self._samples.append(GridImportReading(timestamp, power))
-        self._prune(now_utc)
         try:
             await self._store.async_save(
                 {
                     "source_entity": self._grid_import_entity,
                     "windows": [
-                        {"start": start.isoformat(), "end": end.isoformat()}
+                        {
+                            "start": start.isoformat(),
+                            "end": end.isoformat(),
+                            **self._confirmation_sources.get((start, end), {}),
+                        }
                         for start, end in self._windows
                     ],
                     "samples": [
@@ -222,10 +289,14 @@ class HappyHourImportLedgerRecorder:
                 }
             )
         except Exception:
-            # A sample that failed persistence cannot prove continuity
-            # after a subsequent restart. Keep the last durable timeline.
-            self._samples.pop()
+            # Failed durable proof must never be presented as persisted.
+            self._windows = old_windows
+            self._confirmation_sources = old_sources
+            self._samples = old_samples
             return False
-        self._load_status = "recording"
-        self._last_saved_at = timestamp
-        return True
+        if sample_valid:
+            self._load_status = "recording"
+            self._last_saved_at = timestamp
+        elif newly_confirmed:
+            self._load_status = "confirmed_windows"
+        return sample_valid
