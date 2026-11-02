@@ -203,3 +203,33 @@ def test_release_diagnostics_expose_booking_control_and_error_state():
     assert '"happy_hour_auto_join": happy_hour_auto_join_state(coordinator)' in (
         diagnostics
     )
+
+
+def test_alpha9169_two_joined_hours_keep_independent_financial_windows():
+    bookings = hh.verified_octopus_joined_bookings(
+        _joined(second=True),
+        now=datetime(2026, 10, 24, 19, tzinfo=UTC),
+    )
+    merged = hh.confirmed_booking_windows({"bookings": bookings})
+    separate = hh.independently_confirmed_reward_hours({"bookings": bookings})
+    assert len(merged) == 1
+    assert len(separate) == 2
+    assert [(row["start"], row["end"]) for row in separate] == [
+        ("2026-10-25T11:00:00+00:00", "2026-10-25T12:00:00+00:00"),
+        ("2026-10-25T12:00:00+00:00", "2026-10-25T13:00:00+00:00"),
+    ]
+    assert hh.independently_confirmed_reward_hours(
+        {"bookings": [
+            {"start": "2026-10-25T11:00:00+00:00",
+             "end": "2026-10-25T12:00:00+00:00"}
+        ]}
+    ) == []  # Missing independent confirmation cannot create proof.
+
+
+def test_alpha9169_independent_reward_window_rejects_two_hour_aggregate():
+    bookings = [
+        {"start": "2026-10-25T11:00:00+00:00",
+         "end": "2026-10-25T13:00:00+00:00",
+         "event_id": "7723", "booking_source": "octopus_joined_events"},
+    ]
+    assert hh.independently_confirmed_reward_hours({"bookings": bookings}) == []
