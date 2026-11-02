@@ -67,11 +67,13 @@ async def download_release_asset(
                         await asyncio.sleep(0.6)
                         continue
                     raise ValueError(
-                        f"KEMS GitHub API asset download returned HTTP {response.status}"
+                        "KEMS GitHub API asset download returned HTTP "
+                        f"{response.status}"
                     )
                 if response.status != 200:
                     raise ValueError(
-                        f"KEMS GitHub API asset download returned HTTP {response.status}"
+                        "KEMS GitHub API asset download returned HTTP "
+                        f"{response.status}"
                     )
                 content_type = str(response.headers.get("Content-Type", "")).lower()
                 if "application/json" in content_type or "text/html" in content_type:
@@ -81,7 +83,7 @@ async def download_release_asset(
                     )
                 payload = await response.read()
             break
-        except (asyncio.TimeoutError, ConnectionError):
+        except (TimeoutError, ConnectionError):
             if attempt:
                 raise
             await asyncio.sleep(0.6)
