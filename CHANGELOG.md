@@ -1,3 +1,11 @@
+## 0.9.0-alpha9.169 — Happy Hour booking proof and safe updater checks
+
+- Preserve independently confirmed one-hour Happy Hour reward windows before adjacent booked sessions are grouped for display. Capture physical meter samples up to ten minutes beyond the confirmed end, **for financial evidence only**, never live charging authorisation.
+- Add exactly one retry for transient GitHub asset timeouts and HTTP 500, 502, 503 and 504; reject invalid checksums, version mismatches, wrong media types or 4xx without retry. Continue to install only in the existing 06:00–06:30 safe-first window and never during active export.
+- Add bounded publication pass count, measured Agile publisher wall/CPU time to settlement diagnostics. No phase, async boundary, inverter control, same-scan publication or safety logic changed. **Early-morning slow scans are still under investigation (#405); this is instrumentation, not a claimed performance fix.**
+- The Nov 1 second-hour refund is still not independently recoverable from the existing merged booking evidence and partial physical coverage. Preserve the verified first hour; investigate #419 without inventing import or booked sessions.
+- Preserve 7 kW DNO export limit, 15% paid-export cutoff, 10% household floor, EV connected-idle export, Happy Hour and Power Down controls.
+
 ## 0.9.0-alpha9.168 — historical Happy Hour refund recovery after restart
 
 - Fix the second observed 1 November regression: the independently verified physical meter recorder pruned completed reward-hour windows and samples only six hours after the event. The earlier proof was removed from memory before Alpha9.167 could persist the first-hour financial receipt.
