@@ -122,3 +122,21 @@ def test_control_and_settlement_phases_preserved() -> None:
     assert before < first < control < shadow < second < writer
     assert source.count("with coalesce_identical_settlement_publications(") == 2
     assert '"settlement_publication_coalescing": settlement_publication_stats' in source
+
+
+def test_alpha9169_publication_timing_counters_are_bounded_to_one_pass():
+    manager = _manager()
+    with coalesce_identical_settlement_publications(manager) as scope:
+        scope["publish_passes"] += 1
+        scope["publish_wall_seconds"] += 0.125
+        scope["publish_thread_cpu_seconds"] += 0.05
+        manager._set("sensor.a", "first", {})
+        manager._set("sensor.a", "first", {})
+        assert scope.summary()["publish_passes"] == 1
+        assert scope.summary()["publish_wall_seconds"] == 0.125
+        assert scope.summary()["publish_thread_cpu_seconds"] == 0.05
+        assert scope.summary()["skipped_identical"] == 1
+    with coalesce_identical_settlement_publications(manager) as next_scope:
+        assert next_scope.summary()["publish_passes"] == 0
+        assert next_scope.summary()["attempted"] == 0
+    assert manager._kems_settlement_publication_scope is None

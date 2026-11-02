@@ -1,4 +1,4 @@
-"""Regression for Alpha9.168: completed Happy Hour physical evidence retention.
+"""Regression for Alpha9.169: completed Happy Hour physical evidence retention.
 
 The 1 November 2026 reward ended at 14:00; by 21:18 the old six-hour
 in-memory retention had silently deleted BOTH completed-hour confirmations.
@@ -49,6 +49,7 @@ def _recorder_class():
     allowed = {
         "_STORAGE_VERSION",
         "_PRE_EVENT_SEED",
+        "_POST_EVENT_EVIDENCE_GRACE",
         "_RETENTION",
         "_MAX_SAMPLES",
         "_MAX_METER_AGE_SECONDS",
@@ -91,7 +92,8 @@ def test_pre_168_verified_store_survives_next_morning_restart() -> None:
     Recorder, retention = _recorder_class()
     assert retention >= timedelta(days=2)
     hass = _FakeHass()
-    anchor = datetime.now(UTC)
+    # Anchor at 06:00 UTC so the preceding reward sits on one local billing day.
+    anchor = datetime.now(UTC).replace(hour=6, minute=0, second=0, microsecond=0)
     # Yesterday's two-hour Happy Hour at least 16 hours before this restart.
     start = (anchor - timedelta(hours=18)).replace(microsecond=0)
     middle = start + timedelta(hours=1)
@@ -147,7 +149,7 @@ def test_pre_168_verified_store_survives_next_morning_restart() -> None:
         plan={"reward_hours": hours},
         bookings={"bookings": []},
         persisted_confirmed_windows=recorder.status["persisted_reward_windows"],
-        now=anchor,
+        now=end + timedelta(minutes=30),
         import_rate_pence=35.8828,
         gross_import_cost_pence=739.72,
     )

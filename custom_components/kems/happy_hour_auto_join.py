@@ -754,6 +754,35 @@ def _booking_soc(data: Any, *, operating_mode: str) -> float | None:
     return value
 
 
+def independently_confirmed_reward_hours(
+    booking: Mapping[str, Any],
+) -> list[dict[str, Any]]:
+    """Retain actual joined one-hour receipts *before* grouping adjacent hours.
+
+    This is a read-only recorder input. It cannot grant future charging/import
+    authority; the existing controller still owns every live command.
+    """
+    entries = booking.get("bookings")
+    if not isinstance(entries, list):
+        return []
+    confirmed: dict[tuple[datetime, datetime], dict[str, Any]] = {}
+    for item in entries:
+        if not isinstance(item, Mapping) or not _booking_identity(item):
+            continue
+        start, end = _dt(item.get("start")), _dt(item.get("end"))
+        if (
+            start is None
+            or end is None
+            or not 55 <= (end - start).total_seconds() / 60 <= 65
+        ):
+            continue
+        confirmed[(start, end)] = {
+            "start": start.isoformat(),
+            "end": end.isoformat(),
+        }
+    return [confirmed[key] for key in sorted(confirmed)]
+
+
 def confirmed_booking_windows(booking: Mapping[str, Any]) -> list[dict[str, Any]]:
     """Group independently confirmed one-hour bookings into active reward windows.
 
