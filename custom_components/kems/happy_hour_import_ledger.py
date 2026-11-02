@@ -24,6 +24,7 @@ from .const import DOMAIN, STORAGE_NAMESPACE
 
 _STORAGE_VERSION = 1
 _PRE_EVENT_SEED = timedelta(minutes=10)
+_POST_EVENT_EVIDENCE_GRACE = timedelta(minutes=10)
 # Archive physical proof for the next safe maintenance window and delayed
 # HA restarts. Previously six hours meant complete reward hours vanished from
 # in-memory financial evidence *before* the next morning, although the last
@@ -176,7 +177,8 @@ class HappyHourImportLedgerRecorder:
                     self._windows.append(window)
         self._prune(now_utc)
         if not any(
-            start - _PRE_EVENT_SEED <= now_utc < end for start, end in self._windows
+            start - _PRE_EVENT_SEED <= now_utc < end + _POST_EVENT_EVIDENCE_GRACE
+            for start, end in self._windows
         ):
             return False
 
