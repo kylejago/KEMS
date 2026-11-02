@@ -2,8 +2,8 @@
 
 All settlement math, every reporting overlay and every publication function still
 run in their original order. Any exact unchanged state/attribute HA write is
-suppressed (including an unchanged first publication of an entity this scan). No time-based cache:
-new slot, SOC, tariff or other attribute changes always pass through immediately.
+suppressed, including an unchanged first publication of an entity this scan.
+No time-based cache: new SOC, tariff or other attribute changes pass through.
 """
 
 from __future__ import annotations
