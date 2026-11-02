@@ -944,7 +944,7 @@ views:
       - type: markdown
         content: |
           # History
-          Bill-equivalent history: Live Data after estimated, **unsettled** Happy Hour refunds, alongside the original gross Live and KEMS comparison. Actual metered import and tariff charges are never rewritten; KEMS savings compare the original gross bases.
+          **Live Data vs KEMS** bill-equivalent history: Live Data after estimated, **unsettled** Happy Hour refunds, alongside the original gross Live and KEMS comparison. Actual metered import and tariff charges are never rewritten; KEMS savings compare the original gross bases.
 
       - type: grid
         columns: 2
