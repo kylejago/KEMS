@@ -359,12 +359,13 @@ def refresh_tomorrow_handoff_from_settled_soc(
         and getattr(manager, "_kems_defer_settled_tomorrow_publish", False)
     )
     diagnostic["second_publication_deferred_to_final_flow"] = defer_to_final_flow
-    if second_publication_needed and not defer_to_final_flow:
-        publish_started = perf_counter()
-        publish_cpu_started = thread_time()
-        manager._publish(manager._state)
-        second_publication_seconds = round(perf_counter() - publish_started, 3)
-        second_publication_cpu_seconds = round(thread_time() - publish_cpu_started, 3)
+    if second_publication_needed:
+        if not defer_to_final_flow:
+            publish_started = perf_counter()
+            publish_cpu_started = thread_time()
+            manager._publish(manager._state)
+            second_publication_seconds = round(perf_counter() - publish_started, 3)
+            second_publication_cpu_seconds = round(thread_time() - publish_cpu_started, 3)
     diagnostic["tomorrow_compare_seconds"] = tomorrow_compare_seconds
     diagnostic["tomorrow_compare_thread_cpu_seconds"] = tomorrow_compare_cpu_seconds
     diagnostic["second_publication_seconds"] = second_publication_seconds
