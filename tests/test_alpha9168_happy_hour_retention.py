@@ -49,6 +49,7 @@ def _recorder_class():
     allowed = {
         "_STORAGE_VERSION",
         "_PRE_EVENT_SEED",
+        "_POST_EVENT_EVIDENCE_GRACE",
         "_RETENTION",
         "_MAX_SAMPLES",
         "_MAX_METER_AGE_SECONDS",
