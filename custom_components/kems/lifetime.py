@@ -726,9 +726,7 @@ class LifetimeLedgerRecorder:
             "happy_hour_estimated_credit_pence",
             "happy_hour_credited_import_kwh",
         ):
-            values[key] = round(
-                sum(float(row.get(key, 0.0)) for row in rows), 3
-            )
+            values[key] = round(sum(float(row.get(key, 0.0)) for row in rows), 3)
         return PeriodTotals(
             start_date=(
                 self._ledger.first_observation.date()
