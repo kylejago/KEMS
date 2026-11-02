@@ -19,14 +19,15 @@ views:
         {% set electricity = live.get('electricity_total_cost_pence') %}
         {% set gas = live.get('gas_total_cost_pence') %}
         {% set total = live.get('total_energy_cost_pence') %}
-        {% set credit_raw = states('sensor.kems_happy_hour_estimated_import_credit_today') %}
-        {% set credit = (credit_raw | float) if is_number(credit_raw) else none %}
-        {% set effective_import = (imported | float - credit) if imported is not none and credit is not none else none %}
-        {% set net_electricity = (electricity | float - credit) if electricity is not none and credit is not none else none %}
-        {% set effective_total = (total | float - credit) if total is not none and credit is not none else none %}
+        {% set credit = live.get('happy_hour_estimated_credit_pence') %}
+        {% set eligible = live.get('happy_hour_credited_import_kwh') %}
+        {% set effective_import = live.get('electricity_effective_import_cost_pence') %}
+        {% set net_electricity = live.get('electricity_effective_total_cost_pence') %}
+        {% set effective_total = live.get('total_energy_effective_cost_pence') %}
         | Actual bill-equivalent costs | Today |
         |:---|---:|
         | Electricity import (gross, before rewards) | {{ ('£%.2f' | format(imported | float / 100)) if imported is not none else '—' }} |
+        | Verified Happy Hour eligible import | {{ ('%.3f kWh' | format(eligible)) if eligible is not none else '—' }} |
         | Estimated Happy Hour refund (pending) | {{ ('−£%.2f' | format(credit / 100)) if credit is not none else '—' }} |
         | **Effective electricity import** | **{{ ('£%.2f' | format(effective_import / 100)) if effective_import is not none else '—' }}** |
         | Electricity standing charge | {{ ('£%.2f' | format(standing | float / 100)) if standing is not none else '—' }} |
@@ -35,7 +36,7 @@ views:
         | Gas including charges | {{ ('£%.2f' | format(gas | float / 100)) if gas is not none else '—' }} |
         | **TOTAL ENERGY COST (after est. refund)** | **{{ ('£%.2f' | format(effective_total / 100)) if effective_total is not none else '—' }}** |
 
-        _Gross import and standing charges remain recorded normally. Weekend Happy Hours refund up to 16 kWh per booked hour via a later Octopus account credit. This is an estimate based on verified import and the currently observed import rate, not confirmed Octopus settlement. Unavailable credit data is not assumed £0._
+        _Gross import and standing charges remain recorded normally. Weekend Happy Hours refund up to 16 kWh per booked hour via a later Octopus account credit. This is an estimate from verified import and the rate captured with each reward hour, not confirmed Octopus settlement. Missing historical proof is excluded rather than assumed free._
     - type: markdown
       title: Tariffs & battery now
       content: |
@@ -364,12 +365,14 @@ views:
               {% set live = p.get('live_data', {}) or {} %}
               | Cost | Live Data |
               |---|---:|
-              | Electricity import | {{ ('£%.2f' | format((live.get('electricity_import_cost_pence') | float) / 100)) if live.get('electricity_import_cost_pence') is not none else '—' }} |
+              | Electricity import (gross) | {{ ('£%.2f' | format((live.get('electricity_import_cost_pence') | float) / 100)) if live.get('electricity_import_cost_pence') is not none else '—' }} |
+              | Est. Happy Hour refund (pending) | {{ ('−£%.2f' | format((live.get('happy_hour_estimated_credit_pence') | float) / 100)) if live.get('happy_hour_estimated_credit_pence') is not none else '—' }} |
+              | **Effective import** | **{{ ('£%.2f' | format((live.get('electricity_effective_import_cost_pence') | float) / 100)) if live.get('electricity_effective_import_cost_pence') is not none else '—' }}** |
               | Standing charge | {{ ('£%.2f' | format((live.get('electricity_standing_charge_pence') | float) / 100)) if live.get('electricity_standing_charge_pence') is not none else '—' }} |
               | Estimated export credit | {{ ('−£%.2f' | format((live.get('electricity_export_income_pence') | float) / 100)) if live.get('electricity_export_income_pence') is not none else '—' }} |
-              | **Electricity total** | **{{ ('£%.2f' | format((live.get('electricity_total_cost_pence') | float) / 100)) if live.get('electricity_total_cost_pence') is not none else '—' }}** |
+              | **Electricity after est. refund** | **{{ ('£%.2f' | format((live.get('electricity_effective_total_cost_pence') | float) / 100)) if live.get('electricity_effective_total_cost_pence') is not none else '—' }}** |
               | Gas | {{ ('£%.2f' | format((live.get('gas_total_cost_pence') | float) / 100)) if live.get('gas_total_cost_pence') is not none else '—' }} |
-              | **TOTAL ENERGY COST** | **{{ ('£%.2f' | format((live.get('total_energy_cost_pence') | float) / 100)) if live.get('total_energy_cost_pence') is not none else '—' }}** |
+              | **TOTAL AFTER EST. REFUND** | **{{ ('£%.2f' | format((live.get('total_energy_effective_cost_pence') | float) / 100)) if live.get('total_energy_effective_cost_pence') is not none else '—' }}** |
 
       - type: entities
         title: Energy today
@@ -941,7 +944,7 @@ views:
       - type: markdown
         content: |
           # History
-          Bill-equivalent history using the same **Live Data vs KEMS** contract as the daily pages. Totals include electricity import, standing charge, export income, supplier credits where applicable, gas usage and gas standing charge.
+          Bill-equivalent history: Live Data after estimated, **unsettled** Happy Hour refunds, alongside the original gross Live and KEMS comparison. Actual metered import and tariff charges are never rewritten; KEMS savings compare the original gross bases.
 
       - type: grid
         columns: 2
@@ -954,7 +957,9 @@ views:
               {% set live = p.get('live_data', {}) or {} %}{% set k = p.get('kems', {}) or {} %}
               | | Live | KEMS |
               |---|---:|---:|
-              | Total cost | {{ ('£%.2f' | format((live.get('total_energy_cost_pence') | float) / 100)) if live.get('total_energy_cost_pence') is not none else '—' }} | {{ ('£%.2f' | format((k.get('total_energy_cost_pence') | float) / 100)) if k.get('total_energy_cost_pence') is not none else '—' }} |
+              | Total cost (gross) | {{ ('£%.2f' | format((live.get('total_energy_cost_pence') | float) / 100)) if live.get('total_energy_cost_pence') is not none else '—' }} | {{ ('£%.2f' | format((k.get('total_energy_cost_pence') | float) / 100)) if k.get('total_energy_cost_pence') is not none else '—' }} |
+              | Est. Happy Hour refund | {{ ('−£%.2f' | format((live.get('happy_hour_estimated_credit_pence') | float) / 100)) if live.get('happy_hour_estimated_credit_pence') is not none else '—' }} | — |
+              | **Effective Live cost** | **{{ ('£%.2f' | format((live.get('total_energy_effective_cost_pence') | float) / 100)) if live.get('total_energy_effective_cost_pence') is not none else '—' }}** | — |
               | Electricity | {{ ('£%.2f' | format((live.get('electricity_total_cost_pence') | float) / 100)) if live.get('electricity_total_cost_pence') is not none else '—' }} | {{ ('£%.2f' | format((k.get('electricity_total_cost_pence') | float) / 100)) if k.get('electricity_total_cost_pence') is not none else '—' }} |
               | Gas | {{ ('£%.2f' | format((live.get('gas_total_cost_pence') | float) / 100)) if live.get('gas_total_cost_pence') is not none else '—' }} | {{ ('£%.2f' | format((k.get('gas_total_cost_pence') | float) / 100)) if k.get('gas_total_cost_pence') is not none else '—' }} |
               | Grid import | {{ live.get('grid_import_kwh', '—') }} | {{ k.get('grid_import_kwh', '—') }} |
@@ -968,7 +973,9 @@ views:
               {% set live = p.get('live_data', {}) or {} %}{% set k = p.get('kems', {}) or {} %}
               | | Live | KEMS |
               |---|---:|---:|
-              | Total cost | {{ ('£%.2f' | format((live.get('total_energy_cost_pence') | float) / 100)) if live.get('total_energy_cost_pence') is not none else '—' }} | {{ ('£%.2f' | format((k.get('total_energy_cost_pence') | float) / 100)) if k.get('total_energy_cost_pence') is not none else '—' }} |
+              | Total cost (gross) | {{ ('£%.2f' | format((live.get('total_energy_cost_pence') | float) / 100)) if live.get('total_energy_cost_pence') is not none else '—' }} | {{ ('£%.2f' | format((k.get('total_energy_cost_pence') | float) / 100)) if k.get('total_energy_cost_pence') is not none else '—' }} |
+              | Est. Happy Hour refund | {{ ('−£%.2f' | format((live.get('happy_hour_estimated_credit_pence') | float) / 100)) if live.get('happy_hour_estimated_credit_pence') is not none else '—' }} | — |
+              | **Effective Live cost** | **{{ ('£%.2f' | format((live.get('total_energy_effective_cost_pence') | float) / 100)) if live.get('total_energy_effective_cost_pence') is not none else '—' }}** | — |
               | Grid import | {{ live.get('grid_import_kwh', '—') }} kWh | {{ k.get('grid_import_kwh', '—') }} kWh |
               | Grid export | {{ live.get('grid_export_kwh', '—') }} kWh | {{ k.get('grid_export_kwh', '—') }} kWh |
               **Saving:** {{ ('£%.2f' | format((p.get('saving_pence') | float) / 100)) if p.get('saving_pence') is not none else '—' }}
@@ -980,7 +987,9 @@ views:
               {% set live = p.get('live_data', {}) or {} %}{% set k = p.get('kems', {}) or {} %}
               | | Live | KEMS |
               |---|---:|---:|
-              | Total cost | {{ ('£%.2f' | format((live.get('total_energy_cost_pence') | float) / 100)) if live.get('total_energy_cost_pence') is not none else '—' }} | {{ ('£%.2f' | format((k.get('total_energy_cost_pence') | float) / 100)) if k.get('total_energy_cost_pence') is not none else '—' }} |
+              | Total cost (gross) | {{ ('£%.2f' | format((live.get('total_energy_cost_pence') | float) / 100)) if live.get('total_energy_cost_pence') is not none else '—' }} | {{ ('£%.2f' | format((k.get('total_energy_cost_pence') | float) / 100)) if k.get('total_energy_cost_pence') is not none else '—' }} |
+              | Est. Happy Hour refund | {{ ('−£%.2f' | format((live.get('happy_hour_estimated_credit_pence') | float) / 100)) if live.get('happy_hour_estimated_credit_pence') is not none else '—' }} | — |
+              | **Effective Live cost** | **{{ ('£%.2f' | format((live.get('total_energy_effective_cost_pence') | float) / 100)) if live.get('total_energy_effective_cost_pence') is not none else '—' }}** | — |
               | Grid import | {{ live.get('grid_import_kwh', '—') }} kWh | {{ k.get('grid_import_kwh', '—') }} kWh |
               | Grid export | {{ live.get('grid_export_kwh', '—') }} kWh | {{ k.get('grid_export_kwh', '—') }} kWh |
               **Saving:** {{ ('£%.2f' | format((p.get('saving_pence') | float) / 100)) if p.get('saving_pence') is not none else '—' }}
@@ -992,7 +1001,9 @@ views:
               {% set live = p.get('live_data', {}) or {} %}{% set k = p.get('kems', {}) or {} %}
               | | Live | KEMS |
               |---|---:|---:|
-              | Total cost | {{ ('£%.2f' | format((live.get('total_energy_cost_pence') | float) / 100)) if live.get('total_energy_cost_pence') is not none else '—' }} | {{ ('£%.2f' | format((k.get('total_energy_cost_pence') | float) / 100)) if k.get('total_energy_cost_pence') is not none else '—' }} |
+              | Total cost (gross) | {{ ('£%.2f' | format((live.get('total_energy_cost_pence') | float) / 100)) if live.get('total_energy_cost_pence') is not none else '—' }} | {{ ('£%.2f' | format((k.get('total_energy_cost_pence') | float) / 100)) if k.get('total_energy_cost_pence') is not none else '—' }} |
+              | Est. Happy Hour refund | {{ ('−£%.2f' | format((live.get('happy_hour_estimated_credit_pence') | float) / 100)) if live.get('happy_hour_estimated_credit_pence') is not none else '—' }} | — |
+              | **Effective Live cost** | **{{ ('£%.2f' | format((live.get('total_energy_effective_cost_pence') | float) / 100)) if live.get('total_energy_effective_cost_pence') is not none else '—' }}** | — |
               | Grid import | {{ live.get('grid_import_kwh', '—') }} kWh | {{ k.get('grid_import_kwh', '—') }} kWh |
               | Grid export | {{ live.get('grid_export_kwh', '—') }} kWh | {{ k.get('grid_export_kwh', '—') }} kWh |
               **Saving:** {{ ('£%.2f' | format((p.get('saving_pence') | float) / 100)) if p.get('saving_pence') is not none else '—' }}
@@ -1004,7 +1015,9 @@ views:
               {% set live = p.get('live_data', {}) or {} %}{% set k = p.get('kems', {}) or {} %}
               | | Live | KEMS |
               |---|---:|---:|
-              | Total cost | {{ ('£%.2f' | format((live.get('total_energy_cost_pence') | float) / 100)) if live.get('total_energy_cost_pence') is not none else '—' }} | {{ ('£%.2f' | format((k.get('total_energy_cost_pence') | float) / 100)) if k.get('total_energy_cost_pence') is not none else '—' }} |
+              | Total cost (gross) | {{ ('£%.2f' | format((live.get('total_energy_cost_pence') | float) / 100)) if live.get('total_energy_cost_pence') is not none else '—' }} | {{ ('£%.2f' | format((k.get('total_energy_cost_pence') | float) / 100)) if k.get('total_energy_cost_pence') is not none else '—' }} |
+              | Est. Happy Hour refund | {{ ('−£%.2f' | format((live.get('happy_hour_estimated_credit_pence') | float) / 100)) if live.get('happy_hour_estimated_credit_pence') is not none else '—' }} | — |
+              | **Effective Live cost** | **{{ ('£%.2f' | format((live.get('total_energy_effective_cost_pence') | float) / 100)) if live.get('total_energy_effective_cost_pence') is not none else '—' }}** | — |
               | Grid import | {{ live.get('grid_import_kwh', '—') }} kWh | {{ k.get('grid_import_kwh', '—') }} kWh |
               | Grid export | {{ live.get('grid_export_kwh', '—') }} kWh | {{ k.get('grid_export_kwh', '—') }} kWh |
               **Saving:** {{ ('£%.2f' | format((p.get('saving_pence') | float) / 100)) if p.get('saving_pence') is not none else '—' }}
@@ -1016,7 +1029,9 @@ views:
               {% set live = p.get('live_data', {}) or {} %}{% set k = p.get('kems', {}) or {} %}
               | | Live | KEMS |
               |---|---:|---:|
-              | Total cost | {{ ('£%.2f' | format((live.get('total_energy_cost_pence') | float) / 100)) if live.get('total_energy_cost_pence') is not none else '—' }} | {{ ('£%.2f' | format((k.get('total_energy_cost_pence') | float) / 100)) if k.get('total_energy_cost_pence') is not none else '—' }} |
+              | Total cost (gross) | {{ ('£%.2f' | format((live.get('total_energy_cost_pence') | float) / 100)) if live.get('total_energy_cost_pence') is not none else '—' }} | {{ ('£%.2f' | format((k.get('total_energy_cost_pence') | float) / 100)) if k.get('total_energy_cost_pence') is not none else '—' }} |
+              | Est. Happy Hour refund | {{ ('−£%.2f' | format((live.get('happy_hour_estimated_credit_pence') | float) / 100)) if live.get('happy_hour_estimated_credit_pence') is not none else '—' }} | — |
+              | **Effective Live cost** | **{{ ('£%.2f' | format((live.get('total_energy_effective_cost_pence') | float) / 100)) if live.get('total_energy_effective_cost_pence') is not none else '—' }}** | — |
               | Grid import | {{ live.get('grid_import_kwh', '—') }} kWh | {{ k.get('grid_import_kwh', '—') }} kWh |
               | Grid export | {{ live.get('grid_export_kwh', '—') }} kWh | {{ k.get('grid_export_kwh', '—') }} kWh |
               **Saving:** {{ ('£%.2f' | format((p.get('saving_pence') | float) / 100)) if p.get('saving_pence') is not none else '—' }}
@@ -1028,7 +1043,9 @@ views:
               {% set live = p.get('live_data', {}) or {} %}{% set k = p.get('kems', {}) or {} %}
               | | Live | KEMS |
               |---|---:|---:|
-              | Total cost | {{ ('£%.2f' | format((live.get('total_energy_cost_pence') | float) / 100)) if live.get('total_energy_cost_pence') is not none else '—' }} | {{ ('£%.2f' | format((k.get('total_energy_cost_pence') | float) / 100)) if k.get('total_energy_cost_pence') is not none else '—' }} |
+              | Total cost (gross) | {{ ('£%.2f' | format((live.get('total_energy_cost_pence') | float) / 100)) if live.get('total_energy_cost_pence') is not none else '—' }} | {{ ('£%.2f' | format((k.get('total_energy_cost_pence') | float) / 100)) if k.get('total_energy_cost_pence') is not none else '—' }} |
+              | Est. Happy Hour refund | {{ ('−£%.2f' | format((live.get('happy_hour_estimated_credit_pence') | float) / 100)) if live.get('happy_hour_estimated_credit_pence') is not none else '—' }} | — |
+              | **Effective Live cost** | **{{ ('£%.2f' | format((live.get('total_energy_effective_cost_pence') | float) / 100)) if live.get('total_energy_effective_cost_pence') is not none else '—' }}** | — |
               | Grid import | {{ live.get('grid_import_kwh', '—') }} kWh | {{ k.get('grid_import_kwh', '—') }} kWh |
               | Grid export | {{ live.get('grid_export_kwh', '—') }} kWh | {{ k.get('grid_export_kwh', '—') }} kWh |
               **Saving:** {{ ('£%.2f' | format((p.get('saving_pence') | float) / 100)) if p.get('saving_pence') is not none else '—' }}
