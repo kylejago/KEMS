@@ -655,10 +655,18 @@ class FlowPresentationAgileSmartExportManager(MidnightRolloverAgileSmartExportMa
         cpu_started = thread_time()
         scope = getattr(self, "_kems_settlement_publication_scope", None)
         base_writes_before = getattr(scope, "written", 0)
-        super().reconcile_current_day_settlements(
-            settled_half_hours=settled_half_hours,
-            now=now,
-        )
+        # This class immediately publishes the completed flow contract below.
+        # The handoff may defer its duplicate intermediate Tomorrow publish
+        # only while this guaranteed synchronous final-flow owner is active.
+        prior_defer = getattr(self, "_kems_defer_settled_tomorrow_publish", False)
+        self._kems_defer_settled_tomorrow_publish = True
+        try:
+            super().reconcile_current_day_settlements(
+                settled_half_hours=settled_half_hours,
+                now=now,
+            )
+        finally:
+            self._kems_defer_settled_tomorrow_publish = prior_defer
         base_writes = getattr(scope, "written", 0) - base_writes_before
         base_seconds = perf_counter() - phase_started
         base_cpu_seconds = thread_time() - cpu_started
@@ -718,6 +726,11 @@ class FlowPresentationAgileSmartExportManager(MidnightRolloverAgileSmartExportMa
         final_writes_before = getattr(scope, "written", 0)
         final_skipped_before = getattr(scope, "skipped_identical", 0)
         self._publish(self._state)
+        handoff = self._state.get("settled_soc_handoff_reconciliation")
+        if isinstance(handoff, dict) and handoff.get(
+            "second_publication_deferred_to_final_flow"
+        ):
+            handoff["deferred_tomorrow_published_with_final_flow"] = True
         publication_seconds = perf_counter() - publication_started
         final_writes = getattr(scope, "written", 0) - final_writes_before
         final_skipped = getattr(scope, "skipped_identical", 0) - final_skipped_before
