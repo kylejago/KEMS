@@ -169,3 +169,25 @@ def test_alpha9170_state_lookup_failure_fails_open_for_first_publish():
     assert scope.summary()["written"] == 1
     assert scope.summary()["skipped_existing_identical"] == 0
     assert m._hass.states.calls[-1][1] == "18.0"
+
+
+
+def test_alpha9171_tomorrow_handoff_duplicate_write_is_replaced_by_final_flow():
+    handoff = (KEMS / "agile_settled_soc_handoff.py").read_text()
+    flow = (KEMS / "agile_flow_presentation.py").read_text()
+    # Only the synchronous FlowPresentation owner can defer this publication.
+    assert 'getattr(manager, "_kems_defer_settled_tomorrow_publish", False)' in handoff
+    assert "if second_publication_needed and not defer_to_final_flow:" in handoff
+    assert "manager._publish(manager._state)" in handoff
+    # The owner always restores its marker, including when base reconciliation
+    # fails, and the final _publish remains before return self.state.
+    assert "self._kems_defer_settled_tomorrow_publish = True" in flow
+    assert "finally:" in flow
+    assert "self._kems_defer_settled_tomorrow_publish = prior_defer" in flow
+    final = flow.index("        self._publish(self._state)", flow.index("        # Alpha9.82:"))
+    assert final < flow.index("        return self.state", final)
+    # The bypass cannot span an await or leak into another coordinator refresh.
+    scope = flow.split(
+        "self._kems_defer_settled_tomorrow_publish = True", 1
+    )[1].split("base_writes =", 1)[0]
+    assert "await " not in scope
