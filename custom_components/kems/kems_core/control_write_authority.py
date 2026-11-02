@@ -83,6 +83,7 @@ def resolve_live_min_soc_on_grid(
     previous_min_soc_on_grid: float | None,
     pending_intelligent_ev_hold_active: bool = False,
     happy_hour_house_grid_hold_authorised: bool = False,
+    paid_idle_household_10_percent_authorised: bool = False,
 ) -> float | None:
     """Return the physically safe MinSOC target for the reviewed live write.
 
@@ -106,6 +107,22 @@ def resolve_live_min_soc_on_grid(
         or decision.action != "self_use"
     ):
         return requested
+    # Alpha9.171: FoxESS' physical MinSOC must allow home-only Self Use to
+    # reach 10%, separately from the 15% paid battery-export stop.
+    # This is deliberately *not* a blanket reserve rewrite: the caller must
+    # prove no EV is connected, no hold/session is active, and a writable
+    # physical MinSOC lower limit of <=10%. Force Discharge and EV hold always
+    # retain their requested higher floor.
+    if (
+        paid_idle_household_10_percent_authorised
+        and decision.commands_permitted
+        and decision.action == "self_use"
+        and decision.reason
+        == "Paid-export idle Self Use is inside the bounded live scope"
+        and requested is not None
+        and abs(float(requested) - 15.0) <= 0.05
+    ):
+        return 10.0
     # Alpha9.163: honour explicit household-only 10% floor.
     # Paid export retains independent 15% physical reserve guard.
     if requested is not None and abs(float(requested) - 10.0) <= 0.05:
