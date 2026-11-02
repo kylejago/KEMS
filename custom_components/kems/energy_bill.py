@@ -216,10 +216,7 @@ def _live(
         "happy_hour_estimated_credit_pence": credit,
         "happy_hour_credited_import_kwh": credited_energy,
         "happy_hour_supplier_settled": False,
-        "happy_hour_credit_basis": (
-            "verified physical import and saved hour rate; "
-            "estimated Octopus refund"
-        ),
+        "happy_hour_credit_basis": "verified hourly rate, unsettled Octopus estimate",
         "electricity_effective_import_cost_pence": effective_import,
         "electricity_effective_total_cost_pence": effective_electricity,
         "total_energy_effective_cost_pence": effective_total,
