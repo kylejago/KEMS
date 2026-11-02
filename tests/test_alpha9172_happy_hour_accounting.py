@@ -57,10 +57,7 @@ def _recorder_class():
     selected = [
         node
         for node in tree.body
-        if (
-            isinstance(node, (ast.FunctionDef, ast.ClassDef))
-            and node.name in allowed
-        )
+        if (isinstance(node, (ast.FunctionDef, ast.ClassDef)) and node.name in allowed)
         or (
             isinstance(node, ast.Assign)
             and any(
@@ -133,15 +130,15 @@ def test_independent_confirmations_survive_a_stale_meter_and_restart() -> None:
 
     restarted = Recorder(hass, "kems", grid_import_entity="sensor.site_import")
     asyncio.run(restarted.async_load())
-    assert [row["event_id"] for row in restarted.status["persisted_reward_windows"]] == [
+    assert [
+        row["event_id"] for row in restarted.status["persisted_reward_windows"]
+    ] == [
         "8067",
         "8068",
     ]
     # Bookings can expire; no fabricated meter readings or renewed commands.
     assert (
-        asyncio.run(
-            restarted.async_observe(object(), now=now, confirmed_windows=[])
-        )
+        asyncio.run(restarted.async_observe(object(), now=now, confirmed_windows=[]))
         is False
     )
     assert len(restarted.status["persisted_reward_windows"]) == 2
@@ -156,9 +153,7 @@ def test_one_hour_proof_needs_an_independent_joined_identity() -> None:
     unconfirmed = {"start": hour["start"], "end": hour["end"]}
     assert (
         asyncio.run(
-            recorder.async_observe(
-                object(), now=now, confirmed_windows=[unconfirmed]
-            )
+            recorder.async_observe(object(), now=now, confirmed_windows=[unconfirmed])
         )
         is False
     )
@@ -179,9 +174,7 @@ def test_meter_proof_is_not_substituted_by_a_booking_or_a_stale_sample() -> None
         stale_fields=(),
     )
     assert (
-        asyncio.run(
-            recorder.async_observe(stale, now=now, confirmed_windows=[booking])
-        )
+        asyncio.run(recorder.async_observe(stale, now=now, confirmed_windows=[booking]))
         is False
     )
     assert recorder.samples == []
