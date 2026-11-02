@@ -59,3 +59,86 @@ def test_cheap_period_keeps_force_charge_min_soc():
         )
         == 15.0
     )
+
+
+def test_alpha9171_paid_idle_household_10_percent_requires_explicit_proof():
+    idle = FoxESSControlDecision(
+        backend_available=True,
+        commands_permitted=True,
+        action="self_use",
+        reason="Paid-export idle Self Use is inside the bounded live scope",
+        min_soc_on_grid_percent=15.0,
+    )
+    kwargs = dict(
+        cheap_period_confirmed=False,
+        previous_min_soc_on_grid=15.0,
+    )
+    assert resolve_live_min_soc_on_grid(idle, **kwargs) == 15.0
+    assert (
+        resolve_live_min_soc_on_grid(
+            idle,
+            **kwargs,
+            paid_idle_household_10_percent_authorised=True,
+        )
+        == 10.0
+    )
+    assert (
+        resolve_live_min_soc_on_grid(
+            idle,
+            cheap_period_confirmed=True,
+            previous_min_soc_on_grid=15.0,
+            paid_idle_household_10_percent_authorised=True,
+        )
+        == 15.0
+    )
+
+
+def test_alpha9171_paid_export_and_ev_hold_never_lower_hardware_floor():
+    for action, reason, soc in (
+        ("force_discharge", "Paid export Force Discharge", 15.0),
+        ("self_use", "Verified Happy Hour household battery discharge hold", 100.0),
+        ("self_use", "No-paid-export Self Use is inside the bounded live scope", 15.0),
+    ):
+        decision = FoxESSControlDecision(
+            backend_available=True,
+            commands_permitted=True,
+            action=action,
+            reason=reason,
+            min_soc_on_grid_percent=soc,
+        )
+        assert (
+            resolve_live_min_soc_on_grid(
+                decision,
+                cheap_period_confirmed=False,
+                previous_min_soc_on_grid=15.0,
+                paid_idle_household_10_percent_authorised=True,
+                happy_hour_house_grid_hold_authorised=(
+                    reason == "Verified Happy Hour household battery discharge hold"
+                ),
+            )
+            == soc
+        )
+
+
+def test_alpha9171_hardware_guard_restricts_to_explicit_unplugged_sensor():
+    from pathlib import Path
+
+    source = (
+        Path(__file__).parents[1] / "custom_components/kems/foxess_control_backend.py"
+    ).read_text()
+    guard = source.split("household_floor_authorised = bool(", 1)[1].split(
+        "effective_min_soc = resolve_live_min_soc_on_grid(", 1
+    )[0]
+    for protected in (
+        "ev_confirmed_unplugged",
+        "ev_connected is False",
+        "snapshot.ev_connected is False",
+        "snapshot.ev_charging is False",
+        "abs(float(snapshot.ev_power_kw)) <= 0.05",
+        "not power_down_export_authorised",
+        "not happy_hour_charge_authorised",
+        "not pending_intelligent_ev_hold_active",
+        "minimum_min_soc_on_grid <= 10.05",
+        "control.desired_battery_export_power_kw <= 0.001",
+    ):
+        assert protected in guard

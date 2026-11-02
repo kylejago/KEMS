@@ -1369,10 +1369,50 @@ class FoxESSControlBackend:
                         ),
                     )
                 else:
+                    # Hardware floor may be 10% for ordinary household
+                    # Self Use only when the EV sensor explicitly says
+                    # unplugged. Unknown/unavailable must NOT lower the floor,
+                    # even though those statuses do not block paid export.
+                    ev_status_id = getattr(
+                        getattr(coordinator, "entities", None), "ev_status", None
+                    )
+                    ev_status_state = (
+                        self._hass.states.get(ev_status_id)
+                        if isinstance(ev_status_id, str) and ev_status_id
+                        else None
+                    )
+                    ev_confirmed_unplugged = bool(
+                        ev_status_state is not None
+                        and str(ev_status_state.state).strip().lower()
+                        in {"unplugged", "disconnected"}
+                    )
+                    household_floor_authorised = bool(
+                        not no_paid_export_mode
+                        and not cheap_period_confirmed
+                        and not power_down_export_authorised
+                        and not happy_hour_charge_authorised
+                        and not happy_hour_house_grid_hold_authorised
+                        and not pending_intelligent_ev_hold_active
+                        and not ev_hold_source_grace_active
+                        and ev_hold_floor_percent is None
+                        and ev_connected is False
+                        and snapshot.ev_connected is False
+                        and snapshot.ev_charging is False
+                        and _number(snapshot.ev_power_kw) is not None
+                        and abs(float(snapshot.ev_power_kw)) <= 0.05
+                        and control.ev_grid_guard_status == "inactive"
+                        and ev_confirmed_unplugged
+                        and minimum_min_soc_on_grid is not None
+                        and minimum_min_soc_on_grid <= 10.05
+                        and control.desired_battery_export_power_kw <= 0.001
+                    )
                     effective_min_soc = resolve_live_min_soc_on_grid(
                         decision,
                         cheap_period_confirmed=cheap_period_confirmed,
                         previous_min_soc_on_grid=self._previous_min_soc_on_grid,
+                        paid_idle_household_10_percent_authorised=(
+                            household_floor_authorised
+                        ),
                         pending_intelligent_ev_hold_active=(
                             pending_intelligent_ev_hold_active
                         ),

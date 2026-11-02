@@ -350,12 +350,24 @@ def refresh_tomorrow_handoff_from_settled_soc(
     diagnostic["unchanged_tomorrow_publication_skipped"] = not second_publication_needed
     second_publication_seconds = 0.0
     second_publication_cpu_seconds = 0.0
-    if second_publication_needed:
-        publish_started = perf_counter()
-        publish_cpu_started = thread_time()
-        manager._publish(manager._state)
-        second_publication_seconds = round(perf_counter() - publish_started, 3)
-        second_publication_cpu_seconds = round(thread_time() - publish_cpu_started, 3)
+    # FlowPresentation owns a mandatory final _publish in this very same
+    # synchronous call. It publishes the complete corrected Tomorrow and
+    # canonical flow together; a separate heavy intermediate pass is a no-op
+    # when that owner explicitly promises to publish before returning.
+    defer_to_final_flow = bool(
+        second_publication_needed
+        and getattr(manager, "_kems_defer_settled_tomorrow_publish", False)
+    )
+    diagnostic["second_publication_deferred_to_final_flow"] = defer_to_final_flow
+    if second_publication_needed:  # noqa: SIM102 - preserve reviewed handoff gate
+        if not defer_to_final_flow:
+            publish_started = perf_counter()
+            publish_cpu_started = thread_time()
+            manager._publish(manager._state)
+            second_publication_seconds = round(perf_counter() - publish_started, 3)
+            second_publication_cpu_seconds = round(
+                thread_time() - publish_cpu_started, 3
+            )
     diagnostic["tomorrow_compare_seconds"] = tomorrow_compare_seconds
     diagnostic["tomorrow_compare_thread_cpu_seconds"] = tomorrow_compare_cpu_seconds
     diagnostic["second_publication_seconds"] = second_publication_seconds

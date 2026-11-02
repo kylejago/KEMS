@@ -1,3 +1,10 @@
+## 0.9.0-alpha9.171 — synchronous Tomorrow publication consolidation and guarded household SOC floor
+
+- Remove an intermediate heavy Tomorrow handoff publication only when its calling FlowPresentation manager guarantees the final canonical flow is published before the same synchronous settlement reconciliation returns. The first pre-control SOC/price publication remains mandatory, changed Tomorrow data still reaches Home Assistant in the same scan, and direct handoff callers still publish independently. The latest diagnostics showed ~0.6 seconds per intermediate publication; verify actual reduction after installation.
+- Permit physically configured FoxESS MinSOC 10% solely for ordinary paid-export idle Self Use with externally verified Ohme unplugged status, confirmed noncharging and zero EV power, no Power Down/Happy Hour/Intelligent hold, no stale EV grace and hardware number minimum allowing 10%. Paid battery-export cutoff remains 15%, and EV-connected, charging, unknown/unavailable and force-discharge paths retain existing minimums. This does not change commissioning/baseline restoration or bypass inverter safety.
+- Preserve 7 kW DNO, evidence-only Happy Hour accounting, EV battery protection and safe-first 06:00–06:30 no-export auto-update. Sunday 1 November second-hour credit remains unverified.
+- Compare the actual overnight 03:00–07:45 performance after installation rather than claiming this ends all slow scans.
+
 ## 0.9.0-alpha9.170 — lower Agile state-write load and correct all-time Happy Hour credit
 
 - Coalesce *any* byte-for-byte unchanged Agile Home Assistant entity state and attributes inside the existing synchronous pre-control settlement scope, including the first publication of an entity. New or changed same-scan tariff, SOC, Tomorrow handoff and flow data publish immediately. HA lookup/comparison errors fail open to the original write. No cache, no altered async boundary, and no physical inverter control changes. New counters separately show first-pass unchanged suppressions so performance improvement is measurable against alpha9.169.
