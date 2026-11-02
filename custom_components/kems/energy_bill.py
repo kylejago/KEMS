@@ -193,9 +193,35 @@ def _live(
     electricity_total = round(imported + standing - exported, 2)
     gas_total = gas["gas_total_cost_pence"]
     total = round(electricity_total + gas_total, 2) if gas_total is not None else None
+
+    # Preserve the metered/gross bill and the separate estimated Octopus
+    # account refund. A reward is not a zero-priced meter import: Octopus
+    # bills the day-rate energy and later credits eligible verified kWh.
+    # Each persisted daily row already includes at most one verified credit
+    # per individually booked hour; never reprice old hours at today's rate.
+    credit = round(
+        min(
+            max(_sum(rows, "happy_hour_estimated_credit_pence"), 0.0),
+            max(imported, 0.0),
+        ),
+        2,
+    )
+    credited_energy = round(
+        max(_sum(rows, "happy_hour_credited_import_kwh"), 0.0), 3
+    )
+    effective_import = round(imported - credit, 2)
+    effective_electricity = round(electricity_total - credit, 2)
+    effective_total = round(total - credit, 2) if total is not None else None
     return {
         "ready": total is not None,
         "electricity_import_cost_pence": imported,
+        "happy_hour_estimated_credit_pence": credit,
+        "happy_hour_credited_import_kwh": credited_energy,
+        "happy_hour_supplier_settled": False,
+        "happy_hour_credit_basis": "verified physical import and saved hour rate; estimated Octopus refund",
+        "electricity_effective_import_cost_pence": effective_import,
+        "electricity_effective_total_cost_pence": effective_electricity,
+        "total_energy_effective_cost_pence": effective_total,
         "electricity_standing_charge_pence": standing,
         "electricity_export_income_pence": exported,
         "power_down_reward_pence": 0.0,
@@ -447,8 +473,9 @@ def build_energy_cost_comparison(
         "headline": "Total energy cost",
         "basis": "bill_equivalent",
         "formula": (
-            "electricity import + electricity standing charge - electricity export "
-            "income - settled Power Down rewards + gas usage + gas standing charge"
+            "gross electricity import + electricity standing charge - electricity "
+            "export income - settled Power Down rewards + gas usage + gas standing charge; "
+            "estimated Happy Hour refund shown separately as effective cost, not settled"
         ),
         "battery_wear_included": False,
         "gas_included": True,
@@ -459,6 +486,12 @@ def build_energy_cost_comparison(
         "periods": periods,
         "today_live_total_energy_cost_pence": today["live_data"].get(
             "total_energy_cost_pence"
+        ),
+        "today_live_effective_total_energy_cost_pence": today["live_data"].get(
+            "total_energy_effective_cost_pence"
+        ),
+        "today_happy_hour_estimated_credit_pence": today["live_data"].get(
+            "happy_hour_estimated_credit_pence"
         ),
         "today_kems_total_energy_cost_pence": today["kems"].get(
             "total_energy_cost_pence"
