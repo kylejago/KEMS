@@ -121,3 +121,55 @@ def test_unchanged_updater_gate_and_maintenance_contracts() -> None:
     assert "self._energy_maintenance_blockers()" in base
     assert "await self._defer_for_energy_activity(blockers)" in base
     assert "self.hass.services.async_call(" in base
+
+
+class _TransientSession:
+    def __init__(self, statuses):
+        self.statuses = iter(statuses)
+        self.calls = []
+
+    def get(self, url, *, headers, timeout):
+        self.calls.append((url, timeout))
+        status = next(self.statuses)
+        if status == "timeout":
+            class _TimedOut:
+                async def __aenter__(self):
+                    raise asyncio.TimeoutError("transient API connection timeout")
+
+                async def __aexit__(self, exc_type, exc, tb):
+                    return False
+
+            return _TimedOut()
+        return _Response(b"valid bundle bytes", status=status)
+
+
+def test_transient_timeout_retries_once_and_recovers_without_weakening_sha():
+    body = b"valid bundle bytes"
+    session = _TransientSession(["timeout", 200])
+    assert _download(session, _asset(body)) == body
+    assert len(session.calls) == 2
+
+
+def test_repeated_transient_timeout_fails_without_unbounded_requests():
+    body = b"valid bundle bytes"
+    session = _TransientSession(["timeout", "timeout"])
+    with pytest.raises(asyncio.TimeoutError):
+        _download(session, _asset(body))
+    assert len(session.calls) == 2
+
+
+def test_one_transient_server_503_retries_but_403_and_corrupt_sha_do_not():
+    body = b"valid bundle bytes"
+    session = _TransientSession([503, 200])
+    assert _download(session, _asset(body)) == body
+    assert len(session.calls) == 2
+    denied = _TransientSession([403])
+    with pytest.raises(ValueError, match="HTTP 403"):
+        _download(denied, _asset(body))
+    assert len(denied.calls) == 1
+    invalid = _asset(body)
+    invalid["digest"] = "sha256:" + "0" * 64
+    corrupt = _TransientSession([200])
+    with pytest.raises(ValueError, match="digest disagrees"):
+        _download(corrupt, invalid)
+    assert len(corrupt.calls) == 1
