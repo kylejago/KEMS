@@ -135,7 +135,7 @@ class _TransientSession:
 
             class _TimedOut:
                 async def __aenter__(self):
-                    raise asyncio.TimeoutError("transient API connection timeout")
+                    raise TimeoutError("transient API connection timeout")
 
                 async def __aexit__(self, exc_type, exc, tb):
                     return False
@@ -154,7 +154,7 @@ def test_transient_timeout_retries_once_and_recovers_without_weakening_sha():
 def test_repeated_transient_timeout_fails_without_unbounded_requests():
     body = b"valid bundle bytes"
     session = _TransientSession(["timeout", "timeout"])
-    with pytest.raises(asyncio.TimeoutError):
+    with pytest.raises(TimeoutError):
         _download(session, _asset(body))
     assert len(session.calls) == 2
 
