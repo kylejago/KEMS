@@ -840,9 +840,7 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
             # reward hours. Never substitute a digital-twin estimate for an
             # unknown section of the 16kWh per-hour import allowance.
             joined_windows = confirmed_booking_windows(_controller_for(self).state)
-            external_bookings = verified_octopus_joined_bookings(
-                self.hass, now=now
-            )
+            external_bookings = verified_octopus_joined_bookings(self.hass, now=now)
             external_windows = confirmed_booking_windows(
                 {"bookings": external_bookings}
             )
