@@ -1,4 +1,4 @@
-"""Regression for Alpha9.169: completed Happy Hour physical evidence retention.
+"""Regression for Alpha9.170: completed Happy Hour physical evidence retention.
 
 The 1 November 2026 reward ended at 14:00; by 21:18 the old six-hour
 in-memory retention had silently deleted BOTH completed-hour confirmations.
