@@ -11,6 +11,7 @@ an asset, or bypass the bundle SHA-256 and release-version checks.
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import re
 from collections.abc import Mapping
@@ -44,27 +45,46 @@ async def download_release_asset(
     repository: str,
     user_agent: str,
 ) -> bytes:
-    """Download a bounded asset through REST, validating GitHub's own digest."""
+    """Download a bounded GitHub asset; retry *only* transient transport loss.
+
+    A failed signature, unexpected media type, wrong version or HTTP 4xx is
+    never retried. Two attempts are enough to survive one short congestion
+    event without repeatedly hammering GitHub overnight.
+    """
     url = asset_api_url(asset, repository=repository)
-    async with session.get(
-        url,
-        headers={
-            "Accept": "application/octet-stream",
-            "User-Agent": user_agent,
-        },
-        timeout=15,
-    ) as response:
-        if response.status != 200:
-            raise ValueError(
-                f"KEMS GitHub API asset download returned HTTP {response.status}"
-            )
-        content_type = str(response.headers.get("Content-Type", "")).lower()
-        if "application/json" in content_type or "text/html" in content_type:
-            raise ValueError(
-                "GitHub returned asset metadata/HTML instead of a binary "
-                "release bundle; refusing unsafe fallback"
-            )
-        payload = await response.read()
+    for attempt in range(2):
+        try:
+            async with session.get(
+                url,
+                headers={
+                    "Accept": "application/octet-stream",
+                    "User-Agent": user_agent,
+                },
+                timeout=15,
+            ) as response:
+                if response.status in (500, 502, 503, 504):
+                    if attempt == 0:
+                        await asyncio.sleep(0.6)
+                        continue
+                    raise ValueError(
+                        f"KEMS GitHub API asset download returned HTTP {response.status}"
+                    )
+                if response.status != 200:
+                    raise ValueError(
+                        f"KEMS GitHub API asset download returned HTTP {response.status}"
+                    )
+                content_type = str(response.headers.get("Content-Type", "")).lower()
+                if "application/json" in content_type or "text/html" in content_type:
+                    raise ValueError(
+                        "GitHub returned asset metadata/HTML instead of a binary "
+                        "release bundle; refusing unsafe fallback"
+                    )
+                payload = await response.read()
+            break
+        except (asyncio.TimeoutError, ConnectionError):
+            if attempt:
+                raise
+            await asyncio.sleep(0.6)
     if not payload or len(payload) > ASSET_LIMIT_BYTES:
         raise ValueError("GitHub release bundle asset was empty or too large")
 
