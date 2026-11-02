@@ -133,19 +133,16 @@ def test_alpha9170_all_time_happy_hour_uses_verified_daily_rows_only() -> None:
         period_value_kwargs,
     )
 
-    path = (
-        Path(__file__).parents[1]
-        / "custom_components"
-        / "kems"
-        / "lifetime.py"
-    )
+    path = Path(__file__).parents[1] / "custom_components" / "kems" / "lifetime.py"
     module = ast.parse(path.read_text())
     owner = next(
-        node for node in module.body
+        node
+        for node in module.body
         if isinstance(node, ast.ClassDef) and node.name == "LifetimeLedgerRecorder"
     )
     method = next(
-        node for node in owner.body
+        node
+        for node in owner.body
         if isinstance(node, ast.FunctionDef) and node.name == "_all_time_summary"
     )
     standalone = ast.ClassDef(
@@ -194,16 +191,22 @@ def test_alpha9170_all_time_happy_hour_includes_active_day_once() -> None:
     from datetime import date
     from pathlib import Path
 
-    from kems_core import LifetimeLedger, PeriodTotals, period_value_keys, period_value_kwargs
+    from kems_core import (
+        LifetimeLedger,
+        PeriodTotals,
+        period_value_keys,
+        period_value_kwargs,
+    )
 
     module = ast.parse(
         (Path(__file__).parents[1] / "custom_components/kems/lifetime.py").read_text()
     )
     method = next(
-        node for cls in module.body if isinstance(cls, ast.ClassDef)
-        and cls.name == "LifetimeLedgerRecorder"
-        for node in cls.body if isinstance(node, ast.FunctionDef)
-        and node.name == "_all_time_summary"
+        node
+        for cls in module.body
+        if isinstance(cls, ast.ClassDef) and cls.name == "LifetimeLedgerRecorder"
+        for node in cls.body
+        if isinstance(node, ast.FunctionDef) and node.name == "_all_time_summary"
     )
     compiled = ast.ClassDef(
         name="Recorder", bases=[], keywords=[], body=[method], decorator_list=[]
@@ -214,16 +217,21 @@ def test_alpha9170_all_time_happy_hour_includes_active_day_once() -> None:
         period_value_kwargs=period_value_kwargs,
     )
     exec(
-        compile(ast.fix_missing_locations(ast.Module(body=[compiled], type_ignores=[])),
-                "<all-time-day>", "exec"),
+        compile(
+            ast.fix_missing_locations(ast.Module(body=[compiled], type_ignores=[])),
+            "<all-time-day>",
+            "exec",
+        ),
         ns,
     )
     obj = ns["Recorder"]()
     obj._ledger = LifetimeLedger()
-    obj._daily_records = {"2026-11-01": {
-        "happy_hour_estimated_credit_pence": 261.729,
-        "happy_hour_credited_import_kwh": 7.294,
-    }}
+    obj._daily_records = {
+        "2026-11-01": {
+            "happy_hour_estimated_credit_pence": 261.729,
+            "happy_hour_credited_import_kwh": 7.294,
+        }
+    }
     obj._tracking_date = date(2026, 11, 2)
     obj._tracking_values = {
         "happy_hour_estimated_credit_pence": 120.0,
