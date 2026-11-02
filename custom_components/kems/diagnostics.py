@@ -14,6 +14,7 @@ from .commissioning import build_commissioning_snapshot
 from .coordinator import KEMSCoordinator
 from .foxess_command_shadow import build_foxess_command_shadow_snapshot
 from .foxess_modbus_contract import foxess_modbus_contract_snapshot
+from .happy_hour_accounting_diagnostics import build_happy_hour_accounting_audit
 from .happy_hour_auto_join import happy_hour_auto_join_state
 from .kems_core.agile_plan_budget_reconciliation import reconcile_agile_budget
 from .panel import panel_health_snapshot
@@ -217,6 +218,10 @@ async def async_get_config_entry_diagnostics(
             coordinator, "_happy_hour_preparation_dispatch", {}
         ),
         "happy_hour_import_ledger": coordinator._happy_hour_import_ledger.status,
+        "happy_hour_accounting_audit": build_happy_hour_accounting_audit(
+            coordinator._happy_hour_import_ledger.status,
+            coordinator._lifetime.happy_hour_verified_receipts,
+        ),
         "happy_hour_ohme_control": coordinator.happy_hour_ohme_control_state,
         "agile_history_backfill": coordinator.agile_history_backfill_state,
         "forecast": data.forecast.to_dict(),

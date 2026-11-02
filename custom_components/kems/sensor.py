@@ -930,7 +930,7 @@ SENSORS: tuple[KEMSSensorEntityDescription, ...] = (
         ),
         attributes_fn=lambda data: {
             "supplier_settled": False,
-            "rate_basis": "currently observed import unit rate (indicative)",
+            "rate_basis": "rate captured with verified reward hour (indicative)",
             "credited_import_kwh": (
                 data.periods["today"].happy_hour_credited_import_kwh
                 if "today" in data.periods

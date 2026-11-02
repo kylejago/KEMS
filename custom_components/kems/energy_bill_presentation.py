@@ -23,14 +23,16 @@ _PERIOD_CARD = r"""      - type: markdown
 
           **KEMS strategy:** {{ state_attr('sensor.kems_energy_cost_comparison', 'selected_kems_strategy_label') or '—' }}
 
-          | Period | Live Data | KEMS | Saving |
-          |---|---:|---:|---:|
+          | Period | Live gross | Live after est. HH refund | KEMS | Saving (gross basis) |
+          |---|---:|---:|---:|---:|
           {% for key in ['today', 'yesterday', '7_days', '30_days', 'year', '365_days', 'all_time'] %}
           {% set p = periods.get(key, {}) or {} %}
           {% set live = p.get('live_data', {}) or {} %}
           {% set kems = p.get('kems', {}) or {} %}
-          | {{ p.get('label', key) }} | {{ ('£%.2f' | format((live.get('total_energy_cost_pence') | float) / 100)) if live.get('total_energy_cost_pence') is not none else '—' }} | {{ ('£%.2f' | format((kems.get('total_energy_cost_pence') | float) / 100)) if kems.get('total_energy_cost_pence') is not none else '—' }} | {{ ('£%.2f' | format((p.get('saving_pence') | float) / 100)) if p.get('saving_pence') is not none else '—' }} |
+          | {{ p.get('label', key) }} | {{ ('£%.2f' | format((live.get('total_energy_cost_pence') | float) / 100)) if live.get('total_energy_cost_pence') is not none else '—' }} | {{ ('£%.2f' | format((live.get('total_energy_effective_cost_pence') | float) / 100)) if live.get('total_energy_effective_cost_pence') is not none else '—' }} | {{ ('£%.2f' | format((kems.get('total_energy_cost_pence') | float) / 100)) if kems.get('total_energy_cost_pence') is not none else '—' }} | {{ ('£%.2f' | format((p.get('saving_pence') | float) / 100)) if p.get('saving_pence') is not none else '—' }} |
           {% endfor %}
+
+          **Happy Hour refunds are estimates, not settled Octopus credit.** Gross Live Data and KEMS totals remain the comparable basis for the Saving column. For each period, the independently verified eligible import and estimated credit are shown in the Home and History views; unsupported hours receive no invented refund.
 
           KEMS still retains its individual replay engines internally for validation, but they are no longer separate user-facing products.
 """
@@ -43,15 +45,20 @@ _TODAY_CARD = r"""      - type: markdown
           {% set kems = p.get('kems', {}) or {} %}
           | Bill component | Live Data | KEMS |
           |---|---:|---:|
-          | Electricity import | {{ ('£%.2f' | format((live.get('electricity_import_cost_pence') | float) / 100)) if live.get('electricity_import_cost_pence') is not none else '—' }} | {{ ('£%.2f' | format((kems.get('electricity_import_cost_pence') | float) / 100)) if kems.get('electricity_import_cost_pence') is not none else '—' }} |
+          | Electricity import (gross/day rate) | {{ ('£%.2f' | format((live.get('electricity_import_cost_pence') | float) / 100)) if live.get('electricity_import_cost_pence') is not none else '—' }} | {{ ('£%.2f' | format((kems.get('electricity_import_cost_pence') | float) / 100)) if kems.get('electricity_import_cost_pence') is not none else '—' }} |
+          | Happy Hour eligible import | {{ ('%.3f kWh' | format(live.get('happy_hour_credited_import_kwh') | float)) if live.get('happy_hour_credited_import_kwh') is not none else '—' }} | — |
+          | Estimated Happy Hour refund (unsettled) | {{ ('−£%.2f' | format((live.get('happy_hour_estimated_credit_pence') | float) / 100)) if live.get('happy_hour_estimated_credit_pence') is not none else '—' }} | — |
+          | **Effective import after est. refund** | **{{ ('£%.2f' | format((live.get('electricity_effective_import_cost_pence') | float) / 100)) if live.get('electricity_effective_import_cost_pence') is not none else '—' }}** | — |
           | Electricity standing charge | {{ ('£%.2f' | format((live.get('electricity_standing_charge_pence') | float) / 100)) if live.get('electricity_standing_charge_pence') is not none else '—' }} | {{ ('£%.2f' | format((kems.get('electricity_standing_charge_pence') | float) / 100)) if kems.get('electricity_standing_charge_pence') is not none else '—' }} |
           | Electricity export income | {{ ('-£%.2f' | format((live.get('electricity_export_income_pence') | float) / 100)) if live.get('electricity_export_income_pence') is not none else '—' }} | {{ ('-£%.2f' | format((kems.get('electricity_export_income_pence') | float) / 100)) if kems.get('electricity_export_income_pence') is not none else '—' }} |
           | Supplier/account credits | {{ ('-£%.2f' | format((live.get('supplier_energy_credit_pence') | float) / 100)) if live.get('supplier_energy_credit_pence') is not none else '—' }} | {{ ('-£%.2f' | format((kems.get('supplier_energy_credit_pence') | float) / 100)) if kems.get('supplier_energy_credit_pence') is not none else '—' }} |
-          | **Electricity total** | **{{ ('£%.2f' | format((live.get('electricity_total_cost_pence') | float) / 100)) if live.get('electricity_total_cost_pence') is not none else '—' }}** | **{{ ('£%.2f' | format((kems.get('electricity_total_cost_pence') | float) / 100)) if kems.get('electricity_total_cost_pence') is not none else '—' }}** |
+          | **Electricity gross total** | **{{ ('£%.2f' | format((live.get('electricity_total_cost_pence') | float) / 100)) if live.get('electricity_total_cost_pence') is not none else '—' }}** | **{{ ('£%.2f' | format((kems.get('electricity_total_cost_pence') | float) / 100)) if kems.get('electricity_total_cost_pence') is not none else '—' }}** |
           | Gas usage | {{ ('£%.2f' | format((live.get('gas_usage_cost_pence') | float) / 100)) if live.get('gas_usage_cost_pence') is not none else '—' }} | {{ ('£%.2f' | format((kems.get('gas_usage_cost_pence') | float) / 100)) if kems.get('gas_usage_cost_pence') is not none else '—' }} |
           | Gas standing charge | {{ ('£%.2f' | format((live.get('gas_standing_charge_pence') | float) / 100)) if live.get('gas_standing_charge_pence') is not none else '—' }} | {{ ('£%.2f' | format((kems.get('gas_standing_charge_pence') | float) / 100)) if kems.get('gas_standing_charge_pence') is not none else '—' }} |
           | **Gas total** | **{{ ('£%.2f' | format((live.get('gas_total_cost_pence') | float) / 100)) if live.get('gas_total_cost_pence') is not none else '—' }}** | **{{ ('£%.2f' | format((kems.get('gas_total_cost_pence') | float) / 100)) if kems.get('gas_total_cost_pence') is not none else '—' }}** |
-          | **TOTAL ENERGY COST** | **{{ ('£%.2f' | format((live.get('total_energy_cost_pence') | float) / 100)) if live.get('total_energy_cost_pence') is not none else '—' }}** | **{{ ('£%.2f' | format((kems.get('total_energy_cost_pence') | float) / 100)) if kems.get('total_energy_cost_pence') is not none else '—' }}** |
+          | **TOTAL ENERGY COST (gross)** | **{{ ('£%.2f' | format((live.get('total_energy_cost_pence') | float) / 100)) if live.get('total_energy_cost_pence') is not none else '—' }}** | **{{ ('£%.2f' | format((kems.get('total_energy_cost_pence') | float) / 100)) if kems.get('total_energy_cost_pence') is not none else '—' }}** |
+
+          **Effective Live total after estimated Happy Hour refund:** **{{ ('£%.2f' | format((live.get('total_energy_effective_cost_pence') | float) / 100)) if live.get('total_energy_effective_cost_pence') is not none else '—' }}** (unsettled Octopus credit; gross billing retained).
 
           **KEMS strategy:** {{ kems.get('strategy_label', '—') }}. Battery wear is deliberately excluded from every total above.
 """
@@ -67,9 +74,11 @@ _OVERVIEW_CARD = r"""      - type: markdown
 
           | Today | Live Data | KEMS |
           |---|---:|---:|
-          | Total energy cost | **{{ ('£%.2f' | format((live.get('total_energy_cost_pence') | float) / 100)) if live.get('total_energy_cost_pence') is not none else '—' }}** | **{{ ('£%.2f' | format((kems.get('total_energy_cost_pence') | float) / 100)) if kems.get('total_energy_cost_pence') is not none else '—' }}** |
+          | Total energy cost (gross) | **{{ ('£%.2f' | format((live.get('total_energy_cost_pence') | float) / 100)) if live.get('total_energy_cost_pence') is not none else '—' }}** | **{{ ('£%.2f' | format((kems.get('total_energy_cost_pence') | float) / 100)) if kems.get('total_energy_cost_pence') is not none else '—' }}** |
           | Electricity | {{ ('£%.2f' | format((live.get('electricity_total_cost_pence') | float) / 100)) if live.get('electricity_total_cost_pence') is not none else '—' }} | {{ ('£%.2f' | format((kems.get('electricity_total_cost_pence') | float) / 100)) if kems.get('electricity_total_cost_pence') is not none else '—' }} |
           | Gas | {{ ('£%.2f' | format((live.get('gas_total_cost_pence') | float) / 100)) if live.get('gas_total_cost_pence') is not none else '—' }} | {{ ('£%.2f' | format((kems.get('gas_total_cost_pence') | float) / 100)) if kems.get('gas_total_cost_pence') is not none else '—' }} |
+
+          **Effective Live total after estimated Happy Hour refund:** {{ ('£%.2f' | format((live.get('total_energy_effective_cost_pence') | float) / 100)) if live.get('total_energy_effective_cost_pence') is not none else '—' }}. This is not a settled Octopus account credit.
 
           **Saving today:** {{ ('£%.2f' | format((p.get('saving_pence') | float) / 100)) if p.get('saving_pence') is not none else '—' }}  
           **KEMS strategy:** {{ state_attr('sensor.kems_energy_cost_comparison', 'selected_kems_strategy_label') or '—' }}
