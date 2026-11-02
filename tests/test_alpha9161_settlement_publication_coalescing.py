@@ -94,8 +94,9 @@ def test_second_pass_does_not_inherit_first_pass_seen_set() -> None:
         m._set("sensor.a", "first", {})
     with coalesce_identical_settlement_publications(m) as scope:
         m._set("sensor.a", "first", {})
-    assert scope.summary()["written"] == 1
-    assert len(m._hass.states.calls) == 2
+    assert scope.summary()["written"] == 0
+    assert scope.summary()["skipped_existing_identical"] == 1
+    assert len(m._hass.states.calls) == 1
 
 
 def test_exception_resets_scope_and_no_writes_are_delayed() -> None:
@@ -140,3 +141,31 @@ def test_alpha9169_publication_timing_counters_are_bounded_to_one_pass():
         assert next_scope.summary()["publish_passes"] == 0
         assert next_scope.summary()["attempted"] == 0
     assert manager._kems_settlement_publication_scope is None
+
+
+def test_alpha9170_suppress_unchanged_first_pass_without_delaying_real_change():
+    m = _manager()
+    m._hass.states.async_set("sensor.price", "18.0", {"rate": 18.0})
+    before = len(m._hass.states.calls)
+    with coalesce_identical_settlement_publications(m) as scope:
+        m._set("sensor.price", 18.0, {"rate": 18.0})
+        m._set("sensor.price", 18.0, {"rate": 18.0})
+        m._set("sensor.price", 19.0, {"rate": 19.0})
+        m._set("sensor.price", 19.0, {"rate": 19.0})
+        m._set("sensor.soc", 73, {"soc": 73})
+        assert scope.summary()["skipped_existing_identical"] == 1
+        assert scope.summary()["skipped_identical"] == 3
+        assert scope.summary()["written"] == 2
+    assert [row[1] for row in m._hass.states.calls[before:]] == ["19.0", "73"]
+
+
+def test_alpha9170_state_lookup_failure_fails_open_for_first_publish():
+    m = _manager()
+    m._hass.states.get = lambda entity_id: (_ for _ in ()).throw(
+        RuntimeError("state lookup unavailable")
+    )
+    with coalesce_identical_settlement_publications(m) as scope:
+        m._set("sensor.price", 18.0, {"rate": 18.0})
+    assert scope.summary()["written"] == 1
+    assert scope.summary()["skipped_existing_identical"] == 0
+    assert m._hass.states.calls[-1][1] == "18.0"

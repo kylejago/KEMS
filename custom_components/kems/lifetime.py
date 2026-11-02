@@ -715,6 +715,18 @@ class LifetimeLedgerRecorder:
         values = {
             key: float(getattr(self._ledger, key, 0.0)) for key in period_value_keys()
         }
+        # Financial-only Happy Hour rewards are held in dated daily rows,
+        # not in the cumulative EnergyLedger. The lifetime screen must use
+        # those *same* saved rows as month/year, without inventing a credit
+        # from a grouped booking or altering gross import costs.
+        rows = list(self._daily_records.values())
+        if self._tracking_date is not None:
+            rows.append(self._tracking_values)
+        for key in (
+            "happy_hour_estimated_credit_pence",
+            "happy_hour_credited_import_kwh",
+        ):
+            values[key] = round(sum(float(row.get(key, 0.0)) for row in rows), 3)
         return PeriodTotals(
             start_date=(
                 self._ledger.first_observation.date()

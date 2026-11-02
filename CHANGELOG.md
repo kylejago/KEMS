@@ -1,3 +1,10 @@
+## 0.9.0-alpha9.170 — lower Agile state-write load and correct all-time Happy Hour credit
+
+- Coalesce *any* byte-for-byte unchanged Agile Home Assistant entity state and attributes inside the existing synchronous pre-control settlement scope, including the first publication of an entity. New or changed same-scan tariff, SOC, Tomorrow handoff and flow data publish immediately. HA lookup/comparison errors fail open to the original write. No cache, no altered async boundary, and no physical inverter control changes. New counters separately show first-pass unchanged suppressions so performance improvement is measurable against alpha9.169.
+- Correct lifetime/all-time Happy Hour estimated credit and eligible import to sum previously persisted daily financial rows and the live tracking day, exactly once. The all-time report previously showed 0p while November/year/financial showed 261.729p from 7.294 kWh. Preserve original gross import and supplier-settlement status.
+- Do not invent the missing 1 November 13:00–14:00 second-hour credit: independent booking and physical meter coverage remain incomplete in available on-device records. Issue #419 remains open.
+- Preserve 7 kW DNO grid export limit, 15% paid-export cutoff, 10% household hard protection, EV connected-idle export, Power Down and Happy Hour controls. Automatic safe-first updates remain 06:00–06:30 and avoid active export. Validate the next 03:00–07:45 slowdown separately; no unmeasured improvement claim.
+
 ## 0.9.0-alpha9.169 — Happy Hour booking proof and safe updater checks
 
 - Preserve independently confirmed one-hour Happy Hour reward windows before adjacent booked sessions are grouped for display. Capture physical meter samples up to ten minutes beyond the confirmed end, **for financial evidence only**, never live charging authorisation.

@@ -117,3 +117,126 @@ def test_observed_reconciliation_does_not_rebuild_commissioned_value() -> None:
 
     assert "actual_system_value_pence" not in totals
     assert totals["house_consumption_kwh"] == 1.0
+
+
+def test_alpha9170_all_time_happy_hour_uses_verified_daily_rows_only() -> None:
+    """All-time must agree with month/year; keep supplier gross bill untouched."""
+    import ast
+    from datetime import UTC, date, datetime
+    from pathlib import Path
+
+    from kems_core import (
+        LifetimeLedger,
+        PeriodTotals,
+        period_value_keys,
+        period_value_kwargs,
+    )
+
+    path = Path(__file__).parents[1] / "custom_components" / "kems" / "lifetime.py"
+    module = ast.parse(path.read_text())
+    owner = next(
+        node
+        for node in module.body
+        if isinstance(node, ast.ClassDef) and node.name == "LifetimeLedgerRecorder"
+    )
+    method = next(
+        node
+        for node in owner.body
+        if isinstance(node, ast.FunctionDef) and node.name == "_all_time_summary"
+    )
+    standalone = ast.ClassDef(
+        name="Recorder", bases=[], keywords=[], body=[method], decorator_list=[]
+    )
+    namespace = {
+        "date": date,
+        "PeriodTotals": PeriodTotals,
+        "period_value_keys": period_value_keys,
+        "period_value_kwargs": period_value_kwargs,
+    }
+    exec(
+        compile(
+            ast.fix_missing_locations(ast.Module(body=[standalone], type_ignores=[])),
+            "<all-time-summary>",
+            "exec",
+        ),
+        namespace,
+    )
+    recorder = namespace["Recorder"]()
+    ledger = LifetimeLedger()
+    ledger.first_observation = datetime(2026, 10, 1, tzinfo=UTC)
+    ledger.import_cost_pence = 1500.0
+    recorder._ledger = ledger
+    recorder._tracking_date = date(2026, 11, 2)
+    recorder._tracking_values = {"import_cost_pence": 100.0}
+    recorder._daily_records = {
+        "2026-11-01": {
+            "import_cost_pence": 1400.0,
+            "happy_hour_estimated_credit_pence": 261.729,
+            "happy_hour_credited_import_kwh": 7.294,
+        }
+    }
+    summary = recorder._all_time_summary(date(2026, 11, 2))
+    assert summary.happy_hour_estimated_credit_pence == 261.729
+    assert summary.happy_hour_credited_import_kwh == 7.294
+    assert summary.import_cost_pence == 1500.0
+    assert summary.actual_net_after_estimated_happy_hour_credit_pence == (
+        summary.actual_net_cost_pence - 261.729
+    )
+
+
+def test_alpha9170_all_time_happy_hour_includes_active_day_once() -> None:
+    """Do not double-count today's high-water credit when rollover occurs."""
+    import ast
+    from datetime import date
+    from pathlib import Path
+
+    from kems_core import (
+        LifetimeLedger,
+        PeriodTotals,
+        period_value_keys,
+        period_value_kwargs,
+    )
+
+    module = ast.parse(
+        (Path(__file__).parents[1] / "custom_components/kems/lifetime.py").read_text()
+    )
+    method = next(
+        node
+        for cls in module.body
+        if isinstance(cls, ast.ClassDef) and cls.name == "LifetimeLedgerRecorder"
+        for node in cls.body
+        if isinstance(node, ast.FunctionDef) and node.name == "_all_time_summary"
+    )
+    compiled = ast.ClassDef(
+        name="Recorder", bases=[], keywords=[], body=[method], decorator_list=[]
+    )
+    ns = dict(
+        date=date,
+        PeriodTotals=PeriodTotals,
+        period_value_keys=period_value_keys,
+        period_value_kwargs=period_value_kwargs,
+    )
+    exec(
+        compile(
+            ast.fix_missing_locations(ast.Module(body=[compiled], type_ignores=[])),
+            "<all-time-day>",
+            "exec",
+        ),
+        ns,
+    )
+    obj = ns["Recorder"]()
+    obj._ledger = LifetimeLedger()
+    obj._daily_records = {
+        "2026-11-01": {
+            "happy_hour_estimated_credit_pence": 261.729,
+            "happy_hour_credited_import_kwh": 7.294,
+        }
+    }
+    obj._tracking_date = date(2026, 11, 2)
+    obj._tracking_values = {
+        "happy_hour_estimated_credit_pence": 120.0,
+        "happy_hour_credited_import_kwh": 4.0,
+    }
+    summary = obj._all_time_summary(date(2026, 11, 2))
+    assert summary.happy_hour_estimated_credit_pence == 381.729
+    assert summary.happy_hour_credited_import_kwh == 11.294

@@ -1,9 +1,9 @@
 """Exact-write coalescing exclusively inside one synchronous Agile settlement pass.
 
 All settlement math, every reporting overlay and every publication function still
-run in their original order. Only a second (or later) byte-for-byte-equivalent
-state/attribute write to the same HA entity is suppressed. No time-based cache:
-new slot, SOC, tariff or other attribute changes always pass through immediately.
+run in their original order. Any exact unchanged state/attribute HA write is
+suppressed, including an unchanged first publication of an entity this scan.
+No time-based cache: new SOC, tariff or other attribute changes pass through.
 """
 
 from __future__ import annotations
@@ -25,6 +25,7 @@ class SettlementPublicationScope:
     publish_thread_cpu_seconds: float = 0.0
     compared: int = 0
     skipped_identical: int = 0
+    skipped_existing_identical: int = 0
     written: int = 0
     comparison_seconds: float = 0.0
 
@@ -42,6 +43,7 @@ class SettlementPublicationScope:
             "publish_thread_cpu_seconds": round(self.publish_thread_cpu_seconds, 3),
             "compared": self.compared,
             "skipped_identical": self.skipped_identical,
+            "skipped_existing_identical": self.skipped_existing_identical,
             "written": self.written,
             "comparison_seconds": round(self.comparison_seconds, 3),
         }

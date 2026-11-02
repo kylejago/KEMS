@@ -1532,26 +1532,29 @@ class AgileSmartExportManager:
         scope = getattr(self, "_kems_settlement_publication_scope", None)
         if scope is not None:
             scope["attempted"] += 1
-            if entity_id in scope["seen"]:
-                # Only suppress an *exact* repeated write inside this one
-                # synchronous settlement pass. Read the real HA state, not a
-                # cached copy: wrappers can consume earlier published values.
-                # Any equality/lookup problem fails open to the normal write.
-                checked_at = perf_counter()
-                try:
-                    previous = self._hass.states.get(entity_id)
-                    identical = (
-                        previous is not None
-                        and previous.state == state_value
-                        and previous.attributes == attributes
-                    )
-                except Exception:
-                    identical = False
-                scope["comparison_seconds"] += perf_counter() - checked_at
-                scope["compared"] += 1
-                if identical:
-                    scope["skipped_identical"] += 1
-                    return
+            # Compare every reporting write against the current HA state,
+            # including the first publication of this entity in this pass.
+            # Never cache a previous value: a changed SOC, tariff or handoff
+            # must still be observable by later same-scan planners.
+            # Lookup/comparison errors fail open to the normal HA write.
+            checked_at = perf_counter()
+            try:
+                previous = self._hass.states.get(entity_id)
+                identical = (
+                    previous is not None
+                    and previous.state == state_value
+                    and previous.attributes == attributes
+                )
+            except Exception:
+                identical = False
+            scope["comparison_seconds"] += perf_counter() - checked_at
+            scope["compared"] += 1
+            if identical:
+                scope["skipped_identical"] += 1
+                if entity_id not in scope["seen"]:
+                    scope["skipped_existing_identical"] += 1
+                scope["seen"].add(entity_id)
+                return
             scope["seen"].add(entity_id)
             scope["written"] += 1
         self._hass.states.async_set(entity_id, state_value, attributes)
