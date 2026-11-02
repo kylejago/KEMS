@@ -1,3 +1,10 @@
+## 0.9.0-alpha9.172 — durable independent Happy Hour accounting confirmations
+
+- Persist each genuinely confirmed one-hour Octopus joined reward (including its event ID/code and source) immediately, even if the physical grid import meter is temporarily stale or unavailable. Adjacent two-hour dispatch/display groups are no longer submitted to the financial evidence recorder as independent booking proof.
+- Keep one 16 kWh allowance per individually authorised hour; no pooled allowance, duplicate credits, or fabricated missing meter samples. Save confirmation provenance and physical import observations independently; retain both across normal Home Assistant restarts and disappearing joined-event feeds.
+- Historical Sunday 1 November 2026 figures are reconstructed **only where independently evidenced** by saved booking and complete physical tariff/meter history. The observed two-hour total (10.949 kWh; 392.881p indicative credit) is not automatically written back if the stored second-hour meter trail ends at 13:48. Credit reporting remains read-only and does not change gross import, supplier settlement or physical control.
+- Add automated tests for adjacent bookings, rejection of merged two-hour evidence, stale meter confirmation, restart retention, and storage failures. Preserve 7 kW DNO export limit, 15% paid-export cutoff, guarded 10% confirmed-unplugged household Self Use, EV discharge prevention, and the 06:00–06:30 safe-first update window.
+
 ## 0.9.0-alpha9.171 — synchronous Tomorrow publication consolidation and guarded household SOC floor
 
 - Remove an intermediate heavy Tomorrow handoff publication only when its calling FlowPresentation manager guarantees the final canonical flow is published before the same synchronous settlement reconciliation returns. The first pre-control SOC/price publication remains mandatory, changed Tomorrow data still reaches Home Assistant in the same scan, and direct handoff callers still publish independently. The latest diagnostics showed ~0.6 seconds per intermediate publication; verify actual reduction after installation.
