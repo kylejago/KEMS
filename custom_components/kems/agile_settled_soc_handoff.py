@@ -359,7 +359,7 @@ def refresh_tomorrow_handoff_from_settled_soc(
         and getattr(manager, "_kems_defer_settled_tomorrow_publish", False)
     )
     diagnostic["second_publication_deferred_to_final_flow"] = defer_to_final_flow
-    if second_publication_needed:
+    if second_publication_needed:  # noqa: SIM102 - preserve reviewed handoff gate
         if not defer_to_final_flow:
             publish_started = perf_counter()
             publish_cpu_started = thread_time()
