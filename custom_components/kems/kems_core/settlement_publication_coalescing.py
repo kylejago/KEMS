@@ -20,6 +20,9 @@ class SettlementPublicationScope:
 
     seen: set[str] = field(default_factory=set)
     attempted: int = 0
+    publish_passes: int = 0
+    publish_wall_seconds: float = 0.0
+    publish_thread_cpu_seconds: float = 0.0
     compared: int = 0
     skipped_identical: int = 0
     written: int = 0
@@ -34,6 +37,9 @@ class SettlementPublicationScope:
     def summary(self) -> dict[str, float | int]:
         return {
             "attempted": self.attempted,
+            "publish_passes": self.publish_passes,
+            "publish_wall_seconds": round(self.publish_wall_seconds, 3),
+            "publish_thread_cpu_seconds": round(self.publish_thread_cpu_seconds, 3),
             "compared": self.compared,
             "skipped_identical": self.skipped_identical,
             "written": self.written,
