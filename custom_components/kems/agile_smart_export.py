@@ -1520,9 +1520,7 @@ class AgileSmartExportManager:
         if scope is not None:
             scope["publish_passes"] += 1
             scope["publish_wall_seconds"] += perf_counter() - publication_start
-            scope["publish_thread_cpu_seconds"] += (
-                thread_time() - publication_cpu_start
-            )
+            scope["publish_thread_cpu_seconds"] += thread_time() - publication_cpu_start
 
     def _set(
         self,
