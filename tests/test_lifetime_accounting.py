@@ -211,6 +211,7 @@ def test_alpha9170_all_time_happy_hour_includes_active_day_once() -> None:
         name="Recorder", bases=[], keywords=[], body=[method], decorator_list=[]
     )
     ns = dict(
+        date=date,
         PeriodTotals=PeriodTotals,
         period_value_keys=period_value_keys,
         period_value_kwargs=period_value_kwargs,
