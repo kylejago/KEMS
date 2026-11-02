@@ -7,7 +7,7 @@ import math
 from dataclasses import dataclass, replace
 from datetime import UTC, date, datetime, time, timedelta
 from functools import partial
-from time import perf_counter
+from time import perf_counter, thread_time
 from typing import Any
 from zoneinfo import ZoneInfo
 
@@ -1394,6 +1394,8 @@ class AgileSmartExportManager:
 
     def _publish(self, state: dict[str, Any]) -> None:
         """Expose dashboard states without adding any control/write surface."""
+        publication_start = perf_counter()
+        publication_cpu_start = thread_time()
         quality = state["price_quality"]
         periods = state["periods"]
         self._set(
@@ -1512,6 +1514,15 @@ class AgileSmartExportManager:
                 "unit_of_measurement": "p/kWh",
             },
         )
+        # Read-only, bounded instrumentation. Same-scan publication order
+        # and the exact HA entity payloads remain unchanged.
+        scope = getattr(self, "_kems_settlement_publication_scope", None)
+        if scope is not None:
+            scope["publish_passes"] += 1
+            scope["publish_wall_seconds"] += perf_counter() - publication_start
+            scope["publish_thread_cpu_seconds"] += (
+                thread_time() - publication_cpu_start
+            )
 
     def _set(
         self,
