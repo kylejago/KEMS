@@ -1,3 +1,11 @@
+## 0.9.0-alpha9.173 — consistent Happy Hour bill estimates and missing-proof diagnostics
+
+- Fix Live Data and History displaying gross Happy Hour import costs as if no refund existed: calculate estimated credited kWh/credit and effective electricity import, electricity and full energy cost separately for every retained period. Main Home costs, daily card, 7 history periods and generated Energy Cost cards use the same canonical financial fields.
+- Keep gross day-rate grid-import charges, original tariff history, standing charge and export earnings untouched. Octopus's later Happy Hour account credit is **estimated and unsettled**, not an already-paid refund or a literal 0p supplier import rate. Historical credit is never repriced using today's import rate; period aggregation uses persisted dated verified reward receipts.
+- Preserve gross-basis Live Data vs KEMS savings comparisons to avoid presenting unlike bases as measured optimisation; show effective Live totals separately and label the estimated credit explicitly.
+- Add bounded read-only per-window diagnostics with statuses for saved verified receipts, genuinely independently booked hour without complete meter/tariff proof, and legacy grouped sessions that do not prove separate rewards. The 1 Nov second-hour 13:00–14:00 gap is **not** fabricated, interpolated or marked settled; issue #419 remains open.
+- No change to EV or FoxESS control, physical 7 kW export limit, paid 15% battery cutoff, guarded 10% household self-use, Power Down, Happy Hour physical import permissions or 06:00–06:30 no-active-export safe updates. Full CI required before auto publication.
+
 ## 0.9.0-alpha9.172 — durable independent Happy Hour accounting confirmations
 
 - Persist each genuinely confirmed one-hour Octopus joined reward (including its event ID/code and source) immediately, even if the physical grid import meter is temporarily stale or unavailable. Adjacent two-hour dispatch/display groups are no longer submitted to the financial evidence recorder as independent booking proof.
