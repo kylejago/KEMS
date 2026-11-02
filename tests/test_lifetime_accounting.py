@@ -124,7 +124,6 @@ def test_alpha9170_all_time_happy_hour_uses_verified_daily_rows_only() -> None:
     import ast
     from datetime import UTC, date, datetime
     from pathlib import Path
-    from types import SimpleNamespace
 
     from kems_core import (
         LifetimeLedger,
