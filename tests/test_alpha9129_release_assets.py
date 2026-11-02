@@ -132,6 +132,7 @@ class _TransientSession:
         self.calls.append((url, timeout))
         status = next(self.statuses)
         if status == "timeout":
+
             class _TimedOut:
                 async def __aenter__(self):
                     raise asyncio.TimeoutError("transient API connection timeout")
