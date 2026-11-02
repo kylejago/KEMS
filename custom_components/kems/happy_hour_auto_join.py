@@ -779,6 +779,9 @@ def independently_confirmed_reward_hours(
         confirmed[(start, end)] = {
             "start": start.isoformat(),
             "end": end.isoformat(),
+            "event_id": str(item.get("event_id") or "").strip() or None,
+            "event_code": str(item.get("event_code") or "").strip() or None,
+            "booking_source": str(item.get("booking_source") or "").strip(),
         }
     return [confirmed[key] for key in sorted(confirmed)]
 
