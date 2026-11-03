@@ -1,3 +1,11 @@
+## 0.9.0-alpha9.176 — Reward-inclusive actual ROI, with supplier-settlement provenance
+
+- Count completed, individually verified Happy Hour import bill-credit estimates toward displayed actual ROI from the financial commissioning date. Preserve the original gross metered bill and historical tariff rate. A supplier credit is **not** marked settled until Octopus confirms it.
+- Count the **additional** Power Down reward only when a positive modelled bonus amount, rewardable reduction and successfully completed physically verified event are all available. Normal Agile export earnings are already included and must never be added twice. Missing bonus/baseline remains unknown, not £0 earned.
+- Persist the once-per-event reward journal across restart and history retention independently of inverter control. Show separate Happy Hour and Power Down ROI estimates and an unsettled-rewards total on the ROI dashboard.
+- Apply a read-only ROI overlay rather than rewriting metered energy, physical daily import/export figures or historical value fields. Estimated rewards cannot mark permanent supplier payback complete.
+- No change to Octopus booking authorisation, FoxESS write authority, 7 kW grid-export limit, 15% deliberate-export target, guarded 10% household minimum, EV charging protections or 06:00–06:30 no-export maintenance gate.
+
 ## 0.9.0-alpha9.175 — Weekend Happy Hours variable-token and booking evidence (candidate)
 
 - Read the genuine Octopus GraphQL Weekend Happy Hours token balance from the unique account coordinator, irrespective of the presence of the public Power Up event entity. The upstream public sensor's balance / 2 is labelled a legacy estimate, **not** guaranteed hours. The token price per event is unknown; Octopus remains booking/eligibility authority.
