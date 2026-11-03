@@ -44,6 +44,8 @@ class SolarForecastCoordinator:
         self.hass = hass
         self.config = config
         self._open_meteo_cache = _OpenMeteoResult()
+        self._open_meteo_failures = 0
+        self._open_meteo_retry_after: datetime | None = None
 
     async def async_update(self, now: datetime) -> SolarForecastState:
         """Return the latest fused forecast without making KEMS depend on it."""
@@ -123,37 +125,71 @@ class SolarForecastCoordinator:
             len(matched_entries),
         )
 
+    def _cached_open_meteo_result(self, now: datetime, reason: str) -> _OpenMeteoResult:
+        """Use only recent, same-day evidence; never re-label stale weather as live."""
+        cache = self._open_meteo_cache
+        fetched = cache.fetched_at
+        if (
+            fetched is None
+            or fetched.date() != now.date()
+            or now < fetched
+            or now - fetched >= timedelta(hours=6)
+        ):
+            return _OpenMeteoResult(
+                error=f"{reason}; no sufficiently recent Open-Meteo forecast"
+            )
+        return _OpenMeteoResult(
+            remaining_today_kwh=cache.remaining_today_kwh,
+            tomorrow_kwh=cache.tomorrow_kwh,
+            hourly=cache.hourly,
+            cloud_tomorrow_percent=cache.cloud_tomorrow_percent,
+            precipitation_tomorrow_mm=cache.precipitation_tomorrow_mm,
+            fetched_at=fetched,
+            error=f"{reason}; cached Open-Meteo observation from {fetched.isoformat()}",
+        )
+
     async def _async_open_meteo(self, now: datetime) -> _OpenMeteoResult:
-        """Fetch multi-array hourly GTI, cached to keep API usage tiny."""
+        """Cache successes and exponentially back off on provider outages."""
         if not self.config.open_meteo_enabled:
             return _OpenMeteoResult(error="Open-Meteo disabled")
 
         cached_at = self._open_meteo_cache.fetched_at
-        if cached_at is not None and now - cached_at < timedelta(
-            minutes=max(self.config.open_meteo_refresh_minutes, 15)
+        if (
+            cached_at is not None
+            and cached_at.date() == now.date()
+            and cached_at <= now
+            and now - cached_at
+            < timedelta(minutes=max(self.config.open_meteo_refresh_minutes, 15))
         ):
             return self._open_meteo_cache
 
+        retry_after = self._open_meteo_retry_after
+        if retry_after is not None and now < retry_after:
+            return self._cached_open_meteo_result(
+                now,
+                f"Open-Meteo retry deferred until {retry_after.isoformat()}",
+            )
+
         try:
             result = await self._async_fetch_open_meteo(now)
-        except Exception as err:  # network errors must never break KEMS
-            LOGGER.warning("Open-Meteo forecast update failed: %s", err)
-            if self._open_meteo_cache.fetched_at is not None:
-                return _OpenMeteoResult(
-                    remaining_today_kwh=self._open_meteo_cache.remaining_today_kwh,
-                    tomorrow_kwh=self._open_meteo_cache.tomorrow_kwh,
-                    hourly=self._open_meteo_cache.hourly,
-                    cloud_tomorrow_percent=(
-                        self._open_meteo_cache.cloud_tomorrow_percent
-                    ),
-                    precipitation_tomorrow_mm=(
-                        self._open_meteo_cache.precipitation_tomorrow_mm
-                    ),
-                    fetched_at=self._open_meteo_cache.fetched_at,
-                    error=f"Using cached Open-Meteo data after update error: {err}",
+        except Exception as err:  # External weather must never break KEMS.
+            self._open_meteo_failures += 1
+            delay_minutes = min(60, 5 * 2 ** min(self._open_meteo_failures - 1, 4))
+            self._open_meteo_retry_after = now + timedelta(minutes=delay_minutes)
+            # Report the initial outage and occasional milestones, not every scan.
+            if self._open_meteo_failures in (1, 4, 8, 16):
+                LOGGER.warning(
+                    "Open-Meteo unavailable (failure %d; retry in %dmin): %s",
+                    self._open_meteo_failures,
+                    delay_minutes,
+                    err,
                 )
-            return _OpenMeteoResult(error=str(err))
+            return self._cached_open_meteo_result(
+                now, f"Open-Meteo forecast update failed: {err}"
+            )
 
+        self._open_meteo_failures = 0
+        self._open_meteo_retry_after = None
         self._open_meteo_cache = result
         return result
 

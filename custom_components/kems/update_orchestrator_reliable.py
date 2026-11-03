@@ -10,6 +10,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
+from aiohttp import ClientError
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.exceptions import HomeAssistantError
@@ -156,16 +157,26 @@ class ReliableKEMSUpdateOrchestrator(base.KEMSUpdateOrchestrator):
             "Accept": "application/vnd.github+json",
             "User-Agent": "KEMS-Home-Assistant-Update-Orchestrator",
         }
-        async with session.get(
-            base.GITHUB_RELEASES_URL,
-            headers=headers,
-            timeout=15,
-        ) as response:
-            if response.status >= 400:
-                raise HomeAssistantError(
-                    f"GitHub bundle lookup returned HTTP {response.status}"
-                )
-            releases = await response.json()
+        # A temporary DNS/connection failure must not turn a routine update
+        # check into a permanently failed maintenance transaction. Retry the
+        # metadata GET once only; all HTTP and checksum verification stays strict.
+        for attempt in range(2):
+            try:
+                async with session.get(
+                    base.GITHUB_RELEASES_URL,
+                    headers=headers,
+                    timeout=15,
+                ) as response:
+                    if response.status >= 400:
+                        raise HomeAssistantError(
+                            f"GitHub bundle lookup returned HTTP {response.status}"
+                        )
+                    releases = await response.json()
+                break
+            except (TimeoutError, OSError, ClientError):
+                if attempt:
+                    raise
+                await asyncio.sleep(1)
         if not isinstance(releases, list):
             raise HomeAssistantError(
                 "GitHub bundle lookup returned an invalid response"

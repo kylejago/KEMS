@@ -543,5 +543,8 @@ class LiveSolarSocContinuityAgileSmartExportManager(
         config = getattr(self, "_rolling_config", None)
         if isinstance(config, SimulationConfig):
             _rebase_display_soc(self._state, now=now, config=config)
-        self._publish(self._state)
+        # An outer DeadlineSettlementConsistency owner must publish the final
+        # combined state synchronously. Keep direct Solar callers unchanged.
+        if not getattr(self, "_kems_defer_solar_settlement_publish", False):
+            self._publish(self._state)
         return self.state

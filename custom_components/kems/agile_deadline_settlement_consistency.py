@@ -182,10 +182,19 @@ class DeadlineSettlementConsistencyAgileSmartExportManager(
         settled_half_hours: list[dict[str, Any]],
         now: datetime,
     ) -> dict[str, Any]:
-        super().reconcile_current_day_settlements(
-            settled_half_hours=settled_half_hours,
-            now=now,
-        )
+        # Solar continuity and the deadline overlay both publish through the
+        # same heavy Agile manager chain. Only this guaranteed synchronous final
+        # owner may defer the Solar intermediate write; Solar still completes
+        # its accounting and display-SOC enrichment before the deadline rebase.
+        prior_defer = getattr(self, "_kems_defer_solar_settlement_publish", False)
+        self._kems_defer_solar_settlement_publish = True
+        try:
+            super().reconcile_current_day_settlements(
+                settled_half_hours=settled_half_hours,
+                now=now,
+            )
+        finally:
+            self._kems_defer_solar_settlement_publish = prior_defer
         config = getattr(self, "_rolling_config", None)
         rebase_day_summary_deadline_from_rolling(
             self._state,
