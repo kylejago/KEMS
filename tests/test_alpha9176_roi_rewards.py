@@ -34,3 +34,37 @@ def test_happy_hour_credit_counts_once_and_remains_unsettled():
     assert result.happy_hour_roi_credit_gbp == 2.62
     assert result.roi_rewards_unsettled_gbp == 2.62
     assert base.actual_value_created_total_gbp == 385.68
+
+
+def test_power_down_bonus_is_distinct_from_normal_agile_export():
+    base = _roi()
+    result = apply_reward_roi(
+        base,
+        {
+            "total": 361.729143,
+            "today": 100.0,
+            "happy": 261.729143,
+            "power_down": 100.0,
+            "unsettled": 361.729143,
+        },
+    )
+    assert result.power_down_roi_bonus_gbp == 1.0
+    assert result.actual_value_created_total_gbp == 389.30
+    assert result.actual_value_created_today_gbp == 13.53
+    assert base.actual_value_created_total_gbp == 385.68
+
+
+def test_unsettled_reward_cannot_complete_permanent_payback():
+    base = _roi()
+    result = apply_reward_roi(
+        base,
+        {
+            "total": 2099500.0,
+            "today": 0.0,
+            "happy": 2099500.0,
+            "power_down": 0.0,
+            "unsettled": 2099500.0,
+        },
+    )
+    assert result.system_paid_back is False
+    assert result.actual_payback_date is None
