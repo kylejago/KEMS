@@ -1529,6 +1529,7 @@ def _install_dashboard_card() -> None:
     )
     planner_lines = """**Automatic source:** {{ auto or 'waiting for Octopus Power Up data' }}  
           **Auto join:** {{ states('switch.kems_weekend_happy_hour_auto_join') }}  
+          **Octopus tokens:** {{ state_attr('switch.kems_weekend_happy_hour_auto_join', 'weekend_happy_hours_tokens') if state_attr('switch.kems_weekend_happy_hour_auto_join', 'weekend_happy_hours_tokens') is not none else 'unknown' }}  
           **Booking status:** {{ state_attr('switch.kems_weekend_happy_hour_auto_join', 'status') or 'waiting' }}  
           **Recommended start:** {{ state_attr('switch.kems_weekend_happy_hour_auto_join', 'recommended_start') or '—' }}  
           **Expected benefit:** {{ state_attr('switch.kems_weekend_happy_hour_auto_join', 'estimated_net_benefit_pence') or 0 }} p  
