@@ -60,23 +60,32 @@ def test_force_charge_maps_to_reviewed_remote_control_surface() -> None:
     assert proposed["export_power_limit_w"] is None
 
 
-def test_force_discharge_uses_deliberate_export_not_total_battery_output() -> None:
-    """House support must never inflate FoxESS's deliberate grid-feed setpoint."""
+def test_force_discharge_parity_uses_total_house_and_grid_demand() -> None:
+    """Read-only expected FoxESS setpoint includes the home's share."""
     result = build_foxess_command_shadow(
         _control(
             desired_work_mode="Feed-in First",
             desired_battery_to_home_power_kw=2.0,
             desired_battery_export_power_kw=3.0,
             desired_total_discharge_power_kw=5.0,
-        )
+            desired_min_soc_percent=15.0,
+        ),
+        {
+            "work_mode": "Force Discharge",
+            "force_discharge_power_kw": 5.0,
+            "min_soc_on_grid_percent": 15.0,
+            "export_power_limit_w": 7000,
+        },
     )
 
     proposed = result["proposed_foxess_command"]
     assert result["translation_status"] == PASS
-    assert result["parity_result"] == WAIT
+    assert result["parity_result"] == MATCH
     assert proposed["work_mode"] == "Force Discharge"
-    assert proposed["force_discharge_power_kw"] == 3.0
-    assert proposed["force_discharge_power_kw"] != 5.0
+    assert proposed["force_discharge_power_kw"] == 5.0
+    assert result["kems_decision"]["deliberate_battery_export_power_kw"] == 3.0
+    assert result["commands_permitted"] is False
+    assert result["real_hardware_writes"] == "blocked"
 
 
 def test_read_only_parity_reports_difference_without_authorising_commands() -> None:
