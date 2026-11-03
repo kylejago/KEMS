@@ -1,7 +1,5 @@
 """ROI rewards include only incremental, unsettled reward value."""
 
-from dataclasses import replace
-
 from kems_core import ROIState
 from kems_core.roi_rewards import apply_reward_roi
 
