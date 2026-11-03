@@ -74,11 +74,13 @@ def test_alpha945_banked_balance_never_becomes_more_than_two_hours_in_one_day() 
 
     assert len(candidates) == 4
     assert metadata["weekend_happy_hours_raw_coordinator"] == 8
-    assert metadata["weekend_happy_hours_available"] == 4
+    assert metadata["weekend_happy_hours_tokens"] == 8
+    assert metadata["weekend_happy_hours_available"] is None
+    assert metadata["weekend_happy_hours_legacy_estimate"] == 4
     assert metadata["weekend_happy_hours_event_day_limit"] == 2
-    assert metadata["weekend_happy_hours_redeemable_event_day"] == 2
+    assert metadata["weekend_happy_hours_redeemable_event_day"] is None
     assert metadata["weekend_happy_hours_balance_basis"] == (
-        "octopus coordinator progress / 2"
+        "octopus_token_balance_variable_token_cost"
     )
     assert _event_day_redeemable_reward_hours(1) == 1
     assert _event_day_redeemable_reward_hours(4) == 2
@@ -139,7 +141,7 @@ def test_alpha945_release_identity_and_scope() -> None:
     )
     reason = str(bundle["maintenance"]["reason"])
     assert manifest["version"] == "0.9.0-alpha9.175"
-    assert reason.startswith("Alpha9.174:")
+    assert reason.startswith("Alpha9.175:")
     assert "Alpha9.45" in reason
     assert "raw 6 reports 3 rewards rather than 6" in reason
     assert "two-one-hour-reward event-day limit" in reason

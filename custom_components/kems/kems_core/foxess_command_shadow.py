@@ -145,8 +145,12 @@ def build_foxess_command_shadow(
         home_kw = max(control.desired_battery_to_home_power_kw, 0.0)
         bounded_export_kw = min(desired_export, effective_export_limit_kw)
         requested_total_kw = max(control.desired_total_discharge_power_kw, 0.0)
+        house_plus_grid_kw = home_kw + bounded_export_kw
         force_discharge_power_kw = round(
-            max(requested_total_kw, home_kw + bounded_export_kw), 3
+            min(requested_total_kw, house_plus_grid_kw)
+            if requested_total_kw > 0
+            else house_plus_grid_kw,
+            3,
         )
     elif control.desired_work_mode in {"Self Use", "Feed-in First"}:
         proposed_work_mode = control.desired_work_mode
