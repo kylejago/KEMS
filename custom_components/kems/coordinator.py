@@ -114,6 +114,8 @@ from .product_types import (
 )
 from .providers.entity_map import KEMSEntities
 from .roi_accounting import async_reconcile_financial_commissioning
+from .roi_reward_recorder import ROIRewardRecorder
+from .kems_core.roi_rewards import apply_reward_roi
 from .settings import KEMSSettings
 from .shadow_validation import ShadowValidationRecorder
 from .solar_routing_shadow import (
@@ -219,6 +221,7 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
         self._lifetime = LifetimeLedgerRecorder(hass, entry.entry_id)
         self._power_down = PowerDownHistoryRecorder(hass, entry.entry_id)
         self._roi = ROIEngine()
+        self._roi_rewards = ROIRewardRecorder(hass, entry.entry_id)
 
         super().__init__(
             hass,
@@ -558,6 +561,7 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
             self.settings.roi.commissioning_date,
         )
         await self._power_down.async_load()
+        await self._roi_rewards.async_load()
         await self._agile_smart_export.async_load()
         await self._shadow_validation.async_load()
         await self._lifetime.async_bootstrap(
@@ -1561,6 +1565,23 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
             )
             detail_seconds["power_down_reporting"] = round(
                 perf_counter() - power_down_started, 3
+            )
+            # Reward accounting remains a separate read-only financial store.
+            # Never add normal Agile export income again. Each completed
+            # Happy Hour or independently supported Power Down bonus has a
+            # stable event identity across scans, restarts and day rollover.
+            completed_power_downs = getattr(
+                self._power_down, "_completed_history", None
+            )
+            if completed_power_downs is None:
+                completed_power_downs = [last_power_down]
+            await self._roi_rewards.async_observe(
+                self._lifetime.happy_hour_verified_receipts,
+                list(completed_power_downs),
+            )
+            roi = apply_reward_roi(
+                roi,
+                self._roi_rewards.totals(now, self.settings.roi.commissioning_date),
             )
             phase = self._phase(
                 learned.ready,
