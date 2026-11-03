@@ -783,6 +783,8 @@ def independently_confirmed_reward_hours(
     for item in entries:
         if not isinstance(item, Mapping) or not _booking_identity(item):
             continue
+        if item.get("booking_source") == "octopus_service_pending":
+            continue  # service ACK is not independent reward evidence
         start, end = _dt(item.get("start")), _dt(item.get("end"))
         if (
             start is None
@@ -818,6 +820,8 @@ def confirmed_booking_windows(booking: Mapping[str, Any]) -> list[dict[str, Any]
     for item in entries:
         if not isinstance(item, Mapping):
             continue
+        if item.get("booking_source") == "octopus_service_pending":
+            continue  # withhold free import authority pending joined feed
         code = _booking_identity(item)
         start = _dt(item.get("start"))
         end = _dt(item.get("end"))
@@ -1009,7 +1013,7 @@ class HappyHourAutoJoinController:
             "emergency_stop": bool(control.emergency_stop),
             "battery_installed": bool(options.get("battery_installed", False)),
             "external_join_authority": False,
-            "decision_policy": "two_banked_rewards_night_before_with_verified_prices",
+            "decision_policy": "two_per_weekend_supplier_token_validation_night_before",
             "price_coverage_required_percent": int(
                 HAPPY_HOUR_PRICE_COVERAGE_REQUIRED * 100
             ),
@@ -1139,26 +1143,51 @@ class HappyHourAutoJoinController:
             for item in booked
             if (_dt(item.get("start")) or now).astimezone(_LONDON).date() == pending_day
         ]
-        balance = discovery.get("weekend_happy_hours_available")
-        if balance is None:
-            state["status"] = "waiting_for_reward_balance"
-            self.state = state
-            return
-        target_count = min(
-            HAPPY_HOUR_MAX_REWARDS_PER_EVENT_DAY,
-            len(day_booked) + max(int(balance), 0),
-        )
+        weekend_start = _weekend_start(pending_day)
+        weekend_booked = [
+            item for item in booked
+            if (start := _dt(item.get("start"))) is not None
+            and _weekend_start(start.astimezone(_LONDON).date()) == weekend_start
+        ]
         state["target_day"] = pending_day.isoformat()
-        state["target_reward_hours"] = target_count
         state["booked_target_day_hours"] = len(day_booked)
-        state["booking_limit_reached"] = len(day_booked) >= target_count
-        if len(day_booked) >= target_count:
+        state["booked_weekend_hours"] = len(weekend_booked)
+        state["weekend_booking_limit"] = HAPPY_HOUR_MAX_REWARDS_PER_EVENT_DAY
+        state["booking_limit_reached"] = (
+            len(weekend_booked) >= HAPPY_HOUR_MAX_REWARDS_PER_EVENT_DAY
+        )
+        if state["booking_limit_reached"]:
+            state["status"] = "weekend_booking_limit_reached"
             self.state = state
             return
-        if target_count <= 0:
-            state["status"] = "no_banked_happy_hours"
+
+        # The provider's success response is not yet joined-event proof.
+        # Wait before booking another hour; never use a pending service
+        # acknowledgement to authorise free import or reward credit.
+        if any(
+            item.get("booking_source") == "octopus_service_pending"
+            and (_dt(item.get("end")) or now) > now
+            for item in weekend_booked
+        ):
+            state["status"] = "awaiting_octopus_joined_event_confirmation"
+            state["join_block_reason"] = "Octopus service ACK; waiting for joined-event feed"
             self.state = state
             return
+
+        tokens = discovery.get("weekend_happy_hours_tokens")
+        if tokens is None:
+            state["status"] = "waiting_for_authoritative_token_balance"
+            self.state = state
+            return
+        if int(tokens) <= 0:
+            state["status"] = "no_banked_happy_hour_tokens"
+            self.state = state
+            return
+        # No assumed token-per-hour price. This is the per-weekend cap,
+        # not the number of hours the account can definitely afford.
+        target_count = HAPPY_HOUR_MAX_REWARDS_PER_EVENT_DAY
+        state["target_reward_hours"] = target_count
+        state["booking_attempts_subject_to_supplier_validation"] = True
 
         import_rates, export_rates = discover_octopus_rates(self.hass)
         import_coverage = day_rate_coverage(import_rates, pending_day)
@@ -1188,7 +1217,7 @@ class HappyHourAutoJoinController:
                 "export_price_coverage_percent": round(export_coverage * 100.0, 1),
                 "export_tariff_type": export_type,
                 "export_price_source": export_rate_source,
-                "decision_policy": "two_banked_rewards_night_before_with_verified_prices",
+                "decision_policy": "two_per_weekend_supplier_token_validation_night_before",
             }
         )
         # Preserve the original requirement for sufficiently published Agile
@@ -1240,9 +1269,9 @@ class HappyHourAutoJoinController:
         state["evaluated_candidates"] = [item.to_dict() for item in scores]
         scored = {item.candidate.code: item for item in scores}
         booked_codes = {
-            str(code) for item in day_booked if (code := item.get("event_code"))
+            str(code) for item in weekend_booked if (code := item.get("event_code"))
         }
-        day_windows = confirmed_booking_windows({"bookings": day_booked})
+        day_windows = confirmed_booking_windows({"bookings": weekend_booked})
         # The Octopus API can momentarily list an already-joined hour as
         # available too. The candidate selector excludes overlapping windows
         # regardless of whether Octopus supplied a booking event code.
@@ -1402,9 +1431,11 @@ class HappyHourAutoJoinController:
                 "start": chosen.start.isoformat(),
                 "end": chosen.end.isoformat(),
                 "booked_at": booked_at.isoformat(),
+                "booking_source": "octopus_service_pending",
             }
         )
-        # Only persist bookings confirmed by a KEMS join service call.
+        # Service acknowledgements prevent duplicates but do not prove
+        # independently joined event status or financial reward eligibility.
         # External Octopus joined-event evidence must be refreshed live.
         self._persisted["bookings"] = [
             item
@@ -1422,8 +1453,9 @@ class HappyHourAutoJoinController:
         )
         state.update(
             {
-                "status": "booked",
+                "status": "awaiting_octopus_joined_event_confirmation",
                 "external_join_authority": False,
+                "join_service_acknowledged": True,
                 "bookings": booked,
                 "booked_event_codes": [
                     str(item["event_code"]) for item in booked if item.get("event_code")
