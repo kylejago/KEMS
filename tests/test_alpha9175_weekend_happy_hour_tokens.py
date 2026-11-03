@@ -51,8 +51,7 @@ def test_raw_tokens_are_not_divided_into_guaranteed_hours():
     assert audit["weekend_happy_hours_redeemable_event_day"] is None
     assert audit["weekend_happy_hours_token_cost_per_hour"] is None
     assert (
-        audit["weekend_happy_hours_booking_eligibility"]
-        == "octopus_join_service_only"
+        audit["weekend_happy_hours_booking_eligibility"] == "octopus_join_service_only"
     )
 
 
