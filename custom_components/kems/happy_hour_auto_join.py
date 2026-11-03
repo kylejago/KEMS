@@ -1157,7 +1157,9 @@ class HappyHourAutoJoinController:
             len(weekend_booked) >= HAPPY_HOUR_MAX_REWARDS_PER_EVENT_DAY
         )
         if state["booking_limit_reached"]:
-            state["status"] = "weekend_booking_limit_reached"
+            # A joined pair remains "booked"; the cap is an independent flag.
+            if not windows:
+                state["status"] = "weekend_booking_limit_reached"
             self.state = state
             return
 
