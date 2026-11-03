@@ -141,6 +141,4 @@ def test_shadow_hard_floor_stays_ten_when_normal_reserve_is_lower() -> None:
         desired_total_discharge_power_kw=1.5,
         desired_min_soc_percent=9.0,
     )
-    assert (
-        "minimum_soc" in validate_shadow_command(non_export, config)["failed_checks"]
-    )
+    assert "minimum_soc" in validate_shadow_command(non_export, config)["failed_checks"]
