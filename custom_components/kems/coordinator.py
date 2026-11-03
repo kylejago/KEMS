@@ -93,6 +93,7 @@ from .kems_core.control_event_refresh import (
 )
 from .kems_core.control_write_authority import active_joined_power_down_window
 from .kems_core.happy_hour_financial import estimate_happy_hour_credit
+from .kems_core.roi_rewards import apply_reward_roi
 from .kems_core.scenario_report_gate import ScenarioReportGate
 from .kems_core.settlement_publication_coalescing import (
     coalesce_identical_settlement_publications,
@@ -115,7 +116,6 @@ from .product_types import (
 from .providers.entity_map import KEMSEntities
 from .roi_accounting import async_reconcile_financial_commissioning
 from .roi_reward_recorder import ROIRewardRecorder
-from .kems_core.roi_rewards import apply_reward_roi
 from .settings import KEMSSettings
 from .shadow_validation import ShadowValidationRecorder
 from .solar_routing_shadow import (
