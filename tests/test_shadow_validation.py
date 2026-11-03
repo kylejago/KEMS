@@ -120,9 +120,9 @@ def test_shadow_rejects_below_hard_floor_and_respects_island_reserve() -> None:
         desired_total_discharge_power_kw=1.5,
         desired_min_soc_percent=9.0,
     )
-    assert "minimum_soc" in validate_shadow_command(below_floor, config)[
-        "failed_checks"
-    ]
+    assert (
+        "minimum_soc" in validate_shadow_command(below_floor, config)["failed_checks"]
+    )
 
     island = _control(
         desired_battery_export_power_kw=0.0,
@@ -130,6 +130,4 @@ def test_shadow_rejects_below_hard_floor_and_respects_island_reserve() -> None:
         desired_min_soc_percent=10.0,
         island_mode_active=True,
     )
-    assert "minimum_soc" in validate_shadow_command(island, config)[
-        "failed_checks"
-    ]
+    assert "minimum_soc" in validate_shadow_command(island, config)["failed_checks"]
