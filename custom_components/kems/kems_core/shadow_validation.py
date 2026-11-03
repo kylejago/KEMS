@@ -30,11 +30,7 @@ def validate_shadow_command(
     # Islanded operation separately retains its higher reserve.
     minimum_allowed_soc = max(
         config.island_reserve_percent if control.island_mode_active else 0.0,
-        (
-            config.normal_reserve_percent
-            if export > 0.01
-            else min(config.normal_reserve_percent, 10.0)
-        ),
+        config.normal_reserve_percent if export > 0.01 else 10.0,
     )
 
     checks = [
