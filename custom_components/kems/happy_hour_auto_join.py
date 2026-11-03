@@ -249,7 +249,9 @@ def _octopus_weekend_token_balance(hass: Any) -> int | None:
         if not isinstance(account_data, Mapping):
             continue
         coordinator = account_data.get("POWER_UP_DOWN_COORDINATOR")
-        raw = _number(getattr(getattr(coordinator, "data", None), "weekend_happy_hours", None))
+        raw = _number(
+            getattr(getattr(coordinator, "data", None), "weekend_happy_hours", None)
+        )
         if raw is not None and raw >= 0 and raw.is_integer():
             balances.append(int(raw))
     return balances[0] if len(balances) == 1 else None
@@ -1013,7 +1015,7 @@ class HappyHourAutoJoinController:
             "emergency_stop": bool(control.emergency_stop),
             "battery_installed": bool(options.get("battery_installed", False)),
             "external_join_authority": False,
-            "decision_policy": "two_per_weekend_supplier_token_validation_night_before",
+            "decision_policy": "supplier_token_weekend_night_before",
             "price_coverage_required_percent": int(
                 HAPPY_HOUR_PRICE_COVERAGE_REQUIRED * 100
             ),
@@ -1172,7 +1174,9 @@ class HappyHourAutoJoinController:
             for item in weekend_booked
         ):
             state["status"] = "awaiting_octopus_joined_event_confirmation"
-            state["join_block_reason"] = "Octopus service ACK; waiting for joined-event feed"
+            state["join_block_reason"] = (
+                "Octopus service ACK; waiting for joined-event feed"
+            )
             self.state = state
             return
 
@@ -1219,7 +1223,7 @@ class HappyHourAutoJoinController:
                 "export_price_coverage_percent": round(export_coverage * 100.0, 1),
                 "export_tariff_type": export_type,
                 "export_price_source": export_rate_source,
-                "decision_policy": "two_per_weekend_supplier_token_validation_night_before",
+                "decision_policy": "supplier_token_weekend_night_before",
             }
         )
         # Preserve the original requirement for sufficiently published Agile
