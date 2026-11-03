@@ -23,8 +23,13 @@ def test_happy_hour_credit_counts_once_and_remains_unsettled():
     base = _roi()
     result = apply_reward_roi(
         base,
-        {"total": 261.729143, "today": 0, "happy": 261.729143,
-         "power_down": 0, "unsettled": 261.729143},
+        {
+            "total": 261.729143,
+            "today": 0,
+            "happy": 261.729143,
+            "power_down": 0,
+            "unsettled": 261.729143,
+        },
     )
     assert result.actual_value_created_total_gbp == 388.30
     assert result.actual_roi_percent == 1.85
