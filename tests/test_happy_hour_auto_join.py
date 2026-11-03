@@ -557,9 +557,7 @@ def test_alpha9108_booking_controller_confirms_two_distinct_services(
 
         async def service(domain, action, params, **kwargs):
             calls.append(params["event_code"])
-            chosen = next(
-                slot for slot in slots if slot.code == params["event_code"]
-            )
+            chosen = next(slot for slot in slots if slot.code == params["event_code"])
             externally_confirmed.append(
                 {
                     "event_id": chosen.code,
