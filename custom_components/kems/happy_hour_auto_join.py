@@ -234,6 +234,32 @@ def _reward_hours_for_candidate(candidate: HappyHourCandidate) -> int:
     return min(reward_hours, HAPPY_HOUR_MAX_REWARDS_PER_EVENT_DAY)
 
 
+def _octopus_weekend_token_balance(hass: Any) -> int | None:
+    """Return raw Octopus GraphQL tokens for one unambiguous account.
+
+    The public Weekend Happy Hours sensor in upstream v19.2.1 divides the
+    balance by two. That estimate is not booking authority when token prices
+    can vary by weekend.
+    """
+    domain_data = getattr(hass, "data", {}).get("octopus_energy", {})
+    if not isinstance(domain_data, Mapping):
+        return None
+    balances: list[int] = []
+    for account_data in domain_data.values():
+        if not isinstance(account_data, Mapping):
+            continue
+        coordinator = account_data.get("POWER_UP_DOWN_COORDINATOR")
+        raw = _number(getattr(getattr(coordinator, "data", None), "weekend_happy_hours", None))
+        if raw is not None and raw >= 0 and raw.is_integer():
+            balances.append(int(raw))
+    return balances[0] if len(balances) == 1 else None
+
+
+def _weekend_start(day: date) -> date:
+    """Identify the Saturday of an Octopus weekend in local time."""
+    return day - timedelta(days=(day.weekday() - 5) % 7)
+
+
 def _weekend_happy_hour_count(hass: Any) -> int | None:
     states = getattr(getattr(hass, "states", None), "async_all", None)
     if callable(states):
@@ -292,8 +318,7 @@ def discover_available_happy_hours(
             raw = list(values)
             source = "public_event_entity"
 
-    coordinator_count: int | None = None
-    coordinator_raw_count: int | None = None
+    coordinator_raw_count = _octopus_weekend_token_balance(hass)
     if not raw:
         domain_data = getattr(hass, "data", {}).get("octopus_energy", {})
         coordinator_matches = []
@@ -310,15 +335,8 @@ def discover_available_happy_hours(
             _, data, values = coordinator_matches[0]
             raw = list(values)
             source = "octopus_coordinator"
-            raw_count = _number(getattr(data, "weekend_happy_hours", None))
-            coordinator_raw_count = (
-                max(int(raw_count), 0) if raw_count is not None else None
-            )
-            coordinator_count = _normalise_coordinator_happy_hour_count(raw_count)
 
-    count = coordinator_count
-    if count is None:
-        count = _weekend_happy_hour_count(hass)
+    legacy_hour_estimate = _weekend_happy_hour_count(hass)
 
     candidates: list[HappyHourCandidate] = []
     for item in raw:
@@ -331,30 +349,26 @@ def discover_available_happy_hours(
             candidates.append(candidate)
     candidates.sort(key=lambda item: item.start)
 
-    # The Power Up feed can contain non-Happy-Hour sessions. The dedicated
-    # 19.1+ count is the conservative discriminator for automatic booking.
-    if count is not None and count <= 0:
-        candidates = []
-    if count is not None and count > 0 and len(candidates) > count:
-        # Keep all choices for recommendation because Octopus can expose more
-        # candidate windows than the number of rewards the customer may book.
-        pass
-
+    # The Power Up feed can contain TURN_UP as well as WEEKEND_HAPPY_HOUR
+    # events. The booking service must ultimately verify each event and its
+    # variable token price; a weekend date alone is not entitlement evidence.
     return candidates, {
         "source": source,
         "source_entity": source_entity,
         "public_source_count": len(public_sources),
-        "weekend_happy_hours_available": count,
+        "weekend_happy_hours_tokens": coordinator_raw_count,
         "weekend_happy_hours_raw_coordinator": coordinator_raw_count,
-        "weekend_happy_hours_event_day_limit": (HAPPY_HOUR_MAX_REWARDS_PER_EVENT_DAY),
-        "weekend_happy_hours_redeemable_event_day": (
-            _event_day_redeemable_reward_hours(count)
-        ),
+        "weekend_happy_hours_available": None,
+        "weekend_happy_hours_legacy_estimate": legacy_hour_estimate,
+        "weekend_happy_hours_event_day_limit": HAPPY_HOUR_MAX_REWARDS_PER_EVENT_DAY,
+        "weekend_happy_hours_redeemable_event_day": None,
+        "weekend_happy_hours_token_cost_per_hour": None,
         "weekend_happy_hours_balance_basis": (
-            "octopus public reward count"
-            if coordinator_raw_count is None
-            else "octopus coordinator progress / 2"
+            "octopus_token_balance_variable_token_cost"
+            if coordinator_raw_count is not None
+            else "no_authoritative_octopus_token_balance"
         ),
+        "weekend_happy_hours_booking_eligibility": "octopus_join_service_only",
         "service_target_available": bool(source_entity),
     }
 
@@ -386,7 +400,7 @@ def verified_octopus_joined_bookings(
             continue
         if start.astimezone(_LONDON).weekday() < 5:
             continue
-        if end < now - timedelta(hours=2) or start > now + timedelta(days=2):
+        if end < now - timedelta(days=7) or start > now + timedelta(days=7):
             continue
         identity = str(_field(raw, "id") or "").strip()
         confirmed[(start, end)] = {
