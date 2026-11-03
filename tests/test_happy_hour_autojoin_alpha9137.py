@@ -173,7 +173,9 @@ def test_coordinator_respects_code_less_joined_hours_without_third_booking(
             )
         )
         assert len(calls) == expected_calls
-        assert controller.state["status"] == "booked"
+        assert controller.state["status"] == (
+            "booked" if second else "awaiting_octopus_joined_event_confirmation"
+        )
         assert controller.state["booking_limit_reached"] is second
         assert controller.state["externally_confirmed_reward_hours"] == (
             2 if second else 1
