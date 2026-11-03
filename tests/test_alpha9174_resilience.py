@@ -26,8 +26,7 @@ def _forecast_types():
     coordinator = next(
         item
         for item in parsed.body
-        if isinstance(item, ast.ClassDef)
-        and item.name == "SolarForecastCoordinator"
+        if isinstance(item, ast.ClassDef) and item.name == "SolarForecastCoordinator"
     )
     names = {
         "__init__",
@@ -117,9 +116,7 @@ def test_open_meteo_only_uses_recent_same_day_cached_evidence() -> None:
     assert good.fetched_at == now - timedelta(hours=2)
     assert "cached" in (good.error or "")
 
-    stale = coordinator._cached_open_meteo_result(
-        now + timedelta(hours=5), "offline"
-    )
+    stale = coordinator._cached_open_meteo_result(now + timedelta(hours=5), "offline")
     assert stale.tomorrow_kwh is None
     assert "no sufficiently recent" in (stale.error or "")
 
