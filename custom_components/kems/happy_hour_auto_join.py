@@ -1446,11 +1446,14 @@ class HappyHourAutoJoinController:
         remaining_choices = [code for code in choices[1:] if code != chosen.code]
         self._persisted["preferred_event_codes"] = remaining_choices
         await self._async_save()
-        windows = confirmed_booking_windows({"bookings": booked})
-        next_window = next(
-            (window for window in windows if window["end"] > now),
-            windows[-1],
-        )
+        # The new hour is only service-acknowledged, not present in
+        # confirmed_booking_windows until the Octopus feed independently
+        # confirms it. Report the selected window without granting authority.
+        next_window = {
+            "start": chosen.start,
+            "end": chosen.end,
+            "event_codes": [chosen.code],
+        }
         state.update(
             {
                 "status": "awaiting_octopus_joined_event_confirmation",
