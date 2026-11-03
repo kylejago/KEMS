@@ -97,3 +97,39 @@ def test_shadow_tracking_marks_large_miss_outside_tolerance() -> None:
     )
     assert result["within_tolerance"]["battery_export_kw"] is False
     assert result["tracking_score_percent"] < 100.0
+
+
+def test_shadow_allows_guarded_household_floor_but_not_paid_export_floor() -> None:
+    config = ControlConfig(normal_reserve_percent=15.0)
+    idle = _control(
+        desired_battery_export_power_kw=0.0,
+        desired_total_discharge_power_kw=1.5,
+        desired_min_soc_percent=10.0,
+    )
+    assert validate_shadow_command(idle, config)["passed"] is True
+
+    paid_export = _control(desired_min_soc_percent=10.0)
+    result = validate_shadow_command(paid_export, config)
+    assert "minimum_soc" in result["failed_checks"]
+
+
+def test_shadow_rejects_below_hard_floor_and_respects_island_reserve() -> None:
+    config = ControlConfig(normal_reserve_percent=15.0)
+    below_floor = _control(
+        desired_battery_export_power_kw=0.0,
+        desired_total_discharge_power_kw=1.5,
+        desired_min_soc_percent=9.0,
+    )
+    assert "minimum_soc" in validate_shadow_command(below_floor, config)[
+        "failed_checks"
+    ]
+
+    island = _control(
+        desired_battery_export_power_kw=0.0,
+        desired_total_discharge_power_kw=1.5,
+        desired_min_soc_percent=10.0,
+        island_mode_active=True,
+    )
+    assert "minimum_soc" in validate_shadow_command(island, config)[
+        "failed_checks"
+    ]
