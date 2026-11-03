@@ -170,7 +170,7 @@ def test_confirmed_octopus_hours_never_trigger_duplicate_bookings(
         monkeypatch.setattr(
             joining,
             "discover_available_happy_hours",
-            lambda _hass, now: (candidates, {"weekend_happy_hours_available": 10}),
+            lambda _hass, now: (candidates, {"weekend_happy_hours_tokens": 10}),
         )
         controller = joining.HappyHourAutoJoinController.__new__(
             joining.HappyHourAutoJoinController
