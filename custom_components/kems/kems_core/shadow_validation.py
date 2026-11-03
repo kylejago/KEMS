@@ -25,6 +25,17 @@ def validate_shadow_command(
     export = max(float(control.desired_battery_export_power_kw), 0.0)
     discharge = max(float(control.desired_total_discharge_power_kw), 0.0)
     minimum_soc = float(control.desired_min_soc_percent)
+    # Paid battery export preserves the full configured planning reserve.
+    # Only non-exporting household operation may use the guarded 10% floor.
+    # Islanded operation separately retains its higher reserve.
+    minimum_allowed_soc = max(
+        config.island_reserve_percent if control.island_mode_active else 0.0,
+        (
+            config.normal_reserve_percent
+            if export > 0.01
+            else min(config.normal_reserve_percent, 10.0)
+        ),
+    )
 
     checks = [
         _check(
@@ -80,10 +91,12 @@ def validate_shadow_command(
         ),
         _check(
             "minimum_soc",
-            config.normal_reserve_percent - _EPSILON <= minimum_soc <= 100.0,
+            minimum_allowed_soc - _EPSILON <= minimum_soc <= 100.0,
             (
-                f"minimum SOC {minimum_soc:.1f}% must remain at/above normal reserve "
-                f"{config.normal_reserve_percent:.1f}%"
+                f"minimum SOC {minimum_soc:.1f}% must remain at/above "
+                f"{minimum_allowed_soc:.1f}% "
+                f"({'paid export' if export > 0.01 else 'non-exporting household'} "
+                "floor; island reserve enforced separately)"
             ),
         ),
         _check(
