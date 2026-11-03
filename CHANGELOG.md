@@ -1,5 +1,7 @@
 ## 0.9.0-alpha9.174 — weather resilience and independent shadow reserve parity (candidate)
 
+- Defer one read-only Solar continuity settlement publication *only* when the outer Deadline owner guarantees the same-scan final publish after both solar and deadline enrichment; direct Solar callers publish immediately, and the defer flag always resets on error. Add AST-backed behavioural tests for direct publication, combined fields and exception cleanup. This targets one redundant heavy pass, not the entire P1 #405 bottleneck; verify actual timing on the next overnight diagnostic.
+
 - Correct the read-only shadow command validation mismatch: no deliberate export can use the guarded 10% household SOC floor, while paid battery export still requires the configured 15% reserve, and island protection retains the separate island reserve. No changes to physical FoxESS commands or the live control gate.
 - Exponentially back off Open-Meteo outages (5, 10, 20, 40, then 60 minutes), reduce repeated log floods and retain only same-day, at-most-six-hour-old cached weather evidence; beyond that KEMS falls back to other available forecast sources rather than treating stale Open-Meteo as fresh.
 - Retry a transient DNS/connection failure once during read-only GitHub release metadata discovery. HTTP errors, release verification, checksum and all safe-first installation protections remain unchanged.
