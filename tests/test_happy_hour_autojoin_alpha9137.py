@@ -124,7 +124,7 @@ def test_coordinator_respects_code_less_joined_hours_without_third_booking(
             "discover_available_happy_hours",
             lambda *_args, **_kwargs: (
                 choices,
-                {"weekend_happy_hours_available": 8},
+                {"weekend_happy_hours_tokens": 8},
             ),
         )
         monkeypatch.setattr(hh, "discover_octopus_rates", lambda _hass: ([], []))
