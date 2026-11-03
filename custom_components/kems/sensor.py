@@ -1952,7 +1952,7 @@ SENSORS: tuple[KEMSSensorEntityDescription, ...] = (
     ),
     KEMSSensorEntityDescription(
         key="roi_happy_hour_credit",
-        name="ROI Happy Hour estimated credit",
+        name="ROI Happy Hour credit",
         icon="mdi:cash-refund",
         device_class=SensorDeviceClass.MONETARY,
         native_unit_of_measurement="GBP",
@@ -1965,7 +1965,7 @@ SENSORS: tuple[KEMSSensorEntityDescription, ...] = (
     ),
     KEMSSensorEntityDescription(
         key="roi_power_down_bonus",
-        name="ROI Power Down estimated bonus",
+        name="ROI Power Down bonus",
         icon="mdi:cash-plus",
         device_class=SensorDeviceClass.MONETARY,
         native_unit_of_measurement="GBP",
@@ -1978,7 +1978,7 @@ SENSORS: tuple[KEMSSensorEntityDescription, ...] = (
     ),
     KEMSSensorEntityDescription(
         key="roi_unsettled_rewards",
-        name="ROI estimated rewards awaiting supplier settlement",
+        name="ROI unsettled rewards",
         icon="mdi:clock-outline",
         device_class=SensorDeviceClass.MONETARY,
         native_unit_of_measurement="GBP",
