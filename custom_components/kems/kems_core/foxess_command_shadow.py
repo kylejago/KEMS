@@ -137,12 +137,22 @@ def build_foxess_command_shadow(
         proposed_work_mode = "Force Charge"
         force_charge_power_kw = round(desired_charge, 3)
     elif desired_export > 0.001:
-        # The upstream Force Discharge Power control is the deliberate grid-feed
-        # request. Battery-to-home remains an observed/self-use flow and must
-        # never be added to the force-discharge setpoint.
+        # Read-only parity must compare like with like: the live KH7 Force
+        # Discharge setpoint supplies the home AND grid, whereas the KEMS
+        # deliberate export field is grid-feed only. The live backend already
+        # bounds this combined request; Shadow never writes to the inverter.
         proposed_work_mode = "Force Discharge"
+        home_kw = max(control.desired_battery_to_home_power_kw, 0.0)
+        bounded_export_kw = min(desired_export, effective_export_limit_kw)
+        requested_total_kw = max(control.desired_total_discharge_power_kw, 0.0)
+        house_plus_grid_kw = home_kw + bounded_export_kw
         force_discharge_power_kw = round(
-            min(desired_export, effective_export_limit_kw), 3
+            (
+                min(requested_total_kw, house_plus_grid_kw)
+                if requested_total_kw > 0
+                else house_plus_grid_kw
+            ),
+            3,
         )
     elif control.desired_work_mode in {"Self Use", "Feed-in First"}:
         proposed_work_mode = control.desired_work_mode

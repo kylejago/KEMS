@@ -553,15 +553,31 @@ def test_alpha9108_booking_controller_confirms_two_distinct_services(
             for i in range(4)
         ]
         calls = []
+        externally_confirmed = []
 
         async def service(domain, action, params, **kwargs):
             calls.append(params["event_code"])
+            chosen = next(slot for slot in slots if slot.code == params["event_code"])
+            externally_confirmed.append(
+                {
+                    "event_id": chosen.code,
+                    "start": chosen.start.isoformat(),
+                    "end": chosen.end.isoformat(),
+                    "booking_source": "octopus_joined_events",
+                }
+            )
             return {"success": True}
 
         monkeypatch.setattr(
             happy_join,
+            "verified_octopus_joined_bookings",
+            lambda *_args, **_kwargs: list(externally_confirmed),
+        )
+
+        monkeypatch.setattr(
+            happy_join,
             "discover_available_happy_hours",
-            lambda hass, now: (slots, {"weekend_happy_hours_available": 10}),
+            lambda hass, now: (slots, {"weekend_happy_hours_tokens": 10}),
         )
         monkeypatch.setattr(happy_join, "discover_octopus_rates", lambda hass: ([], []))
         monkeypatch.setattr(happy_join, "day_rate_coverage", lambda rates, day: 0.0)

@@ -132,7 +132,7 @@ def test_shadow_uses_lower_kems_ceiling_when_foxess_allows_more() -> None:
     assert authority["effective_ceiling_kw"] == 6.4
     assert result["effective_export_limit_kw"] == 6.4
     assert proposed["export_power_limit_w"] == 6400
-    assert proposed["force_discharge_power_kw"] == 5.744
+    assert proposed["force_discharge_power_kw"] == 6.4
     assert result["commands_permitted"] is False
     assert result["real_hardware_writes"] == "blocked"
 
@@ -147,7 +147,7 @@ def test_shadow_clamps_to_lower_foxess_ceiling() -> None:
     proposed = result["proposed_foxess_command"]
     assert result["effective_export_limit_kw"] == 5.0
     assert proposed["export_power_limit_w"] == 5000
-    assert proposed["force_discharge_power_kw"] == 5.0
+    assert proposed["force_discharge_power_kw"] == 5.656
     assert result["commands_permitted"] is False
     assert result["real_hardware_writes"] == "blocked"
 
