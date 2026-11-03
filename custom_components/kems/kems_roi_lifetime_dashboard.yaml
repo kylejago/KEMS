@@ -72,6 +72,16 @@ views:
             name: Profit after payback
 
       - type: entities
+        title: Additional rewards included in ROI (not yet supplier-settled)
+        show_header_toggle: false
+        entities:
+          - entity: sensor.kems_roi_happy_hour_credit
+            name: Verified Happy Hour estimated bill credit
+          - entity: sensor.kems_roi_power_down_bonus
+            name: Meter-supported Power Down bonus estimate
+          - entity: sensor.kems_roi_unsettled_rewards
+            name: Awaiting Octopus settlement
+      - type: entities
         title: Actual payback
         show_header_toggle: false
         entities:
