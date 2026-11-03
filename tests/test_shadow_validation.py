@@ -131,3 +131,16 @@ def test_shadow_rejects_below_hard_floor_and_respects_island_reserve() -> None:
         island_mode_active=True,
     )
     assert "minimum_soc" in validate_shadow_command(island, config)["failed_checks"]
+
+
+def test_shadow_hard_floor_stays_ten_when_normal_reserve_is_lower() -> None:
+    """The independent hard floor must not follow an unsafe low configuration."""
+    config = ControlConfig(normal_reserve_percent=5.0)
+    non_export = _control(
+        desired_battery_export_power_kw=0.0,
+        desired_total_discharge_power_kw=1.5,
+        desired_min_soc_percent=9.0,
+    )
+    assert (
+        "minimum_soc" in validate_shadow_command(non_export, config)["failed_checks"]
+    )
