@@ -1147,7 +1147,8 @@ class HappyHourAutoJoinController:
         ]
         weekend_start = _weekend_start(pending_day)
         weekend_booked = [
-            item for item in booked
+            item
+            for item in booked
             if (start := _dt(item.get("start"))) is not None
             and _weekend_start(start.astimezone(_LONDON).date()) == weekend_start
         ]
