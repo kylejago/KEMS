@@ -1,3 +1,11 @@
+## 0.9.0-alpha9.175 — Weekend Happy Hours variable-token and booking evidence (candidate)
+
+- Read the genuine Octopus GraphQL Weekend Happy Hours token balance from the unique account coordinator, irrespective of the presence of the public Power Up event entity. The upstream public sensor's balance / 2 is labelled a legacy estimate, **not** guaranteed hours. The token price per event is unknown; Octopus remains booking/eligibility authority.
+- Preserve night-before (Saturday or Sunday) selection with verified import/export Agile price coverage. Enforce a **single two-hour allowance per weekend**, not two separate daily allowances. Retain Saturday joined-event evidence when considering Sunday booking eligibility.
+- A successful booking-service response becomes a pending acknowledgment. Do not make a second booking, authorise live Happy Hour free import, or add a financial receipt until the independently joined Power Up event feed confirms the booked hour. Preserve idempotency and expose the pending state; rejected bookings remain failures with a cooldown.
+- Include behavioural regression tests for raw tokens, misleading /2 legacy figures, ambiguous source rejection, weekend cap and acknowledgment-versus-joined-event authority. Preserve the 9.173 verified actual-import estimated-credit ledger; do not fabricate missing November 1 meter evidence or Octopus supplier settlement.
+- **Release gate:** full pytest, Ruff, Black, HACS/Hassfest and ESPHome CI must pass before merging; deployment only in the configured 06:00–06:30 no-active-export maintenance window. Power Down, 7 kW export ceiling, 15% deliberate export target, guarded 10% house minimum and EV discharge protections unchanged.
+
 ## 0.9.0-alpha9.174 — weather resilience and independent shadow reserve parity (candidate)
 
 - Defer one read-only Solar continuity settlement publication *only* when the outer Deadline owner guarantees the same-scan final publish after both solar and deadline enrichment; direct Solar callers publish immediately, and the defer flag always resets on error. Add AST-backed behavioural tests for direct publication, combined fields and exception cleanup. This targets one redundant heavy pass, not the entire P1 #405 bottleneck; verify actual timing on the next overnight diagnostic.
