@@ -38,7 +38,9 @@ class ROIRewardRecorder:
                     (str(k), v) for k, v in entries.items() if isinstance(v, dict)
                 )
 
-    async def async_observe(self, receipts: list, events: list) -> None:
+    async def async_observe(
+        self, receipts: list, events: list, *, provisional_happy_hours=()
+    ) -> None:
         changed = False
         for item in receipts:
             if not isinstance(item, dict) or item.get("completed") is not True:
@@ -69,6 +71,63 @@ class ROIRewardRecorder:
                 "pence": round(credit, 6),
                 "supplier_settled": False,
                 "basis": "completed_meter_and_tariff_verified_hour",
+                "confidence": "meter_supported",
+                "coverage_percent": 100.0,
+                "covered_minutes": 60.0,
+                "observed_import_kwh": kwh,
+                "rate_basis": "captured_with_verified_hour",
+            }
+            if self._happy_hours.get(key) != saved:
+                self._happy_hours[key] = saved
+                changed = True
+
+        # A partial, physically witnessed hour may contribute provisional
+        # value before supplier settlement. It must never displace an existing
+        # complete receipt or be multiplied out over missing meter intervals.
+        for item in provisional_happy_hours:
+            if not isinstance(item, dict):
+                continue
+            start, end = item.get("start"), item.get("end")
+            try:
+                start_dt = datetime.fromisoformat(str(start))
+                end_dt = datetime.fromisoformat(str(end))
+            except (TypeError, ValueError):
+                continue
+            pence = number(item.get("credit_pence"))
+            energy = number(item.get("import_kwh"))
+            minutes = number(item.get("covered_minutes"))
+            if (
+                start_dt.tzinfo is None
+                or end_dt.tzinfo is None
+                or not 55 <= (end_dt - start_dt).total_seconds() / 60 <= 65
+                or pence is None
+                or energy is None
+                or not 0 < energy <= 16
+                or minutes is None
+                or minutes < 10
+                or minutes > 60
+                or pence > energy * 200 + 0.05
+            ):
+                continue
+            key = f"{start_dt.isoformat()}|{end_dt.isoformat()}"
+            current = self._happy_hours.get(key)
+            if current is not None and (
+                current.get("basis") == "completed_meter_and_tariff_verified_hour"
+                or current.get("supplier_settled") is True
+                or number(current.get("covered_minutes")) is not None
+                and float(current["covered_minutes"]) > minutes
+            ):
+                continue
+            saved = {
+                "day": start_dt.astimezone(_LONDON).date().isoformat(),
+                "pence": round(pence, 6),
+                "supplier_settled": False,
+                "basis": "provisional_partial_physical_meter_credit",
+                "confidence": item.get("confidence", "low"),
+                "rate_basis": item.get("rate_basis"),
+                "covered_minutes": minutes,
+                "coverage_percent": number(item.get("coverage_percent")),
+                "observed_import_kwh": energy,
             }
             if self._happy_hours.get(key) != saved:
                 self._happy_hours[key] = saved
