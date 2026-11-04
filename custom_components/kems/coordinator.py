@@ -115,9 +115,9 @@ from .product_types import (
     export_tariff_type_from_options,
 )
 from .providers.entity_map import KEMSEntities
+from .restart_request_observability import classify_restart_service_call
 from .roi_accounting import async_reconcile_financial_commissioning
 from .roi_reward_recorder import ROIRewardRecorder
-from .restart_request_observability import classify_restart_service_call
 from .settings import KEMSSettings
 from .shadow_validation import ShadowValidationRecorder
 from .solar_routing_shadow import (
