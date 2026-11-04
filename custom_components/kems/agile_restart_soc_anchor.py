@@ -17,6 +17,7 @@ publication. No accounting, dispatch, safety, or hardware-control state changes.
 
 from __future__ import annotations
 
+from time import perf_counter
 from typing import Any
 
 from .agile_active_elapsed_soc_continuity import (
@@ -202,6 +203,7 @@ class RestartSocAnchorAgileSmartExportManager(
     """Publish restart-safe display SOC without changing canonical routing state."""
 
     def _publish(self, state: dict[str, Any]) -> None:
+        layer_started = perf_counter()
         _reconcile_future_policy_safe_total_discharge_flow(state)
         config = getattr(self, "_rolling_config", None)
         routing = state.get("current_routing_snapshot")
@@ -236,4 +238,17 @@ class RestartSocAnchorAgileSmartExportManager(
                         diagnostic["canonical_decision_provider_bound"] = provider_bound
                         diagnostic["canonical_decision_history_source"] = history_source
 
+        # Report ONLY timing; never cache/skip/reorder a SOC reconciliation
+        # or physical-control dependency for performance reasons.
+        scope = getattr(self, "_kems_settlement_publication_scope", None)
+        if scope is not None:
+            scope.record_layer(
+                "restart_soc_anchor_prepublication", perf_counter() - layer_started
+            )
+        underlying_started = perf_counter()
         IntelligentDispatchObservabilityAgileSmartExportManager._publish(self, state)
+        if scope is not None:
+            scope.record_layer(
+                "underlying_agile_publication_chain",
+                perf_counter() - underlying_started,
+            )

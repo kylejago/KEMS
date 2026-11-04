@@ -28,6 +28,8 @@ class SettlementPublicationScope:
     skipped_existing_identical: int = 0
     written: int = 0
     comparison_seconds: float = 0.0
+    layer_seconds: dict[str, float] = field(default_factory=dict)
+    layer_calls: dict[str, int] = field(default_factory=dict)
 
     def __getitem__(self, key: str) -> Any:
         return getattr(self, key)
@@ -35,7 +37,12 @@ class SettlementPublicationScope:
     def __setitem__(self, key: str, value: Any) -> None:
         setattr(self, key, value)
 
-    def summary(self) -> dict[str, float | int]:
+    def record_layer(self, key: str, seconds: float) -> None:
+        """Count a reporting layer's elapsed time without changing publication."""
+        self.layer_seconds[key] = self.layer_seconds.get(key, 0.0) + max(seconds, 0.0)
+        self.layer_calls[key] = self.layer_calls.get(key, 0) + 1
+
+    def summary(self) -> dict[str, Any]:
         return {
             "attempted": self.attempted,
             "publish_passes": self.publish_passes,
@@ -46,6 +53,10 @@ class SettlementPublicationScope:
             "skipped_existing_identical": self.skipped_existing_identical,
             "written": self.written,
             "comparison_seconds": round(self.comparison_seconds, 3),
+            "layer_seconds": {
+                key: round(value, 3) for key, value in self.layer_seconds.items()
+            },
+            "layer_calls": dict(self.layer_calls),
         }
 
 

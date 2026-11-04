@@ -179,6 +179,7 @@ async def async_get_config_entry_diagnostics(
         ),
         "foxess_control": coordinator.foxess_control_state,
         "coordinator_performance": coordinator.coordinator_performance_state,
+        "restart_service_call": coordinator.restart_service_call_state,
         "agile_historical_replay_cache": {
             **coordinator._agile_smart_export._historical_replay_cache.status,
             "day_rate_index_builds": getattr(
@@ -221,6 +222,7 @@ async def async_get_config_entry_diagnostics(
         "happy_hour_accounting_audit": build_happy_hour_accounting_audit(
             coordinator._happy_hour_import_ledger.status,
             coordinator._lifetime.happy_hour_verified_receipts,
+            roi_reward_audit=data.roi.reward_audit,
         ),
         "happy_hour_ohme_control": coordinator.happy_hour_ohme_control_state,
         "agile_history_backfill": coordinator.agile_history_backfill_state,

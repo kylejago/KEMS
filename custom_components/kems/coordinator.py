@@ -115,6 +115,7 @@ from .product_types import (
     export_tariff_type_from_options,
 )
 from .providers.entity_map import KEMSEntities
+from .restart_request_observability import classify_restart_service_call
 from .roi_accounting import async_reconcile_financial_commissioning
 from .roi_reward_recorder import ROIRewardRecorder
 from .settings import KEMSSettings
@@ -260,6 +261,16 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                 )
             )
 
+        # One low-frequency event listener, read-only: log the call-service
+        # provenance before Core shuts down. The snapshot itself is ephemeral,
+        # while HA logs can preserve the previous process's warning.
+        self._last_restart_service_call: dict[str, object] = {
+            "status": "none_observed_since_kems_setup"
+        }
+        entry.async_on_unload(
+            hass.bus.async_listen("call_service", self._handle_restart_service_call)
+        )
+
         self._last_ev_soc_sync_event: dict[str, str] | None = None
         self._ev_soc_sync_refresh_entities = tuple(
             entity_id
@@ -277,6 +288,25 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                     self._handle_ev_soc_sync_source_change,
                 )
             )
+
+    @property
+    def restart_service_call_state(self) -> dict[str, object]:
+        """Most recent service-origin restart request during this Core session."""
+        return dict(self._last_restart_service_call)
+
+    @callback
+    def _handle_restart_service_call(self, event: Event) -> None:
+        """Record service-request origin flags, never an identity or a restart."""
+        evidence = classify_restart_service_call(event, now=dt_util.now())
+        if evidence is None:
+            return
+        self._last_restart_service_call = evidence
+        LOGGER.warning(
+            "KEMS restart audit: Home Assistant restart SERVICE requested; "
+            "user context=%s, parent context=%s; actor is not proven",
+            evidence["user_context_present"],
+            evidence["parent_context_present"],
+        )
 
     @callback
     def _handle_critical_control_source_change(self, event: Event) -> None:
@@ -672,7 +702,7 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
         stage_seconds: dict[str, float] = {}
         detail_seconds: dict[str, float] = {}
         post_shadow_settlement_changed = False
-        settlement_publication_stats: dict[str, dict[str, float | int]] = {}
+        settlement_publication_stats: dict[str, dict[str, object]] = {}
 
         def checkpoint(name: str) -> None:
             nonlocal checkpoint_at
