@@ -12,6 +12,7 @@ from zoneinfo import ZoneInfo
 from homeassistant.helpers.storage import Store
 
 from .const import DOMAIN, STORAGE_NAMESPACE
+from .kems_core.roi_reward_audit import build_reward_audit
 from .kems_core.roi_rewards import date_of, number
 
 _LONDON = ZoneInfo("Europe/London")
@@ -136,3 +137,14 @@ class ROIRewardRecorder:
             "today": round(hd + dd, 6),
             "unsettled": round(hu + pu, 6),
         }
+
+    def audit(self, now, commissioned, *, bookings=(), events=()):
+        """Expose itemised ROI reward evidence without changing accounting."""
+        return build_reward_audit(
+            self._happy_hours,
+            self._power_downs,
+            bookings,
+            events,
+            now=now,
+            commissioning_date=commissioned,
+        )
