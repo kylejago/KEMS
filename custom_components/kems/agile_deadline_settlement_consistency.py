@@ -187,7 +187,14 @@ class DeadlineSettlementConsistencyAgileSmartExportManager(
         # owner may defer the Solar intermediate write; Solar still completes
         # its accounting and display-SOC enrichment before the deadline rebase.
         prior_defer = getattr(self, "_kems_defer_solar_settlement_publish", False)
+        prior_canonical = getattr(
+            self, "_kems_defer_canonical_settlement_publish", False
+        )
         self._kems_defer_solar_settlement_publish = True
+        # Canonical flow is followed synchronously by this owner's final
+        # publication. Preserve all flow/SOC mutations, but avoid a repeated
+        # heavy intermediate Agile reporting pass and its redundant HA writes.
+        self._kems_defer_canonical_settlement_publish = True
         try:
             super().reconcile_current_day_settlements(
                 settled_half_hours=settled_half_hours,
@@ -195,6 +202,7 @@ class DeadlineSettlementConsistencyAgileSmartExportManager(
             )
         finally:
             self._kems_defer_solar_settlement_publish = prior_defer
+            self._kems_defer_canonical_settlement_publish = prior_canonical
         config = getattr(self, "_rolling_config", None)
         rebase_day_summary_deadline_from_rolling(
             self._state,
