@@ -128,15 +128,9 @@ def build_happy_hour_accounting_audit(
     evidence.sort(key=lambda row: (row["start"], row["end"]))
     # The ROI summary is authoritative for the complete commissioned-period
     # totals; the bounded itemised entries may be truncated in diagnostics.
-    roi_total = (
-        audit.get("included_happy_hour_pence")
-        if audit is not None
-        else None
-    )
+    roi_total = audit.get("included_happy_hour_pence") if audit is not None else None
     roi_provisional = (
-        audit.get("provisional_partial_pence")
-        if audit is not None
-        else None
+        audit.get("provisional_partial_pence") if audit is not None else None
     )
     comparison_complete = bool(
         audit is not None
@@ -174,8 +168,11 @@ def build_happy_hour_accounting_audit(
             "status": (
                 "reconciled_estimate_tiers"
                 if difference is not None and abs(difference) <= 0.05
-                else "needs_evidence_review" if difference is not None
-                else "not_comparable"
+                else (
+                    "needs_evidence_review"
+                    if difference is not None
+                    else "not_comparable"
+                )
             ),
             "scope": "financially_commissioned_happy_hour_rewards",
             "roi_included_estimate_pence": roi_total if comparison_complete else None,
@@ -183,8 +180,7 @@ def build_happy_hour_accounting_audit(
                 roi_provisional if comparison_complete else None
             ),
             "verified_hour_credit_counted_in_roi_pence": (
-                round(verified_counted_in_roi, 3)
-                if comparison_complete else None
+                round(verified_counted_in_roi, 3) if comparison_complete else None
             ),
             "unexplained_difference_pence": difference,
             "supplier_confirmed_credit_pence": None,
