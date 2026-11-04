@@ -28,6 +28,7 @@ class SettlementPublicationScope:
     skipped_existing_identical: int = 0
     written: int = 0
     comparison_seconds: float = 0.0
+    deferred_canonical_flow_publications: int = 0
     layer_seconds: dict[str, float] = field(default_factory=dict)
     layer_calls: dict[str, int] = field(default_factory=dict)
 
