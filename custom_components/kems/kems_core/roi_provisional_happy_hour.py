@@ -30,8 +30,10 @@ def _number(value):
 
 def _dt(value):
     try:
-        value = value if isinstance(value, datetime) else datetime.fromisoformat(
-            str(value).replace("Z", "+00:00")
+        value = (
+            value
+            if isinstance(value, datetime)
+            else datetime.fromisoformat(str(value).replace("Z", "+00:00"))
         )
     except (TypeError, ValueError):
         return None
@@ -146,10 +148,13 @@ def estimate_partial_reward_hours(
                 "credit_pence": round(witnessed_pence, 6),
                 "import_kwh": round(witnessed_kwh, 6),
                 "covered_minutes": round(seconds / 60, 1),
-                "coverage_percent": round(100 * seconds / (end - start).total_seconds(), 1),
+                "coverage_percent": round(
+                    100 * seconds / (end - start).total_seconds(), 1
+                ),
                 "rate_basis": (
                     "adjacent_verified_hour_indicative_rate_proxy"
-                    if proxy_rate_used else "witnessed_historical_tariff_samples"
+                    if proxy_rate_used
+                    else "witnessed_historical_tariff_samples"
                 ),
                 "basis": "provisional_partial_physical_meter_credit",
                 "confidence": "low" if proxy_rate_used else "medium",
