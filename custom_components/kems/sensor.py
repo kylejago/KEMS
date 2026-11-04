@@ -2000,7 +2000,7 @@ SENSORS: tuple[KEMSSensorEntityDescription, ...] = (
     ),
     KEMSSensorEntityDescription(
         key="roi_meter_supported_rewards",
-        name="ROI meter-supported reward estimates",
+        name="ROI meter-supported rewards",
         icon="mdi:cash-check",
         device_class=SensorDeviceClass.MONETARY,
         native_unit_of_measurement="GBP",
