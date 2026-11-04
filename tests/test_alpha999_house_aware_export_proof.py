@@ -26,7 +26,11 @@ BACKEND = (
 
 def _production():
     tree = ast.parse(BACKEND.read_text(encoding="utf-8"), filename=str(BACKEND))
-    wanted = {"_number", "_paid_export_physical_observed_at", "_bounded_paid_export_discharge_setpoint"}
+    wanted = {
+        "_number",
+        "_paid_export_physical_observed_at",
+        "_bounded_paid_export_discharge_setpoint",
+    }
     methods = {"async_setup", "_async_save", "_async_observe_paid_export_stage"}
     selected = [
         node
