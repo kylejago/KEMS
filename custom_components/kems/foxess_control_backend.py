@@ -68,7 +68,9 @@ def _paid_export_physical_observed_at(snapshot: Any) -> datetime | None:
     ages = getattr(snapshot, "source_age_seconds", None)
     if not isinstance(ages, dict):
         return captured
-    readings = tuple(_number(ages.get(k)) for k in ("battery_power_kw", "grid_export_kw"))
+    readings = tuple(
+        _number(ages.get(k)) for k in ("battery_power_kw", "grid_export_kw")
+    )
     if any(age is None or not isfinite(age) or age < 0 for age in readings):
         return None
     return captured - timedelta(seconds=max(readings))
@@ -794,18 +796,19 @@ class FoxESSControlBackend:
                 held = self._paid_export_stage_samples
                 self._paid_export_stage_reason = (
                     "Waiting for physical net-export headroom above house demand"
-                    + (f"; retaining {held}/2 verified samples within "
-                       "180-second Force Discharge window" if held else "")
+                    + (
+                        f"; retaining {held}/2 verified samples within "
+                        "180-second Force Discharge window"
+                        if held
+                        else ""
+                    )
                 )
                 return
 
         if limit_verified and direction_verified:
             physical_at = _paid_export_physical_observed_at(snapshot)
             previous_at = getattr(self, "_paid_export_last_physical_at", None)
-            if (
-                isinstance(captured_at, datetime)
-                and physical_at is None
-            ):
+            if isinstance(captured_at, datetime) and physical_at is None:
                 self._paid_export_stage_reason = (
                     "Waiting for verified timestamp of fresh battery and "
                     "grid-export telemetry"
@@ -1727,9 +1730,8 @@ class FoxESSControlBackend:
                             ),
                         )
 
-        if (
-            not self._paid_export_live_proven
-            and (decision.action != "force_discharge" or not applied)
+        if not self._paid_export_live_proven and (
+            decision.action != "force_discharge" or not applied
         ):
             # A new export session cannot inherit a preceding session's
             # partial proof. The full, physically proven latch remains scoped
@@ -1869,11 +1871,13 @@ class FoxESSControlBackend:
             "paid_export_stage_required_samples": _PAID_EXPORT_PROOF_SAMPLES,
             "paid_export_stage_first_sample_at": (
                 self._paid_export_first_sample_at.isoformat()
-                if self._paid_export_first_sample_at is not None else None
+                if self._paid_export_first_sample_at is not None
+                else None
             ),
             "paid_export_stage_last_physical_at": (
                 self._paid_export_last_physical_at.isoformat()
-                if self._paid_export_last_physical_at is not None else None
+                if self._paid_export_last_physical_at is not None
+                else None
             ),
             "paid_export_stage_failures": self._paid_export_stage_failures,
             "paid_export_stage_blocked": self._paid_export_stage_blocked,
