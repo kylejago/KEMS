@@ -81,6 +81,24 @@ views:
             name: Meter-supported Power Down bonus estimate
           - entity: sensor.kems_roi_unsettled_rewards
             name: Awaiting Octopus settlement
+      - type: markdown
+        title: ROI reward audit — individual events
+        content: |
+          KEMS includes supported reward **estimates**, not confirmed Octopus payments. Normal Agile export income is counted separately and only once.
+
+          {% set rows = state_attr('sensor.kems_roi_reward_audit', 'entries') or [] %}
+          {% if rows %}
+          | Type | Date | Event ID | Value | ROI | Evidence | Supplier |
+          |:--|:--|:--|--:|:--|:--|:--|
+          {% for item in rows[:20] %}
+          | {{ 'Happy Hour' if item.type == 'happy_hour' else 'Power Down' }} | {{ item.date or 'unknown' }} | {{ item.event_id or 'not available' }} | {{ ('£%.2f' | format(item.estimated_reward_pence / 100)) if item.estimated_reward_pence is not none else 'pending' }} | {{ 'Included' if item.included_in_roi else 'Not included' }} | {{ item.evidence_source or 'unknown' }} | {{ item.supplier_status }} |
+          {% endfor %}
+
+          {% else %}
+          No saved individual reward evidence has been reported yet.
+          {% endif %}
+          {% set omitted = state_attr('sensor.kems_roi_reward_audit', 'entries_omitted') | int(0) %}
+          {% if omitted > 0 %}Additional historic records omitted: {{ omitted }}. Full summaries remain in KEMS diagnostics.{% endif %}
       - type: entities
         title: Actual payback
         show_header_toggle: false
