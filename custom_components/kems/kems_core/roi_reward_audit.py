@@ -12,7 +12,9 @@ _LONDON = ZoneInfo("Europe/London")
 
 def _timestamp(value):
     try:
-        result = value if isinstance(value, datetime) else datetime.fromisoformat(str(value))
+        result = (
+            value if isinstance(value, datetime) else datetime.fromisoformat(str(value))
+        )
         return result if result.tzinfo is not None else None
     except (TypeError, ValueError):
         return None
@@ -56,10 +58,15 @@ def build_reward_audit(
     """Describe included and pending rewards without altering accounting."""
     today = now.astimezone(_LONDON).date().isoformat()
     start_day = commissioning_date.isoformat() if commissioning_date else None
-    eligible = lambda day: bool(start_day and isinstance(day, str) and start_day <= day <= today)
+    eligible = lambda day: bool(
+        start_day and isinstance(day, str) and start_day <= day <= today
+    )
     verified_bookings = {}
     for booking in bookings:
-        if not isinstance(booking, dict) or booking.get("booking_source") != "octopus_joined_events":
+        if (
+            not isinstance(booking, dict)
+            or booking.get("booking_source") != "octopus_joined_events"
+        ):
             continue
         identity = _window(booking.get("start"), booking.get("end"))
         if identity is not None:
@@ -92,14 +99,22 @@ def build_reward_audit(
             counted_happy += amount
             if receipt.get("supplier_settled") is not True:
                 unsettled += amount
-        rows.append(_entry(
-            "happy_hour", key, day, amount, receipt.get("basis"),
-            receipt.get("supplier_settled"), included,
-            event_id=booking.get("event_id"),
-            start=parts[0], end=parts[1],
-            booking_source=booking.get("booking_source"),
-            status="included_estimate" if included else "excluded_from_roi",
-        ))
+        rows.append(
+            _entry(
+                "happy_hour",
+                key,
+                day,
+                amount,
+                receipt.get("basis"),
+                receipt.get("supplier_settled"),
+                included,
+                event_id=booking.get("event_id"),
+                start=parts[0],
+                end=parts[1],
+                booking_source=booking.get("booking_source"),
+                status="included_estimate" if included else "excluded_from_roi",
+            )
+        )
 
     for key, receipt in power_downs.items():
         if not isinstance(receipt, dict):
@@ -112,49 +127,84 @@ def build_reward_audit(
             counted_power += amount
             if receipt.get("supplier_settled") is not True:
                 unsettled += amount
-        rows.append(_entry(
-            "power_down", key, day, amount, receipt.get("basis"),
-            receipt.get("supplier_settled"), included,
-            event_id=str(key), start=_get(event, "session_start").isoformat()
-            if isinstance(_get(event, "session_start"), datetime) else None,
-            end=_get(event, "session_end").isoformat()
-            if isinstance(_get(event, "session_end"), datetime) else None,
-            physical_export_verified=_get(event, "physical_export_verified"),
-            physical_grid_export_kwh=_get(event, "physical_grid_export_kwh"),
-            rewardable_reduction_kwh=_get(event, "rewardable_reduction_kwh"),
-            status="included_modelled_bonus" if included else "excluded_from_roi",
-        ))
+        rows.append(
+            _entry(
+                "power_down",
+                key,
+                day,
+                amount,
+                receipt.get("basis"),
+                receipt.get("supplier_settled"),
+                included,
+                event_id=str(key),
+                start=(
+                    _get(event, "session_start").isoformat()
+                    if isinstance(_get(event, "session_start"), datetime)
+                    else None
+                ),
+                end=(
+                    _get(event, "session_end").isoformat()
+                    if isinstance(_get(event, "session_end"), datetime)
+                    else None
+                ),
+                physical_export_verified=_get(event, "physical_export_verified"),
+                physical_grid_export_kwh=_get(event, "physical_grid_export_kwh"),
+                rewardable_reduction_kwh=_get(event, "rewardable_reduction_kwh"),
+                status="included_modelled_bonus" if included else "excluded_from_roi",
+            )
+        )
 
     for identity, booking in verified_bookings.items():
         if identity in saved_windows:
             continue
-        rows.append(_entry(
-            "happy_hour", booking.get("event_id") or str(identity),
-            date_of(booking.get("start")), None, "verified_booking_only",
-            False, False,
-            event_id=booking.get("event_id"), start=booking.get("start"),
-            end=booking.get("end"), booking_source="octopus_joined_events",
-            status="pending_individual_meter_and_tariff_receipt",
-        ))
+        rows.append(
+            _entry(
+                "happy_hour",
+                booking.get("event_id") or str(identity),
+                date_of(booking.get("start")),
+                None,
+                "verified_booking_only",
+                False,
+                False,
+                event_id=booking.get("event_id"),
+                start=booking.get("start"),
+                end=booking.get("end"),
+                booking_source="octopus_joined_events",
+                status="pending_individual_meter_and_tariff_receipt",
+            )
+        )
 
     for key, event in historical.items():
         if key in power_downs or _get(event, "available") is not True:
             continue
         end = _get(event, "session_end")
-        rows.append(_entry(
-            "power_down", key, date_of(end), None,
-            "completed_event_without_independently_valued_bonus",
-            False, False, event_id=key,
-            start=_get(event, "session_start").isoformat()
-            if isinstance(_get(event, "session_start"), datetime) else None,
-            end=end.isoformat() if isinstance(end, datetime) else None,
-            physical_export_verified=_get(event, "physical_export_verified"),
-            physical_grid_export_kwh=_get(event, "physical_grid_export_kwh"),
-            rewardable_reduction_kwh=_get(event, "rewardable_reduction_kwh"),
-            status="pending_bonus_or_baseline_evidence",
-        ))
+        rows.append(
+            _entry(
+                "power_down",
+                key,
+                date_of(end),
+                None,
+                "completed_event_without_independently_valued_bonus",
+                False,
+                False,
+                event_id=key,
+                start=(
+                    _get(event, "session_start").isoformat()
+                    if isinstance(_get(event, "session_start"), datetime)
+                    else None
+                ),
+                end=end.isoformat() if isinstance(end, datetime) else None,
+                physical_export_verified=_get(event, "physical_export_verified"),
+                physical_grid_export_kwh=_get(event, "physical_grid_export_kwh"),
+                rewardable_reduction_kwh=_get(event, "rewardable_reduction_kwh"),
+                status="pending_bonus_or_baseline_evidence",
+            )
+        )
 
-    rows.sort(key=lambda r: (r.get("date") or "", r.get("end") or "", r["reward_key"]), reverse=True)
+    rows.sort(
+        key=lambda r: (r.get("date") or "", r.get("end") or "", r["reward_key"]),
+        reverse=True,
+    )
     return {
         "schema_version": 1,
         "reporting_only": True,
