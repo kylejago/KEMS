@@ -96,8 +96,9 @@ def build_reward_audit(
         amount = number(receipt.get("pence"))
         day = receipt.get("day")
         included = eligible(day) and amount is not None
-        is_provisional = (
-            receipt.get("basis") == "provisional_partial_physical_meter_credit"
+        is_provisional = str(receipt.get("basis") or "").startswith("provisional_")
+        is_historical = (
+            receipt.get("basis") == "provisional_historical_five_minute_meter_credit"
         )
         if included:
             counted_happy += amount
@@ -126,7 +127,11 @@ def build_reward_audit(
                 confidence=receipt.get("confidence"),
                 rate_basis=receipt.get("rate_basis"),
                 status=(
-                    "included_provisional_partial_estimate"
+                    (
+                        "included_provisional_historical_observation_estimate"
+                        if is_historical
+                        else "included_provisional_partial_estimate"
+                    )
                     if included and is_provisional
                     else (
                         "included_meter_supported_estimate"
@@ -235,8 +240,33 @@ def build_reward_audit(
         key=lambda r: (r.get("date") or "", r.get("end") or "", r["reward_key"]),
         reverse=True,
     )
+    commissioned_rows = [row for row in rows if eligible(row.get("date"))]
+    happy_rows = [row for row in commissioned_rows if row["type"] == "happy_hour"]
+    power_rows = [row for row in commissioned_rows if row["type"] == "power_down"]
+    historical_coverage = {
+        "commissioning_date": start_day,
+        "through_date": today,
+        "scope": "known_joined_happy_hours_and_persisted_power_down_events",
+        "known_happy_hour_hours": len(happy_rows),
+        "happy_hour_hours_in_roi": sum(r["included_in_roi"] for r in happy_rows),
+        "happy_hour_hours_pending_evidence": sum(
+            r["estimated_reward_pence"] is None for r in happy_rows
+        ),
+        "known_power_down_events": len(power_rows),
+        "power_down_events_in_roi": sum(r["included_in_roi"] for r in power_rows),
+        "power_down_events_pending_evidence": sum(
+            r["estimated_reward_pence"] is None for r in power_rows
+        ),
+        "all_historical_sessions_discovered": False,
+        "note": (
+            "Counts include only historically witnessed and independently booked "
+            "events. The supplier joined-event feed may omit older sessions; "
+            "no historical coverage or payment is assumed without evidence."
+        ),
+    }
     return {
-        "schema_version": 1,
+        "schema_version": 2,
+        "historical_coverage": historical_coverage,
         "reporting_only": True,
         "supplier_settlement_available": False,
         "included_happy_hour_pence": round(counted_happy, 6),
@@ -250,8 +280,9 @@ def build_reward_audit(
         "entries": rows[:max_entries],
         "entries_omitted": max(len(rows) - max_entries, 0),
         "note": (
-            "Provisional Happy Hour amounts cover only witnessed meter intervals; "
-            "missing periods are never interpolated. Power Down Agile earnings "
+            "Historical five-minute Happy Hour estimates and live partial-hour "
+            "credits cover only witnessed meter intervals. Missing periods "
+            "are never interpolated. Power Down Agile earnings "
             "are displayed for context but never added to ROI twice. "
             "Octopus settlement is unconfirmed."
         ),
