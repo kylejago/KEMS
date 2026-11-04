@@ -58,10 +58,10 @@ def build_reward_audit(
     """Describe included and pending rewards without altering accounting."""
     today = now.astimezone(_LONDON).date().isoformat()
     start_day = commissioning_date.isoformat() if commissioning_date else None
+
     def eligible(day):
-        return bool(
-            start_day and isinstance(day, str) and start_day <= day <= today
-        )
+        return bool(start_day and isinstance(day, str) and start_day <= day <= today)
+
     verified_bookings = {}
     for booking in bookings:
         if (
