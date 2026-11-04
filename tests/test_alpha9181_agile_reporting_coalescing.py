@@ -11,7 +11,6 @@ import ast
 from datetime import UTC, datetime
 from pathlib import Path
 from time import perf_counter
-from types import SimpleNamespace
 
 import pytest
 
@@ -110,7 +109,17 @@ def _owners():
         ],
         decorator_list=[],
     )
-    program = ast.Module(body=[canonical], type_ignores=[])
+    program = ast.Module(
+        body=[
+            ast.ImportFrom(
+                module="__future__",
+                names=[ast.alias(name="annotations")],
+                level=0,
+            ),
+            canonical,
+        ],
+        type_ignores=[],
+    )
     exec(compile(ast.fix_missing_locations(program), "<canonical>", "exec"), namespace)
     Canonical = namespace["Canonical"]
 
@@ -152,7 +161,17 @@ def _owners():
         ],
         decorator_list=[],
     )
-    program = ast.Module(body=[deadline], type_ignores=[])
+    program = ast.Module(
+        body=[
+            ast.ImportFrom(
+                module="__future__",
+                names=[ast.alias(name="annotations")],
+                level=0,
+            ),
+            deadline,
+        ],
+        type_ignores=[],
+    )
     exec(compile(ast.fix_missing_locations(program), "<deadline>", "exec"), namespace)
     return Canonical, Solar, namespace["Deadline"]
 
