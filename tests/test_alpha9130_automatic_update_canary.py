@@ -14,7 +14,7 @@ def test_canary_targets_only_update_version_and_preserves_energy_safety() -> Non
     bundle = json.loads((ROOT / "release" / "kems-bundle.template.json").read_text())
     assert manifest["version"] == "0.9.0-alpha9.179"
     reason = bundle["maintenance"]["reason"]
-    assert reason.startswith("Alpha9.178:")
+    assert reason.startswith("Alpha9.179:")
     assert "separate physical readback" in reason
     assert "Maintain all safety deferrals" in reason
 
