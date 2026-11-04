@@ -42,7 +42,12 @@ def test_explicit_restart_call_is_classified_without_user_identity():
 
 def test_other_service_and_missing_context_are_safe():
     now = datetime(2026, 11, 4, tzinfo=UTC)
-    assert classify(SimpleNamespace(data={"domain": "light", "service": "turn_on"}), now=now) is None
+    assert (
+        classify(
+            SimpleNamespace(data={"domain": "light", "service": "turn_on"}), now=now
+        )
+        is None
+    )
     assert classify(SimpleNamespace(data={}), now=now) is None
     assert classify(SimpleNamespace(data="bad"), now=now) is None
     result = classify(
@@ -76,9 +81,15 @@ def test_settlement_layer_timing_is_bounded_to_one_existing_scope():
 def test_no_control_authority_or_restart_action_is_added():
     coordinator = (KEMS / "coordinator.py").read_text(encoding="utf-8")
     anchor = (KEMS / "agile_restart_soc_anchor.py").read_text(encoding="utf-8")
-    assert 'hass.bus.async_listen("call_service", self._handle_restart_service_call)' in coordinator
+    assert (
+        'hass.bus.async_listen("call_service", self._handle_restart_service_call)'
+        in coordinator
+    )
     assert "entry.async_on_unload(" in coordinator
     assert 'evidence["user_context_present"]' in coordinator
     assert "scope.record_layer(" in anchor
-    assert "IntelligentDispatchObservabilityAgileSmartExportManager._publish(self, state)" in anchor
+    assert (
+        "IntelligentDispatchObservabilityAgileSmartExportManager._publish(self, state)"
+        in anchor
+    )
     assert "self._foxess_control.async_update(" in coordinator
