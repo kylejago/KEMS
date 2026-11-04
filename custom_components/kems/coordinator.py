@@ -1582,9 +1582,12 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
             verified_happy_hour_receipts = self._lifetime.happy_hour_verified_receipts
             witnessed_reward_windows = [
                 *(_controller_for(self).state.get("bookings", []) or []),
-                *(self._happy_hour_import_ledger.status.get(
-                    "persisted_reward_windows", []
-                ) or []),
+                *(
+                    self._happy_hour_import_ledger.status.get(
+                        "persisted_reward_windows", []
+                    )
+                    or []
+                ),
             ]
             provisional_happy_hours = estimate_partial_reward_hours(
                 windows=witnessed_reward_windows,
