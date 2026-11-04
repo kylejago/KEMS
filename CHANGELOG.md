@@ -1,3 +1,11 @@
+## 0.9.0-alpha9.177 — Itemised ROI reward provenance and supplier-settlement audit
+
+- Explain every Happy Hour and Power Down reward included in actual ROI using the existing persisted event-level reward journal, with event ID where independently known, original date/window, estimated value and evidence source.
+- Correlate Happy Hour receipts against independently confirmed Octopus joined bookings by exact one-hour boundaries. The verified 1 November 12:00–13:00 hour can show joined event 8067; the second hour (8068) remains pending rather than fabricating a credit.
+- Show completed Power Down events with missing bonus or baseline as pending. The 3 November session 8135 has physically verified export but no separately established reward amount, so its Agile export remains counted normally and no bonus is invented.
+- Expose a bounded, read-only reward audit via `sensor.kems_roi_reward_audit`, the ROI dashboard and diagnostics, including the source of existing historical bonus estimates such as the previously opaque £0.56.
+- Preserve 9.176 financial totals and reward idempotency; no changes to the physical energy ledger, Octopus booking, FoxESS commands, 7 kW DNO limit, 15% deliberate export cut-off, 10% household floor, EV battery protection or 06:00–06:30 no-export update policy.
+
 ## 0.9.0-alpha9.176 — Reward-inclusive actual ROI, with supplier-settlement provenance
 
 - Count completed, individually verified Happy Hour import bill-credit estimates toward displayed actual ROI from the financial commissioning date. Preserve the original gross metered bill and historical tariff rate. A supplier credit is **not** marked settled until Octopus confirms it.
