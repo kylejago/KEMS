@@ -93,6 +93,7 @@ from .kems_core.control_event_refresh import (
 )
 from .kems_core.control_write_authority import active_joined_power_down_window
 from .kems_core.happy_hour_financial import estimate_happy_hour_credit
+from .kems_core.roi_provisional_happy_hour import estimate_partial_reward_hours
 from .kems_core.roi_rewards import apply_reward_roi
 from .kems_core.scenario_report_gate import ScenarioReportGate
 from .kems_core.settlement_publication_coalescing import (
@@ -1575,9 +1576,29 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
             )
             if completed_power_downs is None:
                 completed_power_downs = [last_power_down]
+            # Do not infer full-hour kWh from a partial or missing meter log.
+            # The provisional ROI entry is independently keyed by joined
+            # hour, then *replaced* by its completed meter-backed receipt.
+            verified_happy_hour_receipts = self._lifetime.happy_hour_verified_receipts
+            witnessed_reward_windows = [
+                *(_controller_for(self).state.get("bookings", []) or []),
+                *(
+                    self._happy_hour_import_ledger.status.get(
+                        "persisted_reward_windows", []
+                    )
+                    or []
+                ),
+            ]
+            provisional_happy_hours = estimate_partial_reward_hours(
+                windows=witnessed_reward_windows,
+                readings=self._happy_hour_import_ledger.samples,
+                completed_receipts=verified_happy_hour_receipts,
+                now=now,
+            )
             await self._roi_rewards.async_observe(
-                self._lifetime.happy_hour_verified_receipts,
+                verified_happy_hour_receipts,
                 list(completed_power_downs),
+                provisional_happy_hours=provisional_happy_hours,
             )
             roi = apply_reward_roi(
                 roi,

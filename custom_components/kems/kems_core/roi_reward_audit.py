@@ -80,7 +80,7 @@ def build_reward_audit(
     }
     rows = []
     saved_windows = set()
-    counted_happy = counted_power = unsettled = 0.0
+    counted_happy = counted_power = unsettled = provisional = metered = 0.0
 
     for key, receipt in happy_hours.items():
         if not isinstance(receipt, dict):
@@ -96,8 +96,15 @@ def build_reward_audit(
         amount = number(receipt.get("pence"))
         day = receipt.get("day")
         included = eligible(day) and amount is not None
+        is_provisional = (
+            receipt.get("basis") == "provisional_partial_physical_meter_credit"
+        )
         if included:
             counted_happy += amount
+            if is_provisional:
+                provisional += amount
+            else:
+                metered += amount
             if receipt.get("supplier_settled") is not True:
                 unsettled += amount
         rows.append(
@@ -113,7 +120,20 @@ def build_reward_audit(
                 start=parts[0],
                 end=parts[1],
                 booking_source=booking.get("booking_source"),
-                status="included_estimate" if included else "excluded_from_roi",
+                covered_minutes=receipt.get("covered_minutes"),
+                coverage_percent=receipt.get("coverage_percent"),
+                observed_import_kwh=receipt.get("observed_import_kwh"),
+                confidence=receipt.get("confidence"),
+                rate_basis=receipt.get("rate_basis"),
+                status=(
+                    "included_provisional_partial_estimate"
+                    if included and is_provisional
+                    else (
+                        "included_meter_supported_estimate"
+                        if included
+                        else "excluded_from_roi"
+                    )
+                ),
             )
         )
 
@@ -126,6 +146,7 @@ def build_reward_audit(
         included = eligible(day) and amount is not None
         if included:
             counted_power += amount
+            metered += amount
             if receipt.get("supplier_settled") is not True:
                 unsettled += amount
         rows.append(
@@ -151,6 +172,10 @@ def build_reward_audit(
                 physical_export_verified=_get(event, "physical_export_verified"),
                 physical_grid_export_kwh=_get(event, "physical_grid_export_kwh"),
                 rewardable_reduction_kwh=_get(event, "rewardable_reduction_kwh"),
+                modelled_agile_export_income_pence=_get(
+                    event, "fixed_export_income_pence"
+                ),
+                agile_export_income_already_counted=True,
                 status="included_modelled_bonus" if included else "excluded_from_roi",
             )
         )
@@ -198,6 +223,10 @@ def build_reward_audit(
                 physical_export_verified=_get(event, "physical_export_verified"),
                 physical_grid_export_kwh=_get(event, "physical_grid_export_kwh"),
                 rewardable_reduction_kwh=_get(event, "rewardable_reduction_kwh"),
+                modelled_agile_export_income_pence=_get(
+                    event, "fixed_export_income_pence"
+                ),
+                agile_export_income_already_counted=True,
                 status="pending_bonus_or_baseline_evidence",
             )
         )
@@ -214,9 +243,16 @@ def build_reward_audit(
         "included_power_down_pence": round(counted_power, 6),
         "included_total_pence": round(counted_happy + counted_power, 6),
         "unsettled_total_pence": round(unsettled, 6),
+        "provisional_partial_pence": round(provisional, 6),
+        "meter_supported_estimate_pence": round(metered, 6),
         "included_count": sum(row["included_in_roi"] for row in rows),
         "pending_count": sum(row["estimated_reward_pence"] is None for row in rows),
         "entries": rows[:max_entries],
         "entries_omitted": max(len(rows) - max_entries, 0),
-        "note": "Amounts are KEMS estimates; Octopus settlement is unconfirmed.",
+        "note": (
+            "Provisional Happy Hour amounts cover only witnessed meter intervals; "
+            "missing periods are never interpolated. Power Down Agile earnings "
+            "are displayed for context but never added to ROI twice. "
+            "Octopus settlement is unconfirmed."
+        ),
     }
