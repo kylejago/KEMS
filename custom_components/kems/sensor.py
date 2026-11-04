@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from typing import Any
 
 from homeassistant.components.sensor import (
@@ -42,6 +43,7 @@ from .const import (
 )
 from .entity import KEMSEntity
 from .kems_core import FOXHOLE_PROPOSAL_PROFILE, KEMSData
+from .kems_core.ev_soc_presentation import displayed_ev_soc
 from .solar_routing_shadow import _physical_solar_flow
 from .update_orchestrator import build_update_sensor_entities
 
@@ -2848,14 +2850,37 @@ class KEMSSensor(KEMSEntity, SensorEntity):
         super().__init__(coordinator, description.key)
         self.entity_description = description
 
+    def _display_ev_soc(self) -> dict[str, Any]:
+        """Resolve only the UI reading; physical EV control keeps its snapshot."""
+        source = getattr(self.coordinator.entities, "vehicle_soc_source", None)
+        state = self.hass.states.get(source) if source else None
+        return displayed_ev_soc(
+            state,
+            self.coordinator.data.snapshot.ev_soc,
+            now=datetime.now(UTC),
+        )
+
     @property
     def native_value(self) -> Any:
         """Return the sensor value."""
+        if self.entity_description.key == "ev_soc":
+            return self._display_ev_soc()["value"]
         return self.entity_description.value_fn(self.coordinator.data)
 
     @property
     def extra_state_attributes(self) -> Mapping[str, Any] | None:
         """Return explainability or diagnostic attributes."""
+        if self.entity_description.key == "ev_soc":
+            status = self._display_ev_soc()
+            return {
+                "display_source": status["source"],
+                "vehicle_report_age_seconds": status["age_seconds"],
+                "vehicle_soc_entity": getattr(
+                    self.coordinator.entities, "vehicle_soc_source", None
+                ),
+                "ohme_soc_percent": self.coordinator.data.snapshot.ev_soc,
+                "note": "Presentation only; charging policy and Ohme sync unchanged",
+            }
         if self.entity_description.attributes_fn is None:
             return None
         return self.entity_description.attributes_fn(self.coordinator.data)

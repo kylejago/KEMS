@@ -73,8 +73,11 @@ def estimate_partial_reward_hours(
     readings: Iterable,
     completed_receipts: Iterable[Mapping],
     now: datetime,
+    max_sample_gap_seconds: int = _MAX_SAMPLE_GAP_SECONDS,
+    historical_sampled: bool = False,
 ) -> list[dict]:
     """Return one bounded, read-only credit *estimate* per incomplete booked hour."""
+    max_gap = max(1, min(int(max_sample_gap_seconds), 390))
     receipts = list(completed_receipts)
     completed = {
         (_dt(item.get("start")), _dt(item.get("end")))
@@ -112,12 +115,16 @@ def estimate_partial_reward_hours(
         past = [item for item in samples if start <= item[0] <= end]
         if len(past) < 2:
             continue
-        fallback_rate = _adjacent_verified_rate(receipts, start)
+        # Old five-minute observations require their own captured tariff;
+        # an adjacent modern credit must never reprice an older session.
+        fallback_rate = (
+            None if historical_sampled else _adjacent_verified_rate(receipts, start)
+        )
         witnessed_kwh = witnessed_pence = seconds = 0.0
         proxy_rate_used = False
         for left, right in zip(past, past[1:], strict=False):
             elapsed = (right[0] - left[0]).total_seconds()
-            if not 0 < elapsed <= _MAX_SAMPLE_GAP_SECONDS:
+            if not 0 < elapsed <= max_gap:
                 continue
             rate_left, rate_right = left[2], right[2]
             if rate_left is not None and rate_right is not None:
@@ -152,12 +159,22 @@ def estimate_partial_reward_hours(
                     100 * seconds / (end - start).total_seconds(), 1
                 ),
                 "rate_basis": (
-                    "adjacent_verified_hour_indicative_rate_proxy"
-                    if proxy_rate_used
-                    else "witnessed_historical_tariff_samples"
+                    "retained_five_minute_tariff_observations"
+                    if historical_sampled
+                    else (
+                        "adjacent_verified_hour_indicative_rate_proxy"
+                        if proxy_rate_used
+                        else "witnessed_historical_tariff_samples"
+                    )
                 ),
-                "basis": "provisional_partial_physical_meter_credit",
-                "confidence": "low" if proxy_rate_used else "medium",
+                "basis": (
+                    "provisional_historical_five_minute_meter_credit"
+                    if historical_sampled
+                    else "provisional_partial_physical_meter_credit"
+                ),
+                "confidence": (
+                    "low" if historical_sampled or proxy_rate_used else "medium"
+                ),
                 "supplier_settled": False,
                 "event_id": window.get("event_id"),
             }
