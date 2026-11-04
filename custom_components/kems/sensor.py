@@ -1986,6 +1986,32 @@ SENSORS: tuple[KEMSSensorEntityDescription, ...] = (
         value_fn=lambda data: data.roi.roi_rewards_unsettled_gbp,
     ),
     KEMSSensorEntityDescription(
+        key="roi_provisional_earnings",
+        name="ROI provisional earnings",
+        icon="mdi:cash-clock",
+        device_class=SensorDeviceClass.MONETARY,
+        native_unit_of_measurement="GBP",
+        suggested_display_precision=2,
+        value_fn=lambda data: data.roi.roi_rewards_provisional_gbp,
+        attributes_fn=lambda data: {
+            "supplier_settled": False,
+            "basis": "witnessed incomplete Happy Hour reward windows",
+        },
+    ),
+    KEMSSensorEntityDescription(
+        key="roi_meter_supported_rewards",
+        name="ROI meter-supported reward estimates",
+        icon="mdi:cash-check",
+        device_class=SensorDeviceClass.MONETARY,
+        native_unit_of_measurement="GBP",
+        suggested_display_precision=2,
+        value_fn=lambda data: data.roi.roi_rewards_meter_supported_gbp,
+        attributes_fn=lambda data: {
+            "supplier_settled": False,
+            "basis": "completed hour receipt or modelled Power Down bonus",
+        },
+    ),
+    KEMSSensorEntityDescription(
         key="roi_reward_audit",
         name="ROI reward audit",
         icon="mdi:clipboard-text-clock-outline",
