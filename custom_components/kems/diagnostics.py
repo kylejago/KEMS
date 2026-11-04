@@ -179,6 +179,7 @@ async def async_get_config_entry_diagnostics(
         ),
         "foxess_control": coordinator.foxess_control_state,
         "coordinator_performance": coordinator.coordinator_performance_state,
+        "restart_service_call": coordinator.restart_service_call_state,
         "agile_historical_replay_cache": {
             **coordinator._agile_smart_export._historical_replay_cache.status,
             "day_rate_index_builds": getattr(
