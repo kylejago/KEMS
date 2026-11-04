@@ -4,7 +4,6 @@ from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 
 import pytest
-
 from kems_core import ROIState
 from kems_core.roi_provisional_happy_hour import estimate_partial_reward_hours
 from kems_core.roi_reward_audit import build_reward_audit
