@@ -1986,6 +1986,13 @@ SENSORS: tuple[KEMSSensorEntityDescription, ...] = (
         value_fn=lambda data: data.roi.roi_rewards_unsettled_gbp,
     ),
     KEMSSensorEntityDescription(
+        key="roi_reward_audit",
+        name="ROI reward audit",
+        icon="mdi:clipboard-text-clock-outline",
+        value_fn=lambda data: data.roi.reward_audit.get("included_count", 0),
+        attributes_fn=lambda data: data.roi.reward_audit,
+    ),
+    KEMSSensorEntityDescription(
         key="actual_roi_percentage",
         name="Actual ROI",
         icon="mdi:battery-charging-100",
