@@ -28,9 +28,8 @@ def displayed_ev_soc(
     This function has no ability to change a Snapshot, EV control, or Ohme.
     """
     source_value = _soc(getattr(vehicle_state, "state", None))
-    reported_at = (
-        getattr(vehicle_state, "last_reported", None)
-        or getattr(vehicle_state, "last_updated", None)
+    reported_at = getattr(vehicle_state, "last_reported", None) or getattr(
+        vehicle_state, "last_updated", None
     )
     age = None
     if isinstance(reported_at, datetime) and reported_at.tzinfo and now.tzinfo:
