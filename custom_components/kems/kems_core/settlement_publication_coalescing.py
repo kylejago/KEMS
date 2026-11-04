@@ -54,6 +54,9 @@ class SettlementPublicationScope:
             "skipped_existing_identical": self.skipped_existing_identical,
             "written": self.written,
             "comparison_seconds": round(self.comparison_seconds, 3),
+            "deferred_canonical_flow_publications": (
+                self.deferred_canonical_flow_publications
+            ),
             "layer_seconds": {
                 key: round(value, 3) for key, value in self.layer_seconds.items()
             },
