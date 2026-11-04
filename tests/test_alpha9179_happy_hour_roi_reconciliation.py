@@ -107,9 +107,9 @@ def test_missing_roi_backed_receipt_surfaces_unexplained_gap():
     modified = dict(ROI, entries=ROI["entries"][1:])
     result = audit_happy_hour(WINDOWS, [VERIFIED], roi_reward_audit=modified)
     assert result["roi_reconciliation"]["status"] == "needs_evidence_review"
-    assert result["roi_reconciliation"]["unexplained_difference_pence"] == pytest.approx(
-        261.729
-    )
+    assert result["roi_reconciliation"][
+        "unexplained_difference_pence"
+    ] == pytest.approx(261.729)
 
 
 def test_truncated_roi_entry_list_is_never_declared_reconciled():
