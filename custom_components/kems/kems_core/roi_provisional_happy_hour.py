@@ -115,7 +115,7 @@ def estimate_partial_reward_hours(
         fallback_rate = _adjacent_verified_rate(receipts, start)
         witnessed_kwh = witnessed_pence = seconds = 0.0
         proxy_rate_used = False
-        for left, right in zip(past, past[1:]):
+        for left, right in zip(past, past[1:], strict=False):
             elapsed = (right[0] - left[0]).total_seconds()
             if not 0 < elapsed <= _MAX_SAMPLE_GAP_SECONDS:
                 continue
