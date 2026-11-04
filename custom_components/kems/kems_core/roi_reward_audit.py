@@ -96,7 +96,9 @@ def build_reward_audit(
         amount = number(receipt.get("pence"))
         day = receipt.get("day")
         included = eligible(day) and amount is not None
-        is_provisional = receipt.get("basis") == "provisional_partial_physical_meter_credit"
+        is_provisional = (
+            receipt.get("basis") == "provisional_partial_physical_meter_credit"
+        )
         if included:
             counted_happy += amount
             if is_provisional:
@@ -126,9 +128,11 @@ def build_reward_audit(
                 status=(
                     "included_provisional_partial_estimate"
                     if included and is_provisional
-                    else "included_meter_supported_estimate"
-                    if included
-                    else "excluded_from_roi"
+                    else (
+                        "included_meter_supported_estimate"
+                        if included
+                        else "excluded_from_roi"
+                    )
                 ),
             )
         )
@@ -168,7 +172,9 @@ def build_reward_audit(
                 physical_export_verified=_get(event, "physical_export_verified"),
                 physical_grid_export_kwh=_get(event, "physical_grid_export_kwh"),
                 rewardable_reduction_kwh=_get(event, "rewardable_reduction_kwh"),
-                modelled_agile_export_income_pence=_get(event, "fixed_export_income_pence"),
+                modelled_agile_export_income_pence=_get(
+                    event, "fixed_export_income_pence"
+                ),
                 agile_export_income_already_counted=True,
                 status="included_modelled_bonus" if included else "excluded_from_roi",
             )
@@ -217,7 +223,9 @@ def build_reward_audit(
                 physical_export_verified=_get(event, "physical_export_verified"),
                 physical_grid_export_kwh=_get(event, "physical_grid_export_kwh"),
                 rewardable_reduction_kwh=_get(event, "rewardable_reduction_kwh"),
-                modelled_agile_export_income_pence=_get(event, "fixed_export_income_pence"),
+                modelled_agile_export_income_pence=_get(
+                    event, "fixed_export_income_pence"
+                ),
                 agile_export_income_already_counted=True,
                 status="pending_bonus_or_baseline_evidence",
             )
