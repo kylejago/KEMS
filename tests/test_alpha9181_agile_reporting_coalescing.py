@@ -191,9 +191,10 @@ def test_deadline_coalesces_one_canonical_pass_without_losing_settled_payload():
     assert owner.events[-1][1]["price_pence"] == 26.7
     assert owner.events[-1][1]["solar_income"] == 11.9
     assert owner.events[-1][1]["deadline_soc"] == 61.2
-    assert owner._kems_settlement_publication_scope[
-        "deferred_canonical_flow_publications"
-    ] == 1
+    assert (
+        owner._kems_settlement_publication_scope["deferred_canonical_flow_publications"]
+        == 1
+    )
     assert owner._kems_defer_canonical_settlement_publish is False
     assert owner._kems_defer_solar_settlement_publish is False
 
@@ -204,9 +205,12 @@ def test_direct_canonical_and_solar_callers_retain_original_publications():
     direct.reconcile_current_day_settlements(settled_half_hours=[], now=NOW)
     assert len(direct.events) == 3
     assert direct.events[-1][1]["solar_income"] == 11.9
-    assert direct._kems_settlement_publication_scope[
-        "deferred_canonical_flow_publications"
-    ] == 0
+    assert (
+        direct._kems_settlement_publication_scope[
+            "deferred_canonical_flow_publications"
+        ]
+        == 0
+    )
 
     solar = Solar()
     solar.reconcile_current_day_settlements(settled_half_hours=[], now=NOW)
@@ -231,7 +235,9 @@ def test_coalescing_has_no_change_to_precontrol_first_publication_or_fast_contro
     coordinator = (KEMS / "coordinator.py").read_text()
     assert "with coalesce_identical_settlement_publications(" in coordinator
     assert "pre_settlement = (" in coordinator
-    assert "pre_settlement.get(\"current_day_settlement_reconciliation\", {})" in coordinator
+    assert (
+        'pre_settlement.get("current_day_settlement_reconciliation", {})' in coordinator
+    )
     deadline = (KEMS / "agile_deadline_settlement_consistency.py").read_text()
     assert "self._publish(self._state)" in deadline
     assert "finally:" in deadline
