@@ -1,3 +1,10 @@
+## 0.9.0-alpha9.182 — Maintain physical paid-export proof through temporary house-demand absorption
+
+- After the first valid 1 kW incremental Force Discharge sample, retain that **verified** battery-discharge-plus-grid-export observation for at most 180 seconds if subsequent solar-safe samples merely show that the household consumed the export headroom. This is inconclusive, not a physical hardware failure.
+- Promote full bounded export **only after two distinct physical sensor publications** (fresh battery and grid-export reports) with independently verified active Force Discharge, correctly bound 7 kW hardware export ceiling and positive net grid export. Repeated coordinator scans of the same physical reading do not count.
+- Reset a partial sample after mode exit, unsuccessful command, expired window, CT/inverter disagreement, solar-only export or real hardware failure. Preserve three real failure strikes, the 1 kW staging ceiling, session-scoped proof (never persisted/reused across restart), commissioned limits and all EV/reward control.
+- Add regression tests reproducing the 4 Nov 18:31 2.009 kW Force Discharge vs 2.492 kW household load, duplicate reports, expiry, mode exit and wrong export-limit readback. No extra scans, background tasks or reporting load.
+
 ## 0.9.0-alpha9.181 — Reduce redundant synchronous Agile settlement reporting
 
 - Coalesce the intermediate Canonical Flow publication **only** while the enclosing Deadline Settlement owner guarantees a complete, synchronous final publish after the same-scan canonical, solar and deadline overlays. Direct Canonical and Solar callers still publish normally.

@@ -12,7 +12,7 @@ Import Power Limit is never written.
 from __future__ import annotations
 
 import asyncio
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from math import isfinite
 from typing import Any
 
@@ -37,6 +37,7 @@ _PAID_EXPORT_STAGE_KW = 1.0
 _PAID_EXPORT_PROOF_PROTOCOL = 3
 _PAID_EXPORT_PROOF_SAMPLES = 2
 _PAID_EXPORT_FAILURE_SAMPLES = 3
+_PAID_EXPORT_GOOD_SAMPLE_WINDOW_SECONDS = 180
 _PAID_EXPORT_MAX_SOLAR_KW = 0.5
 _PAID_EXPORT_MIN_GRID_EXPORT_KW = 0.2
 _PAID_EXPORT_MIN_BATTERY_DISCHARGE_KW = 0.25
@@ -51,6 +52,28 @@ def _number(value: object) -> float | None:
         return float(value)
     except (TypeError, ValueError):
         return None
+
+
+def _paid_export_physical_observed_at(snapshot: Any) -> datetime | None:
+    """Timestamp the *oldest* of the two required physical sensor reports.
+
+    Reusing an unchanged battery/grid reading during successive KEMS scans
+    must not count as two independent direction proofs. When the collector
+    publishes per-source age, both meter reports must advance after the
+    previous successful sample.
+    """
+    captured = getattr(snapshot, "timestamp", None)
+    if not isinstance(captured, datetime) or captured.tzinfo is None:
+        return None
+    ages = getattr(snapshot, "source_age_seconds", None)
+    if not isinstance(ages, dict):
+        return captured
+    readings = tuple(
+        _number(ages.get(k)) for k in ("battery_power_kw", "grid_export_kw")
+    )
+    if any(age is None or not isfinite(age) or age < 0 for age in readings):
+        return None
+    return captured - timedelta(seconds=max(readings))
 
 
 def _bounded_paid_export_discharge_setpoint(
@@ -289,6 +312,10 @@ class FoxESSControlBackend:
         self._paid_activation_baseline_repair_at: str | None = None
         self._paid_export_live_proven = False
         self._paid_export_stage_samples = 0
+        # Never persisted: good-stage samples must be observed again after a
+        # restart, in the same physical Force Discharge session.
+        self._paid_export_first_sample_at: datetime | None = None
+        self._paid_export_last_physical_at: datetime | None = None
         self._paid_export_stage_failures = 0
         self._paid_export_stage_blocked = False
         self._paid_export_stage_reason: str | None = None
@@ -646,17 +673,38 @@ class FoxESSControlBackend:
         config: Any,
     ) -> None:
         """Promote the 1 kW first-export stage only after physical direction proof."""
-        if (
-            self._paid_export_live_proven
-            or self._paid_export_stage_blocked
-            or self._last_applied_action != "force_discharge"
-        ):
+        if self._last_applied_action != "force_discharge":
+            # A Self Use, charge, release or restore breaks the physical proof
+            # session. Never carry a good sample into a later Force Discharge.
+            self._paid_export_stage_samples = 0
+            self._paid_export_first_sample_at = None
+            self._paid_export_last_physical_at = None
+            return
+        if self._paid_export_live_proven or self._paid_export_stage_blocked:
             return
 
         work = entities.get("work_mode") or {}
         mode = str(work.get("normalised_observation") or "")
         if mode != "Force Discharge":
+            self._paid_export_stage_samples = 0
+            self._paid_export_first_sample_at = None
+            self._paid_export_last_physical_at = None
             return
+
+        captured_at = getattr(snapshot, "timestamp", None)
+        first_at = getattr(self, "_paid_export_first_sample_at", None)
+        if (
+            isinstance(captured_at, datetime)
+            and isinstance(first_at, datetime)
+            and (
+                (captured_at - first_at).total_seconds() < 0
+                or (captured_at - first_at).total_seconds()
+                > _PAID_EXPORT_GOOD_SAMPLE_WINDOW_SECONDS
+            )
+        ):
+            self._paid_export_stage_samples = 0
+            self._paid_export_first_sample_at = None
+            self._paid_export_last_physical_at = None
 
         stale = set(getattr(snapshot, "stale_fields", ()) or ())
         if {
@@ -694,6 +742,8 @@ class FoxESSControlBackend:
         # failed battery test during daytime commissioning.
         if solar > _PAID_EXPORT_MAX_SOLAR_KW and not direction_verified:
             self._paid_export_stage_samples = 0
+            self._paid_export_first_sample_at = None
+            self._paid_export_last_physical_at = None
             self._paid_export_stage_reason = (
                 "Waiting for measured battery discharge and net grid export "
                 "with active solar; PV-only export is not battery proof"
@@ -718,6 +768,8 @@ class FoxESSControlBackend:
             )
         ):
             self._paid_export_stage_samples = 0
+            self._paid_export_first_sample_at = None
+            self._paid_export_last_physical_at = None
             self._paid_export_stage_reason = (
                 "1 kW export proof inconclusive: inverter AC, primary grid CT "
                 "and house-load reports disagree; waiting for consistent "
@@ -728,16 +780,55 @@ class FoxESSControlBackend:
         # A shortfall in *net* grid export is inconclusive when the house
         # consumes the staged battery output. Do not count that as a hardware
         # direction failure or persist an unjustified lockout.
-        if not direction_verified and grid_export < _PAID_EXPORT_MIN_GRID_EXPORT_KW:
+        if (
+            not direction_verified
+            and grid_export < _PAID_EXPORT_MIN_GRID_EXPORT_KW
+            and limit_verified
+        ):
             home_from_battery = max(house - solar, 0.0)
             if battery < home_from_battery + _PAID_EXPORT_MIN_GRID_EXPORT_KW:
-                self._paid_export_stage_samples = 0
+                # This sample cannot prove grid export. It also cannot
+                # disprove it: the household absorbed the bounded 1 kW
+                # incremental stage. Preserve only a previously valid first
+                # sample, in this still-active mode and short proof window.
+                # Keep two *independent* positive battery+grid reports
+                # mandatory; never promote from a headroom-only sample.
+                held = self._paid_export_stage_samples
                 self._paid_export_stage_reason = (
                     "Waiting for physical net-export headroom above house demand"
+                    + (
+                        f"; retaining {held}/2 verified samples within "
+                        "180-second Force Discharge window"
+                        if held
+                        else ""
+                    )
                 )
                 return
 
         if limit_verified and direction_verified:
+            physical_at = _paid_export_physical_observed_at(snapshot)
+            previous_at = getattr(self, "_paid_export_last_physical_at", None)
+            if isinstance(captured_at, datetime) and physical_at is None:
+                self._paid_export_stage_reason = (
+                    "Waiting for verified timestamp of fresh battery and "
+                    "grid-export telemetry"
+                )
+                return
+            if (
+                previous_at is not None
+                and physical_at is not None
+                and physical_at <= previous_at
+            ):
+                self._paid_export_stage_reason = (
+                    "Waiting for independently updated physical battery and "
+                    "grid-export readings for second proof"
+                )
+                return
+            if self._paid_export_stage_samples == 0:
+                self._paid_export_first_sample_at = (
+                    captured_at if isinstance(captured_at, datetime) else None
+                )
+            self._paid_export_last_physical_at = physical_at
             self._paid_export_stage_samples += 1
             self._paid_export_stage_failures = 0
             self._paid_export_stage_reason = (
@@ -753,6 +844,8 @@ class FoxESSControlBackend:
             return
 
         self._paid_export_stage_samples = 0
+        self._paid_export_first_sample_at = None
+        self._paid_export_last_physical_at = None
         self._paid_export_stage_failures += 1
         self._paid_export_stage_reason = (
             "Staged Force Discharge did not prove battery discharge + grid export "
@@ -959,6 +1052,8 @@ class FoxESSControlBackend:
             )
             self._paid_export_live_proven = False
             self._paid_export_stage_samples = 0
+            self._paid_export_first_sample_at = None
+            self._paid_export_last_physical_at = None
             self._paid_export_stage_failures = 0
             self._paid_export_stage_blocked = False
             self._paid_export_stage_reason = None
@@ -1635,6 +1730,16 @@ class FoxESSControlBackend:
                             ),
                         )
 
+        if not self._paid_export_live_proven and (
+            decision.action != "force_discharge" or not applied
+        ):
+            # A new export session cannot inherit a preceding session's
+            # partial proof. The full, physically proven latch remains scoped
+            # to this HA Core session as before.
+            self._paid_export_stage_samples = 0
+            self._paid_export_first_sample_at = None
+            self._paid_export_last_physical_at = None
+
         payload = {
             "scope": "alpha9.83_bounded_control_with_export_commissioning",
             "reviewed_foxess_modbus_version": FOXESS_MODBUS_REVIEWED_VERSION,
@@ -1764,6 +1869,16 @@ class FoxESSControlBackend:
             "paid_export_stage_kw": _PAID_EXPORT_STAGE_KW,
             "paid_export_stage_samples": self._paid_export_stage_samples,
             "paid_export_stage_required_samples": _PAID_EXPORT_PROOF_SAMPLES,
+            "paid_export_stage_first_sample_at": (
+                self._paid_export_first_sample_at.isoformat()
+                if self._paid_export_first_sample_at is not None
+                else None
+            ),
+            "paid_export_stage_last_physical_at": (
+                self._paid_export_last_physical_at.isoformat()
+                if self._paid_export_last_physical_at is not None
+                else None
+            ),
             "paid_export_stage_failures": self._paid_export_stage_failures,
             "paid_export_stage_blocked": self._paid_export_stage_blocked,
             "paid_export_stage_reason": self._paid_export_stage_reason,
