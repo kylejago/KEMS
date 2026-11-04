@@ -10,7 +10,6 @@ from kems_core.roi_reward_audit import build_reward_audit
 from kems_core.roi_rewards import apply_reward_roi
 from kems_core import ROIState
 
-
 START = datetime(2026, 11, 1, 13, tzinfo=UTC)
 END = START + timedelta(hours=1)
 NOW = datetime(2026, 11, 4, 9, tzinfo=UTC)
@@ -77,17 +76,33 @@ def test_confirmed_complete_receipt_replaces_incomplete_estimate():
         "import_kwh": 4.0,
         "credit_pence": 143.5312,
     }
-    assert estimate([sample(i, rate=20) for i in range(0, 21, 2)], receipts=[
-        ADJACENT_VERIFIED_HOUR, completed
-    ]) == []
+    assert (
+        estimate(
+            [sample(i, rate=20) for i in range(0, 21, 2)],
+            receipts=[ADJACENT_VERIFIED_HOUR, completed],
+        )
+        == []
+    )
 
 
-@pytest.mark.parametrize("windows,readings", [
-    ([{**BOOKING, "booking_source": "public_available_events", "event_id": None}], [sample(i, rate=20) for i in range(0, 41, 2)]),
-    ([BOOKING], [sample(0, rate=20), sample(40, rate=20)]),
-    ([BOOKING], [sample(i, rate=None) for i in range(0, 41, 2)]),
-    ([BOOKING], []),
-])
+@pytest.mark.parametrize(
+    "windows,readings",
+    [
+        (
+            [
+                {
+                    **BOOKING,
+                    "booking_source": "public_available_events",
+                    "event_id": None,
+                }
+            ],
+            [sample(i, rate=20) for i in range(0, 41, 2)],
+        ),
+        ([BOOKING], [sample(0, rate=20), sample(40, rate=20)]),
+        ([BOOKING], [sample(i, rate=None) for i in range(0, 41, 2)]),
+        ([BOOKING], []),
+    ],
+)
 def test_no_unverified_booking_or_meter_or_tariff_is_invented(windows, readings):
     assert estimate(readings, bookings=windows, receipts=[]) == []
 
@@ -109,12 +124,18 @@ def test_provisional_reward_included_and_audit_preserves_source():
         },
     }
     audit = build_reward_audit(
-        payload, {}, [BOOKING], [], now=NOW,
+        payload,
+        {},
+        [BOOKING],
+        [],
+        now=NOW,
         commissioning_date=datetime(2026, 9, 12, tzinfo=UTC).date(),
     )
     assert audit["included_count"] == 1
     assert audit["pending_count"] == 0
-    assert audit["provisional_partial_pence"] == pytest.approx(provisional["credit_pence"])
+    assert audit["provisional_partial_pence"] == pytest.approx(
+        provisional["credit_pence"]
+    )
     assert audit["unsettled_total_pence"] == pytest.approx(provisional["credit_pence"])
     assert audit["entries"][0]["status"] == "included_provisional_partial_estimate"
     assert audit["entries"][0]["coverage_percent"] == 80
@@ -123,13 +144,21 @@ def test_provisional_reward_included_and_audit_preserves_source():
 
 def test_power_down_modelled_agile_export_is_displayed_but_not_added_to_roi():
     event = SimpleNamespace(
-        available=True, session_id="8135", session_start=NOW - timedelta(hours=15),
+        available=True,
+        session_id="8135",
+        session_start=NOW - timedelta(hours=15),
         session_end=NOW - timedelta(hours=14),
-        fixed_export_income_pence=51.12, rewardable_reduction_kwh=None,
-        physical_export_verified=True, physical_grid_export_kwh=3.268,
+        fixed_export_income_pence=51.12,
+        rewardable_reduction_kwh=None,
+        physical_export_verified=True,
+        physical_grid_export_kwh=3.268,
     )
     audit = build_reward_audit(
-        {}, {}, [], [event], now=NOW,
+        {},
+        {},
+        [],
+        [event],
+        now=NOW,
         commissioning_date=datetime(2026, 9, 12, tzinfo=UTC).date(),
     )
     assert audit["included_total_pence"] == 0
@@ -140,18 +169,24 @@ def test_power_down_modelled_agile_export_is_displayed_but_not_added_to_roi():
 
 def test_roi_reports_provisional_separately_from_meter_supported_reward():
     roi = ROIState(
-        system_installed=True, net_investment_gbp=20995.0,
+        system_installed=True,
+        net_investment_gbp=20995.0,
         actual_value_created_total_gbp=385.68,
         actual_value_created_today_gbp=0.0,
     )
     total = 261.729143 + 114.82496
-    out = apply_reward_roi(roi, {
-        "total": total, "today": 0.0,
-        "happy": total, "power_down": 0.0,
-        "unsettled": total,
-        "provisional": 114.82496,
-        "meter_supported": 261.729143,
-    })
+    out = apply_reward_roi(
+        roi,
+        {
+            "total": total,
+            "today": 0.0,
+            "happy": total,
+            "power_down": 0.0,
+            "unsettled": total,
+            "provisional": 114.82496,
+            "meter_supported": 261.729143,
+        },
+    )
     assert out.actual_value_created_total_gbp == round(385.68 + total / 100, 2)
     assert out.roi_rewards_provisional_gbp == 1.15
     assert out.roi_rewards_meter_supported_gbp == 2.62
