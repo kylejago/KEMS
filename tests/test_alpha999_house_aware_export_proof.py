@@ -26,7 +26,7 @@ BACKEND = (
 
 def _production():
     tree = ast.parse(BACKEND.read_text(encoding="utf-8"), filename=str(BACKEND))
-    wanted = {"_number", "_bounded_paid_export_discharge_setpoint"}
+    wanted = {"_number", "_paid_export_physical_observed_at", "_bounded_paid_export_discharge_setpoint"}
     methods = {"async_setup", "_async_save", "_async_observe_paid_export_stage"}
     selected = [
         node
@@ -55,6 +55,9 @@ def _production():
         "_PAID_EXPORT_PROOF_SAMPLES": 2,
         "_PAID_EXPORT_FAILURE_SAMPLES": 3,
         "_PAID_EXPORT_PROOF_PROTOCOL": 3,
+        "_PAID_EXPORT_GOOD_SAMPLE_WINDOW_SECONDS": 180,
+        "datetime": datetime,
+        "timedelta": timedelta,
         "_LOCAL_WORK_MODES": {"Self Use", "Feed-in First", "Back-up"},
     }
     exec(
@@ -186,6 +189,8 @@ def _backend(store=None):
         _previous_export_power_limit_w=None,
         _paid_export_live_proven=False,
         _paid_export_stage_samples=0,
+        _paid_export_first_sample_at=None,
+        _paid_export_last_physical_at=None,
         _paid_export_stage_failures=0,
         _paid_export_stage_blocked=False,
         _paid_export_stage_reason=None,
@@ -352,7 +357,11 @@ def test_live_ct_disagreement_does_not_latch_and_two_good_samples_recover():
     snapshot = SimpleNamespace(
         timestamp=timestamp,
         stale_fields=(),
-        source_age_seconds={"house_load_kw": 9.0},
+        source_age_seconds={
+            "house_load_kw": 9.0,
+            "battery_power_kw": 1.0,
+            "grid_export_kw": 1.0,
+        },
         house_load_kw=0.346,
         solar_power_kw=0.0,
         battery_power_kw=1.516,
@@ -399,6 +408,7 @@ def test_live_ct_disagreement_does_not_latch_and_two_good_samples_recover():
     snapshot.grid_export_kw = 1.052
     snapshot.foxess_balance_probe["grid_ct"]["value"] = 1.052
     for sample_number in range(2):
+        snapshot.timestamp = timestamp + timedelta(seconds=60 * (sample_number + 1))
         asyncio.run(
             OBSERVE(backend, snapshot=snapshot, entities=entities, config=config)
         )
