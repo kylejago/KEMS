@@ -11,7 +11,9 @@ from datetime import datetime
 from typing import Any
 
 
-def classify_restart_service_call(event: Any, *, now: datetime) -> dict[str, Any] | None:
+def classify_restart_service_call(
+    event: Any, *, now: datetime
+) -> dict[str, Any] | None:
     """Return bounded, non-identifying evidence for a Core restart request."""
     data = getattr(event, "data", None)
     if not isinstance(data, dict):
