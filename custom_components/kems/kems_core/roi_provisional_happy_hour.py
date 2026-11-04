@@ -172,7 +172,9 @@ def estimate_partial_reward_hours(
                     if historical_sampled
                     else "provisional_partial_physical_meter_credit"
                 ),
-                "confidence": "low" if historical_sampled or proxy_rate_used else "medium",
+                "confidence": (
+                    "low" if historical_sampled or proxy_rate_used else "medium"
+                ),
                 "supplier_settled": False,
                 "event_id": window.get("event_id"),
             }
