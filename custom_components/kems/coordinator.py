@@ -1583,6 +1583,15 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                 roi,
                 self._roi_rewards.totals(now, self.settings.roi.commissioning_date),
             )
+            roi = replace(
+                roi,
+                reward_audit=self._roi_rewards.audit(
+                    now,
+                    self.settings.roi.commissioning_date,
+                    bookings=_controller_for(self).state.get("bookings", []),
+                    events=completed_power_downs,
+                ),
+            )
             phase = self._phase(
                 learned.ready,
                 simulation.ready,
