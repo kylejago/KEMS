@@ -25,12 +25,16 @@ class ROIRewardRecorder:
         )
         self._happy_hours: dict[str, dict] = {}
         self._power_downs: dict[str, dict] = {}
+        # Historical joined-event proof is financial-only, never live booking
+        # authority, and survives upstream feed retention expiry.
+        self._joined_happy_hours: dict[str, dict] = {}
 
     async def async_load(self) -> None:
         saved = await self._store.async_load() or {}
         for name, destination in (
             ("happy_hours", self._happy_hours),
             ("power_downs", self._power_downs),
+            ("joined_happy_hours", self._joined_happy_hours),
         ):
             entries = saved.get(name)
             if isinstance(entries, dict):
@@ -39,9 +43,41 @@ class ROIRewardRecorder:
                 )
 
     async def async_observe(
-        self, receipts: list, events: list, *, provisional_happy_hours=()
+        self,
+        receipts: list,
+        events: list,
+        *,
+        provisional_happy_hours=(),
+        historical_bookings=(),
     ) -> None:
         changed = False
+        for item in historical_bookings:
+            if (
+                not isinstance(item, dict)
+                or item.get("booking_source") != "octopus_joined_events"
+            ):
+                continue
+            try:
+                start = datetime.fromisoformat(str(item.get("start")))
+                end = datetime.fromisoformat(str(item.get("end")))
+            except (TypeError, ValueError):
+                continue
+            if (
+                start.tzinfo is None
+                or end.tzinfo is None
+                or not 55 <= (end - start).total_seconds() / 60 <= 65
+            ):
+                continue
+            key = f"{start.isoformat()}|{end.isoformat()}"
+            proof = {
+                "start": start.isoformat(),
+                "end": end.isoformat(),
+                "event_id": str(item.get("event_id") or "") or None,
+                "booking_source": "octopus_joined_events",
+            }
+            if self._joined_happy_hours.get(key) != proof:
+                self._joined_happy_hours[key] = proof
+                changed = True
         for item in receipts:
             if not isinstance(item, dict) or item.get("completed") is not True:
                 continue
@@ -111,18 +147,30 @@ class ROIRewardRecorder:
                 continue
             key = f"{start_dt.isoformat()}|{end_dt.isoformat()}"
             current = self._happy_hours.get(key)
+            historical = (
+                item.get("basis") == "provisional_historical_five_minute_meter_credit"
+            )
             if current is not None and (
                 current.get("basis") == "completed_meter_and_tariff_verified_hour"
                 or current.get("supplier_settled") is True
-                or number(current.get("covered_minutes")) is not None
-                and float(current["covered_minutes"]) > minutes
+                or historical
+                and current.get("basis") == "provisional_partial_physical_meter_credit"
+                or (
+                    current.get("basis") == item.get("basis")
+                    and number(current.get("covered_minutes")) is not None
+                    and float(current["covered_minutes"]) > minutes
+                )
             ):
                 continue
             saved = {
                 "day": start_dt.astimezone(_LONDON).date().isoformat(),
                 "pence": round(pence, 6),
                 "supplier_settled": False,
-                "basis": "provisional_partial_physical_meter_credit",
+                "basis": (
+                    "provisional_historical_five_minute_meter_credit"
+                    if historical
+                    else "provisional_partial_physical_meter_credit"
+                ),
                 "confidence": item.get("confidence", "low"),
                 "rate_basis": item.get("rate_basis"),
                 "covered_minutes": minutes,
@@ -165,6 +213,7 @@ class ROIRewardRecorder:
                 {
                     "happy_hours": self._happy_hours,
                     "power_downs": self._power_downs,
+                    "joined_happy_hours": self._joined_happy_hours,
                 }
             )
 
@@ -181,7 +230,7 @@ class ROIRewardRecorder:
                 if not first <= day <= today:
                     continue
                 total += value
-                if record.get("basis") == "provisional_partial_physical_meter_credit":
+                if str(record.get("basis") or "").startswith("provisional_"):
                     provisional += value
                 if day == today:
                     daily += value
@@ -206,7 +255,7 @@ class ROIRewardRecorder:
         return build_reward_audit(
             self._happy_hours,
             self._power_downs,
-            bookings,
+            [*self._joined_happy_hours.values(), *bookings],
             events,
             now=now,
             commissioning_date=commissioned,
