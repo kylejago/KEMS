@@ -376,14 +376,15 @@ def discover_available_happy_hours(
 
 
 def verified_octopus_joined_bookings(
-    hass: Any, *, now: datetime
+    hass: Any, *, now: datetime, historical_since: date | None = None
 ) -> list[dict[str, Any]]:
     """Confirm code-less reward hours from the Octopus *joined* event feed.
 
     Available events are never booking evidence.  Require one unambiguous
     public Octopus account, independently joined, one-hour weekend events.
-    Do not persist these external observations: losing source confirmation
-    must revoke their live charging authority.
+    Normal calls keep the seven-day live authority window and never persist
+    external observations. The optional commissioned-period query is strictly
+    for the separate read-only ROI evidence store, never live dispatch.
     """
     sources = _public_power_up_sources(hass)
     if len(sources) != 1:
@@ -402,7 +403,10 @@ def verified_octopus_joined_bookings(
             continue
         if start.astimezone(_LONDON).weekday() < 5:
             continue
-        if end < now - timedelta(days=7) or start > now + timedelta(days=7):
+        if historical_since is None:
+            if end < now - timedelta(days=7) or start > now + timedelta(days=7):
+                continue
+        elif start.astimezone(_LONDON).date() < historical_since or end > now:
             continue
         identity = str(_field(raw, "id") or "").strip()
         confirmed[(start, end)] = {
