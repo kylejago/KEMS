@@ -1661,9 +1661,7 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                     )
                 )
                 self._historical_reward_backfill_key = historical_credit_key
-            historical_estimates = getattr(
-                self, "_historical_reward_credit_cache", []
-            )
+            historical_estimates = getattr(self, "_historical_reward_credit_cache", [])
             await self._roi_rewards.async_observe(
                 verified_happy_hour_receipts,
                 list(completed_power_downs),
