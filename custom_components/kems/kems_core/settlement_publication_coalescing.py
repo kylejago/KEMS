@@ -54,8 +54,7 @@ class SettlementPublicationScope:
             "written": self.written,
             "comparison_seconds": round(self.comparison_seconds, 3),
             "layer_seconds": {
-                key: round(value, 3)
-                for key, value in self.layer_seconds.items()
+                key: round(value, 3) for key, value in self.layer_seconds.items()
             },
             "layer_calls": dict(self.layer_calls),
         }
