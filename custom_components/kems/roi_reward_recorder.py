@@ -173,7 +173,7 @@ class ROIRewardRecorder:
         today = now.astimezone(_LONDON).date().isoformat()
 
         def collect(source):
-            total = daily = unsettled = 0.0
+            total = daily = unsettled = provisional = 0.0
             for record in source.values():
                 day, value = record.get("day"), number(record.get("pence"))
                 if first is None or not isinstance(day, str) or value is None:
@@ -181,20 +181,24 @@ class ROIRewardRecorder:
                 if not first <= day <= today:
                     continue
                 total += value
+                if record.get("basis") == "provisional_partial_physical_meter_credit":
+                    provisional += value
                 if day == today:
                     daily += value
                 if record.get("supplier_settled") is not True:
                     unsettled += value
-            return total, daily, unsettled
+            return total, daily, unsettled, provisional
 
-        hh, hd, hu = collect(self._happy_hours)
-        pd, dd, pu = collect(self._power_downs)
+        hh, hd, hu, hp = collect(self._happy_hours)
+        pd, dd, pu, pp = collect(self._power_downs)
         return {
             "happy": round(hh, 6),
             "power_down": round(pd, 6),
             "total": round(hh + pd, 6),
             "today": round(hd + dd, 6),
             "unsettled": round(hu + pu, 6),
+            "provisional": round(hp + pp, 6),
+            "meter_supported": round(hh + pd - hp - pp, 6),
         }
 
     def audit(self, now, commissioned, *, bookings=(), events=()):
