@@ -904,6 +904,7 @@ class ROIState:
     happy_hour_roi_credit_gbp: float = 0.0
     power_down_roi_bonus_gbp: float = 0.0
     roi_rewards_unsettled_gbp: float = 0.0
+    reward_audit: dict[str, Any] = field(default_factory=dict)
     operating_costs_gbp: float = 0.0
     confidence: float = 0.0
     observed_days: int = 0
