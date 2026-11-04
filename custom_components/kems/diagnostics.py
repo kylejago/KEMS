@@ -233,6 +233,7 @@ async def async_get_config_entry_diagnostics(
         "scenarios": data.scenarios.to_dict(),
         "whole_home": asdict(data.whole_home),
         "lifetime": data.lifetime.to_dict(),
+        "roi_reward_audit": data.roi.reward_audit,
         "historical_tariff_revaluation": (
             coordinator._lifetime.historical_tariff_revaluation_status
         ),
