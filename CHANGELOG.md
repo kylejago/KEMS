@@ -1,3 +1,11 @@
+## 0.9.0-alpha9.179 — Reconciled reward evidence and restart/performance observability
+
+- Reconcile the completed-hour Happy Hour financial receipts with separately recorded, partially witnessed ROI estimates by exact independent one-hour booking boundaries. Show the complete-hour and provisional tiers, their differences, coverage, and rate evidence together in diagnostics; a partial estimate never becomes a verified receipt and neither proves supplier settlement. No extra credit or missing meter samples are invented.
+- Add bounded per-layer settlement publication timing counters for the restart SOC anchor and underlying Agile reporting chain. Retain each original synchronously sequenced SOC, tariff, shadow and publish calculation; this **measures** the remaining bottleneck and does not promise a speed-up until field timings support a safe optimization.
+- Observe future Home Assistant `homeassistant.restart` service calls via a read-only bus listener, exposing only the timestamp and whether user/parent context exists. Never log identifiers, service arguments, or infer who initiated a restart. Existing November 4 09:44 request remains unattributed.
+- No changes to FoxESS write authority, EV hold/SOC sync, Agile price recovery, Power Down control, Happy Hour booking or charging, 7 kW export ceiling, 15% paid-export cut-off, 10% home-use floor, or safe-first 06:00–06:30 no-active-export installation window.
+- Gate merge/publication on exact-commit Black, Ruff, full pytest, Python compile, HACS/Hassfest and ESPHome panel compile.
+
 ## 0.9.0-alpha9.178 — Provisional reward earnings until confirmed
 
 - Add *provisional* Happy Hour bill-credit estimates for individually Octopus-confirmed reward hours with physically witnessed but incomplete grid-import coverage. Integrate only observed meter intervals no more than three minutes apart; never invent missing meter samples, extrapolate to the entire hour, or exceed 16 kWh per hour.
