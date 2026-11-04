@@ -416,3 +416,128 @@ def test_live_ct_disagreement_does_not_latch_and_two_good_samples_recover():
         assert not backend._paid_export_stage_blocked
     assert backend._paid_export_live_proven
     assert backend._paid_export_stage_failures == 0
+
+
+def _physical_proof_stage():
+    """Replay 4 November's house-demand interruption on independent scans."""
+    backend = _backend()
+    backend._last_applied_action = "force_discharge"
+
+    async def record():
+        return None
+
+    backend._async_save = record
+    now = datetime(2026, 11, 4, 18, 27, 0, tzinfo=UTC)
+    snapshot = SimpleNamespace(
+        timestamp=now,
+        stale_fields=(),
+        source_age_seconds={"battery_power_kw": 5.0, "grid_export_kw": 5.0},
+        house_load_kw=1.2,
+        solar_power_kw=0.0,
+        battery_power_kw=2.3,
+        grid_export_kw=1.1,
+    )
+    entities = {
+        "work_mode": {"normalised_observation": "Force Discharge"},
+        "export_power_limit": {"normalised_observation": 7000.0},
+    }
+    config = SimpleNamespace(
+        battery_power_positive_is_discharge=True,
+        export_limit_kw=7.0,
+    )
+    return backend, snapshot, entities, config, now
+
+
+def _observe_proof(backend, snapshot, entities, config):
+    asyncio.run(OBSERVE(backend, snapshot=snapshot, entities=entities, config=config))
+
+
+def test_house_demand_jump_preserves_one_short_lived_valid_physical_sample():
+    backend, snapshot, entities, config, now = _physical_proof_stage()
+    _observe_proof(backend, snapshot, entities, config)
+    assert backend._paid_export_stage_samples == 1
+    assert not backend._paid_export_live_proven
+
+    # The actual 4 Nov pattern: the house consumed the 1 kW export margin.
+    snapshot.timestamp = now + timedelta(seconds=60)
+    snapshot.house_load_kw = 2.492
+    snapshot.battery_power_kw = 2.246
+    snapshot.grid_export_kw = 0.0
+    _observe_proof(backend, snapshot, entities, config)
+    assert backend._paid_export_stage_samples == 1
+    assert backend._paid_export_stage_failures == 0
+    assert not backend._paid_export_live_proven
+    assert "retaining 1/2" in backend._paid_export_stage_reason
+
+    snapshot.timestamp = now + timedelta(seconds=120)
+    snapshot.house_load_kw = 1.2
+    snapshot.battery_power_kw = 2.3
+    snapshot.grid_export_kw = 1.1
+    _observe_proof(backend, snapshot, entities, config)
+    assert backend._paid_export_live_proven
+    assert backend._paid_export_stage_samples == 2
+
+
+def test_duplicate_physical_sensor_reports_cannot_prove_two_directions():
+    backend, snapshot, entities, config, now = _physical_proof_stage()
+    _observe_proof(backend, snapshot, entities, config)
+    assert backend._paid_export_stage_samples == 1
+    snapshot.timestamp = now + timedelta(seconds=60)
+    # The KEMS snapshot is newer, but underlying FoxESS battery/grid data
+    # remains the exact same sensor observation as the first sample.
+    snapshot.source_age_seconds = {
+        "battery_power_kw": 65.0,
+        "grid_export_kw": 65.0,
+    }
+    _observe_proof(backend, snapshot, entities, config)
+    assert backend._paid_export_stage_samples == 1
+    assert not backend._paid_export_live_proven
+    assert "independently updated" in backend._paid_export_stage_reason
+
+    # Only a separately published report from both physical meters qualifies.
+    snapshot.timestamp = now + timedelta(seconds=120)
+    snapshot.source_age_seconds = {
+        "battery_power_kw": 5.0,
+        "grid_export_kw": 5.0,
+    }
+    _observe_proof(backend, snapshot, entities, config)
+    assert backend._paid_export_live_proven
+
+
+def test_partial_proof_expires_without_relaxing_the_two_sample_threshold():
+    backend, snapshot, entities, config, now = _physical_proof_stage()
+    _observe_proof(backend, snapshot, entities, config)
+    snapshot.timestamp = now + timedelta(seconds=181)
+    _observe_proof(backend, snapshot, entities, config)
+    assert backend._paid_export_stage_samples == 1
+    assert not backend._paid_export_live_proven
+    assert backend._paid_export_first_sample_at == snapshot.timestamp
+
+
+def test_mode_exit_cannot_carry_first_sample_into_another_export_session():
+    backend, snapshot, entities, config, now = _physical_proof_stage()
+    _observe_proof(backend, snapshot, entities, config)
+    backend._last_applied_action = "self_use"
+    snapshot.timestamp = now + timedelta(seconds=30)
+    _observe_proof(backend, snapshot, entities, config)
+    assert backend._paid_export_stage_samples == 0
+    assert backend._paid_export_first_sample_at is None
+    backend._last_applied_action = "force_discharge"
+    snapshot.timestamp = now + timedelta(seconds=60)
+    _observe_proof(backend, snapshot, entities, config)
+    assert backend._paid_export_stage_samples == 1
+    assert not backend._paid_export_live_proven
+
+
+def test_invalid_export_limit_is_not_treated_as_harmless_house_headroom():
+    backend, snapshot, entities, config, now = _physical_proof_stage()
+    _observe_proof(backend, snapshot, entities, config)
+    snapshot.timestamp = now + timedelta(seconds=60)
+    snapshot.house_load_kw = 2.492
+    snapshot.battery_power_kw = 2.246
+    snapshot.grid_export_kw = 0.0
+    entities["export_power_limit"]["normalised_observation"] = 6400.0
+    _observe_proof(backend, snapshot, entities, config)
+    assert backend._paid_export_stage_samples == 0
+    assert backend._paid_export_stage_failures == 1
+    assert not backend._paid_export_live_proven
