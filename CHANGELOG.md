@@ -1,3 +1,12 @@
+## 0.9.0-alpha9.178 — Provisional reward earnings until confirmed
+
+- Add *provisional* Happy Hour bill-credit estimates for individually Octopus-confirmed reward hours with physically witnessed but incomplete grid-import coverage. Integrate only observed meter intervals no more than three minutes apart; never invent missing meter samples, extrapolate to the entire hour, or exceed 16 kWh per hour.
+- Persist the observed import tariff along with newly captured Happy Hour physical meter samples. For legacy samples without saved tariff, permit an explicitly low-confidence, **adjacent completed verified-hour indicative rate proxy**. Without metered energy or a defensible rate, the amount remains pending.
+- Credit the provisional partial-hour value to actual ROI under the same unique hour key. Once a completed hour receipt becomes available, replace its provisional value rather than counting two amounts. Both stages remain Octopus-unsettled pending supplier proof.
+- Show provisional and meter-supported reward totals separately in ROI sensors and dashboard, with event-level meter coverage, tariff basis, confidence and evidence in the audit.
+- Show modelled normal Agile export income alongside each Power Down event as context. It was already counted in the base physical ROI and is **never added a second time**. Any extra Power Down bonus requires event-specific reward-rate and reduction evidence; unknown extra awards remain unknown, not imagined.
+- No changes to Happy Hour join authority, Power Down dispatch, FoxESS live control, 7 kW grid export ceiling, 15% intentional export cut-off, 10% house floor, EV protection or 06:00–06:30 no-export update policy.
+
 ## 0.9.0-alpha9.177 — Itemised ROI reward provenance and supplier-settlement audit
 
 - Explain every Happy Hour and Power Down reward included in actual ROI using the existing persisted event-level reward journal, with event ID where independently known, original date/window, estimated value and evidence source.

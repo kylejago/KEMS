@@ -76,9 +76,9 @@ def test_hotfix_release_explains_reversion_and_preserves_safety() -> None:
     bundle = json.loads(
         (ROOT / "release" / "kems-bundle.template.json").read_text(encoding="utf-8")
     )
-    assert manifest["version"] == "0.9.0-alpha9.177"
+    assert manifest["version"] == "0.9.0-alpha9.178"
     reason = bundle["maintenance"]["reason"]
-    assert reason.startswith("Alpha9.177:")
+    assert reason.startswith("Alpha9.178:")
     assert "Alpha9.158" in reason
     assert "7 kW" in reason
     assert "10%" in reason
