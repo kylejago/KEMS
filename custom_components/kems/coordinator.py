@@ -93,6 +93,9 @@ from .kems_core.control_event_refresh import (
 )
 from .kems_core.control_write_authority import active_joined_power_down_window
 from .kems_core.happy_hour_financial import estimate_happy_hour_credit
+from .kems_core.historical_reward_backfill import (
+    estimate_historical_happy_hour_credits,
+)
 from .kems_core.roi_provisional_happy_hour import estimate_partial_reward_hours
 from .kems_core.roi_rewards import apply_reward_roi
 from .kems_core.scenario_report_gate import ScenarioReportGate
@@ -874,6 +877,13 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
             # reward hours. Never substitute a digital-twin estimate for an
             # unknown section of the 16kWh per-hour import allowance.
             external_bookings = verified_octopus_joined_bookings(self.hass, now=now)
+            # Read-only financial discovery since commissioning. Never pass
+            # historical joined hours into the live controller or import gate.
+            historical_reward_bookings = verified_octopus_joined_bookings(
+                self.hass,
+                now=now,
+                historical_since=self.settings.roi.commissioning_date,
+            )
             # Reporting proof: retain every independently joined one-hour
             # receipt before the controller aggregates adjacent sessions.
             # This changes no live charge or export authority.
@@ -1625,10 +1635,43 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                 completed_receipts=verified_happy_hour_receipts,
                 now=now,
             )
+            # Historical five-minute readings are lower-confidence estimates;
+            # calculate only when newly completed joined-hour identities appear,
+            # not on every five-minute history append or fast control scan.
+            historical_completed = [
+                booking
+                for booking in historical_reward_bookings
+                if datetime.fromisoformat(str(booking["end"])) <= now
+            ]
+            historical_credit_key = tuple(
+                sorted(
+                    (str(item["start"]), str(item["end"]))
+                    for item in historical_completed
+                )
+            )
+            if historical_credit_key != getattr(
+                self, "_historical_reward_backfill_key", None
+            ):
+                self._historical_reward_credit_cache = (
+                    estimate_historical_happy_hour_credits(
+                        confirmed_bookings=historical_completed,
+                        history=records,
+                        completed_receipts=verified_happy_hour_receipts,
+                        now=now,
+                    )
+                )
+                self._historical_reward_backfill_key = historical_credit_key
+            historical_estimates = getattr(
+                self, "_historical_reward_credit_cache", []
+            )
             await self._roi_rewards.async_observe(
                 verified_happy_hour_receipts,
                 list(completed_power_downs),
-                provisional_happy_hours=provisional_happy_hours,
+                provisional_happy_hours=[
+                    *historical_estimates,
+                    *provisional_happy_hours,
+                ],
+                historical_bookings=historical_reward_bookings,
             )
             roi = apply_reward_roi(
                 roi,
@@ -1639,7 +1682,10 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                 reward_audit=self._roi_rewards.audit(
                     now,
                     self.settings.roi.commissioning_date,
-                    bookings=_controller_for(self).state.get("bookings", []),
+                    bookings=[
+                        *historical_reward_bookings,
+                        *(_controller_for(self).state.get("bookings", []) or []),
+                    ],
                     events=completed_power_downs,
                 ),
             )
