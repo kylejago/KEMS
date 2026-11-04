@@ -62,6 +62,7 @@ class GridImportReading:
 
     timestamp: datetime
     grid_import_kw: float
+    import_rate_pence: float | None = None
 
 
 class HappyHourImportLedgerRecorder:
@@ -150,7 +151,10 @@ class HappyHourImportLedgerRecorder:
             at = _utc(item.get("timestamp"))
             power = _number(item.get("grid_import_kw"))
             if at is not None and power is not None and power >= 0.0:
-                recovered[at] = GridImportReading(at, power)
+                rate = _number(item.get("import_rate_pence"))
+                recovered[at] = GridImportReading(
+                    at, power, rate if rate is not None and 0 <= rate <= 200 else None
+                )
         self._samples = [recovered[at] for at in sorted(recovered)]
         self._last_saved_at = self._samples[-1].timestamp if self._samples else None
         self._load_status = "restored" if self._samples else "empty_saved_store"
@@ -262,7 +266,18 @@ class HappyHourImportLedgerRecorder:
             and (not self._samples or timestamp > self._samples[-1].timestamp)
         )
         if sample_valid:
-            self._samples.append(GridImportReading(timestamp, power))
+            # Retain the tariff that accompanied this physical observation.
+            # Historical samples without a rate retain None, not today's rate.
+            import_rate = _number(getattr(snapshot, "current_import_rate", None))
+            rate_fresh = "current_import_rate" not in (
+                getattr(snapshot, "tariff_stale_fields", ()) or ()
+            )
+            observed_rate = (
+                import_rate
+                if rate_fresh and import_rate is not None and 0 <= import_rate <= 200
+                else None
+            )
+            self._samples.append(GridImportReading(timestamp, power, observed_rate))
             self._prune(now_utc)
         if not newly_confirmed and not sample_valid:
             return False
@@ -283,6 +298,7 @@ class HappyHourImportLedgerRecorder:
                         {
                             "timestamp": sample.timestamp.isoformat(),
                             "grid_import_kw": sample.grid_import_kw,
+                            "import_rate_pence": sample.import_rate_pence,
                         }
                         for sample in self._samples
                     ],
