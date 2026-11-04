@@ -1727,6 +1727,17 @@ class FoxESSControlBackend:
                             ),
                         )
 
+        if (
+            not self._paid_export_live_proven
+            and (decision.action != "force_discharge" or not applied)
+        ):
+            # A new export session cannot inherit a preceding session's
+            # partial proof. The full, physically proven latch remains scoped
+            # to this HA Core session as before.
+            self._paid_export_stage_samples = 0
+            self._paid_export_first_sample_at = None
+            self._paid_export_last_physical_at = None
+
         payload = {
             "scope": "alpha9.83_bounded_control_with_export_commissioning",
             "reviewed_foxess_modbus_version": FOXESS_MODBUS_REVIEWED_VERSION,
