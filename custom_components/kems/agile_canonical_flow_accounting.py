@@ -336,5 +336,15 @@ class CanonicalFlowAccountingAgileSmartExportManager(
         config = getattr(self, "_rolling_config", None)
         if isinstance(config, SimulationConfig):
             _active_slot_from_routing(self._state, now=now, config=config)
-        self._publish(self._state)
+        # The enclosing DeadlineSettlementConsistency owner promises a final
+        # synchronous publish after both Solar and deadline overlays. It has
+        # already received the mandatory first settled-SOC publication and
+        # FlowPresentation's own full publication. Only this intermediate,
+        # presentation-only publication is redundant in that exact scope.
+        if not getattr(self, "_kems_defer_canonical_settlement_publish", False):
+            self._publish(self._state)
+        else:
+            scope = getattr(self, "_kems_settlement_publication_scope", None)
+            if scope is not None:
+                scope["deferred_canonical_flow_publications"] += 1
         return self.state
