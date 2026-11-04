@@ -28,6 +28,7 @@ class SettlementPublicationScope:
     skipped_existing_identical: int = 0
     written: int = 0
     comparison_seconds: float = 0.0
+    deferred_canonical_flow_publications: int = 0
     layer_seconds: dict[str, float] = field(default_factory=dict)
     layer_calls: dict[str, int] = field(default_factory=dict)
 
@@ -53,6 +54,9 @@ class SettlementPublicationScope:
             "skipped_existing_identical": self.skipped_existing_identical,
             "written": self.written,
             "comparison_seconds": round(self.comparison_seconds, 3),
+            "deferred_canonical_flow_publications": (
+                self.deferred_canonical_flow_publications
+            ),
             "layer_seconds": {
                 key: round(value, 3) for key, value in self.layer_seconds.items()
             },

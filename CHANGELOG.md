@@ -1,3 +1,11 @@
+## 0.9.0-alpha9.181 — Reduce redundant synchronous Agile settlement reporting
+
+- Coalesce the intermediate Canonical Flow publication **only** while the enclosing Deadline Settlement owner guarantees a complete, synchronous final publish after the same-scan canonical, solar and deadline overlays. Direct Canonical and Solar callers still publish normally.
+- Keep the mandatory first settled-SOC/price/rolling-control publication, the Flow owner publication, every reconciliation calculation, and the final Deadline publication intact. No asynchronous queue, new cache, stale-state shortcut or disabled SOC continuity.
+- Expose `deferred_canonical_flow_publications` in the existing per-scan publication coalescing diagnostics. The pre-upgrade reference was 4 underlying Agile publication passes consuming 1.254 seconds (6.713-second scan); assess measured improvement only after the new release runs in HA.
+- Test direct callers, same-scan corrected SOC/price/solar/deadline states, exception flag cleanup, and unmodified coordinator/control boundary. Preserve FoxESS/Ohme write authority, 7 kW export cap, 15% paid-export floor, 10% household minimum, Power Down/Happy Hour reward accounting and 06:00–06:30 no-active-export auto-install gate.
+- Require exact-commit Black, Ruff, full pytest, Python compilation, HACS/Hassfest and ESPHome panel compile.
+
 ## 0.9.0-alpha9.180 — Commissioned reward-history recovery and true EV SOC display
 
 - Scan the independently joined Octopus Weekend Happy Hour feed back to the configured financial commissioning date **for financial evidence only**; the existing seven-day live booking/charging authority is unchanged. Persist each historical joined one-hour booking identity in the dedicated ROI journal so it remains auditable after the upstream feed expires.
