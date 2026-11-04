@@ -49,5 +49,7 @@ def apply_reward_roi(roi, rewards):
         power_down_roi_bonus_gbp=round(rewards["power_down"] / 100, 2),
         roi_rewards_unsettled_gbp=round(rewards["unsettled"] / 100, 2),
         roi_rewards_provisional_gbp=round(rewards.get("provisional", 0) / 100, 2),
-        roi_rewards_meter_supported_gbp=round(rewards.get("meter_supported", rewards["total"]) / 100, 2),
+        roi_rewards_meter_supported_gbp=round(
+            rewards.get("meter_supported", rewards["total"]) / 100, 2
+        ),
     )
