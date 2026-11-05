@@ -265,7 +265,7 @@ def test_opt_in_and_foxess_15pct_export_limits_remain_distinct():
     )
     assert "CONF_OHME_IDLE_HOUSE_BRIDGE_ENABLED: False" in const
     assert '"ohme_idle_household_bridge": self._ohme_idle_bridge.status' in backend
-    assert "or bridge_paused_verified" in backend
+    assert "if bridge_paused_verified:" in backend
     assert "paid_idle_household_10_percent_authorised" in backend
     assert "and ev_confirmed_unplugged" in backend
     assert "return 10.0" in authority
