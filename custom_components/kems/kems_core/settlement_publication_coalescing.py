@@ -29,6 +29,7 @@ class SettlementPublicationScope:
     written: int = 0
     comparison_seconds: float = 0.0
     deferred_canonical_flow_publications: int = 0
+    deferred_flow_presentations: int = 0
     layer_seconds: dict[str, float] = field(default_factory=dict)
     layer_calls: dict[str, int] = field(default_factory=dict)
 
@@ -57,6 +58,7 @@ class SettlementPublicationScope:
             "deferred_canonical_flow_publications": (
                 self.deferred_canonical_flow_publications
             ),
+            "deferred_flow_presentations": self.deferred_flow_presentations,
             "layer_seconds": {
                 key: round(value, 3) for key, value in self.layer_seconds.items()
             },

@@ -2085,7 +2085,9 @@ SENSORS: tuple[KEMSSensorEntityDescription, ...] = (
         icon="mdi:home-lightning-bolt",
         device_class=SensorDeviceClass.ENERGY,
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
-        state_class=SensorStateClass.TOTAL_INCREASING,
+        # Historical meter reconciliation can correct this lifetime total
+        # downwards; TOTAL truthfully preserves those adjustments for Recorder.
+        state_class=SensorStateClass.TOTAL,
         suggested_display_precision=2,
         value_fn=lambda data: data.lifetime.house_consumption_kwh,
     ),
@@ -2165,7 +2167,8 @@ SENSORS: tuple[KEMSSensorEntityDescription, ...] = (
         icon="mdi:home-lightning-bolt",
         device_class=SensorDeviceClass.ENERGY,
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
-        state_class=SensorStateClass.TOTAL_INCREASING,
+        # Includes the same historically correctable house electricity total.
+        state_class=SensorStateClass.TOTAL,
         suggested_display_precision=2,
         value_fn=_lifetime_total_energy_kwh,
     ),
@@ -2452,7 +2455,15 @@ SENSORS: tuple[KEMSSensorEntityDescription, ...] = (
         key="control_next_action",
         name="Control next action",
         icon="mdi:step-forward",
-        value_fn=lambda data: data.control.next_action,
+        # Presentation only. The ControlEngine and FoxESS write intent remain
+        # untouched; never keep showing the pre-cheap bridge after handover.
+        value_fn=lambda data: (
+            "Cheap-period Force Charge requested — grid supplies the home "
+            "and charges the battery; no deliberate export"
+            if data.snapshot.cheap_period_confirmed
+            and data.control.desired_work_mode == "Force Charge"
+            else data.control.next_action
+        ),
     ),
     KEMSSensorEntityDescription(
         key="control_preflight",

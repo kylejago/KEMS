@@ -95,7 +95,10 @@ views:
           | Type | Date | Event ID | Reward estimate | Meter coverage | Agile income model* | ROI status | Supplier |
           |:--|:--|:--|--:|:--|--:|:--|:--|
           {% for item in rows[:20] %}
-          | {{ 'Happy Hour' if item.type == 'happy_hour' else 'Power Down' }} | {{ item.date or 'unknown' }} | {{ item.event_id or 'not available' }} | {{ ('£%.2f' | format(item.estimated_reward_pence / 100)) if item.estimated_reward_pence is not none else 'unknown' }} | {{ ('%.1f%%' | format(item.coverage_percent)) if item.coverage_percent is not none else '—' }} | {{ ('£%.2f' | format(item.modelled_agile_export_income_pence / 100)) if item.modelled_agile_export_income_pence is not none else '—' }} | {{ item.status or 'pending' }} | {{ item.supplier_status }} |
+          {% set reward = item.get('estimated_reward_pence') %}
+          {% set coverage = item.get('coverage_percent') %}
+          {% set agile_income = item.get('modelled_agile_export_income_pence') %}
+          | {{ 'Happy Hour' if item.get('type') == 'happy_hour' else 'Power Down' }} | {{ item.get('date') or 'unknown' }} | {{ item.get('event_id') or 'not available' }} | {{ ('£%.2f' | format((reward | float(0)) / 100)) if reward is not none else 'unknown' }} | {{ ('%.1f%%' | format(coverage | float(0))) if coverage is not none else '—' }} | {{ ('£%.2f' | format((agile_income | float(0)) / 100)) if agile_income is not none else '—' }} | {{ item.get('status') or 'pending' }} | {{ item.get('supplier_status') or 'unsettled' }} |
           {% endfor %}
           *Agile export model is shown only for comparison; observed Agile export is already counted in ROI and is never added again.
 

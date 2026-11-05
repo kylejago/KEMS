@@ -699,6 +699,7 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
     async def _async_update_data(self) -> KEMSData:
         """Refresh physical control first; run optional what-if work separately."""
         scan_started = perf_counter()
+        scan_thread_cpu_started = thread_time()
         agile_backfill_seconds = 0.0
         agile_planning_seconds = 0.0
         checkpoint_at = scan_started
@@ -1805,7 +1806,15 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                 emergency_stop=bool(self.settings.control.emergency_stop),
             )
             checkpoint("commissioning_foxess_and_ev_actions")
-            return replace(provisional, control=control)
+            # A projection *at cheap start* expires once the cheap window is
+            # active. Never show an old simulated 15% SOC as the current
+            # physical SOC; do not change the forecast used by live control.
+            display_forecast = (
+                replace(forecast_plan, projected_soc_at_cheap_start_percent=None)
+                if snapshot.cheap_period_confirmed and forecast_plan.ready
+                else forecast_plan
+            )
+            return replace(provisional, control=control, forecast_plan=display_forecast)
         except Exception as err:
             raise UpdateFailed(f"KEMS analysis failed: {err}") from err
         finally:
@@ -1818,6 +1827,12 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
             p95_index = max(0, (95 * len(sorted_samples) + 99) // 100 - 1)
             self._coordinator_performance = {
                 "scan_elapsed_seconds": elapsed,
+                "scan_thread_cpu_seconds": round(
+                    thread_time() - scan_thread_cpu_started, 3
+                ),
+                "scan_wall_minus_thread_cpu_seconds": round(
+                    max(elapsed - (thread_time() - scan_thread_cpu_started), 0.0), 3
+                ),
                 "stage_seconds": dict(stage_seconds),
                 "longest_stage": biggest,
                 "longest_stage_seconds": stage_seconds[biggest],
@@ -1846,6 +1861,9 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                 record = {
                     "at": dt_util.now().isoformat(),
                     "seconds": elapsed,
+                    "scan_thread_cpu_seconds": round(
+                        thread_time() - scan_thread_cpu_started, 3
+                    ),
                     "longest_stage": biggest,
                     "longest_stage_seconds": stage_seconds[biggest],
                     "stage_seconds": dict(stage_seconds),
