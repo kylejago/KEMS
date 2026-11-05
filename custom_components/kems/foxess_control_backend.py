@@ -344,7 +344,10 @@ class FoxESSControlBackend:
         return dict(self._status)
 
     async def async_setup(self) -> None:
-        await self._ohme_idle_bridge.async_setup()
+        # Existing isolated backend tests supply a partial mock, not __init__.
+        bridge = getattr(self, "_ohme_idle_bridge", None)
+        if bridge is not None:
+            await bridge.async_setup()
         data = await self._store.async_load()
         if isinstance(data, dict):
             self._owned = bool(data.get("owned"))
@@ -1563,9 +1566,8 @@ class FoxESSControlBackend:
                         and str(ev_status_state.state).strip().lower()
                         in {"unplugged", "disconnected"}
                     )
-                    household_floor_authorised = (
-                        bool(
-                            not no_paid_export_mode
+                    household_floor_authorised = bool(
+                        not no_paid_export_mode
                             and not cheap_period_confirmed
                             and not power_down_export_authorised
                             and not happy_hour_charge_authorised
@@ -1583,9 +1585,9 @@ class FoxESSControlBackend:
                             and minimum_min_soc_on_grid is not None
                             and minimum_min_soc_on_grid <= 10.05
                             and control.desired_battery_export_power_kw <= 0.001
-                        )
-                        or bridge_paused_verified
                     )
+                    if bridge_paused_verified:
+                        household_floor_authorised = True
                     effective_min_soc = resolve_live_min_soc_on_grid(
                         decision,
                         cheap_period_confirmed=cheap_period_confirmed,
