@@ -19,8 +19,16 @@ from typing import Any
 from homeassistant.helpers.storage import Store
 from homeassistant.loader import async_get_integration
 
-from .const import DOMAIN, STORAGE_NAMESPACE
+from .const import (
+    CONF_OHME_IDLE_HOUSE_BRIDGE_ENABLED,
+    DOMAIN,
+    STORAGE_NAMESPACE,
+)
 from .foxess_command_shadow import build_foxess_command_shadow_snapshot
+from .ohme_idle_household_bridge import (
+    OhmeIdleHouseholdBridge,
+    household_bridge_eligible,
+)
 from .foxess_modbus_contract import (
     FOXESS_MODBUS_REVIEWED_VERSION,
     FOXESS_MODBUS_REVIEWED_VERSIONS,
@@ -329,12 +337,14 @@ class FoxESSControlBackend:
         self._last_write_at: str | None = None
         self._last_write_result = "Never commanded"
         self._status: dict[str, Any] = {}
+        self._ohme_idle_bridge = OhmeIdleHouseholdBridge(hass, entry)
 
     @property
     def status(self) -> dict[str, Any]:
         return dict(self._status)
 
     async def async_setup(self) -> None:
+        await self._ohme_idle_bridge.async_setup()
         data = await self._store.async_load()
         if isinstance(data, dict):
             self._owned = bool(data.get("owned"))
