@@ -201,10 +201,14 @@ class OhmeIdleHouseholdBridge:
             or _normalise(ev_status.state) not in {"plugged in", "paused", "finished"}
             or not _fresh(ev_power, now=now)
         ):
+            self._first_paused_at = None
+            self._first_power_report_at = None
             self._last_result = "Charger status or power readback is stale"
             return False
         mode_state = self._valid_mode_state(now)
         if mode_state is None:
+            self._first_paused_at = None
+            self._first_power_report_at = None
             self._last_result = "No fresh, uniquely reviewed ePod mode select"
             return False
         current_mode = _normalise(mode_state.state)

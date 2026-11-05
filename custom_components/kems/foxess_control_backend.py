@@ -25,10 +25,6 @@ from .const import (
     STORAGE_NAMESPACE,
 )
 from .foxess_command_shadow import build_foxess_command_shadow_snapshot
-from .ohme_idle_household_bridge import (
-    OhmeIdleHouseholdBridge,
-    household_bridge_eligible,
-)
 from .foxess_modbus_contract import (
     FOXESS_MODBUS_REVIEWED_VERSION,
     FOXESS_MODBUS_REVIEWED_VERSIONS,
@@ -42,6 +38,10 @@ from .kems_core.control_write_authority import (
     should_freeze_owned_ev_hold,
 )
 from .kems_core.foxess_ac_balance import paid_export_stage_ct_conflict
+from .ohme_idle_household_bridge import (
+    OhmeIdleHouseholdBridge,
+    household_bridge_eligible,
+)
 from .product_types import EXPORT_TARIFF_TYPE_AGILE, export_tariff_type_from_options
 
 _STORAGE_VERSION = 1
