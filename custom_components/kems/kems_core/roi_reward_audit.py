@@ -41,6 +41,12 @@ def _entry(kind, key, day, value, basis, settled, included, **extra):
         "evidence_source": basis,
         "supplier_settled": settled is True,
         "supplier_status": "settled" if settled is True else "unsettled",
+        # A stable nullable schema lets older/pending event rows coexist with
+        # partially metered receipts without failing dashboard templates.
+        "event_id": None,
+        "coverage_percent": None,
+        "modelled_agile_export_income_pence": None,
+        "status": None,
         **extra,
     }
 

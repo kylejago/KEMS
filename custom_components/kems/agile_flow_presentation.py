@@ -725,7 +725,17 @@ class FlowPresentationAgileSmartExportManager(MidnightRolloverAgileSmartExportMa
         publication_started = perf_counter()
         final_writes_before = getattr(scope, "written", 0)
         final_skipped_before = getattr(scope, "skipped_identical", 0)
-        self._publish(self._state)
+        deferred_to_deadline = bool(
+            getattr(self, "_kems_defer_flow_settlement_publish", False)
+        )
+        if deferred_to_deadline:
+            # DeadlineSettlementConsistency synchronously publishes the same
+            # completed flow contract after its final deadline reconciliation.
+            # Never defer unless that final owner explicitly promises the write.
+            if scope is not None:
+                scope["deferred_flow_presentations"] += 1
+        else:
+            self._publish(self._state)
         handoff = self._state.get("settled_soc_handoff_reconciliation")
         if isinstance(handoff, dict) and handoff.get(
             "second_publication_deferred_to_final_flow"
@@ -745,6 +755,7 @@ class FlowPresentationAgileSmartExportManager(MidnightRolloverAgileSmartExportMa
             "publication_seconds": round(publication_seconds, 3),
             "publication_actual_writes": final_writes,
             "publication_identical_suppressed": final_skipped,
+            "publication_deferred_to_final_deadline": deferred_to_deadline,
             "total_seconds": round(perf_counter() - phase_started, 3),
             "total_thread_cpu_seconds": round(thread_time() - cpu_started, 3),
         }

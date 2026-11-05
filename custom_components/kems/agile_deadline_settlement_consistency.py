@@ -195,6 +195,10 @@ class DeadlineSettlementConsistencyAgileSmartExportManager(
         # publication. Preserve all flow/SOC mutations, but avoid a repeated
         # heavy intermediate Agile reporting pass and its redundant HA writes.
         self._kems_defer_canonical_settlement_publish = True
+        # The final synchronous deadline publication also contains the complete
+        # FlowPresentation contract. Avoid its preceding redundant HA write pass.
+        prior_flow = getattr(self, "_kems_defer_flow_settlement_publish", False)
+        self._kems_defer_flow_settlement_publish = True
         try:
             super().reconcile_current_day_settlements(
                 settled_half_hours=settled_half_hours,
@@ -203,6 +207,7 @@ class DeadlineSettlementConsistencyAgileSmartExportManager(
         finally:
             self._kems_defer_solar_settlement_publish = prior_defer
             self._kems_defer_canonical_settlement_publish = prior_canonical
+            self._kems_defer_flow_settlement_publish = prior_flow
         config = getattr(self, "_rolling_config", None)
         rebase_day_summary_deadline_from_rolling(
             self._state,
