@@ -971,8 +971,22 @@ class FoxESSControlBackend:
         return False
 
     async def async_shutdown(self, coordinator: Any) -> None:
-        """Release any KEMS-owned FoxESS state before integration unload."""
+        """Restore FoxESS protection before resuming a KEMS-paused Ohme."""
+        min_soc_entity: str | None = None
         if not self._owned:
+            shadow = build_foxess_command_shadow_snapshot(
+                self._hass,
+                coordinator,
+                control_override=coordinator.data.control,
+            )
+            min_soc_entity = self._entity_id(
+                self._binding_entities(shadow), "min_soc_on_grid"
+            )
+            await self._ohme_idle_bridge.async_restore_if_safe(
+                keep_paused=False,
+                min_soc_entity=min_soc_entity,
+                battery_soc=coordinator.data.snapshot.battery_soc,
+            )
             return
         writes: list[str] = []
         try:
@@ -982,6 +996,7 @@ class FoxESSControlBackend:
                 control_override=coordinator.data.control,
             )
             entities = self._binding_entities(shadow)
+            min_soc_entity = self._entity_id(entities, "min_soc_on_grid")
             restored = await self._async_restore(
                 entities,
                 writes,
@@ -1009,6 +1024,11 @@ class FoxESSControlBackend:
                 "last_write_result": self._last_write_result,
                 "upstream_watchdog_fallback": True,
             }
+        await self._ohme_idle_bridge.async_restore_if_safe(
+            keep_paused=False,
+            min_soc_entity=min_soc_entity,
+            battery_soc=coordinator.data.snapshot.battery_soc,
+        )
 
     async def async_update(
         self,
