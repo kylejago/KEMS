@@ -147,11 +147,7 @@ class OhmeIdleHouseholdBridge:
         }
         if not _REQUIRED_OPTIONS.issubset(options):
             return None
-        return (
-            state
-            if _normalise(state.state) in _REQUIRED_OPTIONS
-            else None
-        )
+        return state if _normalise(state.state) in _REQUIRED_OPTIONS else None
 
     async def _set_mode(self, mode: str, state: Any) -> bool:
         option = next(
@@ -186,9 +182,10 @@ class OhmeIdleHouseholdBridge:
         eligible: bool,
         ev_status_entity: str | None,
         ev_power_entity: str | None,
+        now: datetime | None = None,
     ) -> bool:
         """Return true only after TWO distinct fresh zero-power pause observations."""
-        now = datetime.now(UTC)
+        now = now or datetime.now(UTC)
         self._status = {"eligible": eligible, "pause_verified": False}
         if not eligible:
             self._first_paused_at = None
@@ -232,10 +229,7 @@ class OhmeIdleHouseholdBridge:
             return False
 
         report = getattr(ev_power, "last_reported", None)
-        if (
-            self._first_paused_at is None
-            or self._first_power_report_at is None
-        ):
+        if self._first_paused_at is None or self._first_power_report_at is None:
             self._first_paused_at = now
             self._first_power_report_at = report
             self._last_result = "First paused/zero-power observation"
@@ -257,11 +251,12 @@ class OhmeIdleHouseholdBridge:
         keep_paused: bool,
         min_soc_entity: str | None,
         battery_soc: float | None,
+        now: datetime | None = None,
     ) -> None:
         """Never unpause KEMS-owned Ohme while the physical floor is below SOC."""
         if not self._owned or keep_paused:
             return
-        now = datetime.now(UTC)
+        now = now or datetime.now(UTC)
         mode = self._valid_mode_state(now)
         floor_state = (
             self._hass.states.get(min_soc_entity) if min_soc_entity else None
@@ -284,7 +279,7 @@ class OhmeIdleHouseholdBridge:
         if _normalise(mode.state) == "paused":
             if not await self._set_mode(self._previous_mode or "smart charge", mode):
                 return
-            observed = self._valid_mode_state(datetime.now(UTC))
+            observed = self._valid_mode_state(now)
             if observed is None or _normalise(observed.state) == "paused":
                 self._last_result = "Ohme resume requested; readback pending"
                 return
