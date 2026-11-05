@@ -157,8 +157,11 @@ def test_pause_is_requested_then_two_independent_reports_are_required():
     now = datetime.now(UTC)
     hass = _make_hass(now)
     bridge = module.OhmeIdleHouseholdBridge(
-            "ohme_idle_house_bridge_enabled": True
-        })
+        hass,
+        SimpleNamespace(
+            entry_id="bridge-186",
+            options={"ohme_idle_house_bridge_enabled": True},
+        ),
     )
 
     async def exercise():
