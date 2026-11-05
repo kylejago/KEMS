@@ -1,3 +1,18 @@
+## 0.9.0-alpha9.184 — Agile reporting efficiency and auditable financial/telemetry evidence
+
+- Suppress exact duplicate state-and-attribute Home Assistant writes **only in the initial read-only Agile comparison publication**. Continue immediately publishing changed price, SOC, tariff, plan and reporting attributes; retain synchronous settlement, final deadline, direct-call and control update behaviour. Record initial writes and suppressed duplicates for subsequent field timing checks.
+- Explicitly flag reported physical export income alongside zero displayed current-day export kWh without modifying either actual measured value or replay ledger; further source/interval reconciliation remains evidence-gated.
+- Explain old FoxESS sensor report timestamps corroborated by fresh numeric siblings on the *same registered Modbus device*, versus genuinely rejected stale fields. Do not weaken original freshness, commissioning or proof checks.
+- Clearly separate ROI-included provisional partial Happy Hour credit, completed meter-supported estimates and supplier-confirmed settlement; none is represented as paid without source confirmation. Normal Agile Power Down export is never counted twice.
+- Add regression coverage for unchanged/changed initial publication, settlement and direct publisher preservation, lookup fail-open, source corroboration and reward provenance.
+- No changes to physical FoxESS writes, Ohme EV charging, 7 kW DNO export limit, 15% deliberate export reserve, 10% absolute household floor, Happy Hour/Power Down authority, or 06:00–06:30 safe-first update window with installation blocked during active export.
+
+## 0.9.0-alpha9.183 — Overnight coordinator and ROI reporting stability
+
+- Coalesce a redundant final-deadline Agile flow publication while preserving settled-SOC first publication, same-scan continuity and mandatory final publication; instrument coordinator wall-clock vs thread CPU time for slow scan attribution.
+- Fix nullable reward audit fields in ROI dashboards and clarify cheap charging display after the slot becomes active; retain historic-adjustment-aware lifetime house/whole-home total state classes.
+- Keep all FoxESS, EV, event, export-limit and battery safety rules unchanged.
+
 ## 0.9.0-alpha9.182 — Maintain physical paid-export proof through temporary house-demand absorption
 
 - After the first valid 1 kW incremental Force Discharge sample, retain that **verified** battery-discharge-plus-grid-export observation for at most 180 seconds if subsequent solar-safe samples merely show that the household consumed the export headroom. This is inconclusive, not a physical hardware failure.
