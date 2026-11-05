@@ -1,3 +1,10 @@
+## 0.9.0-alpha9.186 — Verified paused Ohme enables optional 10% household-only reserve
+
+- Add a **separate, default-off** `ohme_idle_house_bridge_enabled` control option because this introduces a new explicit Ohme mode write outside the Happy Hour reward session. With the option enabled, KEMS may pause the uniquely reviewed Ohme ePod near the 15% export reserve while paid Agile export is idle and the EV is physically connected but not drawing power.
+- Require the actual Ohme mode to read back **Paused**, with two distinct fresh zero-power reports, before lowering FoxESS Min SoC (On Grid) to **10% for household Self Use only**. Ordinary 'plugged in, 0 kW' never authorises the lower floor. Existing 15% deliberate export cut-off, staged export proof, Happy Hour and Power Down authority are unchanged.
+- Before resuming KEMS-owned Ohme Smart charge, require physical readback of a protective FoxESS Min SoC value at or above current battery SOC and at least 15%. Store pause ownership before writing so a restart never forgets it. A safety fault leaves the charger paused rather than exposing the battery; restoration waits for proof.
+- This is a **software-coordinated pause**, not electrical isolation: an external Ohme user or app can override it between scans. It must not be claimed as absolute anti-discharge protection without an independently verified hardware interlock. Confirm the physical behaviour on the live KH7 before relying on it.
+
 ## 0.9.0-alpha9.185 — Reviewed FoxESS Modbus 1.16.0 KH7 control compatibility
 
 - Restore the commissioned KH7 control backend after FoxESS Modbus updated from 1.15.0 to 1.16.0: explicitly allow **only** the two reviewed upstream versions; missing and unreviewed versions continue to fail closed. Keep the original latest-reviewed-version diagnostic key and add the full version allowlist so compatibility decisions are auditable.

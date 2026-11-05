@@ -19,7 +19,11 @@ from typing import Any
 from homeassistant.helpers.storage import Store
 from homeassistant.loader import async_get_integration
 
-from .const import DOMAIN, STORAGE_NAMESPACE
+from .const import (
+    CONF_OHME_IDLE_HOUSE_BRIDGE_ENABLED,
+    DOMAIN,
+    STORAGE_NAMESPACE,
+)
 from .foxess_command_shadow import build_foxess_command_shadow_snapshot
 from .foxess_modbus_contract import (
     FOXESS_MODBUS_REVIEWED_VERSION,
@@ -34,6 +38,10 @@ from .kems_core.control_write_authority import (
     should_freeze_owned_ev_hold,
 )
 from .kems_core.foxess_ac_balance import paid_export_stage_ct_conflict
+from .ohme_idle_household_bridge import (
+    OhmeIdleHouseholdBridge,
+    household_bridge_eligible,
+)
 from .product_types import EXPORT_TARIFF_TYPE_AGILE, export_tariff_type_from_options
 
 _STORAGE_VERSION = 1
@@ -329,12 +337,17 @@ class FoxESSControlBackend:
         self._last_write_at: str | None = None
         self._last_write_result = "Never commanded"
         self._status: dict[str, Any] = {}
+        self._ohme_idle_bridge = OhmeIdleHouseholdBridge(hass, entry)
 
     @property
     def status(self) -> dict[str, Any]:
         return dict(self._status)
 
     async def async_setup(self) -> None:
+        # Existing isolated backend tests supply a partial mock, not __init__.
+        bridge = getattr(self, "_ohme_idle_bridge", None)
+        if bridge is not None:
+            await bridge.async_setup()
         data = await self._store.async_load()
         if isinstance(data, dict):
             self._owned = bool(data.get("owned"))
@@ -961,8 +974,22 @@ class FoxESSControlBackend:
         return False
 
     async def async_shutdown(self, coordinator: Any) -> None:
-        """Release any KEMS-owned FoxESS state before integration unload."""
+        """Restore FoxESS protection before resuming a KEMS-paused Ohme."""
+        min_soc_entity: str | None = None
         if not self._owned:
+            shadow = build_foxess_command_shadow_snapshot(
+                self._hass,
+                coordinator,
+                control_override=coordinator.data.control,
+            )
+            min_soc_entity = self._entity_id(
+                self._binding_entities(shadow), "min_soc_on_grid"
+            )
+            await self._ohme_idle_bridge.async_restore_if_safe(
+                keep_paused=False,
+                min_soc_entity=min_soc_entity,
+                battery_soc=coordinator.data.snapshot.battery_soc,
+            )
             return
         writes: list[str] = []
         try:
@@ -972,6 +999,7 @@ class FoxESSControlBackend:
                 control_override=coordinator.data.control,
             )
             entities = self._binding_entities(shadow)
+            min_soc_entity = self._entity_id(entities, "min_soc_on_grid")
             restored = await self._async_restore(
                 entities,
                 writes,
@@ -999,6 +1027,11 @@ class FoxESSControlBackend:
                 "last_write_result": self._last_write_result,
                 "upstream_watchdog_fallback": True,
             }
+        await self._ohme_idle_bridge.async_restore_if_safe(
+            keep_paused=False,
+            min_soc_entity=min_soc_entity,
+            battery_soc=coordinator.data.snapshot.battery_soc,
+        )
 
     async def async_update(
         self,
@@ -1229,6 +1262,54 @@ class FoxESSControlBackend:
                 reason="Export commissioning requested verified FoxESS restoration",
                 min_soc_on_grid_percent=decision.min_soc_on_grid_percent,
             )
+
+        # Alpha9.186: plugged-in zero power alone cannot lower FoxESS MinSOC.
+        # Require a separately opted-in, physically verified Paused charger.
+        bridge_candidate = household_bridge_eligible(
+            opted_in=bool(
+                self._entry.options.get(CONF_OHME_IDLE_HOUSE_BRIDGE_ENABLED, False)
+            ),
+            control_authorised=bool(
+                decision.commands_permitted
+                and decision.action == "self_use"
+                and decision.reason
+                == "Paid-export idle Self Use is inside the bounded live scope"
+                and control.plan_safe
+                and control.data_fresh
+                and not force_restore
+                and not commissioning_export_test
+                and not ev_hold_source_grace_active
+                and not pending_intelligent_ev_hold_active
+                and ev_hold_floor_percent is None
+                and control.ev_grid_guard_status == "inactive"
+                and not power_down_export_authorised
+                and not happy_hour_charge_authorised
+                and not happy_hour_house_grid_hold_authorised
+                and control.grid_available
+                and not control.island_mode_active
+            ),
+            paid_agile_selected=bool(
+                not no_paid_export_mode
+                and export_tariff_type_from_options(self._entry.options)
+                == EXPORT_TARIFF_TYPE_AGILE
+            ),
+            cheap_period=cheap_period_confirmed,
+            active_session=bool(snapshot.saving_session_active),
+            ev_connected=ev_connected,
+            ev_charging=snapshot.ev_charging,
+            ev_power_kw=snapshot.ev_power_kw,
+            ev_power_age_seconds=snapshot.ev_power_age_seconds,
+            battery_soc=snapshot.battery_soc,
+            desired_export_kw=control.desired_battery_export_power_kw,
+            normal_reserve_percent=coordinator.settings.control.normal_reserve_percent,
+        )
+        bridge_paused_verified = await self._ohme_idle_bridge.async_prepare(
+            snapshot=snapshot,
+            eligible=bridge_candidate,
+            ev_status_entity=getattr(coordinator.entities, "ev_status", None),
+            ev_power_entity=getattr(coordinator.entities, "ev_power_kw", None),
+        )
+        household_floor_authorised = False
 
         writes: list[str] = []
         applied = False
@@ -1505,6 +1586,8 @@ class FoxESSControlBackend:
                         and minimum_min_soc_on_grid <= 10.05
                         and control.desired_battery_export_power_kw <= 0.001
                     )
+                    if bridge_paused_verified:
+                        household_floor_authorised = True
                     effective_min_soc = resolve_live_min_soc_on_grid(
                         decision,
                         cheap_period_confirmed=cheap_period_confirmed,
@@ -1734,6 +1817,13 @@ class FoxESSControlBackend:
                             ),
                         )
 
+        # Hardware floor must be raised and read back BEFORE resuming Ohme.
+        await self._ohme_idle_bridge.async_restore_if_safe(
+            keep_paused=bridge_candidate,
+            min_soc_entity=min_soc_entity_id,
+            battery_soc=snapshot.battery_soc,
+        )
+
         if not self._paid_export_live_proven and (
             decision.action != "force_discharge" or not applied
         ):
@@ -1837,6 +1927,9 @@ class FoxESSControlBackend:
                         happy_hour_house_grid_hold_authorised=(
                             happy_hour_house_grid_hold_authorised
                         ),
+                        paid_idle_household_10_percent_authorised=(
+                            household_floor_authorised
+                        ),
                     )
                     if decision.commands_permitted
                     else None
@@ -1845,8 +1938,13 @@ class FoxESSControlBackend:
             "non_cheap_min_soc_policy": (
                 "pending_intelligent_ev_hold_only"
                 if pending_intelligent_ev_hold_active
-                else "preserve_pre_kems_baseline"
+                else (
+                    "verified_paused_ohme_household_10_percent"
+                    if bridge_paused_verified and household_floor_authorised
+                    else "preserve_pre_kems_baseline"
+                )
             ),
+            "ohme_idle_household_bridge": self._ohme_idle_bridge.status,
             "writes_this_cycle": writes,
             "last_write_at": self._last_write_at,
             "last_write_result": self._last_write_result,
