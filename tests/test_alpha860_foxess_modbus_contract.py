@@ -77,7 +77,8 @@ def test_v115_kh_contract_uses_direct_battery_power_and_bounded_control() -> Non
     _, _, contract = _load_modules()
     snapshot = contract.foxess_modbus_contract_snapshot()
 
-    assert snapshot["reviewed_upstream_version"] == "1.15.0"
+    assert snapshot["reviewed_upstream_version"] == "1.16.0"
+    assert snapshot["reviewed_upstream_versions"] == ["1.15.0", "1.16.0"]
     assert snapshot["kh_families"] == ["KH_PRE119", "KH_PRE133", "KH_133"]
     assert snapshot["required_telemetry"]["battery_soc"]["key"] == "battery_soc"
     assert snapshot["required_telemetry"]["battery_power_kw"]["key"] == "invbatpower"

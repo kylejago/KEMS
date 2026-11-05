@@ -4,11 +4,21 @@ from __future__ import annotations
 
 from typing import Any, Final
 
-FOXESS_MODBUS_REVIEWED_VERSION: Final = "1.15.0"
+# Reviewed *exact* upstream versions for the commissioned KH7 write surface.
+# Never accept unreviewed future releases through a range or prefix match.
+FOXESS_MODBUS_REVIEWED_VERSIONS: Final = ("1.15.0", "1.16.0")
+FOXESS_MODBUS_REVIEWED_VERSION: Final = FOXESS_MODBUS_REVIEWED_VERSIONS[-1]
+
+
+def foxess_modbus_version_is_reviewed(version: str | None) -> bool:
+    """Fail closed when the upstream integration version is absent or unreviewed."""
+    return version in FOXESS_MODBUS_REVIEWED_VERSIONS
+
+
 FOXESS_MODBUS_PLATFORM: Final = "foxess_modbus"
 FOXESS_MODBUS_KH_FAMILIES: Final = ("KH_PRE119", "KH_PRE133", "KH_133")
 
-# Stable upstream telemetry keys reviewed against foxess_modbus v1.15.0.
+# Stable upstream telemetry keys reviewed against foxess_modbus v1.15.0 and v1.16.0.
 # These are the preferred sources KEMS needs to leave pre-installation fallback mode.
 FOXESS_MODBUS_REQUIRED_TELEMETRY: Final = {
     "battery_soc": {
@@ -77,7 +87,7 @@ FOXESS_MODBUS_OPTIONAL_DIAGNOSTICS: Final = {
     "pv4_power": {"key": "pv4_power", "name": "PV4 Power"},
 }
 
-# Writable entities reviewed from upstream v1.15.0. Alpha9.82 keeps the live
+# Writable entities reviewed from upstream v1.15.0 and v1.16.0. Alpha9.82 keeps the live
 # surface bounded: Self Use, confirmed-cheap Force Charge, Min SoC-on-grid and,
 # only after explicit paid-export selection, Force Discharge plus the lower
 # verified KEMS/FoxESS Export Power Limit. Import Power Limit remains blocked.
@@ -100,6 +110,7 @@ def foxess_modbus_contract_snapshot() -> dict[str, Any]:
     return {
         "platform": FOXESS_MODBUS_PLATFORM,
         "reviewed_upstream_version": FOXESS_MODBUS_REVIEWED_VERSION,
+        "reviewed_upstream_versions": list(FOXESS_MODBUS_REVIEWED_VERSIONS),
         "kh_families": list(FOXESS_MODBUS_KH_FAMILIES),
         "required_telemetry": {
             key: dict(value) for key, value in FOXESS_MODBUS_REQUIRED_TELEMETRY.items()
