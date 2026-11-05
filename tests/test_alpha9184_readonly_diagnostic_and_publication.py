@@ -15,7 +15,9 @@ KEMS = Path(__file__).parents[1] / "custom_components" / "kems"
 
 def _evidence_module():
     source = KEMS / "kems_core" / "diagnostic_evidence.py"
-    spec = importlib.util.spec_from_file_location("kems_diagnostic_evidence_test", source)
+    spec = importlib.util.spec_from_file_location(
+        "kems_diagnostic_evidence_test", source
+    )
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
@@ -23,9 +25,7 @@ def _evidence_module():
 
 
 def _set_method_owner():
-    source = ast.parse(
-        (KEMS / "agile_smart_export.py").read_text(encoding="utf-8")
-    )
+    source = ast.parse((KEMS / "agile_smart_export.py").read_text(encoding="utf-8"))
     owner = next(
         node
         for node in source.body
