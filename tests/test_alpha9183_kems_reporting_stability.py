@@ -37,18 +37,18 @@ def test_correctable_lifetime_totals_use_total_not_total_increasing():
 def test_final_deadline_owner_defer_guard_is_restored_on_error():
     deadline = _source("agile_deadline_settlement_consistency.py")
     flow = _source("agile_flow_presentation.py")
-    assert 'self._kems_defer_flow_settlement_publish = True' in deadline
-    assert 'self._kems_defer_flow_settlement_publish = prior_flow' in deadline
-    assert 'if deferred_to_deadline:' in flow
-    assert 'else:\n            self._publish(self._state)' in flow
-    assert 'self._publish(self._state)' in deadline
+    assert "self._kems_defer_flow_settlement_publish = True" in deadline
+    assert "self._kems_defer_flow_settlement_publish = prior_flow" in deadline
+    assert "if deferred_to_deadline:" in flow
+    assert "else:\n            self._publish(self._state)" in flow
+    assert "self._publish(self._state)" in deadline
 
 
 def test_cheap_handover_display_does_not_change_control_authority():
     coordinator = _source("coordinator.py")
     sensor = _source("sensor.py")
-    assert 'display_forecast = (' in coordinator
-    assert 'if snapshot.cheap_period_confirmed and forecast_plan.ready' in coordinator
-    assert 'forecast_plan=display_forecast' in coordinator
+    assert "display_forecast = (" in coordinator
+    assert "if snapshot.cheap_period_confirmed and forecast_plan.ready" in coordinator
+    assert "forecast_plan=display_forecast" in coordinator
     assert 'data.control.desired_work_mode == "Force Charge"' in sensor
-    assert 'scan_thread_cpu_seconds' in coordinator
+    assert "scan_thread_cpu_seconds" in coordinator
