@@ -428,8 +428,17 @@ class AgileSmartExportManager:
             "ready": bool(today and today["ready"] and quality["today_complete"]),
         }
         state_aggregation_seconds = round(perf_counter() - reporting_started, 3)
+        # Only this initial, read-only comparison presentation may omit exact
+        # duplicate HA state writes.  Settlement/flow publications and direct
+        # _publish() callers retain their previous behaviour.
+        base_publication_stats = {"written": 0, "skipped_identical": 0}
+        self._kems_base_publication_stats = base_publication_stats
+        self._kems_suppress_identical_base_publication = True
         publish_started = perf_counter()
-        self._publish(self._state)
+        try:
+            self._publish(self._state)
+        finally:
+            self._kems_suppress_identical_base_publication = False
         publication_seconds = round(perf_counter() - publish_started, 3)
         cache = getattr(self, "_historical_replay_cache", None)
         if cache is not None and cache.needs_persist:
@@ -461,6 +470,10 @@ class AgileSmartExportManager:
             "tomorrow_projection_seconds": tomorrow_comparison_seconds,
             "period_and_state_aggregation_seconds": state_aggregation_seconds,
             "state_publication_seconds": publication_seconds,
+            "initial_publication_writes": base_publication_stats["written"],
+            "initial_publication_identical_suppressed": base_publication_stats[
+                "skipped_identical"
+            ],
             "total_manager_base_seconds": round(perf_counter() - profiler_started, 3),
             "scope": "read_only_agile_comparison_not_hardware_dispatch",
         }
@@ -1530,6 +1543,27 @@ class AgileSmartExportManager:
     ) -> None:
         state_value = str(value)
         scope = getattr(self, "_kems_settlement_publication_scope", None)
+        if scope is None and getattr(
+            self, "_kems_suppress_identical_base_publication", False
+        ):
+            # State/attributes must both match. Changed prices, SOC, tariff
+            # coverage, timestamped plans and routing evidence still publish
+            # immediately. On lookup failure, preserve the normal HA write.
+            stats = getattr(self, "_kems_base_publication_stats", None)
+            try:
+                previous = self._hass.states.get(entity_id)
+                if (
+                    previous is not None
+                    and previous.state == state_value
+                    and previous.attributes == attributes
+                ):
+                    if isinstance(stats, dict):
+                        stats["skipped_identical"] += 1
+                    return
+            except Exception:
+                pass
+            if isinstance(stats, dict):
+                stats["written"] += 1
         if scope is not None:
             scope["attempted"] += 1
             # Compare every reporting write against the current HA state,

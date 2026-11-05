@@ -17,6 +17,11 @@ from .foxess_modbus_contract import foxess_modbus_contract_snapshot
 from .happy_hour_accounting_diagnostics import build_happy_hour_accounting_audit
 from .happy_hour_auto_join import happy_hour_auto_join_state
 from .kems_core.agile_plan_budget_reconciliation import reconcile_agile_budget
+from .kems_core.diagnostic_evidence import (
+    actual_export_evidence,
+    corroborated_unchanged_sources,
+    reward_settlement_evidence,
+)
 from .panel import panel_health_snapshot
 from .providers.octopus import DEFAULT_INTELLIGENT_STALE_DATA_SECONDS
 from .update_orchestrator import update_orchestrator_snapshot
@@ -129,6 +134,11 @@ async def async_get_config_entry_diagnostics(
             ),
             "max_dynamic_source_age_seconds": (data.snapshot.source_data_age_seconds),
             "stale_fields": list(data.snapshot.stale_fields),
+            **corroborated_unchanged_sources(
+                data.snapshot.source_age_seconds,
+                data.snapshot.stale_fields,
+                coordinator.settings.control.stale_data_seconds,
+            ),
             "dynamic_field_ages_seconds": dict(
                 sorted(data.snapshot.source_age_seconds.items())
             ),
@@ -197,6 +207,11 @@ async def async_get_config_entry_diagnostics(
             "items": [item.to_dict() for item in data.advice.items],
         },
         "simulation": asdict(data.simulation),
+        "actual_export_evidence": actual_export_evidence(
+            data.simulation.actual_grid_export_kwh,
+            data.simulation.actual_export_income_pence,
+        ),
+        "reward_settlement_evidence": reward_settlement_evidence(data.roi.reward_audit),
         "agile_smart_export": coordinator.agile_smart_export_state,
         "agile_physical_export_reserve": getattr(
             coordinator, "_agile_live_reserve_status", {"status": "not_yet_evaluated"}
