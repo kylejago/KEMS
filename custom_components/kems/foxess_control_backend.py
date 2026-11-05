@@ -1264,9 +1264,7 @@ class FoxESSControlBackend:
         # Require a separately opted-in, physically verified Paused charger.
         bridge_candidate = household_bridge_eligible(
             opted_in=bool(
-                self._entry.options.get(
-                    CONF_OHME_IDLE_HOUSE_BRIDGE_ENABLED, False
-                )
+                self._entry.options.get(CONF_OHME_IDLE_HOUSE_BRIDGE_ENABLED, False)
             ),
             control_authorised=bool(
                 decision.commands_permitted
@@ -1565,26 +1563,29 @@ class FoxESSControlBackend:
                         and str(ev_status_state.state).strip().lower()
                         in {"unplugged", "disconnected"}
                     )
-                    household_floor_authorised = bool(
-                        not no_paid_export_mode
-                        and not cheap_period_confirmed
-                        and not power_down_export_authorised
-                        and not happy_hour_charge_authorised
-                        and not happy_hour_house_grid_hold_authorised
-                        and not pending_intelligent_ev_hold_active
-                        and not ev_hold_source_grace_active
-                        and ev_hold_floor_percent is None
-                        and ev_connected is False
-                        and snapshot.ev_connected is False
-                        and snapshot.ev_charging is False
-                        and _number(snapshot.ev_power_kw) is not None
-                        and abs(float(snapshot.ev_power_kw)) <= 0.05
-                        and control.ev_grid_guard_status == "inactive"
-                        and ev_confirmed_unplugged
-                        and minimum_min_soc_on_grid is not None
-                        and minimum_min_soc_on_grid <= 10.05
-                        and control.desired_battery_export_power_kw <= 0.001
-                    ) or bridge_paused_verified
+                    household_floor_authorised = (
+                        bool(
+                            not no_paid_export_mode
+                            and not cheap_period_confirmed
+                            and not power_down_export_authorised
+                            and not happy_hour_charge_authorised
+                            and not happy_hour_house_grid_hold_authorised
+                            and not pending_intelligent_ev_hold_active
+                            and not ev_hold_source_grace_active
+                            and ev_hold_floor_percent is None
+                            and ev_connected is False
+                            and snapshot.ev_connected is False
+                            and snapshot.ev_charging is False
+                            and _number(snapshot.ev_power_kw) is not None
+                            and abs(float(snapshot.ev_power_kw)) <= 0.05
+                            and control.ev_grid_guard_status == "inactive"
+                            and ev_confirmed_unplugged
+                            and minimum_min_soc_on_grid is not None
+                            and minimum_min_soc_on_grid <= 10.05
+                            and control.desired_battery_export_power_kw <= 0.001
+                        )
+                        or bridge_paused_verified
+                    )
                     effective_min_soc = resolve_live_min_soc_on_grid(
                         decision,
                         cheap_period_confirmed=cheap_period_confirmed,

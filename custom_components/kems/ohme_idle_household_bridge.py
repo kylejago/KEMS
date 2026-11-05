@@ -142,9 +142,7 @@ class OhmeIdleHouseholdBridge:
         state = self._hass.states.get(_MODE_ENTITY)
         if not _fresh(state, now=now):
             return None
-        options = {
-            _normalise(v) for v in (state.attributes.get("options") or [])
-        }
+        options = {_normalise(v) for v in (state.attributes.get("options") or [])}
         if not _REQUIRED_OPTIONS.issubset(options):
             return None
         return state if _normalise(state.state) in _REQUIRED_OPTIONS else None
@@ -200,8 +198,7 @@ class OhmeIdleHouseholdBridge:
         ev_power = self._hass.states.get(ev_power_entity)
         if (
             not _fresh(ev_status, now=now)
-            or _normalise(ev_status.state)
-            not in {"plugged in", "paused", "finished"}
+            or _normalise(ev_status.state) not in {"plugged in", "paused", "finished"}
             or not _fresh(ev_power, now=now)
         ):
             self._last_result = "Charger status or power readback is stale"
@@ -258,9 +255,7 @@ class OhmeIdleHouseholdBridge:
             return
         now = now or datetime.now(UTC)
         mode = self._valid_mode_state(now)
-        floor_state = (
-            self._hass.states.get(min_soc_entity) if min_soc_entity else None
-        )
+        floor_state = self._hass.states.get(min_soc_entity) if min_soc_entity else None
         floor = _real_number(floor_state.state if floor_state else None)
         soc = _real_number(battery_soc)
         if (

@@ -157,7 +157,6 @@ def test_pause_is_requested_then_two_independent_reports_are_required():
     now = datetime.now(UTC)
     hass = _make_hass(now)
     bridge = module.OhmeIdleHouseholdBridge(
-        hass, SimpleNamespace(entry_id="bridge-186", options={
             "ohme_idle_house_bridge_enabled": True
         })
     )
@@ -171,21 +170,19 @@ def test_pause_is_requested_then_two_independent_reports_are_required():
             "ev_power_entity": "sensor.ohme_epod_power",
         }
         request = await bridge.async_prepare(**kwargs, now=now)
-        first = await bridge.async_prepare(
-            **kwargs, now=now + timedelta(seconds=1)
-        )
+        first = await bridge.async_prepare(**kwargs, now=now + timedelta(seconds=1))
         # Repeating the same power report must not count twice.
         duplicate = await bridge.async_prepare(
             **kwargs, now=now + timedelta(seconds=30)
         )
-        hass.states.get("select.ohme_epod_charge_mode").last_reported = (
-            now + timedelta(seconds=40)
+        hass.states.get("select.ohme_epod_charge_mode").last_reported = now + timedelta(
+            seconds=40
         )
-        hass.states.get("sensor.ohme_epod_status").last_reported = (
-            now + timedelta(seconds=40)
+        hass.states.get("sensor.ohme_epod_status").last_reported = now + timedelta(
+            seconds=40
         )
-        hass.states.get("sensor.ohme_epod_power").last_reported = (
-            now + timedelta(seconds=40)
+        hass.states.get("sensor.ohme_epod_power").last_reported = now + timedelta(
+            seconds=40
         )
         confirmed = await bridge.async_prepare(
             **kwargs, now=now + timedelta(seconds=40)
@@ -212,9 +209,7 @@ def test_pause_is_requested_then_two_independent_reports_are_required():
         return request, first, duplicate, confirmed, still_paused
 
     requested, first, duplicate, verified, paused = asyncio.run(exercise())
-    assert (requested, first, duplicate, verified) == (
-        False, False, False, True
-    )
+    assert (requested, first, duplicate, verified) == (False, False, False, True)
     assert paused == "Paused"
     assert hass.services.calls == ["Paused", "Smart charge"]
     assert bridge.status["owned"] is False
@@ -226,26 +221,32 @@ def test_restart_does_not_reuse_pause_proof():
     store.data.clear()
     now = datetime.now(UTC)
     hass = _make_hass(now)
-    entry = SimpleNamespace(entry_id="restart-186", options={
-        "ohme_idle_house_bridge_enabled": True
-    })
+    entry = SimpleNamespace(
+        entry_id="restart-186", options={"ohme_idle_house_bridge_enabled": True}
+    )
 
     async def exercise():
         original = module.OhmeIdleHouseholdBridge(hass, entry)
         await original.async_setup()
         await original.async_prepare(
-            snapshot=None, eligible=True,
+            snapshot=None,
+            eligible=True,
             ev_status_entity="sensor.ohme_epod_status",
-            ev_power_entity="sensor.ohme_epod_power", now=now
+            ev_power_entity="sensor.ohme_epod_power",
+            now=now,
         )
         later = module.OhmeIdleHouseholdBridge(hass, entry)
         await later.async_setup()
-        return await later.async_prepare(
-            snapshot=None, eligible=True,
-            ev_status_entity="sensor.ohme_epod_status",
-            ev_power_entity="sensor.ohme_epod_power",
-            now=now + timedelta(seconds=2)
-        ), later.status
+        return (
+            await later.async_prepare(
+                snapshot=None,
+                eligible=True,
+                ev_status_entity="sensor.ohme_epod_status",
+                ev_power_entity="sensor.ohme_epod_power",
+                now=now + timedelta(seconds=2),
+            ),
+            later.status,
+        )
 
     first, state = asyncio.run(exercise())
     assert first is False
@@ -256,9 +257,9 @@ def test_restart_does_not_reuse_pause_proof():
 def test_opt_in_and_foxess_15pct_export_limits_remain_distinct():
     const = (KEMS / "const.py").read_text(encoding="utf-8")
     backend = (KEMS / "foxess_control_backend.py").read_text(encoding="utf-8")
-    authority = (
-        KEMS / "kems_core" / "control_write_authority.py"
-    ).read_text(encoding="utf-8")
+    authority = (KEMS / "kems_core" / "control_write_authority.py").read_text(
+        encoding="utf-8"
+    )
     assert "CONF_OHME_IDLE_HOUSE_BRIDGE_ENABLED: False" in const
     assert '"ohme_idle_household_bridge": self._ohme_idle_bridge.status' in backend
     assert "or bridge_paused_verified" in backend
@@ -270,13 +271,9 @@ def test_opt_in_and_foxess_15pct_export_limits_remain_distinct():
 
 
 def test_release_metadata_pin():
-    manifest = json.loads(
-        (KEMS / "manifest.json").read_text(encoding="utf-8")
-    )
+    manifest = json.loads((KEMS / "manifest.json").read_text(encoding="utf-8"))
     bundle = json.loads(
-        (ROOT / "release" / "kems-bundle.template.json").read_text(
-            encoding="utf-8"
-        )
+        (ROOT / "release" / "kems-bundle.template.json").read_text(encoding="utf-8")
     )
     assert manifest["version"] == "0.9.0-alpha9.186"
     assert bundle["maintenance"]["reason"].startswith("Alpha9.186:")
