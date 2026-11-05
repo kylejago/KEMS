@@ -84,9 +84,7 @@ def reward_settlement_evidence(audit: Mapping[str, Any]) -> dict[str, Any]:
     return {
         "status": "supplier_verified" if settled else "estimates_awaiting_supplier",
         "roi_included_estimate_pence": _finite(audit.get("included_total_pence")),
-        "provisional_partial_pence": _finite(
-            audit.get("provisional_partial_pence")
-        ),
+        "provisional_partial_pence": _finite(audit.get("provisional_partial_pence")),
         "meter_supported_estimate_pence": _finite(
             audit.get("meter_supported_estimate_pence")
         ),
