@@ -1564,7 +1564,7 @@ class FoxESSControlBackend:
                         and minimum_min_soc_on_grid is not None
                         and minimum_min_soc_on_grid <= 10.05
                         and control.desired_battery_export_power_kw <= 0.001
-                    )
+                    ) or bridge_paused_verified
                     effective_min_soc = resolve_live_min_soc_on_grid(
                         decision,
                         cheap_period_confirmed=cheap_period_confirmed,
@@ -1794,6 +1794,13 @@ class FoxESSControlBackend:
                             ),
                         )
 
+        # Hardware floor must be raised and read back BEFORE resuming Ohme.
+        await self._ohme_idle_bridge.async_restore_if_safe(
+            keep_paused=bridge_candidate,
+            min_soc_entity=min_soc_entity_id,
+            battery_soc=snapshot.battery_soc,
+        )
+
         if not self._paid_export_live_proven and (
             decision.action != "force_discharge" or not applied
         ):
@@ -1897,6 +1904,9 @@ class FoxESSControlBackend:
                         happy_hour_house_grid_hold_authorised=(
                             happy_hour_house_grid_hold_authorised
                         ),
+                        paid_idle_household_10_percent_authorised=(
+                            household_floor_authorised
+                        ),
                     )
                     if decision.commands_permitted
                     else None
@@ -1905,8 +1915,13 @@ class FoxESSControlBackend:
             "non_cheap_min_soc_policy": (
                 "pending_intelligent_ev_hold_only"
                 if pending_intelligent_ev_hold_active
-                else "preserve_pre_kems_baseline"
+                else (
+                    "verified_paused_ohme_household_10_percent"
+                    if bridge_paused_verified and household_floor_authorised
+                    else "preserve_pre_kems_baseline"
+                )
             ),
+            "ohme_idle_household_bridge": self._ohme_idle_bridge.status,
             "writes_this_cycle": writes,
             "last_write_at": self._last_write_at,
             "last_write_result": self._last_write_result,
