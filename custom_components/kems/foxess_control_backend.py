@@ -1568,23 +1568,23 @@ class FoxESSControlBackend:
                     )
                     household_floor_authorised = bool(
                         not no_paid_export_mode
-                            and not cheap_period_confirmed
-                            and not power_down_export_authorised
-                            and not happy_hour_charge_authorised
-                            and not happy_hour_house_grid_hold_authorised
-                            and not pending_intelligent_ev_hold_active
-                            and not ev_hold_source_grace_active
-                            and ev_hold_floor_percent is None
-                            and ev_connected is False
-                            and snapshot.ev_connected is False
-                            and snapshot.ev_charging is False
-                            and _number(snapshot.ev_power_kw) is not None
-                            and abs(float(snapshot.ev_power_kw)) <= 0.05
-                            and control.ev_grid_guard_status == "inactive"
-                            and ev_confirmed_unplugged
-                            and minimum_min_soc_on_grid is not None
-                            and minimum_min_soc_on_grid <= 10.05
-                            and control.desired_battery_export_power_kw <= 0.001
+                        and not cheap_period_confirmed
+                        and not power_down_export_authorised
+                        and not happy_hour_charge_authorised
+                        and not happy_hour_house_grid_hold_authorised
+                        and not pending_intelligent_ev_hold_active
+                        and not ev_hold_source_grace_active
+                        and ev_hold_floor_percent is None
+                        and ev_connected is False
+                        and snapshot.ev_connected is False
+                        and snapshot.ev_charging is False
+                        and _number(snapshot.ev_power_kw) is not None
+                        and abs(float(snapshot.ev_power_kw)) <= 0.05
+                        and control.ev_grid_guard_status == "inactive"
+                        and ev_confirmed_unplugged
+                        and minimum_min_soc_on_grid is not None
+                        and minimum_min_soc_on_grid <= 10.05
+                        and control.desired_battery_export_power_kw <= 0.001
                     )
                     if bridge_paused_verified:
                         household_floor_authorised = True
