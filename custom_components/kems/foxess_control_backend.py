@@ -1240,6 +1240,56 @@ class FoxESSControlBackend:
                 min_soc_on_grid_percent=decision.min_soc_on_grid_percent,
             )
 
+        # Alpha9.186: plugged-in zero power alone cannot lower FoxESS MinSOC.
+        # Require a separately opted-in, physically verified Paused charger.
+        bridge_candidate = household_bridge_eligible(
+            opted_in=bool(
+                self._entry.options.get(
+                    CONF_OHME_IDLE_HOUSE_BRIDGE_ENABLED, False
+                )
+            ),
+            control_authorised=bool(
+                decision.commands_permitted
+                and decision.action == "self_use"
+                and decision.reason
+                == "Paid-export idle Self Use is inside the bounded live scope"
+                and control.plan_safe
+                and control.data_fresh
+                and not force_restore
+                and not commissioning_export_test
+                and not ev_hold_source_grace_active
+                and not pending_intelligent_ev_hold_active
+                and ev_hold_floor_percent is None
+                and control.ev_grid_guard_status == "inactive"
+                and not power_down_export_authorised
+                and not happy_hour_charge_authorised
+                and not happy_hour_house_grid_hold_authorised
+                and control.grid_available
+                and not control.island_mode_active
+            ),
+            paid_agile_selected=bool(
+                not no_paid_export_mode
+                and export_tariff_type_from_options(self._entry.options)
+                == EXPORT_TARIFF_TYPE_AGILE
+            ),
+            cheap_period=cheap_period_confirmed,
+            active_session=bool(snapshot.saving_session_active),
+            ev_connected=ev_connected,
+            ev_charging=snapshot.ev_charging,
+            ev_power_kw=snapshot.ev_power_kw,
+            ev_power_age_seconds=snapshot.ev_power_age_seconds,
+            battery_soc=snapshot.battery_soc,
+            desired_export_kw=control.desired_battery_export_power_kw,
+            normal_reserve_percent=coordinator.settings.control.normal_reserve_percent,
+        )
+        bridge_paused_verified = await self._ohme_idle_bridge.async_prepare(
+            snapshot=snapshot,
+            eligible=bridge_candidate,
+            ev_status_entity=getattr(coordinator.entities, "ev_status", None),
+            ev_power_entity=getattr(coordinator.entities, "ev_power_kw", None),
+        )
+        household_floor_authorised = False
+
         writes: list[str] = []
         applied = False
         reason = decision.reason
