@@ -211,9 +211,7 @@ async def async_get_config_entry_diagnostics(
             data.simulation.actual_grid_export_kwh,
             data.simulation.actual_export_income_pence,
         ),
-        "reward_settlement_evidence": reward_settlement_evidence(
-            data.roi.reward_audit
-        ),
+        "reward_settlement_evidence": reward_settlement_evidence(data.roi.reward_audit),
         "agile_smart_export": coordinator.agile_smart_export_state,
         "agile_physical_export_reserve": getattr(
             coordinator, "_agile_live_reserve_status", {"status": "not_yet_evaluated"}
