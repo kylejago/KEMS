@@ -1,3 +1,10 @@
+## 0.9.0-alpha9.185 — Reviewed FoxESS Modbus 1.16.0 KH7 control compatibility
+
+- Restore the commissioned KH7 control backend after FoxESS Modbus updated from 1.15.0 to 1.16.0: explicitly allow **only** the two reviewed upstream versions; missing and unreviewed versions continue to fail closed. Keep the original latest-reviewed-version diagnostic key and add the full version allowlist so compatibility decisions are auditable.
+- Upstream 1.16.0 review: KH remote-control register and power-setpoint mapping remains unchanged; the remote-control manager adds an overlapping-update guard. The changed H3 inverter-battery-power register in 1.16.0 is **H3-only**, not the KH7 mapping. Keep KEMS command binding, physical readback, 1 kW first-export staging, independent battery/grid proof and three-strike safety logic unchanged.
+- Preserve all other authority gates, including explicit Agile paid-export selection, reviewed 7 kW export-power-limit readback, 15% paid-export reserve, 10% absolute home battery floor, EV battery-drain protection, Happy Hour no-discharge, Power Down rewards and the automatic 06:00–06:30 safe update window with no installation during export.
+- Add exact-version regression coverage (including absent/future versions) and version-to-backend gating checks. Source review and CI do **not** substitute for an on-device staged live-control confirmation after installation.
+
 ## 0.9.0-alpha9.184 — Agile reporting efficiency and auditable financial/telemetry evidence
 
 - Suppress exact duplicate state-and-attribute Home Assistant writes **only in the initial read-only Agile comparison publication**. Continue immediately publishing changed price, SOC, tariff, plan and reporting attributes; retain synchronous settlement, final deadline, direct-call and control update behaviour. Record initial writes and suppressed duplicates for subsequent field timing checks.

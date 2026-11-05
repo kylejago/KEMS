@@ -21,7 +21,11 @@ from homeassistant.loader import async_get_integration
 
 from .const import DOMAIN, STORAGE_NAMESPACE
 from .foxess_command_shadow import build_foxess_command_shadow_snapshot
-from .foxess_modbus_contract import FOXESS_MODBUS_REVIEWED_VERSION
+from .foxess_modbus_contract import (
+    FOXESS_MODBUS_REVIEWED_VERSION,
+    FOXESS_MODBUS_REVIEWED_VERSIONS,
+    foxess_modbus_version_is_reviewed,
+)
 from .kems_core.control_write_authority import (
     FoxESSControlDecision,
     assess_foxess_control_write_authority,
@@ -1040,7 +1044,7 @@ class FoxESSControlBackend:
             )
         )
         observed_version = await self._foxess_version()
-        version_matches = observed_version == FOXESS_MODBUS_REVIEWED_VERSION
+        version_matches = foxess_modbus_version_is_reviewed(observed_version)
         effective_export_limit_kw = _number(shadow.get("effective_export_limit_kw"))
 
         if no_paid_export_mode and not commissioning_export_test:
@@ -1743,6 +1747,7 @@ class FoxESSControlBackend:
         payload = {
             "scope": "alpha9.83_bounded_control_with_export_commissioning",
             "reviewed_foxess_modbus_version": FOXESS_MODBUS_REVIEWED_VERSION,
+            "reviewed_foxess_modbus_versions": list(FOXESS_MODBUS_REVIEWED_VERSIONS),
             "observed_foxess_modbus_version": observed_version,
             "reviewed_version_matches": version_matches,
             "binding_ready": binding_ready,
