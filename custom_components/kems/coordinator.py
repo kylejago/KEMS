@@ -1814,9 +1814,7 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                 if snapshot.cheap_period_confirmed and forecast_plan.ready
                 else forecast_plan
             )
-            return replace(
-                provisional, control=control, forecast_plan=display_forecast
-            )
+            return replace(provisional, control=control, forecast_plan=display_forecast)
         except Exception as err:
             raise UpdateFailed(f"KEMS analysis failed: {err}") from err
         finally:
