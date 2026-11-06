@@ -573,7 +573,11 @@ class FoxESSControlBackend:
         # The command entity can show 10% while the independent physical
         # register sensor still reports 15%. Verified retries must not skip
         # the write solely because the command entity appears unchanged.
-        if not force_write and current is not None and abs(current - value) <= tolerance:
+        if (
+            not force_write
+            and current is not None
+            and abs(current - value) <= tolerance
+        ):
             return True
         if state is not None:
             minimum = _number(state.attributes.get("min"))
@@ -1750,9 +1754,9 @@ class FoxESSControlBackend:
                                     self._household_floor_retry_at = None
                                     self._household_floor_status = "verified_10_percent"
                                 else:
-                                    self._household_floor_retry_at = (
-                                        datetime.now(UTC) + timedelta(seconds=120)
-                                    )
+                                    self._household_floor_retry_at = datetime.now(
+                                        UTC
+                                    ) + timedelta(seconds=120)
                                     self._household_floor_status = "readback_unverified"
                                     self._last_write_result = (
                                         "Household 10% requested after verified "
@@ -1992,12 +1996,8 @@ class FoxESSControlBackend:
                         # a 10% readback is pending. This is safe and avoids
                         # erasing an asynchronously accepted 10% command.
                         # Mode verification failures still use safe rollback.
-                        if (
-                            ev_restart_floor_target is None
-                            and not (
-                                household_floor_transition
-                                and household_mode_verified
-                            )
+                        if ev_restart_floor_target is None and not (
+                            household_floor_transition and household_mode_verified
                         ):
                             await self._async_restore(
                                 entities,
