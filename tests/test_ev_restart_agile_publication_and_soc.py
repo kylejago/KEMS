@@ -57,7 +57,9 @@ def test_ev_restart_prearms_only_confirmed_cheap_connected_self_use() -> None:
 
 def test_protection_is_read_back_before_self_use_and_failure_preserves_mode() -> None:
     backend = (ROOT / "foxess_control_backend.py").read_text(encoding="utf-8")
-    start = backend.index("ev_restart_floor_target = _cheap_ev_restart_protective_floor(")
+    start = backend.index(
+        "ev_restart_floor_target = _cheap_ev_restart_protective_floor("
+    )
     readback = backend.index("ev_restart_floor_verified = bool(min_soc_ok)", start)
     select = backend.index('if min_soc_ok and decision.action == "self_use":', readback)
     assert start < readback < select
@@ -78,9 +80,7 @@ def test_initial_agile_publication_only_deferred_inside_coordinator_scan() -> No
 
 
 def test_live_soc_is_explicitly_physical_and_unknown_rates_stay_unknown() -> None:
-    dashboard = (ROOT / "kems_master_dashboard.yaml").read_text(
-        encoding="utf-8"
-    )
+    dashboard = (ROOT / "kems_master_dashboard.yaml").read_text(encoding="utf-8")
     assert "name: FoxESS SOC (live)" in dashboard
     assert "title: Measured FoxESS battery SOC" in dashboard
     assert "Advisory KEMS simulation SOC" in dashboard
