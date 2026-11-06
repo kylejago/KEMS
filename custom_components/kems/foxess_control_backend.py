@@ -1880,7 +1880,7 @@ class FoxESSControlBackend:
                             reason=self._last_write_result,
                         )
                         reason = self._last_write_result
-                        if ev_restart_floor_target is None or min_soc_ok:
+                        if ev_restart_floor_target is None:
                             await self._async_restore(
                                 entities,
                                 writes,
@@ -1891,9 +1891,10 @@ class FoxESSControlBackend:
                                     or self._last_applied_action == "force_discharge"
                                 ),
                             )
-                        # On failed EV floor verification, never restore the
-                        # low baseline over an existing protective Force Charge.
-                        # The next scan retries the physical proof.
+                        # An unsuccessful connected-EV handover must not undo
+                        # its protective floor, even when the MinSOC write
+                        # succeeded but the mode write did not. Retain the
+                        # current hardware state and retry on a later scan.
 
         # Hardware floor must be raised and read back BEFORE resuming Ohme.
         await self._ohme_idle_bridge.async_restore_if_safe(
