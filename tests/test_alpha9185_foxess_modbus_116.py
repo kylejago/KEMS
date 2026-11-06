@@ -82,7 +82,7 @@ def test_release_metadata_identity_matches_185():
             encoding="utf-8"
         )
     )["maintenance"]["reason"]
-    assert manifest["version"] == "0.9.0-alpha9.186"
+    assert manifest["version"] == "0.9.0-alpha9.187"
     assert reason.startswith("Alpha9.186:")
     assert "FoxESS Modbus 1.15.0 and 1.16.0" in reason
     assert "06:00-06:30" in reason
