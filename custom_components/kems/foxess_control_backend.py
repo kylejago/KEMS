@@ -373,6 +373,9 @@ class FoxESSControlBackend:
         self._last_verified_min_soc_at: str | None = None
         self._last_write_at: str | None = None
         self._last_write_result = "Never commanded"
+        # A failed household-only readback is retried at most every 120 seconds.
+        self._household_floor_retry_at: datetime | None = None
+        self._household_floor_status = "not_requested"
         self._status: dict[str, Any] = {}
         self._ohme_idle_bridge = OhmeIdleHouseholdBridge(hass, entry)
 
@@ -563,10 +566,14 @@ class FoxESSControlBackend:
         writes: list[str],
         *,
         tolerance: float = 0.0005,
+        force_write: bool = False,
     ) -> bool:
         state = self._hass.states.get(entity_id)
         current = _number(state.state if state is not None else None)
-        if current is not None and abs(current - value) <= tolerance:
+        # The command entity can show 10% while the independent physical
+        # register sensor still reports 15%. Verified retries must not skip
+        # the write solely because the command entity appears unchanged.
+        if not force_write and current is not None and abs(current - value) <= tolerance:
             return True
         if state is not None:
             minimum = _number(state.attributes.get("min"))
@@ -1349,6 +1356,11 @@ class FoxESSControlBackend:
         household_floor_authorised = False
         ev_restart_floor_target: float | None = None
         ev_restart_floor_verified = False
+        household_floor_transition = False
+        household_floor_verified = False
+        household_mode_verified = False
+        household_floor_retry_throttled = False
+        self._household_floor_status = "not_requested"
 
         writes: list[str] = []
         applied = False
