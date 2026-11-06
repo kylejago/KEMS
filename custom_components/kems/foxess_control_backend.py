@@ -1945,7 +1945,12 @@ class FoxESSControlBackend:
                                     UTC
                                 ).isoformat()
                                 await self._async_save()
-                        if pending_intelligent_ev_hold_active:
+                        if household_floor_transition and household_floor_verified:
+                            self._last_write_result = (
+                                "Alpha9.188 household-only 10% Min SoC "
+                                "(On Grid) physically verified in Self Use"
+                            )
+                        elif pending_intelligent_ev_hold_active:
                             self._last_write_result = (
                                 "Alpha9.76 pending Intelligent EV MinSOC hold applied"
                                 if writes
@@ -1982,7 +1987,18 @@ class FoxESSControlBackend:
                             reason=self._last_write_result,
                         )
                         reason = self._last_write_result
-                        if ev_restart_floor_target is None:
+                        # If Self Use was independently observed, do not
+                        # restore the higher pre-KEMS baseline just because
+                        # a 10% readback is pending. This is safe and avoids
+                        # erasing an asynchronously accepted 10% command.
+                        # Mode verification failures still use safe rollback.
+                        if (
+                            ev_restart_floor_target is None
+                            and not (
+                                household_floor_transition
+                                and household_mode_verified
+                            )
+                        ):
                             await self._async_restore(
                                 entities,
                                 writes,
@@ -2035,6 +2051,16 @@ class FoxESSControlBackend:
             "cheap_period_confirmed": bool(cheap_period_confirmed),
             "ev_restart_protective_floor_target": ev_restart_floor_target,
             "ev_restart_protective_floor_verified": ev_restart_floor_verified,
+            "household_only_floor_requested": household_floor_transition,
+            "household_only_floor_verified": household_floor_verified,
+            "household_only_mode_verified": household_mode_verified,
+            "household_only_floor_status": self._household_floor_status,
+            "household_only_retry_throttled": household_floor_retry_throttled,
+            "household_only_retry_after": (
+                self._household_floor_retry_at.isoformat()
+                if self._household_floor_retry_at is not None
+                else None
+            ),
             "power_down_export_authorised": bool(power_down_export_authorised),
             "happy_hour_charge_authorised": bool(happy_hour_charge_authorised),
             "happy_hour_house_grid_hold_authorised": bool(
@@ -2124,7 +2150,11 @@ class FoxESSControlBackend:
                 else (
                     "verified_paused_ohme_household_10_percent"
                     if bridge_paused_verified and household_floor_authorised
-                    else "preserve_pre_kems_baseline"
+                    else (
+                        "confirmed_unplugged_household_10_percent"
+                        if household_floor_authorised
+                        else "preserve_pre_kems_baseline"
+                    )
                 )
             ),
             "ohme_idle_household_bridge": self._ohme_idle_bridge.status,
