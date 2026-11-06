@@ -197,7 +197,7 @@ views:
               action: more-info
           - type: button
             entity: sensor.kems_battery_state_of_charge
-            name: Battery SoC
+            name: FoxESS SOC (live)
             icon: mdi:battery
             show_state: true
             tap_action:
@@ -235,6 +235,7 @@ views:
         {% set ns.rows = ns.rows + ['| ' ~ time_label ~ ' | ' ~ rate_label ~ ' | ' ~ (action | string | replace('|', ' / ') | replace('\n', ' ')) ~ ' | ' ~ soc_label ~ ' |'] %}
         {% endfor %}
         **Today's published plan:** {{ today | count }}/48 slots · **Tomorrow:** {{ tomorrow | count }}/48 slots  
+        _Missing half-hour prices remain unknown; KEMS never fills them with guessed Agile rates._  
         **Current Agile export price:** {{ (slots[0].get('rate_pence') ~ ' p/kWh') if slots and idx < (today | count) and slots[0].get('rate_pence') is not none else '—' }}  
         **FoxESS SOC:** {{ ('%.1f%%' | format(observed_soc | float)) if observed_soc is not none else 'Awaiting fresh reading' }} · **Projected physical SOC:** {{ ('%.1f%%' | format(live_soc | float)) if live_soc is not none else 'Unavailable during priority/uncertainty' }}
   
@@ -435,7 +436,7 @@ views:
             hours_to_show: 24
             entities:
               - entity: sensor.kems_battery_state_of_charge
-                name: Battery SOC
+                name: Physical FoxESS SOC
           - type: history-graph
             title: Energy cost
             hours_to_show: 24

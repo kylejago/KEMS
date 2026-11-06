@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import asyncio
 from datetime import UTC, datetime, timedelta
-from math import isfinite
+from math import ceil, isfinite
 from typing import Any
 
 from homeassistant.helpers.storage import Store
@@ -64,6 +64,43 @@ def _number(value: object) -> float | None:
         return float(value)
     except (TypeError, ValueError):
         return None
+
+
+def _cheap_ev_restart_protective_floor(
+    *,
+    cheap_period_confirmed: bool,
+    ev_connected: bool | None,
+    observed_ev_connected: bool | None,
+    battery_soc: object,
+    action: str,
+    commands_permitted: bool,
+    active_session: bool,
+) -> float | None:
+    """Pre-arm FoxESS before an idle connected EV can resume on cheap power.
+
+    A confirmed cheap/Intelligent slot can contain pauses between charger
+    bursts. Releasing Force Charge into unprotected Self Use at those pauses
+    lets an asynchronous Ohme restart briefly discharge the home battery.
+    Guard only this confirmed cheap-period, connected-EV transition; do not
+    affect expensive-period household Self Use, the 15% paid-export stop, or
+    the independent 10% household floor.
+    """
+    soc = _number(battery_soc)
+    if (
+        not cheap_period_confirmed
+        or not commands_permitted
+        or action != "self_use"
+        or ev_connected is not True
+        or observed_ev_connected is not True
+        or active_session
+        or soc is None
+        or not isfinite(soc)
+        or not 0.0 <= soc <= 100.0
+    ):
+        return None
+    # Leave a one-percent-point guard against sensor quantisation while never
+    # requesting an invalid MinSOC above 100%.
+    return float(min(100, ceil(soc + 1.0)))
 
 
 def _paid_export_physical_observed_at(snapshot: Any) -> datetime | None:
@@ -1310,6 +1347,8 @@ class FoxESSControlBackend:
             ev_power_entity=getattr(coordinator.entities, "ev_power_kw", None),
         )
         household_floor_authorised = False
+        ev_restart_floor_target: float | None = None
+        ev_restart_floor_verified = False
 
         writes: list[str] = []
         applied = False
@@ -1602,6 +1641,25 @@ class FoxESSControlBackend:
                             happy_hour_house_grid_hold_authorised
                         ),
                     )
+                    ev_restart_floor_target = _cheap_ev_restart_protective_floor(
+                        cheap_period_confirmed=cheap_period_confirmed,
+                        ev_connected=ev_connected,
+                        observed_ev_connected=snapshot.ev_connected,
+                        battery_soc=snapshot.battery_soc,
+                        action=decision.action,
+                        commands_permitted=decision.commands_permitted,
+                        active_session=bool(
+                            snapshot.saving_session_active
+                            or power_down_export_authorised
+                            or happy_hour_charge_authorised
+                            or happy_hour_house_grid_hold_authorised
+                        ),
+                    )
+                    if ev_restart_floor_target is not None:
+                        effective_min_soc = max(
+                            float(effective_min_soc or 0.0),
+                            ev_restart_floor_target,
+                        )
                     if effective_min_soc is None:
                         self._last_write_result = (
                             "Cannot preserve pre-KEMS Min SoC-on-grid "
@@ -1615,6 +1673,22 @@ class FoxESSControlBackend:
                             writes,
                             tolerance=0.05,
                         )
+                    # A successful service call is not evidence that FoxESS
+                    # actually raised the floor. Verify physical readback before
+                    # leaving Force Charge for connected-EV Self Use.
+                    if min_soc_ok and ev_restart_floor_target is not None:
+                        min_soc_ok = await self._async_wait_number(
+                            entities,
+                            "min_soc_on_grid",
+                            effective_min_soc,
+                            tolerance=0.05,
+                        )
+                        ev_restart_floor_verified = bool(min_soc_ok)
+                        if not min_soc_ok:
+                            self._last_write_result = (
+                                "Connected EV restart MinSOC not verified: "
+                                "retaining existing FoxESS work mode"
+                            )
                     action_ok = False
                     if min_soc_ok and decision.action == "self_use":
                         action_ok = await self._async_select(
@@ -1806,16 +1880,21 @@ class FoxESSControlBackend:
                             reason=self._last_write_result,
                         )
                         reason = self._last_write_result
-                        await self._async_restore(
-                            entities,
-                            writes,
-                            verify_physical_baseline=bool(
-                                commissioning_export_test
-                                or force_restore
-                                or self._commissioning_restore_pending
-                                or self._last_applied_action == "force_discharge"
-                            ),
-                        )
+                        if ev_restart_floor_target is None:
+                            await self._async_restore(
+                                entities,
+                                writes,
+                                verify_physical_baseline=bool(
+                                    commissioning_export_test
+                                    or force_restore
+                                    or self._commissioning_restore_pending
+                                    or self._last_applied_action == "force_discharge"
+                                ),
+                            )
+                        # An unsuccessful connected-EV handover must not undo
+                        # its protective floor, even when the MinSOC write
+                        # succeeded but the mode write did not. Retain the
+                        # current hardware state and retry on a later scan.
 
         # Hardware floor must be raised and read back BEFORE resuming Ohme.
         await self._ohme_idle_bridge.async_restore_if_safe(
@@ -1852,6 +1931,8 @@ class FoxESSControlBackend:
             "force_restore_requested": bool(force_restore),
             "export_authority_active": export_authority_active,
             "cheap_period_confirmed": bool(cheap_period_confirmed),
+            "ev_restart_protective_floor_target": ev_restart_floor_target,
+            "ev_restart_protective_floor_verified": ev_restart_floor_verified,
             "power_down_export_authorised": bool(power_down_export_authorised),
             "happy_hour_charge_authorised": bool(happy_hour_charge_authorised),
             "happy_hour_house_grid_hold_authorised": bool(

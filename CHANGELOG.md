@@ -1,3 +1,11 @@
+## 0.9.0-alpha9.187 — Verified EV restart floor and lower-overhead Agile publication
+
+- **Connected EV restart protection:** During a positively confirmed cheap/Intelligent period, pre-arm a FoxESS Min SoC (On Grid) at or above the observed battery SOC (with a 1pp bounded margin) before switching a connected idle EV from Force Charge to Self Use. Require the physical MinSOC readback before mode handover; if it cannot be verified, retain the existing work mode and retry on a later scan, without restoring a low baseline.
+- **Scope:** Do not alter the separately opted-in paused-Ohme household-only bridge outside cheap periods, 15% deliberate paid-export cutoff, 10% household floor, 7kW DNO limit, Power Down or Happy Hour precedence. Software coordination and periodic scans are not an electrical EV interlock; the transition safeguard still needs KH7 live validation.
+- **Agile performance:** In the coordinator only, defer one redundant initial read-only Agile presentation cascade until the guaranteed authoritative same-scan settlement publication. All historical exact-input SHA-256 checks, current-day numerical comparisons, forecast inputs, physical control, settlement and state data continue to run; standalone manager calls still publish immediately. Instrument the deferral and verify scan speed after installation.
+- **Display and price evidence:** Rename Live Data battery labels as measured FoxESS SOC, preserve the explicit advisory simulation comparison, and state that missing Agile half-hours remain unknown without inferred values.
+- **Testing and rollout:** Add regression tests for the cheap handover guard, failure boundary, scoped publication and UI semantics. Retain safe-first 06:00–06:30 update installation only when not actively exporting.
+
 ## 0.9.0-alpha9.186 — Verified paused Ohme enables optional 10% household-only reserve
 
 - Add a **separate, default-off** `ohme_idle_house_bridge_enabled` control option because this introduces a new explicit Ohme mode write outside the Happy Hour reward session. With the option enabled, KEMS may pause the uniquely reviewed Ohme ePod near the 15% export reserve while paid Agile export is idle and the EV is physically connected but not drawing power.
