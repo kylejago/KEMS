@@ -1,3 +1,11 @@
+## 0.9.0-alpha9.188 — Verified 15% paid-export / 10% household handover
+
+- **Two separate limits:** Paid battery export remains planned and physically protected at **15% SOC**, including the forecast household reserve until the next cheap period. Only normal household Self Use may use the battery down to **10%**, and only with a confirmed unplugged vehicle or independently verified Ohme pause.
+- **Safe inverter order:** Once deliberate Force Discharge has stopped, switch and verify FoxESS **Self Use before lowering Min SoC (On Grid)** to 10%. Do not lower the register while Force Discharge could still export battery energy.
+- **Physical confirmation:** Check the independent FoxESS Min SoC (On Grid) sensor, not just the command entity or successful Home Assistant service call. If the command says 10% but the sensor has reverted to 15%, reissue the command only when authorised, with a 120-second cooldown between unsuccessful attempts; report the mismatch rather than claiming it is applied.
+- **Failure path:** Retain verified Self Use when the 10% floor is unconfirmed, to avoid re-imposing the pre-KEMS 15% baseline. Failure to verify the Self Use transition retains the original safety restoration path. A 15% floor is conservative and may lead to temporary extra grid import; no hardware violation is inferred from the report alone.
+- **Scope:** No changes to EV connected/charging holds, confirmed cheap Force Charge, Happy Hour, Power Down, the DNO 7 kW grid export ceiling, the 15% deliberate-export cutoff, or the 06:00–06:30 safe-first no-active-export update window. Regression checks and physical post-install testing required.
+
 ## 0.9.0-alpha9.187 — Verified EV restart floor and lower-overhead Agile publication
 
 - **Connected EV restart protection:** During a positively confirmed cheap/Intelligent period, pre-arm a FoxESS Min SoC (On Grid) at or above the observed battery SOC (with a 1pp bounded margin) before switching a connected idle EV from Force Charge to Self Use. Require the physical MinSOC readback before mode handover; if it cannot be verified, retain the existing work mode and retry on a later scan, without restoring a low baseline.
