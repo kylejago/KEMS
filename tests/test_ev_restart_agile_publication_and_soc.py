@@ -63,7 +63,7 @@ def test_protection_is_read_back_before_self_use_and_failure_preserves_mode() ->
     readback = backend.index("ev_restart_floor_verified = bool(min_soc_ok)", start)
     select = backend.index('if min_soc_ok and decision.action == "self_use":', readback)
     assert start < readback < select
-    assert "if ev_restart_floor_target is None:" in backend
+    assert "if ev_restart_floor_target is None and not (" in backend
     assert '"ev_restart_protective_floor_verified"' in backend
 
 
