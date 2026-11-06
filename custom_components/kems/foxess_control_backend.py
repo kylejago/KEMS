@@ -1672,7 +1672,95 @@ class FoxESSControlBackend:
                             float(effective_min_soc or 0.0),
                             ev_restart_floor_target,
                         )
-                    if effective_min_soc is None:
+                    # Return from paid export to Self Use BEFORE lowering the
+                    # hardware reserve to 10%. Lowering it in Force Discharge
+                    # would temporarily remove the 15% paid-export protection.
+                    household_floor_transition = bool(
+                        household_floor_authorised
+                        and not cheap_period_confirmed
+                        and decision.commands_permitted
+                        and decision.action == "self_use"
+                        and effective_min_soc is not None
+                        and abs(float(effective_min_soc) - 10.0) <= 0.05
+                        and control.desired_battery_export_power_kw <= 0.001
+                    )
+                    if household_floor_transition:
+                        household_mode_verified = await self._async_select(
+                            work_mode_entity, "Self Use", writes
+                        )
+                        if household_mode_verified:
+                            household_mode_verified = await self._async_wait_state(
+                                work_mode_entity, "Self Use"
+                            )
+                        if not household_mode_verified:
+                            self._household_floor_status = "self_use_not_verified"
+                            self._last_write_result = (
+                                "Household 10% withheld: FoxESS Self Use "
+                                "not verified; preserve export reserve"
+                            )
+                            min_soc_ok = False
+                        else:
+                            readback_entity = self._observation_entity_id(
+                                entities, "min_soc_on_grid"
+                            )
+                            readback_state = (
+                                self._hass.states.get(readback_entity)
+                                if readback_entity is not None
+                                else None
+                            )
+                            readback = _number(
+                                readback_state.state
+                                if readback_state is not None
+                                else None
+                            )
+                            if readback is not None and abs(readback - 10.0) <= 0.05:
+                                min_soc_ok = True
+                                household_floor_verified = True
+                                self._household_floor_retry_at = None
+                                self._household_floor_status = "verified_10_percent"
+                            elif (
+                                getattr(self, "_household_floor_retry_at", None)
+                                is not None
+                                and datetime.now(UTC) < self._household_floor_retry_at
+                            ):
+                                min_soc_ok = False
+                                household_floor_retry_throttled = True
+                                self._household_floor_status = "retry_throttled"
+                                self._last_write_result = (
+                                    "Household 10% readback unverified; "
+                                    "retry rate-limited in Self Use"
+                                )
+                            else:
+                                min_soc_ok = await self._async_number(
+                                    min_soc_entity,
+                                    10.0,
+                                    writes,
+                                    tolerance=0.05,
+                                    force_write=True,
+                                )
+                                if min_soc_ok:
+                                    min_soc_ok = await self._async_wait_number(
+                                        entities,
+                                        "min_soc_on_grid",
+                                        10.0,
+                                        tolerance=0.05,
+                                    )
+                                household_floor_verified = bool(min_soc_ok)
+                                if household_floor_verified:
+                                    self._household_floor_retry_at = None
+                                    self._household_floor_status = "verified_10_percent"
+                                else:
+                                    self._household_floor_retry_at = (
+                                        datetime.now(UTC) + timedelta(seconds=120)
+                                    )
+                                    self._household_floor_status = "readback_unverified"
+                                    self._last_write_result = (
+                                        "Household 10% requested after verified "
+                                        "Self Use, but independent FoxESS "
+                                        "Min SoC (On Grid) sensor did not "
+                                        "confirm 10%; retry in 120 seconds"
+                                    )
+                    elif effective_min_soc is None:
                         self._last_write_result = (
                             "Cannot preserve pre-KEMS Min SoC-on-grid "
                             "outside cheap period"
@@ -1703,10 +1791,12 @@ class FoxESSControlBackend:
                             )
                     action_ok = False
                     if min_soc_ok and decision.action == "self_use":
-                        action_ok = await self._async_select(
-                            work_mode_entity,
-                            "Self Use",
-                            writes,
+                        action_ok = (
+                            household_mode_verified
+                            if household_floor_transition
+                            else await self._async_select(
+                                work_mode_entity, "Self Use", writes
+                            )
                         )
                     elif (
                         min_soc_ok
