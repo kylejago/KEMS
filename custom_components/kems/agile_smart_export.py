@@ -436,7 +436,15 @@ class AgileSmartExportManager:
         self._kems_suppress_identical_base_publication = True
         publish_started = perf_counter()
         try:
-            self._publish(self._state)
+            if getattr(self, "_kems_defer_initial_agile_publication", False):
+                # The coordinator always executes its full authoritative
+                # settled-day reconciliation immediately after this manager
+                # returns. That pass publishes current rates, slot plans,
+                # SOC and changed prices together. Never defer standalone
+                # manager calls or suppress the reconciliation publication.
+                base_publication_stats["deferred_to_settlement"] = 1
+            else:
+                self._publish(self._state)
         finally:
             self._kems_suppress_identical_base_publication = False
         publication_seconds = round(perf_counter() - publish_started, 3)
@@ -470,6 +478,9 @@ class AgileSmartExportManager:
             "tomorrow_projection_seconds": tomorrow_comparison_seconds,
             "period_and_state_aggregation_seconds": state_aggregation_seconds,
             "state_publication_seconds": publication_seconds,
+            "initial_publication_deferred_to_settlement": bool(
+                base_publication_stats.get("deferred_to_settlement", 0)
+            ),
             "initial_publication_writes": base_publication_stats["written"],
             "initial_publication_identical_suppressed": base_publication_stats[
                 "skipped_identical"
