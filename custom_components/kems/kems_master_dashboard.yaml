@@ -432,7 +432,7 @@ views:
               - entity: sensor.kems_battery_power
                 name: Battery power
           - type: history-graph
-            title: Measured FoxESS battery SOC
+            title: Battery SOC
             hours_to_show: 24
             entities:
               - entity: sensor.kems_battery_state_of_charge

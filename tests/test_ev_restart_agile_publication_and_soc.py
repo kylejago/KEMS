@@ -82,7 +82,7 @@ def test_initial_agile_publication_only_deferred_inside_coordinator_scan() -> No
 def test_live_soc_is_explicitly_physical_and_unknown_rates_stay_unknown() -> None:
     dashboard = (ROOT / "kems_master_dashboard.yaml").read_text(encoding="utf-8")
     assert "name: FoxESS SOC (live)" in dashboard
-    assert "title: Measured FoxESS battery SOC" in dashboard
+    assert "name: Physical FoxESS SOC" in dashboard
     assert "Advisory KEMS simulation SOC" in dashboard
     assert "Missing half-hour prices remain unknown" in dashboard
     assert "if p.get('rate_pence') is not none else '—'" in dashboard
