@@ -989,15 +989,24 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                 else None
             )
             agile_planning_started = perf_counter()
-            await self._agile_smart_export.async_update(
-                records=agile_records,
-                now=now,
-                config=self.settings.simulation,
-                learned=learned,
-                forecast=forecast,
-                forecast_plan=forecast_plan,
-                tariff=self.settings.tariff,
-            )
+            # The authoritative settled-day pass below republishes the entire
+            # read-only Agile presentation in this *same* scan. Defer only the
+            # redundant first manager publication, NOT its calculations, rates,
+            # cache verification, or any physical-control gate. The manager's
+            # standalone callers retain immediate publication by default.
+            self._agile_smart_export._kems_defer_initial_agile_publication = True
+            try:
+                await self._agile_smart_export.async_update(
+                    records=agile_records,
+                    now=now,
+                    config=self.settings.simulation,
+                    learned=learned,
+                    forecast=forecast,
+                    forecast_plan=forecast_plan,
+                    tariff=self.settings.tariff,
+                )
+            finally:
+                self._agile_smart_export._kems_defer_initial_agile_publication = False
             agile_planning_seconds = round(perf_counter() - agile_planning_started, 3)
             manager_base_seconds = float(
                 getattr(self._agile_smart_export, "_performance_detail", {}).get(
