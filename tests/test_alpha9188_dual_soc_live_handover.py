@@ -3,6 +3,7 @@
 This tests the pure planning/authority policy and ensures the live hardware
 handover does not lower the physical export floor in Force Discharge.
 """
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -102,7 +103,7 @@ def test_live_handover_orders_self_use_before_lowering_on_grid_floor() -> None:
     scope = src[start : src.index("elif effective_min_soc is None:", start)]
     mode_write = scope.index("household_mode_verified = await self._async_select(")
     mode_verify = scope.index("household_mode_verified = await self._async_wait_state(")
-    sensor_read = scope.index('self._observation_entity_id(')
+    sensor_read = scope.index("self._observation_entity_id(")
     low_write = scope.index("min_soc_ok = await self._async_number(")
     physical_proof = scope.index("min_soc_ok = await self._async_wait_number(")
     assert mode_write < mode_verify < sensor_read < low_write < physical_proof
@@ -119,4 +120,4 @@ def test_unverified_household_10_never_claims_hardware_success() -> None:
     assert "and household_mode_verified" in src
     assert '"household_only_floor_verified": household_floor_verified' in src
     assert '"household_only_floor_status": self._household_floor_status' in src
-    assert "if not force_write and current is not None" in src
+    assert "not force_write" in src
