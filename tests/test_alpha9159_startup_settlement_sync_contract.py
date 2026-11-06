@@ -78,7 +78,7 @@ def test_hotfix_release_explains_reversion_and_preserves_safety() -> None:
     )
     assert manifest["version"] == "0.9.0-alpha9.187"
     reason = bundle["maintenance"]["reason"]
-    assert reason.startswith("Alpha9.186:")
+    assert reason.startswith("Alpha9.187:")
     assert "Alpha9.158" in reason
     assert "7 kW" in reason
     assert "10%" in reason
