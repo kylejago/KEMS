@@ -50,6 +50,7 @@ from .happy_hour_auto_join import (
 from .happy_hour_budget import (
     apply_happy_hour_control,
     restore_completed_financial_reward_receipts,
+    verified_happy_hour_automation_active,
     verified_live_happy_hour_charge_kw,
     verified_live_happy_hour_house_grid_hold,
 )
