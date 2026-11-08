@@ -913,6 +913,17 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
             self._agile_smart_export._kems_happy_hour_display_control_config = (
                 self.settings.control
             )
+            self._agile_smart_export._kems_happy_hour_meter_samples = (
+                self._happy_hour_import_ledger.samples
+            )
+            self._agile_smart_export._kems_completed_happy_hour_bookings = [
+                dict(record)
+                for record in self._happy_hour_import_ledger.status.get(
+                    "persisted_reward_windows", []
+                )
+                if record.get("booking_source") == "octopus_joined_events"
+                and record.get("event_id")
+            ]
             self._agile_smart_export._verified_happy_hour_grid_samples = (
                 self._happy_hour_import_ledger.samples
             )
