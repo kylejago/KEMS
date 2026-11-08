@@ -382,3 +382,75 @@ def test_alpha9168_incomplete_coverage_and_mixed_historical_tariffs_fail_closed(
     ]
     kwargs["physical_samples"] = readings[:3]
     assert _budget.restore_completed_financial_reward_receipts(**kwargs) == []
+
+
+
+def test_native_happy_hour_automation_on_for_current_booked_reward_hour():
+    """A full battery with verified grid hold is still an active free hour."""
+    args = _case()
+    active = _budget.verified_happy_hour_automation_active(
+        booking=args["booking"],
+        context=args["context"],
+        now=NOW,
+        physical_charge_target_kw=0.0,
+        physical_house_grid_hold=True,
+        power_down_active=False,
+    )
+    assert active
+    assert _budget.verified_happy_hour_automation_active(
+        booking=args["booking"],
+        context=args["context"],
+        now=NOW,
+        physical_charge_target_kw=2.5,
+        physical_house_grid_hold=False,
+        power_down_active=False,
+    )
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        {"context": {"mode": "scheduled_after_recharge"}},
+        {"context": {"mode": "preparation"}},
+        {"context": {"happy_hour_import_authority_active": False}},
+        {"context": {"current_reward_hour_ledger_complete": False}},
+        {"context": {"current_reward_hour_cap_reached": True}},
+        {"context": {"current_reward_hour_remaining_kwh": 0.0}},
+        {"booking": {"bookings": []}},
+        {"power_down_active": True},
+        {"now": START - timedelta(seconds=1)},
+        {"now": START + timedelta(hours=1)},
+        {"physical_house_grid_hold": False, "physical_charge_target_kw": 0.0},
+    ],
+)
+def test_native_happy_hour_automation_fails_off_without_live_authority(change):
+    """No scheduled-only, exhausted, old or physically unverified On state."""
+    args = _case()
+    kwargs = {
+        "booking": args["booking"],
+        "context": dict(args["context"]),
+        "now": NOW,
+        "physical_charge_target_kw": 0.0,
+        "physical_house_grid_hold": True,
+        "power_down_active": False,
+    }
+    if "context" in change:
+        kwargs["context"].update(change["context"])
+    else:
+        kwargs.update(change)
+    assert not _budget.verified_happy_hour_automation_active(**kwargs)
+
+
+def test_native_happy_hour_entity_is_coordinator_owned_binary_sensor():
+    from pathlib import Path
+
+    root = Path(__file__).parents[1] / "custom_components" / "kems"
+    binary = (root / "binary_sensor.py").read_text(encoding="utf-8")
+    coordinator = (root / "coordinator.py").read_text(encoding="utf-8")
+    models = (root / "kems_core" / "models.py").read_text(encoding="utf-8")
+
+    assert 'key="happy_hour_active"' in binary
+    assert 'name="Happy Hour active"' in binary
+    assert "is_on_fn=lambda data: data.happy_hour_active" in binary
+    assert "happy_hour_active: bool = False" in models
+    assert "happy_hour_active=verified_happy_hour_automation_active(" in coordinator
