@@ -384,7 +384,6 @@ def test_alpha9168_incomplete_coverage_and_mixed_historical_tariffs_fail_closed(
     assert _budget.restore_completed_financial_reward_receipts(**kwargs) == []
 
 
-
 def test_native_happy_hour_automation_on_for_current_booked_reward_hour():
     """A full battery with verified grid hold is still an active free hour."""
     args = _case()
