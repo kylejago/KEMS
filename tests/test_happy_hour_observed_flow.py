@@ -106,7 +106,8 @@ def test_no_past_half_hour_is_inferred_from_missing_meter_evidence():
     data["meter_samples"] = [
         row
         for row in data["meter_samples"]
-        if not START + timedelta(minutes=11) <= row.timestamp
+        if not START + timedelta(minutes=11)
+        <= row.timestamp
         <= START + timedelta(minutes=35)
     ]
     report = _load()(**data)
