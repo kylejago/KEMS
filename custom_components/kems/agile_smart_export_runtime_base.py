@@ -406,7 +406,9 @@ class EfficientAgileSmartExportManager(AgileSmartExportManager):
                 confirmed_bookings=getattr(
                     self, "_kems_confirmed_happy_hour_bookings", []
                 ),
-                now=getattr(self, "_last_analysis", None) or datetime.now(UTC),
+                # Use wall-clock time, not the five-minute replay checkpoint:
+                # active/current slots must never be rewritten as forecasts.
+                now=datetime.now(UTC),
                 capacity_kwh=getattr(hh_simulation, "battery_capacity_kwh", 0.0),
                 max_charge_kw=getattr(hh_control, "max_charge_kw", 0.0),
                 charge_efficiency=getattr(hh_simulation, "charge_efficiency", 0.0),
