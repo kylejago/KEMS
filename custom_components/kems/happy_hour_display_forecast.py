@@ -83,7 +83,10 @@ def overlay_booked_happy_hour_flow(
 
     bookings = []
     for item in confirmed_bookings:
-        if not isinstance(item, dict) or item.get("booking_source") != "octopus_joined_events":
+        if (
+            not isinstance(item, dict)
+            or item.get("booking_source") != "octopus_joined_events"
+        ):
             continue
         if not item.get("event_id"):
             continue
@@ -178,7 +181,9 @@ def overlay_booked_happy_hour_flow(
                     )
                 )
                 slot["flow_happy_hour_booking_id"] = event_id
-                slot["flow_happy_hour_authority"] = "display only; live meter guards independent"
+                slot["flow_happy_hour_authority"] = (
+                    "display only; live meter guards independent"
+                )
                 result["slots_overlaid"] += 1
                 result["modelled_charge_input_kwh"] += charge_input
                 result["modelled_stored_charge_kwh"] += stored
