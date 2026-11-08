@@ -175,9 +175,7 @@ def overlay_completed_happy_hour_flow(
             # values themselves came from independent physical power streams.
             solar_export = min(sources["export"], sources["solar"])
             battery_export = sources["export"] - solar_export
-            battery_home = max(
-                sources["battery_discharge"] - battery_export, 0.0
-            )
+            battery_home = max(sources["battery_discharge"] - battery_export, 0.0)
             available_solar = max(sources["solar"] - solar_export, 0.0)
             solar_home = min(available_solar, sources["house"])
             solar_battery = min(
