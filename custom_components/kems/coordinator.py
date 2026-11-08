@@ -1732,15 +1732,18 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                 forecast_plan=forecast_plan,
                 last_power_down=last_power_down,
                 periods=periods,
-                # True only while KEMS has verified physical reward-hour
-                # charging or household battery-discharge hold authority.
-                # A booking alone, a stale plan, or simulated charge cannot
-                # switch an appliance automation on.
-                happy_hour_active=bool(
-                    happy_hour_plan.get("mode") == "charging"
-                    and happy_hour_plan.get("happy_hour_import_authority_active")
-                    is True
-                    and (happy_hour_house_grid_hold or happy_hour_live_charge_kw > 0.001)
+                # A booking alone or a simulated charge never switches an
+                # appliance automation on. Read-only independent authority
+                # also requires the current supplier-joined reward hour.
+                happy_hour_active=verified_happy_hour_automation_active(
+                    booking=_controller_for(self).state,
+                    context=happy_hour_plan,
+                    now=now,
+                    physical_charge_target_kw=happy_hour_live_charge_kw,
+                    physical_house_grid_hold=happy_hour_house_grid_hold,
+                    power_down_active=bool(
+                        snapshot.saving_session_active or power_down_plan.get("active")
+                    ),
                 ),
                 history_samples=len(records),
                 phase=phase,
