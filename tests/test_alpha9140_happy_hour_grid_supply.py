@@ -455,7 +455,6 @@ def test_native_happy_hour_entity_is_coordinator_owned_binary_sensor():
     assert "happy_hour_active=verified_happy_hour_automation_active(" in coordinator
 
 
-
 def test_physical_happy_hour_headroom_does_not_credit_unobserved_house_discharge(
     monkeypatch,
 ):
