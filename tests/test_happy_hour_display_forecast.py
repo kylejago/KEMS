@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
+import importlib.util
+import sys
 from copy import deepcopy
 from datetime import UTC, datetime, timedelta
-from types import ModuleType
-import importlib.util
 from pathlib import Path
-import sys
+from types import ModuleType
 
 
 ROOT = Path(__file__).parents[1]
@@ -16,7 +16,9 @@ START = datetime(2026, 11, 8, 8, tzinfo=UTC)
 
 
 def _forecast():
-    custom = sys.modules.setdefault("custom_components", ModuleType("custom_components"))
+    custom = sys.modules.setdefault(
+        "custom_components", ModuleType("custom_components")
+    )
     custom.__path__ = [str(INTEGRATION.parent)]
     package = sys.modules.setdefault(
         "custom_components.kems", ModuleType("custom_components.kems")
