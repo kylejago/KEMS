@@ -453,3 +453,76 @@ def test_native_happy_hour_entity_is_coordinator_owned_binary_sensor():
     assert "is_on_fn=lambda data: data.happy_hour_active" in binary
     assert "happy_hour_active: bool = False" in models
     assert "happy_hour_active=verified_happy_hour_automation_active(" in coordinator
+
+
+
+def test_physical_happy_hour_headroom_does_not_credit_unobserved_house_discharge(
+    monkeypatch,
+):
+    """Never assume tomorrow's house use has already created battery space."""
+    monkeypatch.setattr(
+        _budget,
+        "verified_happy_hour_physical_headroom",
+        lambda *args, **kwargs: {
+            "physical_soc_verified": True,
+            "physical_charge_headroom_verified": True,
+            "current_physical_soc_percent": 85.0,
+            "physical_battery_headroom_kwh": 8.0,
+        },
+    )
+    start = datetime(2026, 11, 8, 8, tzinfo=UTC)
+    context = {
+        "start": start.isoformat(),
+        "end": (start + timedelta(hours=2)).isoformat(),
+        "preparation_in_current_horizon": True,
+        "desired_stored_charge_kwh": 13.3,
+        # These are not physical observations and must not reduce the need.
+        "expected_house_discharge_before_event_kwh": 12.0,
+        "expected_power_down_export_before_event_kwh": 4.0,
+    }
+    manager = types.SimpleNamespace(
+        _panel_today_records=[], _verified_happy_hour_grid_samples=[]
+    )
+    output = _budget.decorate_happy_hour_context(
+        manager,
+        {},
+        context,
+        now=start - timedelta(hours=2),
+        config=types.SimpleNamespace(discharge_efficiency=0.95),
+        power_down={},
+    )
+    assert output["physical_required_headroom_export_kwh"] == 5.035
+    assert output["physical_headroom_future_discharge_credit_kwh"] == 0.0
+    assert output["happy_hour_import_authority_active"] is False
+
+
+def test_distant_happy_hour_cannot_reuse_physical_headroom_across_cheap_window(
+    monkeypatch,
+):
+    monkeypatch.setattr(
+        _budget,
+        "verified_happy_hour_physical_headroom",
+        lambda *args, **kwargs: {
+            "physical_soc_verified": True,
+            "physical_charge_headroom_verified": True,
+            "current_physical_soc_percent": 85.0,
+            "physical_battery_headroom_kwh": 8.0,
+        },
+    )
+    start = datetime(2026, 11, 8, 8, tzinfo=UTC)
+    result = _budget.decorate_happy_hour_context(
+        types.SimpleNamespace(
+            _panel_today_records=[], _verified_happy_hour_grid_samples=[]
+        ),
+        {},
+        {
+            "start": start.isoformat(),
+            "end": (start + timedelta(hours=2)).isoformat(),
+            "preparation_in_current_horizon": False,
+            "desired_stored_charge_kwh": 13.3,
+        },
+        now=start - timedelta(hours=10),
+        config=types.SimpleNamespace(discharge_efficiency=0.95),
+        power_down={},
+    )
+    assert result["physical_required_headroom_export_kwh"] is None
