@@ -544,30 +544,21 @@ def decorate_happy_hour_context(
         stored_charging = max(
             _number(context.get("desired_stored_charge_kwh")) or 0.0, 0.0
         )
-        home_stored = (
-            max(
-                _number(context.get("expected_house_discharge_before_event_kwh"))
-                or 0.0,
-                0.0,
-            )
-            / efficiency
-        )
-        pd_stored = (
-            max(
-                _number(context.get("expected_power_down_export_before_event_kwh"))
-                or 0.0,
-                0.0,
-            )
-            / efficiency
-        )
         live_headroom = max(
             _number(physical.get("physical_battery_headroom_kwh")) or 0.0, 0.0
         )
-        required = (
-            max(stored_charging - live_headroom - home_stored - pd_stored, 0.0)
-            * efficiency
-        )
+        # A forecast future household discharge (or a not-yet-realised
+        # Power Down) cannot be treated as already-created battery space.
+        # The previous estimate could mask the shortage and withhold every
+        # pre-event preparation slot even when physical SOC was too high.
+        # The existing protected household export budget still caps intent,
+        # and downstream EV/SOC/DNO/commissioning gates own actual writes.
+        required = max(stored_charging - live_headroom, 0.0) * efficiency
         context["physical_required_headroom_export_kwh"] = round(required, 3)
+        context["physical_headroom_future_discharge_credit_kwh"] = 0.0
+        context["physical_headroom_forecast_policy"] = (
+            "no unobserved future home or Power Down discharge credited"
+        )
 
     now_utc = now.astimezone(UTC)
     current = next(
