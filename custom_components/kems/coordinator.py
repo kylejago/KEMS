@@ -50,6 +50,7 @@ from .happy_hour_auto_join import (
 from .happy_hour_budget import (
     apply_happy_hour_control,
     restore_completed_financial_reward_receipts,
+    verified_happy_hour_automation_active,
     verified_live_happy_hour_charge_kw,
     verified_live_happy_hour_house_grid_hold,
 )
@@ -899,6 +900,30 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                 now=now,
                 confirmed_windows=[*independent_hours, *external_hours],
             )
+            # Only independently joined Octopus hours may change the
+            # customer-facing Happy Hour forecast. This is reporting-only:
+            # it never changes Agile source slots or the FoxESS write gate.
+            self._agile_smart_export._kems_confirmed_happy_hour_bookings = [
+                dict(booking)
+                for booking in external_bookings
+                if isinstance(booking, dict)
+                and booking.get("booking_source") == "octopus_joined_events"
+                and booking.get("event_id")
+            ]
+            self._agile_smart_export._kems_happy_hour_display_control_config = (
+                self.settings.control
+            )
+            self._agile_smart_export._kems_happy_hour_meter_samples = (
+                self._happy_hour_import_ledger.samples
+            )
+            self._agile_smart_export._kems_completed_happy_hour_bookings = [
+                dict(record)
+                for record in self._happy_hour_import_ledger.status.get(
+                    "persisted_reward_windows", []
+                )
+                if record.get("booking_source") == "octopus_joined_events"
+                and record.get("event_id")
+            ]
             self._agile_smart_export._verified_happy_hour_grid_samples = (
                 self._happy_hour_import_ledger.samples
             )
@@ -1718,6 +1743,19 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                 forecast_plan=forecast_plan,
                 last_power_down=last_power_down,
                 periods=periods,
+                # A booking alone or a simulated charge never switches an
+                # appliance automation on. Read-only independent authority
+                # also requires the current supplier-joined reward hour.
+                happy_hour_active=verified_happy_hour_automation_active(
+                    booking=_controller_for(self).state,
+                    context=happy_hour_plan,
+                    now=now,
+                    physical_charge_target_kw=happy_hour_live_charge_kw,
+                    physical_house_grid_hold=happy_hour_house_grid_hold,
+                    power_down_active=bool(
+                        snapshot.saving_session_active or power_down_plan.get("active")
+                    ),
+                ),
                 history_samples=len(records),
                 phase=phase,
                 alpha969_shadow_plan=alpha969_shadow_plan,

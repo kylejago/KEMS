@@ -382,3 +382,146 @@ def test_alpha9168_incomplete_coverage_and_mixed_historical_tariffs_fail_closed(
     ]
     kwargs["physical_samples"] = readings[:3]
     assert _budget.restore_completed_financial_reward_receipts(**kwargs) == []
+
+
+def test_native_happy_hour_automation_on_for_current_booked_reward_hour():
+    """A full battery with verified grid hold is still an active free hour."""
+    args = _case()
+    active = _budget.verified_happy_hour_automation_active(
+        booking=args["booking"],
+        context=args["context"],
+        now=NOW,
+        physical_charge_target_kw=0.0,
+        physical_house_grid_hold=True,
+        power_down_active=False,
+    )
+    assert active
+    assert _budget.verified_happy_hour_automation_active(
+        booking=args["booking"],
+        context=args["context"],
+        now=NOW,
+        physical_charge_target_kw=2.5,
+        physical_house_grid_hold=False,
+        power_down_active=False,
+    )
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        {"context": {"mode": "scheduled_after_recharge"}},
+        {"context": {"mode": "preparation"}},
+        {"context": {"happy_hour_import_authority_active": False}},
+        {"context": {"current_reward_hour_ledger_complete": False}},
+        {"context": {"current_reward_hour_cap_reached": True}},
+        {"context": {"current_reward_hour_remaining_kwh": 0.0}},
+        {"booking": {"bookings": []}},
+        {"power_down_active": True},
+        {"now": START - timedelta(seconds=1)},
+        {"now": START + timedelta(hours=1)},
+        {"physical_house_grid_hold": False, "physical_charge_target_kw": 0.0},
+    ],
+)
+def test_native_happy_hour_automation_fails_off_without_live_authority(change):
+    """No scheduled-only, exhausted, old or physically unverified On state."""
+    args = _case()
+    kwargs = {
+        "booking": args["booking"],
+        "context": dict(args["context"]),
+        "now": NOW,
+        "physical_charge_target_kw": 0.0,
+        "physical_house_grid_hold": True,
+        "power_down_active": False,
+    }
+    if "context" in change:
+        kwargs["context"].update(change["context"])
+    else:
+        kwargs.update(change)
+    assert not _budget.verified_happy_hour_automation_active(**kwargs)
+
+
+def test_native_happy_hour_entity_is_coordinator_owned_binary_sensor():
+    from pathlib import Path
+
+    root = Path(__file__).parents[1] / "custom_components" / "kems"
+    binary = (root / "binary_sensor.py").read_text(encoding="utf-8")
+    coordinator = (root / "coordinator.py").read_text(encoding="utf-8")
+    models = (root / "kems_core" / "models.py").read_text(encoding="utf-8")
+
+    assert 'key="happy_hour_active"' in binary
+    assert 'name="Happy Hour active"' in binary
+    assert "is_on_fn=lambda data: data.happy_hour_active" in binary
+    assert "happy_hour_active: bool = False" in models
+    assert "happy_hour_active=verified_happy_hour_automation_active(" in coordinator
+
+
+def test_physical_happy_hour_headroom_does_not_credit_unobserved_house_discharge(
+    monkeypatch,
+):
+    """Never assume tomorrow's house use has already created battery space."""
+    monkeypatch.setattr(
+        _budget,
+        "verified_happy_hour_physical_headroom",
+        lambda *args, **kwargs: {
+            "physical_soc_verified": True,
+            "physical_charge_headroom_verified": True,
+            "current_physical_soc_percent": 85.0,
+            "physical_battery_headroom_kwh": 8.0,
+        },
+    )
+    start = datetime(2026, 11, 8, 8, tzinfo=UTC)
+    context = {
+        "start": start.isoformat(),
+        "end": (start + timedelta(hours=2)).isoformat(),
+        "preparation_in_current_horizon": True,
+        "desired_stored_charge_kwh": 13.3,
+        # These are not physical observations and must not reduce the need.
+        "expected_house_discharge_before_event_kwh": 12.0,
+        "expected_power_down_export_before_event_kwh": 4.0,
+    }
+    manager = types.SimpleNamespace(
+        _panel_today_records=[], _verified_happy_hour_grid_samples=[]
+    )
+    output = _budget.decorate_happy_hour_context(
+        manager,
+        {},
+        context,
+        now=start - timedelta(hours=2),
+        config=types.SimpleNamespace(discharge_efficiency=0.95),
+        power_down={},
+    )
+    assert output["physical_required_headroom_export_kwh"] == 5.035
+    assert output["physical_headroom_future_discharge_credit_kwh"] == 0.0
+    assert output["happy_hour_import_authority_active"] is False
+
+
+def test_distant_happy_hour_cannot_reuse_physical_headroom_across_cheap_window(
+    monkeypatch,
+):
+    monkeypatch.setattr(
+        _budget,
+        "verified_happy_hour_physical_headroom",
+        lambda *args, **kwargs: {
+            "physical_soc_verified": True,
+            "physical_charge_headroom_verified": True,
+            "current_physical_soc_percent": 85.0,
+            "physical_battery_headroom_kwh": 8.0,
+        },
+    )
+    start = datetime(2026, 11, 8, 8, tzinfo=UTC)
+    result = _budget.decorate_happy_hour_context(
+        types.SimpleNamespace(
+            _panel_today_records=[], _verified_happy_hour_grid_samples=[]
+        ),
+        {},
+        {
+            "start": start.isoformat(),
+            "end": (start + timedelta(hours=2)).isoformat(),
+            "preparation_in_current_horizon": False,
+            "desired_stored_charge_kwh": 13.3,
+        },
+        now=start - timedelta(hours=10),
+        config=types.SimpleNamespace(discharge_efficiency=0.95),
+        power_down={},
+    )
+    assert result["physical_required_headroom_export_kwh"] is None

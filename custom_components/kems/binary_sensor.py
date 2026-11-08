@@ -163,6 +163,12 @@ BINARY_SENSORS: tuple[KEMSBinarySensorEntityDescription, ...] = (
         is_on_fn=lambda data: data.simulation.saving_session_active,
     ),
     KEMSBinarySensorEntityDescription(
+        key="happy_hour_active",
+        name="Happy Hour active",
+        icon="mdi:flash",
+        is_on_fn=lambda data: data.happy_hour_active,
+    ),
+    KEMSBinarySensorEntityDescription(
         key="saving_session_baseline_incomplete",
         name="Power Down source baseline incomplete",
         icon="mdi:progress-alert",

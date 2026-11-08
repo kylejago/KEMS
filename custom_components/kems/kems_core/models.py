@@ -1090,5 +1090,7 @@ class KEMSData:
     forecast_plan: ForecastPlanState = field(default_factory=ForecastPlanState)
     last_power_down: PowerDownResult = field(default_factory=PowerDownResult)
     periods: dict[str, PeriodTotals] = field(default_factory=dict)
+    # Same-scan authorised reward hour (never inferred from a scheduled hour).
+    happy_hour_active: bool = False
     # Separate advisory proposal; never passes through FoxESS write authority.
     alpha969_shadow_plan: dict[str, Any] = field(default_factory=dict)
