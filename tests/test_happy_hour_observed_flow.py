@@ -10,7 +10,6 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from types import SimpleNamespace
 
-
 INTEGRATION = Path(__file__).parents[1] / "custom_components" / "kems"
 START = datetime(2026, 11, 8, 8, tzinfo=UTC)
 
