@@ -414,6 +414,22 @@ class EfficientAgileSmartExportManager(AgileSmartExportManager):
                 charge_efficiency=getattr(hh_simulation, "charge_efficiency", 0.0),
                 site_import_limit_kw=getattr(hh_control, "site_import_limit_kw", 0.0),
             )
+        # Completed Happy Hour slots receive separately verified physical
+        # meter flow only if every source covers the half hour and balances.
+        # This reporting audit never changes raw settled Agile records.
+        from .happy_hour_observed_flow import overlay_completed_happy_hour_flow
+
+        state["completed_happy_hour_physical_flow_audit"] = (
+            overlay_completed_happy_hour_flow(
+                state,
+                completed_booked_hours=getattr(
+                    self, "_kems_completed_happy_hour_bookings", []
+                ),
+                meter_samples=getattr(self, "_kems_happy_hour_meter_samples", []),
+                physical_history=self._panel_today_records,
+                now=datetime.now(UTC),
+            )
+        )
         periods = state.get("periods", {})
         settled_days = sorted(
             day
