@@ -930,6 +930,55 @@ def verified_live_happy_hour_house_grid_hold(
     return True
 
 
+def verified_happy_hour_automation_active(
+    *,
+    booking: dict[str, Any],
+    context: dict[str, Any],
+    now: datetime,
+    physical_charge_target_kw: float,
+    physical_house_grid_hold: bool,
+    power_down_active: bool,
+) -> bool:
+    """True only for the current supplier-joined, KEMS-authorised free hour.
+
+    This is a read-only automation signal, not a grid-import command. It
+    drops to Off if physical free-import authority, independent reward-hour
+    evidence or the hourly allowance is lost. A full battery can still
+    expose On while the separately verified household hold prevents discharge.
+    """
+    if (
+        power_down_active
+        or context.get("mode") != "charging"
+        or context.get("happy_hour_import_authority_active") is not True
+        or context.get("current_reward_hour_ledger_complete") is not True
+        or context.get("current_reward_hour_cap_reached") is True
+        or not (physical_house_grid_hold or physical_charge_target_kw > 0.001)
+        or not booked_happy_hour_matches_plan(booking, context, now)
+    ):
+        return False
+
+    start = _dt(context.get("current_reward_hour_start"))
+    end = _dt(context.get("current_reward_hour_end"))
+    remaining = _number(context.get("current_reward_hour_remaining_kwh"))
+    if (
+        start is None
+        or end is None
+        or not start <= now.astimezone(UTC) < end
+        or remaining is None
+        or not 0.0 < remaining <= float(HAPPY_HOUR_FAIR_USE_KWH_PER_REWARD)
+    ):
+        return False
+
+    return any(
+        isinstance(item, dict)
+        and item.get("booking_source") == "octopus_joined_events"
+        and item.get("event_id")
+        and _dt(item.get("start")) == start
+        and _dt(item.get("end")) == end
+        for item in booking.get("bookings", [])
+    )
+
+
 def apply_happy_hour_control(control: Any, snapshot: Any, context: dict[str, Any]):
     """Overlay Happy Hour EV permission without widening normal cheap authority."""
     if not context.get("happy_hour_import_authority_active"):
