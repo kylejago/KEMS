@@ -899,6 +899,19 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                 now=now,
                 confirmed_windows=[*independent_hours, *external_hours],
             )
+            # Only independently joined Octopus hours may change the
+            # customer-facing Happy Hour forecast. This is reporting-only:
+            # it never changes Agile source slots or the FoxESS write gate.
+            self._agile_smart_export._kems_confirmed_happy_hour_bookings = [
+                dict(booking)
+                for booking in external_bookings
+                if isinstance(booking, dict)
+                and booking.get("booking_source") == "octopus_joined_events"
+                and booking.get("event_id")
+            ]
+            self._agile_smart_export._kems_happy_hour_display_control_config = (
+                self.settings.control
+            )
             self._agile_smart_export._verified_happy_hour_grid_samples = (
                 self._happy_hour_import_ledger.samples
             )
