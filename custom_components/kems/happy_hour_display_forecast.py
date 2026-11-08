@@ -128,7 +128,7 @@ def overlay_booked_happy_hour_flow(
                     or finish is None
                     or start < begin
                     or finish > end
-                    or finish <= now_utc
+                    or start < now_utc  # Leave active and settled slots untouched.
                     or finish <= start
                 ):
                     continue
