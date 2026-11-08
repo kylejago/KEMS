@@ -9,7 +9,6 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from types import ModuleType
 
-
 ROOT = Path(__file__).parents[1]
 INTEGRATION = ROOT / "custom_components" / "kems"
 START = datetime(2026, 11, 8, 8, tzinfo=UTC)
@@ -76,9 +75,11 @@ def _state(start=START, entry_soc=76.4):
 def _run(state, *, bookings=None, now=None, site_limit=14.5):
     return _forecast()(
         state,
-        confirmed_bookings=bookings if bookings is not None else [
-            _booking(), _booking(START + timedelta(hours=1), "8307")
-        ],
+        confirmed_bookings=(
+            bookings
+            if bookings is not None
+            else [_booking(), _booking(START + timedelta(hours=1), "8307")]
+        ),
         now=now or START - timedelta(hours=9),
         capacity_kwh=56.42,
         max_charge_kw=7.0,
