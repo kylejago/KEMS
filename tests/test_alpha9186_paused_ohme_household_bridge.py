@@ -239,9 +239,7 @@ def test_owned_charger_pause_can_be_reverified_at_exactly_ten_percent():
     module, store = _bridge_module()
     store.data.clear()
     assert _eligible(module, battery_soc=10.0) is False
-    assert _eligible(
-        module, battery_soc=10.0, owned_paused_at_floor=True
-    ) is True
+    assert _eligible(module, battery_soc=10.0, owned_paused_at_floor=True) is True
     # Ownership is only an eligibility exception, not a bypass of EV,
     # tariff, export, physical-power, or absolute-reserve checks.
     for overrides in (
@@ -284,28 +282,19 @@ def test_owned_charger_pause_can_be_reverified_at_exactly_ten_percent():
             "sensor.ohme_epod_power",
         ):
             hass.states.get(name).last_reported = now + timedelta(seconds=1)
-        assert not await bridge.async_prepare(
-            **kwargs, now=now + timedelta(seconds=1)
-        )
+        assert not await bridge.async_prepare(**kwargs, now=now + timedelta(seconds=1))
         for name in (
             "select.ohme_epod_charge_mode",
             "sensor.ohme_epod_status",
             "sensor.ohme_epod_power",
         ):
             hass.states.get(name).last_reported = now + timedelta(seconds=41)
-        assert await bridge.async_prepare(
-            **kwargs, now=now + timedelta(seconds=41)
-        )
+        assert await bridge.async_prepare(**kwargs, now=now + timedelta(seconds=41))
         assert bridge.owned is True
         # At 10%, the verified pause must remain; FoxESS may hold the
         # 10% physical floor rather than raising it to 15% on day rate.
-        assert _eligible(
-            module, battery_soc=10.0,
-            owned_paused_at_floor=bridge.owned,
-        )
-        assert await bridge.async_prepare(
-            **kwargs, now=now + timedelta(seconds=45)
-        )
+        assert _eligible(module, battery_soc=10.0, owned_paused_at_floor=bridge.owned)
+        assert await bridge.async_prepare(**kwargs, now=now + timedelta(seconds=45))
         floor = hass.states.get("number.foxess_min_soc")
         floor.state = "10"
         floor.last_reported = now + timedelta(seconds=45)
