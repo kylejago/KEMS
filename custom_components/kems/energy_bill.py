@@ -88,6 +88,31 @@ def _bounds(key: str, today: date, days: set[date]) -> tuple[date, date]:
     return (min(days), today) if days else (today, today)
 
 
+def _period_evidence(
+    daily: Mapping[date, Mapping[str, float]],
+    start: date,
+    end: date,
+    today: date,
+) -> dict[str, Any]:
+    """Expose only independently saved closed-day completion evidence."""
+    included = [day for day in daily if start <= day <= end]
+    expected = (end - start).days + 1
+    complete_days = sum(
+        1
+        for day in included
+        if day < today and _f(daily[day].get("__data_complete", 1.0)) >= 0.5
+    )
+    return {
+        "days_expected": expected,
+        "complete_days": complete_days,
+        "incomplete_days": len(included) - complete_days,
+        "data_complete": bool(
+            end < today and len(included) == expected and complete_days == expected
+        ),
+        "evidence_source": "persisted_daily_financial_ledger",
+    }
+
+
 def _standing_maps(
     records: list[Snapshot],
 ) -> tuple[dict[date, float], dict[date, float]]:
@@ -459,6 +484,7 @@ def build_energy_cost_comparison(
             "start_date": start.isoformat(),
             "end_date": end.isoformat(),
             "days_included": len(dates),
+            **_period_evidence(actual, start, end, now.date()),
             "live_data": live,
             "kems": kems,
             "saving_pence": saving,

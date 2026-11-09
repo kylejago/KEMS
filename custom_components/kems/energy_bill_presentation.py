@@ -23,16 +23,16 @@ _PERIOD_CARD = r"""      - type: markdown
 
           **KEMS strategy:** {{ state_attr('sensor.kems_energy_cost_comparison', 'selected_kems_strategy_label') or '—' }}
 
-          | Period | Live gross | Live after est. HH refund | KEMS | Saving (gross basis) |
-          |---|---:|---:|---:|---:|
+          | Period | Live gross | Est. HH credit | Live after est. refund | KEMS | Gross saving | Saving incl. est. refund |
+          |---|---:|---:|---:|---:|---:|---:|
           {% for key in ['today', 'yesterday', '7_days', '30_days', 'year', '365_days', 'all_time'] %}
           {% set p = periods.get(key, {}) or {} %}
           {% set live = p.get('live_data', {}) or {} %}
           {% set kems = p.get('kems', {}) or {} %}
-          | {{ p.get('label', key) }} | {{ ('£%.2f' | format((live.get('total_energy_cost_pence') | float) / 100)) if live.get('total_energy_cost_pence') is not none else '—' }} | {{ ('£%.2f' | format((live.get('total_energy_effective_cost_pence') | float) / 100)) if live.get('total_energy_effective_cost_pence') is not none else '—' }} | {{ ('£%.2f' | format((kems.get('total_energy_cost_pence') | float) / 100)) if kems.get('total_energy_cost_pence') is not none else '—' }} | {{ ('£%.2f' | format((p.get('saving_pence') | float) / 100)) if p.get('saving_pence') is not none else '—' }} |
+          | {{ p.get('label', key) }} | {{ ('£%.2f' | format((live.get('total_energy_cost_pence') | float) / 100)) if live.get('total_energy_cost_pence') is not none else '—' }} | {{ ('£%.2f' | format((live.get('happy_hour_estimated_credit_pence') | float) / 100)) if live.get('happy_hour_estimated_credit_pence') is not none else '—' }} | {{ ('£%.2f' | format((live.get('total_energy_effective_cost_pence') | float) / 100)) if live.get('total_energy_effective_cost_pence') is not none else '—' }} | {{ ('£%.2f' | format((kems.get('total_energy_cost_pence') | float) / 100)) if kems.get('total_energy_cost_pence') is not none else '—' }} | {{ ('£%.2f' | format((p.get('saving_pence') | float) / 100)) if p.get('saving_pence') is not none else '—' }} | {{ ('£%.2f' | format(((p.get('saving_pence') | float) + (live.get('happy_hour_estimated_credit_pence') | float(0))) / 100)) if p.get('saving_pence') is not none else '—' }} |
           {% endfor %}
 
-          **Happy Hour refunds are estimates, not settled Octopus credit.** Gross Live Data and KEMS totals remain the comparable basis for the Saving column. For each period, the independently verified eligible import and estimated credit are shown in the Home and History views; unsupported hours receive no invented refund.
+          **Happy Hour refunds are estimates, not settled Octopus credit.** Gross Live Data and KEMS totals remain the comparable basis for the Gross saving column; the final column adds only the eligible estimated Happy Hour refund when comparison evidence exists. For each period, the independently verified eligible import and estimated credit are shown in the Home and History views; unsupported hours receive no invented refund.
 
           KEMS still retains its individual replay engines internally for validation, but they are no longer separate user-facing products.
 """
