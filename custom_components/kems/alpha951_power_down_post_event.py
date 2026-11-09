@@ -109,21 +109,43 @@ def _today_completed_results() -> list[PowerDownResult]:
     return _results_for_date(recorder, _dt_util().now().date())
 
 
+def _known_bonus_total(results: list[PowerDownResult]) -> float | None:
+    """Only reward events with numeric evidence; do not coerce missing to zero."""
+    values = [
+        max(float(event.bonus_pence), 0.0)
+        for event in results
+        if event.bonus_pence is not None
+    ]
+    return round(sum(values), 2) if values else None
+
+
+def _bonus_evidence_status(results: list[PowerDownResult]) -> str:
+    """Distinguish no event, entirely unvalued, partial, and complete."""
+    if not results:
+        return "no_completed_events"
+    known = sum(event.bonus_pence is not None for event in results)
+    if not known:
+        return "unvalued"
+    return "complete" if known == len(results) else "partial"
+
+
 def _authoritative_today_bonus(simulation: SimulationState) -> float | None:
     """Return *modelled* bonus for the simulated KEMS accounting view only."""
     completed = _today_completed_results()
     if not completed:
         return None
 
-    bonus = sum(max(float(item.bonus_pence or 0.0), 0.0) for item in completed)
+    bonus = _known_bonus_total(completed)
     current_end = simulation.saving_session_end
     current_open = False
     if simulation.saving_session_joined and current_end is not None:
         now = _dt_util().now()
         current_open = current_end > now and _local_date(current_end) == now.date()
     if current_open and simulation.estimated_saving_session_bonus_pence is not None:
-        bonus += max(float(simulation.estimated_saving_session_bonus_pence), 0.0)
-    return round(bonus, 2)
+        bonus = (bonus or 0.0) + max(
+            float(simulation.estimated_saving_session_bonus_pence), 0.0
+        )
+    return round(bonus, 2) if bonus is not None else None
 
 
 def _reconcile_completed_credit(simulation: SimulationState) -> SimulationState:
@@ -275,10 +297,8 @@ def _install_binary_sensor_patch() -> None:
             {
                 "completed_sessions_today": [_result_dict(item) for item in completed],
                 "completed_session_count_today": len(completed),
-                "estimated_bonus_today_pence": round(
-                    sum(max(float(item.bonus_pence or 0.0), 0.0) for item in completed),
-                    2,
-                ),
+                "estimated_bonus_today_pence": _known_bonus_total(completed),
+                "bonus_evidence_status_today": _bonus_evidence_status(completed),
                 "confirmed_supplier_credit_today_pence": None,
                 "bonus_evidence_available_today": any(
                     item.bonus_pence is not None for item in completed
@@ -286,16 +306,17 @@ def _install_binary_sensor_patch() -> None:
                 "unvalued_power_down_events_today": sum(
                     item.bonus_pence is None for item in completed
                 ),
-                "completed_bonus_today_pence": round(
-                    sum(max(float(item.bonus_pence or 0.0), 0.0) for item in completed),
-                    2,
-                ),
-                "power_down_credit_today_pence": round(
-                    float(
-                        self.coordinator.data.simulation.simulated_saving_session_bonus_pence
-                        or 0.0
-                    ),
-                    2,
+                "completed_bonus_today_pence": _known_bonus_total(completed),
+                "power_down_credit_today_pence": (
+                    round(
+                        float(
+                            self.coordinator.data.simulation.simulated_saving_session_bonus_pence
+                            or 0.0
+                        ),
+                        2,
+                    )
+                    if _known_bonus_total(completed) is not None
+                    else None
                 ),
                 "credit_authority": "modelled estimate; not supplier settled",
                 "supplier_settled": False,
@@ -368,25 +389,26 @@ def _install_diagnostics_patch() -> None:
             "retained_count": len(history),
             "completed_today_count": len(completed_today),
             "completed_today": [_result_dict(item) for item in completed_today],
-            "estimated_bonus_today_pence": round(
-                sum(
-                    max(float(item.bonus_pence or 0.0), 0.0) for item in completed_today
-                ),
-                2,
+            "estimated_bonus_today_pence": _known_bonus_total(completed_today),
+            "bonus_evidence_status_today": _bonus_evidence_status(completed_today),
+            "bonus_evidence_available_today": any(
+                item.bonus_pence is not None for item in completed_today
+            ),
+            "unvalued_power_down_events_today": sum(
+                item.bonus_pence is None for item in completed_today
             ),
             "confirmed_supplier_credit_today_pence": None,
-            "completed_bonus_today_pence": round(
-                sum(
-                    max(float(item.bonus_pence or 0.0), 0.0) for item in completed_today
-                ),
-                2,
-            ),
-            "published_power_down_credit_today_pence": round(
-                float(
-                    entry.runtime_data.data.simulation.simulated_saving_session_bonus_pence
-                    or 0.0
-                ),
-                2,
+            "completed_bonus_today_pence": _known_bonus_total(completed_today),
+            "published_power_down_credit_today_pence": (
+                round(
+                    float(
+                        entry.runtime_data.data.simulation.simulated_saving_session_bonus_pence
+                        or 0.0
+                    ),
+                    2,
+                )
+                if _known_bonus_total(completed_today) is not None
+                else None
             ),
             "supplier_settled": False,
             "historical_store_writes_skipped": getattr(

@@ -1,4 +1,4 @@
-"""Alpha9.191: physical Power Down delivery is not a settled reward."""
+"""Alpha9.192: physical Power Down delivery is not a settled reward."""
 
 from __future__ import annotations
 
