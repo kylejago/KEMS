@@ -187,6 +187,7 @@ def build_reward_audit(
                     event, "fixed_export_income_pence"
                 ),
                 agile_export_income_already_counted=True,
+                reward_evidence_status=_get(event, "reward_evidence_status"),
                 status="included_modelled_bonus" if included else "excluded_from_roi",
             )
         )
@@ -238,6 +239,8 @@ def build_reward_audit(
                     event, "fixed_export_income_pence"
                 ),
                 agile_export_income_already_counted=True,
+                reward_evidence_status=_get(event, "reward_evidence_status"),
+                physical_export_coverage_hours=_get(event, "physical_coverage_hours"),
                 status="pending_bonus_or_baseline_evidence",
             )
         )

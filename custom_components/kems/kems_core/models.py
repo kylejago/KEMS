@@ -1025,6 +1025,9 @@ class PowerDownResult:
     physical_export_verified: bool | None = None
     physical_evidence_status: str = "unavailable"
     supplier_settled: bool = False
+    # Missing Octopus reward evidence must remain distinct from verified export.
+    reward_evidence_status: str = "not_evaluated"
+    reward_samples_observed: int = 0
     completed_successfully: bool | None = False
     completion_reason: str = "unavailable"
 

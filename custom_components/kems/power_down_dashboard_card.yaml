@@ -57,10 +57,13 @@
           {% set completed_end = as_datetime(item.get('session_end')) if item.get('session_end') else none %}
           **{{ as_local(completed_start).strftime('%H:%M') if completed_start else '?' }}-{{ as_local(completed_end).strftime('%H:%M') if completed_end else '?' }} — {{ 'Completed successfully' if item.get('completed_successfully') else item.get('completion_reason', 'Completed') }}**
           SOC: {{ item.get('starting_simulated_soc_percent', '-') }}% → {{ item.get('finishing_simulated_soc_percent', '-') }}%  
-          Rewardable reduction: {{ item.get('rewardable_reduction_kwh', '-') }} kWh  
-          KEMS recorded Power Down bonus: {{ 'GBP %.2f' | format((item.get('bonus_pence', 0) | float) / 100) }}  
-          Event export income: {{ 'GBP %.2f' | format((item.get('fixed_export_income_pence', 0) | float) / 100) }}  
-          Combined event income: {{ 'GBP %.2f' | format((item.get('combined_income_pence', 0) | float) / 100) }}  
+          Physical grid export: {{ (item.get('physical_grid_export_kwh') ~ ' kWh') if item.get('physical_grid_export_kwh') is not none else '— (not evidenced)' }} · Meter coverage: {{ (item.get('physical_coverage_percent') ~ '%') if item.get('physical_coverage_percent') is not none else '—' }}  
+          Rewardable reduction: {{ (item.get('rewardable_reduction_kwh') ~ ' kWh') if item.get('rewardable_reduction_kwh') is not none else '— (unvalued)' }}  
+          Additional Power Down bonus: {{ ('GBP %.2f' | format((item.get('bonus_pence') | float) / 100)) if item.get('bonus_pence') is not none else '— (awaiting matched Octopus baseline/rate)' }}  
+          Reward evidence: {{ item.get('reward_evidence_status', 'not_evaluated') | replace('_', ' ') }}  
+          Planned-route export income benchmark (not observed payout): {{ ('GBP %.2f' | format((item.get('fixed_export_income_pence') | float) / 100)) if item.get('fixed_export_income_pence') is not none else '—' }}  
+          Modelled combined income: {{ ('GBP %.2f' | format((item.get('combined_income_pence') | float) / 100)) if item.get('combined_income_pence') is not none else '— (bonus unvalued)' }}  
+          Supplier settlement: {{ 'Confirmed' if item.get('supplier_settled') else 'Not confirmed' }}  
           Maximum inverter output: {{ item.get('maximum_inverter_output_kw', '-') }} kW  
           EV blocked: {{ 'yes' if item.get('ev_successfully_blocked') else 'no' }} · Plan safe: {{ 'yes' if item.get('plan_safe_throughout') else 'no' }}
 

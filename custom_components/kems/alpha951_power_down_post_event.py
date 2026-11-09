@@ -77,6 +77,28 @@ def _result_dict(result: PowerDownResult) -> dict[str, Any]:
     payload["estimated_bonus_pence"] = result.bonus_pence
     payload["physical_export_status"] = result.physical_evidence_status
     payload["supplier_settled"] = False
+    # A verified grid export is not proof of an Octopus Power Down bonus.
+    status = result.reward_evidence_status
+    if status == "not_evaluated":
+        status = (
+            "unvalued_bonus_missing_octopus_net_baseline_or_rate"
+            if result.bonus_pence is None
+            else "modelled_reward_inputs_observed"
+        )
+    payload["reward_evidence_status"] = status
+    payload["bonus_evidence_available"] = result.bonus_pence is not None
+    payload["agile_export_income_already_counted"] = True
+    duration = 0.0
+    if result.session_start is not None and result.session_end is not None:
+        duration = max(
+            (result.session_end - result.session_start).total_seconds() / 3600.0,
+            0.0,
+        )
+    payload["physical_coverage_percent"] = (
+        round(100 * result.physical_coverage_hours / duration, 1)
+        if duration > 0
+        else None
+    )
     return payload
 
 
@@ -258,6 +280,12 @@ def _install_binary_sensor_patch() -> None:
                     2,
                 ),
                 "confirmed_supplier_credit_today_pence": None,
+                "bonus_evidence_available_today": any(
+                    item.bonus_pence is not None for item in completed
+                ),
+                "unvalued_power_down_events_today": sum(
+                    item.bonus_pence is None for item in completed
+                ),
                 "completed_bonus_today_pence": round(
                     sum(max(float(item.bonus_pence or 0.0), 0.0) for item in completed),
                     2,
@@ -292,10 +320,12 @@ def _install_dashboard_patch() -> None:
     )
     replacement = (
         "              | Export income | −£{{ '%.2f' | format(export / 100) }} |\n"
-        "              | Modelled Power Down bonus (unsettled) | −£{{ '%.2f' | "
-        "format((state_attr("
+        "              | Modelled Power Down bonus (unsettled) | {{ "
+        "('−£%.2f' | format((state_attr("
         "'binary_sensor.kems_last_power_down_result_available', "
-        "'power_down_credit_today_pence') | float(0)) / 100) }} |\n"
+        "'power_down_credit_today_pence') | float(0)) / 100)) "
+        "if state_attr('binary_sensor.kems_last_power_down_result_available', "
+        "'bonus_evidence_available_today') else '— (unvalued)' }} |\n"
         "              | **Electricity total**"
     )
 
