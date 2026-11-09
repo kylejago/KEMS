@@ -15,9 +15,10 @@ import asyncio
 import hashlib
 import re
 
-from aiohttp import ClientConnectionError
 from collections.abc import Mapping
 from typing import Any
+
+from aiohttp import ClientConnectionError
 
 ASSET_LIMIT_BYTES = 1024 * 1024
 _HASH = re.compile(r"^sha256:([0-9a-fA-F]{64})$")

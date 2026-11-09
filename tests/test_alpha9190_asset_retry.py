@@ -1,4 +1,4 @@
-"""Alpha9.190: bounded GitHub asset retries never relax checksum or maintenance rules."""
+"""Alpha9.190: bounded retries preserve asset safety and maintenance gates."""
 
 import asyncio
 import hashlib
