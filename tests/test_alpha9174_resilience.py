@@ -154,4 +154,4 @@ def test_github_metadata_retry_is_bounded_and_http_failures_remain_strict() -> N
 
 def test_release_candidate_identity() -> None:
     manifest = (ROOT / "manifest.json").read_text(encoding="utf-8")
-    assert '"version": "0.9.0-alpha9.189"' in manifest
+    assert '"version": "0.9.0-alpha9.190"' in manifest

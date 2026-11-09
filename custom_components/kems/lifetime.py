@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from typing import Any
 from zoneinfo import ZoneInfo
 
@@ -674,14 +674,19 @@ class LifetimeLedgerRecorder:
         self._ledger.historical_repair_required = True
 
     def period_summaries(self, now: datetime) -> dict[str, PeriodTotals]:
-        """Return today, week, month, year, and all-time reporting totals."""
+        """Return completed-day, week, month, year and lifetime reporting totals."""
         today = now.date()
         records = dict(self._daily_records)
         if self._tracking_date == today:
             records[today.isoformat()] = dict(self._tracking_values)
 
-        week_start = date.fromordinal(today.toordinal() - today.weekday())
+        yesterday = today - timedelta(days=1)
+        week_start = today - timedelta(days=today.weekday())
+        last_week_end = week_start - timedelta(days=1)
+        last_week_start = last_week_end - timedelta(days=6)
         month_start = today.replace(day=1)
+        last_month_end = month_start - timedelta(days=1)
+        last_month_start = last_month_end.replace(day=1)
         year_start = today.replace(month=1, day=1)
         return {
             "today": summarise_period_records(
@@ -690,16 +695,34 @@ class LifetimeLedgerRecorder:
                 today,
                 current_day=today,
             ),
+            "yesterday": summarise_period_records(
+                records,
+                yesterday,
+                yesterday,
+                current_day=today,
+            ),
             "week": summarise_period_records(
                 records,
                 week_start,
                 today,
                 current_day=today,
             ),
+            "last_week": summarise_period_records(
+                records,
+                last_week_start,
+                last_week_end,
+                current_day=today,
+            ),
             "month": summarise_period_records(
                 records,
                 month_start,
                 today,
+                current_day=today,
+            ),
+            "last_month": summarise_period_records(
+                records,
+                last_month_start,
+                last_month_end,
                 current_day=today,
             ),
             "year": summarise_period_records(

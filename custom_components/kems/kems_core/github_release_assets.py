@@ -62,9 +62,23 @@ async def download_release_asset(
                 },
                 timeout=15,
             ) as response:
-                if response.status in (500, 502, 503, 504):
+                if response.status in (429, 500, 502, 503, 504):
                     if attempt == 0:
-                        await asyncio.sleep(0.6)
+                        delay = 0.6
+                        if response.status == 429:
+                            try:
+                                rate_delay = float(
+                                    response.headers.get("Retry-After", 0.6)
+                                )
+                            except (TypeError, ValueError, OverflowError):
+                                rate_delay = 0.6
+                            # Long rate limits defer to the scheduled check.
+                            if not 0 <= rate_delay <= 3:
+                                raise ValueError(
+                                    "GitHub rate limit: defer to next update check"
+                                )
+                            delay = max(delay, rate_delay)
+                        await asyncio.sleep(delay)
                         continue
                     raise ValueError(
                         "KEMS GitHub API asset download returned HTTP "
@@ -83,8 +97,16 @@ async def download_release_asset(
                     )
                 payload = await response.read()
             break
-        except (TimeoutError, ConnectionError):
-            if attempt:
+        except Exception as error:
+            # This pure core module also runs in the standalone test suite
+            # without Home Assistant/aiohttp installed. Recognise aiohttp's
+            # connection family without importing that optional dependency.
+            transient = isinstance(error, (TimeoutError, ConnectionError)) or any(
+                cls.__name__ == "ClientConnectionError"
+                and cls.__module__ == "aiohttp.client_exceptions"
+                for cls in type(error).__mro__
+            )
+            if not transient or attempt:
                 raise
             await asyncio.sleep(0.6)
     if not payload or len(payload) > ASSET_LIMIT_BYTES:
