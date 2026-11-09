@@ -14,6 +14,8 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import re
+
+from aiohttp import ClientConnectionError
 from collections.abc import Mapping
 from typing import Any
 
@@ -62,9 +64,21 @@ async def download_release_asset(
                 },
                 timeout=15,
             ) as response:
-                if response.status in (500, 502, 503, 504):
+                if response.status in (429, 500, 502, 503, 504):
                     if attempt == 0:
-                        await asyncio.sleep(0.6)
+                        delay = 0.6
+                        if response.status == 429:
+                            try:
+                                rate_delay = float(response.headers.get("Retry-After", 0.6))
+                            except (TypeError, ValueError, OverflowError):
+                                rate_delay = 0.6
+                            # Long rate limits defer to the scheduled check.
+                            if not 0 <= rate_delay <= 3:
+                                raise ValueError(
+                                    "GitHub rate limit: defer to next update check"
+                                )
+                            delay = max(delay, rate_delay)
+                        await asyncio.sleep(delay)
                         continue
                     raise ValueError(
                         "KEMS GitHub API asset download returned HTTP "
@@ -83,7 +97,7 @@ async def download_release_asset(
                     )
                 payload = await response.read()
             break
-        except (TimeoutError, ConnectionError):
+        except (TimeoutError, ConnectionError, ClientConnectionError):
             if attempt:
                 raise
             await asyncio.sleep(0.6)
