@@ -4,8 +4,14 @@ import asyncio
 import hashlib
 
 import pytest
-from aiohttp import ClientConnectionError
 from kems_core.github_release_assets import download_release_asset
+
+
+class ClientConnectionError(Exception):
+    """Test aiohttp's optional transport exception without importing it."""
+
+
+ClientConnectionError.__module__ = "aiohttp.client_exceptions"
 
 
 class Response:

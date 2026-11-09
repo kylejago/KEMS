@@ -17,8 +17,6 @@ import re
 from collections.abc import Mapping
 from typing import Any
 
-from aiohttp import ClientConnectionError
-
 ASSET_LIMIT_BYTES = 1024 * 1024
 _HASH = re.compile(r"^sha256:([0-9a-fA-F]{64})$")
 
@@ -99,8 +97,16 @@ async def download_release_asset(
                     )
                 payload = await response.read()
             break
-        except (TimeoutError, ConnectionError, ClientConnectionError):
-            if attempt:
+        except Exception as error:
+            # This pure core module also runs in the standalone test suite
+            # without Home Assistant/aiohttp installed. Recognise aiohttp's
+            # connection family without importing that optional dependency.
+            transient = isinstance(error, (TimeoutError, ConnectionError)) or any(
+                cls.__name__ == "ClientConnectionError"
+                and cls.__module__ == "aiohttp.client_exceptions"
+                for cls in type(error).__mro__
+            )
+            if not transient or attempt:
                 raise
             await asyncio.sleep(0.6)
     if not payload or len(payload) > ASSET_LIMIT_BYTES:
