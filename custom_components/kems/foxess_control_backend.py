@@ -1650,7 +1650,8 @@ class FoxESSControlBackend:
                             and soc_for_house_floor
                             <= float(
                                 coordinator.settings.control.normal_reserve_percent
-                            ) + 0.5
+                            )
+                            + 0.5
                         )
                     effective_min_soc = resolve_live_min_soc_on_grid(
                         decision,

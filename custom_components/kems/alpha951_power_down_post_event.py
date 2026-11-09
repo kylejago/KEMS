@@ -310,8 +310,8 @@ def _install_binary_sensor_patch() -> None:
                 "power_down_credit_today_pence": (
                     round(
                         float(
-                            self.coordinator.data.simulation
-                            .simulated_saving_session_bonus_pence or 0.0
+                            self.coordinator.data.simulation.simulated_saving_session_bonus_pence
+                            or 0.0
                         ),
                         2,
                     )
@@ -398,14 +398,12 @@ def _install_diagnostics_patch() -> None:
                 item.bonus_pence is None for item in completed_today
             ),
             "confirmed_supplier_credit_today_pence": None,
-            "completed_bonus_today_pence": _known_bonus_total(
-                completed_today
-            ),
+            "completed_bonus_today_pence": _known_bonus_total(completed_today),
             "published_power_down_credit_today_pence": (
                 round(
                     float(
-                        entry.runtime_data.data.simulation
-                        .simulated_saving_session_bonus_pence or 0.0
+                        entry.runtime_data.data.simulation.simulated_saving_session_bonus_pence
+                        or 0.0
                     ),
                     2,
                 )
