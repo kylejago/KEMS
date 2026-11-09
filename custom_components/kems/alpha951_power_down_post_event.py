@@ -325,7 +325,7 @@ def _install_dashboard_patch() -> None:
         "'binary_sensor.kems_last_power_down_result_available', "
         "'power_down_credit_today_pence') | float(0)) / 100)) "
         "if state_attr('binary_sensor.kems_last_power_down_result_available', "
-        "'bonus_evidence_available_today') else '— (unvalued, pending Octopus evidence)' }} |\n"
+        "'bonus_evidence_available_today') else '— (unvalued)' }} |\n"
         "              | **Electricity total**"
     )
 
