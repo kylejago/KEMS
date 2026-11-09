@@ -71,6 +71,28 @@ views:
           - entity: sensor.kems_profit_after_payback
             name: Profit after payback
 
+      - type: markdown
+        title: Actual ROI — reward-inclusive reconciliation
+        content: |
+          {% set gross = states('sensor.kems_lifetime_system_value') | float(none) %}
+          {% set hh = states('sensor.kems_roi_happy_hour_credit') | float(none) %}
+          {% set pd = states('sensor.kems_roi_power_down_bonus') | float(none) %}
+          {% set total = states('sensor.kems_actual_system_value_total') | float(none) %}
+          | Actual value components | Amount |
+          |:--|--:|
+          | Underlying system value (avoided import and observed Agile export) | {{ '£%.2f' | format(gross) if gross is not none else '—' }} |
+          | + Est. Happy Hour account credits | {{ '+£%.2f' | format(hh) if hh is not none else '—' }} |
+          | + Est. Power Down additional bonus | {{ '+£%.2f' | format(pd) if pd is not none else '—' }} |
+          | **Actual value recovered (reward-inclusive)** | **{{ '£%.2f' | format(total) if total is not none else '—' }}** |
+          {% if gross is not none and hh is not none and pd is not none and total is not none %}
+          {% set residual = total - gross - hh - pd %}
+          **Reconciliation:** {{ 'Matches within rounding' if residual | abs <= 0.02 else ('Review unexplained £%.2f' | format(residual | abs)) }}.
+          {% else %}
+          **Reconciliation:** Source evidence not complete; no missing amounts assumed.
+          {% endif %}
+
+          _Credits are estimates, potentially provisional, and are **not supplier-settled**. Normal Agile export is already in underlying value and is never re-added as Power Down income. Actual payback deducts operating costs. Predicted annual saving and predicted payback are **simulation-based**, not forecasts of future reward settlement._
+
       - type: entities
         title: Additional rewards included in ROI (not yet supplier-settled)
         show_header_toggle: false
