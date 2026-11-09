@@ -41,15 +41,24 @@ class Session:
 
 def request(responses, digest=None):
     session = Session(responses)
-    asset = {"id": 123, "size": 4, "digest": digest or "sha256:" + hashlib.sha256(b"good").hexdigest()}
+    asset = {
+        "id": 123,
+        "size": 4,
+        "digest": digest or "sha256:" + hashlib.sha256(b"good").hexdigest(),
+    }
+
     async def run():
-        return await download_release_asset(session, asset, repository="kylejago/KEMS", user_agent="KEMS-test")
+        return await download_release_asset(
+            session, asset, repository="kylejago/KEMS", user_agent="KEMS-test"
+        )
+
     return session, run
 
 
 def test_http_429_short_retry_after_recovers(monkeypatch):
     async def no_delay(seconds):
         assert 0.6 <= seconds <= 3
+
     monkeypatch.setattr("kems_core.github_release_assets.asyncio.sleep", no_delay)
     session, run = request([Response(429, retry=1), Response()])
     assert asyncio.run(run()) == b"good"
@@ -66,8 +75,11 @@ def test_http_429_long_retry_after_defers_without_second_request(monkeypatch):
 def test_connection_reset_retries_but_sha_error_never_retries(monkeypatch):
     async def no_delay(seconds):
         assert seconds == 0.6
+
     monkeypatch.setattr("kems_core.github_release_assets.asyncio.sleep", no_delay)
-    session, run = request([Response(failure=ClientConnectionError("reset")), Response()])
+    session, run = request(
+        [Response(failure=ClientConnectionError("reset")), Response()]
+    )
     assert asyncio.run(run()) == b"good"
     assert len(session.calls) == 2
 
@@ -80,6 +92,7 @@ def test_connection_reset_retries_but_sha_error_never_retries(monkeypatch):
 def test_403_never_retried_and_repeated_503_is_bounded(monkeypatch):
     async def no_delay(seconds):
         pass
+
     monkeypatch.setattr("kems_core.github_release_assets.asyncio.sleep", no_delay)
     session, run = request([Response(403), Response()])
     with pytest.raises(ValueError, match="403"):

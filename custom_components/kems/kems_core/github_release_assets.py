@@ -69,7 +69,9 @@ async def download_release_asset(
                         delay = 0.6
                         if response.status == 429:
                             try:
-                                rate_delay = float(response.headers.get("Retry-After", 0.6))
+                                rate_delay = float(
+                                    response.headers.get("Retry-After", 0.6)
+                                )
                             except (TypeError, ValueError, OverflowError):
                                 rate_delay = 0.6
                             # Long rate limits defer to the scheduled check.
