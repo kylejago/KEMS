@@ -386,6 +386,21 @@ class PowerDownHistoryRecorder:
                 session_start <= now < session_end
                 and (snapshot.saving_session_active or simulation.saving_session_active)
             )
+            # Persist the reason a bonus cannot be valued. This is reporting
+            # evidence only; missing reward data must not inhibit physical export.
+            if active_now:
+                if _baseline_net_power_kw(snapshot) is None:
+                    self._pending["reward_evidence_status"] = (
+                        "octopus_net_baseline_unavailable"
+                    )
+                elif snapshot.saving_session_octopoints_per_kwh is None:
+                    self._pending["reward_evidence_status"] = (
+                        "octopus_bonus_rate_unavailable"
+                    )
+                else:
+                    self._pending["reward_evidence_status"] = (
+                        "modelled_reward_inputs_observed"
+                    )
             audit = PowerDownAuditState(
                 active_samples_observed=int(
                     self._pending.get("active_samples_observed", 0) or 0
@@ -462,6 +477,9 @@ class PowerDownHistoryRecorder:
                         **self._pending,
                         **physical,
                         "available": True,
+                        "reward_samples_observed": int(
+                            self._pending.get("_agile_reward_samples", 0) or 0
+                        ),
                         "active_samples_observed": audit.active_samples_observed,
                         "ev_successfully_blocked": (
                             audit.ev_successfully_blocked
