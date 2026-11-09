@@ -1350,6 +1350,9 @@ class FoxESSControlBackend:
             battery_soc=snapshot.battery_soc,
             desired_export_kw=control.desired_battery_export_power_kw,
             normal_reserve_percent=coordinator.settings.control.normal_reserve_percent,
+            # At the 10% cutoff, only an already KEMS-owned charger pause may
+            # stay eligible; async_prepare re-checks fresh physical proof.
+            owned_paused_at_floor=self._ohme_idle_bridge.owned,
         )
         bridge_paused_verified = await self._ohme_idle_bridge.async_prepare(
             snapshot=snapshot,

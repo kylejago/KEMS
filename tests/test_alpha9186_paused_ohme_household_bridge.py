@@ -234,6 +234,101 @@ def test_bridge_prearms_at_17_percent_but_never_without_independent_gates():
     assert _eligible(module, battery_soc=17.0, ev_charging=True) is False
 
 
+def test_owned_charger_pause_can_be_reverified_at_exactly_ten_percent():
+    """Regression: 10% must NOT undo a KEMS-owned, physically paused Ohme."""
+    module, store = _bridge_module()
+    store.data.clear()
+    assert _eligible(module, battery_soc=10.0) is False
+    assert _eligible(module, battery_soc=10.0, owned_paused_at_floor=True) is True
+    # Ownership is only an eligibility exception, not a bypass of EV,
+    # tariff, export, physical-power, or absolute-reserve checks.
+    for overrides in (
+        {"ev_charging": True},
+        {"ev_power_kw": 0.6},
+        {"ev_connected": None},
+        {"cheap_period": True},
+        {"active_session": True},
+        {"desired_export_kw": 1.0},
+        {"control_authorised": False},
+        {"opted_in": False},
+        {"battery_soc": 9.9},
+    ):
+        checks = {"battery_soc": 10.0, "owned_paused_at_floor": True}
+        checks.update(overrides)
+        assert _eligible(module, **checks) is False
+
+    now = datetime.now(UTC)
+    hass = _make_hass(now)
+    bridge = module.OhmeIdleHouseholdBridge(
+        hass,
+        SimpleNamespace(
+            entry_id="floor-hold-193",
+            options={"ohme_idle_house_bridge_enabled": True},
+        ),
+    )
+    kwargs = {
+        "snapshot": None,
+        "eligible": True,
+        "ev_status_entity": "sensor.ohme_epod_status",
+        "ev_power_entity": "sensor.ohme_epod_power",
+    }
+
+    async def exercise():
+        await bridge.async_setup()
+        assert not await bridge.async_prepare(**kwargs, now=now)
+        for name in (
+            "select.ohme_epod_charge_mode",
+            "sensor.ohme_epod_status",
+            "sensor.ohme_epod_power",
+        ):
+            hass.states.get(name).last_reported = now + timedelta(seconds=1)
+        assert not await bridge.async_prepare(**kwargs, now=now + timedelta(seconds=1))
+        for name in (
+            "select.ohme_epod_charge_mode",
+            "sensor.ohme_epod_status",
+            "sensor.ohme_epod_power",
+        ):
+            hass.states.get(name).last_reported = now + timedelta(seconds=41)
+        assert await bridge.async_prepare(**kwargs, now=now + timedelta(seconds=41))
+        assert bridge.owned is True
+        # At 10%, the verified pause must remain; FoxESS may hold the
+        # 10% physical floor rather than raising it to 15% on day rate.
+        assert _eligible(module, battery_soc=10.0, owned_paused_at_floor=bridge.owned)
+        assert await bridge.async_prepare(**kwargs, now=now + timedelta(seconds=45))
+        floor = hass.states.get("number.foxess_min_soc")
+        floor.state = "10"
+        floor.last_reported = now + timedelta(seconds=45)
+        await bridge.async_restore_if_safe(
+            keep_paused=True,
+            min_soc_entity="number.foxess_min_soc",
+            battery_soc=10.0,
+            now=now + timedelta(seconds=45),
+        )
+        assert hass.services.calls == ["Paused"]
+        assert bridge.owned is True
+        # At the cheap transition, raising/reading back the hardware floor
+        # must precede any attempt to resume the EV.
+        await bridge.async_restore_if_safe(
+            keep_paused=False,
+            min_soc_entity="number.foxess_min_soc",
+            battery_soc=10.0,
+            now=now + timedelta(seconds=46),
+        )
+        assert hass.services.calls == ["Paused"]
+        floor.state = "15"
+        floor.last_reported = now + timedelta(seconds=47)
+        await bridge.async_restore_if_safe(
+            keep_paused=False,
+            min_soc_entity="number.foxess_min_soc",
+            battery_soc=10.0,
+            now=now + timedelta(seconds=47),
+        )
+
+    asyncio.run(exercise())
+    assert hass.services.calls == ["Paused", "Smart charge"]
+    assert bridge.owned is False
+
+
 def test_physical_ev_power_must_still_be_zero_after_snapshot():
     module, store = _bridge_module()
     store.data.clear()
@@ -351,5 +446,5 @@ def test_release_metadata_pin():
     bundle = json.loads(
         (ROOT / "release" / "kems-bundle.template.json").read_text(encoding="utf-8")
     )
-    assert manifest["version"] == "0.9.0-alpha9.192"
-    assert bundle["maintenance"]["reason"].startswith("Alpha9.192:")
+    assert manifest["version"] == "0.9.0-alpha9.193"
+    assert bundle["maintenance"]["reason"].startswith("Alpha9.193:")

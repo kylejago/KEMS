@@ -64,6 +64,7 @@ def household_bridge_eligible(
     battery_soc: float | None,
     desired_export_kw: float | None,
     normal_reserve_percent: float | None,
+    owned_paused_at_floor: bool = False,
 ) -> bool:
     """Never lower the bus floor on a merely idle, unisolated charger."""
     ev_kw = _real_number(ev_power_kw)
@@ -85,7 +86,15 @@ def household_bridge_eligible(
         and 0 <= age <= 60
         and soc is not None
         and reserve is not None
-        and 10.0 < soc <= reserve + _EARLY_PAUSE_MARGIN_PERCENT
+        # A new bridge must pre-arm above 10%.  Once KEMS already owns the
+        # pause, allow the exact 10% boundary so we do not restore 15% and
+        # trigger expensive automatic FoxESS reserve replenishment.
+        # This flag alone is NOT proof: async_prepare still requires fresh,
+        # independent post-pause mode and zero-power observations each scan.
+        and (
+            10.0 < soc <= reserve + _EARLY_PAUSE_MARGIN_PERCENT
+            or (owned_paused_at_floor and soc == 10.0)
+        )
         and abs(reserve - 15.0) <= 0.05
         and export is not None
         and export <= 0.001
@@ -110,6 +119,11 @@ class OhmeIdleHouseholdBridge:
         self._pause_requested_at: datetime | None = None
         self._last_result = "Not requested"
         self._status: dict[str, Any] = {}
+
+    @property
+    def owned(self) -> bool:
+        """Whether this bridge owns the charger pause (not physical proof)."""
+        return self._owned
 
     @property
     def status(self) -> dict[str, Any]:
