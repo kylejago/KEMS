@@ -111,7 +111,7 @@ def test_both_dashboard_sources_never_render_none_as_zero_bonus() -> None:
     card = (ROOT / "custom_components/kems/power_down_dashboard_card.yaml").read_text()
     assert "physical_grid_export_kwh" in card
     assert "physical_coverage_percent" in card
-    assert "additional Power Down bonus" in card.lower()
+    assert "additional power down bonus" in card.lower()
     assert "item.get('bonus_pence') is not none" in card
     assert "awaiting matched Octopus baseline/rate" in card
     assert "Planned-route export income benchmark" in card
