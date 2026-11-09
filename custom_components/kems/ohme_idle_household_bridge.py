@@ -22,6 +22,9 @@ _STATUS_ENTITY = "sensor.ohme_epod_status"
 _REQUIRED_OPTIONS = {"smart charge", "max charge", "paused"}
 _MAX_AGE_SECONDS = 120
 _MIN_DISTINCT_PROOF_SECONDS = 20
+# Pre-arm the opt-in charger pause before reaching the 15% export reserve.
+# Never lower the physical floor until separately verified near reserve.
+_EARLY_PAUSE_MARGIN_PERCENT = 3.5
 
 
 def _normalise(value: Any) -> str:
@@ -82,7 +85,7 @@ def household_bridge_eligible(
         and 0 <= age <= 60
         and soc is not None
         and reserve is not None
-        and 10.0 < soc <= reserve + 0.5
+        and 10.0 < soc <= reserve + _EARLY_PAUSE_MARGIN_PERCENT
         and abs(reserve - 15.0) <= 0.05
         and export is not None
         and export <= 0.001
@@ -104,6 +107,7 @@ class OhmeIdleHouseholdBridge:
         self._previous_mode: str | None = None
         self._first_paused_at: datetime | None = None
         self._first_power_report_at: datetime | None = None
+        self._pause_requested_at: datetime | None = None
         self._last_result = "Not requested"
         self._status: dict[str, Any] = {}
 
@@ -132,6 +136,7 @@ class OhmeIdleHouseholdBridge:
         # A restart never inherits proof of a paused charger.
         self._first_paused_at = None
         self._first_power_report_at = None
+        self._pause_requested_at = None
 
     async def _save(self) -> None:
         await self._store.async_save(
@@ -205,6 +210,12 @@ class OhmeIdleHouseholdBridge:
             self._first_power_report_at = None
             self._last_result = "Charger status or power readback is stale"
             return False
+        observed_power = _real_number(ev_power.state)
+        if observed_power is None or not 0.0 <= observed_power <= 0.05:
+            self._first_paused_at = None
+            self._first_power_report_at = None
+            self._last_result = "Ohme power readback invalid or nonzero"
+            return False
         mode_state = self._valid_mode_state(now)
         if mode_state is None:
             self._first_paused_at = None
@@ -226,10 +237,21 @@ class OhmeIdleHouseholdBridge:
             self._previous_mode = mode_state.state
             self._owned = True
             await self._save()
+            self._pause_requested_at = now
             await self._set_mode("paused", mode_state)
             return False
 
+        if not self._owned:
+            self._last_result = "Externally Paused mode is not KEMS-owned"
+            return False
         report = getattr(ev_power, "last_reported", None)
+        mode_report = getattr(mode_state, "last_reported", None)
+        if self._pause_requested_at is not None and (
+            report <= self._pause_requested_at
+            or mode_report <= self._pause_requested_at
+        ):
+            self._last_result = "Awaiting post-pause mode and power readback"
+            return False
         if self._first_paused_at is None or self._first_power_report_at is None:
             self._first_paused_at = now
             self._first_power_report_at = report
@@ -288,5 +310,6 @@ class OhmeIdleHouseholdBridge:
         self._previous_mode = None
         self._first_paused_at = None
         self._first_power_report_at = None
+        self._pause_requested_at = None
         self._last_result = "Ohme bridge released after physical floor proof"
         await self._save()

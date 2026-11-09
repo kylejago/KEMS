@@ -1642,7 +1642,16 @@ class FoxESSControlBackend:
                         and control.desired_battery_export_power_kw <= 0.001
                     )
                     if bridge_paused_verified:
-                        household_floor_authorised = True
+                        # Pause/readback may pre-arm earlier, but the physical
+                        # 10% household floor is only requested near 15%.
+                        soc_for_house_floor = _number(snapshot.battery_soc)
+                        household_floor_authorised = bool(
+                            soc_for_house_floor is not None
+                            and soc_for_house_floor
+                            <= float(
+                                coordinator.settings.control.normal_reserve_percent
+                            ) + 0.5
+                        )
                     effective_min_soc = resolve_live_min_soc_on_grid(
                         decision,
                         cheap_period_confirmed=cheap_period_confirmed,
