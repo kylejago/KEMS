@@ -152,9 +152,7 @@ def _project(
     )
 
     projection = flow._future_today_projection(
-        SimpleNamespace(
-            _kems_solar_net_house_protection=solar_net_house_protection
-        ),
+        SimpleNamespace(_kems_solar_net_house_protection=solar_net_house_protection),
         state,
         now=now,
         config=config,
