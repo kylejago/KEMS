@@ -99,13 +99,16 @@ def _render(data, *, power_down=False):
 def test_inactive_solar_forecast_fallback_shows_house_use_and_soc() -> None:
     result = _render(_scenario())
     assert "Battery powers house · no deliberate export" in result
-    assert "~14.3%" in result
-    assert "~13.4%" in result
     assert "Cheap charging forecast · house on grid" in result
-    assert "~20.2%" in result
-    assert "FoxESS SOC: 14.0%" in result
+    assert "**FoxESS SOC:** 14.0%" in result
     assert "15% deliberate-export stop" in result
-    assert "not an independently verified physical reading" in result
+    assert "conservative discharge-only physical ledger" in result
+    # No independent physical future SOC proof: never show simulated numbers.
+    assert "~14.3%" not in result
+    assert "~13.4%" not in result
+    assert "~20.2%" not in result
+    assert "| 23:00 |" in result
+    assert " | — |" in result
 
 
 def test_verified_physical_soc_takes_precedence_over_advisory() -> None:
@@ -115,7 +118,8 @@ def test_verified_physical_soc_takes_precedence_over_advisory() -> None:
     result = _render(scenario)
     assert "14.1%" in result
     assert "~14.3%" not in result
-    assert "~13.4%" in result
+    assert "~13.4%" not in result
+    assert "~20.2%" not in result
 
 
 def test_priority_event_keeps_physical_action_and_suppresses_advisory_soc() -> None:
