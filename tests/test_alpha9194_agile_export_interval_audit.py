@@ -15,7 +15,9 @@ MODULE = (
     / "kems_core"
     / "diagnostic_evidence.py"
 )
-SPEC = importlib.util.spec_from_file_location("kems_alpha9194_diagnostic_evidence", MODULE)
+SPEC = importlib.util.spec_from_file_location(
+    "kems_alpha9194_diagnostic_evidence", MODULE
+)
 assert SPEC is not None and SPEC.loader is not None
 helper = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(helper)
@@ -52,7 +54,12 @@ def _run(state, records, *, now=None, cutoff=None, observed_kwh=0.9, income=24.1
 
 def test_completed_shadow_vs_snapshot_samples_stays_separate_and_read_only() -> None:
     start = datetime(2026, 11, 10, 20, tzinfo=UTC)
-    state = {"today_slots": [_slot(start, 24.11, 1.25), _slot(start + timedelta(minutes=30), 20.0, 0.0)]}
+    state = {
+        "today_slots": [
+            _slot(start, 24.11, 1.25),
+            _slot(start + timedelta(minutes=30), 20.0, 0.0),
+        ]
+    }
     original = deepcopy(state)
     records = [
         _record(start, 2.0),
@@ -74,9 +81,16 @@ def test_completed_shadow_vs_snapshot_samples_stays_separate_and_read_only() -> 
     assert state == original
 
 
-def test_current_partial_slot_is_included_in_actual_income_not_completed_shadow() -> None:
+def test_current_partial_slot_is_included_in_actual_income_not_completed_shadow() -> (
+    None
+):
     start = datetime(2026, 11, 10, 20, tzinfo=UTC)
-    state = {"today_slots": [_slot(start, 10.0, 0.5), _slot(start + timedelta(minutes=30), 20.0, 9.0)]}
+    state = {
+        "today_slots": [
+            _slot(start, 10.0, 0.5),
+            _slot(start + timedelta(minutes=30), 20.0, 9.0),
+        ]
+    }
     records = [
         _record(start, 1.0),
         _record(start + timedelta(minutes=30), 2.0),
@@ -126,7 +140,12 @@ def test_activation_cutoff_is_fail_closed() -> None:
 
 def test_long_gap_and_boundary_crossing_are_explicit_not_verified() -> None:
     start = datetime(2026, 11, 10, 20, tzinfo=UTC)
-    state = {"today_slots": [_slot(start, 12.0, 0.5), _slot(start + timedelta(minutes=30), 14.0, 0.5)]}
+    state = {
+        "today_slots": [
+            _slot(start, 12.0, 0.5),
+            _slot(start + timedelta(minutes=30), 14.0, 0.5),
+        ]
+    }
     records = [
         _record(start + timedelta(minutes=25), 2.0),
         _record(start + timedelta(minutes=40), 0.0),
@@ -151,7 +170,12 @@ def test_dst_fallback_intervals_keep_distinct_offsets() -> None:
         _record(start_b, 2.0),
         _record(start_b + timedelta(minutes=30), 0.0),
     ]
-    audit = _run(state, records, now=datetime(2026, 10, 25, 2, tzinfo=UTC), cutoff="2026-10-25T00:00:00+00:00")
+    audit = _run(
+        state,
+        records,
+        now=datetime(2026, 10, 25, 2, tzinfo=UTC),
+        cutoff="2026-10-25T00:00:00+00:00",
+    )
     assert start_a.astimezone(london).hour == start_b.astimezone(london).hour == 1
     assert audit["completed_slots"] == 2
     assert audit["sample_priced_income_pence"] == 30.0
