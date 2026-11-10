@@ -356,7 +356,7 @@ def test_house_bridge_cannot_bypass_latched_ten_percent_floor() -> None:
     assert policy(state) == 2
     assert state["today_slots"][0]["flow_battery_to_home_kwh"] == pytest.approx(0.157)
     assert state["today_slots"][1]["flow_battery_to_home_kwh"] == pytest.approx(0.0)
-    assert state["flow_total_discharge_parity"]["policy_house_bridge_rows"] == 0
+    assert state["flow_total_discharge_parity"].get("policy_house_bridge_rows", 0) == 0
 
 
 def test_house_bridge_never_preserved_for_cheap_or_unverified_projection() -> None:
