@@ -99,7 +99,8 @@ def agile_export_interval_audit(
     """
     note = (
         "Read-only: snapshot-integrated grid export and Agile income versus "
-        "settled shadow digital-twin slots. Neither is supplier meter settlement; "
+        "explicitly marked settled shadow digital-twin slots only (not replay "
+        "estimates). Neither is supplier meter settlement; "
         "long sample gaps and boundary crossings are not physical proof."
     )
     if now.tzinfo is None:
@@ -132,6 +133,10 @@ def agile_export_interval_audit(
         if start.tzinfo is None or end.tzinfo is None or end <= start:
             continue
         completed = end <= now
+        settled = (
+            completed
+            and source.get("settlement_source") == "settled shadow digital-twin outcome"
+        )
         rate = _finite(source.get("rate_pence"))
         model_kwh = _finite(source.get("grid_export_kwh"))
         row = {
@@ -139,10 +144,11 @@ def agile_export_interval_audit(
             "valid_to": end.isoformat(),
             "completed": completed,
             "rate_pence_per_kwh": rate,
-            "shadow_grid_export_kwh": model_kwh if completed else None,
+            "completed_model_grid_export_kwh": model_kwh if completed else None,
+            "shadow_grid_export_kwh": model_kwh if settled else None,
             "shadow_income_pence": (
                 round(model_kwh * rate, 3)
-                if completed and model_kwh is not None and rate is not None
+                if settled and model_kwh is not None and rate is not None
                 else None
             ),
             "shadow_source": source.get("settlement_source") if completed else None,
@@ -234,11 +240,13 @@ def agile_export_interval_audit(
     observed_completed_kwh = sum(
         row["snapshot_integrated_export_kwh"] for row in completed_rows
     )
-    shadow_completed_kwh = sum(
-        row["shadow_grid_export_kwh"]
-        for row in completed_rows
-        if row["shadow_grid_export_kwh"] is not None
+    settled_rows = [
+        row for row in completed_rows if row["shadow_grid_export_kwh"] is not None
+    ]
+    observed_settled_kwh = sum(
+        row["snapshot_integrated_export_kwh"] for row in settled_rows
     )
+    shadow_completed_kwh = sum(row["shadow_grid_export_kwh"] for row in settled_rows)
     complete_prices = not (unpriced_positive_pairs or unmatched_positive_pairs)
     observed_income = (
         round(
@@ -251,19 +259,24 @@ def agile_export_interval_audit(
     reported_income = _finite(reported_income_pence)
     return {
         "status": (
-            "compared" if complete_prices else "incomplete_price_or_slot_coverage"
+            "no_completed_shadow_settlement"
+            if not settled_rows
+            else "compared" if complete_prices else "incomplete_price_or_slot_coverage"
         ),
         "reporting_only": True,
         "note": note,
         "scope": "current_london_day_snapshot_samples_vs_completed_digital_twin",
         "completed_slots": len(completed_rows),
+        "settled_shadow_slots": len(settled_rows),
+        "unsettled_completed_slots": len(completed_rows) - len(settled_rows),
         "snapshot_integrated_export_all_elapsed_kwh": round(observed_all_kwh, 3),
         "snapshot_integrated_export_completed_slots_kwh": round(
             observed_completed_kwh, 3
         ),
+        "snapshot_integrated_export_settled_slots_kwh": round(observed_settled_kwh, 3),
         "shadow_completed_grid_export_kwh": round(shadow_completed_kwh, 3),
         "shadow_minus_snapshot_completed_kwh": round(
-            shadow_completed_kwh - observed_completed_kwh, 3
+            shadow_completed_kwh - observed_settled_kwh, 3
         ),
         "sample_priced_income_pence": observed_income,
         "reported_actual_export_income_pence": reported_income,

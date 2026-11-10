@@ -179,3 +179,46 @@ def test_dst_fallback_intervals_keep_distinct_offsets() -> None:
     assert start_a.astimezone(london).hour == start_b.astimezone(london).hour == 1
     assert audit["completed_slots"] == 2
     assert audit["sample_priced_income_pence"] == 30.0
+
+
+def test_replay_only_completed_slots_are_not_mislabelled_as_settled() -> None:
+    start = datetime(2026, 11, 10, 20, tzinfo=UTC)
+    settled = _slot(start, 10.0, 1.25)
+    replay = _slot(start + timedelta(minutes=30), 20.0, 0.5)
+    replay.pop("settlement_source")
+    state = {"today_slots": [settled, replay]}
+    original = deepcopy(state)
+    records = [
+        _record(start, 1.0),
+        _record(start + timedelta(minutes=30), 1.0),
+        _record(start + timedelta(minutes=60), 0.0),
+    ]
+    audit = _run(
+        state,
+        records,
+        now=start + timedelta(minutes=65),
+        income=15.0,
+    )
+    assert audit["completed_slots"] == 2
+    assert audit["settled_shadow_slots"] == 1
+    assert audit["unsettled_completed_slots"] == 1
+    assert audit["snapshot_integrated_export_completed_slots_kwh"] == 1.0
+    assert audit["snapshot_integrated_export_settled_slots_kwh"] == 0.5
+    assert audit["shadow_completed_grid_export_kwh"] == 1.25
+    assert audit["shadow_minus_snapshot_completed_kwh"] == 0.75
+    assert audit["rows"][1]["shadow_grid_export_kwh"] is None
+    assert audit["rows"][1]["completed_model_grid_export_kwh"] == 0.5
+    assert state == original
+
+
+def test_replay_only_day_cannot_claim_shadow_comparison() -> None:
+    start = datetime(2026, 11, 10, 20, tzinfo=UTC)
+    replay = _slot(start, 12.0, 1.0)
+    replay.pop("settlement_source")
+    audit = _run(
+        {"today_slots": [replay]},
+        [_record(start, 2.0), _record(start + timedelta(minutes=30), 0.0)],
+    )
+    assert audit["status"] == "no_completed_shadow_settlement"
+    assert audit["shadow_completed_grid_export_kwh"] == 0.0
+    assert audit["unsettled_completed_slots"] == 1
