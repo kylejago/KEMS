@@ -261,7 +261,7 @@ def test_alpha924_release_scope_remains_reporting_only() -> None:
     )
     source = POLICY_PARITY.read_text(encoding="utf-8")
 
-    assert manifest["version"] == "0.9.0-alpha9.195"
+    assert manifest["version"] == "0.9.0-alpha9.196"
     reason = bundle["maintenance"]["reason"].lower()
     assert "alpha9.24" in reason
     assert "flow parity" in reason
@@ -276,7 +276,7 @@ def test_alpha924_release_scope_remains_reporting_only() -> None:
 
 
 def _nov10_house_bridge_state() -> dict[str, Any]:
-    """Reproduce alpha9.195 22:00 evidence across two future half-hours."""
+    """Reproduce alpha9.196 22:00 evidence across two future half-hours."""
     row_2230 = _slot(
         valid_from="2026-11-10T22:30:00+00:00",
         valid_to="2026-11-10T23:00:00+00:00",
