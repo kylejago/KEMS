@@ -6,7 +6,7 @@ import importlib
 import json
 import sys
 import types
-from datetime import UTC, datetime, time
+from datetime import UTC, datetime, time, timedelta
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -345,3 +345,91 @@ def test_at_hard_house_floor_inactive_solar_estimate_cannot_force_discharge(
         assert row["battery_to_home_kwh"] == pytest.approx(0.0)
         assert row["grid_import_kwh"] == pytest.approx(0.6)
         assert row["battery_export_kwh"] == pytest.approx(0.0)
+
+
+def test_nov10_2250_future_2300_house_flow_and_2330_cheap_handoff(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Exact live failure: active precheap + future house slot + cheap slot."""
+    _install_production_projection(monkeypatch)
+
+    start_current = datetime(2026, 11, 10, 22, 30, tzinfo=UTC)
+    start_future = datetime(2026, 11, 10, 23, 0, tzinfo=UTC)
+    start_cheap = datetime(2026, 11, 10, 23, 30, tzinfo=UTC)
+    now = datetime(2026, 11, 10, 22, 50, tzinfo=UTC)
+    slots = [
+        {
+            "valid_from": start.isoformat(),
+            "valid_to": (start + timedelta(minutes=30)).isoformat(),
+            "rate_pence": rate,
+            "planned_battery_to_home_kwh": 0.0,
+            "rolling_planned_battery_export_kwh": 0.0,
+        }
+        for start, rate in (
+            (start_current, 16.7),
+            (start_future, 16.18),
+            (start_cheap, 16.18),
+        )
+    ]
+    state = {
+        "today_slots": slots,
+        "current_routing_snapshot": {"simulated_soc_percent": 14.724},
+        "rolling_export_plan": {
+            "simulated_soc_percent": 14.724,
+            "hard_safety_floor_active": False,
+        },
+    }
+    config = SimulationConfig(
+        battery_capacity_kwh=56.42,
+        battery_reserve_percent=15.0,
+        battery_initial_percent=14.724,
+        max_charge_kw=7.0,
+        max_discharge_kw=7.0,
+        charge_efficiency=0.95,
+        discharge_efficiency=0.95,
+        inverter_limit_kw=7.0,
+        export_limit_kw=7.0,
+    )
+    tariff = TariffSettings(
+        mode="intelligent",
+        day_rate_pence=35.8828,
+        offpeak_rate_pence=6.6,
+        standing_charge_pence=55.52,
+        offpeak_start=time(23, 30),
+        offpeak_end=time(5, 30),
+        intelligent_slots_enabled=True,
+    )
+    projected = flow._future_today_projection(
+        SimpleNamespace(
+            _kems_solar_net_house_protection={
+                "active": False,
+                "conservative_house_kw": 0.0,
+                "gross_house_kwh": 0.746,
+                "net_house_kwh": 0.746,
+                "confidence_percent": 55.0,
+            }
+        ),
+        state,
+        now=now,
+        config=config,
+        learned=LearnedState(typical_house_load_kw=0.994),
+        forecast=SolarForecastState(hourly=()),
+        forecast_plan=ForecastPlanState(
+            minimum_precheap_soc_percent=15.0,
+            maximum_overnight_soc_percent=85.7,
+        ),
+        tariff=tariff,
+    )
+    current = projected[start_current.isoformat()]
+    future = projected[start_future.isoformat()]
+    cheap = projected[start_cheap.isoformat()]
+    assert 0.0 < current["battery_to_home_kwh"] < 0.2
+    assert future["battery_to_home_kwh"] == pytest.approx(0.497)
+    assert future["grid_import_kwh"] == pytest.approx(0.0)
+    assert future["battery_export_kwh"] == pytest.approx(0.0)
+    assert 10.0 < future["estimated_soc_percent"] < current["estimated_soc_percent"]
+    assert future["house_import_floor_soc_percent"] == 10.0
+    assert future["planning_target_soc_percent"] == 15.0
+    assert cheap["battery_to_home_kwh"] == pytest.approx(0.0)
+    assert cheap["grid_to_battery_kwh"] > 0.0
+    assert cheap["grid_import_kwh"] > 0.497
