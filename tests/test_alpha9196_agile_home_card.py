@@ -136,9 +136,9 @@ def test_missing_future_flow_does_not_fabricate_home_action_or_soc() -> None:
     future["flow_basis"] = "settled/replayed KEMS slot"
     future["flow_estimated_soc_percent"] = None
     future["flow_battery_to_home_kwh"] = None
-    scenario["physical_live_slot_outlook"][key]["action"] = (
-        "Hold — no battery export planned"
-    )
+    scenario["physical_live_slot_outlook"][key][
+        "action"
+    ] = "Hold — no battery export planned"
     result = _render(scenario)
     assert "Hold — no battery export planned" in result
     assert "~13.4%" not in result
