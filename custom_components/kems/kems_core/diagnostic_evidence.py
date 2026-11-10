@@ -261,7 +261,11 @@ def agile_export_interval_audit(
     reported_income = _finite(reported_income_pence)
     return {
         "status": (
-            "compared" if complete_prices else "incomplete_price_or_slot_coverage"
+            "no_completed_shadow_settlement"
+            if not settled_rows
+            else "compared"
+            if complete_prices
+            else "incomplete_price_or_slot_coverage"
         ),
         "reporting_only": True,
         "note": note,
