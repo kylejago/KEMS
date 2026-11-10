@@ -273,3 +273,130 @@ def test_alpha924_release_scope_remains_reporting_only() -> None:
     assert "async_call(" not in source
     assert "commands_permitted = true" not in source.lower()
     assert "safe_to_write_hardware = true" not in source.lower()
+
+
+def _nov10_house_bridge_state() -> dict[str, Any]:
+    """Reproduce alpha9.194 22:00 evidence across two future half-hours."""
+    row_2230 = _slot(
+        valid_from="2026-11-10T22:30:00+00:00",
+        valid_to="2026-11-10T23:00:00+00:00",
+        planned_total=0.157,
+        planned_home=0.157,
+        planned_export=0.0,
+        flow_home=0.594,
+        flow_export=0.0,
+        policy=True,
+    )
+    row_2300 = _slot(
+        valid_from="2026-11-10T23:00:00+00:00",
+        valid_to="2026-11-10T23:30:00+00:00",
+        planned_total=0.0,
+        planned_home=0.0,
+        planned_export=0.0,
+        flow_home=0.594,
+        flow_export=0.0,
+        policy=True,
+    )
+    row_2230["flow_estimated_soc_percent"] = 14.0
+    row_2300["flow_estimated_soc_percent"] = 12.9
+    return {
+        "current_routing_snapshot": {
+            "available": True,
+            "generated_at": "2026-11-10T22:00:13+00:00",
+            "routing_valid_from": "2026-11-10T22:00:00+00:00",
+            "routing_valid_to": "2026-11-10T22:30:00+00:00",
+        },
+        "today_slots": [row_2230, row_2300],
+    }
+
+
+def test_nov10_alpha9194_house_bridge_does_not_stop_at_fifteen() -> None:
+    legacy, policy = _reconcilers()
+    legacy_state = _nov10_house_bridge_state()
+    assert legacy(legacy_state) == 2
+    assert legacy_state["today_slots"][0]["flow_battery_to_home_kwh"] == 0.157
+    assert legacy_state["today_slots"][1]["flow_battery_to_home_kwh"] == 0.0
+
+    state = _nov10_house_bridge_state()
+    original_planning = [
+        (
+            row["planned_total_battery_discharge_kwh"],
+            row["planned_battery_to_home_kwh"],
+            row["rolling_planned_battery_export_kwh"],
+        )
+        for row in state["today_slots"]
+    ]
+    assert policy(state) == 0
+    first, second = state["today_slots"]
+    assert first["flow_battery_to_home_kwh"] == pytest.approx(0.594)
+    assert second["flow_battery_to_home_kwh"] == pytest.approx(0.594)
+    assert first["flow_grid_import_kwh"] == second["flow_grid_import_kwh"] == 0.0
+    assert first["flow_battery_export_kwh"] == second["flow_battery_export_kwh"] == 0.0
+    assert first["flow_policy_house_bridge_preserved"] is True
+    assert second["flow_policy_house_bridge_preserved"] is True
+    assert first["flow_policy_house_bridge_additional_kwh"] == pytest.approx(0.437)
+    assert second["flow_policy_house_bridge_additional_kwh"] == pytest.approx(0.594)
+    assert state["flow_total_discharge_parity"]["policy_house_bridge_rows"] == 2
+    assert [
+        (
+            row["planned_total_battery_discharge_kwh"],
+            row["planned_battery_to_home_kwh"],
+            row["rolling_planned_battery_export_kwh"],
+        )
+        for row in state["today_slots"]
+    ] == original_planning
+
+
+def test_house_bridge_cannot_bypass_latched_ten_percent_floor() -> None:
+    _, policy = _reconcilers()
+    state = _nov10_house_bridge_state()
+    state["today_slots"][0]["hard_safety_floor_latched"] = True
+    state["today_slots"][1]["hard_reserve_floor_active"] = True
+
+    assert policy(state) == 2
+    assert state["today_slots"][0]["flow_battery_to_home_kwh"] == pytest.approx(
+        0.157
+    )
+    assert state["today_slots"][1]["flow_battery_to_home_kwh"] == pytest.approx(0.0)
+    assert state["flow_total_discharge_parity"]["policy_house_bridge_rows"] == 0
+
+
+def test_house_bridge_never_preserved_for_cheap_or_unverified_projection() -> None:
+    _, policy = _reconcilers()
+    state = _nov10_house_bridge_state()
+    state["today_slots"][0]["actions"] = ["cheap charge"]
+    state["today_slots"][1]["flow_estimated_soc_percent"] = 9.5
+
+    assert policy(state) == 2
+    assert state["today_slots"][0]["flow_battery_to_home_kwh"] == pytest.approx(
+        0.157
+    )
+    assert state["today_slots"][1]["flow_battery_to_home_kwh"] == pytest.approx(0.0)
+
+
+def test_house_bridge_combines_with_fifteen_percent_export_cap() -> None:
+    _, policy = _reconcilers()
+    state = _nov10_house_bridge_state()
+    first = state["today_slots"][0]
+    first["planned_total_battery_discharge_kwh"] = 0.553
+    first["planned_battery_to_home_kwh"] = 0.157
+    first["rolling_planned_battery_export_kwh"] = 0.396
+    first["flow_battery_export_kwh"] = 0.204
+
+    policy(state)
+    assert first["flow_battery_to_home_kwh"] == pytest.approx(0.594)
+    assert first["flow_battery_export_kwh"] == pytest.approx(0.204)
+    assert first["planned_total_battery_discharge_kwh"] == pytest.approx(0.553)
+    assert first["planned_battery_to_home_kwh"] == pytest.approx(0.157)
+    assert first["rolling_planned_battery_export_kwh"] == pytest.approx(0.396)
+    assert first["flow_policy_export_cap_applied"] is True
+    assert first["flow_policy_house_bridge_preserved"] is True
+
+
+def test_projection_only_change_does_not_modify_hardware_authority() -> None:
+    source = POLICY_PARITY.read_text(encoding="utf-8")
+    assert "planner and physical control are" in source.lower() or "live commands" in source.lower()
+    assert "self.hass.services.async_call(" not in source
+    assert "providers.foxess" not in source
+    assert 'slot["planned_battery_to_home_kwh"] = saved[1]' in source
+    assert 'slot["rolling_planned_battery_export_kwh"] = saved[2]' in source
