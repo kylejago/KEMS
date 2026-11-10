@@ -64,8 +64,8 @@ def _scenario():
         )
     active["flow_battery_to_home_kwh"] = 0.226
     future["flow_battery_to_home_kwh"] = 0.497
-    future["rolling_action"] = "hold — total-discharge / price replan"
-    cheap["rolling_action"] = "cheap charge — overnight window"
+    future["actions"] = ["hold — total-discharge / price replan"]
+    cheap["actions"] = ["cheap charge"]
     cheap["flow_grid_to_battery_kwh"] = 3.325
     tomorrow = [dict(item) for item in today]
     outlook = {
