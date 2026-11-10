@@ -80,7 +80,6 @@ def actual_export_evidence(
     }
 
 
-
 def agile_export_interval_audit(
     *,
     records: list[Any],
@@ -146,8 +145,7 @@ def agile_export_interval_audit(
                 if completed and model_kwh is not None and rate is not None
                 else None
             ),
-            "shadow_source": source.get("settlement_source")
-            if completed else None,
+            "shadow_source": source.get("settlement_source") if completed else None,
             "snapshot_integrated_export_kwh": 0.0,
             "snapshot_integrated_income_pence": 0.0,
             "sample_pairs": 0,
@@ -165,7 +163,8 @@ def agile_export_interval_audit(
     today = now.astimezone(london).date()
     today_records = sorted(
         (
-            item for item in records
+            item
+            for item in records
             if isinstance(getattr(item, "timestamp", None), datetime)
             and item.timestamp.tzinfo is not None
             and item.timestamp.astimezone(london).date() == today
@@ -176,7 +175,9 @@ def agile_export_interval_audit(
     unmatched_positive_pairs = 0
     for current, following in zip(today_records, today_records[1:], strict=False):
         delta = (following.timestamp - current.timestamp).total_seconds()
-        if delta <= 0 or "grid_export_kw" in (getattr(current, "stale_fields", ()) or ()):
+        if delta <= 0 or "grid_export_kw" in (
+            getattr(current, "stale_fields", ()) or ()
+        ):
             continue
         export_kw = _finite(getattr(current, "grid_export_kw", None))
         if export_kw is None or export_kw <= 0:
@@ -185,7 +186,8 @@ def agile_export_interval_audit(
             continue
         match = next(
             (
-                (end, row) for start, end, row in intervals
+                (end, row)
+                for start, end, row in intervals
                 if start <= current.timestamp < end
             ),
             None,
@@ -219,13 +221,9 @@ def agile_export_interval_audit(
         ):
             if row[name] is not None:
                 row[name] = round(row[name], digits)
-        if (
-            row["completed"]
-            and row["shadow_grid_export_kwh"] is not None
-        ):
+        if row["completed"] and row["shadow_grid_export_kwh"] is not None:
             row["shadow_minus_snapshot_kwh"] = round(
-                row["shadow_grid_export_kwh"]
-                - row["snapshot_integrated_export_kwh"],
+                row["shadow_grid_export_kwh"] - row["snapshot_integrated_export_kwh"],
                 4,
             )
         else:
@@ -237,23 +235,24 @@ def agile_export_interval_audit(
         row["snapshot_integrated_export_kwh"] for row in completed_rows
     )
     shadow_completed_kwh = sum(
-        row["shadow_grid_export_kwh"] for row in completed_rows
+        row["shadow_grid_export_kwh"]
+        for row in completed_rows
         if row["shadow_grid_export_kwh"] is not None
     )
     complete_prices = not (unpriced_positive_pairs or unmatched_positive_pairs)
     observed_income = (
         round(
-            sum(
-                row["snapshot_integrated_income_pence"] or 0.0
-                for row in rows
-            ),
+            sum(row["snapshot_integrated_income_pence"] or 0.0 for row in rows),
             2,
         )
-        if complete_prices else None
+        if complete_prices
+        else None
     )
     reported_income = _finite(reported_income_pence)
     return {
-        "status": "compared" if complete_prices else "incomplete_price_or_slot_coverage",
+        "status": (
+            "compared" if complete_prices else "incomplete_price_or_slot_coverage"
+        ),
         "reporting_only": True,
         "note": note,
         "scope": "current_london_day_snapshot_samples_vs_completed_digital_twin",
@@ -270,11 +269,10 @@ def agile_export_interval_audit(
         "reported_actual_export_income_pence": reported_income,
         "sample_income_minus_reported_pence": (
             round(observed_income - reported_income, 2)
-            if observed_income is not None and reported_income is not None else None
+            if observed_income is not None and reported_income is not None
+            else None
         ),
-        "reported_daily_simulation_export_kwh": _finite(
-            reported_grid_export_kwh
-        ),
+        "reported_daily_simulation_export_kwh": _finite(reported_grid_export_kwh),
         "unpriced_positive_sample_pairs": unpriced_positive_pairs,
         "unmatched_positive_sample_pairs": unmatched_positive_pairs,
         "long_gap_pairs": sum(row["over_10_minute_gaps"] for row in rows),
