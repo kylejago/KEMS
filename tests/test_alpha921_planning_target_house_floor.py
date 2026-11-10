@@ -102,6 +102,7 @@ def _project(
     planned_export_kwh: float = 0.0,
     hard_floor_latched: bool = False,
     forecast_floor_percent: float = 15.0,
+    solar_net_house_protection: dict[str, object] | None = None,
 ) -> dict[str, object]:
     """Run the real future-flow projection for one pre-cheap half hour."""
     start = datetime(2026, 9, 10, 21, 0, tzinfo=UTC)  # 22:00 BST
@@ -151,7 +152,9 @@ def _project(
     )
 
     projection = flow._future_today_projection(
-        SimpleNamespace(),
+        SimpleNamespace(
+            _kems_solar_net_house_protection=solar_net_house_protection
+        ),
         state,
         now=now,
         config=config,
@@ -259,3 +262,86 @@ def test_alpha923_release_scope_is_projection_only() -> None:
     assert "providers.foxess" not in source
     assert "commands_permitted = True" not in source
     assert "safe_to_write_hardware = True" not in source
+
+
+def test_rejected_low_confidence_solar_net_house_zero_does_not_erase_home(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Reproduce 10 Nov 22:50: inactive 0kW sentinel + learned 1.2kW."""
+    _install_production_projection(monkeypatch)
+
+    row = _project(
+        soc_percent=14.5,
+        solar_net_house_protection={
+            "active": False,
+            "conservative_house_kw": 0.0,
+            "gross_house_kwh": 0.746,
+            "net_house_kwh": 0.746,
+            "confidence_percent": 55.0,
+            "reason": "solar forecast confidence below safe credit threshold",
+        },
+    )
+
+    assert row["battery_to_home_kwh"] == pytest.approx(0.6)
+    assert row["battery_export_kwh"] == pytest.approx(0.0)
+    assert row["grid_import_kwh"] == pytest.approx(0.0)
+    assert 10.0 < row["estimated_soc_percent"] < 14.5
+    assert row["planning_target_soc_percent"] == 15.0
+    assert row["house_import_floor_soc_percent"] == 10.0
+    assert row["planning_target_limits_export_only"] is True
+
+
+def test_active_valid_solar_net_house_override_remains_authoritative(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Use a genuinely active 0.4kW net-house estimate, not the learned 1.2kW."""
+    _install_production_projection(monkeypatch)
+
+    row = _project(
+        soc_percent=14.5,
+        solar_net_house_protection={
+            "active": True,
+            "conservative_house_kw": 0.4,
+            "confidence_percent": 95.0,
+        },
+    )
+
+    assert row["battery_to_home_kwh"] == pytest.approx(0.2)
+    assert row["grid_import_kwh"] == pytest.approx(0.0)
+    assert row["battery_export_kwh"] == pytest.approx(0.0)
+
+
+def test_nonfinite_or_inactive_nonzero_house_override_falls_back_to_learned(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Rejected proposals and NaN cannot erase or invent house demand."""
+    _install_production_projection(monkeypatch)
+
+    for evidence in (
+        {"active": False, "conservative_house_kw": 0.7},
+        {"active": True, "conservative_house_kw": float("nan")},
+        {"conservative_house_kw": 0.0},
+    ):
+        row = _project(
+            soc_percent=14.5,
+            solar_net_house_protection=evidence,
+        )
+        assert row["battery_to_home_kwh"] == pytest.approx(0.6)
+        assert row["grid_import_kwh"] == pytest.approx(0.0)
+
+
+def test_at_hard_house_floor_inactive_solar_estimate_cannot_force_discharge(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The existing 10% stop and 12% latch still outrank forecast fallback."""
+    _install_production_projection(monkeypatch)
+    evidence = {"active": False, "conservative_house_kw": 0.0}
+    for soc, latched in ((10.0, False), (11.0, True)):
+        row = _project(
+            soc_percent=soc,
+            hard_floor_latched=latched,
+            solar_net_house_protection=evidence,
+        )
+        assert row["battery_to_home_kwh"] == pytest.approx(0.0)
+        assert row["grid_import_kwh"] == pytest.approx(0.6)
+        assert row["battery_export_kwh"] == pytest.approx(0.0)
