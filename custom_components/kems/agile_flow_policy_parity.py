@@ -74,7 +74,6 @@ def _policy_export_override(slot: dict[str, Any]) -> dict[str, float] | None:
     }
 
 
-
 def _policy_house_override(slot: dict[str, Any]) -> dict[str, float] | None:
     """Preserve a canonical house-only forecast beyond the 15% export target.
 
@@ -101,8 +100,7 @@ def _policy_house_override(slot: dict[str, Any]) -> dict[str, float] | None:
         )
     ).lower()
     if any(
-        priority in action
-        for priority in ("cheap charge", "happy hour", "power down")
+        priority in action for priority in ("cheap charge", "happy hour", "power down")
     ):
         return None
 
