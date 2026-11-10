@@ -204,7 +204,13 @@ def _attach_observed_details(
 
 def _conservative_house_kw(self, learned: LearnedState) -> float:
     evidence = getattr(self, "_kems_solar_net_house_protection", None)
-    if isinstance(evidence, dict):
+    # A rejected / low-confidence solar net-house proposal publishes
+    # conservative_house_kw=0.0 as an inactive sentinel, *not* proof that the
+    # house has zero demand. Alpha9.195 incorrectly treated that as a valid
+    # forecast and published zero battery-to-home and zero grid import for
+    # future pre-cheap slots despite the learned nonzero house load.
+    # Only an explicitly active, finite projection owns this override.
+    if isinstance(evidence, dict) and evidence.get("active") is True:
         value = _number(evidence.get("conservative_house_kw"))
         if value is not None and value >= 0.0:
             return value
