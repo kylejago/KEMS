@@ -19,8 +19,13 @@ from .happy_hour_auto_join import happy_hour_auto_join_state
 from .kems_core.agile_plan_budget_reconciliation import reconcile_agile_budget
 from .kems_core.diagnostic_evidence import (
     actual_export_evidence,
+    agile_export_interval_audit,
     corroborated_unchanged_sources,
     reward_settlement_evidence,
+)
+from .product_types import (
+    EXPORT_TARIFF_TYPE_AGILE,
+    export_tariff_type_from_options,
 )
 from .panel import panel_health_snapshot
 from .providers.octopus import DEFAULT_INTELLIGENT_STALE_DATA_SECONDS
@@ -210,6 +215,21 @@ async def async_get_config_entry_diagnostics(
         "actual_export_evidence": actual_export_evidence(
             data.simulation.actual_grid_export_kwh,
             data.simulation.actual_export_income_pence,
+        ),
+        "agile_export_interval_audit": (
+            agile_export_interval_audit(
+                records=coordinator._history.records,
+                agile_state=coordinator.agile_smart_export_state,
+                now=dt_util.now(),
+                reported_grid_export_kwh=data.simulation.actual_grid_export_kwh,
+                reported_income_pence=data.simulation.actual_export_income_pence,
+                activation_cutoff=entry.options.get(
+                    "paid_export_accounting_started_at"
+                ),
+            )
+            if export_tariff_type_from_options(entry.options)
+            == EXPORT_TARIFF_TYPE_AGILE
+            else {"status": "not_agile_tariff", "reporting_only": True}
         ),
         "reward_settlement_evidence": reward_settlement_evidence(data.roi.reward_audit),
         "agile_smart_export": coordinator.agile_smart_export_state,
