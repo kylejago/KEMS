@@ -23,11 +23,11 @@ from .kems_core.diagnostic_evidence import (
     corroborated_unchanged_sources,
     reward_settlement_evidence,
 )
+from .panel import panel_health_snapshot
 from .product_types import (
     EXPORT_TARIFF_TYPE_AGILE,
     export_tariff_type_from_options,
 )
-from .panel import panel_health_snapshot
 from .providers.octopus import DEFAULT_INTELLIGENT_STALE_DATA_SECONDS
 from .update_orchestrator import update_orchestrator_snapshot
 
