@@ -354,9 +354,7 @@ def test_house_bridge_cannot_bypass_latched_ten_percent_floor() -> None:
     state["today_slots"][1]["hard_reserve_floor_active"] = True
 
     assert policy(state) == 2
-    assert state["today_slots"][0]["flow_battery_to_home_kwh"] == pytest.approx(
-        0.157
-    )
+    assert state["today_slots"][0]["flow_battery_to_home_kwh"] == pytest.approx(0.157)
     assert state["today_slots"][1]["flow_battery_to_home_kwh"] == pytest.approx(0.0)
     assert state["flow_total_discharge_parity"]["policy_house_bridge_rows"] == 0
 
@@ -368,9 +366,7 @@ def test_house_bridge_never_preserved_for_cheap_or_unverified_projection() -> No
     state["today_slots"][1]["flow_estimated_soc_percent"] = 9.5
 
     assert policy(state) == 2
-    assert state["today_slots"][0]["flow_battery_to_home_kwh"] == pytest.approx(
-        0.157
-    )
+    assert state["today_slots"][0]["flow_battery_to_home_kwh"] == pytest.approx(0.157)
     assert state["today_slots"][1]["flow_battery_to_home_kwh"] == pytest.approx(0.0)
 
 
@@ -395,7 +391,10 @@ def test_house_bridge_combines_with_fifteen_percent_export_cap() -> None:
 
 def test_projection_only_change_does_not_modify_hardware_authority() -> None:
     source = POLICY_PARITY.read_text(encoding="utf-8")
-    assert "planner and physical control are" in source.lower() or "live commands" in source.lower()
+    assert (
+        "planner and physical control are" in source.lower()
+        or "live commands" in source.lower()
+    )
     assert "self.hass.services.async_call(" not in source
     assert "providers.foxess" not in source
     assert 'slot["planned_battery_to_home_kwh"] = saved[1]' in source
