@@ -231,7 +231,7 @@ views:
         {% set advisory = (advisory_slots.get(key) or {}) if not is_tomorrow else {} %}
         {% set source = p.get('flow_basis') %}
         {% set projected = not is_tomorrow and source in ['canonical current routing snapshot', 'KEMS forecast + final rolling allocation'] %}
-        {% set plan_action = (p.get('rolling_action') or '') | lower %}
+        {% set plan_action = (p.get('actions') or []) | join(' ') | lower %}
         {% set protected = is_state('binary_sensor.kems_power_down_session_active', 'on') or is_state('binary_sensor.kems_happy_hour_active', 'on') or 'power down' in plan_action or 'happy hour' in plan_action %}
         {% set house_flow = p.get('flow_battery_to_home_kwh') %}
         {% set cheap_charge = p.get('flow_grid_to_battery_kwh') %}
@@ -243,12 +243,10 @@ views:
         {% set action = 'Battery powers house · no deliberate export' %}
         {% endif %}
         {% set physical_soc = physical.get('estimated_soc_percent') %}
-        {% set forecast_soc = p.get('flow_estimated_soc_percent') if projected and not protected else none %}
         {% set physical_soc_valid = physical_soc is not none and is_number(physical_soc) %}
-        {% set forecast_soc_valid = forecast_soc is not none and is_number(forecast_soc) %}
         {% set time_label = ('Tomorrow ' if is_tomorrow else '') ~ p.get('label', '—') ~ (' · NOW' if loop.first else '') %}
         {% set rate_label = ('%.2fp' | format(p.get('rate_pence') | float)) if p.get('rate_pence') is not none else '—' %}
-        {% set soc_label = ('%.1f%%' | format(physical_soc | float)) if physical_soc_valid else ('~%.1f%%' | format(forecast_soc | float)) if forecast_soc_valid else '—' %}
+        {% set soc_label = ('%.1f%%' | format(physical_soc | float)) if physical_soc_valid else '—' %}
         {% set ns.rows = ns.rows + ['| ' ~ time_label ~ ' | ' ~ rate_label ~ ' | ' ~ (action | string | replace('|', ' / ') | replace('\n', ' ')) ~ ' | ' ~ soc_label ~ ' |'] %}
         {% endfor %}
         **Today's published plan:** {{ today | count }}/48 slots · **Tomorrow:** {{ tomorrow | count }}/48 slots  
@@ -262,7 +260,7 @@ views:
         The upcoming Agile plan has not been published yet.
         {% endif %}
   
-        _Actions are advisory, not inverter commands. “Battery powers house” means house-only discharge may continue below the 15% deliberate-export stop, but never below the verified 10% hard floor. SOC prefixed ~ is a KEMS forecast (not an independently verified physical reading); “—” means unavailable. Power Down and Happy Hour still take priority. The separate FoxESS SOC above is a physical reading; live hardware and safety checks always determine actual behaviour._
+        _Actions are advisory, not inverter commands. “Battery powers house” means house-only discharge can continue below the 15% deliberate-export stop, but not past the 10% hard floor. Estimated physical SOC uses verified chronological replay or the conservative discharge-only physical ledger when available; “—” deliberately means physical evidence is unavailable, never simulated SOC. Power Down and Happy Hour still take priority. The FoxESS SOC above is a separate physical reading; live guards and inverter measurements govern actual behaviour._
     - type: markdown
       title: Top 5 Agile export prices today
       content: |
