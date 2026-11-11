@@ -537,9 +537,7 @@ class LiveSolarSocContinuityAgileSmartExportManager(
             "publication_seconds": round(live_published_at - live_publish_started, 3),
             "persistence_seconds": round(perf_counter() - live_published_at, 3),
             "post_super_seconds": round(perf_counter() - live_phase_started, 3),
-            "post_super_thread_cpu_seconds": round(
-                thread_time() - live_cpu_started, 3
-            ),
+            "post_super_thread_cpu_seconds": round(thread_time() - live_cpu_started, 3),
             "publication_count": 1,
         }
         return self.state
