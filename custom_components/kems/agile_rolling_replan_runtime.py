@@ -241,7 +241,6 @@ def _rolling_plan(
         }
 
     battery_kwh = capacity * min(max(soc, 0.0), 100.0) / 100.0
-    target_kwh = capacity * target_soc / 100.0
     protected_stored_kwh = protected_precheap_house_stored_kwh(
         capacity_kwh=capacity,
         export_target_soc_percent=target_soc,
