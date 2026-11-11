@@ -19,7 +19,10 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from . import update_orchestrator as base
 from .const import DOMAIN
 from .dashboard import _combined_master_dashboard_bytes, _sync_dashboard_bytes
-from .kems_core.github_release_assets import download_release_asset
+from .kems_core.github_release_assets import (
+    download_release_asset,
+    download_release_asset_pair,
+)
 
 _UPDATE_DASHBOARD_MARKER = (
     "          **Automatic updates are opt-in.** Turn them on below when you are happy "
@@ -233,9 +236,8 @@ class ReliableKEMSUpdateOrchestrator(base.KEMSUpdateOrchestrator):
             except ValueError as error:
                 raise HomeAssistantError(str(error)) from error
 
-        manifest_bytes, checksum_bytes = await asyncio.gather(
-            download(manifest_asset),
-            download(checksum_asset),
+        manifest_bytes, checksum_bytes = await download_release_asset_pair(
+            download, manifest_asset, checksum_asset
         )
         expected = checksum_bytes.decode("utf-8", errors="replace").strip().split()[0]
         observed = hashlib.sha256(manifest_bytes).hexdigest()
