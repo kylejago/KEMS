@@ -62,15 +62,16 @@ def test_three_live_publications_remain_synchronous_and_flag_scoped(
     assert 'self, "_kems_suppress_identical_base_publication", False' in source
     assert "self._kems_suppress_identical_base_publication = True" in source
     assert "finally:" in source
-    assert "self._kems_suppress_identical_base_publication = previous_identical_guard" in source
+    assert (
+        "self._kems_suppress_identical_base_publication = previous_identical_guard"
+        in source
+    )
     assert "_kems_defer_flow_live_update_publish" not in source
     assert "_kems_defer_canonical_live_update_publish" not in source
 
 
 def test_shared_fail_closed_download_helper_is_used_by_both_update_paths() -> None:
-    core = (KEMS / "kems_core" / "github_release_assets.py").read_text(
-        encoding="utf-8"
-    )
+    core = (KEMS / "kems_core" / "github_release_assets.py").read_text(encoding="utf-8")
     assert "async def download_release_asset_pair(" in core
     assert "task.cancel()" in core
     assert "return_exceptions=True" in core
