@@ -108,3 +108,58 @@ def test_403_never_retried_and_repeated_503_is_bounded(monkeypatch):
     with pytest.raises(ValueError, match="503"):
         asyncio.run(run())
     assert len(session.calls) == 2
+
+
+def test_http_429_future_http_date_defers_without_repeat_request(monkeypatch):
+    """GitHub's RFC HTTP-date must never become an eager 0.6s retry."""
+
+    async def unexpected_sleep(_seconds):
+        raise AssertionError("A future Retry-After must defer, not sleep")
+
+    monkeypatch.setattr("kems_core.github_release_assets.asyncio.sleep", unexpected_sleep)
+    session, run = request(
+        [Response(429, retry="Fri, 01 Jan 2099 00:00:00 GMT"), Response()]
+    )
+    with pytest.raises(ValueError, match="defer to next update check"):
+        asyncio.run(run())
+    assert len(session.calls) == 1
+
+
+@pytest.mark.parametrize("retry_after", ["not-an-http-date", "-1", "nan", "inf"])
+def test_http_429_invalid_retry_after_never_spins(monkeypatch, retry_after):
+    async def unexpected_sleep(_seconds):
+        raise AssertionError("Invalid Retry-After must defer immediately")
+
+    monkeypatch.setattr("kems_core.github_release_assets.asyncio.sleep", unexpected_sleep)
+    session, run = request([Response(429, retry=retry_after), Response()])
+    with pytest.raises(ValueError, match="defer to next update check"):
+        asyncio.run(run())
+    assert len(session.calls) == 1
+
+
+def test_http_429_past_http_date_can_recover_in_one_bounded_attempt(monkeypatch):
+    delays = []
+
+    async def no_delay(seconds):
+        delays.append(seconds)
+
+    monkeypatch.setattr("kems_core.github_release_assets.asyncio.sleep", no_delay)
+    session, run = request(
+        [Response(429, retry="Wed, 01 Jan 2020 00:00:00 GMT"), Response()]
+    )
+    assert asyncio.run(run()) == b"good"
+    assert len(session.calls) == 2
+    assert delays == [0.6]
+
+
+def test_http_429_missing_retry_after_keeps_one_bounded_retry(monkeypatch):
+    delays = []
+
+    async def no_delay(seconds):
+        delays.append(seconds)
+
+    monkeypatch.setattr("kems_core.github_release_assets.asyncio.sleep", no_delay)
+    session, run = request([Response(429), Response()])
+    assert asyncio.run(run()) == b"good"
+    assert len(session.calls) == 2
+    assert delays == [0.6]
