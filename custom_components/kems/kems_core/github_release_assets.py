@@ -50,9 +50,11 @@ def _bounded_retry_after(header: Any) -> float:
     """
     if header is None:
         return 0.6
+    numeric = True
     try:
         delay = float(header)
     except (TypeError, ValueError, OverflowError):
+        numeric = False
         try:
             retry_at = parsedate_to_datetime(str(header))
             if retry_at.tzinfo is None:
@@ -62,11 +64,9 @@ def _bounded_retry_after(header: Any) -> float:
             raise ValueError(
                 "GitHub rate limit: defer to next update check"
             ) from error
-    if not isfinite(delay) or delay > 3:
-        raise ValueError("GitHub rate limit: defer to next update check")
-    # An already-passed HTTP-date allows one immediate bounded retry; a
-    # negative numerical delta is invalid and should not trigger a spin.
-    if delay < 0 and isinstance(header, (int, float)):
+    # HTTP-date values that just passed may retry once; negative numeric
+    # seconds, NaN/inf, or long waits defer without another request.
+    if not isfinite(delay) or delay > 3 or (numeric and delay < 0):
         raise ValueError("GitHub rate limit: defer to next update check")
     return max(0.6, delay)
 
