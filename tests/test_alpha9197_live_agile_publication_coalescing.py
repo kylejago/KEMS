@@ -10,7 +10,7 @@ from __future__ import annotations
 import ast
 import asyncio
 from copy import deepcopy
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from pathlib import Path
 from textwrap import indent
 from time import perf_counter
