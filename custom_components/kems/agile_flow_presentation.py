@@ -648,7 +648,13 @@ class FlowPresentationAgileSmartExportManager(MidnightRolloverAgileSmartExportMa
             tariff=tariff,
         )
         _attach_flow_contract(self._state, now=now, future_today=future)
-        self._publish(self._state)
+        # LiveSolarSocContinuity publishes the completed same-scan state after
+        # CanonicalFlowAccounting and its own SOC/solar enrichments. Only that
+        # explicit synchronous owner may defer this intermediate HA write.
+        if getattr(self, "_kems_defer_flow_live_update_publish", False):
+            self._kems_flow_live_update_deferred = True
+        else:
+            self._publish(self._state)
         return self.state
 
     def reconcile_current_day_settlements(
