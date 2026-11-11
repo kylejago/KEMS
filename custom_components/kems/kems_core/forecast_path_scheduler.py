@@ -169,9 +169,14 @@ def allocate_forecast_path_exports(
         if deliberate_export_floor_soc_percent is None
         else _number(deliberate_export_floor_soc_percent)
     )
-    export_floor_stored = capacity * max(
-        target_soc, min(max(export_soc, 0.0), 100.0) if export_soc is not None else 100.0
-    ) / 100.0
+    export_floor_stored = (
+        capacity
+        * max(
+            target_soc,
+            min(max(export_soc, 0.0), 100.0) if export_soc is not None else 100.0,
+        )
+        / 100.0
+    )
     charge_eff = max(min(float(charge_efficiency), 1.0), 0.01)
     discharge_eff = max(min(float(discharge_efficiency), 1.0), 0.01)
     charge_limit = max(float(max_charge_kw), 0.0)
