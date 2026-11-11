@@ -181,3 +181,14 @@ def test_runtime_keeps_two_distinct_targets_and_final_guard() -> None:
     for protected in ('"cheap_charge"', '"happy_hour_charge"', '"power_down_session"'):
         assert protected in ledger
     assert '_enforce_cheap_boundary(state, deadline)' in ledger
+
+
+def test_both_agile_dashboard_views_name_export_and_house_floors_separately() -> None:
+    legacy = (ROOT / "dashboard_alpha740_agile_primary.py").read_text()
+    focused = (ROOT / "agile_operator_dashboard_runtime.py").read_text()
+    for dashboard in (legacy, focused):
+        assert "**Deliberate-export minimum SOC:**" in dashboard
+        assert "household_cheap_start_minimum_soc_percent" in dashboard
+        assert "sensor.kems_projected_soc_at_cheap_period" in dashboard
+        assert "estimate" in dashboard
+        assert "**Target SOC at cheap start:**" not in dashboard
