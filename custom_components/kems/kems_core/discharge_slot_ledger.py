@@ -154,6 +154,7 @@ def allocate_total_discharge_slots(
     export_limit_kw: float,
     safety_headroom_kwh: float = 0.0,
     excluded_windows: Iterable[tuple[datetime, datetime]] = (),
+    maximum_paid_export_kwh: float | None = None,
 ) -> TotalDischargePlan:
     """Allocate one total battery-discharge obligation over physical capacity.
 
@@ -169,6 +170,13 @@ def allocate_total_discharge_slots(
     house = max(float(house_kw), 0.0)
     export_limit = max(float(export_limit_kw), 0.0)
     safety = max(float(safety_headroom_kwh), 0.0)
+    # Only actual paid-export energy is capped; never reduce protected Home
+    # battery service merely because discretionary export is unavailable.
+    paid_export_left = (
+        float("inf")
+        if maximum_paid_export_kwh is None
+        else max(_number(maximum_paid_export_kwh) or 0.0, 0.0)
+    )
     windows = tuple(
         (left.astimezone(UTC), right.astimezone(UTC))
         for left, right in excluded_windows
@@ -281,9 +289,11 @@ def allocate_total_discharge_slots(
             required_extra,
             max(current_capacity - current["allocation_kwh"], 0.0),
             remaining,
+            paid_export_left,
         )
         current["allocation_kwh"] += forced
         remaining -= forced
+        paid_export_left -= forced
 
     # Only energy left after the household has been protected is discretionary
     # export. Rank that remainder by Agile Outgoing price as before.
@@ -291,12 +301,13 @@ def allocate_total_discharge_slots(
         candidates,
         key=lambda value: (-value["rate_pence"], value["valid_from"]),
     ):
-        if remaining <= _EPSILON:
+        if remaining <= _EPSILON or paid_export_left <= _EPSILON:
             break
         spare = max(item["total_capacity_kwh"] - item["allocation_kwh"], 0.0)
-        allocated = min(spare, remaining)
+        allocated = min(spare, remaining, paid_export_left)
         item["allocation_kwh"] += allocated
         remaining -= allocated
+        paid_export_left -= allocated
 
     allocations: list[DischargeSlotAllocation] = []
     for item in sorted(candidates, key=lambda value: value["valid_from"]):
