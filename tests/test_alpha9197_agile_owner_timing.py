@@ -65,8 +65,8 @@ def _actual_set_mixin():
         node for node in cls.body
         if isinstance(node, ast.FunctionDef) and node.name == "_set"
     )
-    code = "from __future__ import annotations\\nclass RealSet:\\n"
-    code += indent(ast.unparse(method), "    ") + "\\n"
+    code = "from __future__ import annotations\nclass RealSet:\n"
+    code += indent(ast.unparse(method), "    ") + "\n"
     namespace = {"perf_counter": perf_counter}
     exec(compile(code, "<production-agile-set>", "exec"), namespace)
     return namespace["RealSet"]
