@@ -186,8 +186,9 @@ def test_active_managed_home_dashboard_explains_separate_floors_and_evidence() -
     dashboard = (ROOT / "kems_master_dashboard.yaml").read_text()
     assert "**Deliberate-export minimum:** 15%" in dashboard
     assert "**Household-only hard floor:** 10%" in dashboard
-    assert "sensor.kems_projected_soc_at_cheap_period" in dashboard
-    assert "model estimate, not the household minimum" in dashboard
+    assert "**Cheap-start SOC forecast:**" in dashboard
+    assert "Projected physical SOC above is an estimate" in dashboard
+    assert "sensor.kems_projected_soc_at_cheap_period" not in dashboard
     assert "Export earnings shown by KEMS are tariff-valued estimates" in dashboard
     assert "Power Down grid-export energy is already included" in dashboard
     assert "additional Power Down bonus requires separate evidence" in dashboard
