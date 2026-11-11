@@ -1041,6 +1041,24 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
             detail_seconds["agile_manager_wrapper_seconds"] = round(
                 max(agile_planning_seconds - manager_base_seconds, 0.0), 3
             )
+            # Read-only, nested wall/CPU timings. All three _publish calls
+            # remain in their original same-scan order because each enriches
+            # the rolling/flow state used by later managers and live control.
+            for owner, attribute in (
+                ("flow", "_kems_flow_live_update_performance"),
+                ("canonical", "_kems_canonical_live_update_performance"),
+                ("solar", "_kems_solar_live_update_performance"),
+            ):
+                layer = getattr(self._agile_smart_export, attribute, None)
+                if not isinstance(layer, dict):
+                    continue
+                for name, duration in layer.items():
+                    if (
+                        isinstance(duration, (int, float))
+                        and not isinstance(duration, bool)
+                        and isfinite(duration)
+                    ):
+                        detail_seconds[f"agile_live_{owner}_{name}"] = duration
             checkpoint("agile_rolling_price_optimisation")
 
             # Alpha9.123 financial solar-routing SHADOW. This is deliberately
