@@ -52,9 +52,7 @@ def test_nov11_2026_measured_25_percent_case_retains_separate_reserves() -> None
         protected_house_kwh=6.112,
     )
     assert physically_allowed_stored == pytest.approx(1.927, abs=0.001)
-    assert physically_allowed_stored * efficiency == pytest.approx(
-        1.831, abs=0.001
-    )
+    assert physically_allowed_stored * efficiency == pytest.approx(1.831, abs=0.001)
     assert physically_allowed_stored <= stored - capacity * 0.15
     assert physically_allowed_stored <= stored - capacity * 0.10 - 6.112
 
@@ -72,11 +70,14 @@ def test_nov11_2026_measured_25_percent_case_retains_separate_reserves() -> None
 def test_house_deadline_goal_does_not_lower_export_floor(
     forecast: float | None, proof: bool, expected: float
 ) -> None:
-    assert total_discharge_deadline_goal_soc_percent(
-        export_target_soc_percent=15.0,
-        forecast_minimum_precheap_soc_percent=forecast,
-        separate_house_floor_proven=proof,
-    ) == expected
+    assert (
+        total_discharge_deadline_goal_soc_percent(
+            export_target_soc_percent=15.0,
+            forecast_minimum_precheap_soc_percent=forecast,
+            separate_house_floor_proven=proof,
+        )
+        == expected
+    )
 
 
 def test_missing_house_evidence_cannot_release_extra_export() -> None:
@@ -88,11 +89,14 @@ def test_missing_house_evidence_cannot_release_extra_export() -> None:
         protected_house_stored_kwh=float("nan"),
         separate_house_floor_proven=True,
     ) == pytest.approx(56.42)
-    assert total_discharge_deadline_goal_soc_percent(
-        export_target_soc_percent=15.0,
-        forecast_minimum_precheap_soc_percent=None,
-        separate_house_floor_proven=False,
-    ) == 15.0
+    assert (
+        total_discharge_deadline_goal_soc_percent(
+            export_target_soc_percent=15.0,
+            forecast_minimum_precheap_soc_percent=None,
+            separate_house_floor_proven=False,
+        )
+        == 15.0
+    )
 
 
 def _slot(start: datetime, price: float) -> dict[str, object]:
@@ -107,9 +111,7 @@ def _slot(start: datetime, price: float) -> dict[str, object]:
 def test_house_to_ten_plan_has_more_total_capacity_without_export_entitlement() -> None:
     now = datetime(2026, 11, 11, 20, 30, tzinfo=UTC)
     deadline = datetime(2026, 11, 11, 23, 30, tzinfo=UTC)
-    slots = [
-        _slot(now + timedelta(minutes=30 * n), 22.0 - n) for n in range(6)
-    ]
+    slots = [_slot(now + timedelta(minutes=30 * n), 22.0 - n) for n in range(6)]
     segments = [
         {
             "start": (now + timedelta(minutes=5 * n)).isoformat(),
@@ -147,17 +149,13 @@ def test_house_to_ten_plan_has_more_total_capacity_without_export_entitlement() 
         safety_headroom_kwh=3.5,
     )
     assert plan.unallocated_total_discharge_kwh == pytest.approx(0.0, abs=0.001)
-    assert plan.allocated_total_discharge_kwh == pytest.approx(
-        target10, abs=0.001
-    )
+    assert plan.allocated_total_discharge_kwh == pytest.approx(target10, abs=0.001)
     assert plan.planned_house_battery_kwh > 0.0
     # This is an uncapped economic candidate, not permission to export it.
     # The live physical budget and FoxESS command guard impose the smaller
     # 1.831 kWh AC allowance in the actual diagnostic scenario.
     assert plan.planned_battery_export_kwh > 0.0
-    assert all(
-        allocation.valid_from < deadline for allocation in plan.allocations
-    )
+    assert all(allocation.valid_from < deadline for allocation in plan.allocations)
 
 
 def test_runtime_keeps_two_distinct_targets_and_final_guard() -> None:
@@ -180,7 +178,7 @@ def test_runtime_keeps_two_distinct_targets_and_final_guard() -> None:
     assert "allow_paid_agile_house_discharge_to_ten_percent(" in physical
     for protected in ('"cheap_charge"', '"happy_hour_charge"', '"power_down_session"'):
         assert protected in ledger
-    assert '_enforce_cheap_boundary(state, deadline)' in ledger
+    assert "_enforce_cheap_boundary(state, deadline)" in ledger
 
 
 def test_both_agile_dashboard_views_name_export_and_house_floors_separately() -> None:
