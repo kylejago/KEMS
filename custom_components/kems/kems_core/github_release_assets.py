@@ -144,7 +144,6 @@ async def download_release_asset(
     return payload
 
 
-
 async def download_release_asset_pair(
     downloader: Callable[[Mapping[str, Any]], Awaitable[bytes]],
     manifest_asset: Mapping[str, Any],
