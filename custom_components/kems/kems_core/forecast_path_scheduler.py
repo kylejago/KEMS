@@ -145,6 +145,7 @@ def allocate_forecast_path_exports(
     minimum_export_rate_pence: float,
     safety_headroom_kwh: float = 0.0,
     excluded_windows: Iterable[tuple[datetime, datetime]] = (),
+    deliberate_export_floor_soc_percent: float | None = None,
 ) -> ForecastPathPlan:
     """Maximise export value without borrowing forecast solar before it arrives.
 
@@ -161,6 +162,16 @@ def allocate_forecast_path_exports(
     target_soc = min(max(float(target_soc_percent), 0.0), 100.0)
     initial_stored = capacity * initial_soc / 100.0
     target_stored = capacity * target_soc / 100.0
+    # A lower household-arrival goal NEVER lowers the paid-export SOC floor.
+    # Preserve legacy single-floor behaviour when callers omit this parameter.
+    export_soc = (
+        target_soc
+        if deliberate_export_floor_soc_percent is None
+        else _number(deliberate_export_floor_soc_percent)
+    )
+    export_floor_stored = capacity * max(
+        target_soc, min(max(export_soc, 0.0), 100.0) if export_soc is not None else 100.0
+    ) / 100.0
     charge_eff = max(min(float(charge_efficiency), 1.0), 0.01)
     discharge_eff = max(min(float(discharge_efficiency), 1.0), 0.01)
     charge_limit = max(float(max_charge_kw), 0.0)
@@ -316,12 +327,23 @@ def allocate_forecast_path_exports(
                 if capacity_share > _EPSILON and slot_capacity > _EPSILON:
                     export_ac += allocation * capacity_share / slot_capacity
 
-            stored_discharge = (house_ac + export_ac) / discharge_eff
-            battery -= stored_discharge
-            minimum = min(minimum, battery)
+            # House load may spend the independently allowed 15% to 10%
+            # stored-energy band. Discretionary export must instead respect
+            # 15% at the time it is allocated, not just the 10% end goal.
+            battery -= house_ac / discharge_eff
             if battery + 1e-7 < target_stored:
+                minimum = min(minimum, battery)
                 feasible = False
                 break
+            if (
+                export_ac > _EPSILON
+                and battery - export_ac / discharge_eff + 1e-7 < export_floor_stored
+            ):
+                minimum = min(minimum, battery)
+                feasible = False
+                break
+            battery -= export_ac / discharge_eff
+            minimum = min(minimum, battery)
 
             surplus_solar_ac = max(solar_kw - solar_to_home_kw, 0.0) * hours
             solar_input += surplus_solar_ac
