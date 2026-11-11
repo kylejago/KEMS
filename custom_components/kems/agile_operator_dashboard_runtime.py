@@ -67,6 +67,7 @@ _AGILE_FOCUSED_VIEW = r"""  - title: Full KEMS Agile
           **Deliberate-export minimum SOC:** {{ state_attr('sensor.kems_agile_rolling_export_plan', 'deliberate_export_floor_soc_percent') or state_attr('sensor.kems_agile_rolling_export_plan', 'target_soc_percent') or 15 }}%  
           **Household-only hard floor:** {{ state_attr('sensor.kems_agile_rolling_export_plan', 'household_cheap_start_minimum_soc_percent') or 10 }}% (Self Use when safe; not a forced discharge target)  
           **Forecast SOC at cheap start:** {{ states('sensor.kems_projected_soc_at_cheap_period') }}% (estimate, not the hard floor)  
+          **Export earnings evidence:** KEMS tariff-valued export income is estimated until supplier settlement. Power Down grid-export energy is already within Agile export totals; any separate Power Down bonus needs independent evidence and must not be counted twice.  
 
           This page keeps the operating view deliberately simple. Detailed price-slot, validation and shadow evidence remains available in KEMS diagnostics.
 
