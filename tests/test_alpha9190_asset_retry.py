@@ -116,7 +116,9 @@ def test_http_429_future_http_date_defers_without_repeat_request(monkeypatch):
     async def unexpected_sleep(_seconds):
         raise AssertionError("A future Retry-After must defer, not sleep")
 
-    monkeypatch.setattr("kems_core.github_release_assets.asyncio.sleep", unexpected_sleep)
+    monkeypatch.setattr(
+        "kems_core.github_release_assets.asyncio.sleep", unexpected_sleep
+    )
     session, run = request(
         [Response(429, retry="Fri, 01 Jan 2099 00:00:00 GMT"), Response()]
     )
@@ -130,7 +132,9 @@ def test_http_429_invalid_retry_after_never_spins(monkeypatch, retry_after):
     async def unexpected_sleep(_seconds):
         raise AssertionError("Invalid Retry-After must defer immediately")
 
-    monkeypatch.setattr("kems_core.github_release_assets.asyncio.sleep", unexpected_sleep)
+    monkeypatch.setattr(
+        "kems_core.github_release_assets.asyncio.sleep", unexpected_sleep
+    )
     session, run = request([Response(429, retry=retry_after), Response()])
     with pytest.raises(ValueError, match="defer to next update check"):
         asyncio.run(run())
