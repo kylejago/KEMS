@@ -88,8 +88,7 @@ def _clarify_policy_action_labels(state: dict[str, Any]) -> dict[str, Any]:
         priority_mode = str(routing.get("dispatch_mode") or "")
         priority_action = str(routing.get("routing_action") or "").strip()
         if (
-            priority_mode
-            in {"cheap_charge", "happy_hour_charge", "power_down_session"}
+            priority_mode in {"cheap_charge", "happy_hour_charge", "power_down_session"}
             and priority_action
         ):
             for key in ("current_action", "today_action"):
