@@ -1897,6 +1897,13 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                 "agile_manager_internal_seconds": dict(
                     getattr(self._agile_smart_export, "_performance_detail", {})
                 ),
+                "agile_live_update_publication_coalescing": dict(
+                    getattr(
+                        self._agile_smart_export,
+                        "_kems_agile_live_update_coalescing",
+                        {},
+                    )
+                ),
                 "stage_detail_seconds": detail_seconds,
                 "settlement_publication_coalescing": settlement_publication_stats,
                 "post_shadow_settlement_changed": post_shadow_settlement_changed,
@@ -1917,6 +1924,13 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                     "stage_detail_seconds": dict(detail_seconds),
                     "agile_manager_internal_seconds": dict(
                         getattr(self._agile_smart_export, "_performance_detail", {})
+                    ),
+                    "agile_live_update_publication_coalescing": dict(
+                        getattr(
+                            self._agile_smart_export,
+                            "_kems_agile_live_update_coalescing",
+                            {},
+                        )
                     ),
                 }
                 self._coordinator_slow_scans.append(record)
