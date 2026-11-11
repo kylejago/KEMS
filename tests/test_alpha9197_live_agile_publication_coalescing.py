@@ -52,7 +52,9 @@ class _Base:
     async def _save_alpha850_live_solar_tracker(self):
         self._alpha850_live_solar_dirty = False
 
-    async def async_update(self, *, records, now, config, learned, forecast, forecast_plan, tariff):
+    async def async_update(
+        self, *, records, now, config, learned, forecast, forecast_plan, tariff
+    ):
         self._state = {
             "generated_at": now.isoformat(),
             "records": deepcopy(records),
@@ -65,11 +67,17 @@ class _Base:
 
 def _production_classes():
     def future(_self, state, *, now, **_kwargs):
-        state["future"] = {"at": now.isoformat(), "next_import_rate": state["simulated_import_rate"]}
+        state["future"] = {
+            "at": now.isoformat(),
+            "next_import_rate": state["simulated_import_rate"],
+        }
         return {"future": deepcopy(state["future"])}
 
     def attach(state, *, now, future_today):
-        state["flow_contract"] = {"valid_at": now.isoformat(), "future": deepcopy(future_today)}
+        state["flow_contract"] = {
+            "valid_at": now.isoformat(),
+            "future": deepcopy(future_today),
+        }
 
     def capture(state, *, now):
         return {"at": now.isoformat(), "price": state["simulated_import_rate"]}
@@ -77,7 +85,10 @@ def _production_classes():
     def active(state, *, now, config):
         if state["records"] and state["records"][0].get("fail_canonical"):
             raise RuntimeError("canonical overlay unavailable")
-        state["active"] = {"rate": state["simulated_import_rate"], "limit": config["limit"]}
+        state["active"] = {
+            "rate": state["simulated_import_rate"],
+            "limit": config["limit"],
+        }
 
     def advance(tracker, state, *, now):
         return {"day": now.date().isoformat(), "flow": state["flow_contract"]}, False
@@ -103,9 +114,24 @@ def _production_classes():
     }
     code = "from __future__ import annotations\n"
     for classname, superclass, filename, owner in (
-        ("Flow", "Base", "agile_flow_presentation.py", "FlowPresentationAgileSmartExportManager"),
-        ("Canonical", "Flow", "agile_canonical_flow_accounting.py", "CanonicalFlowAccountingAgileSmartExportManager"),
-        ("Solar", "Canonical", "agile_live_solar_soc_continuity.py", "LiveSolarSocContinuityAgileSmartExportManager"),
+        (
+            "Flow",
+            "Base",
+            "agile_flow_presentation.py",
+            "FlowPresentationAgileSmartExportManager",
+        ),
+        (
+            "Canonical",
+            "Flow",
+            "agile_canonical_flow_accounting.py",
+            "CanonicalFlowAccountingAgileSmartExportManager",
+        ),
+        (
+            "Solar",
+            "Canonical",
+            "agile_live_solar_soc_continuity.py",
+            "LiveSolarSocContinuityAgileSmartExportManager",
+        ),
     ):
         code += f"class {classname}({superclass}):\n"
         code += indent(_method(filename, owner), "    ") + "\n"
@@ -140,15 +166,11 @@ def test_live_three_publications_become_one_with_identical_final_payload():
     assert len(optimized.published) == 1
     assert optimized_final == legacy_final
     assert optimized.published == [original.published[-1]]
-    assert optimized._kems_agile_live_update_coalescing[
-        "flow_publication_deferred"
-    ]
+    assert optimized._kems_agile_live_update_coalescing["flow_publication_deferred"]
     assert optimized._kems_agile_live_update_coalescing[
         "canonical_publication_deferred"
     ]
-    assert optimized._kems_agile_live_update_coalescing[
-        "final_publication_attempted"
-    ]
+    assert optimized._kems_agile_live_update_coalescing["final_publication_attempted"]
     assert not optimized._kems_agile_live_update_coalescing["fallback_published"]
     assert optimized._kems_defer_flow_live_update_publish is False
     assert optimized._kems_defer_canonical_live_update_publish is False
