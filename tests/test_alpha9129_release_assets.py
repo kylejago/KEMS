@@ -7,7 +7,11 @@ import hashlib
 from pathlib import Path
 
 import pytest
-from kems_core.github_release_assets import asset_api_url, download_release_asset
+from kems_core.github_release_assets import (
+    asset_api_url,
+    download_release_asset,
+    download_release_asset_pair,
+)
 
 ROOT = Path(__file__).parents[1] / "custom_components" / "kems"
 
@@ -114,6 +118,7 @@ def test_unchanged_updater_gate_and_maintenance_contracts() -> None:
     guard = (ROOT / "update_maintenance_guard.py").read_text()
     for s in (base, reliable):
         assert "download_release_asset(" in s
+        assert "download_release_asset_pair(" in s
         assert 'headers["User-Agent"]' in s
         assert 'asset.get("browser_download_url")' not in s
         assert "SHA-256 verification failed" in s
@@ -174,3 +179,82 @@ def test_one_transient_server_503_retries_but_403_and_corrupt_sha_do_not():
     with pytest.raises(ValueError, match="digest disagrees"):
         _download(corrupt, invalid)
     assert len(corrupt.calls) == 1
+
+
+def test_parallel_bundle_and_checksum_downloads_preserve_asset_order() -> None:
+    """Success retains both separate bytes in the original manifest-first order."""
+
+    async def check() -> tuple[bytes, bytes]:
+        async def download(asset: dict) -> bytes:
+            await asyncio.sleep(0)
+            return asset["name"].encode()
+
+        return await download_release_asset_pair(
+            download, {"name": "manifest"}, {"name": "checksum"}
+        )
+
+    assert asyncio.run(check()) == (b"manifest", b"checksum")
+
+
+@pytest.mark.parametrize("failed_asset", ["manifest", "checksum"])
+def test_partial_asset_failure_cancels_other_inflight_request(
+    failed_asset: str,
+) -> None:
+    """Either failing asset must stop the sibling, even when it is hanging."""
+
+    async def check() -> None:
+        sibling_started = asyncio.Event()
+        sibling_cancelled = asyncio.Event()
+        sibling = "checksum" if failed_asset == "manifest" else "manifest"
+
+        async def download(asset: dict) -> bytes:
+            if asset["name"] == sibling:
+                sibling_started.set()
+                try:
+                    await asyncio.Future()
+                except asyncio.CancelledError:
+                    sibling_cancelled.set()
+                    raise
+            await sibling_started.wait()
+            raise ValueError("one release asset failed")
+
+        with pytest.raises(ValueError, match="one release asset failed"):
+            await download_release_asset_pair(
+                download, {"name": "manifest"}, {"name": "checksum"}
+            )
+        assert sibling_cancelled.is_set()
+
+    asyncio.run(check())
+
+
+def test_cancelled_bundle_check_cancels_both_inflight_assets() -> None:
+    """Update-check cancellation must not leave either download running."""
+
+    async def check() -> None:
+        both_started = asyncio.Event()
+        started: set[str] = set()
+        cancelled: set[str] = set()
+
+        async def download(asset: dict) -> bytes:
+            name = asset["name"]
+            started.add(name)
+            if len(started) == 2:
+                both_started.set()
+            try:
+                await asyncio.Future()
+            except asyncio.CancelledError:
+                cancelled.add(name)
+                raise
+
+        task = asyncio.create_task(
+            download_release_asset_pair(
+                download, {"name": "manifest"}, {"name": "checksum"}
+            )
+        )
+        await asyncio.wait_for(both_started.wait(), timeout=1)
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+        assert cancelled == {"manifest", "checksum"}
+
+    asyncio.run(check())
