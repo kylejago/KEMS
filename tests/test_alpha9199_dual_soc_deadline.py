@@ -6,7 +6,6 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
-
 from kems_core.agile_live_reserve import (
     physically_exportable_paid_agile_energy_kwh,
     protected_precheap_house_stored_kwh,
