@@ -32,6 +32,7 @@ _AGILE_PRIMARY_CARDS = r"""      - type: markdown
           **Deliberate-export minimum SOC:** {{ state_attr('sensor.kems_agile_rolling_export_plan', 'deliberate_export_floor_soc_percent') or state_attr('sensor.kems_agile_rolling_export_plan', 'target_soc_percent') or 15 }}%  
           **Household-only floor before cheap charge:** {{ state_attr('sensor.kems_agile_rolling_export_plan', 'household_cheap_start_minimum_soc_percent') or 10 }}% (hard limit, not a required arrival target)  
           **Forecast SOC at cheap start:** {{ states('sensor.kems_projected_soc_at_cheap_period') }}% (model estimate; actual SOC may differ)  
+          **Export earnings evidence:** Live Agile export earnings are tariff-valued estimates pending supplier settlement; Power Down export energy is already included, and any separate bonus must have its own evidence.  
           **Latest safe export start:** {{ d.get('latest_safe_export_start') or state_attr('sensor.kems_agile_rolling_export_plan', 'latest_safe_export_start') or 'Building' }}  
           **Economic early-export guard:** {{ 'ACTIVE' if g.get('active') else 'Standby' }}{% if g.get('active') %} — current price is {{ g.get('price_advantage_pence', 0) }}p/kWh above the marginal future slot{% endif %}.  
           **Planned future export slots:** {{ r | count }}
