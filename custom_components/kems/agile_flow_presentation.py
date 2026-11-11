@@ -650,8 +650,18 @@ class FlowPresentationAgileSmartExportManager(MidnightRolloverAgileSmartExportMa
             tariff=tariff,
         )
         _attach_flow_contract(self._state, now=now, future_today=future)
+        # Keep the full state-mutating _publish chain, but avoid redundant
+        # HA writes for identical state+attributes within the live overlays.
+        # The existing base _set comparison still writes every changed value.
         live_publish_started = perf_counter()
-        self._publish(self._state)
+        previous_identical_guard = getattr(
+            self, "_kems_suppress_identical_base_publication", False
+        )
+        self._kems_suppress_identical_base_publication = True
+        try:
+            self._publish(self._state)
+        finally:
+            self._kems_suppress_identical_base_publication = previous_identical_guard
         self._kems_flow_live_update_performance = {
             "projection_contract_seconds": round(
                 live_publish_started - live_phase_started, 3
