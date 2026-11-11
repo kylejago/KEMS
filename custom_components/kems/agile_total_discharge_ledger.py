@@ -289,6 +289,17 @@ def _apply_total_discharge_ledger(
         )
         * 0.5
     )
+    # The combined discharge deadline may be 10%, but only the independently
+    # verified physical export budget may support discretionary paid export.
+    # An explicitly unavailable physical proof never creates export energy.
+    physical_budget = plan.get("physical_house_budget_evidence")
+    paid_export_cap = None
+    if isinstance(physical_budget, dict):
+        paid_export_cap = (
+            max(_number(physical_budget.get("exportable_ac_kwh")) or 0.0, 0.0)
+            if physical_budget.get("available")
+            else 0.0
+        )
     ledger = allocate_total_discharge_slots(
         slots=list(state.get("today_slots", []) or []),
         capacity_segments=segments,
@@ -299,6 +310,7 @@ def _apply_total_discharge_ledger(
         export_limit_kw=config.export_limit_kw,
         safety_headroom_kwh=safety_headroom,
         excluded_windows=_power_down_windows(plan),
+        maximum_paid_export_kwh=paid_export_cap,
     )
 
     by_start = _slot_map(state)
@@ -394,6 +406,9 @@ def _apply_total_discharge_ledger(
             "total_discharge_ledger_active": True,
             "total_discharge_required_kwh": required_total,
             "total_discharge_deadline_target_soc_percent": round(house_goal, 3),
+            "physical_paid_export_budget_kwh": (
+                round(paid_export_cap, 3) if paid_export_cap is not None else None
+            ),
             "deliberate_export_floor_soc_percent": round(target, 3),
             "household_hard_floor_soc_percent": 10.0,
             "power_down_reserved_discharge_credit_kwh": round(power_down_credit, 3),
