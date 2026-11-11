@@ -253,6 +253,8 @@ views:
         _Missing half-hour prices remain unknown; KEMS never fills them with guessed Agile rates._  
         **Current Agile export price:** {{ (slots[0].get('rate_pence') ~ ' p/kWh') if slots and idx < (today | count) and slots[0].get('rate_pence') is not none else '—' }}  
         **FoxESS SOC:** {{ ('%.1f%%' | format(observed_soc | float)) if observed_soc is not none else 'Awaiting fresh reading' }} · **Projected physical SOC:** {{ ('%.1f%%' | format(live_soc | float)) if live_soc is not none else 'Unavailable during priority/uncertainty' }}
+        **Deliberate-export minimum:** 15% · **Household-only hard floor:** 10% (may be used until 23:30 cheap-rate handover; not a compulsory SOC target)
+        **Forecast SOC at cheap start:** {{ states('sensor.kems_projected_soc_at_cheap_period') ~ '%' if is_number(states('sensor.kems_projected_soc_at_cheap_period')) else '—' }} (model estimate, not the household minimum)
   
         {% if slots %}
         {{ ns.rows | join('\n') }}
@@ -261,6 +263,7 @@ views:
         {% endif %}
   
         _Actions are advisory, not inverter commands. “Battery powers house” means house-only discharge can continue below the 15% deliberate-export stop, but not past the 10% hard floor. Estimated physical SOC uses verified chronological replay or the conservative discharge-only physical ledger when available; “—” deliberately means physical evidence is unavailable, never simulated SOC. Power Down and Happy Hour still take priority. The FoxESS SOC above is a separate physical reading; live guards and inverter measurements govern actual behaviour._
+        _Export earnings shown by KEMS are tariff-valued estimates until independently confirmed by the supplier. Power Down grid-export energy is already included in Agile export totals; an additional Power Down bonus requires separate evidence and must not be counted twice._
     - type: markdown
       title: Top 5 Agile export prices today
       content: |
