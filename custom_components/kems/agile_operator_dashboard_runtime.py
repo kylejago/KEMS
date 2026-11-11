@@ -63,7 +63,10 @@ _AGILE_FOCUSED_VIEW = r"""  - title: Full KEMS Agile
           **Decision now:** **{{ state_attr('sensor.kems_agile_live_scenario', 'routing_action') or state_attr('sensor.kems_agile_rolling_export_plan', 'dispatch_action') or 'Building plan' }}**  
           **Agile export price now:** {{ states('sensor.kems_agile_export_rate_now') }} p/kWh  
           **Tomorrow prices:** {{ states('sensor.kems_agile_tomorrow_publication_plan') }}  
-          **Next planned export slot:** {{ states('sensor.kems_agile_rolling_next_export_slot') }}
+          **Next planned export slot:** {{ states('sensor.kems_agile_rolling_next_export_slot') }}  
+          **Deliberate-export minimum SOC:** {{ state_attr('sensor.kems_agile_rolling_export_plan', 'deliberate_export_floor_soc_percent') or state_attr('sensor.kems_agile_rolling_export_plan', 'target_soc_percent') or 15 }}%  
+          **Household-only hard floor:** {{ state_attr('sensor.kems_agile_rolling_export_plan', 'household_cheap_start_minimum_soc_percent') or 10 }}% (Self Use when safe; not a forced discharge target)  
+          **Forecast SOC at cheap start:** {{ states('sensor.kems_projected_soc_at_cheap_period') }}% (estimate, not the hard floor)  
 
           This page keeps the operating view deliberately simple. Detailed price-slot, validation and shadow evidence remains available in KEMS diagnostics.
 
