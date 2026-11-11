@@ -314,7 +314,12 @@ class CanonicalFlowAccountingAgileSmartExportManager(
             now=now,
         )
         _active_slot_from_routing(self._state, now=now, config=config)
-        self._publish(self._state)
+        # The outer live-solar manager guarantees a synchronous final publish.
+        # Standalone CanonicalFlowAccounting callers still publish immediately.
+        if getattr(self, "_kems_defer_canonical_live_update_publish", False):
+            self._kems_canonical_live_update_deferred = True
+        else:
+            self._publish(self._state)
         return self.state
 
     def reconcile_current_day_settlements(
