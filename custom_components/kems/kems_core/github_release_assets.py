@@ -15,7 +15,7 @@ import asyncio
 import hashlib
 import re
 from collections.abc import Mapping
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from email.utils import parsedate_to_datetime
 from math import isfinite
 from typing import Any
@@ -59,7 +59,7 @@ def _bounded_retry_after(header: Any) -> float:
             retry_at = parsedate_to_datetime(str(header))
             if retry_at.tzinfo is None:
                 raise ValueError("GitHub Retry-After date has no timezone")
-            delay = (retry_at - datetime.now(timezone.utc)).total_seconds()
+            delay = (retry_at - datetime.now(UTC)).total_seconds()
         except (TypeError, ValueError, OverflowError) as error:
             raise ValueError("GitHub rate limit: defer to next update check") from error
     # HTTP-date values that just passed may retry once; negative numeric
