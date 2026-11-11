@@ -58,11 +58,13 @@ def _actual_set_mixin():
     """Run the real KEMS _set method against an in-memory HA state machine."""
     source = ast.parse((ROOT / "agile_smart_export.py").read_text("utf-8"))
     cls = next(
-        node for node in source.body
+        node
+        for node in source.body
         if isinstance(node, ast.ClassDef) and node.name == "AgileSmartExportManager"
     )
     method = next(
-        node for node in cls.body
+        node
+        for node in cls.body
         if isinstance(node, ast.FunctionDef) and node.name == "_set"
     )
     code = "from __future__ import annotations\nclass RealSet:\n"
@@ -317,7 +319,6 @@ def test_diagnostics_are_bounded_and_do_not_change_control_or_publication():
         assert "self.hass.services.async_call(" not in ast.unparse(update)
 
 
-
 def test_live_overlay_preserves_all_enrichment_but_suppresses_only_identical_writes():
     """Real _set deduplicates stable values while publishing changed overlays."""
     _, _, Solar = _production_classes()
@@ -327,11 +328,13 @@ def test_live_overlay_preserves_all_enrichment_but_suppresses_only_identical_wri
     assert len(manager.published) == 3
     assert manager._kems_suppress_identical_base_publication is False
     price = [
-        entry for entry in manager._hass.states.writes
+        entry
+        for entry in manager._hass.states.writes
         if entry[0] == "sensor.test_agile_price"
     ]
     rounds = [
-        entry for entry in manager._hass.states.writes
+        entry
+        for entry in manager._hass.states.writes
         if entry[0] == "sensor.test_agile_enrichment_round"
     ]
     assert [entry[1] for entry in price] == ["22.1"]
@@ -346,12 +349,16 @@ def test_live_overlay_preserves_all_enrichment_but_suppresses_only_identical_wri
         records=[{"house": 2.5, "new_receipt": True}],
     )
     assert len(manager.published) == 6
-    assert [entry[1] for entry in manager._hass.states.writes
-            if entry[0] == "sensor.test_agile_price"] == ["22.1", "37.0"]
-    assert [entry[1] for entry in manager._hass.states.writes
-            if entry[0] == "sensor.test_agile_enrichment_round"] == [
-                "1", "2", "3", "4", "5", "6"
-            ]
+    assert [
+        entry[1]
+        for entry in manager._hass.states.writes
+        if entry[0] == "sensor.test_agile_price"
+    ] == ["22.1", "37.0"]
+    assert [
+        entry[1]
+        for entry in manager._hass.states.writes
+        if entry[0] == "sensor.test_agile_enrichment_round"
+    ] == ["1", "2", "3", "4", "5", "6"]
     assert manager.published[-1]["records"][0]["new_receipt"] is True
     assert manager.published[-1]["solar_elapsed"]["day"] == "2026-11-12"
 
@@ -365,7 +372,8 @@ def test_standalone_direct_publish_keeps_preexisting_repeat_write_semantics():
     manager._publish(manager._state)
     manager._publish(manager._state)
     assert [
-        entry[0] for entry in manager._hass.states.writes
+        entry[0]
+        for entry in manager._hass.states.writes
         if entry[0] == "sensor.test_agile_price"
     ] == ["sensor.test_agile_price", "sensor.test_agile_price"]
     assert manager._kems_suppress_identical_base_publication is False
@@ -395,3 +403,46 @@ def test_live_overlay_failure_restores_original_suppression_flag():
     after = _run(manager)
     assert after["publication_enrichment_round"] == 4
     assert manager._kems_suppress_identical_base_publication is False
+
+
+def test_live_guard_requires_identical_attributes_and_fails_open_to_write():
+    """State text alone is never sufficient to suppress a changed sensor."""
+    _, _, Solar = _production_classes()
+    manager = Solar()
+    _run(manager)
+    states = manager._hass.states
+    states.writes.clear()
+    old_guard = manager._kems_suppress_identical_base_publication
+    manager._kems_suppress_identical_base_publication = True
+    try:
+        manager._set(
+            "sensor.test_agile_price",
+            22.1,
+            {"unit_of_measurement": "p/kWh"},
+        )
+        assert states.writes == []
+        manager._set(
+            "sensor.test_agile_price",
+            22.1,
+            {"unit_of_measurement": "p/kWh", "fresh_source": "Octopus"},
+        )
+        assert len(states.writes) == 1
+        manager._set(
+            "sensor.test_agile_price",
+            23.0,
+            {"unit_of_measurement": "p/kWh", "fresh_source": "Octopus"},
+        )
+        assert len(states.writes) == 2
+
+        def fail_lookup(_entity_id):
+            raise RuntimeError("HA state lookup unavailable")
+
+        states.get = fail_lookup
+        manager._set(
+            "sensor.test_agile_price",
+            23.0,
+            {"unit_of_measurement": "p/kWh", "fresh_source": "Octopus"},
+        )
+        assert len(states.writes) == 3
+    finally:
+        manager._kems_suppress_identical_base_publication = old_guard
