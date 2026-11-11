@@ -165,7 +165,9 @@ def test_runtime_keeps_two_distinct_targets_and_final_guard() -> None:
     floor = (ROOT / "agile_safety_floor.py").read_text()
     physical = (ROOT / "kems_core" / "agile_live_reserve.py").read_text()
 
-    assert "max(export_floor_kwh, house_floor_kwh + stored_house_forecast_kwh)" in rolling
+    assert (
+        "max(export_floor_kwh, house_floor_kwh + stored_house_forecast_kwh)" in rolling
+    )
     assert '"household_cheap_start_minimum_soc_percent": 10.0' in rolling
     assert "total_discharge_deadline_goal_soc_percent(" in ledger
     assert '"deliberate_export_floor_soc_percent": round(target, 3)' in ledger
