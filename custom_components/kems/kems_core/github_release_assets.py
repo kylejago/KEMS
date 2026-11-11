@@ -15,6 +15,9 @@ import asyncio
 import hashlib
 import re
 from collections.abc import Mapping
+from datetime import datetime, timezone
+from email.utils import parsedate_to_datetime
+from math import isfinite
 from typing import Any
 
 ASSET_LIMIT_BYTES = 1024 * 1024
@@ -36,6 +39,36 @@ def asset_api_url(asset: Mapping[str, Any], *, repository: str) -> str:
     ):
         raise ValueError("GitHub release asset size exceeds bounded manifest limit")
     return f"https://api.github.com/repos/{repository}/releases/assets/{asset_id}"
+
+
+def _bounded_retry_after(header: Any) -> float:
+    """Respect GitHub Retry-After seconds or HTTP-date without long sleeps.
+
+    A delay beyond the single short retry allowance, an invalid header, or a
+    timezone-less date must defer to the next scheduled check. This helper
+    never moves the installation window or changes bundle verification.
+    """
+    if header is None:
+        return 0.6
+    try:
+        delay = float(header)
+    except (TypeError, ValueError, OverflowError):
+        try:
+            retry_at = parsedate_to_datetime(str(header))
+            if retry_at.tzinfo is None:
+                raise ValueError("GitHub Retry-After date has no timezone")
+            delay = (retry_at - datetime.now(timezone.utc)).total_seconds()
+        except (TypeError, ValueError, OverflowError) as error:
+            raise ValueError(
+                "GitHub rate limit: defer to next update check"
+            ) from error
+    if not isfinite(delay) or delay > 3:
+        raise ValueError("GitHub rate limit: defer to next update check")
+    # An already-passed HTTP-date allows one immediate bounded retry; a
+    # negative numerical delta is invalid and should not trigger a spin.
+    if delay < 0 and isinstance(header, (int, float)):
+        raise ValueError("GitHub rate limit: defer to next update check")
+    return max(0.6, delay)
 
 
 async def download_release_asset(
@@ -66,18 +99,9 @@ async def download_release_asset(
                     if attempt == 0:
                         delay = 0.6
                         if response.status == 429:
-                            try:
-                                rate_delay = float(
-                                    response.headers.get("Retry-After", 0.6)
-                                )
-                            except (TypeError, ValueError, OverflowError):
-                                rate_delay = 0.6
-                            # Long rate limits defer to the scheduled check.
-                            if not 0 <= rate_delay <= 3:
-                                raise ValueError(
-                                    "GitHub rate limit: defer to next update check"
-                                )
-                            delay = max(delay, rate_delay)
+                            delay = _bounded_retry_after(
+                                response.headers.get("Retry-After")
+                            )
                         await asyncio.sleep(delay)
                         continue
                     raise ValueError(
