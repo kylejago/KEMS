@@ -254,7 +254,7 @@ views:
         **Current Agile export price:** {{ (slots[0].get('rate_pence') ~ ' p/kWh') if slots and idx < (today | count) and slots[0].get('rate_pence') is not none else '—' }}  
         **FoxESS SOC:** {{ ('%.1f%%' | format(observed_soc | float)) if observed_soc is not none else 'Awaiting fresh reading' }} · **Projected physical SOC:** {{ ('%.1f%%' | format(live_soc | float)) if live_soc is not none else 'Unavailable during priority/uncertainty' }}
         **Deliberate-export minimum:** 15% · **Household-only hard floor:** 10% (may be used until 23:30 cheap-rate handover; not a compulsory SOC target)
-        **Forecast SOC at cheap start:** {{ states('sensor.kems_projected_soc_at_cheap_period') ~ '%' if is_number(states('sensor.kems_projected_soc_at_cheap_period')) else '—' }} (model estimate, not the household minimum)
+        **Cheap-start SOC forecast:** Projected physical SOC above is an estimate, not the household minimum. The 10% house floor is a limit, not a forced ending target.
   
         {% if slots %}
         {{ ns.rows | join('\n') }}
