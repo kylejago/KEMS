@@ -637,6 +637,8 @@ class FlowPresentationAgileSmartExportManager(MidnightRolloverAgileSmartExportMa
             forecast_plan=forecast_plan,
             tariff=tariff,
         )
+        live_phase_started = perf_counter()
+        live_cpu_started = thread_time()
         future = _future_today_projection(
             self,
             self._state,
@@ -648,7 +650,17 @@ class FlowPresentationAgileSmartExportManager(MidnightRolloverAgileSmartExportMa
             tariff=tariff,
         )
         _attach_flow_contract(self._state, now=now, future_today=future)
+        live_publish_started = perf_counter()
         self._publish(self._state)
+        self._kems_flow_live_update_performance = {
+            "projection_contract_seconds": round(
+                live_publish_started - live_phase_started, 3
+            ),
+            "publication_seconds": round(perf_counter() - live_publish_started, 3),
+            "post_super_seconds": round(perf_counter() - live_phase_started, 3),
+            "post_super_thread_cpu_seconds": round(thread_time() - live_cpu_started, 3),
+            "publication_count": 1,
+        }
         return self.state
 
     def reconcile_current_day_settlements(

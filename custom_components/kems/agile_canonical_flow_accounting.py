@@ -16,6 +16,7 @@ writes remain blocked.
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from time import perf_counter, thread_time
 from typing import Any
 
 from . import agile_smart_export as agile
@@ -309,12 +310,24 @@ class CanonicalFlowAccountingAgileSmartExportManager(
             forecast_plan=forecast_plan,
             tariff=tariff,
         )
+        live_phase_started = perf_counter()
+        live_cpu_started = thread_time()
         self._alpha849_live_replay_capture = _capture_live_replay_accounting(
             self._state,
             now=now,
         )
         _active_slot_from_routing(self._state, now=now, config=config)
+        live_publish_started = perf_counter()
         self._publish(self._state)
+        self._kems_canonical_live_update_performance = {
+            "capture_active_seconds": round(
+                live_publish_started - live_phase_started, 3
+            ),
+            "publication_seconds": round(perf_counter() - live_publish_started, 3),
+            "post_super_seconds": round(perf_counter() - live_phase_started, 3),
+            "post_super_thread_cpu_seconds": round(thread_time() - live_cpu_started, 3),
+            "publication_count": 1,
+        }
         return self.state
 
     def reconcile_current_day_settlements(
