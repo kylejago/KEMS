@@ -44,7 +44,9 @@ def _forecast(
     export_floor: float | None,
 ):
     return allocate_forecast_path_exports(
-        slots=[_slot(now + timedelta(minutes=30 * i), rate) for i, rate in enumerate(rates)],
+        slots=[
+            _slot(now + timedelta(minutes=30 * i), rate) for i, rate in enumerate(rates)
+        ],
         capacity_segments=_segments(now, len(rates) * 6),
         now=now,
         deadline=now + timedelta(minutes=30 * len(rates)),
@@ -63,8 +65,12 @@ def _forecast(
 
 def test_actual_2256_lower_bound_cannot_plan_2300_paid_export() -> None:
     now = datetime(2026, 11, 11, 22, 30, tzinfo=UTC)
-    old = _forecast(now, soc=14.465, house_kw=1.316, rates=[8.0, 25.0], export_floor=None)
-    fixed = _forecast(now, soc=14.465, house_kw=1.316, rates=[8.0, 25.0], export_floor=15.0)
+    old = _forecast(
+        now, soc=14.465, house_kw=1.316, rates=[8.0, 25.0], export_floor=None
+    )
+    fixed = _forecast(
+        now, soc=14.465, house_kw=1.316, rates=[8.0, 25.0], export_floor=15.0
+    )
     assert old.available and old.planned_battery_export_kwh > 1.0
     assert fixed.available
     assert fixed.planned_battery_export_kwh == pytest.approx(0.0)
@@ -84,7 +90,9 @@ def test_higher_price_2300_cannot_borrow_15_to_10_house_band() -> None:
 
 def test_legacy_forecast_callers_keep_single_target_floor() -> None:
     now = datetime(2026, 11, 11, 22, 30, tzinfo=UTC)
-    default = _forecast(now, soc=16.0, house_kw=0.0, rates=[8.0, 25.0], export_floor=None)
+    default = _forecast(
+        now, soc=16.0, house_kw=0.0, rates=[8.0, 25.0], export_floor=None
+    )
     same = _forecast(now, soc=16.0, house_kw=0.0, rates=[8.0, 25.0], export_floor=10.0)
     assert default.planned_battery_export_kwh == pytest.approx(
         same.planned_battery_export_kwh
@@ -143,7 +151,10 @@ def _clarifier():
 @pytest.mark.parametrize(
     ("mode", "action"),
     [
-        ("cheap_charge", "cheap overnight period — import / charge; battery export blocked"),
+        (
+            "cheap_charge",
+            "cheap overnight period — import / charge; battery export blocked",
+        ),
         ("happy_hour_charge", "Happy Hour — grid priority / battery charge"),
         ("power_down_session", "Power Down — priority session"),
     ],
