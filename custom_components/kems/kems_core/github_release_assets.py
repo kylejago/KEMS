@@ -14,7 +14,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import re
-from collections.abc import Mapping
+from collections.abc import Awaitable, Callable, Mapping
 from datetime import UTC, datetime
 from email.utils import parsedate_to_datetime
 from math import isfinite
@@ -142,3 +142,32 @@ async def download_release_asset(
         if hashlib.sha256(payload).hexdigest().lower() != matched[1].lower():
             raise ValueError("GitHub release asset digest disagrees with bytes")
     return payload
+
+
+async def download_release_asset_pair(
+    downloader: Callable[[Mapping[str, Any]], Awaitable[bytes]],
+    manifest_asset: Mapping[str, Any],
+    checksum_asset: Mapping[str, Any],
+) -> tuple[bytes, bytes]:
+    """Fetch the release bundle and checksum concurrently, without orphaned work.
+
+    Ordinary asyncio.gather propagates one failed request while leaving the
+    sibling request running. A failed release check must not leave an asset
+    request retrying after the updater has already recorded the failure.
+    Keep the existing per-asset retry, digest, media-type and size gates.
+    """
+    tasks = (
+        asyncio.create_task(downloader(manifest_asset)),
+        asyncio.create_task(downloader(checksum_asset)),
+    )
+    try:
+        manifest_bytes, checksum_bytes = await asyncio.gather(*tasks)
+    except BaseException:
+        # Also clean up on cancellation of the parent update check. Consume
+        # both task results to avoid unobserved background transport failures.
+        for task in tasks:
+            if not task.done():
+                task.cancel()
+        await asyncio.gather(*tasks, return_exceptions=True)
+        raise
+    return manifest_bytes, checksum_bytes
