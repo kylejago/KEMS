@@ -33,6 +33,7 @@ from typing import Any
 from . import agile_deadline_guard, agile_rolling_planning
 from . import agile_smart_export as agile
 from .kems_core import SimulationConfig
+from .kems_core.agile_live_reserve import total_discharge_deadline_goal_soc_percent
 from .kems_core.discharge_slot_ledger import (
     allocate_total_discharge_slots,
     required_total_discharge_kwh,
@@ -255,10 +256,21 @@ def _apply_total_discharge_ledger(
     if soc is None or target is None or deadline <= now.astimezone(UTC):
         return plan
 
+    physical_house_proof = plan.get("physical_house_budget_evidence")
+    house_goal = total_discharge_deadline_goal_soc_percent(
+        export_target_soc_percent=target,
+        forecast_minimum_precheap_soc_percent=_number(
+            plan.get("effective_precheap_target_soc_percent")
+        ),
+        separate_house_floor_proven=bool(
+            isinstance(physical_house_proof, dict)
+            and physical_house_proof.get("available")
+        ),
+    )
     required_total = required_total_discharge_kwh(
         battery_capacity_kwh=config.battery_capacity_kwh,
         soc_percent=soc,
-        target_soc_percent=target,
+        target_soc_percent=house_goal,
         discharge_efficiency=config.discharge_efficiency,
     )
     power_down_credit = min(_power_down_discharge_credit(plan), required_total)
@@ -381,6 +393,9 @@ def _apply_total_discharge_ledger(
             "required_average_discharge_kw": round(normal_required / hours, 3),
             "total_discharge_ledger_active": True,
             "total_discharge_required_kwh": required_total,
+            "total_discharge_deadline_target_soc_percent": round(house_goal, 3),
+            "deliberate_export_floor_soc_percent": round(target, 3),
+            "household_hard_floor_soc_percent": 10.0,
             "power_down_reserved_discharge_credit_kwh": round(power_down_credit, 3),
             "normal_agile_total_discharge_required_kwh": round(normal_required, 3),
             "remaining_total_discharge_capacity_kwh": (
