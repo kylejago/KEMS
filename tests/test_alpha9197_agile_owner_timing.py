@@ -14,6 +14,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from textwrap import indent
 from time import perf_counter, thread_time
+from types import SimpleNamespace
 
 import pytest
 
@@ -35,10 +36,47 @@ def _method(filename: str, class_name: str) -> str:
     return ast.unparse(method)
 
 
-class _Base:
+class _FakeStates:
+    def __init__(self):
+        self.current = {}
+        self.writes = []
+
+    def get(self, entity_id):
+        value = self.current.get(entity_id)
+        if value is None:
+            return None
+        return SimpleNamespace(state=value[0], attributes=value[1])
+
+    def async_set(self, entity_id, value, attributes):
+        # HA stores independent state snapshots, not references to mutable slots.
+        stored = (str(value), deepcopy(attributes))
+        self.current[entity_id] = stored
+        self.writes.append((entity_id, *stored))
+
+
+def _actual_set_mixin():
+    """Run the real KEMS _set method against an in-memory HA state machine."""
+    source = ast.parse((ROOT / "agile_smart_export.py").read_text("utf-8"))
+    cls = next(
+        node for node in source.body
+        if isinstance(node, ast.ClassDef) and node.name == "AgileSmartExportManager"
+    )
+    method = next(
+        node for node in cls.body
+        if isinstance(node, ast.FunctionDef) and node.name == "_set"
+    )
+    code = "from __future__ import annotations\\nclass RealSet:\\n"
+    code += indent(ast.unparse(method), "    ") + "\\n"
+    namespace = {"perf_counter": perf_counter}
+    exec(compile(code, "<production-agile-set>", "exec"), namespace)
+    return namespace["RealSet"]
+
+
+class _Base(_actual_set_mixin()):
     def __init__(self):
         self._state = {}
         self.published = []
+        self._hass = SimpleNamespace(states=_FakeStates())
         self._alpha850_live_solar_tracker = None
         self._alpha850_live_solar_dirty = False
 
@@ -50,6 +88,16 @@ class _Base:
         # A real KEMS _publish also *mutates* rolling/panel/flow state.
         state["publication_enrichment_round"] = len(self.published) + 1
         self.published.append(deepcopy(state))
+        self._set(
+            "sensor.test_agile_price",
+            state["simulated_import_rate"],
+            {"unit_of_measurement": "p/kWh"},
+        )
+        self._set(
+            "sensor.test_agile_enrichment_round",
+            len(self.published),
+            {"source": "live-agile"},
+        )
 
     async def _save_alpha850_live_solar_tracker(self):
         self._alpha850_live_solar_dirty = False
@@ -267,3 +315,83 @@ def test_diagnostics_are_bounded_and_do_not_change_control_or_publication():
         assert len(calls) == 1
         assert "_kems_defer_flow_live_update_publish" not in ast.unparse(update)
         assert "self.hass.services.async_call(" not in ast.unparse(update)
+
+
+
+def test_live_overlay_preserves_all_enrichment_but_suppresses_only_identical_writes():
+    """Real _set deduplicates stable values while publishing changed overlays."""
+    _, _, Solar = _production_classes()
+    manager = Solar()
+    first = _run(manager)
+    assert first["publication_enrichment_round"] == 3
+    assert len(manager.published) == 3
+    assert manager._kems_suppress_identical_base_publication is False
+    price = [
+        entry for entry in manager._hass.states.writes
+        if entry[0] == "sensor.test_agile_price"
+    ]
+    rounds = [
+        entry for entry in manager._hass.states.writes
+        if entry[0] == "sensor.test_agile_enrichment_round"
+    ]
+    assert [entry[1] for entry in price] == ["22.1"]
+    assert [entry[1] for entry in rounds] == ["1", "2", "3"]
+
+    # New tariff price, new time and changed intermediate overlay must all
+    # republish. No cross-scan memoisation, source freezing, or state skipping.
+    _run(
+        manager,
+        now=datetime(2026, 11, 12, 0, 0, tzinfo=UTC),
+        rate=37.0,
+        records=[{"house": 2.5, "new_receipt": True}],
+    )
+    assert len(manager.published) == 6
+    assert [entry[1] for entry in manager._hass.states.writes
+            if entry[0] == "sensor.test_agile_price"] == ["22.1", "37.0"]
+    assert [entry[1] for entry in manager._hass.states.writes
+            if entry[0] == "sensor.test_agile_enrichment_round"] == [
+                "1", "2", "3", "4", "5", "6"
+            ]
+    assert manager.published[-1]["records"][0]["new_receipt"] is True
+    assert manager.published[-1]["solar_elapsed"]["day"] == "2026-11-12"
+
+
+def test_standalone_direct_publish_keeps_preexisting_repeat_write_semantics():
+    """The new suppression is not global and cannot affect other publishers."""
+    _, _, Solar = _production_classes()
+    manager = Solar()
+    _run(manager)
+    manager._hass.states.writes.clear()
+    manager._publish(manager._state)
+    manager._publish(manager._state)
+    assert [
+        entry[0] for entry in manager._hass.states.writes
+        if entry[0] == "sensor.test_agile_price"
+    ] == ["sensor.test_agile_price", "sensor.test_agile_price"]
+    assert manager._kems_suppress_identical_base_publication is False
+
+
+def test_live_overlay_failure_restores_original_suppression_flag():
+    """An exception in HA publishing must not leak a flag into later scans."""
+    _, _, Solar = _production_classes()
+    manager = Solar()
+    original = manager._publish
+    attempts = 0
+
+    def fail_on_canonical(state):
+        nonlocal attempts
+        attempts += 1
+        if attempts == 2:
+            raise RuntimeError("HA state write failed")
+        return original(state)
+
+    manager._publish = fail_on_canonical
+    with pytest.raises(RuntimeError, match="HA state write failed"):
+        _run(manager)
+    assert len(manager.published) == 1
+    assert manager._kems_suppress_identical_base_publication is False
+
+    manager._publish = original
+    after = _run(manager)
+    assert after["publication_enrichment_round"] == 4
+    assert manager._kems_suppress_identical_base_publication is False
