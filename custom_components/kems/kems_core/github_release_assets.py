@@ -61,9 +61,7 @@ def _bounded_retry_after(header: Any) -> float:
                 raise ValueError("GitHub Retry-After date has no timezone")
             delay = (retry_at - datetime.now(timezone.utc)).total_seconds()
         except (TypeError, ValueError, OverflowError) as error:
-            raise ValueError(
-                "GitHub rate limit: defer to next update check"
-            ) from error
+            raise ValueError("GitHub rate limit: defer to next update check") from error
     # HTTP-date values that just passed may retry once; negative numeric
     # seconds, NaN/inf, or long waits defer without another request.
     if not isfinite(delay) or delay > 3 or (numeric and delay < 0):
