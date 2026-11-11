@@ -19,6 +19,7 @@ Power Down, cheap charging, midnight rollover, safety, or hardware writes.
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
+from time import perf_counter, thread_time
 from typing import Any
 
 from homeassistant.core import HomeAssistant
@@ -513,6 +514,8 @@ class LiveSolarSocContinuityAgileSmartExportManager(
             forecast_plan=forecast_plan,
             tariff=tariff,
         )
+        live_phase_started = perf_counter()
+        live_cpu_started = thread_time()
         tracker, changed = _advance_tracker(
             self._alpha850_live_solar_tracker,
             self._state,
@@ -522,9 +525,23 @@ class LiveSolarSocContinuityAgileSmartExportManager(
         self._alpha850_live_solar_dirty = self._alpha850_live_solar_dirty or changed
         _apply_elapsed_solar_accounting(self._state, tracker=tracker, now=now)
         _rebase_display_soc(self._state, now=now, config=config)
+        live_publish_started = perf_counter()
         self._publish(self._state)
+        live_published_at = perf_counter()
         if self._alpha850_live_solar_dirty:
             await self._save_alpha850_live_solar_tracker()
+        self._kems_solar_live_update_performance = {
+            "tracker_and_rebase_seconds": round(
+                live_publish_started - live_phase_started, 3
+            ),
+            "publication_seconds": round(live_published_at - live_publish_started, 3),
+            "persistence_seconds": round(perf_counter() - live_published_at, 3),
+            "post_super_seconds": round(perf_counter() - live_phase_started, 3),
+            "post_super_thread_cpu_seconds": round(
+                thread_time() - live_cpu_started, 3
+            ),
+            "publication_count": 1,
+        }
         return self.state
 
     def reconcile_current_day_settlements(
