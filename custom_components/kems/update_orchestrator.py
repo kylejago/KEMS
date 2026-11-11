@@ -27,7 +27,10 @@ from homeassistant.util import dt as dt_util
 
 from .const import DOMAIN
 from .entity import KEMSEntity
-from .kems_core.github_release_assets import download_release_asset
+from .kems_core.github_release_assets import (
+    download_release_asset,
+    download_release_asset_pair,
+)
 from .update_maintenance_guard import maintenance_energy_blockers
 from .versioning import version_is_newer, version_relation
 
@@ -398,9 +401,8 @@ class KEMSUpdateOrchestrator:
             except ValueError as error:
                 raise HomeAssistantError(str(error)) from error
 
-        manifest_bytes, checksum_bytes = await asyncio.gather(
-            download(manifest_asset),
-            download(checksum_asset),
+        manifest_bytes, checksum_bytes = await download_release_asset_pair(
+            download, manifest_asset, checksum_asset
         )
         expected = checksum_bytes.decode("utf-8", errors="replace").strip().split()[0]
         observed = hashlib.sha256(manifest_bytes).hexdigest()
