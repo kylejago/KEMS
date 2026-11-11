@@ -79,6 +79,42 @@ def _clarify_policy_action_labels(state: dict[str, Any]) -> dict[str, Any]:
     action = _house_bridge_action(target_soc, floor_soc)
     clarified_fields = 0
 
+    # A confirmed cheap-charge/Octoplus event route has higher precedence
+    # than any prior 15%-export/10%-house bridge. Earlier compatibility
+    # layers can retain a planning_target_reached flag across 23:30; that
+    # flag must not relabel live Force Charge as daytime house discharge.
+    routing = state.get("current_routing_snapshot")
+    if isinstance(routing, dict):
+        priority_mode = str(routing.get("dispatch_mode") or "")
+        priority_action = str(routing.get("routing_action") or "").strip()
+        if (
+            priority_mode
+            in {"cheap_charge", "happy_hour_charge", "power_down_session"}
+            and priority_action
+        ):
+            for key in ("current_action", "today_action"):
+                if state.get(key) != priority_action:
+                    state[key] = priority_action
+                    clarified_fields += 1
+            if rolling.get("dispatch_action") != priority_action:
+                rolling["dispatch_action"] = priority_action
+                clarified_fields += 1
+            state["rolling_export_plan"] = rolling
+            evidence = {
+                "active": True,
+                "clarified_fields": clarified_fields,
+                "planning_target_soc_percent": round(target_soc, 3),
+                "house_import_floor_soc_percent": round(floor_soc, 3),
+                "hard_safety_recovery_soc_percent": round(recovery_soc, 3),
+                "policy": "confirmed priority route preempts stale house bridge labels",
+                "source": "current_routing_snapshot.dispatch_mode",
+                "priority_dispatch_mode": priority_mode,
+                "reporting_only": True,
+                "hardware_writes": "blocked",
+            }
+            state["policy_action_observability"] = evidence
+            return evidence
+
     rolling_soc = _number(rolling.get("simulated_soc_percent"))
     rolling_house_kw = max(
         _number(rolling.get("current_house_battery_kw")) or 0.0,
