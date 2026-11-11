@@ -525,8 +525,18 @@ class LiveSolarSocContinuityAgileSmartExportManager(
         self._alpha850_live_solar_dirty = self._alpha850_live_solar_dirty or changed
         _apply_elapsed_solar_accounting(self._state, tracker=tracker, now=now)
         _rebase_display_soc(self._state, now=now, config=config)
+        # Keep the full state-mutating _publish chain, but avoid redundant
+        # HA writes for identical state+attributes within the live overlays.
+        # The existing base _set comparison still writes every changed value.
         live_publish_started = perf_counter()
-        self._publish(self._state)
+        previous_identical_guard = getattr(
+            self, "_kems_suppress_identical_base_publication", False
+        )
+        self._kems_suppress_identical_base_publication = True
+        try:
+            self._publish(self._state)
+        finally:
+            self._kems_suppress_identical_base_publication = previous_identical_guard
         live_published_at = perf_counter()
         if self._alpha850_live_solar_dirty:
             await self._save_alpha850_live_solar_tracker()
