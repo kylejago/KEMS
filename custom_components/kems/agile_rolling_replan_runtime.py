@@ -22,6 +22,7 @@ from .agile_physical_planning import (
     physical_planning_soc,
 )
 from .kems_core import SimulationConfig
+from .kems_core.agile_live_reserve import protected_precheap_house_stored_kwh
 from .tariff import TariffSettings
 
 SAFETY_HEADROOM_MINUTES = 30
@@ -241,9 +242,11 @@ def _rolling_plan(
 
     battery_kwh = capacity * min(max(soc, 0.0), 100.0) / 100.0
     target_kwh = capacity * target_soc / 100.0
-    protected_stored_kwh = min(
-        target_kwh + protected_house_ac / efficiency,
-        capacity,
+    protected_stored_kwh = protected_precheap_house_stored_kwh(
+        capacity_kwh=capacity,
+        export_target_soc_percent=target_soc,
+        protected_house_stored_kwh=protected_house_ac / efficiency,
+        separate_house_floor_proven=bool(physical_planning.get("available")),
     )
     arrival_reserve_soc = min(
         max(protected_stored_kwh / capacity * 100.0, target_soc),
@@ -373,6 +376,8 @@ def _rolling_plan(
         "replan_policy": "every KEMS coordinator scan",
         "target_soc_percent": round(target_soc, 1),
         "arrival_target_soc_percent": round(target_soc, 1),
+        "deliberate_export_floor_soc_percent": round(target_soc, 1),
+        "household_cheap_start_minimum_soc_percent": 10.0,
         "arrival_reserve_soc_percent": round(arrival_reserve_soc, 2),
         "arrival_reserve_margin_percent": round(arrival_reserve_soc - target_soc, 2),
         "arrival_reserve_policy": (
