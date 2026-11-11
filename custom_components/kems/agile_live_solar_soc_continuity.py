@@ -585,8 +585,7 @@ class LiveSolarSocContinuityAgileSmartExportManager(
             self._kems_agile_live_update_coalescing = {
                 "enabled": coalesce,
                 "flow_publication_deferred": bool(
-                    coalesce
-                    and getattr(self, "_kems_flow_live_update_deferred", False)
+                    coalesce and getattr(self, "_kems_flow_live_update_deferred", False)
                 ),
                 "canonical_publication_deferred": bool(
                     coalesce
@@ -595,12 +594,8 @@ class LiveSolarSocContinuityAgileSmartExportManager(
                 "final_publication_attempted": final_publication_attempted,
                 "fallback_published": fallback_published,
                 "super_wall_seconds": round(super_elapsed, 3),
-                "final_publication_wall_seconds": round(
-                    final_publication_elapsed, 3
-                ),
-                "live_update_wall_seconds": round(
-                    perf_counter() - phase_started, 3
-                ),
+                "final_publication_wall_seconds": round(final_publication_elapsed, 3),
+                "live_update_wall_seconds": round(perf_counter() - phase_started, 3),
                 "scope": "reporting_only_no_control_or_tariff_gate",
             }
             if coalesce:
