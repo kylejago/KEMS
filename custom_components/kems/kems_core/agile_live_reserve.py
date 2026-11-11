@@ -60,6 +60,63 @@ def _finite(value: Any) -> float | None:
     return number if isfinite(number) else None
 
 
+def protected_precheap_house_stored_kwh(
+    *,
+    capacity_kwh: float,
+    export_target_soc_percent: float,
+    protected_house_stored_kwh: float,
+    separate_house_floor_proven: bool,
+) -> float:
+    """Protect 15% for paid export and 10% for subsequent household service.
+
+    The house may consume the 15%-to-10% band after paid export stops.  Only a
+    verified physical house budget may release that band to price optimisation.
+    Otherwise retain the original conservative export target + house reserve.
+    """
+    capacity = _finite(capacity_kwh)
+    target = _finite(export_target_soc_percent)
+    house = _finite(protected_house_stored_kwh)
+    if (
+        capacity is None
+        or capacity <= 0
+        or target is None
+        or not 0.0 <= target <= 100.0
+        or house is None
+        or house < 0
+    ):
+        return max(capacity or 0.0, 0.0)
+    export_floor = capacity * max(_MIN_PLANNING_RESERVE_PERCENT, target) / 100.0
+    if not separate_house_floor_proven:
+        return min(export_floor + house, capacity)
+    household_floor = capacity * 0.10
+    return min(max(export_floor, household_floor + house), capacity)
+
+
+def total_discharge_deadline_goal_soc_percent(
+    *,
+    export_target_soc_percent: float,
+    forecast_minimum_precheap_soc_percent: float | None,
+    separate_house_floor_proven: bool,
+) -> float:
+    """Use 10% as the home discharge goal only with bounded physical proof.
+
+    A genuinely higher overnight-recharge/retention target remains authoritative.
+    This goal is for combined HOUSE + export discharge, never a paid-export
+    entitlement: the independent 15% export and physical house budget still cap
+    every real export command.
+    """
+    target = _finite(export_target_soc_percent)
+    if target is None or not 0.0 <= target <= 100.0:
+        return 100.0
+    target = max(target, _MIN_PLANNING_RESERVE_PERCENT)
+    forecast = _finite(forecast_minimum_precheap_soc_percent)
+    if forecast is not None and not 0.0 <= forecast <= 100.0:
+        return 100.0
+    if forecast is not None and forecast > target:
+        return forecast
+    return min(target, 10.0) if separate_house_floor_proven else target
+
+
 def allow_paid_agile_house_discharge_to_ten_percent(
     control: ControlState,
     snapshot: Snapshot,

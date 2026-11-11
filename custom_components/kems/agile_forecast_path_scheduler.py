@@ -21,6 +21,7 @@ from . import agile_deadline_guard, agile_rolling_planning
 from . import agile_smart_export as agile
 from . import agile_total_discharge_ledger as total_ledger
 from .kems_core import SimulationConfig
+from .kems_core.agile_live_reserve import total_discharge_deadline_goal_soc_percent
 from .kems_core.forecast_path_scheduler import allocate_forecast_path_exports
 from .tariff import TariffSettings
 
@@ -160,12 +161,19 @@ def _apply_forecast_path(
     soc = _number(plan.get("planning_soc_percent"))
     if soc is None:
         soc = _number(plan.get("simulated_soc_percent"))
-    target = _number(plan.get("target_soc_percent"))
+    export_target = _number(plan.get("target_soc_percent"))
     forecast_target = _number(plan.get("effective_precheap_target_soc_percent"))
-    if soc is None or target is None:
+    if soc is None or export_target is None:
         return plan
-    if forecast_target is not None:
-        target = max(target, forecast_target)
+    physical_house_proof = plan.get("physical_house_budget_evidence")
+    target = total_discharge_deadline_goal_soc_percent(
+        export_target_soc_percent=export_target,
+        forecast_minimum_precheap_soc_percent=forecast_target,
+        separate_house_floor_proven=bool(
+            isinstance(physical_house_proof, dict)
+            and physical_house_proof.get("available")
+        ),
+    )
 
     deadline = agile._next_cheap(now, tariff).astimezone(UTC)
     segments = deadline_runtime._capacity_segments(
@@ -212,6 +220,9 @@ def _apply_forecast_path(
                 "chronological stored-energy, solar-arrival and SOC constraints"
             ),
             "future_solar_borrowing": False,
+            "deliberate_export_floor_soc_percent": round(export_target, 3),
+            "household_hard_floor_soc_percent": 10.0,
+            "physical_export_cap_still_required": True,
             "house_first": True,
             "shared_inverter_capacity": True,
             "economic_export_floor_pence": round(

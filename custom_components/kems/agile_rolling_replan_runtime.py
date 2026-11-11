@@ -240,9 +240,19 @@ def _rolling_plan(
         }
 
     battery_kwh = capacity * min(max(soc, 0.0), 100.0) / 100.0
-    target_kwh = capacity * target_soc / 100.0
+    # Reserve the 15% deliberate-export floor independently from the 10%
+    # household floor. Never release the shared 15%-to-10% band without
+    # independently reconciled physical SOC; the later same-scan physical
+    # house budget remains the final authority on actual paid export.
+    export_floor_kwh = capacity * target_soc / 100.0
+    house_floor_kwh = capacity * 0.10
+    stored_house_forecast_kwh = protected_house_ac / efficiency
     protected_stored_kwh = min(
-        target_kwh + protected_house_ac / efficiency,
+        (
+            max(export_floor_kwh, house_floor_kwh + stored_house_forecast_kwh)
+            if physical_planning.get("available")
+            else export_floor_kwh + stored_house_forecast_kwh
+        ),
         capacity,
     )
     arrival_reserve_soc = min(
@@ -373,6 +383,8 @@ def _rolling_plan(
         "replan_policy": "every KEMS coordinator scan",
         "target_soc_percent": round(target_soc, 1),
         "arrival_target_soc_percent": round(target_soc, 1),
+        "deliberate_export_floor_soc_percent": round(target_soc, 1),
+        "household_cheap_start_minimum_soc_percent": 10.0,
         "arrival_reserve_soc_percent": round(arrival_reserve_soc, 2),
         "arrival_reserve_margin_percent": round(arrival_reserve_soc - target_soc, 2),
         "arrival_reserve_policy": (
