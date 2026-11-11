@@ -191,4 +191,7 @@ def test_both_agile_dashboard_views_name_export_and_house_floors_separately() ->
         assert "household_cheap_start_minimum_soc_percent" in dashboard
         assert "sensor.kems_projected_soc_at_cheap_period" in dashboard
         assert "estimate" in dashboard
+        assert "Export earnings evidence:" in dashboard
+        assert "supplier settlement" in dashboard
+        assert "Power Down" in dashboard
         assert "**Target SOC at cheap start:**" not in dashboard
