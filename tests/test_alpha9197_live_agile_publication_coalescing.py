@@ -200,8 +200,13 @@ def test_exception_fallback_restores_last_completed_reporting_stage(failure):
 
     assert len(legacy.published) >= 1
     assert len(optimized.published) == 1
-    # No lost flow/price/attribute publication on failure after its completion.
-    assert optimized.published[-1] == legacy.published[-1]
+    # Every previously published field survives. A partly completed later
+    # solar-only enrichment can add diagnostic fields, but must not delete or
+    # change the last complete flow, price, or controlled attributes.
+    assert all(
+        optimized.published[-1].get(key) == value
+        for key, value in legacy.published[-1].items()
+    )
     assert optimized._kems_agile_live_update_coalescing["fallback_published"]
     assert not optimized._kems_agile_live_update_coalescing[
         "final_publication_attempted"
