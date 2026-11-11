@@ -19,6 +19,7 @@ Power Down, cheap charging, midnight rollover, safety, or hardware writes.
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
+from time import perf_counter
 from typing import Any
 
 from homeassistant.core import HomeAssistant
@@ -504,28 +505,107 @@ class LiveSolarSocContinuityAgileSmartExportManager(
         forecast_plan: ForecastPlanState,
         tariff: TariffSettings,
     ) -> dict[str, Any]:
-        await super().async_update(
-            records=records,
-            now=now,
-            config=config,
-            learned=learned,
-            forecast=forecast,
-            forecast_plan=forecast_plan,
-            tariff=tariff,
+        """Publish the finished live flow/SOC once; retain exception fallback.
+
+        FlowPresentation and CanonicalFlowAccounting still calculate in exactly
+        their original order. Their intermediate HA writes are unnecessary only
+        when this outer owner guarantees a same-scan final publication without
+        another await between the intermediate computations and that publish.
+        A standalone inner manager is never deferred.
+        """
+        coalesce = (
+            getattr(self, "_kems_coalesce_live_update_publications", True) is not False
         )
-        tracker, changed = _advance_tracker(
-            self._alpha850_live_solar_tracker,
-            self._state,
-            now=now,
+        prior_flow = getattr(self, "_kems_defer_flow_live_update_publish", False)
+        prior_canonical = getattr(
+            self, "_kems_defer_canonical_live_update_publish", False
         )
-        self._alpha850_live_solar_tracker = tracker
-        self._alpha850_live_solar_dirty = self._alpha850_live_solar_dirty or changed
-        _apply_elapsed_solar_accounting(self._state, tracker=tracker, now=now)
-        _rebase_display_soc(self._state, now=now, config=config)
-        self._publish(self._state)
-        if self._alpha850_live_solar_dirty:
-            await self._save_alpha850_live_solar_tracker()
-        return self.state
+        if coalesce:
+            self._kems_defer_flow_live_update_publish = True
+            self._kems_defer_canonical_live_update_publish = True
+            self._kems_flow_live_update_deferred = False
+            self._kems_canonical_live_update_deferred = False
+        phase_started = perf_counter()
+        super_elapsed = 0.0
+        final_publication_elapsed = 0.0
+        final_publication_attempted = False
+        fallback_published = False
+        try:
+            await super().async_update(
+                records=records,
+                now=now,
+                config=config,
+                learned=learned,
+                forecast=forecast,
+                forecast_plan=forecast_plan,
+                tariff=tariff,
+            )
+            super_elapsed = perf_counter() - phase_started
+            tracker, changed = _advance_tracker(
+                self._alpha850_live_solar_tracker,
+                self._state,
+                now=now,
+            )
+            self._alpha850_live_solar_tracker = tracker
+            self._alpha850_live_solar_dirty = self._alpha850_live_solar_dirty or changed
+            _apply_elapsed_solar_accounting(self._state, tracker=tracker, now=now)
+            _rebase_display_soc(self._state, now=now, config=config)
+            # No await occurred after the completed Canonical/Flow enrichments.
+            # Preserve exactly the final publication content and ordering.
+            pub_started = perf_counter()
+            final_publication_attempted = True
+            try:
+                self._publish(self._state)
+            finally:
+                final_publication_elapsed = perf_counter() - pub_started
+            if self._alpha850_live_solar_dirty:
+                await self._save_alpha850_live_solar_tracker()
+            return self.state
+        except Exception:
+            # Previously, an inner layer had already published before a later
+            # reporting-only enrichment could fail. Preserve that fallback on
+            # errors *before* the final publication, without masking the error.
+            if (
+                coalesce
+                and not final_publication_attempted
+                and (
+                    getattr(self, "_kems_flow_live_update_deferred", False)
+                    or getattr(self, "_kems_canonical_live_update_deferred", False)
+                )
+            ):
+                try:
+                    self._publish(self._state)
+                    fallback_published = True
+                except Exception:
+                    pass
+            raise
+        finally:
+            self._kems_defer_flow_live_update_publish = prior_flow
+            self._kems_defer_canonical_live_update_publish = prior_canonical
+            self._kems_agile_live_update_coalescing = {
+                "enabled": coalesce,
+                "flow_publication_deferred": bool(
+                    coalesce
+                    and getattr(self, "_kems_flow_live_update_deferred", False)
+                ),
+                "canonical_publication_deferred": bool(
+                    coalesce
+                    and getattr(self, "_kems_canonical_live_update_deferred", False)
+                ),
+                "final_publication_attempted": final_publication_attempted,
+                "fallback_published": fallback_published,
+                "super_wall_seconds": round(super_elapsed, 3),
+                "final_publication_wall_seconds": round(
+                    final_publication_elapsed, 3
+                ),
+                "live_update_wall_seconds": round(
+                    perf_counter() - phase_started, 3
+                ),
+                "scope": "reporting_only_no_control_or_tariff_gate",
+            }
+            if coalesce:
+                self._kems_flow_live_update_deferred = False
+                self._kems_canonical_live_update_deferred = False
 
     def reconcile_current_day_settlements(
         self,
