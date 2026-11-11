@@ -165,7 +165,7 @@ def test_runtime_keeps_two_distinct_targets_and_final_guard() -> None:
     floor = (ROOT / "agile_safety_floor.py").read_text()
     physical = (ROOT / "kems_core" / "agile_live_reserve.py").read_text()
 
-    assert "protected_precheap_house_stored_kwh(" in rolling
+    assert "max(export_floor_kwh, house_floor_kwh + stored_house_forecast_kwh)" in rolling
     assert '"household_cheap_start_minimum_soc_percent": 10.0' in rolling
     assert "total_discharge_deadline_goal_soc_percent(" in ledger
     assert '"deliberate_export_floor_soc_percent": round(target, 3)' in ledger
@@ -180,15 +180,12 @@ def test_runtime_keeps_two_distinct_targets_and_final_guard() -> None:
     assert "_enforce_cheap_boundary(state, deadline)" in ledger
 
 
-def test_both_agile_dashboard_views_name_export_and_house_floors_separately() -> None:
-    legacy = (ROOT / "dashboard_alpha740_agile_primary.py").read_text()
-    focused = (ROOT / "agile_operator_dashboard_runtime.py").read_text()
-    for dashboard in (legacy, focused):
-        assert "**Deliberate-export minimum SOC:**" in dashboard
-        assert "household_cheap_start_minimum_soc_percent" in dashboard
-        assert "sensor.kems_projected_soc_at_cheap_period" in dashboard
-        assert "estimate" in dashboard
-        assert "Export earnings evidence:" in dashboard
-        assert "supplier settlement" in dashboard
-        assert "Power Down" in dashboard
-        assert "**Target SOC at cheap start:**" not in dashboard
+def test_active_managed_home_dashboard_explains_separate_floors_and_evidence() -> None:
+    dashboard = (ROOT / "kems_master_dashboard.yaml").read_text()
+    assert "**Deliberate-export minimum:** 15%" in dashboard
+    assert "**Household-only hard floor:** 10%" in dashboard
+    assert "sensor.kems_projected_soc_at_cheap_period" in dashboard
+    assert "model estimate, not the household minimum" in dashboard
+    assert "Export earnings shown by KEMS are tariff-valued estimates" in dashboard
+    assert "Power Down grid-export energy is already included" in dashboard
+    assert "additional Power Down bonus requires separate evidence" in dashboard
