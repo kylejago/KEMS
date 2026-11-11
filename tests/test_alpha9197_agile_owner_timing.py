@@ -200,7 +200,9 @@ def test_standalone_managers_keep_original_publish_order():
     assert manager.published[-1]["publication_enrichment_round"] == 2
 
 
-@pytest.mark.parametrize("failure,expected_passes", [("fail_canonical", 1), ("fail_solar", 2)])
+@pytest.mark.parametrize(
+    "failure,expected_passes", [("fail_canonical", 1), ("fail_solar", 2)]
+)
 def test_failed_overlay_keeps_earlier_synchronous_publications(
     failure, expected_passes
 ):
@@ -235,8 +237,14 @@ def test_diagnostics_are_bounded_and_do_not_change_control_or_publication():
     assert '"agile_manager_wrapper_seconds"' in coordinator
     for path, owner in (
         ("agile_flow_presentation.py", "FlowPresentationAgileSmartExportManager"),
-        ("agile_canonical_flow_accounting.py", "CanonicalFlowAccountingAgileSmartExportManager"),
-        ("agile_live_solar_soc_continuity.py", "LiveSolarSocContinuityAgileSmartExportManager"),
+        (
+            "agile_canonical_flow_accounting.py",
+            "CanonicalFlowAccountingAgileSmartExportManager",
+        ),
+        (
+            "agile_live_solar_soc_continuity.py",
+            "LiveSolarSocContinuityAgileSmartExportManager",
+        ),
     ):
         source = ast.parse((ROOT / path).read_text(encoding="utf-8"))
         cls = next(
@@ -247,8 +255,7 @@ def test_diagnostics_are_bounded_and_do_not_change_control_or_publication():
         update = next(
             item
             for item in cls.body
-            if isinstance(item, ast.AsyncFunctionDef)
-            and item.name == "async_update"
+            if isinstance(item, ast.AsyncFunctionDef) and item.name == "async_update"
         )
         calls = [
             item
