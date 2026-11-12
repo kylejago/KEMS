@@ -86,7 +86,7 @@ def build_reward_audit(
     }
     rows = []
     saved_windows = set()
-    counted_happy = counted_power = unsettled = provisional = metered = 0.0
+    counted_happy = counted_power = unsettled = provisional = metered = awarded = 0.0
 
     for key, receipt in happy_hours.items():
         if not isinstance(receipt, dict):
@@ -157,8 +157,10 @@ def build_reward_audit(
         included = eligible(day) and amount is not None
         if included:
             counted_power += amount
-            metered += amount
-            if receipt.get("supplier_settled") is not True:
+            if receipt.get("supplier_settled") is True:
+                awarded += amount
+            else:
+                metered += amount
                 unsettled += amount
         rows.append(
             _entry(
@@ -170,6 +172,7 @@ def build_reward_audit(
                 receipt.get("supplier_settled"),
                 included,
                 event_id=str(key),
+                awarded_octopoints=receipt.get("awarded_octopoints"),
                 start=(
                     _get(event, "session_start").isoformat()
                     if isinstance(_get(event, "session_start"), datetime)
@@ -188,7 +191,11 @@ def build_reward_audit(
                 ),
                 agile_export_income_already_counted=True,
                 reward_evidence_status=_get(event, "reward_evidence_status"),
-                status="included_modelled_bonus" if included else "excluded_from_roi",
+                status=(
+                    "included_supplier_awarded_octopoints"
+                    if included and receipt.get("supplier_settled") is True
+                    else "included_modelled_bonus" if included else "excluded_from_roi"
+                ),
             )
         )
 
@@ -277,7 +284,10 @@ def build_reward_audit(
         "schema_version": 2,
         "historical_coverage": historical_coverage,
         "reporting_only": True,
-        "supplier_settlement_available": False,
+        "supplier_settlement_available": awarded > 0.0,
+        "supplier_awarded_power_down_pence": round(awarded, 6),
+        "supplier_settled_pence": round(awarded, 6),
+        "included_estimate_pence": round(counted_happy + counted_power - awarded, 6),
         "included_happy_hour_pence": round(counted_happy, 6),
         "included_power_down_pence": round(counted_power, 6),
         "included_total_pence": round(counted_happy + counted_power, 6),
@@ -293,6 +303,8 @@ def build_reward_audit(
             "credits cover only witnessed meter intervals. Missing periods "
             "are never interpolated. Power Down Agile earnings "
             "are displayed for context but never added to ROI twice. "
-            "Octopus settlement is unconfirmed."
+            "Octopus awards are marked supplier-awarded only when the "
+            "matched joined event explicitly exposes awarded Octopoints; "
+            "remaining event bonuses are provisional or unknown."
         ),
     }
