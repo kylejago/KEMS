@@ -62,11 +62,7 @@ def _recorder():
 
 
 def _observe(recorder, events, joined=()):
-    asyncio.run(
-        recorder.async_observe(
-            [], events, supplier_power_down_events=joined
-        )
-    )
+    asyncio.run(recorder.async_observe([], events, supplier_power_down_events=joined))
 
 
 def test_awarded_points_replace_model_estimate_and_count_once() -> None:
