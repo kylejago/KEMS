@@ -209,6 +209,7 @@ def _apply_forecast_path(
         minimum_export_rate_pence=max(float(tariff.offpeak_rate_pence), 0.0),
         safety_headroom_kwh=safety_headroom,
         excluded_windows=total_ledger._power_down_windows(plan),
+        deliberate_export_floor_soc_percent=export_target,
     )
     evidence = path.to_dict()
     evidence.update(
@@ -217,7 +218,7 @@ def _apply_forecast_path(
             "confidence_percent": round(confidence, 1),
             "selection_basis": (
                 "highest Agile prices first, with every candidate replayed through "
-                "chronological stored-energy, solar-arrival and SOC constraints"
+                "chronological solar arrival, 15% export and 10% house-only SOC floors"
             ),
             "future_solar_borrowing": False,
             "deliberate_export_floor_soc_percent": round(export_target, 3),
