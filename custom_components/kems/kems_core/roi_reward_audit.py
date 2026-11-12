@@ -286,6 +286,8 @@ def build_reward_audit(
         "reporting_only": True,
         "supplier_settlement_available": awarded > 0.0,
         "supplier_awarded_power_down_pence": round(awarded, 6),
+        "supplier_settled_pence": round(awarded, 6),
+        "included_estimate_pence": round(counted_happy + counted_power - awarded, 6),
         "included_happy_hour_pence": round(counted_happy, 6),
         "included_power_down_pence": round(counted_power, 6),
         "included_total_pence": round(counted_happy + counted_power, 6),
