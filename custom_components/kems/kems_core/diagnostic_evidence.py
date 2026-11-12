@@ -301,7 +301,10 @@ def reward_settlement_evidence(audit: Mapping[str, Any]) -> dict[str, Any]:
     settled = audit.get("supplier_settlement_available") is True
     return {
         "status": "supplier_verified" if settled else "estimates_awaiting_supplier",
-        "roi_included_estimate_pence": _finite(audit.get("included_total_pence")),
+        "roi_included_estimate_pence": _finite(
+            audit.get("included_estimate_pence", audit.get("included_total_pence"))
+        ),
+        "roi_included_total_pence": _finite(audit.get("included_total_pence")),
         "provisional_partial_pence": _finite(audit.get("provisional_partial_pence")),
         "meter_supported_estimate_pence": _finite(
             audit.get("meter_supported_estimate_pence")
@@ -312,7 +315,9 @@ def reward_settlement_evidence(audit: Mapping[str, Any]) -> dict[str, Any]:
         "note": (
             "Meter-supported means physically evidenced, not paid or accepted "
             "by Octopus. Provisional credits are incomplete-window estimates; "
-            "normal Agile export is not an additional Power Down bonus."
+            "normal Agile export is not an additional Power Down bonus. "
+            "Matched awarded Octopoints are recorded separately at their "
+            "£1 per 800 points equivalent; award does not prove cash redemption."
         ),
         "reporting_only": True,
     }
