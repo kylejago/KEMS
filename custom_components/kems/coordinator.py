@@ -1715,9 +1715,25 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                 )
                 self._historical_reward_backfill_key = historical_credit_key
             historical_estimates = getattr(self, "_historical_reward_credit_cache", [])
+            # Read the configured Octopus Power Down event's already-published
+            # joined history; no extra API calls, event joins or hardware writes.
+            supplier_event_id = self.entities.saving_session_events
+            supplier_event_state = (
+                self.hass.states.get(supplier_event_id) if supplier_event_id else None
+            )
+            supplier_joined_events = (
+                supplier_event_state.attributes.get("joined_events", ())
+                if supplier_event_state is not None
+                else ()
+            )
             await self._roi_rewards.async_observe(
                 verified_happy_hour_receipts,
                 list(completed_power_downs),
+                supplier_power_down_events=(
+                    supplier_joined_events
+                    if isinstance(supplier_joined_events, (list, tuple))
+                    else ()
+                ),
                 provisional_happy_hours=[
                     *historical_estimates,
                     *provisional_happy_hours,
