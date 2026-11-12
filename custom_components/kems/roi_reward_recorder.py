@@ -49,6 +49,7 @@ class ROIRewardRecorder:
         *,
         provisional_happy_hours=(),
         historical_bookings=(),
+        supplier_power_down_events=(),
     ) -> None:
         changed = False
         for item in historical_bookings:
@@ -204,8 +205,69 @@ class ROIRewardRecorder:
                 "basis": "meter_supported_modelled_power_down_bonus",
             }
             key = str(event.session_id)
+            # The supplier's later awarded points replace this estimate.
+            # Repeated scans must never downgrade a settled award.
+            if self._power_downs.get(key, {}).get("supplier_settled") is True:
+                continue
             if self._power_downs.get(key) != saved:
                 self._power_downs[key] = saved
+                changed = True
+
+        # Joined Octopus Power Down events can retain a later supplier award.
+        # Match immutable event identity AND event window against KEMS'
+        # completed physical session; never turn a pending/absent award into 0.
+        known_events = {
+            str(event.session_id): event
+            for event in events
+            if event is not None and getattr(event, "session_id", None)
+        }
+        for item in supplier_power_down_events:
+            if not isinstance(item, dict):
+                continue
+            event_id = str(item.get("id") or "")
+            event = known_events.get(event_id)
+            if (
+                event is None
+                or getattr(event, "completed_successfully", None) is not True
+                or getattr(event, "physical_export_verified", None) is not True
+            ):
+                continue
+            points = item.get("rewarded_octopoints")
+            if (
+                not isinstance(points, int)
+                or isinstance(points, bool)
+                or not 0 < points <= 2_000_000
+            ):
+                continue
+            try:
+                joined_start = datetime.fromisoformat(str(item.get("start")))
+                joined_end = datetime.fromisoformat(str(item.get("end")))
+            except (ValueError, TypeError):
+                continue
+            event_start = getattr(event, "session_start", None)
+            event_end = getattr(event, "session_end", None)
+            if (
+                joined_start.tzinfo is None
+                or joined_end.tzinfo is None
+                or not isinstance(event_start, datetime)
+                or not isinstance(event_end, datetime)
+                or event_start.tzinfo is None
+                or event_end.tzinfo is None
+                or joined_start != event_start
+                or joined_end != event_end
+                or date_of(event_end) is None
+            ):
+                continue
+            # Octopus publishes 800 points = £1 = 100 pence.
+            saved = {
+                "day": date_of(event_end),
+                "pence": round(points / 8.0, 6),
+                "supplier_settled": True,
+                "basis": "supplier_awarded_octopoints",
+                "awarded_octopoints": points,
+            }
+            if self._power_downs.get(event_id) != saved:
+                self._power_downs[event_id] = saved
                 changed = True
 
         if changed:
