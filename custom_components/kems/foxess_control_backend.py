@@ -303,7 +303,6 @@ def _paid_agile_contaminated_baseline_verified(
     return len(selected_devices) == 1
 
 
-
 def _paid_agile_owned_stage_baseline_verified(
     entities: dict[str, Any],
     *,

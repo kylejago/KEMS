@@ -166,7 +166,7 @@ def test_existing_historic_recovery_preserved_and_new_path_agile_only() -> None:
         "not bool(control.island_mode_active)",
     ):
         assert gate in control
-    assert "self._previous_work_mode = \"Self Use\"" in control
+    assert 'self._previous_work_mode = "Self Use"' in control
     assert "self._previous_min_soc_on_grid = 10.0" in control
     assert "await self._async_save()" in control
     assert "_paid_agile_owned_stage_baseline_verified" not in (
