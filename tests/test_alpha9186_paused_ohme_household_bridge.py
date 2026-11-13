@@ -446,5 +446,5 @@ def test_release_metadata_pin():
     bundle = json.loads(
         (ROOT / "release" / "kems-bundle.template.json").read_text(encoding="utf-8")
     )
-    assert manifest["version"] == "0.9.0-alpha9.202"
-    assert bundle["maintenance"]["reason"].startswith("Alpha9.202:")
+    assert manifest["version"] == "0.9.0-alpha9.203"
+    assert bundle["maintenance"]["reason"].startswith("Alpha9.203:")
