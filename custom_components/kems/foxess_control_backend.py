@@ -303,6 +303,98 @@ def _paid_agile_contaminated_baseline_verified(
     return len(selected_devices) == 1
 
 
+def _paid_agile_owned_stage_baseline_verified(
+    entities: dict[str, Any],
+    *,
+    original_mode: str | None,
+    original_min_soc: float | None,
+    original_discharge_power: float | None,
+    original_export_limit_w: float | None,
+    last_action: str | None,
+    minimum_min_soc: float | None,
+    normal_export_reserve: float | None,
+    ev_connected: bool | None,
+    ev_charging: bool | None,
+    ev_power_kw: float | None,
+) -> bool:
+    """Match only the separate 13 November KEMS-owned staged-export signature.
+
+    A previous Feed-in First/15%/1 kW/7 kW snapshot can be captured while
+    KEMS is already controlling the KH7. Recovery is *metadata only* and
+    accepts the current independently checked Self Use/10%/7 kW rollback
+    state. Missing or contradictory proof must leave paid Agile blocked.
+    This predicate does not itself grant export/write authority.
+    """
+    originals = (
+        original_min_soc,
+        original_discharge_power,
+        original_export_limit_w,
+        minimum_min_soc,
+        normal_export_reserve,
+        ev_power_kw,
+    )
+    if any(value is None or not isfinite(value) for value in originals):
+        return False
+    if (
+        original_mode != "Feed-in First"
+        or abs(original_min_soc - 15.0) > 0.05
+        or abs(original_discharge_power - 0.997) > 0.01
+        or abs(original_export_limit_w - 7000.0) > 1.0
+        or last_action != "self_use"
+        or abs(minimum_min_soc - 10.0) > 0.05
+        or abs(normal_export_reserve - 15.0) > 0.05
+        or ev_connected is not False
+        or ev_charging is not False
+        or not 0.0 <= ev_power_kw <= 0.1
+    ):
+        return False
+
+    expected = {
+        "work_mode": ("Self Use", None, "command_entity"),
+        "min_soc_on_grid": (10.0, 0.05, "sensor_readback"),
+        "force_discharge_power": (
+            original_discharge_power,
+            0.01,
+            "command_entity",
+        ),
+        "export_power_limit": (7000.0, 1.0, "sensor_readback"),
+    }
+    devices: set[str] = set()
+    for key, (value, tolerance, required_source) in expected.items():
+        item = entities.get(key)
+        if not isinstance(item, dict) or item.get("status") != "PASS":
+            return False
+        device = item.get("device_id")
+        if not isinstance(device, str) or not device:
+            return False
+        devices.add(device)
+        if item.get("observation_source") != required_source:
+            return False
+        observed = item.get("normalised_observation")
+        if tolerance is None:
+            if observed != value:
+                return False
+        else:
+            number = _number(observed)
+            if (
+                number is None
+                or not isfinite(number)
+                or abs(number - value) > tolerance
+            ):
+                return False
+    return len(devices) == 1
+
+
+def _paid_agile_verified_owned_baseline_recovery(
+    entities: dict[str, Any],
+    **evidence: Any,
+) -> bool:
+    """Only the two separately corroborated historical signatures may repair."""
+    return _paid_agile_contaminated_baseline_verified(
+        entities, **evidence
+    ) or _paid_agile_owned_stage_baseline_verified(entities, **evidence)
+
+
 def _idle_pending_restore_safe(
     *,
     pending: bool,
@@ -1234,10 +1326,12 @@ class FoxESSControlBackend:
                 and control.operating_mode == "control"
                 and bool(coordinator.settings.control.control_enabled)
                 and bool(coordinator.settings.control.commissioned)
+                and bool(control.data_fresh)
+                and bool(control.plan_safe)
                 and not bool(coordinator.settings.control.emergency_stop)
                 and bool(control.grid_available)
                 and not bool(control.island_mode_active)
-                and _paid_agile_contaminated_baseline_verified(
+                and _paid_agile_verified_owned_baseline_recovery(
                     entities,
                     original_mode=self._previous_work_mode,
                     original_min_soc=self._previous_min_soc_on_grid,
