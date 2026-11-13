@@ -72,9 +72,7 @@ def compact_roi_reward_audit(audit: Mapping[str, Any]) -> dict[str, Any]:
     except (TypeError, ValueError):
         upstream_omitted = 0
 
-    attrs["entries_omitted"] = upstream_omitted + len(all_rows) - len(
-        attrs["entries"]
-    )
+    attrs["entries_omitted"] = upstream_omitted + len(all_rows) - len(attrs["entries"])
     attrs["full_entries_in_diagnostics"] = True
     attrs["event_details_source"] = "KEMS diagnostics: roi_reward_audit.entries"
 
