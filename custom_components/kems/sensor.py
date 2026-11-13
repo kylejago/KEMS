@@ -44,6 +44,7 @@ from .const import (
 from .entity import KEMSEntity
 from .kems_core import FOXHOLE_PROPOSAL_PROFILE, KEMSData
 from .kems_core.ev_soc_presentation import displayed_ev_soc
+from .kems_core.roi_reward_sensor_attributes import compact_roi_reward_audit
 from .solar_routing_shadow import _physical_solar_flow
 from .update_orchestrator import build_update_sensor_entities
 
@@ -2018,7 +2019,7 @@ SENSORS: tuple[KEMSSensorEntityDescription, ...] = (
         name="ROI reward audit",
         icon="mdi:clipboard-text-clock-outline",
         value_fn=lambda data: data.roi.reward_audit.get("included_count", 0),
-        attributes_fn=lambda data: data.roi.reward_audit,
+        attributes_fn=lambda data: compact_roi_reward_audit(data.roi.reward_audit),
     ),
     KEMSSensorEntityDescription(
         key="actual_roi_percentage",

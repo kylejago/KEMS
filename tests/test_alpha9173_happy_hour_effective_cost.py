@@ -179,4 +179,4 @@ def test_dashboard_and_bill_views_use_shared_effective_cost_without_repricing() 
     assert "live.get('total_energy_effective_cost_pence')" in presentation
     assert "happy_hour_accounting_audit" in diagnostics
     assert "sensor.kems_happy_hour_estimated_import_credit_today')" not in dash
-    assert "0.9.0-alpha9.201" in (KEMS_ROOT / "manifest.json").read_text()
+    assert "0.9.0-alpha9.202" in (KEMS_ROOT / "manifest.json").read_text()
