@@ -131,7 +131,7 @@ def test_final_managed_compare_matches_home_after_legacy_rewriter() -> None:
     assert "£-2.20" in rendered_table
     assert "Est. Happy Hour refund (pending)" in rendered_table
     assert "£3.74" not in rendered_table
-    assert "Live system value vs no system: £13.12" in rendered_table
+    assert "**Live system value vs no system:** £13.12" in rendered_table
     assert "Measured property data after estimated" in final
 
 
