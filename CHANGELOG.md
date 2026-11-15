@@ -1,3 +1,10 @@
+## 0.9.0-alpha9.204 — Happy Hour physical-flow truth and 15% label clarity
+
+- **Completed Happy Hour display:** When a booked half-hour has independently observed grid import but source readings fail the conservative energy-balance check, publish only the proven import and mark battery/solar routing **UNVERIFIED** instead of displaying stale simulated battery discharge. Missing physical meter coverage also fails closed; never interpolate absent readings or alter credit receipts/ROI.
+- **Agile status clarity:** Explicit verified physical `planning_target_reached = false` now prevents a low digital-twin SOC from incorrectly claiming the 15% deliberate-export target was reached. This corrects human-facing labels only, not dispatch modes or decision authority.
+- **Proven overnight protection:** User confirmed the household switched to grid import and battery held at 10% during the 14–15 November physical cutoff test. The 15% deliberate-export / 10% house hard floor / 12% recovery policy is unchanged.
+- **Scope:** No changes to FoxESS/Ohme/Octopus writes, power controls, supplier settlements, EV isolation, DNO 7 kW cap, Power Down ROI, full underlying history or 06:00–06:30 safe-first update window. Validation and post-install Happy Hour display verification required.
+
 ## 0.9.0-alpha9.188 — Verified 15% paid-export / 10% household handover
 
 - **Two separate limits:** Paid battery export remains planned and physically protected at **15% SOC**, including the forecast household reserve until the next cheap period. Only normal household Self Use may use the battery down to **10%**, and only with a confirmed unplugged vehicle or independently verified Ohme pause.

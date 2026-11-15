@@ -115,14 +115,25 @@ def test_no_past_half_hour_is_inferred_from_missing_meter_evidence():
     assert report["completed_slots_with_physical_flow"] < 2
 
 
-def test_disagreeing_physical_power_balance_leaves_replay_unchanged():
+def test_disagreeing_physical_power_balance_masks_simulated_discharge():
     data = _case()
     for record in data["physical_history"]:
         record.battery_power_kw = 0.0
     original = deepcopy(data["state"])
     report = _load()(**data)
     assert report["energy_balance_failed_slots"] == 2
-    assert data["state"] == original
+    assert report["partial_meter_import_slots"] == 2
+    for previous, slot in zip(
+        original["today_slots"], data["state"]["today_slots"], strict=True
+    ):
+        assert slot["flow_grid_import_kwh"] == 3.0
+        assert slot["flow_grid_action"] == "IMPORT"
+        assert slot["flow_battery_action"] == "UNVERIFIED"
+        assert slot["flow_battery_to_home_kwh"] is None
+        assert slot["flow_estimated_soc_percent"] is None
+        assert slot["flow_happy_hour_unreconciled"] is True
+        assert slot["battery_to_home_kwh"] == previous["battery_to_home_kwh"]
+        assert slot.get("grid_import_kwh") == previous.get("grid_import_kwh")
 
 
 def test_current_reward_half_hour_not_overwritten():
@@ -131,3 +142,56 @@ def test_current_reward_half_hour_not_overwritten():
     report = _load()(**data)
     assert report["completed_slots_with_physical_flow"] == 0
     assert data["state"]["today_slots"][0]["flow_battery_action"] == "HOME"
+
+
+def test_two_hour_completed_reward_has_one_unreconciled_half_hour_without_false_home():
+    data = _case()
+    start = START
+    # Reproduce the 15 Nov 07:00 gap: one physical balance is not
+    # trustworthy while physical import is independently covered.
+    data["state"]["today_slots"] = [
+        {
+            "valid_from": (start + timedelta(minutes=30 * i)).isoformat(),
+            "valid_to": (start + timedelta(minutes=30 * (i + 1))).isoformat(),
+            "battery_to_home_kwh": 0.7,
+            "flow_battery_action": "HOME",
+            "flow_grid_import_kwh": 0.0,
+        }
+        for i in range(4)
+    ]
+    data["completed_booked_hours"].append(
+        {
+            "start": (start + timedelta(hours=1)).isoformat(),
+            "end": (start + timedelta(hours=2)).isoformat(),
+            "event_id": "second-booked-hour",
+            "booking_source": "octopus_joined_events",
+        }
+    )
+    data["meter_samples"] = []
+    data["physical_history"] = []
+    for i in range(-1, 26):
+        at = start + timedelta(minutes=5 * i)
+        data["meter_samples"].append(SimpleNamespace(timestamp=at, grid_import_kw=6.0))
+        data["physical_history"].append(
+            SimpleNamespace(
+                timestamp=at,
+                grid_export_kw=0.0,
+                solar_power_kw=1.0,
+                house_load_kw=1.0,
+                battery_power_kw=0.0 if i < 6 else -6.0,
+            )
+        )
+    data["now"] = start + timedelta(hours=3)
+    report = _load()(**data)
+    assert report["completed_slots_with_physical_flow"] == 3
+    assert report["energy_balance_failed_slots"] == 1
+    assert report["partial_meter_import_slots"] == 1
+    assert report["status"] == "partially_verified_completed_happy_hour_flows"
+    first, *later = data["state"]["today_slots"]
+    assert first["flow_grid_import_kwh"] == 3.0
+    assert first["flow_battery_action"] == "UNVERIFIED"
+    assert first["flow_battery_to_home_kwh"] is None
+    assert first["battery_to_home_kwh"] == 0.7
+    assert all(row["flow_grid_import_kwh"] == 3.0 for row in later)
+    assert all(row["flow_battery_action"] == "CHARGE" for row in later)
+    assert sum(row["flow_grid_import_kwh"] for row in [first, *later]) == 12.0

@@ -55,6 +55,14 @@ def _house_bridge_action(target_soc: float, floor_soc: float) -> str:
     )
 
 
+def _pre_target_home_action(target_soc: float) -> str:
+    """Use explicit physical planning truth, never a simulated 15% claim."""
+    return (
+        "Battery serving home; deliberate export not requested "
+        f"({_percent_text(target_soc)}% export target not reached)"
+    )
+
+
 def _clarify_policy_action_labels(state: dict[str, Any]) -> dict[str, Any]:
     """Replace stale historical reserve labels from canonical flow truth only."""
     rolling = state.get("rolling_export_plan")
@@ -124,11 +132,17 @@ def _clarify_policy_action_labels(state: dict[str, Any]) -> dict[str, Any]:
         0.0,
     )
     rolling_action = str(rolling.get("dispatch_action") or "").lower()
+    explicit_target_reached = rolling.get("planning_target_reached")
+    # The conservative verified physical path is authoritative when explicit.
+    # A replay/simulated SOC can fall below 15% despite physical SOC >15%.
     planning_target_reached = (
-        bool(rolling.get("planning_target_reached"))
-        or (rolling_soc is not None and rolling_soc <= target_soc + _EPSILON)
-        or "planning target reached" in rolling_action
-        or "reserve floor" in rolling_action
+        explicit_target_reached
+        if isinstance(explicit_target_reached, bool)
+        else (
+            (rolling_soc is not None and rolling_soc <= target_soc + _EPSILON)
+            or "planning target reached" in rolling_action
+            or "reserve floor" in rolling_action
+        )
     )
     house_bridge_active = (
         not hard_latched
@@ -136,6 +150,32 @@ def _clarify_policy_action_labels(state: dict[str, Any]) -> dict[str, Any]:
         and rolling_house_kw > _EPSILON
         and rolling_export_kw <= _EPSILON
     )
+
+    if (
+        explicit_target_reached is False
+        and not hard_latched
+        and rolling_house_kw > _EPSILON
+        and rolling_export_kw <= _EPSILON
+    ):
+        correct_action = _pre_target_home_action(target_soc)
+        for key in ("dispatch_action",):
+            previous = str(rolling.get(key) or "").lower()
+            if (
+                "deliberate-export target reached" in previous
+                or "planning target reached" in previous
+                or "reserve floor" in previous
+            ):
+                rolling[key] = correct_action
+                clarified_fields += 1
+        for key in ("current_action", "today_action"):
+            previous = str(state.get(key) or "").lower()
+            if (
+                "deliberate-export target reached" in previous
+                or "planning target reached" in previous
+                or "reserve floor" in previous
+            ):
+                state[key] = correct_action
+                clarified_fields += 1
 
     if house_bridge_active:
         if rolling.get("dispatch_action") != action:
@@ -155,11 +195,26 @@ def _clarify_policy_action_labels(state: dict[str, Any]) -> dict[str, Any]:
         house_kw = max(_number(routing.get("battery_to_home_kw")) or 0.0, 0.0)
         export_kw = max(_number(routing.get("battery_export_kw")) or 0.0, 0.0)
         reached = (
-            bool(rolling.get("planning_target_reached"))
-            or (routing_soc is not None and routing_soc <= target_soc + _EPSILON)
-            or "planning target reached" in routing_action.lower()
-            or "reserve floor" in routing_action.lower()
+            explicit_target_reached
+            if isinstance(explicit_target_reached, bool)
+            else (
+                (routing_soc is not None and routing_soc <= target_soc + _EPSILON)
+                or "planning target reached" in routing_action.lower()
+                or "reserve floor" in routing_action.lower()
+            )
         )
+        if (
+            explicit_target_reached is False
+            and house_kw > _EPSILON
+            and export_kw <= _EPSILON
+            and (
+                "deliberate-export target reached" in routing_action.lower()
+                or "planning target reached" in routing_action.lower()
+                or "reserve floor" in routing_action.lower()
+            )
+        ):
+            routing["routing_action"] = _pre_target_home_action(target_soc)
+            clarified_fields += 1
         if (
             reached
             and house_kw > _EPSILON
