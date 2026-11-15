@@ -61,9 +61,7 @@ def _cards(data):
     grid = next(card for card in view["cards"] if card.get("type") == "grid")
     live = next(card for card in grid["cards"] if card.get("title") == "Live")
     comparison = next(
-        card
-        for card in view["cards"]
-        if card.get("title") == "Today — side by side"
+        card for card in view["cards"] if card.get("title") == "Today — side by side"
     )
     return live["content"], comparison["content"]
 
@@ -102,9 +100,13 @@ def _render(template: str):
                 return 0.0
         return None
 
-    return Environment(autoescape=False).from_string(template).render(
-        state_attr=state_attr,
-        states=lambda entity: values.get(entity, "unknown"),
+    return (
+        Environment(autoescape=False)
+        .from_string(template)
+        .render(
+            state_attr=state_attr,
+            states=lambda entity: values.get(entity, "unknown"),
+        )
     )
 
 
@@ -144,9 +146,11 @@ def test_missing_verified_estimate_is_not_filled_in_using_gross() -> None:
     dashboard, _, _ = _runtime_dashboard()
     live, _ = _cards(dashboard)
     # An unknown effective cost is absent, not replaced by misleading gross.
-    missing = _render(live.replace(
-        "live.get('total_energy_effective_cost_pence')",
-        "live.get('absent_effective_total')",
-    ))
+    missing = _render(
+        live.replace(
+            "live.get('total_energy_effective_cost_pence')",
+            "live.get('absent_effective_total')",
+        )
+    )
     assert "# —" in missing
     assert "# £3.74" not in missing
