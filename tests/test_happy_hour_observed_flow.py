@@ -123,7 +123,7 @@ def test_disagreeing_physical_power_balance_masks_simulated_discharge():
     report = _load()(**data)
     assert report["energy_balance_failed_slots"] == 2
     assert report["partial_meter_import_slots"] == 2
-    for previous, slot in zip(original["today_slots"], data["state"]["today_slots"]):
+    for previous, slot in zip(original["today_slots"], data["state"]["today_slots"], strict=True):
         assert slot["flow_grid_import_kwh"] == 3.0
         assert slot["flow_grid_action"] == "IMPORT"
         assert slot["flow_battery_action"] == "UNVERIFIED"
