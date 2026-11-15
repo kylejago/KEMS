@@ -247,7 +247,9 @@ def overlay_completed_happy_hour_flow(
                 audit["energy_balance_failed_slots"] += 1
                 audit["partial_meter_import_slots"] += 1
                 _mask_unreconciled_flow(
-                    slot, booking_id=match[2], import_kwh=import_kwh,
+                    slot,
+                    booking_id=match[2],
+                    import_kwh=import_kwh,
                     reason="physical source energy balance disagrees",
                     balance_kwh=balance,
                 )
