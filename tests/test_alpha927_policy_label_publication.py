@@ -62,7 +62,8 @@ def _live_label_helper():
         "_clarify_policy_action_labels",
     }
     body = [
-        node for node in module.body
+        node
+        for node in module.body
         if isinstance(node, ast.FunctionDef) and node.name in names
     ]
     scope = {
@@ -109,7 +110,9 @@ def test_explicit_physical_plan_not_reached_overrides_simulated_soc_and_stale_te
     assert "target not reached" in state["current_action"]
     assert state["current_action"] == state["today_action"]
     assert state["rolling_export_plan"]["dispatch_action"] == state["current_action"]
-    assert state["current_routing_snapshot"]["routing_action"] == state["current_action"]
+    assert (
+        state["current_routing_snapshot"]["routing_action"] == state["current_action"]
+    )
     assert state["rolling_export_plan"]["planning_soc_percent"] == original_soc
     assert state["rolling_export_plan"]["dispatch_mode"] == "target_reached"
 
