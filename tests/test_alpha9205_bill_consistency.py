@@ -24,9 +24,7 @@ def _cards(path: Path):
         card for card in comparison_grid["cards"] if card.get("title") == "Live"
     )
     side_by_side = next(
-        card
-        for card in compare["cards"]
-        if card.get("title") == "Today — side by side"
+        card for card in compare["cards"] if card.get("title") == "Today — side by side"
     )
     return live["content"], side_by_side["content"]
 
@@ -91,8 +89,12 @@ def test_unverified_credit_is_not_silently_filled_with_gross_cost() -> None:
     periods["today"]["live_data"]["total_energy_effective_cost_pence"] = None
     path = SOURCES[0]
     live, _ = _cards(path)
-    rendered = Environment(autoescape=False).from_string(live).render(
-        state_attr=lambda entity, attr: periods,
+    rendered = (
+        Environment(autoescape=False)
+        .from_string(live)
+        .render(
+            state_attr=lambda entity, attr: periods,
+        )
     )
     assert "# —" in rendered
     assert "# £4.67" not in rendered
