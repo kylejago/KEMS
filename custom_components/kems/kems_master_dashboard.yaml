@@ -836,7 +836,7 @@ views:
           **KEMS potential value vs no system:** £{{ '%.2f' | format((base_total - (kems.get('total_energy_cost_pence') | float)) / 100) }}
           {% endif %}
 
-          _Live includes the estimated, not-yet-settled Happy Hour refund; gross electricity import is unchanged. The no-system baseline and digital twin are independent counterfactuals and are not allocated unsupported Happy Hour credits. Electricity history below remains gross, before estimated refunds. If KEMS is unavailable, no simulated bill is claimed._
+          _Live includes the estimated, not-yet-settled Happy Hour refund; gross electricity import is unchanged. The no-system baseline and digital twin are independent counterfactuals and are not allocated unsupported Happy Hour credits. Electricity history below remains gross, before estimated refunds. If KEMS is unavailable, no simulated bill is claimed; standalone net simulation figures are not interchangeable with this total._
 
       - type: history-graph
         title: Electricity cost — Live vs KEMS
