@@ -1,3 +1,9 @@
+## 0.9.0-alpha9.205 — Consistent Live totals and Octopus gas rollover
+
+- **Live bill parity:** The Compare → Live headline, electricity value, side-by-side comparison and system saving now deduct the same independently recorded **estimated Happy Hour refund** as Home → Today's actual costs. Keep gross bill figures and later Octopus account settlement distinct; do not infer credits for hypothetical KEMS/no-system scenarios.
+- **Gas rollover:** Prefer the chronologically latest Octopus accumulative daily gas usage and cost for each calendar day, not the daily maximum. An older previous-day reading can persist after midnight, then reset lower; the old maximum masked the genuine current values (15 November diagnostic: 19.546 kWh/193p in KEMS versus latest 10.839 kWh/120p from Octopus). This also corrects the gas contribution in Without KEMS and related reporting.
+- **Evidence and safety:** New test reproduces exact 15 November ledger mismatch, tests dashboard source/package parity, and covers gas midnight carryover and out-of-order snapshots. No changes to FoxESS, Ohme, dispatch, 15% deliberate export target, physically verified 10% house cutoff, 12% recovery, export DNO cap or safe-first maintenance window. Happy Hour refund remains **pending estimate**, never a supplier-settled claim.
+
 ## 0.9.0-alpha9.204 — Happy Hour physical-flow truth and 15% label clarity
 
 - **Completed Happy Hour display:** When a booked half-hour has independently observed grid import but source readings fail the conservative energy-balance check, publish only the proven import and mark battery/solar routing **UNVERIFIED** instead of displaying stale simulated battery discharge. Missing physical meter coverage also fails closed; never interpolate absent readings or alter credit receipts/ROI.

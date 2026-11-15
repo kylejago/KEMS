@@ -40,15 +40,25 @@ def _daily_direct_values(
     records: list[Snapshot],
     field: str,
 ) -> dict[date, float]:
-    """Return each day's latest/max cumulative daily value."""
-    values: dict[date, float] = {}
+    """Use the latest observed value for each provider-reset daily counter.
+
+    The Octopus accumulative gas sensors can retain yesterday's high value
+    after midnight before publishing today's lower (reset) counter. Taking
+    the maximum for a calendar day incorrectly locks in that stale previous
+    value for the whole day, including gas cost and the no-system baseline.
+    These sensors already report cumulative *daily* values, so do not sum
+    every snapshot or blindly use the largest snapshot.
+    """
+    values: dict[date, tuple[datetime, float]] = {}
     for record in records:
         value = getattr(record, field)
         if value is None or value < 0:
             continue
         day = record.timestamp.date()
-        values[day] = max(values.get(day, 0.0), float(value))
-    return values
+        previous = values.get(day)
+        if previous is None or record.timestamp >= previous[0]:
+            values[day] = (record.timestamp, float(value))
+    return {day: observed for day, (_, observed) in values.items()}
 
 
 class GasEngine:
