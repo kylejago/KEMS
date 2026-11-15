@@ -153,6 +153,27 @@ _KEMS_PARITY_BLOCK = """      - type: grid
           | Export income | {{ states('sensor.kems_simulated_export_income_today') }} p |
 """
 
+_COMPARE_LIVE = """          - type: markdown
+            title: Live
+            content: |
+              {% set p = ((state_attr('sensor.kems_energy_cost_comparison', 'periods') or {}).get('today', {}) or {}) %}
+              {% set live = p.get('live_data', {}) or {} %}
+              {% set total = live.get('total_energy_effective_cost_pence') %}
+              {% set electricity = live.get('electricity_effective_total_cost_pence') %}
+              {% set gas = live.get('gas_total_cost_pence') %}
+              {% set credit = live.get('happy_hour_estimated_credit_pence') %}
+              **Today total energy cost**  
+              # {{ ('£%.2f' | format(total / 100)) if total is not none else '—' }}
+
+              Electricity: {{ ('£%.2f' | format(electricity / 100)) if electricity is not none else '—' }}  
+              Gas: {{ ('£%.2f' | format(gas / 100)) if gas is not none else '—' }}  
+              Grid import: {{ (live.get('grid_import_kwh') ~ ' kWh') if live.get('grid_import_kwh') is not none else '—' }}  
+              Grid export: {{ (live.get('grid_export_kwh') ~ ' kWh') if live.get('grid_export_kwh') is not none else '—' }}  
+              Est. Happy Hour refund (pending): {{ ('−£%.2f' | format(credit / 100)) if credit is not none else '—' }}
+
+              _Measured property data after estimated, unsettled Octopus refund._
+"""
+
 _COMPARE_KEMS = """          - type: markdown
             title: KEMS
             content: |
@@ -181,9 +202,11 @@ _COMPARE_SIDE_BY_SIDE = """      - type: markdown
           {% set gas = (gas_state | float(0)) if gas_state | lower not in bad else none %}
           {% set base_state = states('sensor.kems_compare_no_system_cost_today') %}
           {% set base_e = (base_state | float(0)) if base_state | lower not in bad else none %}
-          {% set live_state = states('sensor.kems_whole_home_observed_cost_today') %}
-          {% set live_total = (live_state | float(0)) if live_state | lower not in bad else none %}
-          {% set live_e = (live_total - gas) if live_total is not none and gas is not none else none %}
+          {% set p = ((state_attr('sensor.kems_energy_cost_comparison', 'periods') or {}).get('today', {}) or {}) %}
+          {% set live = p.get('live_data', {}) or {} %}
+          {% set live_total = live.get('total_energy_effective_cost_pence') %}
+          {% set live_e = live.get('electricity_effective_total_cost_pence') %}
+          {% set happy_credit = live.get('happy_hour_estimated_credit_pence') %}
           {% set kems_state = states('sensor.kems_whole_home_simulated_cost_today') %}
           {% set kems_total = (kems_state | float(0)) if kems_state | lower not in bad else none %}
           {% set kems_e = (kems_total - gas) if kems_total is not none and gas is not none else none %}
@@ -191,7 +214,8 @@ _COMPARE_SIDE_BY_SIDE = """      - type: markdown
           | Metric | Without KEMS | Live | KEMS |
           |---|---:|---:|---:|
           | Total energy cost | {{ ('£%.2f' | format(base_total / 100)) if base_total is not none else '—' }} | {{ ('£%.2f' | format(live_total / 100)) if live_total is not none else '—' }} | {{ ('£%.2f' | format(kems_total / 100)) if kems_total is not none else '—' }} |
-          | Electricity | {{ ('£%.2f' | format(base_e / 100)) if base_e is not none else '—' }} | {{ ('£%.2f' | format(live_e / 100)) if live_e is not none else '—' }} | {{ ('£%.2f' | format(kems_e / 100)) if kems_e is not none else '—' }} |
+          | Est. Happy Hour refund (pending) | — | {{ ('−£%.2f' | format(happy_credit / 100)) if happy_credit is not none else '—' }} | — |
+          | Electricity (Live after est. refund) | {{ ('£%.2f' | format(base_e / 100)) if base_e is not none else '—' }} | {{ ('£%.2f' | format(live_e / 100)) if live_e is not none else '—' }} | {{ ('£%.2f' | format(kems_e / 100)) if kems_e is not none else '—' }} |
           | Gas | {{ ('£%.2f' | format(gas / 100)) if gas is not none else '—' }} | {{ ('£%.2f' | format(gas / 100)) if gas is not none else '—' }} | {{ ('£%.2f' | format(gas / 100)) if gas is not none else '—' }} |
           | Grid import | {{ state_attr('sensor.kems_compare_no_system_cost_today', 'grid_import_kwh') or '—' }} | {{ states('sensor.kems_observed_grid_import_today') }} | {{ states('sensor.kems_simulated_grid_import_today') }} |
           | Grid export | {{ state_attr('sensor.kems_compare_no_system_cost_today', 'grid_export_kwh') or 0 }} | {{ states('sensor.kems_observed_grid_export_today') }} | {{ states('sensor.kems_simulated_grid_export_today') }} |
@@ -202,6 +226,8 @@ _COMPARE_SIDE_BY_SIDE = """      - type: markdown
           {% if base_total is not none and kems_total is not none %}
           **KEMS potential value vs no system:** £{{ '%.2f' | format((base_total - kems_total) / 100) }}
           {% endif %}
+
+          _Live includes the verified-evidence Happy Hour refund estimate, not a settled supplier credit. Without KEMS and KEMS are separate counterfactuals; electricity history remains gross._
 """
 
 
@@ -226,6 +252,15 @@ def _repair_compare_view(content: str) -> str:
     if end < 0:
         end = len(content)
     compare = content[start:end]
+    # Alpha9.206: Alpha9.5 rewrites Compare -> Live to the gross flat
+    # whole-home sensor. Repair the final runtime payload here, after that
+    # compatibility layer, so it uses the same verified-estimate basis as Home.
+    compare = _replace_between(
+        compare,
+        "          - type: markdown\n            title: Live\n",
+        "          - type: markdown\n            title: KEMS\n",
+        _COMPARE_LIVE,
+    )
     compare = _replace_between(
         compare,
         "          - type: markdown\n            title: KEMS\n",

@@ -1,3 +1,10 @@
+## 0.9.0-alpha9.206 — Repair final runtime Compare refund parity
+
+- **Cause confirmed with installed 9.205:** The packaged dashboard displayed the correct effective Live value, but the legacy Alpha9.5 presentation layer replaced Compare → Live with the gross `sensor.kems_whole_home_observed_cost_today`. Alpha9.37's later dashboard contract replaced the KEMS and side-by-side cards, but did not repair Live; it also retained gross Live in the comparison table.
+- **Runtime fix:** Repair Compare → Live and the side-by-side financial table *after* that legacy rewrite, using the same `sensor.kems_energy_cost_comparison` **effective after estimated, unsettled Happy Hour refund** fields as Home. Include a clearly labelled pending refund and adjust live system value vs no system. Keep gross meter figures and counterfactual KEMS/no-system totals separate.
+- **Regression:** Reproduce the genuine Alpha9.5 overwrite using its checked-in historical card and render the final managed dashboard against 15 November 22:24 observations: gross £3.74, estimated refund £4.74, effective -£1.00, electricity -£2.20, no-system £12.12, Live system value £13.12.
+- **Safety:** Financial presentation only. Do not touch battery reserve SOC, export optimisation, hard 10% cutoff, EV charging, Power Down control, Happy Hour dispatch, inverter write paths, or DNO export limit.
+
 ## 0.9.0-alpha9.205 — Consistent Live totals and Octopus gas rollover
 
 - **Live bill parity:** The Compare → Live headline, electricity value, side-by-side comparison and system saving now deduct the same independently recorded **estimated Happy Hour refund** as Home → Today's actual costs. Keep gross bill figures and later Octopus account settlement distinct; do not infer credits for hypothetical KEMS/no-system scenarios.
