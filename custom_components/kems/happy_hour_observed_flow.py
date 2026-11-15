@@ -80,6 +80,70 @@ def _integrate(
     return energy + power * (end - cursor).total_seconds() / 3600.0, True
 
 
+
+def _mask_unreconciled_flow(
+    slot: dict[str, Any],
+    *,
+    booking_id: str,
+    import_kwh: float | None,
+    reason: str,
+    balance_kwh: float | None = None,
+) -> None:
+    """Do not present stale simulated Home discharge as observed Happy Hour flow.
+
+    Preserve independently observed import, when available. All other
+    physical source routes remain unknown until the site balance reconciles.
+    Never modify optimiser/settlement slot fields or credit receipts.
+    """
+    for key in (
+        "flow_grid_kwh",
+        "flow_grid_export_kwh",
+        "flow_solar_kwh",
+        "flow_solar_to_home_kwh",
+        "flow_solar_to_battery_kwh",
+        "flow_solar_export_kwh",
+        "flow_battery_kwh",
+        "flow_battery_charge_kwh",
+        "flow_grid_to_battery_kwh",
+        "flow_battery_to_home_kwh",
+        "flow_battery_export_kwh",
+        "flow_estimated_soc_percent",
+        "flow_soc_pre_settlement_backcast_percent",
+    ):
+        slot[key] = None
+    slot["flow_grid_import_kwh"] = (
+        round(import_kwh, 3) if import_kwh is not None else None
+    )
+    slot["flow_grid_action"] = (
+        "IMPORT" if import_kwh is not None and import_kwh > _EPSILON
+        else "UNVERIFIED"
+    )
+    slot["flow_solar_action"] = "UNVERIFIED"
+    slot["flow_battery_action"] = "UNVERIFIED"
+    slot["flow_basis"] = (
+        "completed Happy Hour: physically observed import only; "
+        "remaining source routes unreconciled"
+        if import_kwh is not None
+        else "completed Happy Hour: insufficient physical meter coverage"
+    )
+    slot["flow_scope"] = "partial physical observation; no inferred routing"
+    slot["flow_checks"] = {"physical_energy_balance_verified": False}
+    slot["flow_happy_hour_booking_id"] = booking_id
+    slot["flow_happy_hour_meter_import_kwh"] = (
+        round(import_kwh, 3) if import_kwh is not None else None
+    )
+    slot["flow_happy_hour_unreconciled"] = True
+    slot["flow_happy_hour_unreconciled_reason"] = reason
+    slot["flow_happy_hour_energy_balance_gap_kwh"] = (
+        round(balance_kwh, 3) if balance_kwh is not None else None
+    )
+    slot["flow_happy_hour_authority"] = (
+        "independent meter observation only; no physical routing claim or live write"
+    )
+    slot["flow_settled_soc_backcast_applied"] = False
+    slot["flow_settled_soc_backcast_source"] = "unreconciled physical reward slot"
+
+
 def overlay_completed_happy_hour_flow(
     state: dict[str, Any],
     *,
@@ -99,6 +163,7 @@ def overlay_completed_happy_hour_flow(
         "completed_slots_with_physical_flow": 0,
         "incomplete_meter_slots": 0,
         "energy_balance_failed_slots": 0,
+        "partial_meter_import_slots": 0,
         "scope": "flow_* display only; no financial settlement edits",
     }
     slots = state.get("today_slots")
@@ -138,6 +203,10 @@ def overlay_completed_happy_hour_flow(
         )
         if not import_ok:
             audit["incomplete_meter_slots"] += 1
+            _mask_unreconciled_flow(
+                slot, booking_id=match[2], import_kwh=None,
+                reason="physical grid-import sample coverage incomplete",
+            )
             continue
         sources: dict[str, float] = {"import": import_kwh}
         for label, field, sign in (
@@ -156,6 +225,11 @@ def overlay_completed_happy_hour_flow(
             )
             if not coverage:
                 audit["incomplete_meter_slots"] += 1
+                audit["partial_meter_import_slots"] += 1
+                _mask_unreconciled_flow(
+                    slot, booking_id=match[2], import_kwh=import_kwh,
+                    reason=f"{field} physical sample coverage incomplete",
+                )
                 break
             sources[label] = value
         else:
@@ -169,6 +243,12 @@ def overlay_completed_happy_hour_flow(
             )
             if balance > max(0.2, 0.07 * sources["house"]):
                 audit["energy_balance_failed_slots"] += 1
+                audit["partial_meter_import_slots"] += 1
+                _mask_unreconciled_flow(
+                    slot, booking_id=match[2], import_kwh=import_kwh,
+                    reason="physical source energy balance disagrees",
+                    balance_kwh=balance,
+                )
                 continue
             # Allocate solar to house first for a *labelled estimate*,
             # leaving any solar surplus free to charge battery. The energy
@@ -204,6 +284,7 @@ def overlay_completed_happy_hour_flow(
                     scope="observed completed reward half-hour",
                 )
             )
+            slot["flow_happy_hour_unreconciled"] = False
             slot["flow_happy_hour_booking_id"] = match[2]
             slot["flow_happy_hour_meter_import_kwh"] = round(import_kwh, 3)
             slot["flow_happy_hour_energy_balance_gap_kwh"] = round(balance, 3)
@@ -213,4 +294,6 @@ def overlay_completed_happy_hour_flow(
             audit["completed_slots_with_physical_flow"] += 1
     if audit["completed_slots_with_physical_flow"]:
         audit["status"] = "verified_completed_happy_hour_flows"
+    if audit["partial_meter_import_slots"] or audit["incomplete_meter_slots"]:
+        audit["status"] = "partially_verified_completed_happy_hour_flows"
     return audit
