@@ -80,7 +80,6 @@ def _integrate(
     return energy + power * (end - cursor).total_seconds() / 3600.0, True
 
 
-
 def _mask_unreconciled_flow(
     slot: dict[str, Any],
     *,
@@ -115,8 +114,7 @@ def _mask_unreconciled_flow(
         round(import_kwh, 3) if import_kwh is not None else None
     )
     slot["flow_grid_action"] = (
-        "IMPORT" if import_kwh is not None and import_kwh > _EPSILON
-        else "UNVERIFIED"
+        "IMPORT" if import_kwh is not None and import_kwh > _EPSILON else "UNVERIFIED"
     )
     slot["flow_solar_action"] = "UNVERIFIED"
     slot["flow_battery_action"] = "UNVERIFIED"
@@ -204,7 +202,9 @@ def overlay_completed_happy_hour_flow(
         if not import_ok:
             audit["incomplete_meter_slots"] += 1
             _mask_unreconciled_flow(
-                slot, booking_id=match[2], import_kwh=None,
+                slot,
+                booking_id=match[2],
+                import_kwh=None,
                 reason="physical grid-import sample coverage incomplete",
             )
             continue
@@ -227,7 +227,9 @@ def overlay_completed_happy_hour_flow(
                 audit["incomplete_meter_slots"] += 1
                 audit["partial_meter_import_slots"] += 1
                 _mask_unreconciled_flow(
-                    slot, booking_id=match[2], import_kwh=import_kwh,
+                    slot,
+                    booking_id=match[2],
+                    import_kwh=import_kwh,
                     reason=f"{field} physical sample coverage incomplete",
                 )
                 break
