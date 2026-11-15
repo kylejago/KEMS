@@ -169,9 +169,7 @@ def test_two_hour_completed_reward_has_one_unreconciled_half_hour_without_false_
     data["physical_history"] = []
     for i in range(-1, 26):
         at = start + timedelta(minutes=5 * i)
-        data["meter_samples"].append(
-            SimpleNamespace(timestamp=at, grid_import_kw=6.0)
-        )
+        data["meter_samples"].append(SimpleNamespace(timestamp=at, grid_import_kw=6.0))
         data["physical_history"].append(
             SimpleNamespace(
                 timestamp=at,
