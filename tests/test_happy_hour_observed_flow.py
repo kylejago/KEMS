@@ -133,7 +133,7 @@ def test_disagreeing_physical_power_balance_masks_simulated_discharge():
         assert slot["flow_estimated_soc_percent"] is None
         assert slot["flow_happy_hour_unreconciled"] is True
         assert slot["battery_to_home_kwh"] == previous["battery_to_home_kwh"]
-        assert slot["grid_import_kwh"] == previous.get("grid_import_kwh")
+        assert slot.get("grid_import_kwh") == previous.get("grid_import_kwh")
 
 
 def test_current_reward_half_hour_not_overwritten():
