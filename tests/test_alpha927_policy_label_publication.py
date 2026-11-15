@@ -5,8 +5,8 @@ from __future__ import annotations
 import ast
 import json
 import math
-from typing import Any
 from pathlib import Path
+from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
 CLARITY = ROOT / "custom_components" / "kems" / "agile_observability_clarity.py"
