@@ -119,9 +119,8 @@ def foxess_import_counter_candidate_probe(
             if source_config_entry is not None and config_entry is not None
             else None
         )
-        at = (
-            getattr(state, "last_reported", None)
-            or getattr(state, "last_updated", None)
+        at = getattr(state, "last_reported", None) or getattr(
+            state, "last_updated", None
         )
         seconds = (
             max(0.0, (now - at).total_seconds())

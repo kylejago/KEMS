@@ -9,15 +9,14 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
+from kems_core import operational_diagnostic_probes as probe
 
 ROOT = Path(__file__).parents[1] / "custom_components" / "kems"
 
 
 def _module(relative: str):
     path = ROOT / relative
-    spec = importlib.util.spec_from_file_location(
-        "alpha9211_" + path.stem, path
-    )
+    spec = importlib.util.spec_from_file_location("alpha9211_" + path.stem, path)
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
@@ -41,7 +40,6 @@ def _registry(device: str = "foxess-kh7", disabled=None):
 
 
 def test_potential_cumulative_kh7_meter_never_authorises_free_import() -> None:
-    probe = _module("kems_core/operational_diagnostic_probes.py")
     status = probe.foxess_import_counter_candidate_probe(
         source_entity_id="sensor.kh7_grid_consumption",
         source_registry=_registry(),
@@ -78,7 +76,6 @@ def test_potential_cumulative_kh7_meter_never_authorises_free_import() -> None:
 def test_meter_probe_fails_closed_on_ineligible_candidate(
     state, unit, klass, device, expected
 ) -> None:
-    probe = _module("kems_core/operational_diagnostic_probes.py")
     result = probe.foxess_import_counter_candidate_probe(
         source_entity_id="sensor.kh7_grid_consumption",
         source_registry=_registry(),
@@ -91,7 +88,6 @@ def test_meter_probe_fails_closed_on_ineligible_candidate(
 
 
 def test_missing_and_disabled_candidate_not_mistaken_for_proven_meter() -> None:
-    probe = _module("kems_core/operational_diagnostic_probes.py")
     result = probe.foxess_import_counter_candidate_probe(
         source_entity_id="sensor.kh7_grid_consumption",
         source_registry=_registry(),
@@ -101,7 +97,9 @@ def test_missing_and_disabled_candidate_not_mistaken_for_proven_meter() -> None:
         },
         now=datetime(2026, 11, 16, 12, tzinfo=UTC),
     )
-    assert result["candidates"]["lifetime_total"]["candidate_status"] == "not_registered"
+    assert (
+        result["candidates"]["lifetime_total"]["candidate_status"] == "not_registered"
+    )
     assert result["candidates"]["daily_total"]["candidate_status"] == "disabled"
     assert result["counter_source_approved"] is False
 
@@ -161,21 +159,33 @@ def test_full_hour_receipt_not_duplicated_and_store_overlap_not_authority() -> N
     persisted = {
         "first_sample": "2026-11-15T06:51:30+00:00",
         "last_sample": "2026-11-15T09:09:02+00:00",
-        "persisted_reward_windows": [{
-            "start": start, "end": end,
-            "event_id": "8546", "booking_source": "octopus_joined_events"
-        }],
+        "persisted_reward_windows": [
+            {
+                "start": start,
+                "end": end,
+                "event_id": "8546",
+                "booking_source": "octopus_joined_events",
+            }
+        ],
     }
     receipt = {
-        "start": start, "end": end, "completed": True,
-        "credit_pence": 255.521419, "import_kwh": 7.121
+        "start": start,
+        "end": end,
+        "completed": True,
+        "credit_pence": 255.521419,
+        "import_kwh": 7.121,
     }
     audit = {
-        "entries": [{
-            "type": "happy_hour", "start": start, "end": end,
-            "included_in_roi": True, "estimated_reward_pence": 255.521,
-            "evidence_source": "completed_meter_and_tariff_verified_hour"
-        }],
+        "entries": [
+            {
+                "type": "happy_hour",
+                "start": start,
+                "end": end,
+                "included_in_roi": True,
+                "estimated_reward_pence": 255.521,
+                "evidence_source": "completed_meter_and_tariff_verified_hour",
+            }
+        ],
         "entries_omitted": 0,
         "included_happy_hour_pence": 255.521419,
         "provisional_partial_pence": 0.0,
@@ -203,7 +213,8 @@ def test_diagnostic_wiring_is_read_only_without_new_control_authority() -> None:
     source = (ROOT / "diagnostics.py").read_text()
     assert "happy_hour_import_counter_candidates" in source
     assert "foxess_import_counter_candidate_probe" in source
-    assert "unrecoverable_from_current_on_device_store" in (
-        ROOT / "happy_hour_accounting_diagnostics.py"
-    ).read_text()
+    assert (
+        "unrecoverable_from_current_on_device_store"
+        in (ROOT / "happy_hour_accounting_diagnostics.py").read_text()
+    )
     assert "async_update_entity" not in source

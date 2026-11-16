@@ -38,7 +38,6 @@ def _valid_receipt(item: Mapping[str, Any]) -> bool:
     )
 
 
-
 def _meter_window_recovery(
     start: datetime,
     end: datetime,
@@ -69,6 +68,7 @@ def _covered_minutes(row: Mapping[str, Any], full_minutes: float) -> float | Non
     except (ValueError, TypeError, OverflowError):
         return None
     return value if isfinite(value) and 0 <= value <= full_minutes else None
+
 
 def build_happy_hour_accounting_audit(
     persisted_ledger_status: Mapping[str, Any],
@@ -157,7 +157,6 @@ def build_happy_hour_accounting_audit(
                 }
             )
 
-
     # The complete-hour ledger is deliberately strict; disclose weaker ROI
     # provisional evidence as separate rows rather than hiding incomplete
     # independently booked historical hours from operator diagnostics.
@@ -229,6 +228,7 @@ def build_happy_hour_accounting_audit(
         float(receipts[key]["credit_pence"])
         for key, row in roi_rows.items()
         if key in receipts
+        and row.get("included_in_roi") is True
         and row.get("evidence_source") == "completed_meter_and_tariff_verified_hour"
     )
     difference = (
@@ -241,8 +241,10 @@ def build_happy_hour_accounting_audit(
         "hour_evidence_omitted": max(len(evidence) - 24, 0),
         "completed_verified_receipts": len(receipts),
         "provisional_roi_hours_without_complete_receipt": sum(
-            1 for row in evidence
-            if row["status"] == "provisional_hour_observed_import_only_full_receipt_incomplete"
+            1
+            for row in evidence
+            if row["status"]
+            == "provisional_hour_observed_import_only_full_receipt_incomplete"
         ),
         "hours_outside_current_meter_store": sum(
             row.get("on_device_recovery_status")
