@@ -23,6 +23,10 @@ from .kems_core.diagnostic_evidence import (
     corroborated_unchanged_sources,
     reward_settlement_evidence,
 )
+from .kems_core.operational_diagnostic_probes import (
+    power_down_baseline_probe,
+    roi_recorder_probe,
+)
 from .panel import panel_health_snapshot
 from .product_types import (
     EXPORT_TARIFF_TYPE_AGILE,
@@ -76,6 +80,26 @@ async def async_get_config_entry_diagnostics(
     }
 
     registry = er.async_get(hass)
+    baseline_entity_registry = {
+        logical: power_down_baseline_probe(
+            configured.get(logical),
+            (
+                registry.entities.get(configured[logical])
+                if configured.get(logical)
+                else None
+            ),
+            hass.states.get(configured[logical]) if configured.get(logical) else None,
+        )
+        for logical in (
+            "saving_session_import_baseline",
+            "saving_session_export_baseline",
+        )
+    }
+    reward_state = hass.states.get("sensor.kems_roi_reward_audit")
+    reward_recorder = roi_recorder_probe(
+        data.roi.reward_audit,
+        reward_state.attributes if reward_state is not None else None,
+    )
     kems_entities: dict[str, Any] = {}
     for registry_entry in registry.entities.values():
         if registry_entry.config_entry_id != entry.entry_id:
@@ -131,6 +155,8 @@ async def async_get_config_entry_diagnostics(
             "summary": coordinator.source_validation.summary(),
         },
         "source_entity_states": source_states,
+        "power_down_baseline_entity_registry": baseline_entity_registry,
+        "roi_reward_recorder_probe": reward_recorder,
         "source_freshness": {
             "stale_timeout_seconds": coordinator.settings.control.stale_data_seconds,
             "intelligent_source_stale_timeout_seconds": max(
