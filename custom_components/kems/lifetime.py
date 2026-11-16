@@ -583,7 +583,7 @@ class LifetimeLedgerRecorder:
             and current_date >= config.commissioning_date
         )
         for key, current in values.items():
-            if key == PERIOD_DATA_COMPLETE_KEY:
+            if key in (PERIOD_DATA_COMPLETE_KEY, "__data_coverage_percent"):
                 continue
             previous = previous_values.get(key, 0.0)
             delta = current - previous
