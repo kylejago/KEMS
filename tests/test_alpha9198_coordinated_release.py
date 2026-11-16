@@ -30,7 +30,7 @@ def test_release_version_bundle_and_optional_component_versions_are_pinned() -> 
 def test_reason_explicitly_guards_original_safety_and_provenance() -> None:
     bundle = json.loads(RELEASE.read_text(encoding="utf-8"))
     reason = bundle["maintenance"]["reason"]
-    assert reason.startswith("Alpha9.213:")
+    assert reason.startswith("Alpha9.215:")
     for statement in (
         "all three original",
         "identical Home Assistant sensor state+complete-attribute writes",
