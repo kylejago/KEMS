@@ -59,3 +59,39 @@ def test_no_control_modules_changed_in_compare_regression() -> None:
     text = SOURCES[0].read_text(encoding="utf-8")
     assert "estimated, unsettled Happy Hour refund" in text
     assert "ROI is a separate accrued accounting ledger" in text
+
+
+def test_15_nov_roi_ledger_and_bill_comparison_are_not_misrepresented() -> None:
+    from jinja2 import Environment
+
+    side = next(
+        card["content"]
+        for card in _view(SOURCES[0].read_text())["cards"]
+        if card.get("title") == "Today — side by side"
+    )
+    payload = {
+        "today": {
+            "live_data": {
+                "total_energy_effective_cost_pence": -101.0,
+                "electricity_effective_total_cost_pence": -221.0,
+                "gas_total_cost_pence": 120.0,
+                "happy_hour_estimated_credit_pence": 474.048,
+                "grid_import_kwh": 80.5,
+                "grid_export_kwh": 31.0,
+            }
+        }
+    }
+    rendered = Environment(autoescape=False).from_string(side).render(
+        state_attr=lambda entity, attr: (
+            payload if entity == "sensor.kems_energy_cost_comparison" else None
+        ),
+        states=lambda entity: {
+            "sensor.kems_compare_no_system_cost_today": "1106.0",
+            "sensor.kems_actual_system_value_today": "13.31",
+        }.get(entity, "unknown"),
+    )
+    assert "£13.27" in rendered
+    assert "ROI ledger value today:** £13.31" in rendered
+    assert "differ by £0.04" in rendered
+    assert "Est. Happy Hour refund (pending)" in rendered
+    assert "£13.31" not in rendered.split("**Live system value vs no system:**")[1].split("\n")[0]

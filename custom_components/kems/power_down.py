@@ -39,24 +39,48 @@ def _number(value: Any) -> float | None:
 
 
 def _baseline_net_power_kw(snapshot: Snapshot) -> float | None:
-    """Convert the Octopus reward baseline into the current period's net kW."""
-    imported = snapshot.saving_session_import_baseline_period_kwh
-    exported = snapshot.saving_session_export_baseline_period_kwh
+    """Require matched import AND export Octopus evidence before reward estimates.
+
+    A missing export baseline cannot be treated as zero on a property with
+    both import and export MPANs. This is reward accounting only: never a
+    change to dispatch, actual Agile export income, or inverter safety.
+    """
+    if snapshot.saving_session_baseline_incomplete is True:
+        return None
+
+    imported = _number(snapshot.saving_session_import_baseline_period_kwh)
+    exported = _number(snapshot.saving_session_export_baseline_period_kwh)
     start = snapshot.saving_session_baseline_period_start
     end = snapshot.saving_session_baseline_period_end
-    if imported is not None and start is not None and end is not None and end > start:
+    if (
+        imported is not None
+        and exported is not None
+        and imported >= 0.0
+        and exported >= 0.0
+        and start is not None
+        and end is not None
+        and end > start
+    ):
         hours = (end - start).total_seconds() / 3600.0
         if hours > 0.0:
-            return (float(imported) - float(exported or 0.0)) / hours
+            return (imported - exported) / hours
 
-    imported = snapshot.saving_session_import_baseline_total_kwh
-    exported = snapshot.saving_session_export_baseline_total_kwh
+    imported = _number(snapshot.saving_session_import_baseline_total_kwh)
+    exported = _number(snapshot.saving_session_export_baseline_total_kwh)
     start = snapshot.saving_session_start
     end = snapshot.saving_session_end
-    if imported is None or start is None or end is None or end <= start:
+    if (
+        imported is None
+        or exported is None
+        or imported < 0.0
+        or exported < 0.0
+        or start is None
+        or end is None
+        or end <= start
+    ):
         return None
     hours = (end - start).total_seconds() / 3600.0
-    return (float(imported) - float(exported or 0.0)) / hours if hours > 0.0 else None
+    return (imported - exported) / hours if hours > 0.0 else None
 
 
 def _agile_power_down_route(
