@@ -132,8 +132,7 @@ class LifetimeLedgerRecorder:
             "incomplete_recorded_days": incomplete_total,
             "recent_days": recent[-14:],
             "older_coverage_percent_unavailable": any(
-                row["simulation_data_coverage_percent"] is None
-                for row in recent
+                row["simulation_data_coverage_percent"] is None for row in recent
             ),
             "may_include_current_unfinished_day": True,
             "restarts_not_proven_cause": True,
