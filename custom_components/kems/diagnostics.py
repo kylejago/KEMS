@@ -342,6 +342,7 @@ async def async_get_config_entry_diagnostics(
             period_name: totals.to_dict()
             for period_name, totals in data.periods.items()
         },
+        "historical_coverage_audit": coordinator._lifetime.historical_coverage_audit,
         "roi": asdict(data.roi),
         "control": asdict(data.control),
         "alpha969_shadow_plan": dict(data.alpha969_shadow_plan),
