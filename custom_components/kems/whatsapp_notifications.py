@@ -325,7 +325,8 @@ class KEMSWhatsAppNotifications:
                 recovery_key = f"private:recovery:{key}:{sent_start}"
                 recovered = await self._send(
                     recovery_key,
-                    f"✅ *KEMS — Warning cleared*\n{key.replace('_', ' ').title()} has recovered.",
+                    f"✅ *KEMS — Warning cleared*\n"
+                    f"{key.replace('_', ' ').title()} has recovered.",
                     private=True,
                     now=now,
                 )
@@ -348,7 +349,8 @@ class KEMSWhatsAppNotifications:
                 if await self._send(
                     alert_key,
                     f"🚨 *KEMS — Technical warning*\n⚠️ {description}.\n"
-                    "Persisting for at least 5 minutes. Energy control operates independently.",
+                    "Persisting for at least 5 minutes. "
+                    "Energy control operates independently.",
                     private=True,
                     now=now,
                 ):
