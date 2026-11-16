@@ -57,12 +57,18 @@ def test_power_down_export_baseline_missing_disabled_or_unavailable() -> None:
     assert power_down_baseline_probe(eid, None, None)["status"] == (
         "not_registered_or_missing_state"
     )
-    assert power_down_baseline_probe(
-        eid, SimpleNamespace(disabled_by=None), SimpleNamespace(state="unavailable")
-    )["status"] == "registered_but_unavailable"
-    assert power_down_baseline_probe(
-        eid, SimpleNamespace(disabled_by=None), SimpleNamespace(state="0.025")
-    )["status"] == "available"
+    assert (
+        power_down_baseline_probe(
+            eid, SimpleNamespace(disabled_by=None), SimpleNamespace(state="unavailable")
+        )["status"]
+        == "registered_but_unavailable"
+    )
+    assert (
+        power_down_baseline_probe(
+            eid, SimpleNamespace(disabled_by=None), SimpleNamespace(state="0.025")
+        )["status"]
+        == "available"
+    )
 
 
 def test_diagnostic_is_read_only_and_exposes_both_probes() -> None:

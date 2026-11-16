@@ -72,9 +72,7 @@ def power_down_baseline_probe(
         "entity_id": entity_id,
         "registered": registered_entity is not None,
         "disabled_by": (
-            getattr(disabled, "value", str(disabled))
-            if disabled is not None
-            else None
+            getattr(disabled, "value", str(disabled)) if disabled is not None else None
         ),
         "state_exists": state is not None,
         "status": status,

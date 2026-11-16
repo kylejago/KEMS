@@ -83,10 +83,17 @@ async def async_get_config_entry_diagnostics(
     baseline_entity_registry = {
         logical: power_down_baseline_probe(
             configured.get(logical),
-            registry.entities.get(configured[logical]) if configured.get(logical) else None,
+            (
+                registry.entities.get(configured[logical])
+                if configured.get(logical)
+                else None
+            ),
             hass.states.get(configured[logical]) if configured.get(logical) else None,
         )
-        for logical in ("saving_session_import_baseline", "saving_session_export_baseline")
+        for logical in (
+            "saving_session_import_baseline",
+            "saving_session_export_baseline",
+        )
     }
     reward_state = hass.states.get("sensor.kems_roi_reward_audit")
     reward_recorder = roi_recorder_probe(
