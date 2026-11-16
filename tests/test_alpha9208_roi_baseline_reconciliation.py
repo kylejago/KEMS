@@ -51,7 +51,9 @@ def _data(**changes):
                 actual_system_value_pence=-12.90,
             )
         },
-        "snapshot": SimpleNamespace(timestamp=datetime(2026, 11, 16, 8, 51, tzinfo=UTC)),
+        "snapshot": SimpleNamespace(
+            timestamp=datetime(2026, 11, 16, 8, 51, tzinfo=UTC)
+        ),
     }
     default.update(changes)
     return SimpleNamespace(**default)
@@ -75,10 +77,17 @@ def test_diagnostic_reconciles_actual_4p_baseline_gap_without_rewriting_live() -
 @pytest.mark.parametrize(
     ("mutation", "expected"),
     [
-        ({"simulation": SimpleNamespace(ready=False)}, "roi_daily_evidence_unavailable"),
+        (
+            {"simulation": SimpleNamespace(ready=False)},
+            "roi_daily_evidence_unavailable",
+        ),
         ({"periods": {}}, "roi_daily_evidence_unavailable"),
         (
-            {"snapshot": SimpleNamespace(timestamp=datetime(2026, 11, 17, 0, 0, tzinfo=UTC))},
+            {
+                "snapshot": SimpleNamespace(
+                    timestamp=datetime(2026, 11, 17, 0, 0, tzinfo=UTC)
+                )
+            },
             "daily_rollover_or_period_mismatch",
         ),
     ],
@@ -103,7 +112,10 @@ def test_mismatched_live_import_does_not_get_silently_adjusted() -> None:
 def test_nonfinite_baseline_and_missing_scenario_are_not_invented() -> None:
     data = _data()
     data.simulation.baseline_no_system_cost_pence = float("nan")
-    assert _comparison()(data)["comparison_basis_reason"] == "nonfinite_or_missing_financial_evidence"
+    assert (
+        _comparison()(data)["comparison_basis_reason"]
+        == "nonfinite_or_missing_financial_evidence"
+    )
     data.scenarios.scenario = lambda key: None
     assert _comparison()(data)["total_cost_pence"] is None
 
@@ -116,7 +128,9 @@ def test_happy_hour_credit_does_not_get_copied_into_baseline() -> None:
     assert "reward" not in result["comparison_cost_basis"]
 
 
-def test_dashboard_sources_and_final_compatibility_card_share_source_authority() -> None:
+def test_dashboard_sources_and_final_compatibility_card_share_source_authority() -> (
+    None
+):
     master = (ROOT / "dashboards" / "kems_master_dashboard.yaml").read_text()
     packaged = (KEMS / "kems_master_dashboard.yaml").read_text()
     repair = (KEMS / "alpha937_dashboard_contract.py").read_text()
@@ -125,4 +139,6 @@ def test_dashboard_sources_and_final_compatibility_card_share_source_authority()
     assert "roi_meter_sampled_baseline" in master
     assert "compare_no_system_cost_today(data)" in sensor
     assert "No-system uses the same measured-history baseline" not in master
-    assert "same measured-history baseline as ROI when source evidence matches" in repair
+    assert (
+        "same measured-history baseline as ROI when source evidence matches" in repair
+    )
