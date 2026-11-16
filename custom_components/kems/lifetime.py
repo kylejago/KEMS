@@ -93,6 +93,54 @@ class LifetimeLedgerRecorder:
         """Return whether a stored ledger was restored."""
         return self._loaded_existing
 
+    @property
+    def historical_coverage_audit(self) -> dict[str, Any]:
+        """Bounded read-only evidence for the daily completeness classifier.
+
+        No interpolation, historic completion promotion or estimated
+        electricity/reward adjustments are performed here.
+        """
+        rows = dict(self._daily_records)
+        if self._tracking_date is not None:
+            rows[self._tracking_date.isoformat()] = self._tracking_values
+
+        recent = []
+        incomplete_total = 0
+        for day, values in sorted(rows.items()):
+            if not isinstance(values, dict):
+                continue
+            complete = values.get(PERIOD_DATA_COMPLETE_KEY, 1.0) >= 0.5
+            if not complete:
+                incomplete_total += 1
+            coverage = values.get("__data_coverage_percent")
+            recent.append(
+                {
+                    "date": day,
+                    "data_complete": bool(complete),
+                    "simulation_data_coverage_percent": (
+                        round(float(coverage), 3)
+                        if isinstance(coverage, (int, float))
+                        else None
+                    ),
+                    "recorded_values_present": bool(values),
+                }
+            )
+        return {
+            "classification_source": "simulation.data_coverage >= 99.9",
+            "required_simulation_coverage_percent": 99.9,
+            "recorded_days": len(recent),
+            "incomplete_recorded_days": incomplete_total,
+            "recent_days": recent[-14:],
+            "older_coverage_percent_unavailable": any(
+                row["simulation_data_coverage_percent"] is None
+                for row in recent
+            ),
+            "may_include_current_unfinished_day": True,
+            "restarts_not_proven_cause": True,
+            "observation_only": True,
+            "no_missing_samples_inferred": True,
+        }
+
     async def async_load(self) -> None:
         """Load all-time totals and current-day tracking metadata."""
         data = await self._store.async_load()
@@ -562,6 +610,7 @@ class LifetimeLedgerRecorder:
             PERIOD_DATA_COMPLETE_KEY: (
                 1.0 if simulation.data_coverage >= 99.9 else 0.0
             ),
+            "__data_coverage_percent": float(simulation.data_coverage),
             "house_consumption_kwh": simulation.actual_house_consumption_kwh or 0.0,
             "ev_energy_kwh": simulation.actual_ev_energy_kwh or 0.0,
             "grid_import_kwh": simulation.actual_grid_import_kwh or 0.0,
