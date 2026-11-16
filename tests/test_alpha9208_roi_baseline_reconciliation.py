@@ -28,6 +28,7 @@ def _data(**changes):
         ready=True,
         total_cost_pence=341.51,
         import_cost_pence=285.99,
+        energy_net_cost_pence=285.99,
         standing_charge_pence=55.52,
     )
     default = {
@@ -66,6 +67,7 @@ def test_diagnostic_reconciles_actual_4p_baseline_gap_without_rewriting_live() -
     assert result["total_cost_pence"] == pytest.approx(345.67)
     assert result["scenario_replay_cost_pence"] == pytest.approx(341.51)
     assert result["roi_vs_replay_difference_pence"] == pytest.approx(4.16)
+    assert result["net_electricity_cost_pence"] == pytest.approx(290.15)
     assert result["comparison_cost_basis"] == "roi_meter_sampled_baseline"
     # Gross import 303.13p, export 0.08p, electricity standing 55.52p,
     # gas 72p. Counterfactual minus live exactly matches accrued ROI today.
@@ -97,6 +99,7 @@ def test_incomplete_or_cross_day_evidence_falls_back_without_fake_parity(
 ) -> None:
     result = _comparison()(_data(**mutation))
     assert result["total_cost_pence"] == 341.51
+    assert result["net_electricity_cost_pence"] == 285.99
     assert result["comparison_cost_basis"] == "scenario_replay_unreconciled"
     assert result["comparison_basis_reason"] == expected
 
@@ -138,6 +141,7 @@ def test_dashboard_sources_and_final_compatibility_card_share_source_authority()
     assert master == packaged
     assert "roi_meter_sampled_baseline" in master
     assert "compare_no_system_cost_today(data)" in sensor
+    assert "sensor.kems_compare_no_system_net_electricity_cost_today" in master
     assert "No-system uses the same measured-history baseline" not in master
     assert (
         "same measured-history baseline as ROI when source evidence matches" in repair

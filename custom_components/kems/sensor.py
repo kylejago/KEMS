@@ -43,8 +43,8 @@ from .const import (
 )
 from .entity import KEMSEntity
 from .kems_core import FOXHOLE_PROPOSAL_PROFILE, KEMSData
-from .kems_core.ev_soc_presentation import displayed_ev_soc
 from .kems_core.compare_roi_baseline import compare_no_system_cost_today
+from .kems_core.ev_soc_presentation import displayed_ev_soc
 from .kems_core.roi_reward_sensor_attributes import compact_roi_reward_audit
 from .solar_routing_shadow import _physical_solar_flow
 from .update_orchestrator import build_update_sensor_entities
@@ -104,11 +104,16 @@ def _scenario_cost(
 
 
 def _no_system_comparison_attributes(data: KEMSData) -> Mapping[str, Any]:
-    """Retain replay evidence while explicitly identifying the cost authority."""
-    return {
-        **_scenario_attributes(data, "no_system"),
-        **compare_no_system_cost_today(data),
-    }
+    """Retain the independent replay as evidence, not financial authority."""
+    original = dict(_scenario_attributes(data, "no_system"))
+    aligned = compare_no_system_cost_today(data)
+    if aligned.get("comparison_cost_basis") == "roi_meter_sampled_baseline":
+        original["scenario_replay_import_cost_pence"] = original.get(
+            "import_cost_pence"
+        )
+        original["import_cost_pence"] = aligned["roi_baseline_import_cost_pence"]
+        original["energy_net_cost_pence"] = aligned["net_electricity_cost_pence"]
+    return {**original, **aligned}
 
 
 def _forecast_plan_attributes(data: KEMSData) -> Mapping[str, Any]:
@@ -996,6 +1001,17 @@ SENSORS: tuple[KEMSSensorEntityDescription, ...] = (
         native_unit_of_measurement="p",
         suggested_display_precision=2,
         value_fn=lambda data: compare_no_system_cost_today(data)["total_cost_pence"],
+        attributes_fn=_no_system_comparison_attributes,
+    ),
+    KEMSSensorEntityDescription(
+        key="compare_no_system_net_electricity_cost_today",
+        name="Compare no system electricity net cost today before standing charge",
+        icon="mdi:transmission-tower-import",
+        native_unit_of_measurement="p",
+        suggested_display_precision=2,
+        value_fn=lambda data: compare_no_system_cost_today(data)[
+            "net_electricity_cost_pence"
+        ],
         attributes_fn=_no_system_comparison_attributes,
     ),
     KEMSSensorEntityDescription(

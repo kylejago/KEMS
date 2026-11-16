@@ -34,15 +34,23 @@ def compare_no_system_cost_today(data: Any) -> dict[str, Any]:
     if scenario is None:
         return {
             "total_cost_pence": None,
+            "net_electricity_cost_pence": None,
             "comparison_cost_basis": "unavailable",
             "comparison_basis_reason": "no_system_scenario_unavailable",
         }
     replay = _money(scenario.total_cost_pence)
+    replay_net = _money(scenario.energy_net_cost_pence)
     result: dict[str, Any] = {
         "total_cost_pence": round(replay, 2) if replay is not None else None,
+        "net_electricity_cost_pence": (
+            round(replay_net, 2) if replay_net is not None else None
+        ),
         "comparison_cost_basis": "scenario_replay_unreconciled",
         "comparison_basis_reason": "roi_daily_evidence_unavailable",
         "scenario_replay_cost_pence": round(replay, 2) if replay is not None else None,
+        "scenario_replay_net_electricity_cost_pence": (
+            round(replay_net, 2) if replay_net is not None else None
+        ),
         "roi_baseline_import_cost_pence": None,
         "roi_vs_replay_difference_pence": None,
     }
@@ -106,6 +114,7 @@ def compare_no_system_cost_today(data: Any) -> dict[str, Any]:
     effective = round(baseline + standing, 2)
     result.update(
         total_cost_pence=effective,
+        net_electricity_cost_pence=round(baseline, 2),
         comparison_cost_basis="roi_meter_sampled_baseline",
         comparison_basis_reason="matched_actual_import_export_and_daily_ledger",
         roi_baseline_import_cost_pence=round(baseline, 2),

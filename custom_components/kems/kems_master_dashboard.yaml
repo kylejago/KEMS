@@ -837,13 +837,13 @@ views:
           _Live uses the estimated, unsettled Happy Hour refund; gross electricity import remains recorded normally. Without KEMS uses the same measured-history baseline as ROI when source evidence matches (or an explicitly labelled scenario replay fallback). Gas and standing charges are shown on both sides; ROI may also include distinct supplier event rewards._
 
       - type: history-graph
-        title: Gross electricity cost — Live vs Without KEMS
+        title: Electricity net cost — Live vs Without KEMS (before standing and HH)
         hours_to_show: 168
         entities:
           - entity: sensor.kems_observed_cost_today
             name: Live (gross before HH refund)
-          - entity: sensor.kems_compare_no_system_cost_today
-            name: Without KEMS
+          - entity: sensor.kems_compare_no_system_net_electricity_cost_today
+            name: Without KEMS (net, no standing)
 
   - title: Tomorrow
     path: tomorrow
