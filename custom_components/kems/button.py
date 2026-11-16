@@ -19,10 +19,12 @@ async def async_setup_entry(
 ) -> None:
     """Provide independently triggered family and private WhatsApp tests."""
     coordinator = entry.runtime_data
-    async_add_entities([
-        KEMSWhatsAppTestButton(coordinator, private=False),
-        KEMSWhatsAppTestButton(coordinator, private=True),
-    ])
+    async_add_entities(
+        [
+            KEMSWhatsAppTestButton(coordinator, private=False),
+            KEMSWhatsAppTestButton(coordinator, private=True),
+        ]
+    )
 
 
 class KEMSWhatsAppTestButton(KEMSEntity, ButtonEntity):
@@ -36,9 +38,7 @@ class KEMSWhatsAppTestButton(KEMSEntity, ButtonEntity):
             "whatsapp_private_test" if private else "whatsapp_family_test",
         )
         self._private = private
-        self._attr_name = (
-            "WhatsApp private test" if private else "WhatsApp family test"
-        )
+        self._attr_name = "WhatsApp private test" if private else "WhatsApp family test"
         self._attr_icon = "mdi:message-lock-check" if private else "mdi:message-check"
 
     async def async_press(self) -> None:
