@@ -25,6 +25,7 @@ from .kems_core.diagnostic_evidence import (
     reward_settlement_evidence,
 )
 from .kems_core.operational_diagnostic_probes import (
+    foxess_import_counter_candidate_probe,
     power_down_baseline_probe,
     roi_recorder_probe,
 )
@@ -96,6 +97,25 @@ async def async_get_config_entry_diagnostics(
             "saving_session_export_baseline",
         )
     }
+    # These are historical *candidate* FoxESS energy counters, not authority.
+    # Never auto-configure or use them to extend a free-import reward budget.
+    import_power_entity = configured.get("grid_import_kw", "")
+    candidate_ids = {
+        "lifetime_total": import_power_entity + "_energy_total",
+        "daily_total": import_power_entity + "_energy_today",
+    }
+    import_counter_candidates = foxess_import_counter_candidate_probe(
+        source_entity_id=import_power_entity,
+        source_registry=registry.entities.get(import_power_entity),
+        candidates={
+            label: (
+                registry.entities.get(candidate_id),
+                hass.states.get(candidate_id),
+            )
+            for label, candidate_id in candidate_ids.items()
+        },
+        now=dt_util.now(),
+    )
     reward_state = hass.states.get("sensor.kems_roi_reward_audit")
     reward_recorder = roi_recorder_probe(
         data.roi.reward_audit,
@@ -158,6 +178,7 @@ async def async_get_config_entry_diagnostics(
         "source_entity_states": source_states,
         "power_down_baseline_entity_registry": baseline_entity_registry,
         "roi_reward_recorder_probe": reward_recorder,
+        "happy_hour_import_counter_candidates": import_counter_candidates,
         "source_freshness": {
             "stale_timeout_seconds": coordinator.settings.control.stale_data_seconds,
             "intelligent_source_stale_timeout_seconds": max(
