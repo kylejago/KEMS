@@ -23,6 +23,7 @@ async def async_setup_entry(
         [
             KEMSWhatsAppTestButton(coordinator, private=False),
             KEMSWhatsAppTestButton(coordinator, private=True),
+            KEMSWhatsAppTestAllButton(coordinator),
         ]
     )
 
@@ -49,4 +50,24 @@ class KEMSWhatsAppTestButton(KEMSEntity, ButtonEntity):
         if not await reporter.async_send_test(private=self._private):
             raise HomeAssistantError(
                 "WhatsApp test failed; see KEMS WhatsApp diagnostics and notify entity"
+            )
+
+
+class KEMSWhatsAppTestAllButton(KEMSEntity, ButtonEntity):
+    """Send a sample recap and event/alert messages on request only."""
+
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_name = "WhatsApp test all"
+    _attr_icon = "mdi:message-text-fast"
+
+    def __init__(self, coordinator) -> None:
+        super().__init__(coordinator, "whatsapp_test_all")
+
+    async def async_press(self) -> None:
+        reporter = getattr(self.coordinator, "_kems_whatsapp_reporter", None)
+        if reporter is None or not reporter.enabled:
+            raise HomeAssistantError("Enable WhatsApp notifications in KEMS options")
+        if not await reporter.async_send_test_all():
+            raise HomeAssistantError(
+                "WhatsApp test-all did not complete; inspect KEMS WhatsApp diagnostics"
             )
