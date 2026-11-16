@@ -180,13 +180,16 @@ def completed_period_message(
         "*⚡ Energy*",
         f"⬇️ Grid import: {_quantity(_field(period, 'grid_import_kwh'), 'kWh')}",
         f"⬆️ Grid export: {_quantity(_field(period, 'grid_export_kwh'), 'kWh')}",
-        f"☀️ Solar generated: {_quantity(_field(period, 'solar_generation_kwh'), 'kWh')}",
+        "☀️ Solar generated: "
+        + _quantity(_field(period, "solar_generation_kwh"), "kWh"),
         "",
         "*💷 Actual energy finances*",
         f"Import cost: {_pounds(_field(period, 'import_cost_pence'))}",
         f"Agile export income: {_pounds(_field(period, 'export_income_pence'))}",
         f"Gas cost: {_pounds(_field(period, 'gas_cost_pence'))}",
-        f"*Net energy cost (reported actual): {_pounds(_field(period, 'actual_net_cost_pence'))}*",
+        "*Net energy cost (reported actual): "
+        + _pounds(_field(period, "actual_net_cost_pence"))
+        + "*",
         "",
         "*🎁 Additional event credits*",
         "Happy Hour credit (estimated, not settled): "
