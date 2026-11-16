@@ -106,21 +106,13 @@ def matching_completed_period(
     start: date,
     end: date,
 ) -> Any | None:
-    """Never assume 'yesterday', 'week' or 'last_week' date labels are fresh."""
+    """Match exact London calendar boundaries, including partial day ledgers."""
     if not isinstance(periods, Mapping):
         return None
-    wanted_days = (end - start).days + 1
     for period in periods.values():
         if (
-            _period_day(_field(period, "start_date")) != start
-            or _period_day(_field(period, "end_date")) != end
-        ):
-            continue
-        if (
-            _field(period, "data_complete") is True
-            and _field(period, "complete_days") == wanted_days
-            and _field(period, "incomplete_days") == 0
-            and _field(period, "days_included") == wanted_days
+            _period_day(_field(period, "start_date")) == start
+            and _period_day(_field(period, "end_date")) == end
         ):
             return period
     return None
@@ -154,52 +146,107 @@ def _pounds(pence: Any) -> str:
     return f"£{number / 100:.2f}" if isfinite(number) else "unavailable"
 
 
+def _number(value: Any) -> float | None:
+    try:
+        number = float(value)
+    except (ValueError, TypeError, OverflowError):
+        return None
+    return number if isfinite(number) else None
+
+
 def completed_period_message(
-    periods: Mapping[str, Any], now: datetime, weekly: bool
+    periods: Mapping[str, Any],
+    now: datetime,
+    weekly: bool,
+    *,
+    standing_charge_pence_per_day: float | None = None,
 ) -> tuple[str, str]:
-    """A calendar-correct recap; incomplete history has no invented figures."""
+    """Publish recorded totals with explicit incomplete-coverage provenance.
+
+    The KEMS period ledger's actual_net_cost_pence excludes electricity
+    standing charge. Dashboard gross cost includes it once per calendar day.
+    Never claim a complete bill if one or more days are incomplete.
+    """
     start, end = recap_window(now, weekly)
     kind = "weekly" if weekly else "daily"
     key = f"recap:{kind}:{start.isoformat()}:{end.isoformat()}"
     title = (
-        f"📅 *KEMS — Weekly Energy Summary*\n{start:%d %b}–{end:%d %b %Y}"
+        f"📅 *KEMS — Weekly Energy Summary*\\n{start:%d %b}–{end:%d %b %Y}"
         if weekly
-        else f"📊 *KEMS — Daily Energy Summary*\n{start:%d %b %Y}"
+        else f"📊 *KEMS — Daily Energy Summary*\\n{start:%d %b %Y}"
     )
     period = matching_completed_period(periods, start, end)
-    if period is None:
+    if period is None or not _number(_field(period, "days_included")):
         return (
             key,
-            f"{title}\n\n⚠️ *Report not yet available*\n"
-            "Completed-period figures are missing or incomplete. "
+            f"{title}\\n\\n⚠️ *No recorded period totals available*\\n"
             "No costs, savings or rewards have been inferred.",
         )
+
+    days = (end - start).days + 1
+    included = int(_number(_field(period, "days_included")) or 0)
+    complete = int(_number(_field(period, "complete_days")) or 0)
+    fully_covered = (
+        _field(period, "data_complete") is True
+        and included == days
+        and complete == days
+        and _field(period, "incomplete_days") == 0
+    )
+    coverage = (
+        "✅ Complete recorded coverage"
+        if fully_covered
+        else f"⚠️ *Partial coverage* ({complete}/{days} complete days; "
+        f"{included}/{days} days recorded). Totals may be understated."
+    )
+
+    standing_daily = _number(standing_charge_pence_per_day)
+    base_net = _number(_field(period, "actual_net_cost_pence"))
+    estimated_refund = _number(
+        _field(period, "happy_hour_estimated_credit_pence")
+    )
+    standing = (
+        standing_daily * days if standing_daily is not None else None
+    )
+    gross = (
+        base_net + standing
+        if base_net is not None and standing is not None
+        else None
+    )
+    after_credit = (
+        gross - estimated_refund
+        if gross is not None and estimated_refund is not None
+        else None
+    )
+
     lines = [
         title,
+        coverage,
         "",
-        "*⚡ Energy*",
+        "*⚡ Recorded energy*",
         f"⬇️ Grid import: {_quantity(_field(period, 'grid_import_kwh'), 'kWh')}",
         f"⬆️ Grid export: {_quantity(_field(period, 'grid_export_kwh'), 'kWh')}",
         "☀️ Solar generated: "
         + _quantity(_field(period, "solar_generation_kwh"), "kWh"),
         "",
-        "*💷 Actual energy finances*",
-        f"Import cost: {_pounds(_field(period, 'import_cost_pence'))}",
+        "*💷 Recorded finances*",
+        f"Electricity import: {_pounds(_field(period, 'import_cost_pence'))}",
+        f"Electricity standing charge: {_pounds(standing)}",
         f"Agile export income: {_pounds(_field(period, 'export_income_pence'))}",
         f"Gas cost: {_pounds(_field(period, 'gas_cost_pence'))}",
-        "*Net energy cost (reported actual): "
-        + _pounds(_field(period, "actual_net_cost_pence"))
+        f"*Gross energy total (dashboard basis): {_pounds(gross)}*",
+        "",
+        "*🎁 Event credits*",
+        "Happy Hour refund (estimated, unsettled): "
+        + _pounds(estimated_refund),
+        "Power Down supplier-confirmed award: unavailable in period ledger",
+        "*Net after estimated Happy Hour refund: "
+        + _pounds(after_credit)
         + "*",
         "",
-        "*🎁 Additional event credits*",
-        "Happy Hour credit (estimated, not settled): "
-        + _pounds(_field(period, "happy_hour_estimated_credit_pence")),
-        "Power Down verified reward: unavailable in completed-period ledger",
-        "",
-        "ℹ️ Estimated credits are not confirmed payments and are "
-        "not added again to the reported actual net cost.",
+        "ℹ️ Estimated refunds are not supplier-confirmed. "
+        "A partial report is not a verified full-period bill.",
     ]
-    return key, "\n".join(lines)
+    return key, "\\n".join(lines)
 
 
 def morning_report_due(now: datetime, weekly: bool) -> bool:
