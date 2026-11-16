@@ -89,4 +89,17 @@ def compact_roi_reward_audit(audit: Mapping[str, Any]) -> dict[str, Any]:
             coverage_attrs.pop("note", None)
 
     attrs["sensor_entries_truncated"] = bool(attrs["entries_omitted"])
+    # Even after row trimming, future provider versions may add unbounded
+    # historical-coverage metadata. Keep financial totals intact, but never
+    # allow these extra descriptive fields to defeat HA's 16 KiB limit.
+    if _byte_count(attrs) > MAX_SENSOR_ATTRIBUTES_BYTES:
+        attrs["historical_coverage"] = {
+            "details_omitted_for_recorder": True,
+        }
+        attrs["historical_coverage_in_diagnostics"] = True
+        attrs["sensor_entries_truncated"] = True
+    # The summary consists of bounded numeric and boolean fields under the
+    # current audit schema; make failures explicit if that contract ever grows.
+    if _byte_count(attrs) > MAX_SENSOR_ATTRIBUTES_BYTES:
+        raise ValueError("ROI reward audit summary exceeds the Recorder budget")
     return attrs

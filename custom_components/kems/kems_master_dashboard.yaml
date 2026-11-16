@@ -752,10 +752,10 @@ views:
       - type: markdown
         content: |
           # Compare
-          Three views of the same property: **Without KEMS** is the counterfactual cost if the solar/battery/KEMS system had never been installed, **Live** is what actually happened **after the estimated, unsettled Happy Hour refund**, and **KEMS** is what the digital twin would have done. Gross import and export are retained separately.
+          Two views of the same property: **Without KEMS** estimates the counterfactual cost if the solar/battery/KEMS system had never been installed; **Live** shows measured costs after the estimated, unsettled Happy Hour refund. Gross import and export remain separate. ROI is a separate accrued accounting ledger.
 
       - type: grid
-        columns: 3
+        columns: 2
         square: false
         cards:
           - type: markdown
@@ -795,57 +795,48 @@ views:
 
               _Measured property data after estimated, unsettled Octopus refund. Gross billing remains separately recorded._
 
-          - type: markdown
-            title: KEMS
-            content: |
-              {% set p = ((state_attr('sensor.kems_energy_cost_comparison', 'periods') or {}).get('today', {}) or {}) %}
-              {% set kems = p.get('kems', {}) or {} %}
-              **Today total energy cost**  
-              # {{ ('£%.2f' | format((kems.get('total_energy_cost_pence') | float) / 100)) if kems.get('total_energy_cost_pence') is not none else '—' }}
-
-              Electricity: {{ ('£%.2f' | format((kems.get('electricity_total_cost_pence') | float) / 100)) if kems.get('electricity_total_cost_pence') is not none else '—' }}  
-              Gas: {{ ('£%.2f' | format((kems.get('gas_total_cost_pence') | float) / 100)) if kems.get('gas_total_cost_pence') is not none else '—' }}  
-              Grid import: {{ (kems.get('grid_import_kwh') ~ ' kWh') if kems.get('grid_import_kwh') is not none else '—' }}  
-              Grid export: {{ (kems.get('grid_export_kwh') ~ ' kWh') if kems.get('grid_export_kwh') is not none else '—' }}
-
-              _Configured KEMS digital twin._
-
       - type: markdown
         title: Today — side by side
         content: |
           {% set p = ((state_attr('sensor.kems_energy_cost_comparison', 'periods') or {}).get('today', {}) or {}) %}
           {% set live = p.get('live_data', {}) or {} %}
-          {% set kems = p.get('kems', {}) or {} %}
+          {% set gas = live.get('gas_total_cost_pence') %}
           {% set base_state = states('sensor.kems_compare_no_system_cost_today') %}
           {% set base_e = (base_state | float(0)) if base_state not in ['unknown','unavailable','none',''] else none %}
-          {% set gas = live.get('gas_total_cost_pence') %}
           {% set base_total = (base_e + (gas | float(0))) if base_e is not none and gas is not none else none %}
-          | Metric | Without KEMS | Live | KEMS |
-          |---|---:|---:|---:|
-          | Total energy cost | {{ ('£%.2f' | format(base_total / 100)) if base_total is not none else '—' }} | {{ ('£%.2f' | format((live.get('total_energy_effective_cost_pence') | float) / 100)) if live.get('total_energy_effective_cost_pence') is not none else '—' }} | {{ ('£%.2f' | format((kems.get('total_energy_cost_pence') | float) / 100)) if kems.get('total_energy_cost_pence') is not none else '—' }} |
-          | Est. Happy Hour refund (pending) | — | {{ ('−£%.2f' | format((live.get('happy_hour_estimated_credit_pence') | float) / 100)) if live.get('happy_hour_estimated_credit_pence') is not none else '—' }} | — |
-          | Electricity (Live after est. refund) | {{ ('£%.2f' | format(base_e / 100)) if base_e is not none else '—' }} | {{ ('£%.2f' | format((live.get('electricity_effective_total_cost_pence') | float) / 100)) if live.get('electricity_effective_total_cost_pence') is not none else '—' }} | {{ ('£%.2f' | format((kems.get('electricity_total_cost_pence') | float) / 100)) if kems.get('electricity_total_cost_pence') is not none else '—' }} |
-          | Gas | {{ ('£%.2f' | format((gas | float) / 100)) if gas is not none else '—' }} | {{ ('£%.2f' | format((live.get('gas_total_cost_pence') | float) / 100)) if live.get('gas_total_cost_pence') is not none else '—' }} | {{ ('£%.2f' | format((kems.get('gas_total_cost_pence') | float) / 100)) if kems.get('gas_total_cost_pence') is not none else '—' }} |
-          | Grid import | {{ state_attr('sensor.kems_compare_no_system_cost_today', 'grid_import_kwh') if state_attr('sensor.kems_compare_no_system_cost_today', 'grid_import_kwh') is not none else '—' }} | {{ live.get('grid_import_kwh', '—') }} | {{ kems.get('grid_import_kwh', '—') }} |
-          | Grid export | {{ state_attr('sensor.kems_compare_no_system_cost_today', 'grid_export_kwh') if state_attr('sensor.kems_compare_no_system_cost_today', 'grid_export_kwh') is not none else '—' }} | {{ live.get('grid_export_kwh', '—') }} | {{ kems.get('grid_export_kwh', '—') }} |
+          {% set live_total = live.get('total_energy_effective_cost_pence') %}
+          {% set live_e = live.get('electricity_effective_total_cost_pence') %}
+          {% set credit = live.get('happy_hour_estimated_credit_pence') %}
+          {% set roi_state = states('sensor.kems_actual_system_value_today') %}
+          {% set roi_today = (roi_state | float(0)) if roi_state not in ['unknown','unavailable','none',''] else none %}
+          | Metric | Without KEMS | Live |
+          |---|---:|---:|
+          | Total energy cost | {{ ('£%.2f' | format(base_total / 100)) if base_total is not none else '—' }} | {{ ('£%.2f' | format(live_total / 100)) if live_total is not none else '—' }} |
+          | Est. Happy Hour refund (pending) | — | {{ ('−£%.2f' | format(credit / 100)) if credit is not none else '—' }} |
+          | Electricity (Live after est. refund) | {{ ('£%.2f' | format(base_e / 100)) if base_e is not none else '—' }} | {{ ('£%.2f' | format(live_e / 100)) if live_e is not none else '—' }} |
+          | Gas | {{ ('£%.2f' | format(gas / 100)) if gas is not none else '—' }} | {{ ('£%.2f' | format(gas / 100)) if gas is not none else '—' }} |
+          | Grid import | {{ state_attr('sensor.kems_compare_no_system_cost_today', 'grid_import_kwh') if state_attr('sensor.kems_compare_no_system_cost_today', 'grid_import_kwh') is not none else '—' }} | {{ live.get('grid_import_kwh', '—') }} |
+          | Grid export | {{ state_attr('sensor.kems_compare_no_system_cost_today', 'grid_export_kwh') if state_attr('sensor.kems_compare_no_system_cost_today', 'grid_export_kwh') is not none else '—' }} | {{ live.get('grid_export_kwh', '—') }} |
 
-          {% if base_total is not none and live.get('total_energy_effective_cost_pence') is not none %}
-          **Live system value vs no system:** £{{ '%.2f' | format((base_total - (live.get('total_energy_effective_cost_pence') | float)) / 100) }}
+          {% if base_total is not none and live_total is not none %}
+          **Live system value vs no system:** £{{ '%.2f' | format((base_total - live_total) / 100) }}
           {% endif %}
-          {% if base_total is not none and kems.get('total_energy_cost_pence') is not none %}
-          **KEMS potential value vs no system:** £{{ '%.2f' | format((base_total - (kems.get('total_energy_cost_pence') | float)) / 100) }}
+          {% if roi_today is not none and base_total is not none and live_total is not none %}
+          **ROI ledger value today:** £{{ '%.2f' | format(roi_today) }} (separate ledger measure)
+          {% set difference = roi_today - ((base_total - live_total) / 100) %}
+          {% if difference | abs > 0.01 %}
+          _ROI and bill-equivalent comparison currently differ by £{{ '%.2f' | format(difference | abs) }}. These use different accounting bases or update times; the difference is under review and is not an extra supplier reward._
+          {% endif %}
           {% endif %}
 
-          _Live includes the estimated, not-yet-settled Happy Hour refund; gross electricity import is unchanged. The no-system baseline and digital twin are independent counterfactuals and are not allocated unsupported Happy Hour credits. Electricity history below remains gross, before estimated refunds. If KEMS is unavailable, no simulated bill is claimed; standalone net simulation figures are not interchangeable with this total._
+          _Live uses the estimated, unsettled Happy Hour refund; gross electricity import remains recorded normally. Without KEMS is a counterfactual, not an Octopus bill. ROI is a separately accrued ledger including eligible event rewards; it is not interchangeable with this bill-equivalent comparison._
 
       - type: history-graph
-        title: Electricity cost — Live vs KEMS
+        title: Gross electricity cost — Live vs Without KEMS
         hours_to_show: 168
         entities:
           - entity: sensor.kems_observed_cost_today
             name: Live (gross before HH refund)
-          - entity: sensor.kems_simulated_kems_cost_today
-            name: KEMS
           - entity: sensor.kems_compare_no_system_cost_today
             name: Without KEMS
 

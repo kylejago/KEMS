@@ -98,3 +98,15 @@ def test_oversized_notes_stay_bounded_and_financial_totals_unchanged():
     result = compact_roi_reward_audit(audit)
     assert _byte_count(result) < MAX_SENSOR_ATTRIBUTES_BYTES
     assert result["included_total_pence"] == audit["included_total_pence"]
+
+
+def test_adversarial_historical_coverage_cannot_overflow_recorder() -> None:
+    """Unbounded upstream descriptive metadata must not drop all HA history."""
+    audit = _audit(40)
+    audit["historical_coverage"]["large_dynamic_provider_blob"] = "X" * 100_000
+    result = compact_roi_reward_audit(audit)
+    assert _byte_count(result) <= MAX_SENSOR_ATTRIBUTES_BYTES
+    assert result["historical_coverage"] == {"details_omitted_for_recorder": True}
+    assert result["historical_coverage_in_diagnostics"] is True
+    assert result["included_total_pence"] == 926.349057
+    assert result["included_power_down_pence"] == 30.0

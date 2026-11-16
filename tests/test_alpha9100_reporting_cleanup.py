@@ -108,8 +108,8 @@ def test_today_side_by_side_uses_bill_equivalent_source() -> None:
     assert "electricity_export_income_pence" in home
     assert "sensor.kems_simulated_kems_cost_today" not in home
     assert "sensor.kems_energy_cost_comparison" in second
-    assert "total_energy_cost_pence" in second
-    assert "electricity_total_cost_pence" in second
+    assert "total_energy_effective_cost_pence" in second
+    assert "electricity_effective_total_cost_pence" in second
     assert "gas_total_cost_pence" in second
     assert "sensor.kems_simulated_kems_cost_today" not in second
-    assert "not interchangeable with this total" in second
+    assert "not interchangeable with this bill-equivalent comparison" in second

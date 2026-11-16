@@ -119,10 +119,10 @@ def test_compare_kems_uses_same_canonical_today_entities_as_kems_page() -> None:
     )[0]
 
     assert "sensor.kems_compare_full_kems_cost_today" not in compare
-    assert "sensor.kems_whole_home_simulated_cost_today" in compare
-    assert "sensor.kems_simulated_grid_import_today" in compare
-    assert "sensor.kems_simulated_grid_export_today" in compare
-    assert "canonical current-day simulation" in compare
+    assert "sensor.kems_whole_home_simulated_cost_today" not in compare
+    assert "sensor.kems_simulated_grid_import_today" not in compare
+    assert "sensor.kems_simulated_grid_export_today" not in compare
+    assert "total_energy_effective_cost_pence" in compare
 
 
 def test_dashboard_contract_repair_is_idempotent_and_reporting_only() -> None:
@@ -144,8 +144,8 @@ def test_alpha937_release_identity_and_scope() -> None:
     bundle = json.loads((ROOT / "release" / "kems-bundle.template.json").read_text())
     reason = str(bundle["maintenance"]["reason"])
 
-    assert manifest["version"] == "0.9.0-alpha9.206"
-    assert reason.startswith("Alpha9.206:")
+    assert manifest["version"] == "0.9.0-alpha9.207"
+    assert reason.startswith("Alpha9.207:")
     assert "Alpha9.37" in reason
     assert "canonical current-day KEMS cost" in reason
     assert "presentation/reporting only" in reason

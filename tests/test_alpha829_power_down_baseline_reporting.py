@@ -26,7 +26,8 @@ def test_power_down_reward_equation_remains_net_meter_based() -> None:
 
     assert "simulated_net = simulated_import_kwh - simulated_export_kwh" in simulation
     assert "reduction = max(baseline_interval - simulated_net, 0.0)" in simulation
-    assert "float(imported) - float(exported or 0.0)" in accounting
+    assert "imported - exported" in accounting
+    assert "or exported is None" in accounting
 
 
 def test_alpha829_release_contract_is_successor_safe() -> None:

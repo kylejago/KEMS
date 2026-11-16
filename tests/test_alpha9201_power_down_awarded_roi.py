@@ -156,3 +156,24 @@ def test_missing_octopus_rate_baseline_and_award_remains_pending() -> None:
     assert audit["included_power_down_pence"] == 0.0
     assert audit["supplier_settlement_available"] is False
     assert audit["entries"][0]["status"] == "pending_bonus_or_baseline_evidence"
+
+
+def test_supplier_power_down_award_does_not_stack_with_agile_export_or_repeat() -> None:
+    recorder = _recorder()
+    event = _event()
+    _observe(recorder, [event])
+    first = recorder.totals(datetime(2026, 11, 12, 19, tzinfo=UTC), date(2026, 9, 12))
+    assert first["power_down"] == 56.48
+    _observe(recorder, [event], [_joined(800)])
+    _observe(recorder, [event], [_joined(800)])
+    _observe(recorder, [event])
+    now = datetime(2026, 11, 12, 19, tzinfo=UTC)
+    rewards = recorder.totals(now, date(2026, 9, 12))
+    assert rewards["power_down"] == 100.0
+    assert rewards["total"] == 100.0
+    assert rewards["supplier_awarded"] == 100.0
+    assert rewards["unsettled"] == 0.0
+    # The route's 57.2p Agile export benchmark never becomes extra reward.
+    assert rewards["total"] != 100.0 + event.fixed_export_income_pence
+    audit = recorder.audit(now, date(2026, 9, 12), events=[event])
+    assert audit["entries"][0]["agile_export_income_already_counted"] is True

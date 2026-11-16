@@ -47,7 +47,7 @@ def _runtime_dashboard():
     compare = module._replace_between(
         compare,
         "          - type: markdown\n            title: Live\n",
-        "          - type: markdown\n            title: KEMS\n",
+        "      - type: markdown\n        title: Today — side by side\n",
         _legacy_compare_live_card(),
     )
     after_alpha95 = prefix + compare
