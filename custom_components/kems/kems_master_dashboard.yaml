@@ -776,7 +776,12 @@ views:
               Grid import: {{ (s.attributes.grid_import_kwh ~ ' kWh') if s and s.attributes.grid_import_kwh is not none else '—' }}  
               Grid export: {{ (s.attributes.grid_export_kwh ~ ' kWh') if s and s.attributes.grid_export_kwh is not none else '0 kWh' }}
 
-              _Counterfactual no-system replay._
+              {% set basis = state_attr('sensor.kems_compare_no_system_cost_today', 'comparison_cost_basis') %}
+              {% if basis == 'roi_meter_sampled_baseline' %}
+              _No-system electricity cost is calculated from the matched ROI meter-sampled baseline; the import and export kWh shown are from the independent scenario replay._
+              {% else %}
+              _Separate no-system scenario replay: ROI's meter-sampled baseline could not yet be reconciled. This difference is disclosed, not treated as an additional reward._
+              {% endif %}
 
           - type: markdown
             title: Live
@@ -829,7 +834,7 @@ views:
           {% endif %}
           {% endif %}
 
-          _Live uses the estimated, unsettled Happy Hour refund; gross electricity import remains recorded normally. Without KEMS is a counterfactual, not an Octopus bill. ROI is a separately accrued ledger including eligible event rewards; it is not interchangeable with this bill-equivalent comparison._
+          _Live uses the estimated, unsettled Happy Hour refund; gross electricity import remains recorded normally. Without KEMS uses the same measured-history baseline as ROI when source evidence matches (or an explicitly labelled scenario replay fallback). Gas and standing charges are shown on both sides; ROI may also include distinct supplier event rewards._
 
       - type: history-graph
         title: Gross electricity cost — Live vs Without KEMS
