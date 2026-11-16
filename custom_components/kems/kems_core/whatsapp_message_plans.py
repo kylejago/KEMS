@@ -224,8 +224,6 @@ def notify_entity_readiness(entity_id: Any, state: Any) -> dict[str, Any]:
         }
     return {
         "send_eligible": True,
-        "status": (
-            "ready_for_first_send" if value == "unknown" else "ready"
-        ),
+        "status": ("ready_for_first_send" if value == "unknown" else "ready"),
         "ha_state": value,
     }
