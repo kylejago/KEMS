@@ -60,7 +60,7 @@ def test_boundary_reference_splits_same_samples_without_changing_income() -> Non
         _record(start + timedelta(minutes=25), 2.0),
         _record(start + timedelta(minutes=40), 0.0),
     ]
-    result = _run(slots, records, start + timedelta(minutes=45))
+    result = _run(slots, records, start + timedelta(minutes=65))
     assert result["sample_priced_income_pence"] == 6.0
     assert result["snapshot_integrated_export_all_elapsed_kwh"] == 0.5
     assert result["boundary_reference_export_completed_kwh"] == 0.5
@@ -78,7 +78,7 @@ def test_boundary_reference_fails_closed_on_unpublished_second_slot() -> None:
         _record(start + timedelta(minutes=25), 2.0),
         _record(start + timedelta(minutes=40), 0.0),
     ]
-    result = _run([_slot(start, 12.0, 0.5)], records, start + timedelta(minutes=45))
+    result = _run([_slot(start, 12.0, 0.5)], records, start + timedelta(minutes=65))
     assert result["sample_priced_income_pence"] == 6.0
     assert result["boundary_reference_unmatched_kwh"] == pytest.approx(0.3333)
     assert result["boundary_reference_priced_income_pence"] is None
@@ -94,7 +94,7 @@ def test_boundary_reference_preserves_repeated_dst_hour_with_utc_offsets() -> No
     result = audit.agile_export_interval_audit(
         records=records,
         agile_state={"today_slots": slots},
-        now=start + timedelta(minutes=45),
+        now=start + timedelta(minutes=65),
         reported_grid_export_kwh=0.5,
         reported_income_pence=6.0,
         activation_cutoff=start.isoformat(),
@@ -109,7 +109,14 @@ def test_boundary_reference_preserves_repeated_dst_hour_with_utc_offsets() -> No
         (0.0, 0.0, 0.0, 0.0, True, "waiting_for_selected_agile_export"),
         (4.0, 0.0, 0.0, 0.0, True, "physical_reserve_guard_blocked_request"),
         (4.0, 4.0, 0.0, 0.0, True, "planner_request_not_in_final_control"),
-        (4.0, 4.0, 4.0, 0.0, True, "authorised_export_not_yet_observed_in_single_snapshot"),
+        (
+            4.0,
+            4.0,
+            4.0,
+            0.0,
+            True,
+            "authorised_export_not_yet_observed_in_single_snapshot",
+        ),
         (4.0, 4.0, 4.0, 3.5, True, "grid_export_observed"),
         (4.0, 4.0, 4.0, 0.0, False, "control_gate_not_authorised"),
     ],
@@ -129,7 +136,12 @@ def test_single_scan_export_evidence_never_claims_settlement(
         desired_work_mode="Force Discharge",
         blocked_reason=None,
     )
-    state = {"rolling_export_plan": {"available": True, "current_battery_export_target_kw": requested}}
+    state = {
+        "rolling_export_plan": {
+            "available": True,
+            "current_battery_export_target_kw": requested,
+        }
+    }
     guard = {"requested_export_kw": requested, "permitted_export_kw": permitted}
     result = audit.agile_current_export_execution_observation(
         snapshot=snapshot, control=control, agile_state=state, physical_guard=guard
@@ -142,8 +154,15 @@ def test_single_scan_export_evidence_never_claims_settlement(
 
 
 def test_missing_observations_do_not_claim_success_or_failing_hardware() -> None:
-    state = {"rolling_export_plan": {"available": True, "current_battery_export_target_kw": 4.0}}
-    control = SimpleNamespace(desired_battery_export_power_kw=4.0, commands_permitted=True)
+    state = {
+        "rolling_export_plan": {
+            "available": True,
+            "current_battery_export_target_kw": 4.0,
+        }
+    }
+    control = SimpleNamespace(
+        desired_battery_export_power_kw=4.0, commands_permitted=True
+    )
     snap = SimpleNamespace(grid_export_kw=None, grid_import_kw=0.0)
     result = audit.agile_current_export_execution_observation(
         snapshot=snap, control=control, agile_state=state, physical_guard={}

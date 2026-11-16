@@ -343,9 +343,7 @@ def agile_export_interval_audit(
             shadow_completed_kwh - boundary_reference_settled_kwh, 3
         ),
         "boundary_reference_priced_income_pence": boundary_reference_priced_income,
-        "boundary_reference_unmatched_kwh": round(
-            boundary_reference_unmatched_kwh, 4
-        ),
+        "boundary_reference_unmatched_kwh": round(boundary_reference_unmatched_kwh, 4),
         "boundary_reference_unpriced_pairs": boundary_reference_unpriced_pairs,
         "boundary_reference_reallocated_kwh": round(
             boundary_reference_reallocated_kwh, 4
@@ -371,7 +369,6 @@ def agile_export_interval_audit(
         ),
         "rows": rows,
     }
-
 
 
 def agile_current_export_execution_observation(
@@ -431,9 +428,11 @@ def agile_current_export_execution_observation(
         "status": status,
         "reporting_only": True,
         "physical_dispatch_verified": False,
-        "observation_timestamp": getattr(snapshot, "timestamp", None).isoformat()
-        if getattr(snapshot, "timestamp", None) is not None
-        else None,
+        "observation_timestamp": (
+            getattr(snapshot, "timestamp", None).isoformat()
+            if getattr(snapshot, "timestamp", None) is not None
+            else None
+        ),
         "rolling_plan_requested_export_kw": requested,
         "physical_guard_requested_export_kw": guard_requested,
         "physical_guard_permitted_export_kw": permitted,

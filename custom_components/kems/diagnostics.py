@@ -263,9 +263,7 @@ async def async_get_config_entry_diagnostics(
                 snapshot=data.snapshot,
                 control=data.control,
                 agile_state=coordinator.agile_smart_export_state,
-                physical_guard=getattr(
-                    coordinator, "_agile_live_reserve_status", {}
-                ),
+                physical_guard=getattr(coordinator, "_agile_live_reserve_status", {}),
             )
             if export_tariff_type_from_options(entry.options)
             == EXPORT_TARIFF_TYPE_AGILE
