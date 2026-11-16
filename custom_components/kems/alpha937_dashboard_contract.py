@@ -197,37 +197,38 @@ _COMPARE_KEMS = """          - type: markdown
 _COMPARE_SIDE_BY_SIDE = """      - type: markdown
         title: Today — side by side
         content: |
-          {% set bad = ['unknown', 'unavailable', 'none', ''] %}
-          {% set gas_state = states('sensor.kems_gas_cost_today') %}
-          {% set gas = (gas_state | float(0)) if gas_state | lower not in bad else none %}
-          {% set base_state = states('sensor.kems_compare_no_system_cost_today') %}
-          {% set base_e = (base_state | float(0)) if base_state | lower not in bad else none %}
           {% set p = ((state_attr('sensor.kems_energy_cost_comparison', 'periods') or {}).get('today', {}) or {}) %}
           {% set live = p.get('live_data', {}) or {} %}
+          {% set gas = live.get('gas_total_cost_pence') %}
+          {% set base_state = states('sensor.kems_compare_no_system_cost_today') %}
+          {% set base_e = (base_state | float(0)) if base_state not in ['unknown','unavailable','none',''] else none %}
+          {% set base_total = (base_e + (gas | float(0))) if base_e is not none and gas is not none else none %}
           {% set live_total = live.get('total_energy_effective_cost_pence') %}
           {% set live_e = live.get('electricity_effective_total_cost_pence') %}
-          {% set happy_credit = live.get('happy_hour_estimated_credit_pence') %}
-          {% set kems_state = states('sensor.kems_whole_home_simulated_cost_today') %}
-          {% set kems_total = (kems_state | float(0)) if kems_state | lower not in bad else none %}
-          {% set kems_e = (kems_total - gas) if kems_total is not none and gas is not none else none %}
-          {% set base_total = (base_e + gas) if base_e is not none and gas is not none else none %}
-          | Metric | Without KEMS | Live | KEMS |
-          |---|---:|---:|---:|
-          | Total energy cost | {{ ('£%.2f' | format(base_total / 100)) if base_total is not none else '—' }} | {{ ('£%.2f' | format(live_total / 100)) if live_total is not none else '—' }} | {{ ('£%.2f' | format(kems_total / 100)) if kems_total is not none else '—' }} |
-          | Est. Happy Hour refund (pending) | — | {{ ('−£%.2f' | format(happy_credit / 100)) if happy_credit is not none else '—' }} | — |
-          | Electricity (Live after est. refund) | {{ ('£%.2f' | format(base_e / 100)) if base_e is not none else '—' }} | {{ ('£%.2f' | format(live_e / 100)) if live_e is not none else '—' }} | {{ ('£%.2f' | format(kems_e / 100)) if kems_e is not none else '—' }} |
-          | Gas | {{ ('£%.2f' | format(gas / 100)) if gas is not none else '—' }} | {{ ('£%.2f' | format(gas / 100)) if gas is not none else '—' }} | {{ ('£%.2f' | format(gas / 100)) if gas is not none else '—' }} |
-          | Grid import | {{ state_attr('sensor.kems_compare_no_system_cost_today', 'grid_import_kwh') or '—' }} | {{ states('sensor.kems_observed_grid_import_today') }} | {{ states('sensor.kems_simulated_grid_import_today') }} |
-          | Grid export | {{ state_attr('sensor.kems_compare_no_system_cost_today', 'grid_export_kwh') or 0 }} | {{ states('sensor.kems_observed_grid_export_today') }} | {{ states('sensor.kems_simulated_grid_export_today') }} |
+          {% set credit = live.get('happy_hour_estimated_credit_pence') %}
+          {% set roi_state = states('sensor.kems_actual_system_value_today') %}
+          {% set roi_today = (roi_state | float(0)) if roi_state not in ['unknown','unavailable','none',''] else none %}
+          | Metric | Without KEMS | Live |
+          |---|---:|---:|
+          | Total energy cost | {{ ('£%.2f' | format(base_total / 100)) if base_total is not none else '—' }} | {{ ('£%.2f' | format(live_total / 100)) if live_total is not none else '—' }} |
+          | Est. Happy Hour refund (pending) | — | {{ ('−£%.2f' | format(credit / 100)) if credit is not none else '—' }} |
+          | Electricity (Live after est. refund) | {{ ('£%.2f' | format(base_e / 100)) if base_e is not none else '—' }} | {{ ('£%.2f' | format(live_e / 100)) if live_e is not none else '—' }} |
+          | Gas | {{ ('£%.2f' | format(gas / 100)) if gas is not none else '—' }} | {{ ('£%.2f' | format(gas / 100)) if gas is not none else '—' }} |
+          | Grid import | {{ state_attr('sensor.kems_compare_no_system_cost_today', 'grid_import_kwh') if state_attr('sensor.kems_compare_no_system_cost_today', 'grid_import_kwh') is not none else '—' }} | {{ live.get('grid_import_kwh', '—') }} |
+          | Grid export | {{ state_attr('sensor.kems_compare_no_system_cost_today', 'grid_export_kwh') if state_attr('sensor.kems_compare_no_system_cost_today', 'grid_export_kwh') is not none else '—' }} | {{ live.get('grid_export_kwh', '—') }} |
 
           {% if base_total is not none and live_total is not none %}
           **Live system value vs no system:** £{{ '%.2f' | format((base_total - live_total) / 100) }}
           {% endif %}
-          {% if base_total is not none and kems_total is not none %}
-          **KEMS potential value vs no system:** £{{ '%.2f' | format((base_total - kems_total) / 100) }}
+          {% if roi_today is not none and base_total is not none and live_total is not none %}
+          **ROI ledger value today:** £{{ '%.2f' | format(roi_today) }} (separate ledger measure)
+          {% set difference = roi_today - ((base_total - live_total) / 100) %}
+          {% if difference | abs > 0.01 %}
+          _ROI and bill-equivalent comparison currently differ by £{{ '%.2f' | format(difference | abs) }}. These use different accounting bases or update times; the difference is under review and is not an extra supplier reward._
+          {% endif %}
           {% endif %}
 
-          _Live includes the verified-evidence Happy Hour refund estimate, not a settled supplier credit. Without KEMS and KEMS are separate counterfactuals; electricity history remains gross._
+          _Live uses the estimated, unsettled Happy Hour refund; gross electricity import remains recorded normally. Without KEMS is a counterfactual, not an Octopus bill. ROI is a separately accrued ledger including eligible event rewards; it is not interchangeable with this bill-equivalent comparison._
 """
 
 
@@ -243,7 +244,7 @@ def _replace_between(content: str, start: str, end: str, replacement: str) -> st
 
 
 def _repair_compare_view(content: str) -> str:
-    """Make Compare use the same canonical KEMS-today contract as the KEMS page."""
+    """Keep only measured Live and no-system cards after legacy compatibility rewrites."""
     marker = "\n  - title: Compare\n"
     start = content.find(marker)
     if start < 0:
@@ -252,26 +253,33 @@ def _repair_compare_view(content: str) -> str:
     if end < 0:
         end = len(content)
     compare = content[start:end]
-    # Alpha9.206: Alpha9.5 rewrites Compare -> Live to the gross flat
-    # whole-home sensor. Repair the final runtime payload here, after that
-    # compatibility layer, so it uses the same verified-estimate basis as Home.
+    # Alpha9.5 still overwrites the Live card with gross values. Always repair
+    # after that layer; the optional former KEMS column is not a required anchor.
+    live_marker = "          - type: markdown\n            title: Live\n"
+    kems_marker = "          - type: markdown\n            title: KEMS\n"
+    side_marker = "      - type: markdown\n        title: Today — side by side\n"
+    if kems_marker in compare:
+        compare = _replace_between(compare, live_marker, kems_marker, _COMPARE_LIVE)
+        compare = _replace_between(compare, kems_marker, side_marker, "")
+    else:
+        compare = _replace_between(compare, live_marker, side_marker, _COMPARE_LIVE)
     compare = _replace_between(
         compare,
-        "          - type: markdown\n            title: Live\n",
-        "          - type: markdown\n            title: KEMS\n",
-        _COMPARE_LIVE,
-    )
-    compare = _replace_between(
-        compare,
-        "          - type: markdown\n            title: KEMS\n",
-        "      - type: markdown\n        title: Today — side by side\n",
-        _COMPARE_KEMS,
-    )
-    compare = _replace_between(
-        compare,
-        "      - type: markdown\n        title: Today — side by side\n",
-        "      - type: history-graph\n        title: Electricity cost — Live vs KEMS\n",
+        side_marker,
+        "      - type: history-graph\n",
         _COMPARE_SIDE_BY_SIDE,
+    )
+    compare = compare.replace(
+        "Three views of the same property:",
+        "Two views of the same property:",
+    )
+    compare = compare.replace(
+        "title: Electricity cost — Live vs KEMS",
+        "title: Gross electricity cost — Live vs Without KEMS",
+    )
+    compare = compare.replace(
+        "          - entity: sensor.kems_simulated_kems_cost_today\n            name: KEMS\n",
+        "",
     )
     return content[:start] + compare + content[end:]
 
