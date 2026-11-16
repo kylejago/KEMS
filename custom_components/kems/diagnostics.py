@@ -179,6 +179,11 @@ async def async_get_config_entry_diagnostics(
         "power_down_baseline_entity_registry": baseline_entity_registry,
         "roi_reward_recorder_probe": reward_recorder,
         "happy_hour_import_counter_candidates": import_counter_candidates,
+        "whatsapp_notifications": (
+            coordinator._kems_whatsapp_reporter.status
+            if getattr(coordinator, "_kems_whatsapp_reporter", None) is not None
+            else {"enabled": False, "status": "not_initialised"}
+        ),
         "source_freshness": {
             "stale_timeout_seconds": coordinator.settings.control.stale_data_seconds,
             "intelligent_source_stale_timeout_seconds": max(

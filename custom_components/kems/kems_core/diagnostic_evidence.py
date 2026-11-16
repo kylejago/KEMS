@@ -156,6 +156,7 @@ def agile_export_interval_audit(
             "snapshot_integrated_income_pence": 0.0,
             "sample_pairs": 0,
             "sample_spanned_seconds": 0.0,
+            "sample_observed_seconds": 0.0,
             "over_10_minute_gaps": 0,
             "cross_slot_boundary_pairs": 0,
             "boundary_reference_export_kwh": 0.0,
@@ -180,6 +181,27 @@ def agile_export_interval_audit(
         ),
         key=lambda item: item.timestamp,
     )
+    # Time coverage is distinct from *positive export* time. All valid
+    # observations, including 0kW, prove source visibility for an interval.
+    # Do not count missing/stale source readings as observed or invent kWh.
+    for current, following in zip(today_records, today_records[1:], strict=False):
+        delta = (following.timestamp - current.timestamp).total_seconds()
+        power = _finite(getattr(current, "grid_export_kw", None))
+        if (
+            delta <= 0
+            or power is None
+            or power < 0
+            or "grid_export_kw" in (getattr(current, "stale_fields", ()) or ())
+        ):
+            continue
+        capped_end = current.timestamp + timedelta(seconds=min(delta, 1800.0))
+        for start, end, row in intervals:
+            seconds = (
+                min(capped_end, end, now) - max(start, current.timestamp)
+            ).total_seconds()
+            if seconds > 0:
+                row["sample_observed_seconds"] += seconds
+
     unpriced_positive_pairs = 0
     unmatched_positive_pairs = 0
     boundary_reference_unmatched_kwh = 0.0
@@ -260,12 +282,32 @@ def agile_export_interval_audit(
             ("snapshot_integrated_export_kwh", 4),
             ("snapshot_integrated_income_pence", 3),
             ("sample_spanned_seconds", 1),
+            ("sample_observed_seconds", 1),
             ("boundary_reference_export_kwh", 4),
             ("boundary_reference_income_pence", 3),
             ("boundary_reference_spanned_seconds", 1),
         ):
             if row[name] is not None:
                 row[name] = round(row[name], digits)
+        duration = (
+            datetime.fromisoformat(row["valid_to"])
+            - datetime.fromisoformat(row["valid_from"])
+        ).total_seconds()
+        observed = min(row["sample_observed_seconds"], duration)
+        row["sample_coverage_percent"] = (
+            round(100.0 * observed / duration, 1) if duration > 0 else None
+        )
+        row["unobserved_seconds"] = round(max(duration - observed, 0.0), 1)
+        row["positive_export_sample_seconds"] = row["sample_spanned_seconds"]
+        row["sample_coverage_status"] = (
+            "incomplete_sample_coverage"
+            if row["completed"] and row["sample_coverage_percent"] < 95.0
+            else (
+                "observed_at_least_95_percent"
+                if row["completed"]
+                else "slot_not_complete"
+            )
+        )
         if row["completed"] and row["shadow_grid_export_kwh"] is not None:
             row["shadow_minus_snapshot_kwh"] = round(
                 row["shadow_grid_export_kwh"] - row["snapshot_integrated_export_kwh"],
@@ -364,6 +406,20 @@ def agile_export_interval_audit(
         "unpriced_positive_sample_pairs": unpriced_positive_pairs,
         "unmatched_positive_sample_pairs": unmatched_positive_pairs,
         "long_gap_pairs": sum(row["over_10_minute_gaps"] for row in rows),
+        "settled_slots_with_incomplete_sample_coverage": sum(
+            row["sample_coverage_status"] == "incomplete_sample_coverage"
+            for row in settled_rows
+        ),
+        "settled_slots_unobserved_seconds": round(
+            sum(row["unobserved_seconds"] for row in settled_rows), 1
+        ),
+        "sample_coverage_note": (
+            "Diagnostic observed-time coverage counts valid same-day FoxESS "
+            "power readings even when grid export is zero, and excludes stale "
+            "samples. Positive export sample spans are a different metric; "
+            "neither is an independent export meter or Octopus settlement. "
+            "Missing elapsed time is not evidence of zero export."
+        ),
         "boundary_crossing_pairs": sum(
             row["cross_slot_boundary_pairs"] for row in rows
         ),

@@ -115,6 +115,13 @@ from .const import (
     CONF_TARIFF_CHANGE_3_OFFPEAK_RATE,
     CONF_TARIFF_CHANGE_3_STANDING_CHARGE,
     CONF_TARIFF_MODE,
+    CONF_WHATSAPP_DAILY,
+    CONF_WHATSAPP_ENABLED,
+    CONF_WHATSAPP_FAMILY_ENTITY,
+    CONF_WHATSAPP_PRIVATE,
+    CONF_WHATSAPP_PRIVATE_ENTITY,
+    CONF_WHATSAPP_SESSIONS,
+    CONF_WHATSAPP_WEEKLY,
     DEFAULT_OPTIONS,
     DOMAIN,
     ENTITY_MAPPING_KEYS,
@@ -132,6 +139,7 @@ from .tariff import normalise_october_2026_loyal_options
 
 SENSOR_SELECTOR = EntitySelector(EntitySelectorConfig(domain="sensor"))
 BINARY_SENSOR_SELECTOR = EntitySelector(EntitySelectorConfig(domain="binary_sensor"))
+NOTIFY_SELECTOR = EntitySelector(EntitySelectorConfig(domain="notify"))
 EVENT_SELECTOR = EntitySelector(EntitySelectorConfig(domain="event"))
 NUMBER_SELECTOR = EntitySelector(EntitySelectorConfig(domain="number"))
 
@@ -346,6 +354,18 @@ MONITORING_SCHEMA = vol.Schema(
         vol.Required(CONF_HISTORY_DAYS): _number(1, 365, 1, "days"),
         vol.Required(CONF_DETAILED_COMPARISONS_ENABLED): BOOLEAN_SELECTOR,
         vol.Required(CONF_GAS_KWH_PER_M3): _number(1, 20, "any", "kWh/m³"),
+    }
+)
+
+WHATSAPP_SCHEMA = vol.Schema(
+    {
+        vol.Required(CONF_WHATSAPP_ENABLED): BOOLEAN_SELECTOR,
+        vol.Required(CONF_WHATSAPP_FAMILY_ENTITY): NOTIFY_SELECTOR,
+        vol.Required(CONF_WHATSAPP_PRIVATE_ENTITY): NOTIFY_SELECTOR,
+        vol.Required(CONF_WHATSAPP_SESSIONS): BOOLEAN_SELECTOR,
+        vol.Required(CONF_WHATSAPP_DAILY): BOOLEAN_SELECTOR,
+        vol.Required(CONF_WHATSAPP_WEEKLY): BOOLEAN_SELECTOR,
+        vol.Required(CONF_WHATSAPP_PRIVATE): BOOLEAN_SELECTOR,
     }
 )
 
@@ -638,6 +658,7 @@ class KEMSOptionsFlow(OptionsFlowWithReload):
         "forecast": "Forecast and reserve planning",
         "financial": "System cost and ROI",
         "monitoring": "Monitoring and history",
+        "whatsapp": "WhatsApp notifications (optional)",
         "panel": "Panel display",
         "control": "KEMS type, mode and safety",
     }
@@ -747,6 +768,15 @@ class KEMSOptionsFlow(OptionsFlowWithReload):
         if user_input is not None:
             return self._save_options(user_input)
         return self._show_category("monitoring", MONITORING_SCHEMA)
+
+    async def async_step_whatsapp(
+        self,
+        user_input: dict[str, Any] | None = None,
+    ):
+        """Configure HA notify targets; opt-in, with reload and zero control impact."""
+        if user_input is not None:
+            return self._save_options(user_input)
+        return self._show_category("whatsapp", WHATSAPP_SCHEMA)
 
     async def async_step_panel(
         self,

@@ -62,6 +62,10 @@ from .settings import KEMSSettings
 from .source_authority import async_reconcile_source_mappings
 from .update_orchestrator import async_unload_update_orchestrator
 from .update_orchestrator_convergent import async_setup_update_orchestrator
+from .whatsapp_notifications import (
+    async_setup_kems_whatsapp,
+    async_unload_kems_whatsapp,
+)
 
 LOGGER = logging.getLogger(__name__)
 
@@ -219,6 +223,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         await update_orchestrator.async_set_policy(automatic_restart=True)
     install_agile_simulation_presentation()
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+    # No notifications are sent until users explicitly enable them in
+    # integration options. Setup failures do not gate physical dispatch.
+    await async_setup_kems_whatsapp(hass, entry, coordinator)
     LOGGER.info(
         "KEMS initialised; FoxESS writes remain bounded and EV SOC sync / "
         "Happy Hour Ohme control are explicit opt-ins"
@@ -229,6 +236,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload KEMS config entry."""
     coordinator: KEMSCoordinator = entry.runtime_data
+    await async_unload_kems_whatsapp(coordinator)
     await async_unload_update_orchestrator(hass, entry)
     await coordinator.async_shutdown()
     return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
