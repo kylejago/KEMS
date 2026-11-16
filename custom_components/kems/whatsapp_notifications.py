@@ -266,9 +266,9 @@ class KEMSWhatsAppNotifications:
         now = dt_util.now()
         destination = "Private" if private else "Family"
         message = (
-            f"🧪 *KEMS — {destination} WhatsApp Test*\\n"
-            "✅ This test was requested using the KEMS Home Assistant button.\\n"
-            "📱 The configured notification route accepted the message.\\n"
+            f"🧪 *KEMS — {destination} WhatsApp Test*\n"
+            "✅ This test was requested using the KEMS Home Assistant button.\n"
+            "📱 The configured notification route accepted the message.\n"
             "ℹ️ Automatic event notifications and scheduled reports are unchanged."
         )
         async with self._lock:
@@ -325,7 +325,7 @@ class KEMSWhatsAppNotifications:
                 recovery_key = f"private:recovery:{key}:{sent_start}"
                 recovered = await self._send(
                     recovery_key,
-                    f"✅ *KEMS — Warning cleared*\\n{key.replace('_', ' ').title()} has recovered.",
+                    f"✅ *KEMS — Warning cleared*\n{key.replace('_', ' ').title()} has recovered.",
                     private=True,
                     now=now,
                 )
@@ -347,7 +347,7 @@ class KEMSWhatsAppNotifications:
                 alert_key = f"private:warning:{key}:{first.isoformat()}"
                 if await self._send(
                     alert_key,
-                    f"🚨 *KEMS — Technical warning*\\n⚠️ {description}.\\n"\n                    "Persisting for at least 5 minutes. Energy control operates independently.",
+                    f"🚨 *KEMS — Technical warning*\n⚠️ {description}.\n"\n                    "Persisting for at least 5 minutes. Energy control operates independently.",
                     private=True,
                     now=now,
                 ):
