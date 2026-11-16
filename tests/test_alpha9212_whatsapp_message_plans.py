@@ -39,29 +39,42 @@ def test_joined_only_with_durable_once_only_phases_and_rescheduled_identity():
     )
     assert len(planned) == 1
     assert "confirmed joined" in planned[0][1]
-    assert mod.event_notifications(
+    assert (
+        mod.event_notifications(
+            category="Power Down",
+            joined_events=[event],
+            now=start - timedelta(minutes=45),
+            sent_keys={planned[0][0]: "delivered"},
+        )
+        == []
+    )
+    started = mod.event_notifications(
         category="Power Down",
         joined_events=[event],
-        now=start - timedelta(minutes=45),
-        sent_keys={planned[0][0]: "delivered"},
-    ) == []
-    started = mod.event_notifications(
-        category="Power Down", joined_events=[event], now=start,
+        now=start,
         sent_keys={planned[0][0]: "delivered"},
     )
     assert len(started) == 1 and "started" in started[0][1]
     ended = mod.event_notifications(
-        category="Power Down", joined_events=[event],
-        now=start + timedelta(hours=1), sent_keys={},
+        category="Power Down",
+        joined_events=[event],
+        now=start + timedelta(hours=1),
+        sent_keys={},
     )
     assert "supplier-settled reward is not yet verified" in ended[0][1]
-    assert mod.event_notifications(
-        category="Power Down", joined_events=[event],
-        now=start + timedelta(hours=2), sent_keys={},
-    ) == []
+    assert (
+        mod.event_notifications(
+            category="Power Down",
+            joined_events=[event],
+            now=start + timedelta(hours=2),
+            sent_keys={},
+        )
+        == []
+    )
     updated = _event(start + timedelta(minutes=10))
     changed = mod.event_notifications(
-        category="Power Down", joined_events=[updated],
+        category="Power Down",
+        joined_events=[updated],
         now=start - timedelta(minutes=20),
         sent_keys={planned[0][0]: "delivered"},
     )
@@ -71,10 +84,15 @@ def test_joined_only_with_durable_once_only_phases_and_rescheduled_identity():
 
 def test_happy_hour_does_not_announce_unjoined_suggestion():
     start = datetime(2026, 11, 21, 8, tzinfo=UTC)
-    assert mod.event_notifications(
-        category="Happy Hour", joined_events=[_event(start, joined=False)],
-        now=start - timedelta(hours=2), sent_keys={},
-    ) == []
+    assert (
+        mod.event_notifications(
+            category="Happy Hour",
+            joined_events=[_event(start, joined=False)],
+            now=start - timedelta(hours=2),
+            sent_keys={},
+        )
+        == []
+    )
 
 
 def test_london_dst_daily_and_weekly_previous_completed_periods():
@@ -82,9 +100,7 @@ def test_london_dst_daily_and_weekly_previous_completed_periods():
     now = datetime(2026, 3, 30, 7, tzinfo=UTC)
     assert mod.morning_report_due(now, weekly=True)
     start, end = mod.recap_window(now, weekly=True)
-    assert (start.isoformat(), end.isoformat()) == (
-        "2026-03-23", "2026-03-29"
-    )
+    assert (start.isoformat(), end.isoformat()) == ("2026-03-23", "2026-03-29")
     assert mod.recap_window(now, weekly=False)[0].isoformat() == "2026-03-29"
     # Autumn shift: 25 Oct is 25h. 08:00 London is 08:00 UTC in November.
     autumn = datetime(2026, 10, 26, 8, tzinfo=UTC)
@@ -97,14 +113,22 @@ def test_stale_yesterday_label_and_incomplete_week_cannot_publish_old_money():
     now = datetime(2026, 11, 16, 8, tzinfo=UTC)
     periods = {
         "yesterday": {
-            "start_date": "2026-11-14", "end_date": "2026-11-14",
-            "days_included": 1, "complete_days": 1, "incomplete_days": 0,
-            "data_complete": True, "export_income_pence": 99999,
+            "start_date": "2026-11-14",
+            "end_date": "2026-11-14",
+            "days_included": 1,
+            "complete_days": 1,
+            "incomplete_days": 0,
+            "data_complete": True,
+            "export_income_pence": 99999,
         },
         "week": {
-            "start_date": "2026-11-09", "end_date": "2026-11-15",
-            "days_included": 7, "complete_days": 2, "incomplete_days": 4,
-            "data_complete": False, "export_income_pence": 99999,
+            "start_date": "2026-11-09",
+            "end_date": "2026-11-15",
+            "days_included": 7,
+            "complete_days": 2,
+            "incomplete_days": 4,
+            "data_complete": False,
+            "export_income_pence": 99999,
         },
     }
     _, daily = mod.completed_period_message(periods, now, weekly=False)
@@ -117,11 +141,17 @@ def test_stale_yesterday_label_and_incomplete_week_cannot_publish_old_money():
 def test_completed_period_money_separates_export_hh_and_supplier_award():
     now = datetime(2026, 11, 16, 8, tzinfo=UTC)
     period = {
-        "start_date": "2026-11-15", "end_date": "2026-11-15",
-        "days_included": 1, "complete_days": 1, "incomplete_days": 0,
-        "data_complete": True, "grid_export_kwh": 12.7,
-        "grid_import_kwh": 3.2, "solar_generation_kwh": 2.4,
-        "import_cost_pence": 100.0, "export_income_pence": 355.86,
+        "start_date": "2026-11-15",
+        "end_date": "2026-11-15",
+        "days_included": 1,
+        "complete_days": 1,
+        "incomplete_days": 0,
+        "data_complete": True,
+        "grid_export_kwh": 12.7,
+        "grid_import_kwh": 3.2,
+        "solar_generation_kwh": 2.4,
+        "import_cost_pence": 100.0,
+        "export_income_pence": 355.86,
         "gas_cost_pence": 72.0,
         "actual_net_cost_pence": -183.86,
         "happy_hour_estimated_credit_pence": 116.604,
@@ -138,9 +168,13 @@ def test_completed_period_money_separates_export_hh_and_supplier_award():
 def test_no_partial_or_invalid_price_is_fabricated():
     now = datetime(2026, 11, 16, 8, tzinfo=UTC)
     period = {
-        "start_date": "2026-11-15", "end_date": "2026-11-15",
-        "days_included": 1, "complete_days": 1, "incomplete_days": 0,
-        "data_complete": True, "grid_export_kwh": float("nan"),
+        "start_date": "2026-11-15",
+        "end_date": "2026-11-15",
+        "days_included": 1,
+        "complete_days": 1,
+        "incomplete_days": 0,
+        "data_complete": True,
+        "grid_export_kwh": float("nan"),
     }
     _, message = mod.completed_period_message({"a": period}, now, weekly=False)
     assert "Grid export: unavailable" in message

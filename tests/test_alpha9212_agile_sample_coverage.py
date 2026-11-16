@@ -91,8 +91,10 @@ def test_sparse_positive_pairs_do_not_claim_full_interval() -> None:
 
 def test_positive_sample_at_boundary_is_split_for_coverage_only() -> None:
     start = datetime(2026, 11, 16, 18, tzinfo=UTC)
-    record = [_record(start + timedelta(minutes=25), 6.0),
-              _record(start + timedelta(minutes=35), 0.0)]
+    record = [
+        _record(start + timedelta(minutes=25), 6.0),
+        _record(start + timedelta(minutes=35), 0.0),
+    ]
     result = _run(record, start + timedelta(minutes=40))
     row = result["rows"][0]
     assert row["sample_observed_seconds"] == 300.0

@@ -302,9 +302,11 @@ def agile_export_interval_audit(
         row["sample_coverage_status"] = (
             "incomplete_sample_coverage"
             if row["completed"] and row["sample_coverage_percent"] < 95.0
-            else "observed_at_least_95_percent"
-            if row["completed"]
-            else "slot_not_complete"
+            else (
+                "observed_at_least_95_percent"
+                if row["completed"]
+                else "slot_not_complete"
+            )
         )
         if row["completed"] and row["shadow_grid_export_kwh"] is not None:
             row["shadow_minus_snapshot_kwh"] = round(

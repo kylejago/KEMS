@@ -50,9 +50,7 @@ class KEMSWhatsAppNotifications:
         self.entry = entry
         self.coordinator = coordinator
         self.options = dict(entry.options)
-        self._store = Store(
-            hass, 1, f"{STORAGE_NAMESPACE}_whatsapp_{entry.entry_id}"
-        )
+        self._store = Store(hass, 1, f"{STORAGE_NAMESPACE}_whatsapp_{entry.entry_id}")
         self._cancel: Any = None
         self._lock = asyncio.Lock()
         self._tasks: set[asyncio.Task[Any]] = set()
@@ -144,8 +142,7 @@ class KEMSWhatsAppNotifications:
                         {
                             str(k): str(v)
                             for k, v in value.items()
-                            if isinstance(k, str)
-                            and isinstance(v, str)
+                            if isinstance(k, str) and isinstance(v, str)
                         },
                     )
         except (OSError, ValueError, TypeError) as err:
@@ -202,9 +199,7 @@ class KEMSWhatsAppNotifications:
         if key in self._delivered:
             return True
         target = self.options.get(
-            CONF_WHATSAPP_PRIVATE_ENTITY
-            if private
-            else CONF_WHATSAPP_FAMILY_ENTITY
+            CONF_WHATSAPP_PRIVATE_ENTITY if private else CONF_WHATSAPP_FAMILY_ENTITY
         )
         self._last_attempt = now.isoformat()
         if not self._target_available(target):
@@ -256,7 +251,9 @@ class KEMSWhatsAppNotifications:
             and getattr(control, "commissioned", False)
             and getattr(control, "plan_safe", True) is False
         ):
-            warnings["unsafe_control_plan"] = "A commissioned KEMS control plan is unsafe"
+            warnings["unsafe_control_plan"] = (
+                "A commissioned KEMS control plan is unsafe"
+            )
         if getattr(self.coordinator, "last_update_success", True) is False:
             warnings["coordinator_update_failed"] = (
                 "KEMS coordinator data refresh is failing"
@@ -299,10 +296,7 @@ class KEMSWhatsAppNotifications:
                 first = datetime.fromisoformat(self._warning_since[key])
             except ValueError:
                 first = now
-            if (
-                now - first >= _WARNING_PERSISTENCE
-                and key not in self._warning_alerted
-            ):
+            if now - first >= _WARNING_PERSISTENCE and key not in self._warning_alerted:
                 alert_key = f"private:warning:{key}:{first.isoformat()}"
                 if await self._send(
                     alert_key,
@@ -330,17 +324,17 @@ class KEMSWhatsAppNotifications:
                     power_down = data.snapshot
                     joined: list[dict[str, Any]] = []
                     if power_down.saving_session_joined is True:
-                        joined.append({
-                            "joined": True,
-                            "event_id": power_down.saving_session_id,
-                            "start": power_down.saving_session_start,
-                            "end": power_down.saving_session_end,
-                        })
+                        joined.append(
+                            {
+                                "joined": True,
+                                "event_id": power_down.saving_session_id,
+                                "start": power_down.saving_session_start,
+                                "end": power_down.saving_session_end,
+                            }
+                        )
                     happy = [
                         {**row, "joined": True}
-                        for row in verified_octopus_joined_bookings(
-                            self.hass, now=now
-                        )
+                        for row in verified_octopus_joined_bookings(self.hass, now=now)
                     ]
                     for category, events in (
                         ("Power Down", joined),
@@ -357,9 +351,8 @@ class KEMSWhatsAppNotifications:
                     (False, CONF_WHATSAPP_DAILY),
                     (True, CONF_WHATSAPP_WEEKLY),
                 ):
-                    if (
-                        self.options.get(option) is True
-                        and morning_report_due(now, weekly=weekly)
+                    if self.options.get(option) is True and morning_report_due(
+                        now, weekly=weekly
                     ):
                         key, message = completed_period_message(
                             data.periods, now, weekly=weekly

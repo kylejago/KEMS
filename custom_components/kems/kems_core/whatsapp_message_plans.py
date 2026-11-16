@@ -88,7 +88,9 @@ def _period_day(value: Any) -> date | None:
 
 
 def _field(period: Any, key: str) -> Any:
-    return period.get(key) if isinstance(period, Mapping) else getattr(period, key, None)
+    return (
+        period.get(key) if isinstance(period, Mapping) else getattr(period, key, None)
+    )
 
 
 def matching_completed_period(
@@ -184,7 +186,5 @@ def completed_period_message(
 def morning_report_due(now: datetime, weekly: bool) -> bool:
     local = now.astimezone(LONDON)
     return (
-        local.hour == 8
-        and local.minute < 15
-        and (not weekly or local.weekday() == 0)
+        local.hour == 8 and local.minute < 15 and (not weekly or local.weekday() == 0)
     )

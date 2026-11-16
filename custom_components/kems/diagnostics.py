@@ -181,8 +181,7 @@ async def async_get_config_entry_diagnostics(
         "happy_hour_import_counter_candidates": import_counter_candidates,
         "whatsapp_notifications": (
             coordinator._kems_whatsapp_reporter.status
-            if getattr(coordinator, "_kems_whatsapp_reporter", None)
-            is not None
+            if getattr(coordinator, "_kems_whatsapp_reporter", None) is not None
             else {"enabled": False, "status": "not_initialised"}
         ),
         "source_freshness": {
