@@ -22,7 +22,12 @@ def _baseline():
     ]
     # With postponed annotations, no Home Assistant installation is required.
     module = ast.Module(
-        body=[ast.ImportFrom(module="__future__", names=[ast.alias(name="annotations")], level=0), *definitions],
+        body=[
+            ast.ImportFrom(
+                module="__future__", names=[ast.alias(name="annotations")], level=0
+            ),
+            *definitions,
+        ],
         type_ignores=[],
     )
     namespace = {"math": __import__("math")}
@@ -50,14 +55,34 @@ def _sample(**overrides):
 def test_both_import_export_baseline_required_before_bonus_estimate():
     baseline = _baseline()
     assert baseline(_sample()) == 0.6
-    assert baseline(_sample(saving_session_export_baseline_period_kwh=None, saving_session_export_baseline_total_kwh=None)) is None
-    assert baseline(_sample(saving_session_import_baseline_period_kwh=None, saving_session_import_baseline_total_kwh=None)) is None
+    no_export = _sample(
+        saving_session_export_baseline_period_kwh=None,
+        saving_session_export_baseline_total_kwh=None,
+    )
+    no_import = _sample(
+        saving_session_import_baseline_period_kwh=None,
+        saving_session_import_baseline_total_kwh=None,
+    )
+    invalid_export = _sample(
+        saving_session_export_baseline_period_kwh=float("nan"),
+        saving_session_export_baseline_total_kwh=None,
+    )
+    assert baseline(no_export) is None
+    assert baseline(no_import) is None
     assert baseline(_sample(saving_session_baseline_incomplete=True)) is None
-    assert baseline(_sample(saving_session_export_baseline_period_kwh=float("nan"), saving_session_export_baseline_total_kwh=None)) is None
+    assert baseline(invalid_export) is None
 
 
 def test_valid_matched_total_fallback_remains_conservative():
     baseline = _baseline()
     assert baseline(_sample(saving_session_export_baseline_period_kwh=None)) == 0.6
-    assert baseline(_sample(saving_session_export_baseline_period_kwh=None, saving_session_export_baseline_total_kwh=None)) is None
-    assert baseline(_sample(saving_session_import_baseline_period_kwh=0.0, saving_session_export_baseline_period_kwh=1.0)) == -2.0
+    no_export = _sample(
+        saving_session_export_baseline_period_kwh=None,
+        saving_session_export_baseline_total_kwh=None,
+    )
+    negative_net = _sample(
+        saving_session_import_baseline_period_kwh=0.0,
+        saving_session_export_baseline_period_kwh=1.0,
+    )
+    assert baseline(no_export) is None
+    assert baseline(negative_net) == -2.0
