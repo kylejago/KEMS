@@ -9,8 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from collections.abc import Mapping
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
 from typing import Any
 
 from homeassistant.core import HomeAssistant, callback
@@ -26,7 +25,6 @@ from .const import (
     CONF_WHATSAPP_PRIVATE_ENTITY,
     CONF_WHATSAPP_SESSIONS,
     CONF_WHATSAPP_WEEKLY,
-    DOMAIN,
     STORAGE_NAMESPACE,
 )
 from .happy_hour_auto_join import verified_octopus_joined_bookings
@@ -119,9 +117,11 @@ class KEMSWhatsAppNotifications:
                     state.attributes.get("id"),
                 )
             ).lower()
-            if "kems_whatsapp" in text or "kems whatsapp" in text:
-                if state.state == "on":
-                    conflicts.append(state.entity_id)
+            if (
+                ("kems_whatsapp" in text or "kems whatsapp" in text)
+                and state.state == "on"
+            ):
+                conflicts.append(state.entity_id)
         return sorted(conflicts)
 
     async def async_setup(self) -> None:
