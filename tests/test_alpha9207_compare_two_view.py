@@ -1,4 +1,4 @@
-"""Alpha9.207: two-column Compare stays bill-equivalent through runtime compatibility."""
+"""Alpha9.207: two-view Compare preserves the bill-equivalent runtime contract."""
 
 from __future__ import annotations
 
