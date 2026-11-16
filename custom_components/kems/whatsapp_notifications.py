@@ -55,6 +55,8 @@ class KEMSWhatsAppNotifications:
         self._delivered: dict[str, str] = {}
         self._warning_since: dict[str, str] = {}
         self._warning_alerted: dict[str, str] = {}
+        self._tracked_power_down: dict[str, Any] = {}
+        self._storage_healthy = True
         self._last_error: str | None = None
         self._last_delivered: str | None = None
         self._last_attempt: str | None = None
@@ -84,6 +86,8 @@ class KEMSWhatsAppNotifications:
             "private_alerts_enabled": self.options.get(CONF_WHATSAPP_PRIVATE) is True,
             "legacy_automation_conflicts": self._legacy_conflicts(),
             "last_error": self._last_error,
+            "delivery_store_healthy": self._storage_healthy,
+            "tracked_joined_power_down_event": bool(self._tracked_power_down),
             "last_attempt": self._last_attempt,
             "last_success": self._last_delivered,
             "successful_deliveries_since_setup": self._delivered_count,
@@ -128,6 +132,12 @@ class KEMSWhatsAppNotifications:
             return
         try:
             stored = await self._store.async_load() or {}
+            tracked = stored.get("tracked_power_down")
+            if isinstance(tracked, dict):
+                self._tracked_power_down = {
+                    key: tracked.get(key)
+                    for key in ("event_id", "start", "end", "joined")
+                }
             for field, name in (
                 ("delivered", "_delivered"),
                 ("warning_since", "_warning_since"),
@@ -147,6 +157,7 @@ class KEMSWhatsAppNotifications:
         except (OSError, ValueError, TypeError) as err:
             # Persistence is an idempotency prerequisite. Never send if the
             # existing delivery store could not be loaded safely.
+            self._storage_healthy = False
             self._last_error = f"delivery_store_unavailable: {type(err).__name__}"
             LOGGER.warning("KEMS WhatsApp disabled: could not load delivery state")
             return
@@ -184,9 +195,11 @@ class KEMSWhatsAppNotifications:
                     "delivered": self._delivered,
                     "warning_since": self._warning_since,
                     "warning_alerted": self._warning_alerted,
+                    "tracked_power_down": self._tracked_power_down,
                 }
             )
         except (OSError, ValueError, TypeError) as err:
+            self._storage_healthy = False
             self._last_error = f"delivery_state_save_failed: {type(err).__name__}"
             LOGGER.warning("KEMS WhatsApp could not persist dedupe state")
             return False
@@ -195,6 +208,8 @@ class KEMSWhatsAppNotifications:
     async def _send(
         self, key: str, message: str, *, private: bool, now: datetime
     ) -> bool:
+        if not self._storage_healthy:
+            return False
         if key in self._delivered:
             return True
         target = self.options.get(
@@ -309,7 +324,12 @@ class KEMSWhatsAppNotifications:
             await self._persist()
 
     async def _tick(self, now: datetime) -> None:
-        if not self.enabled or self._cancel is None or self._lock.locked():
+        if (
+            not self.enabled
+            or not self._storage_healthy
+            or self._cancel is None
+            or self._lock.locked()
+        ):
             return
         async with self._lock:
             try:
@@ -323,14 +343,39 @@ class KEMSWhatsAppNotifications:
                     power_down = data.snapshot
                     joined: list[dict[str, Any]] = []
                     if power_down.saving_session_joined is True:
-                        joined.append(
-                            {
-                                "joined": True,
-                                "event_id": power_down.saving_session_id,
-                                "start": power_down.saving_session_start,
-                                "end": power_down.saving_session_end,
-                            }
-                        )
+                        active = {
+                            "joined": True,
+                            "event_id": power_down.saving_session_id,
+                            "start": power_down.saving_session_start,
+                            "end": power_down.saving_session_end,
+                        }
+                        joined.append(active)
+                        stored = {
+                            key: (
+                                value.isoformat()
+                                if isinstance(value, datetime)
+                                else value
+                            )
+                            for key, value in active.items()
+                        }
+                        if stored != self._tracked_power_down:
+                            self._tracked_power_down = stored
+                            await self._persist()
+                    elif self._tracked_power_down.get("joined") is True:
+                        # The provider drops a finished event immediately.
+                        # Only a previously joined event may produce an
+                        # ending alert, never a retroactive start or plan.
+                        previous = self._tracked_power_down
+                        try:
+                            end = datetime.fromisoformat(str(previous["end"]))
+                        except (ValueError, TypeError):
+                            end = None
+                        if (
+                            end is not None
+                            and end.tzinfo is not None
+                            and end <= now < end + timedelta(minutes=2)
+                        ):
+                            joined.append(previous)
                     happy = [
                         {**row, "joined": True}
                         for row in verified_octopus_joined_bookings(self.hass, now=now)
