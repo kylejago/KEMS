@@ -40,6 +40,15 @@ CONF_EV_SOC_SYNC_ENABLED = "ev_soc_sync_enabled"
 CONF_HAPPY_HOUR_OHME_CONTROL_ENABLED = "happy_hour_ohme_control_enabled"
 CONF_OHME_IDLE_HOUSE_BRIDGE_ENABLED = "ohme_idle_house_bridge_enabled"
 
+# Optional external notifications; no KEMS inverter, tariff or EV authority.
+CONF_WHATSAPP_ENABLED = "whatsapp_enabled"
+CONF_WHATSAPP_FAMILY_ENTITY = "whatsapp_family_notify_entity"
+CONF_WHATSAPP_PRIVATE_ENTITY = "whatsapp_private_notify_entity"
+CONF_WHATSAPP_SESSIONS = "whatsapp_confirmed_sessions"
+CONF_WHATSAPP_DAILY = "whatsapp_daily_yesterday"
+CONF_WHATSAPP_WEEKLY = "whatsapp_weekly_previous_week"
+CONF_WHATSAPP_PRIVATE = "whatsapp_private_warnings"
+
 CONF_HOUSE_LOAD = "house_load_kw"
 CONF_BATTERY_SOC = "battery_soc"
 CONF_BATTERY_POWER = "battery_power_kw"
@@ -206,6 +215,13 @@ DEFAULT_OPTIONS = {
     CONF_HAPPY_HOUR_OHME_CONTROL_ENABLED: False,
     CONF_OHME_IDLE_HOUSE_BRIDGE_ENABLED: False,
     CONF_EV_SOC_SYNC_ENABLED: False,
+    CONF_WHATSAPP_ENABLED: False,
+    CONF_WHATSAPP_FAMILY_ENTITY: "notify.whatsapp_message",
+    CONF_WHATSAPP_PRIVATE_ENTITY: "notify.kems_private_alerts_message",
+    CONF_WHATSAPP_SESSIONS: True,
+    CONF_WHATSAPP_DAILY: True,
+    CONF_WHATSAPP_WEEKLY: True,
+    CONF_WHATSAPP_PRIVATE: True,
     CONF_SCAN_INTERVAL: DEFAULT_SCAN_INTERVAL_SECONDS,
     CONF_HISTORY_DAYS: DEFAULT_HISTORY_DAYS,
     CONF_DETAILED_COMPARISONS_ENABLED: True,

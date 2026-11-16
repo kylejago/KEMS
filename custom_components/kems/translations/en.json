@@ -402,6 +402,19 @@
           "forecast_watch_margin_kwh": "If the predicted morning energy margin falls within this amount KEMS reports Watch but does not restrict export. Default 3kWh.",
           "forecast_recovery_margin_kwh": "Minimum predicted same-day deficit before spare solar is diverted to the battery. Default 1kWh."
         }
+      },
+      "whatsapp": {
+        "title": "KEMS WhatsApp notifications",
+        "description": "Disabled by default. Uses existing Home Assistant notify entities only, with no WhatsApp credentials or battery control access. Disable legacy kems_whatsapp.yaml automations to prevent duplicates. Daily 08:00 (yesterday), Monday 08:00 (previous Mon–Sun); incomplete periods are labelled unavailable. Notifications are deduplicated and isolated from energy control.",
+        "data": {
+          "whatsapp_enabled": "Enable KEMS WhatsApp notifications",
+          "whatsapp_family_notify_entity": "Family group notify entity",
+          "whatsapp_private_notify_entity": "Private alert notify entity",
+          "whatsapp_confirmed_sessions": "Confirmed Power Down / Happy Hour sessions",
+          "whatsapp_daily_yesterday": "Daily yesterday report at 08:00",
+          "whatsapp_weekly_previous_week": "Monday previous-week report at 08:00",
+          "whatsapp_private_warnings": "Private persistent critical warnings"
+        }
       }
     }
   }
