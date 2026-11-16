@@ -32,22 +32,33 @@ def test_confirmed_events_only_and_rich_format():
     assert len(result) == 1
     assert "🟢 Happy Hour" in result[0][1]
     assert "✅ Joined" in result[0][1]
-    assert messages.event_notifications(
-        category="Happy Hour", joined_events=[joined], now=now,
-        sent_keys={result[0][0]: now.isoformat()},
-    ) == []
+    assert (
+        messages.event_notifications(
+            category="Happy Hour",
+            joined_events=[joined],
+            now=now,
+            sent_keys={result[0][0]: now.isoformat()},
+        )
+        == []
+    )
 
 
 def test_daily_recap_financial_labels():
     now = datetime(2026, 11, 16, 8, 1, tzinfo=ZoneInfo("Europe/London"))
     day = "2026-11-15"
     period = {
-        "start_date": day, "end_date": day,
-        "data_complete": True, "complete_days": 1,
-        "days_included": 1, "incomplete_days": 0,
-        "grid_import_kwh": 12.5, "grid_export_kwh": 18.4,
-        "solar_generation_kwh": 8.2, "import_cost_pence": 145,
-        "export_income_pence": 276, "gas_cost_pence": 85,
+        "start_date": day,
+        "end_date": day,
+        "data_complete": True,
+        "complete_days": 1,
+        "days_included": 1,
+        "incomplete_days": 0,
+        "grid_import_kwh": 12.5,
+        "grid_export_kwh": 18.4,
+        "solar_generation_kwh": 8.2,
+        "import_cost_pence": 145,
+        "export_income_pence": 276,
+        "gas_cost_pence": 85,
         "actual_net_cost_pence": -46,
         "happy_hour_estimated_credit_pence": 120,
     }
