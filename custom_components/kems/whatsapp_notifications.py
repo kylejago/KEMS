@@ -258,6 +258,27 @@ class KEMSWhatsAppNotifications:
         await self._persist()
         return True
 
+    async def async_send_test(self, *, private: bool) -> bool:
+        """User-invoked test; bypasses scheduled-message deduplication only."""
+        if not self.enabled or not self._storage_healthy:
+            self._last_error = "whatsapp_notifications_disabled_or_store_unavailable"
+            return False
+        now = dt_util.now()
+        destination = "Private" if private else "Family"
+        message = (
+            f"🧪 *KEMS — {destination} WhatsApp Test*\\n"
+            "✅ This test was requested using the KEMS Home Assistant button.\\n"
+            "📱 The configured notification route accepted the message.\\n"
+            "ℹ️ Automatic event notifications and scheduled reports are unchanged."
+        )
+        async with self._lock:
+            return await self._send(
+                f"manual-test:{destination.lower()}:{now.isoformat()}",
+                message,
+                private=private,
+                now=now,
+            )
+
     def _current_warnings(self) -> dict[str, str]:
         data = getattr(self.coordinator, "data", None)
         if data is None:
@@ -304,7 +325,7 @@ class KEMSWhatsAppNotifications:
                 recovery_key = f"private:recovery:{key}:{sent_start}"
                 recovered = await self._send(
                     recovery_key,
-                    f"KEMS recovery: {key.replace('_', ' ')} has cleared.",
+                    f"✅ *KEMS — Warning cleared*\\n{key.replace('_', ' ').title()} has recovered.",
                     private=True,
                     now=now,
                 )
@@ -326,7 +347,7 @@ class KEMSWhatsAppNotifications:
                 alert_key = f"private:warning:{key}:{first.isoformat()}"
                 if await self._send(
                     alert_key,
-                    f"KEMS important warning (persisting ≥5 minutes): {description}.",
+                    f"🚨 *KEMS — Technical warning*\\n⚠️ {description}.\\n"\n                    "Persisting for at least 5 minutes. Energy control operates independently.",
                     private=True,
                     now=now,
                 ):
