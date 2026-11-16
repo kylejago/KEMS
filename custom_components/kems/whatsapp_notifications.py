@@ -118,9 +118,8 @@ class KEMSWhatsAppNotifications:
                 )
             ).lower()
             if (
-                ("kems_whatsapp" in text or "kems whatsapp" in text)
-                and state.state == "on"
-            ):
+                "kems_whatsapp" in text or "kems whatsapp" in text
+            ) and state.state == "on":
                 conflicts.append(state.entity_id)
         return sorted(conflicts)
 
