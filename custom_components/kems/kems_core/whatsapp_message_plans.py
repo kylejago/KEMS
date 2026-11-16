@@ -188,3 +188,42 @@ def morning_report_due(now: datetime, weekly: bool) -> bool:
     return (
         local.hour == 8 and local.minute < 15 and (not weekly or local.weekday() == 0)
     )
+
+
+def notify_entity_readiness(entity_id: Any, state: Any) -> dict[str, Any]:
+    """HA NotifyEntity state is UNKNOWN until its first successful send.
+
+    A registered notify entity in the unknown state is a valid first-send
+    destination. Missing or explicitly unavailable entities fail closed.
+    Never attempt sending to a guessed service or a non-notify entity.
+    """
+    if not isinstance(entity_id, str) or not entity_id.startswith("notify."):
+        return {
+            "send_eligible": False,
+            "status": "invalid_notify_entity",
+            "ha_state": None,
+        }
+    if state is None:
+        return {
+            "send_eligible": False,
+            "status": "notify_entity_not_found",
+            "ha_state": None,
+        }
+    value = getattr(state, "state", None)
+    if value == "unavailable":
+        return {
+            "send_eligible": False,
+            "status": "notify_entity_unavailable",
+            "ha_state": value,
+        }
+    if value is None:
+        return {
+            "send_eligible": False,
+            "status": "missing_notify_entity_state",
+            "ha_state": None,
+        }
+    return {
+        "send_eligible": True,
+        "status": ("ready_for_first_send" if value == "unknown" else "ready"),
+        "ha_state": value,
+    }
