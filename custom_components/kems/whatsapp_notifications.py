@@ -347,7 +347,8 @@ class KEMSWhatsAppNotifications:
                 alert_key = f"private:warning:{key}:{first.isoformat()}"
                 if await self._send(
                     alert_key,
-                    f"🚨 *KEMS — Technical warning*\n⚠️ {description}.\n"\n                    "Persisting for at least 5 minutes. Energy control operates independently.",
+                    f"🚨 *KEMS — Technical warning*\n⚠️ {description}.\n"
+                    "Persisting for at least 5 minutes. Energy control operates independently.",
                     private=True,
                     now=now,
                 ):
