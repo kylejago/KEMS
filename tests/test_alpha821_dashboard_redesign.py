@@ -98,16 +98,16 @@ def test_today_slots_live_on_kems_and_tomorrow_slots_live_on_tomorrow() -> None:
         assert label in tomorrow
 
 
-def test_compare_is_three_column_no_system_live_kems_view() -> None:
+def test_compare_is_two_column_no_system_live_view() -> None:
     compare = _view("Compare")
     content = yaml.safe_dump(compare, sort_keys=False)
     literal = str(compare)
-    assert "columns: 3" in content
-    for title in ("Without KEMS", "Live", "KEMS"):
+    assert "columns: 2" in content
+    for title in ("Without KEMS", "Live"):
         assert f"title: {title}" in content
     assert "sensor.kems_compare_no_system_cost_today" in content
     assert "Live system value vs no system" in literal
-    assert "KEMS potential value vs no system" in literal
+    assert "KEMS potential value vs no system" not in literal
 
 
 def test_history_has_requested_calendar_periods() -> None:

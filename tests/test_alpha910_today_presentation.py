@@ -90,13 +90,13 @@ def test_alpha910_compare_today_uses_current_scenario_and_flat_live_totals() -> 
     )
 
     assert "sensor.kems_compare_no_system_cost_today" in compare
-    assert "sensor.kems_compare_full_kems_cost_today" in compare
-    assert "sensor.kems_whole_home_observed_cost_today" in compare
-    assert "sensor.kems_observed_grid_import_today" in compare
-    assert "sensor.kems_observed_grid_export_today" in compare
-    assert "sensor.kems_energy_cost_comparison" not in compare
+    assert "sensor.kems_compare_full_kems_cost_today" not in compare
+    assert "total_energy_effective_cost_pence" in compare
+    assert "live.get('grid_import_kwh'" in compare
+    assert "live.get('grid_export_kwh'" in compare
+    assert "sensor.kems_energy_cost_comparison" in compare
     assert "p.get('kems', {})" not in compare
-    assert "p.get('live_data', {})" not in compare
+    assert "p.get('live_data', {})" in compare
 
 
 def test_alpha910_does_not_fabricate_historical_slot_data() -> None:

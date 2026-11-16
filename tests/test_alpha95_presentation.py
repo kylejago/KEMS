@@ -127,7 +127,7 @@ def test_alpha95_current_day_cards_use_stable_flat_entities() -> None:
         DASHBOARD.read_text(encoding="utf-8")
     )
 
-    assert "states('sensor.kems_whole_home_observed_cost_today')" in content
+    assert "total_energy_effective_cost_pence" in content
     assert "states('sensor.kems_whole_home_simulated_cost_today')" in content
     assert "states('sensor.kems_whole_home_energy_today')" in content
     # Alpha9.150 keeps live cost provenance explicit: the estimated

@@ -119,10 +119,10 @@ def test_compare_kems_uses_same_canonical_today_entities_as_kems_page() -> None:
     )[0]
 
     assert "sensor.kems_compare_full_kems_cost_today" not in compare
-    assert "sensor.kems_whole_home_simulated_cost_today" in compare
-    assert "sensor.kems_simulated_grid_import_today" in compare
-    assert "sensor.kems_simulated_grid_export_today" in compare
-    assert "canonical current-day simulation" in compare
+    assert "sensor.kems_whole_home_simulated_cost_today" not in compare
+    assert "sensor.kems_simulated_grid_import_today" not in compare
+    assert "sensor.kems_simulated_grid_export_today" not in compare
+    assert "total_energy_effective_cost_pence" in compare
 
 
 def test_dashboard_contract_repair_is_idempotent_and_reporting_only() -> None:
