@@ -134,7 +134,7 @@ def test_stale_yesterday_label_and_incomplete_week_cannot_publish_old_money():
     }
     _, daily = mod.completed_period_message(periods, now, weekly=False)
     _, weekly = mod.completed_period_message(periods, now, weekly=True)
-    assert "Partial coverage" in daily
+    assert "No recorded period totals available" in daily
     assert "Partial coverage" in weekly
     assert "£999.99" not in daily
     assert "£999.99" in weekly  # Explicitly reported as partial recorded income.
