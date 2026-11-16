@@ -171,15 +171,15 @@ def completed_period_message(
     kind = "weekly" if weekly else "daily"
     key = f"recap:{kind}:{start.isoformat()}:{end.isoformat()}"
     title = (
-        f"📅 *KEMS — Weekly Energy Summary*\\n{start:%d %b}–{end:%d %b %Y}"
+        f"📅 *KEMS — Weekly Energy Summary*\n{start:%d %b}–{end:%d %b %Y}"
         if weekly
-        else f"📊 *KEMS — Daily Energy Summary*\\n{start:%d %b %Y}"
+        else f"📊 *KEMS — Daily Energy Summary*\n{start:%d %b %Y}"
     )
     period = matching_completed_period(periods, start, end)
     if period is None or not _number(_field(period, "days_included")):
         return (
             key,
-            f"{title}\\n\\n⚠️ *No recorded period totals available*\\n"
+            f"{title}\n\n⚠️ *No recorded period totals available*\n"
             "No costs, savings or rewards have been inferred.",
         )
 
@@ -246,7 +246,7 @@ def completed_period_message(
         "ℹ️ Estimated refunds are not supplier-confirmed. "
         "A partial report is not a verified full-period bill.",
     ]
-    return key, "\\n".join(lines)
+    return key, "\n".join(lines)
 
 
 def morning_report_due(now: datetime, weekly: bool) -> bool:
