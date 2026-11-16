@@ -5,6 +5,7 @@ from __future__ import annotations
 import importlib.util
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from types import SimpleNamespace
 
 SOURCE = (
     Path(__file__).resolve().parents[1]
@@ -179,3 +180,47 @@ def test_no_partial_or_invalid_price_is_fabricated():
     _, message = mod.completed_period_message({"a": period}, now, weekly=False)
     assert "Grid export: unavailable" in message
     assert "Agile export income: unavailable" in message
+
+
+def test_first_send_unknown_notify_entity_is_allowed() -> None:
+    unknown = mod.notify_entity_readiness(
+        "notify.whatsapp_message", SimpleNamespace(state="unknown")
+    )
+    assert unknown == {
+        "send_eligible": True,
+        "status": "ready_for_first_send",
+        "ha_state": "unknown",
+    }
+    other = mod.notify_entity_readiness(
+        "notify.kems_private_alerts_message",
+        SimpleNamespace(state="unknown"),
+    )
+    assert other["send_eligible"] is True
+
+
+def test_real_unavailable_or_absent_targets_stay_blocked() -> None:
+    assert (
+        mod.notify_entity_readiness(
+            "notify.whatsapp_message", SimpleNamespace(state="unavailable")
+        )["send_eligible"]
+        is False
+    )
+    assert (
+        mod.notify_entity_readiness("notify.whatsapp_message", None)["status"]
+        == "notify_entity_not_found"
+    )
+    assert (
+        mod.notify_entity_readiness(
+            "sensor.not_a_notifier", SimpleNamespace(state="ready")
+        )["send_eligible"]
+        is False
+    )
+
+
+def test_sent_notify_entity_remains_sendable() -> None:
+    result = mod.notify_entity_readiness(
+        "notify.whatsapp_message",
+        SimpleNamespace(state="2026-11-16T20:37:00+00:00"),
+    )
+    assert result["send_eligible"] is True
+    assert result["status"] == "ready"

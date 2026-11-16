@@ -32,6 +32,7 @@ from .kems_core.whatsapp_message_plans import (
     completed_period_message,
     event_notifications,
     morning_report_due,
+    notify_entity_readiness,
 )
 
 LOGGER = logging.getLogger(__name__)
@@ -74,17 +75,24 @@ class KEMSWhatsAppNotifications:
         private = self.options.get(
             CONF_WHATSAPP_PRIVATE_ENTITY, "notify.kems_private_alerts_message"
         )
+        family_readiness = self._target_readiness(family)
+        private_readiness = self._target_readiness(private)
+        legacy = self._legacy_conflicts()
         return {
             "enabled": self.enabled,
             "family_target": family,
             "private_target": private,
-            "family_target_available": self._target_available(family),
-            "private_target_available": self._target_available(private),
+            "family_target_available": family_readiness["send_eligible"],
+            "private_target_available": private_readiness["send_eligible"],
+            "family_target_status": family_readiness["status"],
+            "private_target_status": private_readiness["status"],
+            "family_target_ha_state": family_readiness["ha_state"],
+            "private_target_ha_state": private_readiness["ha_state"],
             "daily_enabled": self.options.get(CONF_WHATSAPP_DAILY) is True,
             "weekly_enabled": self.options.get(CONF_WHATSAPP_WEEKLY) is True,
             "joined_events_enabled": self.options.get(CONF_WHATSAPP_SESSIONS) is True,
             "private_alerts_enabled": self.options.get(CONF_WHATSAPP_PRIVATE) is True,
-            "legacy_automation_conflicts": self._legacy_conflicts(),
+            "legacy_automation_conflicts": legacy,
             "last_error": self._last_error,
             "delivery_store_healthy": self._storage_healthy,
             "tracked_joined_power_down_event": bool(self._tracked_power_down),
@@ -95,20 +103,24 @@ class KEMSWhatsAppNotifications:
             "reporting_only": True,
             "control_dependency": False,
             "migration_note": (
-                "Disable/remove legacy kems_whatsapp.yaml automations to "
-                "avoid duplicate messages; KEMS suppresses notifications "
-                "if identifiable legacy KEMS WhatsApp automations are active."
+                "No legacy KEMS WhatsApp automation detected; no separate "
+                "YAML or notification automation is required."
+                if not legacy
+                else "An active legacy KEMS WhatsApp automation was detected; "
+                "KEMS suppresses duplicate notifications until it is disabled."
             ),
         }
 
+    def _target_readiness(self, target: Any) -> dict[str, Any]:
+        state = (
+            self.hass.states.get(target)
+            if isinstance(target, str) and target.startswith("notify.")
+            else None
+        )
+        return notify_entity_readiness(target, state)
+
     def _target_available(self, target: Any) -> bool:
-        if not isinstance(target, str) or not target.startswith("notify."):
-            return False
-        state = self.hass.states.get(target)
-        return state is not None and state.state not in {
-            "unknown",
-            "unavailable",
-        }
+        return self._target_readiness(target)["send_eligible"]
 
     def _legacy_conflicts(self) -> list[str]:
         conflicts: list[str] = []
