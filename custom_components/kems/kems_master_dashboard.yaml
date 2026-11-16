@@ -843,7 +843,7 @@ views:
           - entity: sensor.kems_observed_cost_today
             name: Live (gross before HH refund)
           - entity: sensor.kems_compare_no_system_net_electricity_cost_today
-            name: Without KEMS (net, no standing)
+            name: Without KEMS
 
   - title: Tomorrow
     path: tomorrow

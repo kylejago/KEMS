@@ -1005,7 +1005,7 @@ SENSORS: tuple[KEMSSensorEntityDescription, ...] = (
     ),
     KEMSSensorEntityDescription(
         key="compare_no_system_net_electricity_cost_today",
-        name="Compare no system electricity net cost today before standing charge",
+        name="Compare no system net electricity cost today",
         icon="mdi:transmission-tower-import",
         native_unit_of_measurement="p",
         suggested_display_precision=2,
