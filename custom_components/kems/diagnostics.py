@@ -19,6 +19,7 @@ from .happy_hour_auto_join import happy_hour_auto_join_state
 from .kems_core.agile_plan_budget_reconciliation import reconcile_agile_budget
 from .kems_core.diagnostic_evidence import (
     actual_export_evidence,
+    agile_current_export_execution_observation,
     agile_export_interval_audit,
     corroborated_unchanged_sources,
     reward_settlement_evidence,
@@ -252,6 +253,17 @@ async def async_get_config_entry_diagnostics(
                 activation_cutoff=entry.options.get(
                     "paid_export_accounting_started_at"
                 ),
+            )
+            if export_tariff_type_from_options(entry.options)
+            == EXPORT_TARIFF_TYPE_AGILE
+            else {"status": "not_agile_tariff", "reporting_only": True}
+        ),
+        "agile_current_export_execution_observation": (
+            agile_current_export_execution_observation(
+                snapshot=data.snapshot,
+                control=data.control,
+                agile_state=coordinator.agile_smart_export_state,
+                physical_guard=getattr(coordinator, "_agile_live_reserve_status", {}),
             )
             if export_tariff_type_from_options(entry.options)
             == EXPORT_TARIFF_TYPE_AGILE

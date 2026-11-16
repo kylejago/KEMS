@@ -7,7 +7,7 @@ assessments back into FoxESS, tariff, EV or financial control.
 from __future__ import annotations
 
 from collections.abc import Mapping
-from datetime import datetime
+from datetime import datetime, timedelta
 from math import isfinite
 from typing import Any
 from zoneinfo import ZoneInfo
@@ -158,6 +158,9 @@ def agile_export_interval_audit(
             "sample_spanned_seconds": 0.0,
             "over_10_minute_gaps": 0,
             "cross_slot_boundary_pairs": 0,
+            "boundary_reference_export_kwh": 0.0,
+            "boundary_reference_income_pence": 0.0,
+            "boundary_reference_spanned_seconds": 0.0,
         }
         rows.append(row)
         intervals.append((start, end, row))
@@ -179,6 +182,9 @@ def agile_export_interval_audit(
     )
     unpriced_positive_pairs = 0
     unmatched_positive_pairs = 0
+    boundary_reference_unmatched_kwh = 0.0
+    boundary_reference_unpriced_pairs = 0
+    boundary_reference_reallocated_kwh = 0.0
     for current, following in zip(today_records, today_records[1:], strict=False):
         delta = (following.timestamp - current.timestamp).total_seconds()
         if delta <= 0 or "grid_export_kw" in (
@@ -218,12 +224,45 @@ def agile_export_interval_audit(
             row["snapshot_integrated_income_pence"] += (
                 export_kwh * row["rate_pence_per_kwh"]
             )
+        # Independent diagnostic reference: allocate *the same* start-sample
+        # power over the actual elapsed timestamp overlaps, including a
+        # half-hour boundary. Do not change the existing tariff-priced
+        # accounting convention or the original settled-shadow comparison.
+        capped_end = current.timestamp + timedelta(seconds=span)
+        allocated_seconds = 0.0
+        for other_start, other_end, reference_row in intervals:
+            reference_seconds = (
+                min(capped_end, other_end) - max(current.timestamp, other_start)
+            ).total_seconds()
+            if reference_seconds <= 0:
+                continue
+            allocated_seconds += reference_seconds
+            reference_kwh = export_kw * reference_seconds / 3600.0
+            reference_row["boundary_reference_export_kwh"] += reference_kwh
+            reference_row["boundary_reference_spanned_seconds"] += reference_seconds
+            reference_rate = reference_row["rate_pence_per_kwh"]
+            if reference_rate is None:
+                boundary_reference_unpriced_pairs += 1
+                reference_row["boundary_reference_income_pence"] = None
+            elif reference_row["boundary_reference_income_pence"] is not None:
+                reference_row["boundary_reference_income_pence"] += (
+                    reference_kwh * reference_rate
+                )
+            if reference_row is not row:
+                boundary_reference_reallocated_kwh += reference_kwh
+        if allocated_seconds < span:
+            boundary_reference_unmatched_kwh += (
+                export_kw * (span - allocated_seconds) / 3600.0
+            )
 
     for row in rows:
         for name, digits in (
             ("snapshot_integrated_export_kwh", 4),
             ("snapshot_integrated_income_pence", 3),
             ("sample_spanned_seconds", 1),
+            ("boundary_reference_export_kwh", 4),
+            ("boundary_reference_income_pence", 3),
+            ("boundary_reference_spanned_seconds", 1),
         ):
             if row[name] is not None:
                 row[name] = round(row[name], digits)
@@ -256,6 +295,21 @@ def agile_export_interval_audit(
         if complete_prices
         else None
     )
+    boundary_reference_priced_income = (
+        round(
+            sum(row["boundary_reference_income_pence"] or 0.0 for row in rows),
+            2,
+        )
+        if not boundary_reference_unpriced_pairs
+        and boundary_reference_unmatched_kwh <= 0.000001
+        else None
+    )
+    boundary_reference_completed_kwh = sum(
+        row["boundary_reference_export_kwh"] for row in completed_rows
+    )
+    boundary_reference_settled_kwh = sum(
+        row["boundary_reference_export_kwh"] for row in settled_rows
+    )
     reported_income = _finite(reported_income_pence)
     return {
         "status": (
@@ -279,6 +333,27 @@ def agile_export_interval_audit(
             shadow_completed_kwh - observed_settled_kwh, 3
         ),
         "sample_priced_income_pence": observed_income,
+        "boundary_reference_export_completed_kwh": round(
+            boundary_reference_completed_kwh, 3
+        ),
+        "boundary_reference_export_settled_kwh": round(
+            boundary_reference_settled_kwh, 3
+        ),
+        "boundary_reference_shadow_minus_export_kwh": round(
+            shadow_completed_kwh - boundary_reference_settled_kwh, 3
+        ),
+        "boundary_reference_priced_income_pence": boundary_reference_priced_income,
+        "boundary_reference_unmatched_kwh": round(boundary_reference_unmatched_kwh, 4),
+        "boundary_reference_unpriced_pairs": boundary_reference_unpriced_pairs,
+        "boundary_reference_reallocated_kwh": round(
+            boundary_reference_reallocated_kwh, 4
+        ),
+        "boundary_reference_note": (
+            "Diagnostic only: prorates the same instantaneous starting power "
+            "sample by overlapping published half-hours. This is NOT an "
+            "independent physical or Octopus settlement measurement, and "
+            "does not change KEMS billed earnings or control."
+        ),
         "reported_actual_export_income_pence": reported_income,
         "sample_income_minus_reported_pence": (
             round(observed_income - reported_income, 2)
@@ -293,6 +368,91 @@ def agile_export_interval_audit(
             row["cross_slot_boundary_pairs"] for row in rows
         ),
         "rows": rows,
+    }
+
+
+def agile_current_export_execution_observation(
+    *,
+    snapshot: Any,
+    control: Any,
+    agile_state: Mapping[str, Any],
+    physical_guard: Mapping[str, Any],
+) -> dict[str, Any]:
+    """One-scan plan / permitted request / FoxESS CT observation.
+
+    Never treat a one-scan mismatch as a failed dispatch; inverter ramping,
+    house consumption and solar export all prevent strict kW equality.
+    No new hardware write authority or control policy.
+    """
+    plan = agile_state.get("rolling_export_plan")
+    if not isinstance(plan, dict) or not plan.get("available"):
+        return {
+            "status": "no_rolling_plan",
+            "reporting_only": True,
+            "physical_dispatch_verified": False,
+        }
+
+    requested = _finite(plan.get("current_battery_export_target_kw"))
+    guard_requested = _finite(physical_guard.get("requested_export_kw"))
+    permitted = _finite(physical_guard.get("permitted_export_kw"))
+    desired = _finite(getattr(control, "desired_battery_export_power_kw", None))
+    observed = _finite(getattr(snapshot, "grid_export_kw", None))
+    imported = _finite(getattr(snapshot, "grid_import_kw", None))
+    if (
+        requested is None
+        or desired is None
+        or observed is None
+        or observed < 0
+        or imported is None
+        or imported < 0
+    ):
+        status = "missing_or_invalid_current_evidence"
+    elif not getattr(control, "commands_permitted", False):
+        status = "control_gate_not_authorised"
+    elif requested <= 0.15 and desired <= 0.15:
+        status = (
+            "grid_export_observed_without_battery_request"
+            if observed > 0.15
+            else "waiting_for_selected_agile_export"
+        )
+    elif permitted is not None and permitted <= 0.15 and requested > 0.15:
+        status = "physical_reserve_guard_blocked_request"
+    elif desired <= 0.15:
+        status = "planner_request_not_in_final_control"
+    elif observed <= 0.15:
+        status = "authorised_export_not_yet_observed_in_single_snapshot"
+    else:
+        status = "grid_export_observed"
+
+    return {
+        "status": status,
+        "reporting_only": True,
+        "physical_dispatch_verified": False,
+        "observation_timestamp": (
+            getattr(snapshot, "timestamp", None).isoformat()
+            if getattr(snapshot, "timestamp", None) is not None
+            else None
+        ),
+        "rolling_plan_requested_export_kw": requested,
+        "physical_guard_requested_export_kw": guard_requested,
+        "physical_guard_permitted_export_kw": permitted,
+        "physical_guard_status": physical_guard.get("status"),
+        "final_control_desired_battery_export_kw": desired,
+        "final_control_commands_permitted": getattr(
+            control, "commands_permitted", False
+        ),
+        "observed_grid_export_kw": observed,
+        "observed_grid_import_kw": imported,
+        "physical_soc_percent": _finite(getattr(snapshot, "battery_soc", None)),
+        "desired_work_mode": getattr(control, "desired_work_mode", None),
+        "control_blocked_reason": getattr(control, "blocked_reason", None),
+        "interpretation": (
+            "A single FoxESS grid CT reading cannot prove the requested "
+            "battery export was delivered or not delivered: distinguish "
+            "ramp time, solar output, household load and protective veto. "
+            "Use sustained matched intervals or cumulative supplier meter "
+            "evidence before changing dispatch or earnings."
+        ),
     }
 
 
