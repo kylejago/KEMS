@@ -279,6 +279,64 @@ class KEMSWhatsAppNotifications:
                 now=now,
             )
 
+    async def async_send_test_all(self) -> bool:
+        """Manually send a recorded recap and clearly marked example alerts.
+
+        This never changes real event status, report deduplication or control.
+        """
+        if not self.enabled or not self._storage_healthy:
+            self._last_error = "whatsapp_notifications_disabled_or_store_unavailable"
+            return False
+        now = dt_util.now()
+        data = getattr(self.coordinator, "data", None)
+        periods = getattr(data, "periods", {}) if data is not None else {}
+        snapshot = getattr(data, "snapshot", None)
+        standing = getattr(snapshot, "electricity_standing_charge", None)
+        _, recap = completed_period_message(
+            periods,
+            now,
+            weekly=False,
+            standing_charge_pence_per_day=standing,
+        )
+        examples = [
+            (
+                False,
+                "📊 *KEMS WhatsApp Test — Yesterday's Totals*\n"
+                + recap
+                + "\n\n🧪 TEST ONLY — no scheduled report recorded.",
+            ),
+            (
+                False,
+                "🧪 *KEMS Power Down — Example Notification*\n"
+                "⚡ Sample confirmed-event start message.\n"
+                "No actual Power Down session has been started or joined.\n"
+                "💷 Supplier reward: not verified (example only).",
+            ),
+            (
+                False,
+                "🧪 *KEMS Happy Hour — Example Notification*\n"
+                "🟢 Sample confirmed-event start message.\n"
+                "No actual Happy Hour session has been started or joined.\n"
+                "🎁 Refund: estimated only when verified meter evidence exists.",
+            ),
+            (
+                True,
+                "🧪 *KEMS Private Technical Alert — Example*\n"
+                "🚨 Demonstration alert — no real fault is asserted.\n"
+                "✅ Energy control and scheduled alerts are unchanged.",
+            ),
+        ]
+        async with self._lock:
+            for index, (private, message) in enumerate(examples, start=1):
+                if not await self._send(
+                    f"manual-test-all:{now.isoformat()}:{index}",
+                    message,
+                    private=private,
+                    now=now,
+                ):
+                    return False
+        return True
+
     def _current_warnings(self) -> dict[str, str]:
         data = getattr(self.coordinator, "data", None)
         if data is None:
@@ -435,7 +493,12 @@ class KEMSWhatsAppNotifications:
                         now, weekly=weekly
                     ):
                         key, message = completed_period_message(
-                            data.periods, now, weekly=weekly
+                            data.periods,
+                            now,
+                            weekly=weekly,
+                            standing_charge_pence_per_day=getattr(
+                                data.snapshot, "electricity_standing_charge", None
+                            ),
                         )
                         await self._send(key, message, private=False, now=now)
                 if self.options.get(CONF_WHATSAPP_PRIVATE) is True:
