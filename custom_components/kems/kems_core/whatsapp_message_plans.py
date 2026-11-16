@@ -54,21 +54,29 @@ def event_notifications(
         date_label = start.astimezone(LONDON).strftime("%a %d %b, %H:%M")
         end_label = end.astimezone(LONDON).strftime("%H:%M %Z")
         display = f"{date_label}–{end_label}"
+        label = "⚡ Power Down" if category == "Power Down" else "🟢 Happy Hour"
         if now < start <= now + timedelta(hours=24):
-            phase, message = (
-                "planned",
-                f"KEMS {category}: confirmed joined session planned for {display}.",
+            phase = "planned"
+            message = (
+                f"*{label} — Confirmed booking*\n"
+                f"📅 {display}\n"
+                "✅ Joined with Octopus\n"
+                "KEMS will follow its configured event controls."
             )
         elif start <= now < start + timedelta(minutes=2):
-            phase, message = (
-                "started",
-                f"KEMS {category}: confirmed session started ({display}).",
+            phase = "started"
+            message = (
+                f"*{label} — Started*\n"
+                f"🕒 {display}\n"
+                "✅ Confirmed joined session is active."
             )
         elif end <= now < end + timedelta(minutes=2):
-            phase, message = (
-                "ended",
-                f"KEMS {category}: session ended ({display}). "
-                "Final supplier-settled reward is not yet verified.",
+            phase = "ended"
+            message = (
+                f"*{label} — Finished*\n"
+                f"🕒 {display}\n"
+                "💷 Supplier-settled rewards are not yet verified. "
+                "Any estimated credit is separate from confirmed earnings."
             )
         else:
             continue
@@ -154,31 +162,42 @@ def completed_period_message(
     kind = "weekly" if weekly else "daily"
     key = f"recap:{kind}:{start.isoformat()}:{end.isoformat()}"
     title = (
-        f"KEMS weekly recap: {start:%d %b}–{end:%d %b %Y}"
+        f"📅 *KEMS — Weekly Energy Summary*\n{start:%d %b}–{end:%d %b %Y}"
         if weekly
-        else f"KEMS yesterday: {start:%d %b %Y}"
+        else f"📊 *KEMS — Daily Energy Summary*\n{start:%d %b %Y}"
     )
     period = matching_completed_period(periods, start, end)
     if period is None:
         return (
             key,
-            f"{title}\nCompleted-period figures unavailable or incomplete. "
+            f"{title}\n\n⚠️ *Report not yet available*\n"
+            "Completed-period figures are missing or incomplete. "
             "No costs, savings or rewards have been inferred.",
         )
     lines = [
         title,
-        f"Grid import: {_quantity(_field(period, 'grid_import_kwh'), 'kWh')}",
-        f"Grid export: {_quantity(_field(period, 'grid_export_kwh'), 'kWh')}",
-        f"Solar generated: {_quantity(_field(period, 'solar_generation_kwh'), 'kWh')}",
+        "",
+        "*⚡ Energy*",
+        f"⬇️ Grid import: {_quantity(_field(period, 'grid_import_kwh'), 'kWh')}",
+        f"⬆️ Grid export: {_quantity(_field(period, 'grid_export_kwh'), 'kWh')}",
+        "☀️ Solar generated: "
+        + _quantity(_field(period, "solar_generation_kwh"), "kWh"),
+        "",
+        "*💷 Actual energy finances*",
         f"Import cost: {_pounds(_field(period, 'import_cost_pence'))}",
         f"Agile export income: {_pounds(_field(period, 'export_income_pence'))}",
         f"Gas cost: {_pounds(_field(period, 'gas_cost_pence'))}",
-        "Net energy cost before Happy Hour estimates: "
-        + _pounds(_field(period, "actual_net_cost_pence")),
-        "Happy Hour credit (estimated, not supplier-settled): "
+        "*Net energy cost (reported actual): "
+        + _pounds(_field(period, "actual_net_cost_pence"))
+        + "*",
+        "",
+        "*🎁 Additional event credits*",
+        "Happy Hour credit (estimated, not settled): "
         + _pounds(_field(period, "happy_hour_estimated_credit_pence")),
-        "Power Down supplier awards for this period: unavailable "
-        "(not included in the period energy figures).",
+        "Power Down verified reward: unavailable in completed-period ledger",
+        "",
+        "ℹ️ Estimated credits are not confirmed payments and are "
+        "not added again to the reported actual net cost.",
     ]
     return key, "\n".join(lines)
 

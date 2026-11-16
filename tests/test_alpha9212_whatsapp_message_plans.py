@@ -39,7 +39,7 @@ def test_joined_only_with_durable_once_only_phases_and_rescheduled_identity():
         sent_keys={},
     )
     assert len(planned) == 1
-    assert "confirmed joined" in planned[0][1]
+    assert "*⚡ Power Down — Confirmed booking*" in planned[0][1]
     assert (
         mod.event_notifications(
             category="Power Down",
@@ -55,14 +55,14 @@ def test_joined_only_with_durable_once_only_phases_and_rescheduled_identity():
         now=start,
         sent_keys={planned[0][0]: "delivered"},
     )
-    assert len(started) == 1 and "started" in started[0][1]
+    assert len(started) == 1 and "Started" in started[0][1]
     ended = mod.event_notifications(
         category="Power Down",
         joined_events=[event],
         now=start + timedelta(hours=1),
         sent_keys={},
     )
-    assert "supplier-settled reward is not yet verified" in ended[0][1]
+    assert "Supplier-settled rewards are not yet verified" in ended[0][1]
     assert (
         mod.event_notifications(
             category="Power Down",
@@ -134,8 +134,8 @@ def test_stale_yesterday_label_and_incomplete_week_cannot_publish_old_money():
     }
     _, daily = mod.completed_period_message(periods, now, weekly=False)
     _, weekly = mod.completed_period_message(periods, now, weekly=True)
-    assert "unavailable or incomplete" in daily
-    assert "unavailable or incomplete" in weekly
+    assert "missing or incomplete" in daily
+    assert "missing or incomplete" in weekly
     assert "£999.99" not in daily + weekly
 
 
@@ -161,9 +161,9 @@ def test_completed_period_money_separates_export_hh_and_supplier_award():
         {"calendar_matched": period}, now, weekly=False
     )
     assert "Agile export income: £3.56" in message
-    assert "Happy Hour credit (estimated, not supplier-settled): £1.17" in message
-    assert "Power Down supplier awards for this period: unavailable" in message
-    assert "Net energy cost before Happy Hour estimates: £-1.84" in message
+    assert "Happy Hour credit (estimated, not settled): £1.17" in message
+    assert "Power Down verified reward: unavailable" in message
+    assert "Net energy cost (reported actual): £-1.84" in message
 
 
 def test_no_partial_or_invalid_price_is_fabricated():
