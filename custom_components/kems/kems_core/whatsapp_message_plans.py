@@ -201,16 +201,10 @@ def completed_period_message(
 
     standing_daily = _number(standing_charge_pence_per_day)
     base_net = _number(_field(period, "actual_net_cost_pence"))
-    estimated_refund = _number(
-        _field(period, "happy_hour_estimated_credit_pence")
-    )
-    standing = (
-        standing_daily * days if standing_daily is not None else None
-    )
+    estimated_refund = _number(_field(period, "happy_hour_estimated_credit_pence"))
+    standing = standing_daily * days if standing_daily is not None else None
     gross = (
-        base_net + standing
-        if base_net is not None and standing is not None
-        else None
+        base_net + standing if base_net is not None and standing is not None else None
     )
     after_credit = (
         gross - estimated_refund
@@ -236,12 +230,9 @@ def completed_period_message(
         f"*Gross energy total (dashboard basis): {_pounds(gross)}*",
         "",
         "*🎁 Event credits*",
-        "Happy Hour refund (estimated, unsettled): "
-        + _pounds(estimated_refund),
+        "Happy Hour refund (estimated, unsettled): " + _pounds(estimated_refund),
         "Power Down supplier-confirmed award: unavailable in period ledger",
-        "*Net after estimated Happy Hour refund: "
-        + _pounds(after_credit)
-        + "*",
+        "*Net after estimated Happy Hour refund: " + _pounds(after_credit) + "*",
         "",
         "ℹ️ Estimated refunds are not supplier-confirmed. "
         "A partial report is not a verified full-period bill.",
