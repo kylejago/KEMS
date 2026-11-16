@@ -66,14 +66,14 @@ def test_daily_recap_financial_labels():
         {"yesterday": period}, now, weekly=False
     )
     assert key == "recap:daily:2026-11-15:2026-11-15"
-    assert "*💷 Actual energy finances*" in text
-    assert "£-0.46" in text
-    assert "£1.20" in text and "estimated, not settled" in text
-    assert "Power Down verified reward: unavailable" in text
+    assert "*💷 Recorded finances*" in text
+    assert "Gross energy total (dashboard basis): unavailable" in text
+    assert "£1.20" in text and "estimated, unsettled" in text
+    assert "Power Down supplier-confirmed award: unavailable" in text
 
 
 def test_incomplete_recap_never_fabricates_costs():
     now = datetime(2026, 11, 16, 8, tzinfo=UTC)
     _, text = messages.completed_period_message({}, now, weekly=True)
-    assert "Report not yet available" in text
+    assert "No recorded period totals available" in text
     assert "No costs, savings or rewards have been inferred" in text
