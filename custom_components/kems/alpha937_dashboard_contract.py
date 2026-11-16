@@ -228,7 +228,7 @@ _COMPARE_SIDE_BY_SIDE = """      - type: markdown
           {% endif %}
           {% endif %}
 
-          _Live uses the estimated, unsettled Happy Hour refund; gross electricity import remains recorded normally. Without KEMS is a counterfactual, not an Octopus bill. ROI is a separately accrued ledger including eligible event rewards; it is not interchangeable with this bill-equivalent comparison._
+          _Live uses the estimated, unsettled Happy Hour refund; gross electricity import remains recorded normally. Without KEMS uses the same measured-history baseline as ROI when source evidence matches (or an explicitly labelled scenario replay fallback). Gas and standing charges are shown on both sides; ROI may also include distinct supplier event rewards._
 """
 
 
