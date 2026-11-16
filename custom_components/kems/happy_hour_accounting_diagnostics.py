@@ -38,6 +38,38 @@ def _valid_receipt(item: Mapping[str, Any]) -> bool:
     )
 
 
+def _meter_window_recovery(
+    start: datetime,
+    end: datetime,
+    persisted_ledger_status: Mapping[str, Any],
+) -> str:
+    """Classify only what can be recovered from the *current on-device* store."""
+    first = persisted_ledger_status.get("first_sample")
+    last = persisted_ledger_status.get("last_sample")
+    try:
+        first_at = datetime.fromisoformat(str(first).replace("Z", "+00:00"))
+        last_at = datetime.fromisoformat(str(last).replace("Z", "+00:00"))
+    except (TypeError, ValueError):
+        return "on_device_meter_range_unknown"
+    if first_at.tzinfo is None or last_at.tzinfo is None or first_at > last_at:
+        return "on_device_meter_range_unknown"
+    if end <= first_at or start >= last_at:
+        return "unrecoverable_from_current_on_device_store"
+    return "retained_sample_range_overlaps_but_coverage_unverified"
+
+
+def _covered_minutes(row: Mapping[str, Any], full_minutes: float) -> float | None:
+    """Return observed coverage only; never assume missing intervals are metered."""
+    raw = row.get("covered_minutes")
+    if raw is None or isinstance(raw, bool):
+        return None
+    try:
+        value = float(raw)
+    except (ValueError, TypeError, OverflowError):
+        return None
+    return value if isfinite(value) and 0 <= value <= full_minutes else None
+
+
 def build_happy_hour_accounting_audit(
     persisted_ledger_status: Mapping[str, Any],
     verified_receipts: list[Mapping[str, Any]],
@@ -63,7 +95,7 @@ def build_happy_hour_accounting_audit(
             if not isinstance(row, Mapping) or row.get("type") != "happy_hour":
                 continue
             key = _window(row)
-            if key and row.get("included_in_roi") is True:
+            if key:
                 roi_rows[key] = row
 
     evidence: list[dict[str, Any]] = []
@@ -125,6 +157,58 @@ def build_happy_hour_accounting_audit(
                 }
             )
 
+    # The complete-hour ledger is deliberately strict; disclose weaker ROI
+    # provisional evidence as separate rows rather than hiding incomplete
+    # independently booked historical hours from operator diagnostics.
+    for key, row in roi_rows.items():
+        if key in seen or key in receipts:
+            continue
+        start, end = key
+        duration = (end - start).total_seconds() / 60.0
+        covered = _covered_minutes(row, duration)
+        is_provisional = str(row.get("status") or "").startswith(
+            "included_provisional_"
+        )
+        status = (
+            "provisional_hour_observed_import_only_full_receipt_incomplete"
+            if is_provisional
+            else "booking_or_roi_hour_without_complete_meter_receipt"
+        )
+        evidence.append(
+            {
+                "start": start.isoformat(),
+                "end": end.isoformat(),
+                "status": status,
+                "event_id": row.get("event_id"),
+                "booking_source": row.get("booking_source"),
+                "independent_booking_recorded": bool(
+                    row.get("event_id")
+                    and row.get("booking_source") == "octopus_joined_events"
+                ),
+                "saved_credit_pence": None,
+                "saved_eligible_import_kwh": None,
+                "roi_estimated_credit_pence": row.get("estimated_reward_pence"),
+                "roi_evidence_source": row.get("evidence_source"),
+                "roi_estimate_status": row.get("status"),
+                "roi_coverage_percent": row.get("coverage_percent"),
+                "roi_rate_basis": row.get("rate_basis"),
+                "observed_minutes": round(covered, 2) if covered is not None else None,
+                "missing_unverified_minutes": (
+                    round(max(duration - covered, 0.0), 2)
+                    if covered is not None
+                    else None
+                ),
+                "on_device_recovery_status": _meter_window_recovery(
+                    start, end, persisted_ledger_status
+                ),
+                "on_device_recovery_scope": (
+                    "Current saved samples only; independently archived Octopus "
+                    "records or externally held meter proof may still exist."
+                ),
+                "credit_is_provisional_not_supplier_paid": is_provisional,
+            }
+        )
+
     evidence.sort(key=lambda row: (row["start"], row["end"]))
     # The ROI summary is authoritative for the complete commissioned-period
     # totals; the bounded itemised entries may be truncated in diagnostics.
@@ -144,6 +228,7 @@ def build_happy_hour_accounting_audit(
         float(receipts[key]["credit_pence"])
         for key, row in roi_rows.items()
         if key in receipts
+        and row.get("included_in_roi") is True
         and row.get("evidence_source") == "completed_meter_and_tariff_verified_hour"
     )
     difference = (
@@ -155,15 +240,32 @@ def build_happy_hour_accounting_audit(
         "hour_evidence": evidence[-24:],
         "hour_evidence_omitted": max(len(evidence) - 24, 0),
         "completed_verified_receipts": len(receipts),
+        "provisional_roi_hours_without_complete_receipt": sum(
+            1
+            for row in evidence
+            if row["status"]
+            == "provisional_hour_observed_import_only_full_receipt_incomplete"
+        ),
+        "hours_outside_current_meter_store": sum(
+            row.get("on_device_recovery_status")
+            == "unrecoverable_from_current_on_device_store"
+            for row in evidence
+        ),
         "recorded_unverified_windows": sum(
             1
             for row in evidence
             if "incomplete" in row["status"]
             or "not_independent" in row["status"]
             or "missing_independent" in row["status"]
+            or "without_complete" in row["status"]
         ),
         "physical_meter_last_saved_sample": persisted_ledger_status.get("last_sample"),
         "supplier_credit_settled": False,
+        "historical_recovery_note": (
+            "Partial observed minutes and estimated ROI amounts are retained "
+            "unchanged, but no missing meter interval is reconstructed. "
+            "Outside-current-store does not exclude archived HA/Octopus data."
+        ),
         "roi_reconciliation": {
             "status": (
                 "reconciled_estimate_tiers"
