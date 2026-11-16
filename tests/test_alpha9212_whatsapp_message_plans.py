@@ -134,8 +134,8 @@ def test_stale_yesterday_label_and_incomplete_week_cannot_publish_old_money():
     }
     _, daily = mod.completed_period_message(periods, now, weekly=False)
     _, weekly = mod.completed_period_message(periods, now, weekly=True)
-    assert "missing or incomplete" in daily
-    assert "missing or incomplete" in weekly
+    assert "Partial coverage" in daily
+    assert "Partial coverage" in weekly
     assert "£999.99" not in daily + weekly
 
 
@@ -161,9 +161,9 @@ def test_completed_period_money_separates_export_hh_and_supplier_award():
         {"calendar_matched": period}, now, weekly=False
     )
     assert "Agile export income: £3.56" in message
-    assert "Happy Hour credit (estimated, not settled): £1.17" in message
-    assert "Power Down verified reward: unavailable" in message
-    assert "Net energy cost (reported actual): £-1.84" in message
+    assert "Happy Hour refund (estimated, unsettled): £1.17" in message
+    assert "Power Down supplier-confirmed award: unavailable" in message
+    assert "Gross energy total (dashboard basis): unavailable" in message
 
 
 def test_no_partial_or_invalid_price_is_fabricated():
@@ -224,3 +224,47 @@ def test_sent_notify_entity_remains_sendable() -> None:
     )
     assert result["send_eligible"] is True
     assert result["status"] == "ready"
+
+
+def test_partial_day_uses_dashboard_gross_and_estimated_net() -> None:
+    now = datetime(2026, 11, 16, 8, tzinfo=UTC)
+    period = {
+        "start_date": "2026-11-15",
+        "end_date": "2026-11-15",
+        "days_included": 1,
+        "complete_days": 0,
+        "incomplete_days": 1,
+        "data_complete": False,
+        "grid_import_kwh": 84.5,
+        "grid_export_kwh": 31.0,
+        "solar_generation_kwh": 12.7,
+        "import_cost_pence": 1004.02,
+        "export_income_pence": 780.41,
+        "gas_cost_pence": 120,
+        "actual_net_cost_pence": 343.61,
+        "happy_hour_estimated_credit_pence": 474.048,
+    }
+    _, text = mod.completed_period_message(
+        {"yesterday": period},
+        now,
+        weekly=False,
+        standing_charge_pence_per_day=55.5236,
+    )
+    assert "Partial coverage" in text
+    assert "0/1 complete days" in text
+    assert "Gross energy total (dashboard basis): £3.99" in text
+    assert "Net after estimated Happy Hour refund: £-0.75" in text
+    assert "Electricity standing charge: £0.56" in text
+    assert "Happy Hour refund (estimated, unsettled): £4.74" in text
+
+
+def test_missing_day_is_not_fabricated() -> None:
+    now = datetime(2026, 11, 16, 8, tzinfo=UTC)
+    _, text = mod.completed_period_message(
+        {},
+        now,
+        weekly=False,
+        standing_charge_pence_per_day=55.5236,
+    )
+    assert "No recorded period totals available" in text
+    assert "£" not in text
