@@ -112,4 +112,6 @@ def test_today_side_by_side_uses_bill_equivalent_source() -> None:
     assert "electricity_effective_total_cost_pence" in second
     assert "gas_total_cost_pence" in second
     assert "sensor.kems_simulated_kems_cost_today" not in second
-    assert "same measured-history baseline as ROI when source evidence matches" in second
+    assert (
+        "same measured-history baseline as ROI when source evidence matches" in second
+    )
