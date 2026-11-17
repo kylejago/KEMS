@@ -168,7 +168,9 @@ def _bill_effective_total(
     charges, export credits and eligible estimated Happy Hour refunds.
     """
     period = matching_completed_period(bill_equivalent_periods, start, end)
-    if period is None or _number(_field(period, "days_included")) != (end - start).days + 1:
+    if period is None:
+        return None
+    if _number(_field(period, "days_included")) != (end - start).days + 1:
         return None
     live = _field(period, "live_data")
     if not isinstance(live, Mapping) or _field(live, "ready") is not True:
