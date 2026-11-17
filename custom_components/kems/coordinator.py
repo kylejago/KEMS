@@ -875,8 +875,12 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                 await self._forecast_validation.async_save()
 
             history_record_started = perf_counter()
-            if await self._history.async_record(snapshot):
-                self._counter_evidence.observe(now=snapshot.timestamp)
+            await self._history.async_record(snapshot)
+            # The independent cumulative-counter evidence must observe fresh
+            # HA reports even when the separate sampled-history recorder does
+            # not accept a snapshot. This is read-only; never use it for
+            # dispatch, Happy Hour credits or speculative gap backfill.
+            self._counter_evidence.observe(now=snapshot.timestamp)
             detail_seconds["history_record"] = round(
                 perf_counter() - history_record_started, 3
             )

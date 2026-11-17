@@ -1,3 +1,11 @@
+## 0.9.0-alpha9.223 — Independent metering evidence and historical coverage clarity
+
+- **FoxESS counter evidence (#352):** Inspect candidate cumulative import-counter reports on **every KEMS coordinator scan**, instead of only when the separate sampled-history recorder accepts a row. Continue to store only fresh, source-bound, at-least-15-minute-apart real HA reports; no fabricated kWh or backfill.
+- **Counter provenance:** Diagnostics now disclose number of read-only checks, accepted evidence batches, last check timestamp and whether candidate reports are fresh enough to sample. These values do **not** prove physical meter independence, supplier settlement or authorise use in Happy Hour credit/ROI.
+- **Historical coverage (#487):** Report how many days have persisted recorded totals separately from days that fail the strict 99.9% **simulation replay** threshold. Explicitly disclose zero independently meter-verified complete days. No legacy flag promotion, financial reinterpretation or missing-interval estimation.
+- **Solar/EV safety scope:** Keep existing price-ranked store-versus-export optimisation and confirmed-cheap grid-powered house/EV battery hold unchanged. #365 solar physical decision, #349 Happy Hour no-discharge, #451 15%/10% parity, #405 performance and #446 supplier export reconciliation still require live evidence.
+- **Release guards:** No new FoxESS/Ohme writes, tariff/ledger changes, physical safety-floor changes or update-window changes; regression tests for independent meter observation and coverage disclosure.
+
 ## 0.9.0-alpha9.222 — Refund-adjusted daily WhatsApp energy total
 
 - **Daily family recap:** The one-line Energy total now reports the canonical **TOTAL ENERGY COST (after estimated Happy Hour refund)** for the matching completed day, including electricity and gas, standing charges, Agile export income and supported unsettled Happy Hour credits, instead of showing the gross figure.
