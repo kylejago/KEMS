@@ -42,6 +42,7 @@ from .forecast_validation import ForecastValidationRecorder
 from .forecasting import SolarForecastCoordinator
 from .foxess_command_shadow import build_foxess_command_shadow_snapshot
 from .foxess_control_backend import FoxESSControlBackend
+from .foxess_counter_evidence import FoxESSCounterEvidenceRecorder
 from .happy_hour_auto_join import (
     _controller_for,
     independently_confirmed_reward_hours,
@@ -60,7 +61,6 @@ from .happy_hour_physical_preparation import (
     apply_verified_happy_hour_preparation,
 )
 from .historical_tariff_revaluation import financial_replay_records
-from .foxess_counter_evidence import FoxESSCounterEvidenceRecorder
 from .history import HistoryRecorder
 from .kems_core import (
     AdviceEngine,
