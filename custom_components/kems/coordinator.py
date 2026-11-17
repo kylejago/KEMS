@@ -61,6 +61,7 @@ from .happy_hour_physical_preparation import (
 )
 from .historical_tariff_revaluation import financial_replay_records
 from .history import HistoryRecorder
+from .foxess_counter_evidence import FoxESSCounterEvidenceRecorder
 from .kems_core import (
     AdviceEngine,
     ControlEngine,
@@ -157,6 +158,9 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
             hass,
             entry.entry_id,
             settings.history_days,
+        )
+        self._counter_evidence = FoxESSCounterEvidenceRecorder(
+            hass, entry.entry_id, entities.grid_import_kw or ""
         )
         self._ev_charge_trace = EVChargeTraceRecorder(hass, entry.entry_id)
         self._happy_hour_import_ledger = HappyHourImportLedgerRecorder(
@@ -568,6 +572,7 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
         await self._foxess_control.async_setup()
         await self._export_commissioning_test.async_load()
         await self._history.async_load()
+        await self._counter_evidence.async_load()
         await self._happy_hour_import_ledger.async_load()
         # The existing five-minute history can warm-start the physical ledger,
         # but *each missing historical minute* consumes worst-case battery
@@ -870,7 +875,8 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                 await self._forecast_validation.async_save()
 
             history_record_started = perf_counter()
-            await self._history.async_record(snapshot)
+            if await self._history.async_record(snapshot):
+                self._counter_evidence.observe(now=snapshot.timestamp)
             detail_seconds["history_record"] = round(
                 perf_counter() - history_record_started, 3
             )
@@ -2073,6 +2079,7 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
         await self._ev_soc_sync.async_shutdown()
         await self._happy_hour_ohme.async_shutdown()
         await self._history.async_save()
+        await self._counter_evidence.async_shutdown()
         await self._ev_charge_trace.async_save()
         await self._ev_grid_hold.async_save()
         await self._forecast_validation.async_save()
