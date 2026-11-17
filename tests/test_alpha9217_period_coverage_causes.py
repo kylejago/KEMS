@@ -60,8 +60,7 @@ def test_only_recent_calendar_days_are_included_and_pairs_need_two_samples():
     ]
     assert all(row["pair_count"] == 0 for row in report["day_rows"])
     assert all(
-        row["source_eligible_pair_percent"] is None
-        for row in report["day_rows"]
+        row["source_eligible_pair_percent"] is None for row in report["day_rows"]
     )
 
 
