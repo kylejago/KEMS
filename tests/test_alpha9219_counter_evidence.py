@@ -95,7 +95,9 @@ def test_source_identity_and_tampered_records_rejected_on_restore() -> None:
         },
         now=now,
     )
-    assert evidence.status()["candidates"]["lifetime_total"]["fresh_report_samples"] == 0
+    assert (
+        evidence.status()["candidates"]["lifetime_total"]["fresh_report_samples"] == 0
+    )
     evidence.restore(
         {
             "source_entity_id": "sensor.source",
@@ -109,7 +111,9 @@ def test_source_identity_and_tampered_records_rejected_on_restore() -> None:
         },
         now=now,
     )
-    assert evidence.status()["candidates"]["lifetime_total"]["fresh_report_samples"] == 1
+    assert (
+        evidence.status()["candidates"]["lifetime_total"]["fresh_report_samples"] == 1
+    )
     reloaded = CounterEvidenceSeries("sensor.source")
     reloaded.restore(evidence.payload(), now=now + timedelta(minutes=1))
     assert reloaded.payload() == evidence.payload()
@@ -149,9 +153,7 @@ def test_forensic_gaps_report_exact_times_not_inferred_energy() -> None:
         _snapshot(start + timedelta(minutes=22), load=None),
         _snapshot(start + timedelta(minutes=27)),
     ]
-    result = observation_coverage_probe(
-        records, start + timedelta(hours=3)
-    )
+    result = observation_coverage_probe(records, start + timedelta(hours=3))
     gaps = result["source_gap_details"]
     assert gaps
     assert result["source_gap_details_available"] == len(gaps)
