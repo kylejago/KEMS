@@ -40,7 +40,6 @@ def test_daily_recap_matches_user_requested_five_fields_exactly() -> None:
     )
 
 
-
 def test_daily_recap_uses_dashboard_total_after_refunds_including_gas() -> None:
     now = datetime(2026, 11, 18, 8, tzinfo=UTC)
     period = {
