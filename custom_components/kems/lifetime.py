@@ -35,6 +35,7 @@ from .kems_core.lifetime_accounting import (
     SIGNED_LIFETIME_KEYS,
     should_accumulate_lifetime_value,
 )
+from .kems_core.periods import recorded_totals_present
 
 STORAGE_VERSION = 1
 LEDGER_SCHEMA_VERSION = 2
@@ -117,6 +118,21 @@ class LifetimeLedgerRecorder:
                 {
                     "date": day,
                     "data_complete": bool(complete),
+                    "simulation_replay_complete": bool(complete),
+                    "recorded_totals_available": bool(
+                        any(
+                            key in values
+                            for key in (
+                                "grid_import_kwh",
+                                "grid_export_kwh",
+                                "solar_generation_kwh",
+                                "import_cost_pence",
+                                "export_income_pence",
+                            )
+                        )
+                        and values.get("__data_coverage_percent", 1.0) > 0
+                    ),
+                    "independent_meter_completeness": "not_verified",
                     "simulation_data_coverage_percent": (
                         round(float(coverage), 3)
                         if isinstance(coverage, (int, float))
@@ -127,6 +143,9 @@ class LifetimeLedgerRecorder:
             )
         return {
             "classification_source": "simulation.data_coverage >= 99.9",
+            "legacy_data_complete_means": "simulation_replay_complete",
+            "recorded_totals_can_exist_with_incomplete_replay": True,
+            "recorded_ledger_totals_are_not_meter_settlement": True,
             "required_simulation_coverage_percent": 99.9,
             "recorded_days": len(recent),
             "incomplete_recorded_days": incomplete_total,
@@ -798,6 +817,11 @@ class LifetimeLedgerRecorder:
             "happy_hour_credited_import_kwh",
         ):
             values[key] = round(sum(float(row.get(key, 0.0)) for row in rows), 3)
+        recorded_days = sum(1 for row in rows if recorded_totals_present(row))
+        simulation_complete = (
+            not self._ledger.historical_repair_required
+            and self._ledger.accumulation_days_incomplete == 0
+        )
         return PeriodTotals(
             start_date=(
                 self._ledger.first_observation.date()
@@ -808,10 +832,13 @@ class LifetimeLedgerRecorder:
             days_included=self._ledger.observed_days,
             complete_days=self._ledger.accumulation_days_complete,
             incomplete_days=self._ledger.accumulation_days_incomplete,
-            data_complete=(
-                not self._ledger.historical_repair_required
-                and self._ledger.accumulation_days_incomplete == 0
-            ),
+            data_complete=simulation_complete,
+            recorded_totals_available=recorded_days > 0,
+            recorded_days_with_totals=recorded_days,
+            simulation_coverage_complete=simulation_complete,
+            simulation_complete_days=self._ledger.accumulation_days_complete,
+            simulation_incomplete_days=self._ledger.accumulation_days_incomplete,
+            independent_meter_completeness="not_verified",
             **period_value_kwargs(values),
         )
 

@@ -131,6 +131,7 @@ def test_alpha9170_all_time_happy_hour_uses_verified_daily_rows_only() -> None:
         period_value_keys,
         period_value_kwargs,
     )
+    from kems_core.periods import recorded_totals_present
 
     path = Path(__file__).parents[1] / "custom_components" / "kems" / "lifetime.py"
     module = ast.parse(path.read_text())
@@ -152,6 +153,7 @@ def test_alpha9170_all_time_happy_hour_uses_verified_daily_rows_only() -> None:
         "PeriodTotals": PeriodTotals,
         "period_value_keys": period_value_keys,
         "period_value_kwargs": period_value_kwargs,
+        "recorded_totals_present": recorded_totals_present,
     }
     exec(
         compile(
@@ -196,6 +198,7 @@ def test_alpha9170_all_time_happy_hour_includes_active_day_once() -> None:
         period_value_keys,
         period_value_kwargs,
     )
+    from kems_core.periods import recorded_totals_present
 
     module = ast.parse(
         (Path(__file__).parents[1] / "custom_components/kems/lifetime.py").read_text()
@@ -215,6 +218,7 @@ def test_alpha9170_all_time_happy_hour_includes_active_day_once() -> None:
         PeriodTotals=PeriodTotals,
         period_value_keys=period_value_keys,
         period_value_kwargs=period_value_kwargs,
+        recorded_totals_present=recorded_totals_present,
     )
     exec(
         compile(

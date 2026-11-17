@@ -825,6 +825,18 @@ class PeriodTotals:
     incomplete_days: int = 0
     data_complete: bool = True
 
+    # Distinct reporting evidence: historical data_complete/complete_days
+    # remain conservative *simulation replay* coverage for compatibility.
+    # Recorded ledger totals may exist even when that replay is incomplete.
+    recorded_totals_available: bool = False
+    recorded_days_with_totals: int = 0
+    simulation_coverage_complete: bool = False
+    simulation_complete_days: int = 0
+    simulation_incomplete_days: int = 0
+    # A stored energy total is not proof of continuous physical metering or
+    # supplier settlement; no guessed meter-complete flag is exposed.
+    independent_meter_completeness: str = "not_verified"
+
     house_consumption_kwh: float = 0.0
     ev_energy_kwh: float = 0.0
     grid_import_kwh: float = 0.0

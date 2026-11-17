@@ -183,20 +183,36 @@ def completed_period_message(
             "No costs, savings or rewards have been inferred.",
         )
 
+    # New ledgers distinguish saved totals from simulator replay. Older
+    # diagnostics have no explicit availability field, so retain legacy
+    # presence-based compatibility for their already-recorded figures.
+    if _field(period, "recorded_totals_available") is False:
+        return (
+            key,
+            f"{title}\n\n⚠️ *No recorded period totals available*\n"
+            "No costs, savings or rewards have been inferred.",
+        )
+
     days = (end - start).days + 1
     included = int(_number(_field(period, "days_included")) or 0)
     complete = int(_number(_field(period, "complete_days")) or 0)
+    replay_complete = _field(period, "simulation_coverage_complete")
+    if replay_complete is None:
+        replay_complete = _field(period, "data_complete")
     fully_covered = (
-        _field(period, "data_complete") is True
+        replay_complete is True
         and included == days
         and complete == days
         and _field(period, "incomplete_days") == 0
     )
     coverage = (
-        "✅ Complete recorded coverage"
+        "✅ Recorded totals available; simulation replay coverage complete. "
+        "Independent meter completeness not verified."
         if fully_covered
-        else f"⚠️ *Partial coverage* ({complete}/{days} complete days; "
-        f"{included}/{days} days recorded). Totals may be understated."
+        else f"⚠️ *Partial coverage* — simulation replay "
+        f"({complete}/{days} complete days; {included}/{days} days recorded). "
+        "Saved totals are shown, but missing intervals may understate them. "
+        "Independent meter completeness not verified."
     )
 
     standing_daily = _number(standing_charge_pence_per_day)
