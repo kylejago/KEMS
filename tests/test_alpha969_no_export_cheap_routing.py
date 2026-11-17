@@ -716,8 +716,8 @@ def test_alpha969_release_identity_is_explicitly_shadow_only() -> None:
         (root / "release" / "kems-bundle.template.json").read_text(encoding="utf-8")
     )
     reason = bundle["maintenance"]["reason"]
-    assert manifest["version"] == "0.9.0-alpha9.216"
-    assert reason.startswith("Alpha9.216:")
+    assert manifest["version"] == "0.9.0-alpha9.217"
+    assert reason.startswith("Alpha9.217:")
     assert "Alpha9.68 Control-mode cheap-period planner" in reason
     assert "No new KH7 output control" in reason
     assert bundle["components"]["property_web"]["version"] == "0.9.0-alpha9-web.0"
