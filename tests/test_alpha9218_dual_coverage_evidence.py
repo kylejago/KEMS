@@ -6,12 +6,12 @@ from datetime import UTC, date, datetime, timedelta
 from types import SimpleNamespace
 
 from kems_core.period_coverage_probe import observation_coverage_probe
-from kems_core.whatsapp_message_plans import completed_period_message
 from kems_core.periods import (
     period_value_keys,
     recorded_totals_present,
     summarise_period_records,
 )
+from kems_core.whatsapp_message_plans import completed_period_message
 
 
 def test_incomplete_simulation_still_has_reported_ledger_totals() -> None:
