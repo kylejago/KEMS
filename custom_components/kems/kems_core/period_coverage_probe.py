@@ -74,10 +74,10 @@ def observation_coverage_probe(
             )
             if _load_kw(following) is None:
                 result["missing_following_load_pairs"] += 1
-            elif (
-                getattr(current, "current_import_rate", None) is None
-                or "current_import_rate"
-                in getattr(current, "tariff_stale_fields", ())
+            elif getattr(
+                current, "current_import_rate", None
+            ) is None or "current_import_rate" in getattr(
+                current, "tariff_stale_fields", ()
             ):
                 result["missing_or_stale_import_tariff_pairs"] += 1
             elif _load_kw(current) is None:
