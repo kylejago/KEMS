@@ -51,24 +51,32 @@ def test_end_message_observed_time_and_dedupe_identity():
     assert "Cheap Slot Ended" in msg
     assert "End: 05:30" in msg
     assert "KEMS continues" in msg
-    assert key != mod.intelligent_slot_message(
-        state="off", changed_at=changed + timedelta(hours=1),
-        now=changed + timedelta(hours=1)
-    )[0]
+    assert (
+        key
+        != mod.intelligent_slot_message(
+            state="off",
+            changed_at=changed + timedelta(hours=1),
+            now=changed + timedelta(hours=1),
+        )[0]
+    )
 
 
 def test_not_an_event_when_unknown_or_stale_or_naive():
     at = datetime(2026, 11, 17, 20, tzinfo=UTC)
     for state in ("unknown", "unavailable", ""):
-        assert mod.intelligent_slot_message(
-            state=state, changed_at=at, now=at
-        ) is None
-    assert mod.intelligent_slot_message(
-        state="on", changed_at=at, now=at + timedelta(minutes=6)
-    ) is None
-    assert mod.intelligent_slot_message(
-        state="on", changed_at=at.replace(tzinfo=None), now=at
-    ) is None
+        assert mod.intelligent_slot_message(state=state, changed_at=at, now=at) is None
+    assert (
+        mod.intelligent_slot_message(
+            state="on", changed_at=at, now=at + timedelta(minutes=6)
+        )
+        is None
+    )
+    assert (
+        mod.intelligent_slot_message(
+            state="on", changed_at=at.replace(tzinfo=None), now=at
+        )
+        is None
+    )
 
 
 def test_reporter_keeps_state_and_idempotency_without_affecting_control():
