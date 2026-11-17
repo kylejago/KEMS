@@ -50,8 +50,7 @@ def test_absent_ledger_and_zero_replay_are_not_mistaken_for_meter_readings() -> 
     day = date(2026, 11, 15)
     assert not recorded_totals_present({})
     assert not recorded_totals_present(
-        {"__data_complete": 0.0, "__data_coverage_percent": 0.0,
-         "grid_import_kwh": 0.0}
+        {"__data_complete": 0.0, "__data_coverage_percent": 0.0, "grid_import_kwh": 0.0}
     )
     for rows in ({}, {"2026-11-15": {}}):
         result = summarise_period_records(
@@ -69,9 +68,15 @@ def test_absent_ledger_and_zero_replay_are_not_mistaken_for_meter_readings() -> 
     )
 
 
-def _snap(t: datetime, *, load: float | None = 1.0, rate: float | None = .2,
-          grid_import: float | None = .1, grid_export: float | None = 0.0,
-          stale: tuple[str, ...] = ()):
+def _snap(
+    t: datetime,
+    *,
+    load: float | None = 1.0,
+    rate: float | None = 0.2,
+    grid_import: float | None = 0.1,
+    grid_export: float | None = 0.0,
+    stale: tuple[str, ...] = (),
+):
     return SimpleNamespace(
         timestamp=t,
         house_load_kw=load,
@@ -108,9 +113,9 @@ def test_stale_and_nonfinite_physical_samples_are_not_counted() -> None:
         _snap(start, grid_import=float("nan")),
         _snap(start + timedelta(minutes=5), stale=("grid_export_kw",)),
     ]
-    day = observation_coverage_probe(
-        samples, start + timedelta(minutes=5)
-    )["day_rows"][0]
+    day = observation_coverage_probe(samples, start + timedelta(minutes=5))["day_rows"][
+        0
+    ]
     assert day["independent_grid_import_observed_pairs"] == 0
     assert day["independent_grid_export_observed_pairs"] == 0
     assert day["independent_grid_both_observed_pairs"] == 0
