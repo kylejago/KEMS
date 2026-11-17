@@ -78,6 +78,12 @@ class KEMSWhatsAppNotifications:
         family_readiness = self._target_readiness(family)
         private_readiness = self._target_readiness(private)
         legacy = self._legacy_conflicts()
+        daily_keys = sorted(
+            key for key in self._delivered if key.startswith("recap:daily:")
+        )
+        weekly_keys = sorted(
+            key for key in self._delivered if key.startswith("recap:weekly:")
+        )
         return {
             "enabled": self.enabled,
             "family_target": family,
@@ -100,6 +106,16 @@ class KEMSWhatsAppNotifications:
             "last_success": self._last_delivered,
             "successful_deliveries_since_setup": self._delivered_count,
             "durably_recorded_delivery_keys": len(self._delivered),
+            "scheduled_daily_recaps_accepted": len(daily_keys),
+            "scheduled_weekly_recaps_accepted": len(weekly_keys),
+            "last_scheduled_daily_recap_key": daily_keys[-1] if daily_keys else None,
+            "last_scheduled_weekly_recap_key": (
+                weekly_keys[-1] if weekly_keys else None
+            ),
+            "schedule_delivery_basis": (
+                "HA notify service accepted and persisted; recipient receipt "
+                "is not independently verified"
+            ),
             "reporting_only": True,
             "control_dependency": False,
             "migration_note": (
