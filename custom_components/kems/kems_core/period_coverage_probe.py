@@ -92,10 +92,10 @@ def observation_coverage_probe(
                 reasons.append("missing_following_load")
             if _load_kw(current) is None:
                 reasons.append("missing_current_load")
-            if (
-                getattr(current, "current_import_rate", None) is None
-                or "current_import_rate"
-                in getattr(current, "tariff_stale_fields", ())
+            if getattr(
+                current, "current_import_rate", None
+            ) is None or "current_import_rate" in getattr(
+                current, "tariff_stale_fields", ()
             ):
                 reasons.append("missing_or_stale_import_tariff")
             # This deliberately checks physical grid observations even when
@@ -190,9 +190,7 @@ def observation_coverage_probe(
         "day_rows": daily,
         "source_gap_details": detail_events[-MAX_GAP_DETAIL_EVENTS:],
         "source_gap_details_available": reason_count,
-        "source_gap_details_omitted": max(
-            reason_count - MAX_GAP_DETAIL_EVENTS, 0
-        ),
+        "source_gap_details_omitted": max(reason_count - MAX_GAP_DETAIL_EVENTS, 0),
         "source_gap_detail_maximum": MAX_GAP_DETAIL_EVENTS,
         "gap_timestamps_are_not_cumulative_meter_anchors": True,
     }
