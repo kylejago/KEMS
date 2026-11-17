@@ -29,6 +29,7 @@ from .kems_core.operational_diagnostic_probes import (
     power_down_baseline_probe,
     roi_recorder_probe,
 )
+from .kems_core.period_coverage_probe import observation_coverage_probe
 from .panel import panel_health_snapshot
 from .product_types import (
     EXPORT_TARIFF_TYPE_AGILE,
@@ -343,6 +344,9 @@ async def async_get_config_entry_diagnostics(
             for period_name, totals in data.periods.items()
         },
         "historical_coverage_audit": coordinator._lifetime.historical_coverage_audit,
+        "historical_observation_coverage_causes": observation_coverage_probe(
+            coordinator._history.records, dt_util.now()
+        ),
         "roi": asdict(data.roi),
         "control": asdict(data.control),
         "alpha969_shadow_plan": dict(data.alpha969_shadow_plan),
