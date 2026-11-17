@@ -17,6 +17,7 @@ from .foxess_modbus_contract import foxess_modbus_contract_snapshot
 from .happy_hour_accounting_diagnostics import build_happy_hour_accounting_audit
 from .happy_hour_auto_join import happy_hour_auto_join_state
 from .kems_core.agile_plan_budget_reconciliation import reconcile_agile_budget
+from .kems_core.period_coverage_probe import observation_coverage_probe
 from .kems_core.diagnostic_evidence import (
     actual_export_evidence,
     agile_current_export_execution_observation,
@@ -343,6 +344,9 @@ async def async_get_config_entry_diagnostics(
             for period_name, totals in data.periods.items()
         },
         "historical_coverage_audit": coordinator._lifetime.historical_coverage_audit,
+        "historical_observation_coverage_causes": observation_coverage_probe(
+            coordinator._history.records, dt_util.now()
+        ),
         "roi": asdict(data.roi),
         "control": asdict(data.control),
         "alpha969_shadow_plan": dict(data.alpha969_shadow_plan),
