@@ -66,10 +66,12 @@ def test_daily_recap_financial_labels():
         {"yesterday": period}, now, weekly=False
     )
     assert key == "recap:daily:2026-11-15:2026-11-15"
-    assert "*💷 Recorded finances*" in text
-    assert "Gross energy total (dashboard basis): unavailable" in text
-    assert "£1.20" in text and "estimated, unsettled" in text
-    assert "Power Down supplier-confirmed award: unavailable" in text
+    assert "Grid import: 12.50 kWh" in text
+    assert "Grid export: 18.40 kWh" in text
+    assert "Solar generated: 8.20 kWh" in text
+    assert "Energy total: unavailable" in text
+    assert "estimated, unsettled" not in text
+    assert "Power Down" not in text
 
 
 def test_incomplete_recap_never_fabricates_costs():

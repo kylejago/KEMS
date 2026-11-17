@@ -1,4 +1,4 @@
-"""KEMS alpha9.220: source-verified Intelligent Octopus slot WhatsApp events."""
+"""KEMS alpha9.221: source-verified Intelligent Octopus slot WhatsApp events."""
 
 from __future__ import annotations
 
@@ -92,3 +92,39 @@ def test_reporter_keeps_state_and_idempotency_without_affecting_control():
     assert "No real slot has been started" in source
     assert "No real slot has ended" in source
     ast.parse(source)
+
+
+def test_intelligent_slot_messages_have_real_line_breaks() -> None:
+    on_time = datetime(2026, 11, 17, 23, 30, tzinfo=UTC)
+    off_time = on_time + timedelta(hours=6)
+    _, on = mod.intelligent_slot_message(
+        state="on",
+        changed_at=on_time,
+        now=on_time,
+        end_time=off_time,
+    )
+    _, off = mod.intelligent_slot_message(
+        state="off",
+        changed_at=off_time,
+        now=off_time,
+    )
+    assert "*\n🕒 Start: 23:30\n🕓 End: 05:30\n" in on
+    assert "*\n🕒 End: 05:30\n" in off
+    for message in (on, off):
+        assert "\n" in message
+        assert r"\n" not in message
+
+
+def test_test_all_intelligent_examples_have_actual_line_breaks() -> None:
+    tree = ast.parse((ROOT / "whatsapp_notifications.py").read_text())
+    strings = [
+        node.value
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Constant) and isinstance(node.value, str)
+    ]
+    on = next(value for value in strings if "Sample active-slot alert only." in value)
+    off = next(value for value in strings if "Sample ended-slot alert only." in value)
+    assert "*\n🕒 Start: 23:30\n🕓 End: TBC\n" in on
+    assert "*\n🕒 End: 05:30\n" in off
+    assert r"\n" not in on
+    assert r"\n" not in off

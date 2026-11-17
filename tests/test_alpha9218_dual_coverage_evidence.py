@@ -1,4 +1,4 @@
-"""Alpha9.220: report existing ledger totals without asserting meter completeness."""
+"""Alpha9.221: report existing ledger totals without asserting meter completeness."""
 
 from __future__ import annotations
 
@@ -146,12 +146,14 @@ def test_daily_recap_shows_reported_totals_without_claiming_complete_metering() 
         weekly=False,
         standing_charge_pence_per_day=55.5236,
     )
-    assert "Partial coverage" in message
-    assert "Saved totals are shown" in message
-    assert "Independent meter completeness not verified" in message
+    assert "15 Nov 2026" in message
     assert "Grid import: 84.50 kWh" in message
-    assert "Gross energy total (dashboard basis): £3.99" in message
-    assert "Net after estimated Happy Hour refund: £-0.75" in message
+    assert "Grid export: 31.00 kWh" in message
+    assert "Solar generated: 12.70 kWh" in message
+    assert "Energy total: £3.99" in message
+    assert "Partial coverage" not in message
+    assert "Happy Hour refund" not in message
+    assert "Power Down" not in message
 
 
 def test_no_replay_coverage_does_not_publish_zero_placeholder_as_actual() -> None:

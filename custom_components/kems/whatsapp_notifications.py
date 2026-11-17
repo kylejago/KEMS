@@ -371,14 +371,14 @@ class KEMSWhatsAppNotifications:
             ),
             (
                 False,
-                "🧪 *KEMS Octopus Intelligent — Cheap Slot Active*\\n"
-                "🕒 Start: 23:30\\n🕓 End: TBC\\n"
+                "🧪 *KEMS Octopus Intelligent — Cheap Slot Active*\n"
+                "🕒 Start: 23:30\n🕓 End: TBC\n"
                 "Sample active-slot alert only. No real slot has been started.",
             ),
             (
                 False,
-                "🧪 *KEMS Octopus Intelligent — Cheap Slot Ended*\\n"
-                "🕒 End: 05:30\\n"
+                "🧪 *KEMS Octopus Intelligent — Cheap Slot Ended*\n"
+                "🕒 End: 05:30\n"
                 "Sample ended-slot alert only. No real slot has ended.",
             ),
             (

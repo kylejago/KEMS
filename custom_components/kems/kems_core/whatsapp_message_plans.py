@@ -228,6 +228,22 @@ def completed_period_message(
         else None
     )
 
+    if not weekly:
+        # Compact daily family recap, preserving the dashboard gross cost.
+        # Coverage and unsettled credit details remain in KEMS diagnostics
+        # and the separate detailed weekly summary.
+        return key, "\n".join(
+            [
+                title,
+                "",
+                f"⬇️ Grid import: {_quantity(_field(period, 'grid_import_kwh'), 'kWh')}",
+                f"⬆️ Grid export: {_quantity(_field(period, 'grid_export_kwh'), 'kWh')}",
+                "☀️ Solar generated: "
+                + _quantity(_field(period, "solar_generation_kwh"), "kWh"),
+                f"💷 *Energy total: {_pounds(gross)}*",
+            ]
+        )
+
     lines = [
         title,
         coverage,
@@ -325,9 +341,9 @@ def intelligent_slot_message(
     if state == "off":
         return (
             key,
-            "⚡ *Octopus Intelligent — Cheap Slot Ended*\\n"
-            f"🕒 End: {timestamp:%H:%M}\\n"
-            "The Intelligent Octopus cheap slot has ended. ✅\\n"
+            "⚡ *Octopus Intelligent — Cheap Slot Ended*\n"
+            f"🕒 End: {timestamp:%H:%M}\n"
+            "The Intelligent Octopus cheap slot has ended. ✅\n"
             "KEMS continues to follow its configured battery and EV protections.",
         )
     end = _aware(end_time)
@@ -339,9 +355,9 @@ def intelligent_slot_message(
     end_label = end.astimezone(LONDON).strftime("%H:%M") if valid_end else "TBC"
     return (
         key,
-        "⚡ *Octopus Intelligent — Cheap Slot Active*\\n"
-        f"🕒 Start: {timestamp:%H:%M}\\n"
-        f"🕓 End: {end_label}\\n"
-        "Good news — an Intelligent Octopus cheap slot is active! 🔋💡\\n"
+        "⚡ *Octopus Intelligent — Cheap Slot Active*\n"
+        f"🕒 Start: {timestamp:%H:%M}\n"
+        f"🕓 End: {end_label}\n"
+        "Good news — an Intelligent Octopus cheap slot is active! 🔋💡\n"
         "KEMS will continue to enforce its EV and home-battery protections.",
     )

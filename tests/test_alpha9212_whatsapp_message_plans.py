@@ -161,10 +161,12 @@ def test_completed_period_money_separates_export_hh_and_supplier_award():
     _, message = mod.completed_period_message(
         {"calendar_matched": period}, now, weekly=False
     )
-    assert "Agile export income: £3.56" in message
-    assert "Happy Hour refund (estimated, unsettled): £1.17" in message
-    assert "Power Down supplier-confirmed award: unavailable" in message
-    assert "Gross energy total (dashboard basis): unavailable" in message
+    assert "Grid import: 3.20 kWh" in message
+    assert "Grid export: 12.70 kWh" in message
+    assert "Solar generated: 2.40 kWh" in message
+    assert "Energy total: unavailable" in message
+    assert "Happy Hour refund" not in message
+    assert "Power Down" not in message
 
 
 def test_no_partial_or_invalid_price_is_fabricated():
@@ -180,7 +182,7 @@ def test_no_partial_or_invalid_price_is_fabricated():
     }
     _, message = mod.completed_period_message({"a": period}, now, weekly=False)
     assert "Grid export: unavailable" in message
-    assert "Agile export income: unavailable" in message
+    assert "Energy total: unavailable" in message
 
 
 def test_first_send_unknown_notify_entity_is_allowed() -> None:
@@ -251,12 +253,14 @@ def test_partial_day_uses_dashboard_gross_and_estimated_net() -> None:
         weekly=False,
         standing_charge_pence_per_day=55.5236,
     )
-    assert "Partial coverage" in text
-    assert "0/1 complete days" in text
-    assert "Gross energy total (dashboard basis): £3.99" in text
-    assert "Net after estimated Happy Hour refund: £-0.75" in text
-    assert "Electricity standing charge: £0.56" in text
-    assert "Happy Hour refund (estimated, unsettled): £4.74" in text
+    assert "15 Nov 2026" in text
+    assert "Grid import: 84.50 kWh" in text
+    assert "Grid export: 31.00 kWh" in text
+    assert "Solar generated: 12.70 kWh" in text
+    assert "Energy total: £3.99" in text
+    assert "Partial coverage" not in text
+    assert "Happy Hour refund" not in text
+    assert "Electricity standing charge" not in text
 
 
 def test_missing_day_is_not_fabricated() -> None:

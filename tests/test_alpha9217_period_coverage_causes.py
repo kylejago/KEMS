@@ -1,4 +1,4 @@
-"""Alpha9.220: read-only causes, not an invitation to invent missing kWh."""
+"""Alpha9.221: read-only causes, not an invitation to invent missing kWh."""
 
 from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
