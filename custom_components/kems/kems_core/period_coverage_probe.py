@@ -7,6 +7,7 @@ settled financial amounts, simulation outputs or physical dispatch.
 from __future__ import annotations
 
 from datetime import datetime, timedelta
+from math import isfinite
 from typing import Any
 from zoneinfo import ZoneInfo
 
@@ -14,6 +15,17 @@ from .simulation import _load_kw
 
 LONDON = ZoneInfo("Europe/London")
 LARGE_GAP_SECONDS = 600
+
+
+def _independent_grid_sample(snapshot: Any, field: str) -> bool:
+    """Require a finite physical grid sample not flagged stale."""
+    value = getattr(snapshot, field, None)
+    return (
+        isinstance(value, (int, float))
+        and isfinite(value)
+        and value >= 0
+        and field not in getattr(snapshot, "stale_fields", ())
+    )
 
 
 def observation_coverage_probe(
@@ -57,6 +69,9 @@ def observation_coverage_probe(
             "missing_or_stale_import_tariff_pairs": 0,
             "eligible_pairs_without_independent_grid_import": 0,
             "eligible_pairs_without_independent_grid_export": 0,
+            "independent_grid_import_observed_pairs": 0,
+            "independent_grid_export_observed_pairs": 0,
+            "independent_grid_both_observed_pairs": 0,
             "gaps_over_10_minutes": 0,
             "largest_gap_seconds": 0,
             "gap_seconds_over_10_minutes": 0,
@@ -66,6 +81,25 @@ def observation_coverage_probe(
             if elapsed <= 0:
                 continue
             result["pair_count"] += 1
+            # This deliberately checks physical grid observations even when
+            # house-load or import-tariff evidence prevents simulation replay.
+            import_evidence = all(
+                _independent_grid_sample(snap, "grid_import_kw")
+                for snap in (current, following)
+            )
+            export_evidence = all(
+                _independent_grid_sample(snap, "grid_export_kw")
+                for snap in (current, following)
+            )
+            result["independent_grid_import_observed_pairs"] += int(
+                import_evidence
+            )
+            result["independent_grid_export_observed_pairs"] += int(
+                export_evidence
+            )
+            result["independent_grid_both_observed_pairs"] += int(
+                import_evidence and export_evidence
+            )
             if elapsed > LARGE_GAP_SECONDS:
                 result["gaps_over_10_minutes"] += 1
                 result["gap_seconds_over_10_minutes"] += round(elapsed)
@@ -101,6 +135,12 @@ def observation_coverage_probe(
             if total
             else None
         )
+        result["independent_grid_observed_pair_percent"] = (
+            round(100 * result["independent_grid_both_observed_pairs"] / total, 2)
+            if total
+            else None
+        )
+        result["independent_meter_completeness"] = "not_verified"
         daily.append(result)
 
     return {
@@ -108,7 +148,9 @@ def observation_coverage_probe(
         "days_with_records": len(daily),
         "days_requested": recent_days,
         "time_basis": "Europe/London",
-        "simulation_source_checks_only": True,
+        "simulation_source_checks_only": False,
+        "simulation_source_checks_and_independent_grid_observations": True,
+        "independent_meter_observation_does_not_prove_full_day": True,
         "gap_duration_is_not_metered_kwh": True,
         "not_authoritative_for_period_completion": True,
         "not_supplier_settlement": True,
