@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 from datetime import date
+from math import isfinite
 
 from .models import PeriodTotals
 
@@ -26,9 +27,13 @@ def recorded_totals_present(values: dict[str, float]) -> bool:
         return False
     # A newly observed day with zero replay coverage cannot establish any
     # metered total, even though _current_values emits zero placeholders.
-    if values.get("__data_coverage_percent", 1.0) <= 0:
+    coverage = values.get("__data_coverage_percent", 1.0)
+    if not isfinite(coverage) or coverage <= 0:
         return False
-    return any(key in values for key in LEDGER_TOTAL_EVIDENCE_KEYS)
+    return any(
+        isinstance(values.get(key), (int, float)) and isfinite(values[key])
+        for key in LEDGER_TOTAL_EVIDENCE_KEYS
+    )
 
 
 _PERIOD_METADATA_FIELDS = frozenset(
@@ -102,7 +107,9 @@ def summarise_period_records(
         for day, values in selected
         if day != current_day and not record_complete(values)
     )
-    data_complete = all(record_complete(values) for _, values in selected)
+    data_complete = bool(selected) and all(
+        record_complete(values) for _, values in selected
+    )
     recorded_days = sum(
         1 for _, values in selected if recorded_totals_present(values)
     )
