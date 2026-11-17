@@ -325,9 +325,9 @@ def intelligent_slot_message(
     if state == "off":
         return (
             key,
-            "⚡ *Octopus Intelligent — Cheap Slot Ended*\\n"
-            f"🕒 End: {timestamp:%H:%M}\\n"
-            "The Intelligent Octopus cheap slot has ended. ✅\\n"
+            "⚡ *Octopus Intelligent — Cheap Slot Ended*\n"
+            f"🕒 End: {timestamp:%H:%M}\n"
+            "The Intelligent Octopus cheap slot has ended. ✅\n"
             "KEMS continues to follow its configured battery and EV protections.",
         )
     end = _aware(end_time)
@@ -339,9 +339,9 @@ def intelligent_slot_message(
     end_label = end.astimezone(LONDON).strftime("%H:%M") if valid_end else "TBC"
     return (
         key,
-        "⚡ *Octopus Intelligent — Cheap Slot Active*\\n"
-        f"🕒 Start: {timestamp:%H:%M}\\n"
-        f"🕓 End: {end_label}\\n"
-        "Good news — an Intelligent Octopus cheap slot is active! 🔋💡\\n"
+        "⚡ *Octopus Intelligent — Cheap Slot Active*\n"
+        f"🕒 Start: {timestamp:%H:%M}\n"
+        f"🕓 End: {end_label}\n"
+        "Good news — an Intelligent Octopus cheap slot is active! 🔋💡\n"
         "KEMS will continue to enforce its EV and home-battery protections.",
     )
