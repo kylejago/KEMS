@@ -15,6 +15,7 @@ from .simulation import _load_kw
 
 LONDON = ZoneInfo("Europe/London")
 LARGE_GAP_SECONDS = 600
+MAX_GAP_DETAIL_EVENTS = 48
 
 
 def _independent_grid_sample(snapshot: Any, field: str) -> bool:
@@ -55,6 +56,9 @@ def observation_coverage_probe(
             grouped.setdefault(day.isoformat(), []).append(snapshot)
 
     daily: list[dict[str, Any]] = []
+    # Retain bounded forensic timestamps, not reconstructed interval energy.
+    detail_events: list[dict[str, Any]] = []
+    reason_count = 0
     for day, values in sorted(grouped.items()):
         values.sort(key=lambda snap: snap.timestamp)
         result: dict[str, Any] = {
@@ -81,6 +85,19 @@ def observation_coverage_probe(
             if elapsed <= 0:
                 continue
             result["pair_count"] += 1
+            reasons: list[str] = []
+            if elapsed > LARGE_GAP_SECONDS:
+                reasons.append("observation_gap_over_10_minutes")
+            if _load_kw(following) is None:
+                reasons.append("missing_following_load")
+            if _load_kw(current) is None:
+                reasons.append("missing_current_load")
+            if (
+                getattr(current, "current_import_rate", None) is None
+                or "current_import_rate"
+                in getattr(current, "tariff_stale_fields", ())
+            ):
+                reasons.append("missing_or_stale_import_tariff")
             # This deliberately checks physical grid observations even when
             # house-load or import-tariff evidence prevents simulation replay.
             import_evidence = all(
@@ -96,6 +113,25 @@ def observation_coverage_probe(
             result["independent_grid_both_observed_pairs"] += int(
                 import_evidence and export_evidence
             )
+            if not import_evidence:
+                reasons.append("independent_import_power_unavailable")
+            if not export_evidence:
+                reasons.append("independent_export_power_unavailable")
+            if reasons:
+                reason_count += 1
+                detail_events.append(
+                    {
+                        "date": day,
+                        "start": current.timestamp.isoformat(),
+                        "end": following.timestamp.isoformat(),
+                        "duration_seconds": round(elapsed),
+                        "reasons": reasons,
+                        "independent_import_power_at_both_ends": import_evidence,
+                        "independent_export_power_at_both_ends": export_evidence,
+                        "interval_kwh_proven": False,
+                        "eligible_for_backfill": False,
+                    }
+                )
             if elapsed > LARGE_GAP_SECONDS:
                 result["gaps_over_10_minutes"] += 1
                 result["gap_seconds_over_10_minutes"] += round(elapsed)
@@ -152,4 +188,11 @@ def observation_coverage_probe(
         "not_supplier_settlement": True,
         "intervals_count_pairs_not_elapsed_hours": True,
         "day_rows": daily,
+        "source_gap_details": detail_events[-MAX_GAP_DETAIL_EVENTS:],
+        "source_gap_details_available": reason_count,
+        "source_gap_details_omitted": max(
+            reason_count - MAX_GAP_DETAIL_EVENTS, 0
+        ),
+        "source_gap_detail_maximum": MAX_GAP_DETAIL_EVENTS,
+        "gap_timestamps_are_not_cumulative_meter_anchors": True,
     }
