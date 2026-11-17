@@ -110,9 +110,7 @@ def summarise_period_records(
     data_complete = bool(selected) and all(
         record_complete(values) for _, values in selected
     )
-    recorded_days = sum(
-        1 for _, values in selected if recorded_totals_present(values)
-    )
+    recorded_days = sum(1 for _, values in selected if recorded_totals_present(values))
     return PeriodTotals(
         start_date=start,
         end_date=end,
