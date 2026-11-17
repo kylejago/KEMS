@@ -12,7 +12,8 @@ from datetime import UTC, datetime, timedelta
 from math import isfinite
 from typing import Any, Mapping
 
-MAX_SAMPLES_PER_CANDIDATE = 512
+MAX_SAMPLES_PER_CANDIDATE = 1536
+MIN_SAMPLE_SPACING_SECONDS = 900
 MAX_SAMPLE_AGE_SECONDS = 180
 MAX_HISTORY_DAYS = 30
 PLAUSIBILITY_ONLY_KW = 25.0
@@ -159,8 +160,16 @@ class CounterEvidenceSeries:
             if row is None:
                 continue
             history = self.rows[label]
-            if history and row["reported_at"] <= history[-1]["reported_at"]:
-                continue
+            if history:
+                if row["reported_at"] <= history[-1]["reported_at"]:
+                    continue
+                previous_capture = _parse_instant(history[-1]["observed_at"])
+                if (
+                    previous_capture is not None
+                    and (now - previous_capture).total_seconds()
+                    < MIN_SAMPLE_SPACING_SECONDS
+                ):
+                    continue
             history.append(row)
             if len(history) > MAX_SAMPLES_PER_CANDIDATE:
                 del history[:-MAX_SAMPLES_PER_CANDIDATE]
@@ -224,6 +233,7 @@ class CounterEvidenceSeries:
             "source_power_entity": self.source_entity_id,
             "candidates": outcomes,
             "max_samples_per_candidate": MAX_SAMPLES_PER_CANDIDATE,
+            "minimum_capture_spacing_seconds": MIN_SAMPLE_SPACING_SECONDS,
             "max_capture_age_seconds": MAX_SAMPLE_AGE_SECONDS,
             "plausibility_only_max_kw": PLAUSIBILITY_ONLY_KW,
             "candidate_plausibility_is_not_physical_meter_proof": True,
