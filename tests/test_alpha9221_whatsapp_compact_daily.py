@@ -36,8 +36,77 @@ def test_daily_recap_matches_user_requested_five_fields_exactly() -> None:
         "⬇️ Grid import: 48.00 kWh\n"
         "⬆️ Grid export: 15.20 kWh\n"
         "☀️ Solar generated: 4.30 kWh\n"
-        "💷 *Energy total: £0.38*"
+        "💷 *Energy total: −£4.62*"
     )
+
+
+def test_daily_recap_uses_dashboard_total_after_refunds_including_gas() -> None:
+    now = datetime(2026, 11, 18, 8, tzinfo=UTC)
+    period = {
+        "start_date": "2026-11-17",
+        "end_date": "2026-11-17",
+        "days_included": 1,
+        "recorded_totals_available": True,
+        "grid_import_kwh": 20.0,
+        "grid_export_kwh": 18.0,
+        "solar_generation_kwh": 5.0,
+        "actual_net_cost_pence": 250.0,
+        "happy_hour_estimated_credit_pence": 0.0,
+    }
+    canonical = {
+        "yesterday": {
+            "start_date": "2026-11-17",
+            "end_date": "2026-11-17",
+            "days_included": 1,
+            "live_data": {
+                "ready": True,
+                "total_energy_cost_pence": 160.0,
+                "total_energy_effective_cost_pence": 135.0,
+            },
+        }
+    }
+    _, message = completed_period_message(
+        {"yesterday": period},
+        now,
+        weekly=False,
+        standing_charge_pence_per_day=55.0,
+        bill_equivalent_periods=canonical,
+    )
+    assert "💷 *Energy total: £1.35*" in message
+    assert "£3.05" not in message
+    assert "Gross energy total" not in message
+
+
+def test_daily_recap_rejects_stale_dashboard_total_and_uses_recorded_net() -> None:
+    now = datetime(2026, 11, 18, 8, tzinfo=UTC)
+    period = {
+        "start_date": "2026-11-17",
+        "end_date": "2026-11-17",
+        "days_included": 1,
+        "recorded_totals_available": True,
+        "actual_net_cost_pence": 150.0,
+        "happy_hour_estimated_credit_pence": 25.0,
+    }
+    stale = {
+        "yesterday": {
+            "start_date": "2026-11-16",
+            "end_date": "2026-11-16",
+            "days_included": 1,
+            "live_data": {
+                "ready": True,
+                "total_energy_effective_cost_pence": 9999.0,
+            },
+        }
+    }
+    _, message = completed_period_message(
+        {"yesterday": period},
+        now,
+        weekly=False,
+        standing_charge_pence_per_day=50.0,
+        bill_equivalent_periods=stale,
+    )
+    assert "💷 *Energy total: £1.75*" in message
+    assert "£99.99" not in message
 
 
 def test_daily_recap_does_not_mask_missing_cost_or_kwh() -> None:

@@ -257,7 +257,7 @@ def test_partial_day_uses_dashboard_gross_and_estimated_net() -> None:
     assert "Grid import: 84.50 kWh" in text
     assert "Grid export: 31.00 kWh" in text
     assert "Solar generated: 12.70 kWh" in text
-    assert "Energy total: £3.99" in text
+    assert "Energy total: −£0.75" in text
     assert "Partial coverage" not in text
     assert "Happy Hour refund" not in text
     assert "Electricity standing charge" not in text

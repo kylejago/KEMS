@@ -1,3 +1,10 @@
+## 0.9.0-alpha9.222 — Refund-adjusted daily WhatsApp energy total
+
+- **Daily family recap:** The one-line Energy total now reports the canonical **TOTAL ENERGY COST (after estimated Happy Hour refund)** for the matching completed day, including electricity and gas, standing charges, Agile export income and supported unsettled Happy Hour credits, instead of showing the gross figure.
+- **Fallback and clarity:** If the canonical comparison is missing, incomplete or stale for that day, use the recorded period's after-refund estimate only when supporting ledger data exists. Negative net costs show as `−£x.xx` instead of ambiguous negative-pound formatting.
+- **Scope:** Keeps the daily message to date, grid import/export, solar and one net total; weekly detail is unchanged. No impact on control, FoxESS, Ohme, battery SOC reserve, export dispatch, or updater safety guards.
+- **Regression:** Daily refund scenarios, stale date rejection and legacy coverage expectations tested; GitHub validation required before publishing.
+
 ## 0.9.0-alpha9.206 — Repair final runtime Compare refund parity
 
 - **Cause confirmed with installed 9.205:** The packaged dashboard displayed the correct effective Live value, but the legacy Alpha9.5 presentation layer replaced Compare → Live with the gross `sensor.kems_whole_home_observed_cost_today`. Alpha9.37's later dashboard contract replaced the KEMS and side-by-side cards, but did not repair Live; it also retained gross Live in the comparison table.

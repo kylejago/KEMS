@@ -150,7 +150,7 @@ def test_daily_recap_shows_reported_totals_without_claiming_complete_metering() 
     assert "Grid import: 84.50 kWh" in message
     assert "Grid export: 31.00 kWh" in message
     assert "Solar generated: 12.70 kWh" in message
-    assert "Energy total: £3.99" in message
+    assert "Energy total: −£0.75" in message
     assert "Partial coverage" not in message
     assert "Happy Hour refund" not in message
     assert "Power Down" not in message
