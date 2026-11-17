@@ -136,9 +136,7 @@ class CounterEvidenceSeries:
                 continue
             approved: list[dict[str, Any]] = []
             for row in items:
-                checked = _validate_row(
-                    row, label=label, entity_id=entity_id, now=now
-                )
+                checked = _validate_row(row, label=label, entity_id=entity_id, now=now)
                 if checked is not None:
                     approved.append(checked)
             approved.sort(key=lambda row: row["reported_at"])
