@@ -23,9 +23,7 @@ class FoxESSCounterEvidenceRecorder:
 
     def __init__(self, hass: Any, entry_id: str, import_power_entity: str) -> None:
         self._hass = hass
-        self._store = Store(
-            hass, 1, f"kems.{entry_id}.foxess_counter_evidence"
-        )
+        self._store = Store(hass, 1, f"kems.{entry_id}.foxess_counter_evidence")
         self._series = CounterEvidenceSeries(import_power_entity)
         self._last_storage_error: str | None = None
         self._restored_samples = 0
@@ -40,9 +38,7 @@ class FoxESSCounterEvidenceRecorder:
             self._last_storage_error = str(error)[:256]
             _LOGGER.warning("KEMS optional counter evidence load failed: %s", error)
             return
-        self._restored_samples = sum(
-            len(items) for items in self._series.rows.values()
-        )
+        self._restored_samples = sum(len(items) for items in self._series.rows.values())
 
     def observe(self, *, now: datetime) -> None:
         """Observe counter HA states without awaiting I/O or using them in dispatch."""
