@@ -315,22 +315,13 @@ def intelligent_slot_message(
     end. The next_offpeak_start entity can refer to a later slot, so it
     must not be mistaken for the start of the currently active slot.
     """
-    if (
-        state not in {"on", "off"}
-        or now.tzinfo is None
-        or changed_at.tzinfo is None
-    ):
+    if state not in {"on", "off"} or now.tzinfo is None or changed_at.tzinfo is None:
         return None
     age = (now - changed_at).total_seconds()
     if not -15 <= age <= 300:
         return None
     timestamp = changed_at.astimezone(LONDON)
-    key = (
-        "intelligent-slot:"
-        + state
-        + ":"
-        + changed_at.astimezone(UTC).isoformat()
-    )
+    key = "intelligent-slot:" + state + ":" + changed_at.astimezone(UTC).isoformat()
     if state == "off":
         return (
             key,
