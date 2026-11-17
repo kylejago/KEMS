@@ -300,3 +300,57 @@ def notify_entity_readiness(entity_id: Any, state: Any) -> dict[str, Any]:
         "status": ("ready_for_first_send" if value == "unknown" else "ready"),
         "ha_state": value,
     }
+
+
+def intelligent_slot_message(
+    *,
+    state: str,
+    changed_at: datetime,
+    now: datetime,
+    end_time: Any = None,
+) -> tuple[str, str] | None:
+    """Announce observed Octopus Intelligent slot transitions, not rate guesses.
+
+    Use the observed binary-sensor transition timestamp as the real start or
+    end. The next_offpeak_start entity can refer to a later slot, so it
+    must not be mistaken for the start of the currently active slot.
+    """
+    if (
+        state not in {"on", "off"}
+        or now.tzinfo is None
+        or changed_at.tzinfo is None
+    ):
+        return None
+    age = (now - changed_at).total_seconds()
+    if not -15 <= age <= 300:
+        return None
+    timestamp = changed_at.astimezone(LONDON)
+    key = (
+        "intelligent-slot:"
+        + state
+        + ":"
+        + changed_at.astimezone(UTC).isoformat()
+    )
+    if state == "off":
+        return (
+            key,
+            "⚡ *Octopus Intelligent — Cheap Slot Ended*\\n"
+            f"🕒 End: {timestamp:%H:%M}\\n"
+            "The Intelligent Octopus cheap slot has ended. ✅\\n"
+            "KEMS continues to follow its configured battery and EV protections.",
+        )
+    end = _aware(end_time)
+    valid_end = (
+        end is not None
+        and end >= changed_at
+        and end <= changed_at + timedelta(hours=24)
+    )
+    end_label = end.astimezone(LONDON).strftime("%H:%M") if valid_end else "TBC"
+    return (
+        key,
+        "⚡ *Octopus Intelligent — Cheap Slot Active*\\n"
+        f"🕒 Start: {timestamp:%H:%M}\\n"
+        f"🕓 End: {end_label}\\n"
+        "Good news — an Intelligent Octopus cheap slot is active! 🔋💡\\n"
+        "KEMS will continue to enforce its EV and home-battery protections.",
+    )
