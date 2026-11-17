@@ -31,6 +31,7 @@ from .happy_hour_auto_join import verified_octopus_joined_bookings
 from .kems_core.whatsapp_message_plans import (
     completed_period_message,
     event_notifications,
+    intelligent_slot_message,
     morning_report_due,
     notify_entity_readiness,
 )
@@ -57,6 +58,8 @@ class KEMSWhatsAppNotifications:
         self._warning_since: dict[str, str] = {}
         self._warning_alerted: dict[str, str] = {}
         self._tracked_power_down: dict[str, Any] = {}
+        self._intelligent_slot_last_state: str | None = None
+        self._slot_setup_at: datetime | None = None
         self._storage_healthy = True
         self._last_error: str | None = None
         self._last_delivered: str | None = None
@@ -84,6 +87,9 @@ class KEMSWhatsAppNotifications:
         weekly_keys = sorted(
             key for key in self._delivered if key.startswith("recap:weekly:")
         )
+        slot_keys = sorted(
+            key for key in self._delivered if key.startswith("intelligent-slot:")
+        )
         return {
             "enabled": self.enabled,
             "family_target": family,
@@ -97,6 +103,14 @@ class KEMSWhatsAppNotifications:
             "daily_enabled": self.options.get(CONF_WHATSAPP_DAILY) is True,
             "weekly_enabled": self.options.get(CONF_WHATSAPP_WEEKLY) is True,
             "joined_events_enabled": self.options.get(CONF_WHATSAPP_SESSIONS) is True,
+            "intelligent_slot_alerts_enabled": (
+                self.options.get(CONF_WHATSAPP_SESSIONS) is True
+            ),
+            "intelligent_slot_last_observed_state": self._intelligent_slot_last_state,
+            "intelligent_slot_transitions_accepted": len(slot_keys),
+            "legacy_intelligent_slot_mobile_automations": (
+                self._legacy_intelligent_slot_mobile_automations()
+            ),
             "private_alerts_enabled": self.options.get(CONF_WHATSAPP_PRIVATE) is True,
             "legacy_automation_conflicts": legacy,
             "last_error": self._last_error,
@@ -126,6 +140,20 @@ class KEMSWhatsAppNotifications:
                 "KEMS suppresses duplicate notifications until it is disabled."
             ),
         }
+
+    def _legacy_intelligent_slot_mobile_automations(self) -> list[str]:
+        """Detect the two supplied automations without disabling them."""
+        aliases = {
+            "octopus intelligent slot notification on",
+            "octopus intelligent slot end notification",
+        }
+        return sorted(
+            state.entity_id
+            for state in self.hass.states.async_all("automation")
+            if state.state == "on"
+            and str(state.attributes.get("friendly_name") or "").strip().lower()
+            in aliases
+        )
 
     def _target_readiness(self, target: Any) -> dict[str, Any]:
         state = (
@@ -160,6 +188,9 @@ class KEMSWhatsAppNotifications:
             return
         try:
             stored = await self._store.async_load() or {}
+            slot_state = stored.get("intelligent_slot_last_state")
+            if slot_state in {"on", "off"}:
+                self._intelligent_slot_last_state = slot_state
             tracked = stored.get("tracked_power_down")
             if isinstance(tracked, dict):
                 self._tracked_power_down = {
@@ -189,6 +220,8 @@ class KEMSWhatsAppNotifications:
             self._last_error = f"delivery_store_unavailable: {type(err).__name__}"
             LOGGER.warning("KEMS WhatsApp disabled: could not load delivery state")
             return
+
+        self._slot_setup_at = dt_util.now()
 
         @callback
         def _timer(now: datetime) -> None:
@@ -224,6 +257,7 @@ class KEMSWhatsAppNotifications:
                     "warning_since": self._warning_since,
                     "warning_alerted": self._warning_alerted,
                     "tracked_power_down": self._tracked_power_down,
+                    "intelligent_slot_last_state": self._intelligent_slot_last_state,
                 }
             )
         except (OSError, ValueError, TypeError) as err:
@@ -352,6 +386,47 @@ class KEMSWhatsAppNotifications:
                 ):
                     return False
         return True
+
+    async def _intelligent_slot_alerts(self, now: datetime) -> None:
+        """Track real binary-sensor transitions with a persistent baseline.
+
+        Ignore unknown/unavailable and integration-startup initial state.
+        Never infer slots from tariff prices or a next-slot timestamp.
+        """
+        entity_id = getattr(self.coordinator.entities, "intelligent_slot", None)
+        state = self.hass.states.get(entity_id) if entity_id else None
+        value = getattr(state, "state", None)
+        if value not in {"on", "off"}:
+            return
+        if self._intelligent_slot_last_state is None:
+            self._intelligent_slot_last_state = value
+            await self._persist()
+            return
+        if value == self._intelligent_slot_last_state:
+            return
+        changed_at = getattr(state, "last_changed", None)
+        if not isinstance(changed_at, datetime) or changed_at.tzinfo is None:
+            return
+        # A change during HA/KEMS downtime is not a witnessed start/end.
+        # Rebaseline rather than send a misleading retroactive event.
+        if self._slot_setup_at is None or changed_at < self._slot_setup_at:
+            self._intelligent_slot_last_state = value
+            await self._persist()
+            return
+        end_entity = getattr(self.coordinator.entities, "offpeak_end", None)
+        end_state = self.hass.states.get(end_entity) if end_entity else None
+        proposal = intelligent_slot_message(
+            state=value,
+            changed_at=changed_at,
+            now=now,
+            end_time=getattr(end_state, "state", None),
+        )
+        if proposal is None:
+            return
+        key, message = proposal
+        if await self._send(key, message, private=False, now=now):
+            self._intelligent_slot_last_state = value
+            await self._persist()
 
     def _current_warnings(self) -> dict[str, str]:
         data = getattr(self.coordinator, "data", None)
@@ -501,6 +576,8 @@ class KEMSWhatsAppNotifications:
                             sent_keys=self._delivered,
                         ):
                             await self._send(key, message, private=False, now=now)
+                if self.options.get(CONF_WHATSAPP_SESSIONS) is True:
+                    await self._intelligent_slot_alerts(now)
                 for weekly, option in (
                     (False, CONF_WHATSAPP_DAILY),
                     (True, CONF_WHATSAPP_WEEKLY),
