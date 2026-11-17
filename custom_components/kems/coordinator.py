@@ -60,8 +60,8 @@ from .happy_hour_physical_preparation import (
     apply_verified_happy_hour_preparation,
 )
 from .historical_tariff_revaluation import financial_replay_records
-from .history import HistoryRecorder
 from .foxess_counter_evidence import FoxESSCounterEvidenceRecorder
+from .history import HistoryRecorder
 from .kems_core import (
     AdviceEngine,
     ControlEngine,
