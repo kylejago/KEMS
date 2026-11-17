@@ -28,6 +28,9 @@ class FoxESSCounterEvidenceRecorder:
         self._last_storage_error: str | None = None
         self._restored_samples = 0
         self._checkpoint_requests = 0
+        self._observation_checks = 0
+        self._accepted_observation_batches = 0
+        self._last_observation_checked_at: datetime | None = None
 
     async def async_load(self) -> None:
         """Never let optional counter evidence block KEMS physical control."""
@@ -42,8 +45,11 @@ class FoxESSCounterEvidenceRecorder:
 
     def observe(self, *, now: datetime) -> None:
         """Observe counter HA states without awaiting I/O or using them in dispatch."""
+        self._observation_checks += 1
+        self._last_observation_checked_at = now
         if not self._series.observe(self._hass, now=now):
             return
+        self._accepted_observation_batches += 1
         try:
             self._store.async_delay_save(self._series.payload, 300)
             self._checkpoint_requests += 1
@@ -58,6 +64,16 @@ class FoxESSCounterEvidenceRecorder:
         return {
             **self._series.status(),
             "restored_samples": self._restored_samples,
+            "observation_checks_since_setup": self._observation_checks,
+            "accepted_observation_batches_since_setup": (
+                self._accepted_observation_batches
+            ),
+            "last_observation_checked_at": (
+                self._last_observation_checked_at.isoformat()
+                if self._last_observation_checked_at is not None
+                else None
+            ),
+            "observation_independent_of_sampled_history": True,
             "delayed_checkpoint_requests": self._checkpoint_requests,
             "last_storage_error": self._last_storage_error,
             "storage_schema_version": 1,

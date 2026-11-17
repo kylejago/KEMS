@@ -64,6 +64,10 @@ def test_coverage_audit_records_real_reason_without_reclassifying_days():
     assert result["required_simulation_coverage_percent"] == 99.9
     assert result["recorded_days"] == 3
     assert result["incomplete_recorded_days"] == 2
+    assert result["simulation_replay_incomplete_days"] == 2
+    assert result["days_with_recorded_totals"] == 1
+    assert result["independent_meter_complete_days_verified"] == 0
+    assert result["recorded_totals_do_not_prove_meter_completeness"] is True
     assert result["recent_days"][0]["simulation_data_coverage_percent"] is None
     assert result["recent_days"][1]["simulation_data_coverage_percent"] == 98.4
     assert result["recent_days"][2]["data_complete"] is False

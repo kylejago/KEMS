@@ -149,6 +149,12 @@ class LifetimeLedgerRecorder:
             "required_simulation_coverage_percent": 99.9,
             "recorded_days": len(recent),
             "incomplete_recorded_days": incomplete_total,
+            "simulation_replay_incomplete_days": incomplete_total,
+            "days_with_recorded_totals": sum(
+                int(row["recorded_totals_available"]) for row in recent
+            ),
+            "independent_meter_complete_days_verified": 0,
+            "recorded_totals_do_not_prove_meter_completeness": True,
             "recent_days": recent[-14:],
             "older_coverage_percent_unavailable": any(
                 row["simulation_data_coverage_percent"] is None for row in recent

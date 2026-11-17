@@ -8,6 +8,7 @@ from datetime import datetime
 from math import isfinite
 from typing import Any
 
+from .counter_evidence import MAX_SAMPLE_AGE_SECONDS
 from .roi_reward_sensor_attributes import (
     MAX_SENSOR_ATTRIBUTES_BYTES,
     compact_roi_reward_audit,
@@ -166,6 +167,11 @@ def foxess_import_counter_candidate_probe(
             "unit": unit,
             "state_class": state_class,
             "age_seconds": round(seconds, 1) if seconds is not None else None,
+            "fresh_report_for_evidence_capture": bool(
+                status == "single_reading_only_unverified"
+                and seconds is not None
+                and seconds <= MAX_SAMPLE_AGE_SECONDS
+            ),
             "source_device_match": same_device,
             "source_config_entry_match": same_config_entry,
             "candidate_status": status,
@@ -177,6 +183,7 @@ def foxess_import_counter_candidate_probe(
         "source_import_power_entity": source_entity_id,
         "candidates": rows,
         "reporting_only": True,
+        "counter_capture_requires_fresh_report_seconds": MAX_SAMPLE_AGE_SECONDS,
         "counter_source_approved": False,
         "long_gap_recovery_enabled": False,
         "reward_hour_cap_kwh": 16,
