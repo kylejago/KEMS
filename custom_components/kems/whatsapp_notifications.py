@@ -329,6 +329,11 @@ class KEMSWhatsAppNotifications:
                 now=now,
             )
 
+    def _bill_equivalent_periods(self) -> Any:
+        """Read the same canonical energy costs shown on the KEMS dashboard."""
+        state = self.hass.states.get("sensor.kems_energy_cost_comparison")
+        return state.attributes.get("periods") if state is not None else None
+
     async def async_send_test_all(self) -> bool:
         """Manually send a recorded recap and clearly marked example alerts.
 
@@ -347,6 +352,7 @@ class KEMSWhatsAppNotifications:
             now,
             weekly=False,
             standing_charge_pence_per_day=standing,
+            bill_equivalent_periods=self._bill_equivalent_periods(),
         )
         examples = [
             (
@@ -604,6 +610,7 @@ class KEMSWhatsAppNotifications:
                             standing_charge_pence_per_day=getattr(
                                 data.snapshot, "electricity_standing_charge", None
                             ),
+                            bill_equivalent_periods=self._bill_equivalent_periods(),
                         )
                         await self._send(key, message, private=False, now=now)
                 if self.options.get(CONF_WHATSAPP_PRIVATE) is True:
