@@ -91,12 +91,8 @@ def observation_coverage_probe(
                 _independent_grid_sample(snap, "grid_export_kw")
                 for snap in (current, following)
             )
-            result["independent_grid_import_observed_pairs"] += int(
-                import_evidence
-            )
-            result["independent_grid_export_observed_pairs"] += int(
-                export_evidence
-            )
+            result["independent_grid_import_observed_pairs"] += int(import_evidence)
+            result["independent_grid_export_observed_pairs"] += int(export_evidence)
             result["independent_grid_both_observed_pairs"] += int(
                 import_evidence and export_evidence
             )
