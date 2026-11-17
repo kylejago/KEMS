@@ -6,6 +6,7 @@ from datetime import UTC, date, datetime, timedelta
 from types import SimpleNamespace
 
 from kems_core.period_coverage_probe import observation_coverage_probe
+from kems_core.whatsapp_message_plans import completed_period_message
 from kems_core.periods import (
     period_value_keys,
     recorded_totals_present,
@@ -113,3 +114,61 @@ def test_stale_and_nonfinite_physical_samples_are_not_counted() -> None:
     assert day["independent_grid_import_observed_pairs"] == 0
     assert day["independent_grid_export_observed_pairs"] == 0
     assert day["independent_grid_both_observed_pairs"] == 0
+
+
+def test_daily_recap_shows_reported_totals_without_claiming_complete_metering() -> None:
+    period = summarise_period_records(
+        {
+            "2026-11-15": {
+                "__data_complete": 0.0,
+                "__data_coverage_percent": 93.75,
+                "grid_import_kwh": 84.5,
+                "grid_export_kwh": 31.0,
+                "solar_generation_kwh": 12.7,
+                "import_cost_pence": 1004.02,
+                "export_income_pence": 780.41,
+                "gas_cost_pence": 120.0,
+                "happy_hour_estimated_credit_pence": 474.048,
+            }
+        },
+        date(2026, 11, 15),
+        date(2026, 11, 15),
+        current_day=date(2026, 11, 16),
+    )
+    _, message = completed_period_message(
+        {"yesterday": period.to_dict()},
+        datetime(2026, 11, 16, 8, tzinfo=UTC),
+        weekly=False,
+        standing_charge_pence_per_day=55.5236,
+    )
+    assert "Partial coverage" in message
+    assert "Saved totals are shown" in message
+    assert "Independent meter completeness not verified" in message
+    assert "Grid import: 84.50 kWh" in message
+    assert "Gross energy total (dashboard basis): £3.99" in message
+    assert "Net after estimated Happy Hour refund: £-0.75" in message
+
+
+def test_no_replay_coverage_does_not_publish_zero_placeholder_as_actual() -> None:
+    period = summarise_period_records(
+        {
+            "2026-11-15": {
+                "__data_complete": 0.0,
+                "__data_coverage_percent": 0.0,
+                "grid_import_kwh": 0.0,
+                "grid_export_kwh": 0.0,
+            }
+        },
+        date(2026, 11, 15),
+        date(2026, 11, 15),
+        current_day=date(2026, 11, 16),
+    )
+    assert period.days_included == 1
+    assert period.recorded_totals_available is False
+    _, message = completed_period_message(
+        {"yesterday": period.to_dict()},
+        datetime(2026, 11, 16, 8, tzinfo=UTC),
+        weekly=False,
+    )
+    assert "No recorded period totals available" in message
+    assert "Grid import: 0.00 kWh" not in message
