@@ -31,11 +31,11 @@ from .kems_core import (
     reconciled_observed_lifetime_values,
     summarise_period_records,
 )
-from .kems_core.periods import recorded_totals_present
 from .kems_core.lifetime_accounting import (
     SIGNED_LIFETIME_KEYS,
     should_accumulate_lifetime_value,
 )
+from .kems_core.periods import recorded_totals_present
 
 STORAGE_VERSION = 1
 LEDGER_SCHEMA_VERSION = 2
