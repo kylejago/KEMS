@@ -88,11 +88,11 @@ def _snap(
     )
 
 
-def test_grid_readings_are_counted_even_when_simulation_load_is_missing() -> None:
+def test_grid_readings_are_counted_even_when_simulation_tariff_is_missing() -> None:
     start = datetime(2026, 11, 16, 12, tzinfo=UTC)
     samples = [
-        _snap(start, load=None),
-        _snap(start + timedelta(minutes=5), load=None),
+        _snap(start, load=None, rate=None),
+        _snap(start + timedelta(minutes=5), load=None, rate=None),
         _snap(start + timedelta(minutes=10), rate=None),
     ]
     r = observation_coverage_probe(samples, start + timedelta(hours=1))
