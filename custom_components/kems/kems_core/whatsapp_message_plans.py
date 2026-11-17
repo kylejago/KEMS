@@ -143,7 +143,9 @@ def _pounds(pence: Any) -> str:
         number = float(pence)
     except (ValueError, TypeError, OverflowError):
         return "unavailable"
-    return f"£{number / 100:.2f}" if isfinite(number) else "unavailable"
+    if not isfinite(number):
+        return "unavailable"
+    return f"−£{abs(number) / 100:.2f}" if number < 0 else f"£{number / 100:.2f}"
 
 
 def _number(value: Any) -> float | None:
@@ -154,12 +156,33 @@ def _number(value: Any) -> float | None:
     return number if isfinite(number) else None
 
 
+def _bill_effective_total(
+    bill_equivalent_periods: Mapping[str, Any] | None,
+    start: date,
+    end: date,
+) -> float | None:
+    """Return the canonical refund-adjusted energy bill for the exact period.
+
+    A stale or incomplete dashboard snapshot must never override the recorded
+    period ledger. The canonical bill includes electricity, gas, standing
+    charges, export credits and eligible estimated Happy Hour refunds.
+    """
+    period = matching_completed_period(bill_equivalent_periods, start, end)
+    if period is None or _number(_field(period, "days_included")) != (end - start).days + 1:
+        return None
+    live = _field(period, "live_data")
+    if not isinstance(live, Mapping) or _field(live, "ready") is not True:
+        return None
+    return _number(_field(live, "total_energy_effective_cost_pence"))
+
+
 def completed_period_message(
     periods: Mapping[str, Any],
     now: datetime,
     weekly: bool,
     *,
     standing_charge_pence_per_day: float | None = None,
+    bill_equivalent_periods: Mapping[str, Any] | None = None,
 ) -> tuple[str, str]:
     """Publish recorded totals with explicit incomplete-coverage provenance.
 
@@ -229,7 +252,11 @@ def completed_period_message(
     )
 
     if not weekly:
-        # Compact daily family recap, preserving the dashboard gross cost.
+        # Use the same canonical, refund-adjusted TOTAL ENERGY COST as the
+        # dashboard. Only fall back to the period ledger's refund-adjusted
+        # estimate when an exact-date canonical bill is unavailable.
+        bill_total = _bill_effective_total(bill_equivalent_periods, start, end)
+        daily_total = bill_total if bill_total is not None else after_credit
         # Coverage and unsettled credit details remain in KEMS diagnostics
         # and the separate detailed weekly summary.
         return key, "\n".join(
@@ -240,7 +267,7 @@ def completed_period_message(
                 f"⬆️ Grid export: {_quantity(_field(period, 'grid_export_kwh'), 'kWh')}",
                 "☀️ Solar generated: "
                 + _quantity(_field(period, "solar_generation_kwh"), "kWh"),
-                f"💷 *Energy total: {_pounds(gross)}*",
+                f"💷 *Energy total: {_pounds(daily_total)}*",
             ]
         )
 
