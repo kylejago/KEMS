@@ -8,9 +8,10 @@ Never use these records for charge, dispatch, ROI or historical backfill.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from datetime import UTC, datetime, timedelta
 from math import isfinite
-from typing import Any, Mapping
+from typing import Any
 
 MAX_SAMPLES_PER_CANDIDATE = 1536
 MIN_SAMPLE_SPACING_SECONDS = 900
