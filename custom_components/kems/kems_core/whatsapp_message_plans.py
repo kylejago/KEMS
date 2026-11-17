@@ -228,6 +228,22 @@ def completed_period_message(
         else None
     )
 
+    if not weekly:
+        # Compact daily family recap, preserving the dashboard gross cost.
+        # Coverage and unsettled credit details remain in KEMS diagnostics
+        # and the separate detailed weekly summary.
+        return key, "\n".join(
+            [
+                title,
+                "",
+                f"⬇️ Grid import: {_quantity(_field(period, 'grid_import_kwh'), 'kWh')}",
+                f"⬆️ Grid export: {_quantity(_field(period, 'grid_export_kwh'), 'kWh')}",
+                "☀️ Solar generated: "
+                + _quantity(_field(period, "solar_generation_kwh"), "kWh"),
+                f"💷 *Energy total: {_pounds(gross)}*",
+            ]
+        )
+
     lines = [
         title,
         coverage,
