@@ -122,14 +122,8 @@ def test_test_all_intelligent_examples_have_actual_line_breaks() -> None:
         for node in ast.walk(tree)
         if isinstance(node, ast.Constant) and isinstance(node.value, str)
     ]
-    on = next(
-        value for value in strings
-        if "Sample active-slot alert only." in value
-    )
-    off = next(
-        value for value in strings
-        if "Sample ended-slot alert only." in value
-    )
+    on = next(value for value in strings if "Sample active-slot alert only." in value)
+    off = next(value for value in strings if "Sample ended-slot alert only." in value)
     assert "*\n🕒 Start: 23:30\n🕓 End: TBC\n" in on
     assert "*\n🕒 End: 05:30\n" in off
     assert r"\n" not in on
