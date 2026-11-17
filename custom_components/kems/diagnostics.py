@@ -180,6 +180,9 @@ async def async_get_config_entry_diagnostics(
         "power_down_baseline_entity_registry": baseline_entity_registry,
         "roi_reward_recorder_probe": reward_recorder,
         "happy_hour_import_counter_candidates": import_counter_candidates,
+        "foxess_import_counter_longitudinal_evidence": (
+            coordinator._counter_evidence.status
+        ),
         "whatsapp_notifications": (
             coordinator._kems_whatsapp_reporter.status
             if getattr(coordinator, "_kems_whatsapp_reporter", None) is not None
