@@ -49,7 +49,7 @@ def test_alpha973_release_identity_and_scope() -> None:
     )
     reason = str(bundle["maintenance"]["reason"])
 
-    assert manifest["version"] == "0.9.0-alpha9.229"
+    assert manifest["version"] == "0.9.0-alpha9.230"
     assert reason.startswith("Alpha9.221:")
     assert "Alpha9.75 requires a physically verified FoxESS MinSOC readback" in reason
     assert (
