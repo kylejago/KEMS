@@ -1,3 +1,10 @@
+## 0.9.0-alpha9.224 — Restore scheduled cheap charge when optional Intelligent sensor is unavailable; dependable WhatsApp boundaries
+
+- **P0 #496:** A stale/unavailable **optional Intelligent extra-slot sensor** alone no longer fails tariff commissioning **inside the independently authoritative configured 23:30–05:30 regular cheap schedule**, provided real price/other tariff inputs remain current. It also no longer blocks normal daytime Self Use/export with no active EV charging and explicitly unconfirmed Intelligent authority. Missing import rates/other tariff fields and unresolved EV-active extra slots still fail closed; no missing Intelligent signal is accepted as an extra cheap period.
+- **Family WhatsApp #496:** Observe the separate Octopus ordinary off-peak binary entity to send actual start/end boundaries, even if the Intelligent extra-slot feed is unavailable. Persist normal offpeak baseline/dedupe keys independently, avoid double announcements when both raw binaries change together, never invent an event on integration restart or on an unavailable source.
+- **Private WhatsApp:** Alert after five minutes if commissioning is actually blocked by stale tariff evidence. This reporting-only alert does not drive energy control.
+- No new FoxESS command API, battery SOC floor, DNO, Ohme EV authority, grid import cap or money/ROI adjustments. Post-install genuine overnight charge and handset receipt remain to be physically checked.
+
 ## 0.9.0-alpha9.223 — Independent metering evidence and historical coverage clarity
 
 - **FoxESS counter evidence (#352):** Inspect candidate cumulative import-counter reports on **every KEMS coordinator scan**, instead of only when the separate sampled-history recorder accepts a row. Continue to store only fresh, source-bound, at-least-15-minute-apart real HA reports; no fabricated kWh or backfill.

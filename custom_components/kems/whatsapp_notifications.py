@@ -34,6 +34,7 @@ from .kems_core.whatsapp_message_plans import (
     intelligent_slot_message,
     morning_report_due,
     notify_entity_readiness,
+    regular_offpeak_message,
 )
 
 LOGGER = logging.getLogger(__name__)
@@ -59,6 +60,7 @@ class KEMSWhatsAppNotifications:
         self._warning_alerted: dict[str, str] = {}
         self._tracked_power_down: dict[str, Any] = {}
         self._intelligent_slot_last_state: str | None = None
+        self._regular_offpeak_last_state: str | None = None
         self._slot_setup_at: datetime | None = None
         self._storage_healthy = True
         self._last_error: str | None = None
@@ -90,6 +92,9 @@ class KEMSWhatsAppNotifications:
         slot_keys = sorted(
             key for key in self._delivered if key.startswith("intelligent-slot:")
         )
+        regular_keys = sorted(
+            key for key in self._delivered if key.startswith("regular-offpeak:")
+        )
         return {
             "enabled": self.enabled,
             "family_target": family,
@@ -108,6 +113,8 @@ class KEMSWhatsAppNotifications:
             ),
             "intelligent_slot_last_observed_state": self._intelligent_slot_last_state,
             "intelligent_slot_transitions_accepted": len(slot_keys),
+            "regular_offpeak_last_observed_state": self._regular_offpeak_last_state,
+            "regular_offpeak_transitions_accepted": len(regular_keys),
             "legacy_intelligent_slot_mobile_automations": (
                 self._legacy_intelligent_slot_mobile_automations()
             ),
@@ -191,6 +198,9 @@ class KEMSWhatsAppNotifications:
             slot_state = stored.get("intelligent_slot_last_state")
             if slot_state in {"on", "off"}:
                 self._intelligent_slot_last_state = slot_state
+            regular_state = stored.get("regular_offpeak_last_state")
+            if regular_state in {"on", "off"}:
+                self._regular_offpeak_last_state = regular_state
             tracked = stored.get("tracked_power_down")
             if isinstance(tracked, dict):
                 self._tracked_power_down = {
@@ -258,6 +268,7 @@ class KEMSWhatsAppNotifications:
                     "warning_alerted": self._warning_alerted,
                     "tracked_power_down": self._tracked_power_down,
                     "intelligent_slot_last_state": self._intelligent_slot_last_state,
+                    "regular_offpeak_last_state": self._regular_offpeak_last_state,
                 }
             )
         except (OSError, ValueError, TypeError) as err:
@@ -405,6 +416,36 @@ class KEMSWhatsAppNotifications:
                     return False
         return True
 
+    async def _regular_offpeak_alerts(self, now: datetime) -> None:
+        """Announce actual normal off-peak boundaries, not guessed rate windows."""
+        entity_id = getattr(self.coordinator.entities, "off_peak", None)
+        state = self.hass.states.get(entity_id) if entity_id else None
+        value = getattr(state, "state", None)
+        if value not in {"on", "off"}:
+            return
+        if self._regular_offpeak_last_state is None:
+            self._regular_offpeak_last_state = value
+            await self._persist()
+            return
+        if value == self._regular_offpeak_last_state:
+            return
+        changed_at = getattr(state, "last_changed", None)
+        if not isinstance(changed_at, datetime) or changed_at.tzinfo is None:
+            return
+        if self._slot_setup_at is None or changed_at < self._slot_setup_at:
+            self._regular_offpeak_last_state = value
+            await self._persist()
+            return
+        proposal = regular_offpeak_message(
+            state=value, changed_at=changed_at, now=now
+        )
+        if proposal is None:
+            return
+        key, message = proposal
+        if await self._send(key, message, private=False, now=now):
+            self._regular_offpeak_last_state = value
+            await self._persist()
+
     async def _intelligent_slot_alerts(self, now: datetime) -> None:
         """Track real binary-sensor transitions with a persistent baseline.
 
@@ -421,6 +462,24 @@ class KEMSWhatsAppNotifications:
             await self._persist()
             return
         if value == self._intelligent_slot_last_state:
+            return
+        # The normal tariff sensor has its own independent start/end alert.
+        # Avoid a duplicate Intelligent notification at the same boundary.
+        offpeak_entity = getattr(self.coordinator.entities, "off_peak", None)
+        offpeak_state = self.hass.states.get(offpeak_entity) if offpeak_entity else None
+        normal_value = getattr(offpeak_state, "state", None)
+        normal_changed = getattr(offpeak_state, "last_changed", None)
+        normal_just_ended = bool(
+            normal_value == "off"
+            and isinstance(normal_changed, datetime)
+            and normal_changed.tzinfo is not None
+            and 0 <= (now - normal_changed).total_seconds() <= 300
+        )
+        if (value == "on" and normal_value == "on") or (
+            value == "off" and normal_just_ended
+        ):
+            self._intelligent_slot_last_state = value
+            await self._persist()
             return
         changed_at = getattr(state, "last_changed", None)
         if not isinstance(changed_at, datetime) or changed_at.tzinfo is None:
@@ -471,6 +530,16 @@ class KEMSWhatsAppNotifications:
         if getattr(self.coordinator, "last_update_success", True) is False:
             warnings["coordinator_update_failed"] = (
                 "KEMS coordinator data refresh is failing"
+            )
+        stale_tariff = tuple(getattr(snapshot, "tariff_stale_fields", ()) or ())
+        if (
+            stale_tariff
+            and getattr(control, "control_enabled", False)
+            and not getattr(control, "commissioned", False)
+        ):
+            warnings["tariff_commissioning_blocked"] = (
+                "KEMS energy control is blocked by tariff-source evidence: "
+                + ", ".join(stale_tariff[:5])
             )
         stale = tuple(getattr(snapshot, "stale_fields", ()) or ())
         if stale and getattr(control, "control_enabled", False):
@@ -595,6 +664,7 @@ class KEMSWhatsAppNotifications:
                         ):
                             await self._send(key, message, private=False, now=now)
                 if self.options.get(CONF_WHATSAPP_SESSIONS) is True:
+                    await self._regular_offpeak_alerts(now)
                     await self._intelligent_slot_alerts(now)
                 for weekly, option in (
                     (False, CONF_WHATSAPP_DAILY),
