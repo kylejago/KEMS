@@ -179,6 +179,7 @@ async def async_get_config_entry_diagnostics(
             "minor_version": entry.minor_version,
         },
         "configured_entities": configured,
+        "ohme_charge_plan_observer": coordinator._ohme_charge_plan.status,
         "octopus_source_consolidation": {
             "tariff_provider": "octopus_energy",
             "regular_offpeak_entity": offpeak_entity,
