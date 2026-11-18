@@ -32,12 +32,14 @@ from .kems_core.operational_diagnostic_probes import (
     roi_recorder_probe,
 )
 from .kems_core.period_coverage_probe import observation_coverage_probe
+from .kems_core.supplier_meter_reconciliation import reconcile_supplier_history
 from .panel import panel_health_snapshot
 from .product_types import (
     EXPORT_TARIFF_TYPE_AGILE,
     export_tariff_type_from_options,
 )
 from .providers.octopus import DEFAULT_INTELLIGENT_STALE_DATA_SECONDS
+from .supplier_csv_import import read_local_supplier_csvs
 from .update_orchestrator import update_orchestrator_snapshot
 
 
@@ -186,6 +188,31 @@ async def async_get_config_entry_diagnostics(
         now=dt_util.now(),
     )
 
+    # Optional supplier CSVs are read only during an explicitly requested
+    # diagnostic export, on the HA executor. They never affect the coordinator.
+    supplier_source = await hass.async_add_executor_job(
+        read_local_supplier_csvs,
+        hass.config.path("kems_supplier_evidence"),
+    )
+    kems_daily_values = dict(coordinator._lifetime._daily_records)
+    if coordinator._lifetime._tracking_date is not None:
+        kems_daily_values[coordinator._lifetime._tracking_date.isoformat()] = dict(
+            coordinator._lifetime._tracking_values
+        )
+    supplier_reconciliation = reconcile_supplier_history(
+        imported=supplier_source["import"],
+        exported=supplier_source["export"],
+        kems_days=kems_daily_values,
+        coverage_days=history_coverage["recent_days"],
+        now=dt_util.now(),
+    )
+    supplier_reconciliation["csv_file_loading"] = {
+        "expected_directory": supplier_source["expected_directory"],
+        "errors": supplier_source["errors"],
+        "no_source_data_embedded_in_release": True,
+        "owner_upload_required": True,
+    }
+
     gap_meter_anchors = meter_gap_anchor_evidence(
         gaps=gap_provenance["source_gap_details"],
         import_lifetime_rows=coordinator._counter_evidence.lifetime_counter_rows,
@@ -236,6 +263,7 @@ async def async_get_config_entry_diagnostics(
             coordinator._export_counter_evidence.status
         ),
         "historical_two_way_meter_gap_anchors": gap_meter_anchors,
+        "historical_supplier_meter_reconciliation": supplier_reconciliation,
         "whatsapp_notifications": (
             coordinator._kems_whatsapp_reporter.status
             if getattr(coordinator, "_kems_whatsapp_reporter", None) is not None
