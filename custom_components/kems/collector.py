@@ -64,6 +64,7 @@ class Collector:
             ev_connected=ohme.connected,
             ev_power_kw=ohme.power_kw,
             ev_soc=ohme.vehicle_soc,
+            ev_charge_mode=ohme.charge_mode,
             live_current_demand_kw=octopus.current_demand_kw,
         )
 
