@@ -58,9 +58,7 @@ def history_gap_provenance(
         if completed is None:
             continue
         target = item.get("target")
-        updates.append(
-            (completed, str(target) if isinstance(target, str) else None)
-        )
+        updates.append((completed, str(target) if isinstance(target, str) else None))
 
     daily_counts: dict[str, dict[str, int]] = defaultdict(
         lambda: {
@@ -96,16 +94,17 @@ def history_gap_provenance(
             )
             # A successful update with no target still counts as evidence.
             update_near = any(
-                start <= at <= end + UPDATE_AFTER_GAP_GRACE
-                for at, _ in updates
+                start <= at <= end + UPDATE_AFTER_GAP_GRACE for at, _ in updates
             )
             counters = daily_counts[day_text]
             counters["gaps_over_10_minutes"] += 1
             counters["seconds_of_observation_gaps"] += round(seconds)
             counters[
-                "gaps_near_successful_kems_update"
-                if update_near
-                else "gaps_without_update_correspondence"
+                (
+                    "gaps_near_successful_kems_update"
+                    if update_near
+                    else "gaps_without_update_correspondence"
+                )
             ] += 1
             details.append(
                 {
@@ -149,9 +148,7 @@ def history_gap_provenance(
                     )
                 ),
                 "ongoing_day": day == today.isoformat(),
-                "gaps_over_10_minutes": row_counts.get(
-                    "gaps_over_10_minutes", 0
-                ),
+                "gaps_over_10_minutes": row_counts.get("gaps_over_10_minutes", 0),
                 "gaps_near_successful_kems_update": row_counts.get(
                     "gaps_near_successful_kems_update", 0
                 ),
