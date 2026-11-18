@@ -44,7 +44,6 @@ from .coordinator import KEMSCoordinator
 from .dashboard import async_sync_managed_dashboard
 from .dashboard_pipeline import install_dashboard_pipeline
 from .energy_bill_presentation import install_energy_bill_dashboard_patch
-from .kems_core.octopus_source_consolidation import consolidate_octopus_sources
 from .entity_discovery import (
     SourceValidationResult,
     async_discover_entities,
@@ -52,6 +51,7 @@ from .entity_discovery import (
 )
 from .happy_hour_auto_join import install_happy_hour_auto_join
 from .kems_core import configure_ev_charge_policy
+from .kems_core.octopus_source_consolidation import consolidate_octopus_sources
 from .providers.entity_map import KEMSEntities
 from .providers.foxess import FoxESSProvider
 from .providers.gas import GasProvider

@@ -9,9 +9,6 @@ from fnmatch import fnmatch
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_registry as er
 
-from .kems_core.octopus_source_consolidation import (
-    UNVERIFIED_OHME_EXTRA_SLOT_KEYS,
-)
 from .const import (
     CONF_BATTERY_CURRENT,
     CONF_BATTERY_POWER,
@@ -46,6 +43,9 @@ from .const import (
     CONF_VEHICLE_SOC_SOURCE,
     DOMAIN,
     ENTITY_MAPPING_KEYS,
+)
+from .kems_core.octopus_source_consolidation import (
+    UNVERIFIED_OHME_EXTRA_SLOT_KEYS,
 )
 
 

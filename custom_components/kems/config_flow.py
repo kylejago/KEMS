@@ -134,11 +134,11 @@ from .entity_discovery import (
     async_discover_entities,
     async_validate_entity_mappings,
 )
-from .product_types import SYSTEM_TYPE_DEFINITIONS, SYSTEM_TYPES
-from .tariff import normalise_october_2026_loyal_options
 from .kems_core.octopus_source_consolidation import (
     UNVERIFIED_OHME_EXTRA_SLOT_KEYS,
 )
+from .product_types import SYSTEM_TYPE_DEFINITIONS, SYSTEM_TYPES
+from .tariff import normalise_october_2026_loyal_options
 
 SENSOR_SELECTOR = EntitySelector(EntitySelectorConfig(domain="sensor"))
 BINARY_SENSOR_SELECTOR = EntitySelector(EntitySelectorConfig(domain="binary_sensor"))
