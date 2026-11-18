@@ -110,6 +110,11 @@ class KEMSWhatsAppNotifications:
             "joined_events_enabled": self.options.get(CONF_WHATSAPP_SESSIONS) is True,
             "intelligent_slot_alerts_enabled": (
                 self.options.get(CONF_WHATSAPP_SESSIONS) is True
+                and bool(getattr(self.coordinator.entities, "intelligent_slot", None))
+            ),
+            "regular_offpeak_alerts_enabled": (
+                self.options.get(CONF_WHATSAPP_SESSIONS) is True
+                and bool(getattr(self.coordinator.entities, "off_peak", None))
             ),
             "intelligent_slot_last_observed_state": self._intelligent_slot_last_state,
             "intelligent_slot_transitions_accepted": len(slot_keys),
@@ -584,7 +589,8 @@ class KEMSWhatsAppNotifications:
                     alert_key,
                     f"🚨 *KEMS — Technical warning*\n⚠️ {description}.\n"
                     "Persisting for at least 5 minutes. "
-                    "Energy control operates independently.",
+                    "WhatsApp only reports the fault; it cannot override "
+                    "KEMS commissioning or inverter safety.",
                     private=True,
                     now=now,
                 ):

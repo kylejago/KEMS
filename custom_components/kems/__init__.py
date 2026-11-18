@@ -44,6 +44,7 @@ from .coordinator import KEMSCoordinator
 from .dashboard import async_sync_managed_dashboard
 from .dashboard_pipeline import install_dashboard_pipeline
 from .energy_bill_presentation import install_energy_bill_dashboard_patch
+from .kems_core.octopus_source_consolidation import consolidate_octopus_sources
 from .entity_discovery import (
     SourceValidationResult,
     async_discover_entities,
@@ -135,7 +136,17 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             "optimiser target; the independent hard safety floor remains 10%%"
         )
 
-    validation = await async_validate_entity_mappings(hass, dict(entry.data))
+    # Remove the unsupported megakid Intelligent mappings *before* HA source
+    # validation or coordinator construction. Octopus/Ohme cannot prove extra
+    # daytime cheap electricity, so these roles must remain unconfigured.
+    original_entities = dict(entry.data)
+    consolidated_entities = consolidate_octopus_sources(original_entities)
+    if consolidated_entities != original_entities:
+        LOGGER.info(
+            "KEMS retired deprecated Intelligent source mappings: %s",
+            sorted(set(original_entities) - set(consolidated_entities)),
+        )
+    validation = await async_validate_entity_mappings(hass, consolidated_entities)
     discovery = await async_discover_entities(hass)
     authority = await async_reconcile_source_mappings(
         hass,
@@ -143,9 +154,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         discovery.mappings,
     )
     final_validation = await async_validate_entity_mappings(hass, authority.mappings)
-    enriched = final_validation.accepted
+    enriched = consolidate_octopus_sources(final_validation.accepted)
 
-    if enriched != dict(entry.data):
+    if enriched != original_entities:
         hass.config_entries.async_update_entry(entry, data=enriched)
     if validation.rejected:
         LOGGER.warning("KEMS rejected unsafe source mappings: %s", validation.summary())

@@ -9,6 +9,9 @@ from fnmatch import fnmatch
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_registry as er
 
+from .kems_core.octopus_source_consolidation import (
+    UNVERIFIED_OHME_EXTRA_SLOT_KEYS,
+)
 from .const import (
     CONF_BATTERY_CURRENT,
     CONF_BATTERY_POWER,
@@ -508,6 +511,11 @@ def discover_from_candidates(candidates: Iterable[Candidate]) -> DiscoveryResult
     ambiguous: list[str] = []
 
     for rule in RULES:
+        # Ohme extra smart-charge dispatches are not supplier-verified by
+        # bottlecapdave. Do not rediscover the failing old Intelligent source
+        # (or unsupported same-name replacement) after stored-config cleanup.
+        if rule.key in UNVERIFIED_OHME_EXTRA_SLOT_KEYS:
+            continue
         ranked = sorted(
             (
                 DiscoveryMatch(candidate.entity_id, score_candidate(candidate, rule))
