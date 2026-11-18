@@ -22,7 +22,11 @@ class FoxESSCounterEvidenceRecorder:
     """Record bounded fresh cumulative reports across integration restarts."""
 
     def __init__(
-        self, hass: Any, entry_id: str, import_power_entity: str, *,
+        self,
+        hass: Any,
+        entry_id: str,
+        import_power_entity: str,
+        *,
         direction: str = "import",
     ) -> None:
         if direction not in {"import", "export"}:
