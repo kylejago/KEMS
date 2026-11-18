@@ -385,3 +385,53 @@ def test_next_fallback_rate_switches_at_renewal_midnight_inside_cheap_window() -
 
     assert result.current_import_rate == 3.326952381
     assert result.next_import_rate == 8.0
+
+
+def test_smart_charge_observation_does_not_invent_daytime_discount() -> None:
+    """Ohme Smart charge + power protects the battery, not tariff authority."""
+    now = datetime(2026, 10, 8, 14, 0, tzinfo=LONDON)
+    result = resolve_tariff(
+        settings=_renewal_settings(),
+        now=now,
+        live_current_import_rate=37.17,
+        live_next_import_rate=37.17,
+        live_current_export_rate=12.0,
+        live_standing_charge=55.52,
+        live_off_peak=False,
+        live_intelligent_slot=None,
+        live_next_offpeak_start=None,
+        live_offpeak_end=None,
+        ev_charging=True,
+        ev_connected=True,
+        ev_power_kw=7.0,
+        ev_charge_mode="Smart charge",
+        fallback_export_rate=12.0,
+    )
+    assert result.intelligent_slot is False
+    assert result.current_import_rate == 37.17
+    assert result.intelligent_slot_evidence["ohme_smart_charging_observed"] is True
+    assert result.intelligent_slot_evidence["ohme_smart_charge_is_tariff_authority"] is False
+
+
+def test_ohme_smart_charge_without_real_power_is_not_confirmed() -> None:
+    """A planned/paused Smart charge mode is not an active dispatch."""
+    now = datetime(2026, 10, 8, 14, 0, tzinfo=LONDON)
+    result = resolve_tariff(
+        settings=_renewal_settings(),
+        now=now,
+        live_current_import_rate=37.17,
+        live_next_import_rate=37.17,
+        live_current_export_rate=None,
+        live_standing_charge=None,
+        live_off_peak=False,
+        live_intelligent_slot=None,
+        live_next_offpeak_start=None,
+        live_offpeak_end=None,
+        ev_charging=False,
+        ev_connected=True,
+        ev_power_kw=0.0,
+        ev_charge_mode="Smart charge",
+        fallback_export_rate=12.0,
+    )
+    assert result.intelligent_slot is False
+    assert result.intelligent_slot_evidence["ohme_smart_charging_observed"] is False
