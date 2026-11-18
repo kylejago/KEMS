@@ -63,7 +63,6 @@ from .happy_hour_physical_preparation import (
 )
 from .historical_tariff_revaluation import financial_replay_records
 from .history import HistoryRecorder
-from .lifecycle_evidence import CoreLifecycleEvidenceRecorder
 from .kems_core import (
     AdviceEngine,
     ControlEngine,
@@ -114,6 +113,7 @@ from .kems_core.shared_bus_balance import (
     assess_shared_bus_balance,
     summarise_shared_bus_audits,
 )
+from .lifecycle_evidence import CoreLifecycleEvidenceRecorder
 from .lifetime import LifetimeLedgerRecorder
 from .ohme_charge_slot_observer import OhmeChargeSlotObserver
 from .power_down import PowerDownHistoryRecorder
