@@ -62,12 +62,18 @@ def parse_octopus_csv(text: str, *, direction: str) -> dict[str, Any]:
         "start": headers.get("start"),
         "end": headers.get("end"),
         "estimated": next(
-            (field for label, field in headers.items() if label.startswith("estimated cost inc. tax (p)")),
+            (
+                field
+                for label, field in headers.items()
+                if label.startswith("estimated cost inc. tax (p)")
+            ),
             None,
         ),
     }
     if not all(columns.values()):
-        raise ValueError("CSV is missing Octopus consumption, cost, start or end columns")
+        raise ValueError(
+            "CSV is missing Octopus consumption, cost, start or end columns"
+        )
     intervals: dict[datetime, dict[str, Any]] = {}
     duplicate_intervals: set[str] = set()
     invalid_rows = 0
@@ -115,8 +121,7 @@ def _expected_slots(day: date) -> set[datetime]:
         day + timedelta(days=1), time.min, tzinfo=LONDON
     ).astimezone(UTC)
     return {
-        start + HALF_HOUR * index
-        for index in range(int((finish - start) / HALF_HOUR))
+        start + HALF_HOUR * index for index in range(int((finish - start) / HALF_HOUR))
     }
 
 
@@ -228,9 +233,7 @@ def _cost_evidence(
 ) -> dict[str, Any]:
     """Expose non-equivalent pricing figures without suggesting settlement."""
     previous = _number(kems_pence)
-    estimated = (
-        supplier.get("estimated_energy_cost_pence") if supplier else None
-    )
+    estimated = supplier.get("estimated_energy_cost_pence") if supplier else None
     return {
         "direction": direction,
         "kems_calculated_pence": previous,
@@ -330,12 +333,8 @@ def reconcile_supplier_history(
         day = date.fromisoformat(day_text)
         if not lower <= day <= today:
             continue
-        import_summary = (
-            _slot_summary(daily["import"], day_text) if imported else None
-        )
-        export_summary = (
-            _slot_summary(daily["export"], day_text) if exported else None
-        )
+        import_summary = _slot_summary(daily["import"], day_text) if imported else None
+        export_summary = _slot_summary(daily["export"], day_text) if exported else None
         led = kems_days.get(day_text) or {}
         replay = coverage.get(day_text) or {}
         candidate_slots = _extra_cheap_slots(daily["import"])
@@ -394,18 +393,18 @@ def reconcile_supplier_history(
                     source["half_hour_coverage_complete"] = False
                     row[f"grid_{direction}_comparison"] = _compare(
                         source,
-                        (kems_days.get(row["date"]) or {}).get(
-                            f"grid_{direction}_kwh"
-                        ),
+                        (kems_days.get(row["date"]) or {}).get(f"grid_{direction}_kwh"),
                     )
             row["csv_source_integrity_warning"] = True
     return {
         "status": (
             "awaiting_local_octopus_csv"
             if imported is None and exported is None
-            else "csv_source_has_invalid_or_duplicate_rows"
-            if suspicious
-            else "read_only_supplier_comparison"
+            else (
+                "csv_source_has_invalid_or_duplicate_rows"
+                if suspicious
+                else "read_only_supplier_comparison"
+            )
         ),
         "import_csv_present": imported is not None,
         "export_csv_present": exported is not None,
