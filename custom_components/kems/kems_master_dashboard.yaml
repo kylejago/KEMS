@@ -312,36 +312,13 @@ views:
         **Charging plan & safeguards**
   
         **KEMS policy:** {{ states('select.kems_ev_charging_policy') if states('select.kems_ev_charging_policy') | lower not in bad else 'Unavailable' }}  
-        **Cheap period:** {{ 'Confirmed active' if is_state('binary_sensor.kems_cheap_period_confirmed', 'on') else 'Not confirmed active' }} · **Intelligent slot:** {{ 'Active' if is_state('binary_sensor.kems_intelligent_slot', 'on') else 'Inactive' if is_state('binary_sensor.kems_intelligent_slot', 'off') else 'Unknown' }}  
+        **Supplier-confirmed cheap period:** {{ 'Active' if is_state('binary_sensor.kems_cheap_period_confirmed', 'on') else 'Not confirmed active' }}  
         **Charging permitted by KEMS:** {{ 'Yes' if is_state('binary_sensor.kems_ev_charging_allowed_by_control', 'on') else 'No' if is_state('binary_sensor.kems_ev_charging_allowed_by_control', 'off') else 'Unavailable' }}  
         **EV battery protection:** {{ states('sensor.kems_ev_grid_protection') | replace('_', ' ') if states('sensor.kems_ev_grid_protection') | lower not in bad else 'Unavailable' }}  
-        **Intelligent data:** {{ 'Fresh' if is_state('binary_sensor.kems_intelligent_slot_source_fresh', 'on') else 'Stale' if is_state('binary_sensor.kems_intelligent_slot_source_fresh', 'off') else 'Unavailable' }}  
-        {% set offpeak = states('sensor.octopus_intelligent_tariff_octopus_intelligent_next_offpeak_start') %}
-        {% set offpeak_end = states('sensor.octopus_intelligent_tariff_octopus_intelligent_offpeak_end') %}
-        **Next regular off-peak start:** {{ as_local(as_datetime(offpeak)).strftime('%a %d %b %H:%M') if offpeak | lower not in bad else 'Not published' }}  
-        **Current off-peak end:** {{ as_local(as_datetime(offpeak_end)).strftime('%a %d %b %H:%M') if offpeak_end | lower not in bad else '—' }}  
+        **Standard overnight cheap window:** 23:30–05:30 (UK local time; configured Intelligent Go tariff)  
+        **Extra daytime Intelligent slots:** Not independently supplier-confirmed live for Ohme.  
   
-        **Upcoming Intelligent Octopus dispatch slots**
-  
-        {% set src = 'binary_sensor.octopus_intelligent_tariff_octopus_intelligent_slot' %}
-        {% set legacy = state_attr(src, 'plannedDispatches') %}
-        {% set modern = state_attr(src, 'planned_dispatches') %}
-        {% set slots = legacy if legacy is sequence and legacy is not string else modern if modern is sequence and modern is not string else none %}
-        {% if slots is none %}
-        _Dispatch schedule not exposed by the configured Intelligent slot entity._
-        {% elif slots | count == 0 %}
-        _No upcoming smart dispatches currently published._
-        {% else %}
-        {% for slot in slots[:6] %}
-        {% set begin = slot.get('startDtUtc') or slot.get('start') or slot.get('start_time') %}
-        {% set finish = slot.get('endDtUtc') or slot.get('end') or slot.get('end_time') %}
-        {% set source_type = slot.get('source') or slot.get('type') %}
-        - **{{ as_local(as_datetime(begin)).strftime('%a %d %b %H:%M') if begin else 'Start unavailable' }}–{{ as_local(as_datetime(finish)).strftime('%H:%M') if finish else '—' }}**{% if source_type %} · {{ source_type | replace('_', ' ') | title }}{% endif %}
-        {% endfor %}
-        {% if slots | count > 6 %}_Plus {{ slots | count - 6 }} further published dispatches._{% endif %}
-        {% endif %}
-  
-        _These are published/observed slots, not new charger commands. Charging follows KEMS cheap-period policy, confirmed live charging conditions and physical battery-protection rules. A 100% target is a preference, not a requirement._
+        _Ohme charging status alone does not prove a discounted whole-home import rate. KEMS will not assume extra cheap daytime import, force-charge the house battery, or alter EV safeguards without verified supplier evidence. A 100% EV target remains a preference, not a requirement._
     - type: markdown
       title: Happy Hour — booking & charging plan
       content: "{% set hh = 'switch.kems_weekend_happy_hour_auto_join' %}\n{% set plan = 'sensor.kems_agile_happy_hour_plan' %}\n{% set status = state_attr(hh, 'status') or 'waiting for an update' %}\n{% set booked_raw = state_attr(hh, 'booked_start') %}\n{% set booked_end_raw = state_attr(hh, 'booked_end') %}\n{% set rec_raw = state_attr(hh, 'recommended_start') %}\n{% set rec_end_raw = state_attr(hh, 'recommended_end') %}\n{% set booked = as_datetime(booked_raw) if booked_raw else none %}\n{% set booked_end = as_datetime(booked_end_raw) if booked_end_raw else none %}\n{% set recommended = as_datetime(rec_raw) if rec_raw else none %}\n{% set rec_end = as_datetime(rec_end_raw) if rec_end_raw else none %}\n{% set rec = state_attr(hh, 'recommendation') or {} %}\n**Auto join:** {{ 'ON' if is_state(hh, 'on') else 'OFF' }} · **Ohme control:** {{ 'ON' if is_state('switch.kems_happy_hour_ohme_control', 'on') else 'OFF' }}  \n**Planner:** {{ status | replace('_', ' ') | title }}  \n**Octopus verification:** {{ state_attr(plan, 'automatic_status') or 'Awaiting data' }}\n\n{% if booked and booked_end and as_local(booked_end) > now() %}\n**✅ {{ 'Active booking' if as_local(booked) <= now() else 'Next booked session' }}:** {{ as_local(booked).strftime('%a %d %b %H:%M') }}–{{ as_local(booked_end).strftime('%H:%M') }}\n{% elif recommended and as_local(recommended) > now() %}\n**💡 Recommended, not booked:** {{ as_local(recommended).strftime('%a %d %b %H:%M') }}{% if rec_end %}–{{ as_local(rec_end).strftime('%H:%M') }}{% endif %}\n{% else %}\n**No booked or recommended upcoming session**\n{% endif %}\n\n{% if (booked and booked_end and as_local(booked_end) > now()) or (recommended and as_local(recommended) > now()) %}\n**Planned free battery import:** {{ rec.get('expected_battery_free_import_kwh', '—') }} kWh  \n**Pre-event export:** {{ state_attr(hh, 'planned_pre_event_export_kwh') if state_attr(hh, 'planned_pre_event_export_kwh') is not none else rec.get('planned_pre_event_export_kwh', '—') }} kWh  \n**Expected net benefit:** {{ ('£%.2f' | format((state_attr(hh, 'estimated_net_benefit_pence') | float) / 100)) if state_attr(hh, 'estimated_net_benefit_pence') is not none else '—' }}\n{% else %}\n_Battery, household and EV allowances will appear when an automatic event is verified and a plan is available._\n{% endif %}\n\n**Verified FoxESS SOC:** {{ (state_attr(plan, 'current_physical_soc_percent') ~ '%') if state_attr(plan, 'physical_soc_verified') else '— (awaiting verified physical evidence)' }}  \n**Physical battery charging headroom:** {{ (state_attr(plan, 'physical_battery_headroom_kwh') ~ ' kWh') if state_attr(plan, 'physical_soc_verified') else '—' }}  \n**Physical pre-event export requirement:** {{ (state_attr(plan, 'physical_required_headroom_export_kwh') ~ ' kWh') if state_attr(plan, 'physical_required_headroom_export_kwh') is not none else '— (re-evaluate after cheap recharge)' }}  \n**Ohme charge mode:** {{ states('select.ohme_epod_charge_mode') }}  \n**Reward-hour import remaining:** {{ state_attr(plan, 'current_reward_hour_remaining_kwh') if state_attr(plan, 'current_reward_hour_remaining_kwh') is not none else '—' }} kWh  \n**EV allowance remaining:** {{ state_attr(plan, 'ev_allowance_kwh_remaining') if state_attr(plan, 'ev_allowance_kwh_remaining') is not none else '—' }} kWh\n"
