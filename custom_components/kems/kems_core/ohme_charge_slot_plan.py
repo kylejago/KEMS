@@ -66,7 +66,8 @@ def observe_ohme_slot_response(
     except (KeyError, ValueError):
         zone = ZoneInfo("Europe/London")
     reference = now.astimezone(UTC)
-    if not isinstance(response, Mapping) or not isinstance(response.get("slots"), list):
+    raw_slots = response.get("slots") if isinstance(response, Mapping) else None
+    if not isinstance(raw_slots, list):
         return {
             "status": "unexpected_response",
             "slots": [],
@@ -84,7 +85,7 @@ def observe_ohme_slot_response(
     rows: list[tuple[datetime, datetime, float | None, float | None]] = []
     invalid = 0
     naive_count = 0
-    for item in response["slots"][:128]:
+    for item in raw_slots[:128]:
         if not isinstance(item, Mapping):
             invalid += 1
             continue
@@ -127,9 +128,9 @@ def observe_ohme_slot_response(
     return {
         "status": "plan_observed" if normalized else "no_slots_reported",
         "slots": normalized,
-        "raw_count": len(response["slots"]),
+        "raw_count": len(raw_slots),
         "valid_count": len(unique),
-        "invalid_count": invalid + max(len(response["slots"]) - 128, 0),
+        "invalid_count": invalid + max(len(raw_slots) - 128, 0),
         "expired_count": expired_count,
         "active_count": active_count,
         "overlap_count": overlaps,
