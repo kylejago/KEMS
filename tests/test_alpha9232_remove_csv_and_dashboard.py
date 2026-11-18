@@ -1,4 +1,4 @@
-"""Regression for removing unused owner-local CSV diagnostics and old EV dashboard refs."""
+"""Guard removal of local CSV diagnostics and legacy EV dashboard references."""
 
 from pathlib import Path
 
@@ -26,6 +26,8 @@ def test_unused_local_supplier_csv_feature_is_absent() -> None:
 
 def test_ev_dashboard_uses_kems_cheap_confirmation_not_legacy_dispatches() -> None:
     dashboard = (INTEGRATION / "kems_master_dashboard.yaml").read_text()
+    source = (ROOT / "dashboards/kems_master_dashboard.yaml").read_text()
+    assert dashboard == source
     assert "octopus_intelligent_tariff_octopus_intelligent" not in dashboard
     assert "plannedDispatches" not in dashboard
     assert "planned_dispatches" not in dashboard
