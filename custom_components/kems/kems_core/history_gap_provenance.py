@@ -37,6 +37,7 @@ def history_gap_provenance(
     *,
     records: Sequence[Any],
     update_history: Sequence[Mapping[str, Any]] | None,
+    lifecycle_events: Sequence[Mapping[str, Any]] | None = None,
     ledger_audit: Mapping[str, Any],
     now: datetime,
 ) -> dict[str, Any]:
@@ -60,11 +61,30 @@ def history_gap_provenance(
         target = item.get("target")
         updates.append((completed, str(target) if isinstance(target, str) else None))
 
+    lifecycle: list[tuple[datetime, str]] = []
+    for event in lifecycle_events or []:
+        if not isinstance(event, Mapping):
+            continue
+        kind = event.get("kind")
+        if kind not in {
+            "kems_setup",
+            "core_started_event_observed",
+            "core_stopping_event_observed",
+            "core_restart_service_requested",
+        }:
+            continue
+        stamp = _instant(event.get("observed_at"))
+        if stamp is not None:
+            lifecycle.append((stamp, kind))
+
     daily_counts: dict[str, dict[str, int]] = defaultdict(
         lambda: {
             "gaps_over_10_minutes": 0,
             "gaps_near_successful_kems_update": 0,
             "gaps_without_update_correspondence": 0,
+            "gaps_near_kems_setup": 0,
+            "gaps_near_observed_core_lifecycle": 0,
+            "gaps_without_any_recorded_lifecycle_or_update": 0,
             "seconds_of_observation_gaps": 0,
         }
     )
@@ -96,8 +116,40 @@ def history_gap_provenance(
             update_near = any(
                 start <= at <= end + UPDATE_AFTER_GAP_GRACE for at, _ in updates
             )
+            near_events = [
+                kind
+                for at, kind in lifecycle
+                if start - timedelta(minutes=2)
+                <= at
+                <= end + UPDATE_AFTER_GAP_GRACE
+            ]
+            kems_setup_near = "kems_setup" in near_events
+            core_lifecycle_near = any(
+                kind in {
+                    "core_started_event_observed",
+                    "core_stopping_event_observed",
+                }
+                for kind in near_events
+            )
+            if core_lifecycle_near:
+                lifecycle_classification = "core_lifecycle_event_near_gap"
+            elif kems_setup_near:
+                lifecycle_classification = "kems_setup_near_gap"
+            elif update_near:
+                lifecycle_classification = "completed_kems_update_near_gap"
+            elif "core_restart_service_requested" in near_events:
+                lifecycle_classification = "core_restart_request_near_gap"
+            else:
+                lifecycle_classification = "no_recorded_correspondence"
             counters = daily_counts[day_text]
             counters["gaps_over_10_minutes"] += 1
+            counters["gaps_near_kems_setup"] += int(kems_setup_near)
+            counters["gaps_near_observed_core_lifecycle"] += int(
+                core_lifecycle_near
+            )
+            counters["gaps_without_any_recorded_lifecycle_or_update"] += int(
+                lifecycle_classification == "no_recorded_correspondence"
+            )
             counters["seconds_of_observation_gaps"] += round(seconds)
             counters[
                 (
@@ -116,6 +168,13 @@ def history_gap_provenance(
                     "nearby_update_version": matching,
                     "update_proximity_is_cause_proof": False,
                     "metered_energy_during_gap": "unknown",
+                    "lifecycle_classification": lifecycle_classification,
+                    "kems_setup_near_gap": kems_setup_near,
+                    "core_lifecycle_event_near_gap": core_lifecycle_near,
+                    "restart_service_request_near_gap": (
+                        "core_restart_service_requested" in near_events
+                    ),
+                    "kems_setup_alone_proves_core_restart": False,
                 }
             )
 
@@ -156,6 +215,17 @@ def history_gap_provenance(
                     "gaps_without_update_correspondence", 0
                 ),
                 "restart_cause_proven": False,
+                "gaps_near_kems_setup": row_counts.get(
+                    "gaps_near_kems_setup", 0
+                ),
+                "gaps_near_observed_core_lifecycle": row_counts.get(
+                    "gaps_near_observed_core_lifecycle", 0
+                ),
+                "gaps_without_any_recorded_lifecycle_or_update": (
+                    row_counts.get(
+                        "gaps_without_any_recorded_lifecycle_or_update", 0
+                    )
+                ),
             }
         )
     return {
@@ -164,13 +234,18 @@ def history_gap_provenance(
         "update_proximity_is_not_cause_proof": True,
         "update_history_is_bounded": True,
         "successful_update_events_considered": len(updates),
+        "lifecycle_events_considered": len(lifecycle),
+        "lifecycle_markers_are_prospective_only": True,
+        "kems_setup_is_not_core_restart_proof": True,
+        "absence_of_lifecycle_events_does_not_exclude_restart": True,
         "recorded_totals_do_not_prove_full_meter_coverage": True,
         "simulation_completeness_unchanged": True,
         "source_gap_details": details[-MAX_DETAIL_ROWS:],
         "source_gap_details_omitted": max(0, len(details) - MAX_DETAIL_ROWS),
         "days": rows,
         "next_step": (
-            "Use Home Assistant Core restart logs and independent cumulative "
+            "Correlate observed KEMS setup/Core lifecycle markers with Core "
+            "restart logs, and independently confirm cumulative "
             "grid import/export meter anchors to prove missing intervals. "
             "Do not mark replay complete or infer kWh from elapsed downtime."
         ),
