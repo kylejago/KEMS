@@ -29,18 +29,10 @@ def _sample(hour: int, minute: int = 0, **updates):
 
 
 def test_overnight_window_is_excluded_from_daytime_parity() -> None:
-    assert fixed_overnight_offpeak(
-        datetime(2026, 11, 19, 23, 30, tzinfo=LONDON)
-    )
-    assert fixed_overnight_offpeak(
-        datetime(2026, 11, 19, 5, 29, tzinfo=LONDON)
-    )
-    assert not fixed_overnight_offpeak(
-        datetime(2026, 11, 19, 5, 30, tzinfo=LONDON)
-    )
-    assert not fixed_overnight_offpeak(
-        datetime(2026, 11, 19, 23, 29, tzinfo=LONDON)
-    )
+    assert fixed_overnight_offpeak(datetime(2026, 11, 19, 23, 30, tzinfo=LONDON))
+    assert fixed_overnight_offpeak(datetime(2026, 11, 19, 5, 29, tzinfo=LONDON))
+    assert not fixed_overnight_offpeak(datetime(2026, 11, 19, 5, 30, tzinfo=LONDON))
+    assert not fixed_overnight_offpeak(datetime(2026, 11, 19, 23, 29, tzinfo=LONDON))
     result = _sample(23, 45, legacy_slot=True)
     assert result["classification"] == "overnight_excluded"
 
@@ -83,15 +75,10 @@ def test_manual_boost_charging_is_not_a_smart_charge_dispatch() -> None:
 
 def test_absent_mode_or_power_cannot_count_as_a_match() -> None:
     assert (
-        _sample(14, ohme_charge_mode=None, ohme_power_kw=7.0)[
-            "classification"
-        ]
+        _sample(14, ohme_charge_mode=None, ohme_power_kw=7.0)["classification"]
         == "evidence_incomplete"
     )
-    assert (
-        _sample(14, ohme_power_kw=None)["classification"]
-        == "evidence_incomplete"
-    )
+    assert _sample(14, ohme_power_kw=None)["classification"] == "evidence_incomplete"
     assert (
         _sample(14, legacy_planned_dispatch=None)["classification"]
         == "evidence_incomplete"
@@ -107,9 +94,7 @@ def test_ohme_charge_plan_is_not_a_discount_authority() -> None:
 
 def test_comparison_is_not_wired_into_control() -> None:
     root = Path(__file__).parents[1] / "custom_components" / "kems"
-    source = (root / "legacy_intelligent_parity_monitor.py").read_text(
-        encoding="utf-8"
-    )
+    source = (root / "legacy_intelligent_parity_monitor.py").read_text(encoding="utf-8")
     assert "services.async_call(" not in source
     assert "async_apply_pending(" not in source
     assert "ControlEngine.plan" not in source
