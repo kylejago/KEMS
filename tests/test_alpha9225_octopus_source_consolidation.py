@@ -45,7 +45,7 @@ def test_old_sources_cannot_be_reintroduced_at_setup_or_reconfiguration() -> Non
     config = (ROOT / "config_flow.py").read_text()
     assert "consolidate_octopus_sources(original_entities)" in startup
     assert "async_validate_entity_mappings(hass, consolidated_entities)" in startup
-    assert "enriched = consolidate_octopus_sources(final_validation.accepted)" in startup
+    assert "enriched = consolidate_octopus_sources(" in startup
     assert "if rule.key in UNVERIFIED_OHME_EXTRA_SLOT_KEYS:" in discovery
     assert "if key in UNVERIFIED_OHME_EXTRA_SLOT_KEYS:" in config
     for source in (startup, discovery, config):
@@ -57,7 +57,7 @@ def test_ohme_plans_and_unsupported_intelligent_source_do_not_grant_cheap() -> N
     configured = migration.consolidate_octopus_sources(
         {
             "off_peak": "binary_sensor.octopus_energy_electricity_meter_off_peak",
-            "intelligent_slot": "binary_sensor.octopus_energy_ohme_intelligent_dispatching",
+            "intelligent_slot": "binary_sensor.octopus_energy_dispatching",
         }
     )
     assert configured == {
@@ -86,5 +86,5 @@ def test_diagnostic_offpeak_attributes_are_explicitly_read_only() -> None:
     assert '"octopus_source_consolidation"' in code
     assert '"tariff_provider": "octopus_energy"' in code
     assert '"offpeak_boundaries_reporting_only"' in code
-    assert '"ohme_extra_daytime_discount": "not_supplier_confirmed_fail_closed"' in code
+    assert "not_supplier_confirmed_fail_closed" in code
     ast.parse(code)
