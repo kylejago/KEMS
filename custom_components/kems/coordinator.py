@@ -113,6 +113,7 @@ from .kems_core.shared_bus_balance import (
     summarise_shared_bus_audits,
 )
 from .lifetime import LifetimeLedgerRecorder
+from .ohme_charge_slot_observer import OhmeChargeSlotObserver
 from .power_down import PowerDownHistoryRecorder
 from .product_types import (
     EXPORT_TARIFF_TYPE_AGILE,
@@ -163,6 +164,9 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
             hass, entry.entry_id, entities.grid_import_kw or ""
         )
         self._ev_charge_trace = EVChargeTraceRecorder(hass, entry.entry_id)
+        # Independent Ohme read-only observer; its network calls never hold up
+        # the physical KEMS control scan or provide cheap tariff authority.
+        self._ohme_charge_plan = OhmeChargeSlotObserver(hass, entities)
         self._happy_hour_import_ledger = HappyHourImportLedgerRecorder(
             hass, entry.entry_id, grid_import_entity=entities.grid_import_kw
         )
@@ -568,6 +572,7 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
         """Load retained learning history and permanent supporting ledgers."""
         await self._commissioning_restart_proof.async_load()
         await self._ev_soc_sync.async_setup()
+        await self._ohme_charge_plan.async_setup()
         await self._happy_hour_ohme.async_setup()
         await self._foxess_control.async_setup()
         await self._export_commissioning_test.async_load()
@@ -2081,6 +2086,7 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
         await self._export_commissioning_test.async_shutdown()
         await self._foxess_control.async_shutdown(self)
         await self._ev_soc_sync.async_shutdown()
+        await self._ohme_charge_plan.async_shutdown()
         await self._happy_hour_ohme.async_shutdown()
         await self._history.async_save()
         await self._counter_evidence.async_shutdown()
