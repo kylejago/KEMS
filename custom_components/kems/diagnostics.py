@@ -30,6 +30,7 @@ from .kems_core.operational_diagnostic_probes import (
     roi_recorder_probe,
 )
 from .kems_core.period_coverage_probe import observation_coverage_probe
+from .kems_core.history_gap_provenance import history_gap_provenance
 from .panel import panel_health_snapshot
 from .product_types import (
     EXPORT_TARIFF_TYPE_AGILE,
@@ -170,6 +171,18 @@ async def async_get_config_entry_diagnostics(
         for key in ("current_start", "current_end", "next_start", "next_end")
         if offpeak_attrs.get(key) is not None
     }
+
+    update_snapshot = update_orchestrator_snapshot(hass, entry)
+    history_coverage = coordinator._lifetime.historical_coverage_audit
+    gap_sources = observation_coverage_probe(
+        coordinator._history.records, dt_util.now()
+    )
+    gap_provenance = history_gap_provenance(
+        records=coordinator._history.records,
+        update_history=update_snapshot.get("history"),
+        ledger_audit=history_coverage,
+        now=dt_util.now(),
+    )
 
     return {
         "integration": {
@@ -372,10 +385,9 @@ async def async_get_config_entry_diagnostics(
             period_name: totals.to_dict()
             for period_name, totals in data.periods.items()
         },
-        "historical_coverage_audit": coordinator._lifetime.historical_coverage_audit,
-        "historical_observation_coverage_causes": observation_coverage_probe(
-            coordinator._history.records, dt_util.now()
-        ),
+        "historical_coverage_audit": history_coverage,
+        "historical_observation_coverage_causes": gap_sources,
+        "historical_restart_gap_provenance": gap_provenance,
         "roi": asdict(data.roi),
         "control": asdict(data.control),
         "alpha969_shadow_plan": dict(data.alpha969_shadow_plan),
@@ -383,7 +395,7 @@ async def async_get_config_entry_diagnostics(
         "shadow_readiness": shadow_readiness,
         "commissioning": build_commissioning_snapshot(hass, coordinator),
         "panel_health": panel_health_snapshot(hass),
-        "updates": update_orchestrator_snapshot(hass, entry),
+        "updates": update_snapshot,
         "last_power_down": data.last_power_down.to_dict(),
         "quality": asdict(data.quality),
         "history_samples": data.history_samples,
