@@ -97,9 +97,10 @@ def test_other_gaps_cannot_be_excused_by_unrelated_updates() -> None:
     assert day["gaps_near_successful_kems_update"] == 0
     assert day["gaps_without_update_correspondence"] == 1
     assert report["successful_update_events_considered"] == 2
-    assert report["source_gap_details"][0][
-        "successfully_completed_kems_update_near_gap"
-    ] is False
+    assert (
+        report["source_gap_details"][0]["successfully_completed_kems_update_near_gap"]
+        is False
+    )
 
 
 def test_no_meter_completion_inferred_from_good_simulation() -> None:
@@ -134,9 +135,7 @@ def test_naive_update_time_not_accepted_as_evidence() -> None:
             _snap("2026-11-18T06:00:00"),
             _snap("2026-11-18T06:20:00"),
         ],
-        update_history=[
-            {"result": "success", "completed_at": "2026-11-18T06:10:00"}
-        ],
+        update_history=[{"result": "success", "completed_at": "2026-11-18T06:10:00"}],
         ledger_audit=_audit(),
         now=_instant("2026-11-18T21:00:00"),
     )
