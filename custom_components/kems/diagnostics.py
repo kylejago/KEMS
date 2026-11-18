@@ -24,12 +24,12 @@ from .kems_core.diagnostic_evidence import (
     corroborated_unchanged_sources,
     reward_settlement_evidence,
 )
+from .kems_core.history_gap_provenance import history_gap_provenance
 from .kems_core.operational_diagnostic_probes import (
     foxess_import_counter_candidate_probe,
     power_down_baseline_probe,
     roi_recorder_probe,
 )
-from .kems_core.history_gap_provenance import history_gap_provenance
 from .kems_core.period_coverage_probe import observation_coverage_probe
 from .panel import panel_health_snapshot
 from .product_types import (
