@@ -39,6 +39,7 @@ from .kems_core.commissioning_evidence import (
 from .kems_core.commissioning_presentation import (
     recorder_safe_commissioning_attributes,
 )
+from .kems_core.tariff_commissioning_gate import tariff_data_commissioning_ready
 from .panel import PANEL_CONFIG_VERSION, panel_health_snapshot
 from .product_types import EXPORT_TARIFF_TYPE_NONE, export_tariff_type_from_options
 from .source_authority import PHYSICAL_SOURCE_KEYS, duplicate_physical_sources
@@ -462,15 +463,12 @@ def build_commissioning_snapshot(
         _check(
             "tariff_data",
             "Tariff data",
-            (
-                PASS
-                if data.snapshot.current_import_rate is not None
-                and not data.snapshot.tariff_stale_fields
-                else FAIL
-            ),
+            (PASS if tariff_data_commissioning_ready(data.snapshot) else FAIL),
             (
                 f"Current import {data.snapshot.current_import_rate} p/kWh; "
-                f"cheap period confirmed={data.snapshot.cheap_period_confirmed}"
+                f"cheap period confirmed={data.snapshot.cheap_period_confirmed}; "
+                f"operational stale fields={list(data.snapshot.tariff_stale_fields)}; "
+                "optional Intelligent staleness never grants extra-slot charging"
             ),
         )
     )

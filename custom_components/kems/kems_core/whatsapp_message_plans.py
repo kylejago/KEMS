@@ -347,6 +347,40 @@ def notify_entity_readiness(entity_id: Any, state: Any) -> dict[str, Any]:
     }
 
 
+def regular_offpeak_message(
+    *,
+    state: str,
+    changed_at: datetime,
+    now: datetime,
+) -> tuple[str, str] | None:
+    """Only observed normal tariff off-peak ON/OFF transitions.
+
+    Independent of the optional Intelligent extra-slot sensor. Never infer
+    an event from tariff price alone or reconstruct one after an HA restart.
+    """
+    if state not in {"on", "off"} or now.tzinfo is None or changed_at.tzinfo is None:
+        return None
+    age = (now - changed_at).total_seconds()
+    if not -15 <= age <= 300:
+        return None
+    timestamp = changed_at.astimezone(LONDON)
+    key = "regular-offpeak:" + state + ":" + changed_at.astimezone(UTC).isoformat()
+    if state == "on":
+        return (
+            key,
+            "⚡ *Octopus Off-Peak Active*\n"
+            f"🕒 Start: {timestamp:%H:%M}\n"
+            "The regular cheap import period is active. "
+            "KEMS will power the home from the grid and charge the battery when safe.",
+        )
+    return (
+        key,
+        "⚡ *Octopus Off-Peak Ended*\n"
+        f"🕒 End: {timestamp:%H:%M}\n"
+        "KEMS has returned to its normal battery and Agile export protections.",
+    )
+
+
 def intelligent_slot_message(
     *,
     state: str,
