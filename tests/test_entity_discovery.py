@@ -203,8 +203,8 @@ def test_supported_entities_are_discovered_without_false_rate_matches() -> None:
     assert result.mappings[constants.CONF_GRID_EXPORT] == "sensor.foxess_feed_in"
 
 
-def test_kyles_octopus_intelligent_and_ohme_inventory_auto_maps() -> None:
-    """The observed integration naming patterns should configure in one click."""
+def test_kyles_octopus_and_ohme_auto_maps_without_legacy_intelligent() -> None:
+    """Existing Octopus and Ohme map; unsupported Intelligent slots never do."""
     constants, discovery = _load_discovery()
     candidate = discovery.Candidate
     candidates = [
@@ -361,9 +361,6 @@ def test_kyles_octopus_intelligent_and_ohme_inventory_auto_maps() -> None:
         constants.CONF_NEXT_IMPORT_RATE,
         constants.CONF_ELECTRICITY_STANDING_CHARGE,
         constants.CONF_OFF_PEAK,
-        constants.CONF_INTELLIGENT_SLOT,
-        constants.CONF_NEXT_OFFPEAK_START,
-        constants.CONF_OFFPEAK_END,
         constants.CONF_GAS_CURRENT_RATE,
         constants.CONF_GAS_STANDING_CHARGE,
         constants.CONF_GAS_USAGE_TODAY,
@@ -378,6 +375,9 @@ def test_kyles_octopus_intelligent_and_ohme_inventory_auto_maps() -> None:
         constants.CONF_GRID_IMPORT,
     }
     assert expected <= result.mappings.keys()
+    assert constants.CONF_INTELLIGENT_SLOT not in result.mappings
+    assert constants.CONF_NEXT_OFFPEAK_START not in result.mappings
+    assert constants.CONF_OFFPEAK_END not in result.mappings
     assert result.mappings[constants.CONF_HOUSE_LOAD].endswith("_current_demand")
     assert result.mappings[constants.CONF_GRID_IMPORT].endswith("_current_demand")
     assert result.mappings[constants.CONF_GAS_METER_TOTAL].endswith(
