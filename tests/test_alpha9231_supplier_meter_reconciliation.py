@@ -167,7 +167,7 @@ def test_extra_cheap_slot_identification_is_historical_only() -> None:
     report = _compare(source, source, actual_import=51.55, actual_export=51.55)
     daily = report["days"][0]
     assert daily["extra_cheap_slot_count"] == 2
-    assert {x["start"][-14:-6] for x in daily["extra_cheap_import_candidate_slots"]} == {
+    assert {x["start"][11:19] for x in daily["extra_cheap_import_candidate_slots"]} == {
         "06:30:00",
         "07:00:00",
     }
@@ -195,7 +195,7 @@ def test_naive_bad_and_negative_csv_rows_rejected() -> None:
 
 def test_missing_estimated_price_is_never_assumed_zero() -> None:
     data = _csv(date(2026, 11, 17))
-    data = data.replace(",35.8,1.15", ",no data,1.15", 1)
+    data = data.replace(",6.6,1.15", ",no data,1.15", 1)
     parsed = parse_octopus_csv(data, direction="import")
     assert parsed["rows"][0]["estimated_cost_pence"] is None
     report = _compare(data, data)
