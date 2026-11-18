@@ -410,7 +410,10 @@ def test_smart_charge_observation_does_not_invent_daytime_discount() -> None:
     assert result.intelligent_slot is False
     assert result.current_import_rate == 37.17
     assert result.intelligent_slot_evidence["ohme_smart_charging_observed"] is True
-    assert result.intelligent_slot_evidence["ohme_smart_charge_is_tariff_authority"] is False
+    assert (
+        result.intelligent_slot_evidence["ohme_smart_charge_is_tariff_authority"]
+        is False
+    )
 
 
 def test_ohme_smart_charge_without_real_power_is_not_confirmed() -> None:
