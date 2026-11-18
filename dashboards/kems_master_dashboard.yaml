@@ -994,7 +994,7 @@ views:
 
               **Saving incl. estimated Happy Hour refund:** {{ ('£%.2f' | format(((saved | float) + (credit | float(0))) / 100)) if saved is not none else '—' }}
 
-              _Evidence: {{ 'complete day' if p.get('data_complete') is sameas true else 'day-completion not confirmed from this comparison' }}. Unknown values stay unknown. Gross metered import remains unchanged; Happy Hour refunds await Octopus settlement._
+              _Comparison coverage: {{ 'complete for this comparison' if p.get('data_complete') is sameas true else 'partial or unverified for this comparison' }}. A partial simulation does not erase recorded actual totals; missing intervals are not assumed zero. Independent meter completeness is unverified. Happy Hour refunds await Octopus settlement._
           - type: markdown
             title: This Week
             content: |
