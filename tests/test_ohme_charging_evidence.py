@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import pytest
-
 from kems_core.ohme import combine_charger_evidence, interpret_charger_status
 
 
