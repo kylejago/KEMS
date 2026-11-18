@@ -108,10 +108,10 @@ def observe_ohme_slot_response(
     rows.sort(key=lambda entry: (entry[0], entry[1], entry[2] or 0))
     unique = list(dict.fromkeys(rows))
     duplicates = len(rows) - len(unique)
-    overlaps = sum(
-        int(current[0] < previous[1])
-        for previous, current in zip(unique, unique[1:])
-    )
+    overlaps = 0
+    for previous, current in zip(unique, unique[1:]):
+        if current[0] < previous[1]:
+            overlaps += 1
     active_count = sum(start <= reference < end for start, end, _, _ in unique)
     expired_count = sum(end <= reference for _, end, _, _ in unique)
     normalized = [
