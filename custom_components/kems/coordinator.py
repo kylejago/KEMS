@@ -10,6 +10,7 @@ from time import perf_counter, thread_time
 from zoneinfo import ZoneInfo
 
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import EVENT_HOMEASSISTANT_START, EVENT_HOMEASSISTANT_STOP
 from homeassistant.core import Event, HomeAssistant, callback
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.event import async_call_later, async_track_state_change_event
@@ -62,6 +63,7 @@ from .happy_hour_physical_preparation import (
 )
 from .historical_tariff_revaluation import financial_replay_records
 from .history import HistoryRecorder
+from .lifecycle_evidence import CoreLifecycleEvidenceRecorder
 from .kems_core import (
     AdviceEngine,
     ControlEngine,
@@ -162,6 +164,28 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
         )
         self._counter_evidence = FoxESSCounterEvidenceRecorder(
             hass, entry.entry_id, entities.grid_import_kw or ""
+        )
+        self._export_counter_evidence = FoxESSCounterEvidenceRecorder(
+            hass, entry.entry_id, entities.grid_export_kw or "", direction="export"
+        )
+        self._lifecycle_evidence = CoreLifecycleEvidenceRecorder(
+            hass, entry.entry_id
+        )
+        entry.async_on_unload(
+            hass.bus.async_listen(
+                EVENT_HOMEASSISTANT_START,
+                lambda _event: self._lifecycle_evidence.observe(
+                    "core_started_event_observed"
+                ),
+            )
+        )
+        entry.async_on_unload(
+            hass.bus.async_listen(
+                EVENT_HOMEASSISTANT_STOP,
+                lambda _event: self._lifecycle_evidence.observe(
+                    "core_stopping_event_observed"
+                ),
+            )
         )
         self._ev_charge_trace = EVChargeTraceRecorder(hass, entry.entry_id)
         # Independent Ohme read-only observer; its network calls never hold up
@@ -306,6 +330,11 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
         """Most recent service-origin restart request during this Core session."""
         return dict(self._last_restart_service_call)
 
+    @property
+    def lifecycle_evidence_state(self) -> dict[str, object]:
+        """Read-only bounded Core / KEMS setup lifecycle observations."""
+        return self._lifecycle_evidence.status
+
     @callback
     def _handle_restart_service_call(self, event: Event) -> None:
         """Record service-request origin flags, never an identity or a restart."""
@@ -313,6 +342,7 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
         if evidence is None:
             return
         self._last_restart_service_call = evidence
+        self._lifecycle_evidence.observe("core_restart_service_requested")
         LOGGER.warning(
             "KEMS restart audit: Home Assistant restart SERVICE requested; "
             "user context=%s, parent context=%s; actor is not proven",
@@ -578,6 +608,8 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
         await self._export_commissioning_test.async_load()
         await self._history.async_load()
         await self._counter_evidence.async_load()
+        await self._export_counter_evidence.async_load()
+        await self._lifecycle_evidence.async_load()
         await self._happy_hour_import_ledger.async_load()
         # The existing five-minute history can warm-start the physical ledger,
         # but *each missing historical minute* consumes worst-case battery
@@ -886,6 +918,7 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
             # not accept a snapshot. This is read-only; never use it for
             # dispatch, Happy Hour credits or speculative gap backfill.
             self._counter_evidence.observe(now=snapshot.timestamp)
+            self._export_counter_evidence.observe(now=snapshot.timestamp)
             detail_seconds["history_record"] = round(
                 perf_counter() - history_record_started, 3
             )
@@ -2090,6 +2123,8 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
         await self._happy_hour_ohme.async_shutdown()
         await self._history.async_save()
         await self._counter_evidence.async_shutdown()
+        await self._export_counter_evidence.async_shutdown()
+        await self._lifecycle_evidence.async_save()
         await self._ev_charge_trace.async_save()
         await self._ev_grid_hold.async_save()
         await self._forecast_validation.async_save()
