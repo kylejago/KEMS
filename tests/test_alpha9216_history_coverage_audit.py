@@ -6,6 +6,8 @@ import ast
 from datetime import date
 from pathlib import Path
 
+from kems_core.periods import recorded_totals_present
+
 FILE = (
     Path(__file__).resolve().parents[1] / "custom_components" / "kems" / "lifetime.py"
 )
@@ -32,7 +34,10 @@ def _method(name: str):
         body=[node],
         decorator_list=[],
     )
-    namespace = {"PERIOD_DATA_COMPLETE_KEY": "__data_complete"}
+    namespace = {
+        "PERIOD_DATA_COMPLETE_KEY": "__data_complete",
+        "recorded_totals_present": recorded_totals_present,
+    }
     exec(
         compile(
             ast.fix_missing_locations(ast.Module(body=[klass], type_ignores=[])),
