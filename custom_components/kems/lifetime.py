@@ -129,7 +129,8 @@ class LifetimeLedgerRecorder:
                             else "no_verified_recorded_totals"
                         )
                     ),
-                    "ongoing_day": day == (
+                    "ongoing_day": day
+                    == (
                         self._tracking_date.isoformat()
                         if self._tracking_date is not None
                         else None
