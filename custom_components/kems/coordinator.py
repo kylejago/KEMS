@@ -168,9 +168,7 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
         self._export_counter_evidence = FoxESSCounterEvidenceRecorder(
             hass, entry.entry_id, entities.grid_export_kw or "", direction="export"
         )
-        self._lifecycle_evidence = CoreLifecycleEvidenceRecorder(
-            hass, entry.entry_id
-        )
+        self._lifecycle_evidence = CoreLifecycleEvidenceRecorder(hass, entry.entry_id)
         entry.async_on_unload(
             hass.bus.async_listen(
                 EVENT_HOMEASSISTANT_START,
