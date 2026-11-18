@@ -119,18 +119,20 @@ class LifetimeLedgerRecorder:
                     "date": day,
                     "data_complete": bool(complete),
                     "simulation_replay_complete": bool(complete),
-                    "recorded_totals_available": bool(
-                        any(
-                            key in values
-                            for key in (
-                                "grid_import_kwh",
-                                "grid_export_kwh",
-                                "solar_generation_kwh",
-                                "import_cost_pence",
-                                "export_income_pence",
-                            )
+                    "recorded_totals_available": recorded_totals_present(values),
+                    "display_status": (
+                        "simulation_complete_meter_not_verified"
+                        if complete
+                        else (
+                            "recorded_totals_available_simulation_partial"
+                            if recorded_totals_present(values)
+                            else "no_verified_recorded_totals"
                         )
-                        and values.get("__data_coverage_percent", 1.0) > 0
+                    ),
+                    "ongoing_day": day == (
+                        self._tracking_date.isoformat()
+                        if self._tracking_date is not None
+                        else None
                     ),
                     "independent_meter_completeness": "not_verified",
                     "simulation_data_coverage_percent": (
@@ -145,6 +147,8 @@ class LifetimeLedgerRecorder:
             "classification_source": "simulation.data_coverage >= 99.9",
             "legacy_data_complete_means": "simulation_replay_complete",
             "recorded_totals_can_exist_with_incomplete_replay": True,
+            "incomplete_flag_is_simulation_only": True,
+            "independent_meter_completion_requires_evidence": True,
             "recorded_ledger_totals_are_not_meter_settlement": True,
             "required_simulation_coverage_percent": 99.9,
             "recorded_days": len(recent),
