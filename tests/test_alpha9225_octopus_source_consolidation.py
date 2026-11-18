@@ -67,9 +67,8 @@ def test_ohme_plans_and_unsupported_intelligent_source_do_not_grant_cheap() -> N
     assert "slot_signal = live_intelligent_slot is True" in code
     assert "confirmed = all(passed for _, passed in checks)" in code
     assert "if extra_slot_confirmed and not schedule_offpeak:" in code
-    assert '"ohme_charge_plan_proves_discount": False' in (
-        ROOT / "diagnostics.py"
-    ).read_text()
+    diagnostics = (ROOT / "diagnostics.py").read_text()
+    assert '"ohme_charge_plan_proves_discount": False' in diagnostics
 
 
 def test_whatsapp_still_watches_normal_offpeak_and_has_truthful_warning() -> None:
