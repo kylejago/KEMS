@@ -25,6 +25,7 @@ from .kems_core.diagnostic_evidence import (
     reward_settlement_evidence,
 )
 from .kems_core.history_gap_provenance import history_gap_provenance
+from .kems_core.meter_gap_anchor_evidence import meter_gap_anchor_evidence
 from .kems_core.operational_diagnostic_probes import (
     foxess_import_counter_candidate_probe,
     power_down_baseline_probe,
@@ -180,8 +181,17 @@ async def async_get_config_entry_diagnostics(
     gap_provenance = history_gap_provenance(
         records=coordinator._history.records,
         update_history=update_snapshot.get("history"),
+        lifecycle_events=coordinator._lifecycle_evidence.events,
         ledger_audit=history_coverage,
         now=dt_util.now(),
+    )
+
+    gap_meter_anchors = meter_gap_anchor_evidence(
+        gaps=gap_provenance["source_gap_details"],
+        import_lifetime_rows=coordinator._counter_evidence.lifetime_counter_rows,
+        export_lifetime_rows=(
+            coordinator._export_counter_evidence.lifetime_counter_rows
+        ),
     )
 
     return {
@@ -222,6 +232,10 @@ async def async_get_config_entry_diagnostics(
         "foxess_import_counter_longitudinal_evidence": (
             coordinator._counter_evidence.status
         ),
+        "foxess_export_counter_longitudinal_evidence": (
+            coordinator._export_counter_evidence.status
+        ),
+        "historical_two_way_meter_gap_anchors": gap_meter_anchors,
         "whatsapp_notifications": (
             coordinator._kems_whatsapp_reporter.status
             if getattr(coordinator, "_kems_whatsapp_reporter", None) is not None
@@ -291,6 +305,7 @@ async def async_get_config_entry_diagnostics(
         "foxess_control": coordinator.foxess_control_state,
         "coordinator_performance": coordinator.coordinator_performance_state,
         "restart_service_call": coordinator.restart_service_call_state,
+        "core_lifecycle_evidence": coordinator.lifecycle_evidence_state,
         "agile_historical_replay_cache": {
             **coordinator._agile_smart_export._historical_replay_cache.status,
             "day_rate_index_builds": getattr(
