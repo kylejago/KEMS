@@ -9,6 +9,7 @@ from __future__ import annotations
 from collections import Counter, deque
 from datetime import UTC, datetime
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_registry as er
@@ -81,7 +82,11 @@ class LegacyIntelligentParityMonitor:
         ohme_plan_active: bool | None = None,
     ) -> None:
         """Sample both integrations without creating control or tariff authority."""
-        reference = now or dt_util.now()
+        # The interval callback supplies UTC; use the property's configured
+        # local timezone for the 23:30–05:30 comparison exclusion.
+        reference = (now or dt_util.now()).astimezone(
+            ZoneInfo(self._hass.config.time_zone)
+        )
         if (
             self._last_sample is not None
             and (reference - self._last_sample).total_seconds()
