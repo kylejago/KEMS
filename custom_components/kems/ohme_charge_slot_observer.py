@@ -18,6 +18,7 @@ from homeassistant.helpers.event import async_track_time_interval
 from homeassistant.util import dt as dt_util
 
 from .kems_core.ohme_charge_slot_plan import observe_ohme_slot_response
+from .legacy_intelligent_parity_monitor import LegacyIntelligentParityMonitor
 from .providers.entity_map import KEMSEntities
 
 POLL_INTERVAL_SECONDS = 90
@@ -40,6 +41,8 @@ class OhmeChargeSlotObserver:
         self._last_state: str = "not_yet_polled"
         self._config_entry_id: str | None = None
         self._sensor_entity_id: str | None = None
+        self._legacy_parity = LegacyIntelligentParityMonitor(hass, entities)
+        self._legacy_parity_error: str | None = None
 
     def _resolve_ohme_sources(self) -> str | None:
         """Select only the Ohme account owning the configured EV status."""
@@ -85,6 +88,8 @@ class OhmeChargeSlotObserver:
         usable = age is not None and age <= PLAN_FRESH_SECONDS
         return {
             "read_only": True,
+            "legacy_intelligent_comparison": self._legacy_parity.status,
+            "legacy_comparison_error_type": self._legacy_parity_error,
             "uses_service": "ohme.list_charge_slots",
             "poll_seconds": POLL_INTERVAL_SECONDS,
             "last_state": self._last_state,
@@ -121,7 +126,29 @@ class OhmeChargeSlotObserver:
 
     @callback
     def _schedule_poll(self, _now: datetime) -> None:
-        if self._closed or (self._task is not None and not self._task.done()):
+        if self._closed:
+            return
+        plan_age = (
+            max((_now - self._last_success).total_seconds(), 0)
+            if self._last_success is not None
+            else None
+        )
+        plan_active: bool | None = None
+        if (
+            plan_age is not None
+            and plan_age <= PLAN_FRESH_SECONDS
+            and self._last_result.get("status")
+            in {"plan_observed", "no_slots_reported"}
+        ):
+            plan_active = bool(self._last_result.get("active_count", 0))
+        try:
+            self._legacy_parity.observe(now=_now, ohme_plan_active=plan_active)
+            self._legacy_parity_error = None
+        except Exception as error:
+            # A comparison is optional diagnostics; it must not stop Ohme
+            # observation, tariff refresh, or the physical KEMS controller.
+            self._legacy_parity_error = type(error).__name__
+        if self._task is not None and not self._task.done():
             return
         self._task = self._hass.async_create_task(self._async_poll())
 
