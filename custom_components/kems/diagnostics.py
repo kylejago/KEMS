@@ -196,9 +196,9 @@ async def async_get_config_entry_diagnostics(
     )
     kems_daily_values = dict(coordinator._lifetime._daily_records)
     if coordinator._lifetime._tracking_date is not None:
-        kems_daily_values[
-            coordinator._lifetime._tracking_date.isoformat()
-        ] = dict(coordinator._lifetime._tracking_values)
+        kems_daily_values[coordinator._lifetime._tracking_date.isoformat()] = dict(
+            coordinator._lifetime._tracking_values
+        )
     supplier_reconciliation = reconcile_supplier_history(
         imported=supplier_source["import"],
         exported=supplier_source["export"],
