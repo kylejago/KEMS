@@ -46,7 +46,13 @@ def _csv(
         local = start.astimezone(LONDON).time()
         cheap = local >= time(23, 30) or local < time(5, 30)
         rate = 6.6 if cheap or index in (extra_cheap or set()) else 35.8
-        row = [energy, round(energy * rate, 5), 1.15, start.isoformat(), end.isoformat()]
+        row = [
+            energy,
+            round(energy * rate, 5),
+            1.15,
+            start.isoformat(),
+            end.isoformat(),
+        ]
         writer.writerow(row)
         if index in (repeat or set()):
             writer.writerow(row)
@@ -128,7 +134,9 @@ def test_missing_interval_prevents_supplier_complete_claim() -> None:
     assert day["supplier_import"]["present_half_hour_slots"] == 47
     assert day["supplier_import"]["missing_half_hour_slots"] == 1
     assert day["grid_import_comparison"]["status"] == "supplier_coverage_incomplete"
-    assert not day["grid_import_comparison"]["supplier_corroboration_within_two_percent"]
+    assert not day["grid_import_comparison"][
+        "supplier_corroboration_within_two_percent"
+    ]
 
 
 def test_duplicate_input_cannot_double_count_or_certify() -> None:
@@ -155,7 +163,8 @@ def test_extra_cheap_slot_identification_is_historical_only() -> None:
     day = date(2026, 11, 17)
     starts = sorted(_expected_slots(day))
     index_0630 = next(
-        i for i, start in enumerate(starts)
+        i
+        for i, start in enumerate(starts)
         if start.astimezone(LONDON).time() == time(6, 30)
     )
     index_0700 = index_0630 + 1
