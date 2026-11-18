@@ -162,6 +162,15 @@ async def async_get_config_entry_diagnostics(
         len(ev_trace_samples) - ev_trace["samples_included"], 0
     )
 
+    offpeak_entity = configured.get("off_peak")
+    offpeak_state = hass.states.get(offpeak_entity) if offpeak_entity else None
+    offpeak_attrs = offpeak_state.attributes if offpeak_state is not None else {}
+    offpeak_boundaries = {
+        key: str(offpeak_attrs[key])
+        for key in ("current_start", "current_end", "next_start", "next_end")
+        if offpeak_attrs.get(key) is not None
+    }
+
     return {
         "integration": {
             "entry_id": entry.entry_id,
@@ -170,6 +179,22 @@ async def async_get_config_entry_diagnostics(
             "minor_version": entry.minor_version,
         },
         "configured_entities": configured,
+        "octopus_source_consolidation": {
+            "tariff_provider": "octopus_energy",
+            "regular_offpeak_entity": offpeak_entity,
+            "regular_offpeak_state": (
+                offpeak_state.state if offpeak_state is not None else None
+            ),
+            "offpeak_boundaries_reporting_only": offpeak_boundaries,
+            "deprecated_intelligent_mappings_present": any(
+                key in configured
+                for key in ("intelligent_slot", "next_offpeak_start", "offpeak_end")
+            ),
+            "ohme_extra_daytime_discount": "not_supplier_confirmed_fail_closed",
+            "ohme_charge_plan_proves_discount": False,
+            "extra_daytime_grid_force_charge_authorised": False,
+            "other_integration_uninstall_automated": False,
+        },
         "source_validation": {
             "valid": coordinator.source_validation.valid,
             "accepted": dict(sorted(coordinator.source_validation.accepted.items())),
