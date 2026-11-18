@@ -134,9 +134,7 @@ def test_missing_export_anchor_prevents_two_way_claim() -> None:
         ],
         export_lifetime_rows=[],
     )
-    assert (
-        result["gap_rows"][0]["export_counter"]["status"] == "no_bounded_anchor_pair"
-    )
+    assert result["gap_rows"][0]["export_counter"]["status"] == "no_bounded_anchor_pair"
     assert result["two_way_physical_provenance_verified"] is False
 
 
