@@ -38,9 +38,7 @@ def _parse(value: Any) -> datetime | None:
     return stamp.astimezone(UTC) if stamp.tzinfo is not None else None
 
 
-def validated_lifecycle_events(
-    payload: Any, *, now: datetime
-) -> list[dict[str, str]]:
+def validated_lifecycle_events(payload: Any, *, now: datetime) -> list[dict[str, str]]:
     """Allow only bounded, recent, strictly typed and timezone-aware evidence."""
     if not isinstance(payload, dict) or payload.get("schema_version") != 1:
         return []
@@ -55,9 +53,7 @@ def validated_lifecycle_events(
             or instant < now.astimezone(UTC) - timedelta(days=KEEP_DAYS)
         ):
             continue
-        result.append(
-            {"kind": raw["kind"], "observed_at": instant.isoformat()}
-        )
+        result.append({"kind": raw["kind"], "observed_at": instant.isoformat()})
     return sorted(result, key=lambda row: row["observed_at"])[-MAX_EVENTS:]
 
 
