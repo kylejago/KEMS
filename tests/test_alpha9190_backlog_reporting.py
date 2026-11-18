@@ -128,7 +128,8 @@ def test_yesterday_dashboard_separates_gross_and_estimated_refund():
     assert "Gross comparison saving" in card
     assert "Saving incl. estimated Happy Hour refund" in card
     assert "saved is not none" in card
-    assert "day-completion not confirmed" in card
+    assert "partial or unverified for this comparison" in card
+    assert "Independent meter completeness is unverified" in card
     assert content.count("Gross comparison saving:") == 7
     assert content.count("Saving incl. est. Happy Hour refund (unsettled):") == 6
 
