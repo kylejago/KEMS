@@ -8,7 +8,8 @@ has not independently confirmed discounted house-electricity hours.
 from __future__ import annotations
 
 import asyncio
-from datetime import UTC, datetime, timedelta
+from contextlib import suppress
+from datetime import datetime, timedelta
 from typing import Any
 
 from homeassistant.core import HomeAssistant, callback
@@ -171,7 +172,5 @@ class OhmeChargeSlotObserver:
             self._unsubscribe = None
         if self._task is not None and not self._task.done():
             self._task.cancel()
-            try:
+            with suppress(asyncio.CancelledError):
                 await self._task
-            except asyncio.CancelledError:
-                pass
