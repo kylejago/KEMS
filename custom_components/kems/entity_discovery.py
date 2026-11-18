@@ -35,6 +35,7 @@ from .const import (
     CONF_NEXT_OFFPEAK_START,
     CONF_OFF_PEAK,
     CONF_OFFPEAK_END,
+    CONF_OHME_CHARGE_MODE,
     CONF_OHME_SOC_INPUT,
     CONF_SAVING_SESSION_EVENTS,
     CONF_SAVING_SESSION_EXPORT_BASELINE,
@@ -301,6 +302,14 @@ RULES = (
         excluded_tokens=("schedule", "slot"),
         device_classes=("enum",),
         exact_patterns=("sensor.ohme_*_status",),
+    ),
+    DiscoveryRule(
+        CONF_OHME_CHARGE_MODE,
+        OHME_PLATFORMS,
+        ("select",),
+        (("charge",), ("mode",)),
+        excluded_tokens=("target", "vehicle", "price cap"),
+        exact_patterns=("select.ohme_*_charge_mode",),
     ),
     DiscoveryRule(
         CONF_EV_CONNECTED,

@@ -232,6 +232,7 @@ def _intelligent_extra_slot_evidence(
     ev_charging: bool | None,
     ev_power_kw: float | None,
     ev_soc: float | None,
+    ev_charge_mode: str | None,
 ) -> tuple[bool, str, dict[str, Any]]:
     """Require corroborated Octopus + Ohme evidence before large extra-slot import."""
     slot_enabled = settings.intelligent_slots_enabled
@@ -248,6 +249,11 @@ def _intelligent_extra_slot_evidence(
         ev_power_kw is not None and float(ev_power_kw) >= INTELLIGENT_EV_MIN_POWER_KW
     )
     soc_plausible = ev_soc is None or 0.0 <= float(ev_soc) <= 100.0
+    smart_charge_observed = (
+        str(ev_charge_mode or "").strip().casefold().replace("_", " ") == "smart charge"
+        and ev_charging is True
+        and power_active
+    )
     price_corroborated = _rate_matches_cheap(
         live_current_import_rate,
         cheap_rate_pence,
@@ -308,6 +314,9 @@ def _intelligent_extra_slot_evidence(
         "minimum_expected_demand_kw": minimum_expected_demand_kw,
         "ohme_connected": ev_connected,
         "ohme_charging": ev_charging,
+        "ohme_charge_mode": ev_charge_mode,
+        "ohme_smart_charging_observed": smart_charge_observed,
+        "ohme_smart_charge_is_tariff_authority": False,
         "ohme_power_kw": ev_power_kw,
         "ohme_power_active": power_active,
         "ohme_soc_percent": ev_soc,
@@ -335,6 +344,7 @@ def resolve_tariff(
     ev_power_kw: float | None = None,
     ev_soc: float | None = None,
     live_current_demand_kw: float | None = None,
+    ev_charge_mode: str | None = None,
 ) -> ResolvedTariff:
     """Resolve normal overnight cheap periods plus fail-closed Intelligent extras."""
     effective = effective_tariff_rates(settings, now)
@@ -405,6 +415,7 @@ def resolve_tariff(
         ev_charging=ev_charging,
         ev_power_kw=ev_power_kw,
         ev_soc=ev_soc,
+        ev_charge_mode=ev_charge_mode,
     )
 
     evidence["effective_fallback_day_rate_pence"] = effective.day_rate_pence

@@ -31,6 +31,7 @@ from ..const import (
     CONF_NEXT_OFFPEAK_START,
     CONF_OFF_PEAK,
     CONF_OFFPEAK_END,
+    CONF_OHME_CHARGE_MODE,
     CONF_OHME_SOC_INPUT,
     CONF_SAVING_SESSION_EVENTS,
     CONF_SAVING_SESSION_EXPORT_BASELINE,
@@ -72,6 +73,7 @@ class KEMSEntities:
     gas_usage_today: str | None = None
     gas_cost_today: str | None = None
     ev_status: str | None = None
+    ohme_charge_mode: str | None = None
     ev_connected: str | None = None
     ev_charging: str | None = None
     ev_power_kw: str | None = None
@@ -115,6 +117,7 @@ class KEMSEntities:
             gas_usage_today=_safe_source(data, CONF_GAS_USAGE_TODAY),
             gas_cost_today=_safe_source(data, CONF_GAS_COST_TODAY),
             ev_status=_safe_source(data, CONF_EV_STATUS),
+            ohme_charge_mode=_safe_source(data, CONF_OHME_CHARGE_MODE),
             ev_connected=_safe_source(data, CONF_EV_CONNECTED),
             ev_charging=_safe_source(data, CONF_EV_CHARGING),
             ev_power_kw=_safe_source(data, CONF_EV_POWER),
