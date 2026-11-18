@@ -7,7 +7,7 @@ tariff resolution and FoxESS/EV control. The old integration is optional.
 from __future__ import annotations
 
 from collections import Counter, deque
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 
 from homeassistant.core import HomeAssistant
@@ -64,7 +64,7 @@ class LegacyIntelligentParityMonitor:
             return None, None
         reported = getattr(state, "last_reported", None) or state.last_updated
         if reported.tzinfo is None:
-            reported = reported.replace(tzinfo=dt_util.UTC)
+            reported = reported.replace(tzinfo=UTC)
         age = max((now - reported).total_seconds(), 0.0)
         if age > LEGACY_MAX_AGE_SECONDS:
             return None, round(age, 1)
