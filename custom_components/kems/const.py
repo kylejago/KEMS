@@ -36,6 +36,7 @@ CONF_EV_POWER = "ev_power_kw"
 CONF_EV_SOC = "ev_soc"
 CONF_VEHICLE_SOC_SOURCE = "vehicle_soc_source"
 CONF_OHME_SOC_INPUT = "ohme_soc_input"
+CONF_OHME_CHARGE_MODE = "ohme_charge_mode"
 CONF_EV_SOC_SYNC_ENABLED = "ev_soc_sync_enabled"
 CONF_HAPPY_HOUR_OHME_CONTROL_ENABLED = "happy_hour_ohme_control_enabled"
 CONF_OHME_IDLE_HOUSE_BRIDGE_ENABLED = "ohme_idle_house_bridge_enabled"
@@ -76,6 +77,7 @@ ENTITY_MAPPING_KEYS = (
     CONF_GAS_USAGE_TODAY,
     CONF_GAS_COST_TODAY,
     CONF_EV_STATUS,
+    CONF_OHME_CHARGE_MODE,
     CONF_EV_CONNECTED,
     CONF_EV_CHARGING,
     CONF_EV_POWER,
