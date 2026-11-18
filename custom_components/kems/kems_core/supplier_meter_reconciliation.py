@@ -220,6 +220,56 @@ def _compare(supplier: dict[str, Any] | None, ledger_kwh: Any) -> dict[str, Any]
     }
 
 
+def _cost_evidence(
+    supplier: dict[str, Any] | None,
+    kems_pence: Any,
+    *,
+    direction: str,
+) -> dict[str, Any]:
+    """Expose non-equivalent pricing figures without suggesting settlement."""
+    previous = _number(kems_pence)
+    estimated = (
+        supplier.get("estimated_energy_cost_pence") if supplier else None
+    )
+    return {
+        "direction": direction,
+        "kems_calculated_pence": previous,
+        "octopus_estimated_energy_pence": estimated,
+        "supplier_estimated_minus_kems_pence": (
+            round(estimated - previous, 2)
+            if estimated is not None and previous is not None
+            else None
+        ),
+        "no_standing_charges_in_supplier_comparison": True,
+        "kems_and_supplier_tariff_pricing_may_differ": True,
+        "not_settled_supplier_payout_or_authoritative_roi": True,
+    }
+
+
+def _export_interval_examples(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Bounded supplier half-hours for comparing independent export with twin."""
+    active = sorted(
+        (item for item in rows if item["kwh"] > 0),
+        key=lambda item: item["kwh"],
+        reverse=True,
+    )
+    return [
+        {
+            "start": item["start"].isoformat(),
+            "end": item["end"].isoformat(),
+            "supplier_export_kwh": round(float(item["kwh"]), 3),
+            "supplier_estimated_income_pence": (
+                round(float(item["estimated_cost_pence"]), 2)
+                if item["estimated_cost_pence"] is not None
+                else None
+            ),
+            "matched_kems_half_hour_physical_sample": False,
+            "model_vs_meter_comparison_required": True,
+        }
+        for item in active[:12]
+    ]
+
+
 def _extra_cheap_slots(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     cheap, regular = _rates(rows)
     if cheap is None or regular is None or regular <= cheap * 1.3:
@@ -309,6 +359,15 @@ def reconcile_supplier_history(
                 ),
                 "grid_export_comparison": _compare(
                     export_summary, led.get("grid_export_kwh")
+                ),
+                "import_energy_cost_evidence": _cost_evidence(
+                    import_summary, led.get("import_cost_pence"), direction="import"
+                ),
+                "export_energy_income_evidence": _cost_evidence(
+                    export_summary, led.get("export_income_pence"), direction="export"
+                ),
+                "supplier_export_half_hour_examples": _export_interval_examples(
+                    daily["export"]
                 ),
                 "extra_cheap_import_candidate_slots": candidate_slots[:12],
                 "extra_cheap_slot_count": len(candidate_slots),
