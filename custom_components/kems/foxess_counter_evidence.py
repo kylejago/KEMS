@@ -21,9 +21,21 @@ _LOGGER = logging.getLogger(__name__)
 class FoxESSCounterEvidenceRecorder:
     """Record bounded fresh cumulative reports across integration restarts."""
 
-    def __init__(self, hass: Any, entry_id: str, import_power_entity: str) -> None:
+    def __init__(
+        self, hass: Any, entry_id: str, import_power_entity: str, *,
+        direction: str = "import",
+    ) -> None:
+        if direction not in {"import", "export"}:
+            raise ValueError("Only import/export evidence supported")
         self._hass = hass
-        self._store = Store(hass, 1, f"kems.{entry_id}.foxess_counter_evidence")
+        # Preserve the original import store across this upgrade.
+        key = (
+            f"kems.{entry_id}.foxess_counter_evidence"
+            if direction == "import"
+            else f"kems.{entry_id}.foxess_export_counter_evidence"
+        )
+        self._store = Store(hass, 1, key)
+        self._direction = direction
         self._series = CounterEvidenceSeries(import_power_entity)
         self._last_storage_error: str | None = None
         self._restored_samples = 0
@@ -63,6 +75,7 @@ class FoxESSCounterEvidenceRecorder:
         """Expose audit provenance without suggesting counter approval."""
         return {
             **self._series.status(),
+            "direction": self._direction,
             "restored_samples": self._restored_samples,
             "observation_checks_since_setup": self._observation_checks,
             "accepted_observation_batches_since_setup": (
@@ -79,6 +92,11 @@ class FoxESSCounterEvidenceRecorder:
             "storage_schema_version": 1,
             "persistent_across_restarts": True,
         }
+
+    @property
+    def lifetime_counter_rows(self) -> list[dict[str, Any]]:
+        """Read-only candidate samples; never independently metered energy."""
+        return [dict(row) for row in self._series.rows["lifetime_total"]]
 
     async def async_shutdown(self) -> None:
         """Flush the last observations on clean integration unload."""
