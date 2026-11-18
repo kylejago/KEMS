@@ -66,9 +66,7 @@ def observe_ohme_slot_response(
     except (KeyError, ValueError):
         zone = ZoneInfo("Europe/London")
     reference = now.astimezone(UTC)
-    if not isinstance(response, Mapping) or not isinstance(
-        response.get("slots"), list
-    ):
+    if not isinstance(response, Mapping) or not isinstance(response.get("slots"), list):
         return {
             "status": "unexpected_response",
             "slots": [],

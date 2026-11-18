@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import ast
 import importlib.util
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1] / "custom_components" / "kems"
@@ -99,9 +99,11 @@ def test_invalid_undated_and_unbounded_plan_values_are_rejected():
             "start": "2026-11-18T07:00:00+00:00",
             "end": "2026-11-18T06:30:00+00:00",
         },
-        {"start": "2026-11-18T01:00:00+00:00",
-         "end": "2026-11-18T02:00:00+00:00",
-         "power": float("nan")},
+        {
+            "start": "2026-11-18T01:00:00+00:00",
+            "end": "2026-11-18T02:00:00+00:00",
+            "power": float("nan"),
+        },
     ]
     result = mod.observe_ohme_slot_response({"slots": rows}, now=now)
     assert result["status"] == "plan_observed"
@@ -129,10 +131,14 @@ def test_dst_aware_and_naive_fields_preserve_distinct_slots():
     result = mod.observe_ohme_slot_response(
         {
             "slots": [
-                {"start": "2026-10-25T01:10:00+01:00",
-                 "end": "2026-10-25T01:20:00+01:00"},
-                {"start": "2026-10-25T01:10:00+00:00",
-                 "end": "2026-10-25T01:20:00+00:00"},
+                {
+                    "start": "2026-10-25T01:10:00+01:00",
+                    "end": "2026-10-25T01:20:00+01:00",
+                },
+                {
+                    "start": "2026-10-25T01:10:00+00:00",
+                    "end": "2026-10-25T01:20:00+00:00",
+                },
             ]
         },
         now=now,
