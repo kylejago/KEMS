@@ -119,13 +119,12 @@ def history_gap_provenance(
             near_events = [
                 kind
                 for at, kind in lifecycle
-                if start - timedelta(minutes=2)
-                <= at
-                <= end + UPDATE_AFTER_GAP_GRACE
+                if start - timedelta(minutes=2) <= at <= end + UPDATE_AFTER_GAP_GRACE
             ]
             kems_setup_near = "kems_setup" in near_events
             core_lifecycle_near = any(
-                kind in {
+                kind
+                in {
                     "core_started_event_observed",
                     "core_stopping_event_observed",
                 }
@@ -144,9 +143,7 @@ def history_gap_provenance(
             counters = daily_counts[day_text]
             counters["gaps_over_10_minutes"] += 1
             counters["gaps_near_kems_setup"] += int(kems_setup_near)
-            counters["gaps_near_observed_core_lifecycle"] += int(
-                core_lifecycle_near
-            )
+            counters["gaps_near_observed_core_lifecycle"] += int(core_lifecycle_near)
             counters["gaps_without_any_recorded_lifecycle_or_update"] += int(
                 lifecycle_classification == "no_recorded_correspondence"
             )
@@ -215,16 +212,12 @@ def history_gap_provenance(
                     "gaps_without_update_correspondence", 0
                 ),
                 "restart_cause_proven": False,
-                "gaps_near_kems_setup": row_counts.get(
-                    "gaps_near_kems_setup", 0
-                ),
+                "gaps_near_kems_setup": row_counts.get("gaps_near_kems_setup", 0),
                 "gaps_near_observed_core_lifecycle": row_counts.get(
                     "gaps_near_observed_core_lifecycle", 0
                 ),
                 "gaps_without_any_recorded_lifecycle_or_update": (
-                    row_counts.get(
-                        "gaps_without_any_recorded_lifecycle_or_update", 0
-                    )
+                    row_counts.get("gaps_without_any_recorded_lifecycle_or_update", 0)
                 ),
             }
         )
