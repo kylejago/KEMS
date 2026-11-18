@@ -463,9 +463,7 @@ def build_commissioning_snapshot(
         _check(
             "tariff_data",
             "Tariff data",
-            (
-                PASS if tariff_data_commissioning_ready(data.snapshot) else FAIL
-            ),
+            (PASS if tariff_data_commissioning_ready(data.snapshot) else FAIL),
             (
                 f"Current import {data.snapshot.current_import_rate} p/kWh; "
                 f"cheap period confirmed={data.snapshot.cheap_period_confirmed}; "

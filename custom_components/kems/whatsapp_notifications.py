@@ -436,9 +436,7 @@ class KEMSWhatsAppNotifications:
             self._regular_offpeak_last_state = value
             await self._persist()
             return
-        proposal = regular_offpeak_message(
-            state=value, changed_at=changed_at, now=now
-        )
+        proposal = regular_offpeak_message(state=value, changed_at=changed_at, now=now)
         if proposal is None:
             return
         key, message = proposal

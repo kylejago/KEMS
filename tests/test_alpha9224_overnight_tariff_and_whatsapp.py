@@ -27,7 +27,15 @@ gate = _load("alpha9224_tariff_gate", GATE)
 messages = _load("alpha9224_messages", PLANS)
 
 
-def _snapshot(*, off_peak=False, intel=False, ev=False, stale=("intelligent_slot",), rate=6.6, cheap=False):
+def _snapshot(
+    *,
+    off_peak=False,
+    intel=False,
+    ev=False,
+    stale=("intelligent_slot",),
+    rate=6.6,
+    cheap=False,
+):
     return SimpleNamespace(
         current_import_rate=rate,
         tariff_stale_fields=stale,
@@ -87,25 +95,32 @@ def test_normal_offpeak_messages_use_source_transition_not_forecast():
 def test_no_stale_or_fabricated_offpeak_boundaries():
     now = datetime(2026, 11, 18, 5, 30, tzinfo=UTC)
     for state in ("unavailable", "unknown", ""):
-        assert messages.regular_offpeak_message(
-            state=state, changed_at=now, now=now
-        ) is None
-    assert messages.regular_offpeak_message(
-        state="off", changed_at=now - timedelta(minutes=7), now=now
-    ) is None
-    assert messages.regular_offpeak_message(
-        state="on", changed_at=now.replace(tzinfo=None), now=now
-    ) is None
+        assert (
+            messages.regular_offpeak_message(state=state, changed_at=now, now=now)
+            is None
+        )
+    assert (
+        messages.regular_offpeak_message(
+            state="off", changed_at=now - timedelta(minutes=7), now=now
+        )
+        is None
+    )
+    assert (
+        messages.regular_offpeak_message(
+            state="on", changed_at=now.replace(tzinfo=None), now=now
+        )
+        is None
+    )
 
 
 def test_reporter_persists_independent_offpeak_dedupe_and_no_extra_control():
     source = REPORTER.read_text(encoding="utf-8")
     assert '"regular_offpeak_last_state": self._regular_offpeak_last_state' in source
-    assert 'await self._regular_offpeak_alerts(now)' in source
-    assert 'await self._intelligent_slot_alerts(now)' in source
-    assert 'regular_offpeak_transitions_accepted' in source
-    assert 'normal_just_ended' in source
-    assert 'tariff_commissioning_blocked' in source
+    assert "await self._regular_offpeak_alerts(now)" in source
+    assert "await self._intelligent_slot_alerts(now)" in source
+    assert "regular_offpeak_transitions_accepted" in source
+    assert "normal_just_ended" in source
+    assert "tariff_commissioning_blocked" in source
     assert 'not getattr(control, "commissioned", False)' in source
     assert '"intelligent_slot_last_state": self._intelligent_slot_last_state' in source
     ast.parse(source)
