@@ -95,6 +95,7 @@ from .kems_core.control_event_refresh import (
     meaningful_ev_power_transition,
 )
 from .kems_core.control_write_authority import active_joined_power_down_window
+from .kems_core.ev_grid_guard import measured_ohme_ev_charge_active
 from .kems_core.happy_hour_financial import estimate_happy_hour_credit
 from .kems_core.historical_reward_backfill import (
     estimate_historical_happy_hour_credits,
@@ -1479,6 +1480,10 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
             # grants Force Charge on an unconfirmed Intelligent slot.
             ev_hold_source_uncertain = self._ev_hold_source_uncertain()
             previous_ev_floor = self._ev_grid_hold.status.get("latched_min_soc_percent")
+            measured_ohme_hold = measured_ohme_ev_charge_active(snapshot)
+            observed_ohme_hold_latched = bool(
+                self._ev_grid_hold.status.get("observed_ohme_hold_active")
+            )
             paid_agile_ev_hold_eligible = bool(
                 tariff_type == EXPORT_TARIFF_TYPE_AGILE
                 and not snapshot.saving_session_active
@@ -1486,8 +1491,16 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                 and control.desired_work_mode in {"Force Charge", "Self Use"}
                 and (
                     snapshot.cheap_period_confirmed
+                    or measured_ohme_hold
+                    or observed_ohme_hold_latched
                     or (previous_ev_floor is not None and ev_hold_source_uncertain)
                 )
+            )
+            ohme_status_state = self.hass.states.get(self.entities.ev_status)
+            ohme_finished = bool(
+                ohme_status_state is not None
+                and str(ohme_status_state.state).strip().lower()
+                in {"finished", "completed", "unplugged", "disconnected"}
             )
             control = await self._ev_grid_hold.async_apply(
                 snapshot,
@@ -1498,6 +1511,7 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                 ),
                 source_uncertain=ev_hold_source_uncertain,
                 source_grace_seconds=_ALPHA975_EV_HOLD_SOURCE_GRACE_SECONDS,
+                ohme_finished=ohme_finished,
             )
             ev_hold_state = self._ev_grid_hold.status
             control, stress_started = (
@@ -1862,6 +1876,9 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                 ),
                 pending_intelligent_ev_hold_active=bool(
                     ev_hold_state.get("pending_intelligent_ev_hold_active")
+                ),
+                observed_ohme_hold_active=bool(
+                    ev_hold_state.get("observed_ohme_hold_active")
                 ),
                 commissioning_export_test=(
                     self._export_commissioning_test.hardware_authority_active

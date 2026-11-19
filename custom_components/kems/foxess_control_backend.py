@@ -1187,6 +1187,7 @@ class FoxESSControlBackend:
         paid_agile_ev_hold_eligible: bool = False,
         ev_hold_source_grace_active: bool = False,
         pending_intelligent_ev_hold_active: bool = False,
+        observed_ohme_hold_active: bool = False,
         commissioning_export_test: bool = False,
         force_restore: bool = False,
         power_down_export_authorised: bool = False,
@@ -1194,6 +1195,11 @@ class FoxESSControlBackend:
         happy_hour_house_grid_hold_authorised: bool = False,
     ) -> dict[str, Any]:
         """Apply the authoritative bounded command for this scan."""
+        # Both non-cheap holds use the EXISTING reviewed Self Use / MinSOC route.
+        # Measured Ohme activity is only protection, never cheap-rate authority.
+        hold_only_ev_active = bool(
+            pending_intelligent_ev_hold_active or observed_ohme_hold_active
+        )
         shadow = build_foxess_command_shadow_snapshot(
             self._hass,
             coordinator,
@@ -1263,6 +1269,7 @@ class FoxESSControlBackend:
             and ev_hold_floor_percent is None
             and not ev_hold_source_grace_active
             and not pending_intelligent_ev_hold_active
+            and not observed_ohme_hold_active
             and no_paid_export_mode
             and not commissioning_export_test
             and control.operating_mode == "control"
@@ -1319,6 +1326,7 @@ class FoxESSControlBackend:
                 and ev_hold_floor_percent is None
                 and not ev_hold_source_grace_active
                 and not pending_intelligent_ev_hold_active
+                and not observed_ohme_hold_active
                 and not self._commissioning_restore_pending
                 and binding_ready
                 and technical_ready
@@ -1422,6 +1430,7 @@ class FoxESSControlBackend:
                 and not commissioning_export_test
                 and not ev_hold_source_grace_active
                 and not pending_intelligent_ev_hold_active
+                and not observed_ohme_hold_active
                 and ev_hold_floor_percent is None
                 and control.ev_grid_guard_status == "inactive"
                 and not power_down_export_authorised
@@ -1480,6 +1489,7 @@ class FoxESSControlBackend:
             and not ev_hold_source_grace_active
             and ev_connected is not None
             and not pending_intelligent_ev_hold_active
+            and not observed_ohme_hold_active
         )
         frozen_ev_hold = should_freeze_owned_ev_hold(
             owned_by_kems=self._owned,
@@ -1503,7 +1513,7 @@ class FoxESSControlBackend:
             emergency_stop=bool(coordinator.settings.control.emergency_stop),
             island_mode_active=bool(control.island_mode_active),
             grid_available=bool(control.grid_available),
-            pending_intelligent_ev_hold_active=pending_intelligent_ev_hold_active,
+            pending_intelligent_ev_hold_active=hold_only_ev_active,
             write_authority_recovered=write_authority_recovered,
             ev_hold_guard_active=(
                 control.ev_grid_guard_status
@@ -1516,6 +1526,8 @@ class FoxESSControlBackend:
                     "battery_hold_ev_or_site_unverified",
                     "ev_battery_hold_source_grace",
                     "ev_battery_hold_pending_intelligent_window",
+                    "ev_battery_hold_ohme_measured",
+                    "ev_battery_hold_ohme_brief_pause",
                 }
             ),
             force_charge_hold_authorised=True,
@@ -1558,7 +1570,15 @@ class FoxESSControlBackend:
             )
             reason = (
                 f"{reason}; verified "
-                + ("pending Intelligent " if pending_intelligent_ev_hold_active else "")
+                + (
+                    "observed Ohme "
+                    if observed_ohme_hold_active
+                    else (
+                        "pending Intelligent "
+                        if pending_intelligent_ev_hold_active
+                        else ""
+                    )
+                )
                 + f"EV hold frozen at {float(ev_hold_floor_percent):.1f}% "
                 "until telemetry recovers or release authority becomes explicit"
             )
@@ -1583,7 +1603,7 @@ class FoxESSControlBackend:
             ev_hold_active=bool(
                 ev_hold_floor_percent is not None
                 or ev_hold_source_grace_active
-                or pending_intelligent_ev_hold_active
+                or hold_only_ev_active
             ),
             happy_hour_active=bool(
                 happy_hour_charge_authorised or happy_hour_house_grid_hold_authorised
@@ -1725,6 +1745,7 @@ class FoxESSControlBackend:
                         and not happy_hour_charge_authorised
                         and not happy_hour_house_grid_hold_authorised
                         and not pending_intelligent_ev_hold_active
+                        and not observed_ohme_hold_active
                         and not ev_hold_source_grace_active
                         and ev_hold_floor_percent is None
                         and ev_connected is False
@@ -1757,9 +1778,7 @@ class FoxESSControlBackend:
                         paid_idle_household_10_percent_authorised=(
                             household_floor_authorised
                         ),
-                        pending_intelligent_ev_hold_active=(
-                            pending_intelligent_ev_hold_active
-                        ),
+                        pending_intelligent_ev_hold_active=(hold_only_ev_active),
                         happy_hour_house_grid_hold_authorised=(
                             happy_hour_house_grid_hold_authorised
                         ),
@@ -2061,14 +2080,14 @@ class FoxESSControlBackend:
                                 "Alpha9.188 household-only 10% Min SoC "
                                 "(On Grid) physically verified in Self Use"
                             )
-                        elif pending_intelligent_ev_hold_active:
-                            self._last_write_result = (
-                                "Alpha9.76 pending Intelligent EV MinSOC hold applied"
-                                if writes
-                                else (
-                                    "Alpha9.76 pending Intelligent EV MinSOC hold "
-                                    "already matched"
-                                )
+                        elif hold_only_ev_active:
+                            hold_label = (
+                                "Alpha9.233 observed Ohme EV MinSOC hold"
+                                if observed_ohme_hold_active
+                                else "Alpha9.76 pending Intelligent EV MinSOC hold"
+                            )
+                            self._last_write_result = f"{hold_label} " + (
+                                "applied" if writes else "already matched"
                             )
                         else:
                             self._last_write_result = (
@@ -2193,10 +2212,14 @@ class FoxESSControlBackend:
                     "hold_grace_unverified"
                     if hold_grace_unverified
                     else (
-                        "pending_intelligent_ev_hold"
-                        if pending_intelligent_ev_hold_active
-                        and decision.action == "self_use"
-                        else decision.action
+                        "observed_ohme_ev_hold"
+                        if observed_ohme_hold_active and decision.action == "self_use"
+                        else (
+                            "pending_intelligent_ev_hold"
+                            if pending_intelligent_ev_hold_active
+                            and decision.action == "self_use"
+                            else decision.action
+                        )
                     )
                 )
             ),
@@ -2204,6 +2227,7 @@ class FoxESSControlBackend:
             "ev_hold_frozen_on_transient_loss": frozen_ev_hold,
             "ev_hold_source_grace_active": ev_hold_source_grace_active,
             "pending_intelligent_ev_hold_active": pending_intelligent_ev_hold_active,
+            "observed_ohme_hold_active": observed_ohme_hold_active,
             "ev_hold_grace_unverified": hold_grace_unverified,
             "latched_ev_hold_min_soc_percent": ev_hold_floor_percent,
             "observed_min_soc_on_grid": observed_min_soc,
@@ -2237,9 +2261,7 @@ class FoxESSControlBackend:
                         decision,
                         cheap_period_confirmed=cheap_period_confirmed,
                         previous_min_soc_on_grid=self._previous_min_soc_on_grid,
-                        pending_intelligent_ev_hold_active=(
-                            pending_intelligent_ev_hold_active
-                        ),
+                        pending_intelligent_ev_hold_active=(hold_only_ev_active),
                         happy_hour_house_grid_hold_authorised=(
                             happy_hour_house_grid_hold_authorised
                         ),
@@ -2252,15 +2274,19 @@ class FoxESSControlBackend:
                 )
             ),
             "non_cheap_min_soc_policy": (
-                "pending_intelligent_ev_hold_only"
-                if pending_intelligent_ev_hold_active
+                "observed_ohme_hold_only"
+                if observed_ohme_hold_active
                 else (
-                    "verified_paused_ohme_household_10_percent"
-                    if bridge_paused_verified and household_floor_authorised
+                    "pending_intelligent_ev_hold_only"
+                    if pending_intelligent_ev_hold_active
                     else (
-                        "confirmed_unplugged_household_10_percent"
-                        if household_floor_authorised
-                        else "preserve_pre_kems_baseline"
+                        "verified_paused_ohme_household_10_percent"
+                        if bridge_paused_verified and household_floor_authorised
+                        else (
+                            "confirmed_unplugged_household_10_percent"
+                            if household_floor_authorised
+                            else "preserve_pre_kems_baseline"
+                        )
                     )
                 )
             ),
