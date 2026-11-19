@@ -12,8 +12,8 @@ from homeassistant.helpers.storage import Store
 from .const import DOMAIN, STORAGE_NAMESPACE
 from .kems_core.ev_grid_guard import (
     measured_ohme_ev_charge_active,
-    protect_measured_ohme_ev_hold,
     protect_live_cheap_ev,
+    protect_measured_ohme_ev_hold,
     protect_pending_intelligent_ev_hold,
 )
 
