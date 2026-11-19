@@ -1,3 +1,11 @@
+## 0.9.0-alpha9.236 — Backlog evidence: cold startup, historical gap and ordinary Agile export triage
+
+- **#405:** Add per-scan historical replay-cache SHA-256 fingerprint elapsed time and hit/miss counts, plus base-manager and wrapper current-thread CPU versus non-CPU wall-time breakdown. Initial 55.7s post-update scan included 14.2s historical-worker time and 30.9s manager-wrapper wall time; no algorithm, await order or physical dispatch path was changed, **and no speed-up is claimed** without subsequent field evidence.
+- **#487:** List the five longest >10-minute observation gaps with no *recorded* successful update or KEMS/Core lifecycle event, so uncorrelated gaps can be investigated first. A missing event record does not prove no restart. Gap seconds are not metered kWh and do not repair historical completeness or ROI.
+- **#446:** Rank the five largest completed, explicitly shadow-settled **ordinary non-Power-down** Agile export discrepancies separately from the event-overlapping list. Include physical sample coverage/gaps/boundary crossings and explicitly flag no independent supplier-meter validation. The physical CT sample income calculation, shadow estimates and recorded financial totals are unmodified.
+- **Safety:** Preserve 7 kW DNO, 15% deliberate-export floor, 10% household floor with 12% recovery, cheap-tariff EV isolation, Happy Hour / Power Down priority, source freshness, hardware writes, publisher integrity and safe-first automatic 06:00–06:30 maintenance gate.
+- **Acceptance:** New read-only regressions plus full Black/Ruff/Pytest/compile/HACS/hassfest/ESPHome CI. Physical EV session, supplier-meter and multi-morning startup performance acceptance remain open.
+
 ## 0.9.0-alpha9.235 — Read-only Agile export audit and coordinator restart attribution
 
 - **#446:** Rank the five largest settled-shadow versus physical snapshot-integrated Agile half-hour differences, with separate positive/negative/absolute totals, source coverage and boundary flags, and explicit overlaps with **completed, physically verified Power Down** sessions. An overlap is context, not proof of cause. No physical/supplier meter or financial settlement is inferred.
