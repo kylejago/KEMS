@@ -1268,7 +1268,8 @@ class FoxESSControlBackend:
             not cheap_period_confirmed
             and ev_hold_floor_percent is None
             and not ev_hold_source_grace_active
-            and not hold_only_ev_active
+            and not pending_intelligent_ev_hold_active
+            and not observed_ohme_hold_active
             and no_paid_export_mode
             and not commissioning_export_test
             and control.operating_mode == "control"
@@ -1324,7 +1325,8 @@ class FoxESSControlBackend:
                 not cheap_period_confirmed
                 and ev_hold_floor_percent is None
                 and not ev_hold_source_grace_active
-                and not hold_only_ev_active
+                and not pending_intelligent_ev_hold_active
+            and not observed_ohme_hold_active
                 and not self._commissioning_restore_pending
                 and binding_ready
                 and technical_ready
@@ -1427,7 +1429,8 @@ class FoxESSControlBackend:
                 and not force_restore
                 and not commissioning_export_test
                 and not ev_hold_source_grace_active
-                and not hold_only_ev_active
+                and not pending_intelligent_ev_hold_active
+            and not observed_ohme_hold_active
                 and ev_hold_floor_percent is None
                 and control.ev_grid_guard_status == "inactive"
                 and not power_down_export_authorised
@@ -1485,7 +1488,8 @@ class FoxESSControlBackend:
             decision.commands_permitted
             and not ev_hold_source_grace_active
             and ev_connected is not None
-            and not hold_only_ev_active
+            and not pending_intelligent_ev_hold_active
+            and not observed_ohme_hold_active
         )
         frozen_ev_hold = should_freeze_owned_ev_hold(
             owned_by_kems=self._owned,
@@ -1740,7 +1744,8 @@ class FoxESSControlBackend:
                         and not power_down_export_authorised
                         and not happy_hour_charge_authorised
                         and not happy_hour_house_grid_hold_authorised
-                        and not hold_only_ev_active
+                        and not pending_intelligent_ev_hold_active
+            and not observed_ohme_hold_active
                         and not ev_hold_source_grace_active
                         and ev_hold_floor_percent is None
                         and ev_connected is False
@@ -2077,12 +2082,12 @@ class FoxESSControlBackend:
                             )
                         elif hold_only_ev_active:
                             hold_label = (
-                                "Alpha9.233 observed Ohme"
+                                "Alpha9.233 observed Ohme EV MinSOC hold"
                                 if observed_ohme_hold_active
-                                else "Alpha9.76 pending Intelligent"
+                                else "Alpha9.76 pending Intelligent EV MinSOC hold"
                             )
                             self._last_write_result = (
-                                f"{hold_label} EV MinSOC hold "
+                                f"{hold_label} "
                                 + ("applied" if writes else "already matched")
                             )
                         else:
