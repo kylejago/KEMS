@@ -24,8 +24,6 @@ def _nonnegative(value: float | None) -> float | None:
     return max(float(value), 0.0)
 
 
-
-
 def measured_ohme_ev_charge_active(snapshot: Snapshot) -> bool:
     """Fresh charger demand is a *hold-only* trigger, never a cheap-rate signal."""
     power = _nonnegative(snapshot.ev_power_kw)
@@ -167,6 +165,7 @@ def protect_measured_ohme_ev_hold(
             else "Short Ohme pause: retain verified battery floor until charging ends"
         ),
     )
+
 
 def protect_pending_intelligent_ev_hold(
     snapshot: Snapshot,
