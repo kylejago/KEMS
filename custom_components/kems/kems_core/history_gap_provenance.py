@@ -175,6 +175,29 @@ def history_gap_provenance(
                 }
             )
 
+    # Rank only gaps lacking *recorded* update or lifecycle correspondence.
+    # A missing marker is not proof there was no HA restart: lifecycle capture
+    # is prospective, and update history is bounded. Rank existing records,
+    # never extrapolate lost energy from gap duration.
+    unexplained = sorted(
+        (
+            item
+            for item in details
+            if item["lifecycle_classification"] == "no_recorded_correspondence"
+        ),
+        key=lambda item: (-item["gap_seconds"], item["start"]),
+    )
+    next_unexplained = [
+        {
+            "date": item["date"],
+            "start": item["start"],
+            "end": item["end"],
+            "gap_seconds": item["gap_seconds"],
+            "recorded_restart_correspondence": False,
+            "physical_import_export_kwh": None,
+        }
+        for item in unexplained[:5]
+    ]
     rows: list[dict[str, Any]] = []
     for item in ledger_audit.get("recent_days") or []:
         if not isinstance(item, Mapping):
@@ -235,6 +258,16 @@ def history_gap_provenance(
         "simulation_completeness_unchanged": True,
         "source_gap_details": details[-MAX_DETAIL_ROWS:],
         "source_gap_details_omitted": max(0, len(details) - MAX_DETAIL_ROWS),
+        "gaps_without_recorded_correspondence": len(unexplained),
+        "largest_unattributed_observation_gaps": next_unexplained,
+        "largest_unattributed_observation_gaps_omitted": max(
+            len(unexplained) - len(next_unexplained), 0
+        ),
+        "unattributed_gap_note": (
+            "Prioritised by elapsed time only. Lack of a recorded update or "
+            "lifecycle event does not prove no restart; no physical kWh or "
+            "recovered financial value can be inferred."
+        ),
         "days": rows,
         "next_step": (
             "Correlate observed KEMS setup/Core lifecycle markers with Core "
