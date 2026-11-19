@@ -332,7 +332,6 @@ def test_measured_charge_latches_pause_and_releases_on_finished_or_timeout():
     assert status["observed_ohme_hold_active"] is False
 
 
-
 def test_transient_missing_ohme_readback_freezes_only_verified_existing_floor():
     module, fake_store = _session_module()
     fake_store.data.clear()
