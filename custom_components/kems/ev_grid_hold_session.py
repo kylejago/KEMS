@@ -11,6 +11,8 @@ from homeassistant.helpers.storage import Store
 
 from .const import DOMAIN, STORAGE_NAMESPACE
 from .kems_core.ev_grid_guard import (
+    measured_ohme_ev_charge_active,
+    protect_measured_ohme_ev_hold,
     protect_live_cheap_ev,
     protect_pending_intelligent_ev_hold,
 )
@@ -29,6 +31,8 @@ class EVGridHoldSession:
         self._last_confirmed_cheap_at: datetime | None = None
         self._grace_active = False
         self._pending_intelligent_hold_active = False
+        self._observed_ohme_hold_active = False
+        self._last_measured_ohme_at: datetime | None = None
         self._last_status = "inactive"
 
     @property
@@ -39,6 +43,12 @@ class EVGridHoldSession:
             "source_uncertainty_grace_active": self._grace_active,
             "pending_intelligent_ev_hold_active": (
                 self._pending_intelligent_hold_active
+            ),
+            "observed_ohme_hold_active": self._observed_ohme_hold_active,
+            "last_measured_ohme_at": (
+                self._last_measured_ohme_at.isoformat()
+                if self._last_measured_ohme_at is not None
+                else None
             ),
             "last_confirmed_cheap_at": (
                 self._last_confirmed_cheap_at.isoformat()
@@ -103,10 +113,54 @@ class EVGridHoldSession:
         no_paid_export_mode: bool,
         source_uncertain: bool = False,
         source_grace_seconds: int = 90,
+        ohme_finished: bool = False,
     ) -> Any:
         """Apply reviewed guard and preserve only a bounded uncertain-source hold."""
         now = snapshot.timestamp
         disconnected = snapshot.ev_connected is False
+
+        # Measured Ohme power is a physical battery-hold trigger, not a
+        # supplier discount. Allow a short, bounded zero-power charger pause
+        # only after a successfully established measured hold.
+        measured = measured_ohme_ev_charge_active(snapshot)
+        brief_pause = bool(
+            not measured
+            and not ohme_finished
+            and not disconnected
+            and self._observed_ohme_hold_active
+            and self._last_measured_ohme_at is not None
+            and timedelta(0)
+            <= now - self._last_measured_ohme_at
+            <= timedelta(seconds=120)
+        )
+        observed = protect_measured_ohme_ev_hold(
+            snapshot,
+            control,
+            config,
+            eligible_for_hold_only=no_paid_export_mode,
+            held_floor_percent=self._held_floor,
+            bounded_pause=brief_pause,
+        )
+        if observed.ev_grid_guard_status in {
+            "ev_battery_hold_ohme_measured",
+            "ev_battery_hold_ohme_brief_pause",
+        }:
+            self._observed_ohme_hold_active = True
+            self._pending_intelligent_hold_active = False
+            self._grace_active = False
+            self._last_status = observed.ev_grid_guard_status
+            if measured:
+                self._last_measured_ohme_at = now
+            floor = observed.desired_min_soc_percent
+            if isfinite(floor) and (
+                self._held_floor is None or floor > self._held_floor
+            ):
+                self._held_floor = floor
+                await self.async_save()
+            return observed
+        self._observed_ohme_hold_active = False
+        if ohme_finished or disconnected:
+            self._last_measured_ohme_at = None
 
         pending = protect_pending_intelligent_ev_hold(
             snapshot,
