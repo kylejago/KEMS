@@ -88,6 +88,7 @@ def agile_export_interval_audit(
     reported_grid_export_kwh: Any,
     reported_income_pence: Any,
     activation_cutoff: Any,
+    completed_power_down: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Compare different export scopes by half-hour without changing their values.
 
@@ -116,6 +117,32 @@ def agile_export_interval_audit(
             "note": note,
         }
 
+    # A previously completed, physically verified Power Down may overlap the
+    # sample-versus-shadow comparison. This is context for audit triage only:
+    # overlap neither proves causation nor changes export income or dispatch.
+    verified_power_down_interval: tuple[datetime, datetime] | None = None
+    if (
+        isinstance(completed_power_down, Mapping)
+        and completed_power_down.get("completed_successfully") is True
+        and completed_power_down.get("physical_export_verified") is True
+    ):
+        try:
+            event_start = datetime.fromisoformat(
+                str(completed_power_down.get("session_start"))
+            )
+            event_end = datetime.fromisoformat(
+                str(completed_power_down.get("session_end"))
+            )
+        except (TypeError, ValueError):
+            pass
+        else:
+            if (
+                event_start.tzinfo is not None
+                and event_end.tzinfo is not None
+                and event_end > event_start
+            ):
+                verified_power_down_interval = (event_start, event_end)
+
     raw_slots = agile_state.get("today_slots")
     if not isinstance(raw_slots, list):
         return {"status": "no_agile_slots", "reporting_only": True, "note": note}
@@ -143,6 +170,11 @@ def agile_export_interval_audit(
             "valid_from": start.isoformat(),
             "valid_to": end.isoformat(),
             "completed": completed,
+            "verified_power_down_window_overlap": (
+                verified_power_down_interval is not None
+                and min(end, verified_power_down_interval[1])
+                > max(start, verified_power_down_interval[0])
+            ),
             "rate_pence_per_kwh": rate,
             "completed_model_grid_export_kwh": model_kwh if completed else None,
             "shadow_grid_export_kwh": model_kwh if settled else None,
@@ -352,6 +384,48 @@ def agile_export_interval_audit(
     boundary_reference_settled_kwh = sum(
         row["boundary_reference_export_kwh"] for row in settled_rows
     )
+    # Rank model-versus-sampled export differences without promoting either
+    # source to supplier settlement. Positive/negative offsets can cancel in
+    # the daily net, so retain the absolute discrepancy as separate evidence.
+    ranked_variances = sorted(
+        settled_rows,
+        key=lambda row: (
+            -abs(row["shadow_minus_snapshot_kwh"]),
+            row["valid_from"],
+        ),
+    )
+    top_variances = [
+        {
+            "valid_from": row["valid_from"],
+            "valid_to": row["valid_to"],
+            "shadow_minus_snapshot_kwh": row["shadow_minus_snapshot_kwh"],
+            "verified_power_down_window_overlap": row[
+                "verified_power_down_window_overlap"
+            ],
+            "shadow_minus_boundary_reference_kwh": round(
+                row["shadow_grid_export_kwh"] - row["boundary_reference_export_kwh"],
+                4,
+            ),
+            "snapshot_export_kwh": row["snapshot_integrated_export_kwh"],
+            "shadow_export_kwh": row["shadow_grid_export_kwh"],
+            "sample_coverage_percent": row["sample_coverage_percent"],
+            "unobserved_seconds": row["unobserved_seconds"],
+            "evidence_limitation_flags": (
+                (
+                    ["incomplete_observation_coverage"]
+                    if row["sample_coverage_percent"] < 95.0
+                    else []
+                )
+                + (
+                    ["cross_slot_sample_pair"]
+                    if row["cross_slot_boundary_pairs"]
+                    else []
+                )
+                + (["over_ten_minute_sample_gap"] if row["over_10_minute_gaps"] else [])
+            ),
+        }
+        for row in ranked_variances[:5]
+    ]
     reported_income = _finite(reported_income_pence)
     return {
         "status": (
@@ -373,6 +447,44 @@ def agile_export_interval_audit(
         "shadow_completed_grid_export_kwh": round(shadow_completed_kwh, 3),
         "shadow_minus_snapshot_completed_kwh": round(
             shadow_completed_kwh - observed_settled_kwh, 3
+        ),
+        "verified_power_down_overlap_settled_slots": sum(
+            row["verified_power_down_window_overlap"] for row in settled_rows
+        ),
+        "verified_power_down_overlap_shadow_minus_sample_kwh": round(
+            sum(
+                row["shadow_minus_snapshot_kwh"]
+                for row in settled_rows
+                if row["verified_power_down_window_overlap"]
+            ),
+            3,
+        ),
+        "non_power_down_shadow_minus_sample_kwh": round(
+            sum(
+                row["shadow_minus_snapshot_kwh"]
+                for row in settled_rows
+                if not row["verified_power_down_window_overlap"]
+            ),
+            3,
+        ),
+        "settled_variance_absolute_sum_kwh": round(
+            sum(abs(row["shadow_minus_snapshot_kwh"]) for row in settled_rows), 3
+        ),
+        "settled_variance_positive_sum_kwh": round(
+            sum(max(row["shadow_minus_snapshot_kwh"], 0.0) for row in settled_rows),
+            3,
+        ),
+        "settled_variance_negative_sum_kwh": round(
+            sum(min(row["shadow_minus_snapshot_kwh"], 0.0) for row in settled_rows),
+            3,
+        ),
+        "top_settled_variance_rows": top_variances,
+        "top_settled_variance_rows_omitted": max(len(ranked_variances) - 5, 0),
+        "variance_triage_note": (
+            "Ranked read-only digital-twin minus power-sample differences. "
+            "Flags identify possible evidence limitations, not root causes; "
+            "neither source is an independent supplier export meter. "
+            "Verified Power Down overlap is context, not attribution."
         ),
         "sample_priced_income_pence": observed_income,
         "boundary_reference_export_completed_kwh": round(

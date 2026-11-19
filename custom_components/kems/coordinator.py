@@ -234,6 +234,8 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
         # have expired. Diagnostics only; never schedule or authorise control.
         self._coordinator_slow_hourly: dict[str, dict[str, object]] = {}
         self._coordinator_scan_samples: list[float] = []
+        # Restart-local index for diagnosing first-scan outliers; telemetry only.
+        self._coordinator_scan_index_since_setup = 0
         self._coordinator_slow_log_at: datetime | None = None
         self._agile_history_backfill = AgileHistoryBackfill(hass, entities)
         self._agile_smart_export = EfficientAgileSmartExportManager(
@@ -1965,12 +1967,17 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
             checkpoint("other_and_finalisation")
             elapsed = round(perf_counter() - scan_started, 3)
             biggest = max(stage_seconds, key=stage_seconds.get)
+            self._coordinator_scan_index_since_setup += 1
             self._coordinator_scan_samples.append(elapsed)
             self._coordinator_scan_samples = self._coordinator_scan_samples[-60:]
             sorted_samples = sorted(self._coordinator_scan_samples)
             p95_index = max(0, (95 * len(sorted_samples) + 99) // 100 - 1)
             self._coordinator_performance = {
                 "scan_elapsed_seconds": elapsed,
+                "scan_index_since_setup": self._coordinator_scan_index_since_setup,
+                "first_three_after_setup": (
+                    self._coordinator_scan_index_since_setup <= 3
+                ),
                 "scan_thread_cpu_seconds": round(
                     thread_time() - scan_thread_cpu_started, 3
                 ),
@@ -2005,6 +2012,9 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                 record = {
                     "at": dt_util.now().isoformat(),
                     "seconds": elapsed,
+                    "scan_index_since_setup": (
+                        self._coordinator_scan_index_since_setup
+                    ),
                     "scan_thread_cpu_seconds": round(
                         thread_time() - scan_thread_cpu_started, 3
                     ),
