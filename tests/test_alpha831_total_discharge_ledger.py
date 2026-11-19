@@ -87,9 +87,7 @@ def test_house_reserve_is_not_assumed_to_be_guaranteed_future_discharge() -> Non
     assert abs(split_total - 22.887) <= 0.01
 
 
-def test_verified_house_budget_prevents_instantaneous_load_held_for_entire_evening() -> (
-    None
-):
+def test_verified_house_budget_does_not_extrapolate_live_load() -> None:
     """19 Nov: current 2.914 kW is NOT a justified 4.8-hour household forecast."""
     now = datetime(2026, 11, 19, 18, 30, tzinfo=UTC)
     deadline = now + timedelta(hours=5)
