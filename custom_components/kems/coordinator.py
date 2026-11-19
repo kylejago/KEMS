@@ -1063,6 +1063,7 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                 else None
             )
             agile_planning_started = perf_counter()
+            agile_planning_thread_cpu_started = thread_time()
             # The authoritative settled-day pass below republishes the entire
             # read-only Agile presentation in this *same* scan. Defer only the
             # redundant first manager publication, NOT its calculations, rates,
@@ -1082,6 +1083,9 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
             finally:
                 self._agile_smart_export._kems_defer_initial_agile_publication = False
             agile_planning_seconds = round(perf_counter() - agile_planning_started, 3)
+            agile_planning_thread_cpu_seconds = max(
+                thread_time() - agile_planning_thread_cpu_started, 0.0
+            )
             manager_base_seconds = float(
                 getattr(self._agile_smart_export, "_performance_detail", {}).get(
                     "total_manager_base_seconds", agile_planning_seconds
@@ -1090,6 +1094,27 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
             detail_seconds["agile_manager_wrapper_seconds"] = round(
                 max(agile_planning_seconds - manager_base_seconds, 0.0), 3
             )
+            manager_base_cpu_seconds = float(
+                getattr(self._agile_smart_export, "_performance_detail", {}).get(
+                    "manager_base_thread_cpu_seconds", 0.0
+                )
+            )
+            wrapper_cpu_seconds = max(
+                agile_planning_thread_cpu_seconds - manager_base_cpu_seconds, 0.0
+            )
+            detail_seconds["agile_manager_wrapper_thread_cpu_seconds"] = round(
+                wrapper_cpu_seconds, 3
+            )
+            detail_seconds["agile_manager_wrapper_non_cpu_seconds"] = round(
+                max(
+                    agile_planning_seconds - manager_base_seconds - wrapper_cpu_seconds,
+                    0.0,
+                ),
+                3,
+            )
+            # This is measured wall-minus-current-thread CPU, not evidence of
+            # a specific asyncio task, rate provider, or causative bottleneck.
+            # No replay, publication, or physical-control ordering changes.
             # Read-only, nested wall/CPU timings. All three _publish calls
             # remain in their original same-scan order because each enriches
             # the rolling/flow state used by later managers and live control.
