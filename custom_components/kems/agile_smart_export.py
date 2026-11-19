@@ -199,6 +199,16 @@ class AgileSmartExportManager:
     ) -> dict[str, Any]:
         """Refresh prices and calculate every requested comparison period."""
         profiler_started = perf_counter()
+        profiler_thread_cpu_started = thread_time()
+        # Capture immutable counters before this exact historical comparison.
+        # These measure cold-cache rebuild cost without relaxing SHA-256
+        # verification or changing the replay schedule / inherited wrappers.
+        historical_cache = getattr(self, "_historical_replay_cache", None)
+        cache_hits_before = getattr(historical_cache, "_hits", 0)
+        cache_misses_before = getattr(historical_cache, "_misses", 0)
+        cache_fingerprint_seconds_before = getattr(
+            historical_cache, "_fingerprint_seconds", 0.0
+        )
         await self._refresh(records, now)
         rate_refresh_seconds = round(perf_counter() - profiler_started, 3)
         # The earlier per-day filter traversed *every* retained Octopus price
@@ -456,6 +466,23 @@ class AgileSmartExportManager:
             await self.async_save()
         persistence_await_seconds = round(perf_counter() - persistence_started, 3)
         self._performance_detail = {
+            "historical_cache_hits_this_pass": (
+                getattr(historical_cache, "_hits", 0) - cache_hits_before
+            ),
+            "historical_cache_misses_this_pass": (
+                getattr(historical_cache, "_misses", 0) - cache_misses_before
+            ),
+            "historical_cache_fingerprint_seconds_this_pass": round(
+                max(
+                    getattr(historical_cache, "_fingerprint_seconds", 0.0)
+                    - cache_fingerprint_seconds_before,
+                    0.0,
+                ),
+                3,
+            ),
+            "manager_base_thread_cpu_seconds": round(
+                thread_time() - profiler_thread_cpu_started, 3
+            ),
             "persistence_await_seconds": persistence_await_seconds,
             "rate_refresh_seconds": rate_refresh_seconds,
             "historical_and_live_day_comparisons_seconds": day_comparison_seconds,
