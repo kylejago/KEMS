@@ -155,6 +155,7 @@ def allocate_total_discharge_slots(
     safety_headroom_kwh: float = 0.0,
     excluded_windows: Iterable[tuple[datetime, datetime]] = (),
     maximum_paid_export_kwh: float | None = None,
+    protected_house_budget_kwh: float | None = None,
 ) -> TotalDischargePlan:
     """Allocate one total battery-discharge obligation over physical capacity.
 
@@ -176,6 +177,15 @@ def allocate_total_discharge_slots(
         float("inf")
         if maximum_paid_export_kwh is None
         else max(_number(maximum_paid_export_kwh) or 0.0, 0.0)
+    )
+    # Use a verified house-energy allowance only when supplied by the
+    # independent physical guard. Otherwise preserve the original fail-safe
+    # policy of reserving the live house load across the whole horizon.
+    # The current physical house-load floor is never capped by this forecast.
+    future_house_budget_left = (
+        float("inf")
+        if protected_house_budget_kwh is None
+        else max(_number(protected_house_budget_kwh) or 0.0, 0.0)
     )
     windows = tuple(
         (left.astimezone(UTC), right.astimezone(UTC))
@@ -272,9 +282,13 @@ def allocate_total_discharge_slots(
             item["house_capacity_kwh"],
             item["total_capacity_kwh"],
             remaining,
+            # Serve physically observed current demand even if it exceeds the
+            # forecast. Only FUTURE speculative demand uses the approved cap.
+            remaining if item["is_current"] else future_house_budget_left,
         )
         item["allocation_kwh"] = house_dispatch
         remaining -= house_dispatch
+        future_house_budget_left = max(future_house_budget_left - house_dispatch, 0.0)
 
     # Preserve the rolling deadline safety guard, but only with discharge
     # budget left after mandatory home service. It may move discretionary
