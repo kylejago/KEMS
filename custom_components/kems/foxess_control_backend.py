@@ -1745,7 +1745,7 @@ class FoxESSControlBackend:
                         and not happy_hour_charge_authorised
                         and not happy_hour_house_grid_hold_authorised
                         and not pending_intelligent_ev_hold_active
-                and not observed_ohme_hold_active
+                        and not observed_ohme_hold_active
                         and not ev_hold_source_grace_active
                         and ev_hold_floor_percent is None
                         and ev_connected is False
@@ -2086,9 +2086,8 @@ class FoxESSControlBackend:
                                 if observed_ohme_hold_active
                                 else "Alpha9.76 pending Intelligent EV MinSOC hold"
                             )
-                            self._last_write_result = (
-                                f"{hold_label} "
-                                + ("applied" if writes else "already matched")
+                            self._last_write_result = f"{hold_label} " + (
+                                "applied" if writes else "already matched"
                             )
                         else:
                             self._last_write_result = (
