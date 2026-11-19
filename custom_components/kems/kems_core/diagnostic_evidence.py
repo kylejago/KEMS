@@ -368,8 +368,7 @@ def agile_export_interval_audit(
             "valid_to": row["valid_to"],
             "shadow_minus_snapshot_kwh": row["shadow_minus_snapshot_kwh"],
             "shadow_minus_boundary_reference_kwh": round(
-                row["shadow_grid_export_kwh"]
-                - row["boundary_reference_export_kwh"],
+                row["shadow_grid_export_kwh"] - row["boundary_reference_export_kwh"],
                 4,
             ),
             "snapshot_export_kwh": row["snapshot_integrated_export_kwh"],
@@ -377,12 +376,17 @@ def agile_export_interval_audit(
             "sample_coverage_percent": row["sample_coverage_percent"],
             "unobserved_seconds": row["unobserved_seconds"],
             "evidence_limitation_flags": (
-                (["incomplete_observation_coverage"]
-                 if row["sample_coverage_percent"] < 95.0 else [])
-                + (["cross_slot_sample_pair"]
-                   if row["cross_slot_boundary_pairs"] else [])
-                + (["over_ten_minute_sample_gap"]
-                   if row["over_10_minute_gaps"] else [])
+                (
+                    ["incomplete_observation_coverage"]
+                    if row["sample_coverage_percent"] < 95.0
+                    else []
+                )
+                + (
+                    ["cross_slot_sample_pair"]
+                    if row["cross_slot_boundary_pairs"]
+                    else []
+                )
+                + (["over_ten_minute_sample_gap"] if row["over_10_minute_gaps"] else [])
             ),
         }
         for row in ranked_variances[:5]
@@ -413,17 +417,11 @@ def agile_export_interval_audit(
             sum(abs(row["shadow_minus_snapshot_kwh"]) for row in settled_rows), 3
         ),
         "settled_variance_positive_sum_kwh": round(
-            sum(
-                max(row["shadow_minus_snapshot_kwh"], 0.0)
-                for row in settled_rows
-            ),
+            sum(max(row["shadow_minus_snapshot_kwh"], 0.0) for row in settled_rows),
             3,
         ),
         "settled_variance_negative_sum_kwh": round(
-            sum(
-                min(row["shadow_minus_snapshot_kwh"], 0.0)
-                for row in settled_rows
-            ),
+            sum(min(row["shadow_minus_snapshot_kwh"], 0.0) for row in settled_rows),
             3,
         ),
         "top_settled_variance_rows": top_variances,
