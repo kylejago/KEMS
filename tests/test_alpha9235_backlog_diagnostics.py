@@ -31,9 +31,7 @@ def _slot(start: datetime, shadow_kwh: float, *, settled: bool = True) -> dict:
 
 
 def _observation(at: datetime, power_kw: float) -> SimpleNamespace:
-    return SimpleNamespace(
-        timestamp=at, grid_export_kw=power_kw, stale_fields=()
-    )
+    return SimpleNamespace(timestamp=at, grid_export_kw=power_kw, stale_fields=())
 
 
 def _audit(now: datetime, slots: list[dict], records: list) -> dict:
@@ -101,11 +99,13 @@ def test_coordinator_restart_index_is_observability_only() -> None:
     source = (ROOT / "coordinator.py").read_text()
     module = ast.parse(source)
     cls = next(
-        node for node in module.body
+        node
+        for node in module.body
         if isinstance(node, ast.ClassDef) and node.name == "KEMSCoordinator"
     )
     update = next(
-        node for node in cls.body
+        node
+        for node in cls.body
         if isinstance(node, ast.AsyncFunctionDef) and node.name == "_async_update_data"
     )
     scan_source = ast.unparse(update)
