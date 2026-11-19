@@ -2076,20 +2076,14 @@ class FoxESSControlBackend:
                                 "(On Grid) physically verified in Self Use"
                             )
                         elif hold_only_ev_active:
+                            hold_label = (
+                                "Alpha9.233 observed Ohme"
+                                if observed_ohme_hold_active
+                                else "Alpha9.76 pending Intelligent"
+                            )
                             self._last_write_result = (
-                                (
-                                    "Alpha9.233 observed Ohme EV MinSOC hold applied"
-                                    if observed_ohme_hold_active
-                                    else "Alpha9.76 pending Intelligent EV MinSOC hold applied"
-                                )
-                                if writes
-                                else (
-                                    (
-                                        "Alpha9.233 observed Ohme EV MinSOC hold already matched"
-                                        if observed_ohme_hold_active
-                                        else "Alpha9.76 pending Intelligent EV MinSOC hold already matched"
-                                    )
-                                )
+                                f"{hold_label} EV MinSOC hold "
+                                + ("applied" if writes else "already matched")
                             )
                         else:
                             self._last_write_result = (
