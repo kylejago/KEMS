@@ -1569,9 +1569,11 @@ class FoxESSControlBackend:
                 + (
                     "observed Ohme "
                     if observed_ohme_hold_active
-                    else "pending Intelligent "
-                    if pending_intelligent_ev_hold_active
-                    else ""
+                    else (
+                        "pending Intelligent "
+                        if pending_intelligent_ev_hold_active
+                        else ""
+                    )
                 )
                 + f"EV hold frozen at {float(ev_hold_floor_percent):.1f}% "
                 "until telemetry recovers or release authority becomes explicit"
@@ -1771,9 +1773,7 @@ class FoxESSControlBackend:
                         paid_idle_household_10_percent_authorised=(
                             household_floor_authorised
                         ),
-                        pending_intelligent_ev_hold_active=(
-                            hold_only_ev_active
-                        ),
+                        pending_intelligent_ev_hold_active=(hold_only_ev_active),
                         happy_hour_house_grid_hold_authorised=(
                             happy_hour_house_grid_hold_authorised
                         ),
@@ -2263,9 +2263,7 @@ class FoxESSControlBackend:
                         decision,
                         cheap_period_confirmed=cheap_period_confirmed,
                         previous_min_soc_on_grid=self._previous_min_soc_on_grid,
-                        pending_intelligent_ev_hold_active=(
-                            hold_only_ev_active
-                        ),
+                        pending_intelligent_ev_hold_active=(hold_only_ev_active),
                         happy_hour_house_grid_hold_authorised=(
                             happy_hour_house_grid_hold_authorised
                         ),
@@ -2280,15 +2278,17 @@ class FoxESSControlBackend:
             "non_cheap_min_soc_policy": (
                 "observed_ohme_hold_only"
                 if observed_ohme_hold_active
-                else "pending_intelligent_ev_hold_only"
-                if pending_intelligent_ev_hold_active
                 else (
-                    "verified_paused_ohme_household_10_percent"
-                    if bridge_paused_verified and household_floor_authorised
+                    "pending_intelligent_ev_hold_only"
+                    if pending_intelligent_ev_hold_active
                     else (
-                        "confirmed_unplugged_household_10_percent"
-                        if household_floor_authorised
-                        else "preserve_pre_kems_baseline"
+                        "verified_paused_ohme_household_10_percent"
+                        if bridge_paused_verified and household_floor_authorised
+                        else (
+                            "confirmed_unplugged_household_10_percent"
+                            if household_floor_authorised
+                            else "preserve_pre_kems_baseline"
+                        )
                     )
                 )
             ),
