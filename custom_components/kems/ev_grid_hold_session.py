@@ -161,6 +161,29 @@ class EVGridHoldSession:
         self._observed_ohme_hold_active = False
         if ohme_finished or disconnected:
             self._last_measured_ohme_at = None
+        # A short Ohme data dropout must not undo an *already verified*
+        # physical floor. Ask the existing FoxESS backend to freeze it with
+        # readback proof; do not issue new writes or infer a cheap tariff.
+        elif (
+            self._held_floor is not None
+            and self._last_measured_ohme_at is not None
+            and timedelta(0)
+            <= now - self._last_measured_ohme_at
+            <= timedelta(seconds=90)
+            and not snapshot.cheap_period_confirmed
+            and no_paid_export_mode
+        ):
+            self._observed_ohme_hold_active = True
+            self._grace_active = True
+            self._last_status = "ev_battery_hold_source_grace"
+            return replace(
+                control,
+                ev_grid_guard_status="ev_battery_hold_source_grace",
+                next_action=(
+                    "Ohme temporarily unconfirmed: preserve only a previously "
+                    "physically verified MinSOC hold, with no new FoxESS write"
+                ),
+            )
 
         pending = protect_pending_intelligent_ev_hold(
             snapshot,
