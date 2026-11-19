@@ -87,6 +87,78 @@ def test_house_reserve_is_not_assumed_to_be_guaranteed_future_discharge() -> Non
     assert abs(split_total - 22.887) <= 0.01
 
 
+
+def test_verified_house_budget_prevents_instantaneous_load_held_for_entire_evening() -> None:
+    """19 Nov: current 2.914 kW is NOT a justified 4.8-hour household forecast."""
+    now = datetime(2026, 11, 19, 18, 30, tzinfo=UTC)
+    deadline = now + timedelta(hours=5)
+    slots = [_slot(now + timedelta(minutes=30 * i), 28.45 - i) for i in range(10)]
+    inputs = dict(
+        slots=slots,
+        capacity_segments=_segments(now, solar_kw=0.0, battery_kw=7.0, count=60),
+        now=now,
+        deadline=deadline,
+        required_discharge_kwh=13.257,
+        house_kw=2.914,
+        export_limit_kw=7.0,
+        safety_headroom_kwh=3.5,
+        maximum_paid_export_kwh=5.023,
+    )
+    old = allocate_total_discharge_slots(**inputs)
+    assert old.planned_battery_export_kwh == 0.0
+    assert old.planned_house_battery_kwh == 13.257
+
+    protected = allocate_total_discharge_slots(
+        **inputs,
+        protected_house_budget_kwh=8.233,  # forecast 6.333 + physical buffer
+    )
+    assert 0.0 < protected.planned_battery_export_kwh <= 5.023
+    assert protected.planned_house_battery_kwh <= 8.233 + 1e-6
+    assert abs(
+        protected.planned_house_battery_kwh
+        + protected.planned_battery_export_kwh
+        - protected.allocated_total_discharge_kwh
+    ) <= 0.01
+    assert protected.allocations[0].planned_house_battery_kwh > 0.0
+    assert protected.allocations[0].planned_battery_export_kwh > 0.0
+    assert protected.unallocated_total_discharge_kwh <= 0.002
+
+
+def test_future_house_budget_never_overrides_current_live_house_floor() -> None:
+    """A household demand spike remains physically supplied house-first."""
+    now = datetime(2026, 11, 19, 19, 0, tzinfo=UTC)
+    result = allocate_total_discharge_slots(
+        slots=[_slot(now, 28.45), _slot(now + timedelta(minutes=30), 20.0)],
+        capacity_segments=_segments(now, solar_kw=0.0, battery_kw=7.0, count=12),
+        now=now,
+        deadline=now + timedelta(hours=1),
+        required_discharge_kwh=4.0,
+        house_kw=4.0,
+        export_limit_kw=7.0,
+        maximum_paid_export_kwh=2.0,
+        protected_house_budget_kwh=0.5,
+    )
+    assert result.allocations[0].planned_house_battery_kwh == 2.0
+    assert result.planned_battery_export_kwh <= 2.0
+    assert result.unallocated_total_discharge_kwh >= 0.0
+
+
+def test_absent_protected_house_budget_preserves_original_safe_allocation() -> None:
+    now = datetime(2026, 11, 19, 18, 30, tzinfo=UTC)
+    inputs = dict(
+        slots=[_slot(now, 28.45), _slot(now + timedelta(minutes=30), 21.0)],
+        capacity_segments=_segments(now, solar_kw=0.0, battery_kw=7.0, count=12),
+        now=now,
+        deadline=now + timedelta(hours=1),
+        required_discharge_kwh=4.0,
+        house_kw=2.914,
+        export_limit_kw=7.0,
+        maximum_paid_export_kwh=2.0,
+    )
+    assert allocate_total_discharge_slots(**inputs) == allocate_total_discharge_slots(
+        **inputs, protected_house_budget_kwh=None
+    )
+
 def test_safety_headroom_forces_earlier_total_discharge_before_deadline_cliff() -> None:
     start = datetime(2026, 8, 26, 20, 0, tzinfo=UTC)
     second = start + timedelta(minutes=30)
