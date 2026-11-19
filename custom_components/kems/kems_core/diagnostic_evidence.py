@@ -352,6 +352,41 @@ def agile_export_interval_audit(
     boundary_reference_settled_kwh = sum(
         row["boundary_reference_export_kwh"] for row in settled_rows
     )
+    # Rank model-versus-sampled export differences without promoting either
+    # source to supplier settlement. Positive/negative offsets can cancel in
+    # the daily net, so retain the absolute discrepancy as separate evidence.
+    ranked_variances = sorted(
+        settled_rows,
+        key=lambda row: (
+            -abs(row["shadow_minus_snapshot_kwh"]),
+            row["valid_from"],
+        ),
+    )
+    top_variances = [
+        {
+            "valid_from": row["valid_from"],
+            "valid_to": row["valid_to"],
+            "shadow_minus_snapshot_kwh": row["shadow_minus_snapshot_kwh"],
+            "shadow_minus_boundary_reference_kwh": round(
+                row["shadow_grid_export_kwh"]
+                - row["boundary_reference_export_kwh"],
+                4,
+            ),
+            "snapshot_export_kwh": row["snapshot_integrated_export_kwh"],
+            "shadow_export_kwh": row["shadow_grid_export_kwh"],
+            "sample_coverage_percent": row["sample_coverage_percent"],
+            "unobserved_seconds": row["unobserved_seconds"],
+            "evidence_limitation_flags": (
+                (["incomplete_observation_coverage"]
+                 if row["sample_coverage_percent"] < 95.0 else [])
+                + (["cross_slot_sample_pair"]
+                   if row["cross_slot_boundary_pairs"] else [])
+                + (["over_ten_minute_sample_gap"]
+                   if row["over_10_minute_gaps"] else [])
+            ),
+        }
+        for row in ranked_variances[:5]
+    ]
     reported_income = _finite(reported_income_pence)
     return {
         "status": (
@@ -373,6 +408,30 @@ def agile_export_interval_audit(
         "shadow_completed_grid_export_kwh": round(shadow_completed_kwh, 3),
         "shadow_minus_snapshot_completed_kwh": round(
             shadow_completed_kwh - observed_settled_kwh, 3
+        ),
+        "settled_variance_absolute_sum_kwh": round(
+            sum(abs(row["shadow_minus_snapshot_kwh"]) for row in settled_rows), 3
+        ),
+        "settled_variance_positive_sum_kwh": round(
+            sum(
+                max(row["shadow_minus_snapshot_kwh"], 0.0)
+                for row in settled_rows
+            ),
+            3,
+        ),
+        "settled_variance_negative_sum_kwh": round(
+            sum(
+                min(row["shadow_minus_snapshot_kwh"], 0.0)
+                for row in settled_rows
+            ),
+            3,
+        ),
+        "top_settled_variance_rows": top_variances,
+        "top_settled_variance_rows_omitted": max(len(ranked_variances) - 5, 0),
+        "variance_triage_note": (
+            "Ranked read-only digital-twin minus power-sample differences. "
+            "Flags identify possible evidence limitations, not root causes; "
+            "neither source is an independent supplier export meter."
         ),
         "sample_priced_income_pence": observed_income,
         "boundary_reference_export_completed_kwh": round(
