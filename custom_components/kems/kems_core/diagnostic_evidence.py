@@ -426,6 +426,27 @@ def agile_export_interval_audit(
         }
         for row in ranked_variances[:5]
     ]
+    # Top ordinary Agile differences must not be hidden behind a higher-ranked
+    # physically verified Power Down window. Restrict to explicitly settled
+    # shadow rows, and keep measurement quality visible for every candidate.
+    non_power_down_ranked = [
+        row
+        for row in ranked_variances
+        if not row["verified_power_down_window_overlap"]
+    ]
+    top_non_power_down = [
+        {
+            "valid_from": row["valid_from"],
+            "valid_to": row["valid_to"],
+            "shadow_minus_snapshot_kwh": row["shadow_minus_snapshot_kwh"],
+            "sample_coverage_percent": row["sample_coverage_percent"],
+            "unobserved_seconds": row["unobserved_seconds"],
+            "cross_slot_boundary_pairs": row["cross_slot_boundary_pairs"],
+            "over_10_minute_gaps": row["over_10_minute_gaps"],
+            "independent_supplier_meter_verified": False,
+        }
+        for row in non_power_down_ranked[:5]
+    ]
     reported_income = _finite(reported_income_pence)
     return {
         "status": (
@@ -480,6 +501,11 @@ def agile_export_interval_audit(
         ),
         "top_settled_variance_rows": top_variances,
         "top_settled_variance_rows_omitted": max(len(ranked_variances) - 5, 0),
+        "non_power_down_completed_settled_slots": len(non_power_down_ranked),
+        "top_non_power_down_variance_rows": top_non_power_down,
+        "top_non_power_down_variance_rows_omitted": max(
+            len(non_power_down_ranked) - len(top_non_power_down), 0
+        ),
         "variance_triage_note": (
             "Ranked read-only digital-twin minus power-sample differences. "
             "Flags identify possible evidence limitations, not root causes; "
