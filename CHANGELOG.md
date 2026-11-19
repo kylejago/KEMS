@@ -1,3 +1,10 @@
+## 0.9.0-alpha9.235 — Read-only Agile export audit and coordinator restart attribution
+
+- **#446:** Rank the five largest settled-shadow versus physical snapshot-integrated Agile half-hour differences, with separate positive/negative/absolute totals, source coverage and boundary flags, and explicit overlaps with **completed, physically verified Power Down** sessions. An overlap is context, not proof of cause. No physical/supplier meter or financial settlement is inferred.
+- **#405:** Add restart-local coordinator scan indices and first-three-after-setup context to performance diagnostics and slow-scan records. Preserve scan scheduling, the raw timings and synchronous critical control behavior. Full overnight speed acceptance remains open.
+- **Safety:** No EV/Ohme, Happy Hour, Power Down, inverter command, battery minimum SOC, DNO, pricing, actual income, ROI, historical backfill or supplier-confirmation changes. 15% deliberate-export and 10% household-only floors and the 7 kW hardware export cap remain authoritative.
+- **Validation:** Includes regression coverage for cancelling shadow variances, incomplete physical sampling and verified/unverified Power Down overlap. No change to the safe-first 06:00–06:30 automatic update window.
+
 ## 0.9.0-alpha9.234 — Guarded Agile house-demand allocation and paid export recovery
 
 - **Export planner:** The 19 November 18:40 physical diagnostic showed 39% physical SOC, 38.317% conservative physical planning SOC and 5.023 kWh of physically permitted AC export, but the total-discharge ledger reserved all 13.257 kWh for the house by extrapolating an instantaneous 2.914 kW load until 23:30. The separate measured-source-bound house forecast was 6.333 kWh with a 2 kWh independent stored-energy buffer.
