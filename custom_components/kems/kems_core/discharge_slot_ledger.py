@@ -288,9 +288,7 @@ def allocate_total_discharge_slots(
         )
         item["allocation_kwh"] = house_dispatch
         remaining -= house_dispatch
-        future_house_budget_left = max(
-            future_house_budget_left - house_dispatch, 0.0
-        )
+        future_house_budget_left = max(future_house_budget_left - house_dispatch, 0.0)
 
     # Preserve the rolling deadline safety guard, but only with discharge
     # budget left after mandatory home service. It may move discretionary
