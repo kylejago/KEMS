@@ -207,9 +207,12 @@ def test_missing_physical_soc_and_site_headroom_never_approve_new_hold():
     assert _apply(_snapshot(grid_import_kw=None)).ev_grid_guard_status == (
         "observed_ohme_hold_blocked_site_unknown"
     )
-    assert _apply(
-        _snapshot(grid_import_kw=9.0, battery_power_kw=6.323)
-    ).ev_grid_guard_status == "observed_ohme_hold_blocked_site_limit"
+    assert (
+        _apply(
+            _snapshot(grid_import_kw=9.0, battery_power_kw=6.323)
+        ).ev_grid_guard_status
+        == "observed_ohme_hold_blocked_site_limit"
+    )
 
 
 def test_ohme_hold_can_be_applied_when_mode_sensor_is_unavailable():
