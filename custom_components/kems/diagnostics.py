@@ -334,6 +334,7 @@ async def async_get_config_entry_diagnostics(
                 now=dt_util.now(),
                 reported_grid_export_kwh=data.simulation.actual_grid_export_kwh,
                 reported_income_pence=data.simulation.actual_export_income_pence,
+                completed_power_down=data.last_power_down.to_dict(),
                 activation_cutoff=entry.options.get(
                     "paid_export_accounting_started_at"
                 ),
