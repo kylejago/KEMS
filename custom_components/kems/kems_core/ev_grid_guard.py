@@ -24,6 +24,150 @@ def _nonnegative(value: float | None) -> float | None:
     return max(float(value), 0.0)
 
 
+
+
+def measured_ohme_ev_charge_active(snapshot: Snapshot) -> bool:
+    """Fresh charger demand is a *hold-only* trigger, never a cheap-rate signal."""
+    power = _nonnegative(snapshot.ev_power_kw)
+    age = snapshot.ev_power_age_seconds
+    return bool(
+        snapshot.ev_connected is True
+        and snapshot.ev_charging is True
+        and power is not None
+        and power > _EV_ACTIVE_KW
+        and age is not None
+        and 0 <= age <= _MAX_OHME_AGE_SECONDS
+        and "ev_power_kw" not in snapshot.stale_fields
+    )
+
+
+def protect_measured_ohme_ev_hold(
+    snapshot: Snapshot,
+    control: ControlState,
+    config: ControlConfig,
+    *,
+    eligible_for_hold_only: bool,
+    held_floor_percent: float | None = None,
+    bounded_pause: bool = False,
+) -> ControlState:
+    """Use the existing Self Use + physical MinSOC route during real EV draw.
+
+    The native Ohme slot service may return an empty plan *while charging*.
+    Fresh physical Ohme power and connected/charging state are a stronger
+    battery-protection trigger, not proof of an Octopus discounted tariff.
+    This guard never selects Force Charge or changes import rate.
+    """
+    if (
+        not eligible_for_hold_only
+        or snapshot.cheap_period_confirmed
+        or snapshot.saving_session_active
+        or control.operating_mode != "control"
+        or control.desired_work_mode != "Self Use"
+        or control.desired_battery_export_power_kw > 0.001
+        or not control.data_fresh
+        or not control.plan_safe
+        or not config.control_enabled
+        or not config.commissioned
+        or config.emergency_stop
+        or control.island_mode_active
+        or not control.grid_available
+        or control.alpha969_routing_shadow_only
+        or control.site_import_limit_exceeded
+    ):
+        return control
+
+    active = measured_ohme_ev_charge_active(snapshot)
+    power = _nonnegative(snapshot.ev_power_kw)
+    age = snapshot.ev_power_age_seconds
+    paused = bool(
+        not active
+        and bounded_pause
+        and held_floor_percent is not None
+        and snapshot.ev_connected is True
+        and snapshot.ev_charging is False
+        and power is not None
+        and power <= _EV_ACTIVE_KW
+        and age is not None
+        and 0 <= age <= _MAX_OHME_AGE_SECONDS
+        and "ev_power_kw" not in snapshot.stale_fields
+    )
+    if not active and not paused:
+        return control
+
+    soc = snapshot.battery_soc
+    if (
+        soc is None
+        or not isfinite(soc)
+        or not 0 <= soc <= 100
+        or "battery_soc" in snapshot.stale_fields
+        or snapshot.source_data_age_seconds is None
+        or snapshot.source_data_age_seconds > config.stale_data_seconds
+    ):
+        return replace(
+            control,
+            ev_grid_guard_status="observed_ohme_hold_blocked_no_fresh_soc",
+            next_action="Ohme charging detected; physical SOC proof missing, no new EV hold write",
+        )
+
+    grid = _nonnegative(snapshot.grid_import_kw)
+    discharge = _nonnegative(snapshot.battery_power_kw)
+    limit = config.site_import_limit_kw
+    if (
+        grid is None
+        or discharge is None
+        or "grid_import_kw" in snapshot.stale_fields
+        or "battery_power_kw" in snapshot.stale_fields
+        or limit is None
+        or not isfinite(limit)
+        or limit <= 0
+    ):
+        return replace(
+            control,
+            ev_grid_guard_status="observed_ohme_hold_blocked_site_unknown",
+            next_action="Ohme battery hold awaiting fresh CT and site-limit evidence",
+        )
+    projected_import = grid + discharge
+    if projected_import > limit + 0.001:
+        return replace(
+            control,
+            ev_grid_guard_status="observed_ohme_hold_blocked_site_limit",
+            next_action="Ohme battery hold blocked by physical site-import limit",
+        )
+
+    held_soc = min(
+        100.0,
+        max(
+            control.desired_min_soc_percent,
+            float(ceil(soc) + 1),
+            held_floor_percent or 0.0,
+        ),
+    )
+    return replace(
+        control,
+        ev_grid_guard_status=(
+            "ev_battery_hold_ohme_measured"
+            if active
+            else "ev_battery_hold_ohme_brief_pause"
+        ),
+        desired_work_mode="Self Use",
+        desired_charge_power_kw=0.0,
+        desired_battery_to_home_power_kw=0.0,
+        desired_battery_export_power_kw=0.0,
+        desired_total_discharge_power_kw=0.0,
+        desired_grid_export_allowed=False,
+        desired_min_soc_percent=held_soc,
+        grid_bypass_power_kw=round(projected_import, 3),
+        total_site_import_kw=round(projected_import, 3),
+        site_import_headroom_kw=round(limit - projected_import, 3),
+        site_import_limit_exceeded=False,
+        next_action=(
+            "Fresh Ohme EV charging: existing Self Use physical MinSOC hold; "
+            "no daytime cheap tariff or battery Force Charge authority"
+            if active
+            else "Short Ohme pause: retain verified battery floor until charging ends"
+        ),
+    )
+
 def protect_pending_intelligent_ev_hold(
     snapshot: Snapshot,
     control: ControlState,
