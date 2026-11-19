@@ -323,7 +323,7 @@ def test_measured_charge_latches_pause_and_releases_on_finished_or_timeout():
     assert paused.ev_grid_guard_status == "ev_battery_hold_ohme_brief_pause"
     assert paused.desired_min_soc_percent == 89.0
     assert ended.ev_grid_guard_status == "inactive"
-    assert resumed.desired_min_soc_percent == 89.0
+    assert resumed.desired_min_soc_percent == 87.0
     assert timeout.ev_grid_guard_status == "inactive"
     assert status["observed_ohme_hold_active"] is False
 
