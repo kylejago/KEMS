@@ -80,9 +80,10 @@ def test_gap_priority_does_not_treat_missing_marker_as_proof_of_no_restart() -> 
         now=start + timedelta(hours=1),
     )
     assert result["gaps_without_recorded_correspondence"] == 1
-    assert result["largest_unattributed_observation_gaps"][0][
-        "physical_import_export_kwh"
-    ] is None
+    assert (
+        result["largest_unattributed_observation_gaps"][0]["physical_import_export_kwh"]
+        is None
+    )
     assert "does not prove no restart" in result["unattributed_gap_note"]
 
 

@@ -430,9 +430,7 @@ def agile_export_interval_audit(
     # physically verified Power Down window. Restrict to explicitly settled
     # shadow rows, and keep measurement quality visible for every candidate.
     non_power_down_ranked = [
-        row
-        for row in ranked_variances
-        if not row["verified_power_down_window_overlap"]
+        row for row in ranked_variances if not row["verified_power_down_window_overlap"]
     ]
     top_non_power_down = [
         {

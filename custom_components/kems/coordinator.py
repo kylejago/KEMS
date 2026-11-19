@@ -1107,9 +1107,7 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
             )
             detail_seconds["agile_manager_wrapper_non_cpu_seconds"] = round(
                 max(
-                    agile_planning_seconds
-                    - manager_base_seconds
-                    - wrapper_cpu_seconds,
+                    agile_planning_seconds - manager_base_seconds - wrapper_cpu_seconds,
                     0.0,
                 ),
                 3,
