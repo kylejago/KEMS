@@ -18,6 +18,7 @@ from kems_core import ControlConfig, ControlState, Snapshot
 from kems_core.control_write_authority import (
     assess_foxess_control_write_authority,
     resolve_live_min_soc_on_grid,
+    should_freeze_owned_ev_hold,
 )
 from kems_core.ev_grid_guard import (
     measured_ohme_ev_charge_active,
@@ -329,6 +330,86 @@ def test_measured_charge_latches_pause_and_releases_on_finished_or_timeout():
     assert resumed.desired_min_soc_percent == 87.0
     assert timeout.ev_grid_guard_status == "inactive"
     assert status["observed_ohme_hold_active"] is False
+
+
+
+def test_transient_missing_ohme_readback_freezes_only_verified_existing_floor():
+    module, fake_store = _session_module()
+    fake_store.data.clear()
+
+    async def run():
+        session = module.EVGridHoldSession(object(), "ohme-dropout")
+        first = await session.async_apply(
+            _snapshot(), _control(), _config(), no_paid_export_mode=True
+        )
+        uncertain = await session.async_apply(
+            _snapshot(
+                timestamp=NOW + timedelta(seconds=30),
+                ev_charging=None,
+                ev_power_kw=None,
+            ),
+            _control(),
+            _config(),
+            no_paid_export_mode=True,
+            source_uncertain=True,
+        )
+        during_status = session.status
+        expired = await session.async_apply(
+            _snapshot(
+                timestamp=NOW + timedelta(seconds=100),
+                ev_charging=None,
+                ev_power_kw=None,
+            ),
+            _control(),
+            _config(),
+            no_paid_export_mode=True,
+            source_uncertain=True,
+        )
+        return first, uncertain, during_status, expired, session.status
+
+    first, uncertain, during, expired, end = asyncio.run(run())
+    assert first.desired_min_soc_percent == 89.0
+    assert uncertain.ev_grid_guard_status == "ev_battery_hold_source_grace"
+    assert during["observed_ohme_hold_active"]
+    assert during["latched_min_soc_percent"] == 89.0
+    assert should_freeze_owned_ev_hold(
+        owned_by_kems=True,
+        latched_min_soc_percent=89.0,
+        last_applied_action="self_use",
+        observed_min_soc_on_grid_percent=89.0,
+        last_verified_min_soc_on_grid_percent=89.0,
+        cheap_period_confirmed=False,
+        source_uncertainty_grace_active=True,
+        no_paid_export_mode=True,
+        ev_connected=True,
+        operating_mode="control",
+        master_control_enabled=True,
+        user_commissioned=True,
+        emergency_stop=False,
+        island_mode_active=False,
+        grid_available=True,
+        pending_intelligent_ev_hold_active=True,
+    )
+    assert not should_freeze_owned_ev_hold(
+        owned_by_kems=True,
+        latched_min_soc_percent=89.0,
+        last_applied_action="self_use",
+        observed_min_soc_on_grid_percent=10.0,
+        last_verified_min_soc_on_grid_percent=89.0,
+        cheap_period_confirmed=False,
+        source_uncertainty_grace_active=True,
+        no_paid_export_mode=True,
+        ev_connected=True,
+        operating_mode="control",
+        master_control_enabled=True,
+        user_commissioned=True,
+        emergency_stop=False,
+        island_mode_active=False,
+        grid_available=True,
+        pending_intelligent_ev_hold_active=True,
+    )
+    assert expired.ev_grid_guard_status == "inactive"
+    assert end["observed_ohme_hold_active"] is False
 
 
 def test_wiring_does_not_promote_ohme_to_cheap_or_add_service_write():
