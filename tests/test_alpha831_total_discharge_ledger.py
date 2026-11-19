@@ -87,8 +87,9 @@ def test_house_reserve_is_not_assumed_to_be_guaranteed_future_discharge() -> Non
     assert abs(split_total - 22.887) <= 0.01
 
 
-
-def test_verified_house_budget_prevents_instantaneous_load_held_for_entire_evening() -> None:
+def test_verified_house_budget_prevents_instantaneous_load_held_for_entire_evening() -> (
+    None
+):
     """19 Nov: current 2.914 kW is NOT a justified 4.8-hour household forecast."""
     now = datetime(2026, 11, 19, 18, 30, tzinfo=UTC)
     deadline = now + timedelta(hours=5)
@@ -114,11 +115,14 @@ def test_verified_house_budget_prevents_instantaneous_load_held_for_entire_eveni
     )
     assert 0.0 < protected.planned_battery_export_kwh <= 5.023
     assert protected.planned_house_battery_kwh <= 8.233 + 1e-6
-    assert abs(
-        protected.planned_house_battery_kwh
-        + protected.planned_battery_export_kwh
-        - protected.allocated_total_discharge_kwh
-    ) <= 0.01
+    assert (
+        abs(
+            protected.planned_house_battery_kwh
+            + protected.planned_battery_export_kwh
+            - protected.allocated_total_discharge_kwh
+        )
+        <= 0.01
+    )
     assert protected.allocations[0].planned_house_battery_kwh > 0.0
     assert protected.allocations[0].planned_battery_export_kwh > 0.0
     assert protected.unallocated_total_discharge_kwh <= 0.002
@@ -158,6 +162,7 @@ def test_absent_protected_house_budget_preserves_original_safe_allocation() -> N
     assert allocate_total_discharge_slots(**inputs) == allocate_total_discharge_slots(
         **inputs, protected_house_budget_kwh=None
     )
+
 
 def test_safety_headroom_forces_earlier_total_discharge_before_deadline_cliff() -> None:
     start = datetime(2026, 8, 26, 20, 0, tzinfo=UTC)
