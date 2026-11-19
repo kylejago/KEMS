@@ -76,9 +76,7 @@ def test_ranked_variance_surfaces_cancelling_errors_without_changing_totals() ->
     top = result["top_settled_variance_rows"]
     assert [r["shadow_minus_snapshot_kwh"] for r in top] == [-1.0, 0.5, 0.1]
     assert top[0]["sample_coverage_percent"] == 100.0
-    assert top[0]["evidence_limitation_flags"] == [
-        "over_ten_minute_sample_gap"
-    ]
+    assert top[0]["evidence_limitation_flags"] == ["over_ten_minute_sample_gap"]
     assert result["reporting_only"] is True
     assert "independent supplier export meter" in result["variance_triage_note"]
     assert slots == original
@@ -132,16 +130,15 @@ def test_verified_power_down_overlap_is_separated_not_assumed_cause() -> None:
         True,
         False,
     ]
-    assert result["top_settled_variance_rows"][0][
-        "verified_power_down_window_overlap"
-    ] is True
+    assert (
+        result["top_settled_variance_rows"][0]["verified_power_down_window_overlap"]
+        is True
+    )
     assert result["reporting_only"] is True
 
     # A mere planned/unverified event is never presented as physical proof.
     event["physical_export_verified"] = False
-    unverified = _audit(
-        start + timedelta(minutes=95), slots, records, power_down=event
-    )
+    unverified = _audit(start + timedelta(minutes=95), slots, records, power_down=event)
     assert unverified["verified_power_down_overlap_settled_slots"] == 0
     assert unverified["non_power_down_shadow_minus_sample_kwh"] == -1.75
 
