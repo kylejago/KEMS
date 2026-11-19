@@ -300,6 +300,24 @@ def _apply_total_discharge_ledger(
             if physical_budget.get("available")
             else 0.0
         )
+    # The physical house budget already includes the independently forecast
+    # home energy plus an extra conservative buffer. Without it, extrapolating
+    # the instantaneous load over the entire evening can consume ALL of the
+    # paid-export budget, even when the same physical guard proves safe AC
+    # export headroom. Do not apply this optimisation to digital-twin/shadow
+    # replays or to an unverified physical input.
+    protected_house_budget_ac = None
+    if isinstance(physical_budget, dict) and physical_budget.get("available"):
+        stored_house = _number(physical_budget.get("protected_house_stored_kwh"))
+        discharge_efficiency = _number(config.discharge_efficiency)
+        if (
+            stored_house is not None
+            and stored_house >= 0
+            and discharge_efficiency is not None
+            and 0 < discharge_efficiency <= 1
+        ):
+            protected_house_budget_ac = stored_house * discharge_efficiency
+
     ledger = allocate_total_discharge_slots(
         slots=list(state.get("today_slots", []) or []),
         capacity_segments=segments,
@@ -311,6 +329,7 @@ def _apply_total_discharge_ledger(
         safety_headroom_kwh=safety_headroom,
         excluded_windows=_power_down_windows(plan),
         maximum_paid_export_kwh=paid_export_cap,
+        protected_house_budget_kwh=protected_house_budget_ac,
     )
 
     by_start = _slot_map(state)
@@ -408,6 +427,24 @@ def _apply_total_discharge_ledger(
             "total_discharge_deadline_target_soc_percent": round(house_goal, 3),
             "physical_paid_export_budget_kwh": (
                 round(paid_export_cap, 3) if paid_export_cap is not None else None
+            ),
+            "physical_house_allocation_cap_ac_kwh": (
+                round(protected_house_budget_ac, 3)
+                if protected_house_budget_ac is not None
+                else None
+            ),
+            "live_load_constant_horizon_projection_kwh": round(
+                planning_house_kw * hours, 3
+            ),
+            "physical_house_allocation_cap_active": (
+                protected_house_budget_ac is not None
+                and planning_house_kw * hours > protected_house_budget_ac + _EPSILON
+            ),
+            "physical_house_allocation_policy": (
+                "verified physical guard house forecast plus independent buffer; "
+                "current live house load remains unbounded"
+                if protected_house_budget_ac is not None
+                else "fail-closed constant live house load across horizon"
             ),
             "deliberate_export_floor_soc_percent": round(target, 3),
             "household_hard_floor_soc_percent": 10.0,
