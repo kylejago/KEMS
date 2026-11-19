@@ -34,7 +34,13 @@ def _observation(at: datetime, power_kw: float) -> SimpleNamespace:
     return SimpleNamespace(timestamp=at, grid_export_kw=power_kw, stale_fields=())
 
 
-def _audit(now: datetime, slots: list[dict], records: list) -> dict:
+def _audit(
+    now: datetime,
+    slots: list[dict],
+    records: list,
+    *,
+    power_down: dict | None = None,
+) -> dict:
     return audit_module.agile_export_interval_audit(
         now=now,
         agile_state={"today_slots": slots},
@@ -42,6 +48,7 @@ def _audit(now: datetime, slots: list[dict], records: list) -> dict:
         reported_grid_export_kwh=9.0,
         reported_income_pence=18.41,
         activation_cutoff="2026-11-19T00:00:00+00:00",
+        completed_power_down=power_down,
     )
 
 
@@ -69,7 +76,9 @@ def test_ranked_variance_surfaces_cancelling_errors_without_changing_totals() ->
     top = result["top_settled_variance_rows"]
     assert [r["shadow_minus_snapshot_kwh"] for r in top] == [-1.0, 0.5, 0.1]
     assert top[0]["sample_coverage_percent"] == 100.0
-    assert top[0]["evidence_limitation_flags"] == []
+    assert top[0]["evidence_limitation_flags"] == [
+        "over_ten_minute_sample_gap"
+    ]
     assert result["reporting_only"] is True
     assert "independent supplier export meter" in result["variance_triage_note"]
     assert slots == original
@@ -93,6 +102,48 @@ def test_variance_triage_marks_gaps_and_crossings_without_claiming_cause() -> No
     assert "cross_slot_sample_pair" in top["evidence_limitation_flags"]
     assert "over_ten_minute_sample_gap" in top["evidence_limitation_flags"]
     assert len(result["top_settled_variance_rows"]) == 1
+
+
+def test_verified_power_down_overlap_is_separated_not_assumed_cause() -> None:
+    start = datetime(2026, 11, 19, 17, tzinfo=UTC)
+    event = {
+        "completed_successfully": True,
+        "physical_export_verified": True,
+        "session_start": start.isoformat(),
+        "session_end": (start + timedelta(hours=1)).isoformat(),
+    }
+    slots = [
+        _slot(start, 0.0),
+        _slot(start + timedelta(minutes=30), 0.0),
+        _slot(start + timedelta(hours=1), 0.25),
+    ]
+    records = [
+        _observation(start, 2.0),
+        _observation(start + timedelta(minutes=30), 2.0),
+        _observation(start + timedelta(hours=1), 0.0),
+        _observation(start + timedelta(minutes=90), 0.0),
+    ]
+    result = _audit(start + timedelta(minutes=95), slots, records, power_down=event)
+    assert result["verified_power_down_overlap_settled_slots"] == 2
+    assert result["verified_power_down_overlap_shadow_minus_sample_kwh"] == -2.0
+    assert result["non_power_down_shadow_minus_sample_kwh"] == 0.25
+    assert [row["verified_power_down_window_overlap"] for row in result["rows"]] == [
+        True,
+        True,
+        False,
+    ]
+    assert result["top_settled_variance_rows"][0][
+        "verified_power_down_window_overlap"
+    ] is True
+    assert result["reporting_only"] is True
+
+    # A mere planned/unverified event is never presented as physical proof.
+    event["physical_export_verified"] = False
+    unverified = _audit(
+        start + timedelta(minutes=95), slots, records, power_down=event
+    )
+    assert unverified["verified_power_down_overlap_settled_slots"] == 0
+    assert unverified["non_power_down_shadow_minus_sample_kwh"] == -1.75
 
 
 def test_coordinator_restart_index_is_observability_only() -> None:
