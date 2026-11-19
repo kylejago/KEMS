@@ -104,7 +104,10 @@ def protect_measured_ohme_ev_hold(
         return replace(
             control,
             ev_grid_guard_status="observed_ohme_hold_blocked_no_fresh_soc",
-            next_action="Ohme charging detected; physical SOC proof missing, no new EV hold write",
+            next_action=(
+                "Ohme charging detected; physical SOC proof missing, "
+                "no new EV hold write"
+            ),
         )
 
     grid = _nonnegative(snapshot.grid_import_kw)
