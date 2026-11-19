@@ -1326,7 +1326,7 @@ class FoxESSControlBackend:
                 and ev_hold_floor_percent is None
                 and not ev_hold_source_grace_active
                 and not pending_intelligent_ev_hold_active
-            and not observed_ohme_hold_active
+                and not observed_ohme_hold_active
                 and not self._commissioning_restore_pending
                 and binding_ready
                 and technical_ready
@@ -1430,7 +1430,7 @@ class FoxESSControlBackend:
                 and not commissioning_export_test
                 and not ev_hold_source_grace_active
                 and not pending_intelligent_ev_hold_active
-            and not observed_ohme_hold_active
+                and not observed_ohme_hold_active
                 and ev_hold_floor_percent is None
                 and control.ev_grid_guard_status == "inactive"
                 and not power_down_export_authorised
@@ -1745,7 +1745,7 @@ class FoxESSControlBackend:
                         and not happy_hour_charge_authorised
                         and not happy_hour_house_grid_hold_authorised
                         and not pending_intelligent_ev_hold_active
-            and not observed_ohme_hold_active
+                and not observed_ohme_hold_active
                         and not ev_hold_source_grace_active
                         and ev_hold_floor_percent is None
                         and ev_connected is False
