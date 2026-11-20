@@ -1,4 +1,51 @@
-# Start here — KEMS Alpha8.0
+# Start here — KEMS
+
+## Current live system (20 November 2026)
+
+KEMS `0.9.0-alpha9.239` is the latest version verified installed from
+Home Assistant diagnostics. The property uses FoxESS KH7, solar PV, battery,
+Octopus Energy and Ohme ePod in **live Control mode**. This is **not** the
+earlier Alpha8.0 simulation-only commissioning baseline described below.
+
+The integration is available through **Home Assistant → Settings → Devices &
+services → KEMS**. Its managed dashboard should distinguish **Live KEMS**
+(measured power, physical battery SOC and actual control), **No KEMS**
+(counterfactual), and clearly labelled planned/simulated Agile intervals.
+A model result must never be presented as an independent supplier meter.
+
+**Live control:** 7 kW DNO export ceiling, 15% minimum for deliberate paid
+export, 10% independent house-only cutoff, whole-site import protection and
+measured Ohme-triggered battery hold. Normal confirmed overnight off-peak
+import is authorised; **extra Ohme smart-charging periods do not prove
+whole-home discounted electricity** until the supplier confirms that scope
+and KEMS has a separately approved live tariff route.
+
+**Not live:** the experimental price-driven solar-only
+`solar_routing_shadow` decision to switch Self Use to Feed-in First.
+Ordinary Agile battery export is already live and separate.
+
+**Updates:** automatic safe-first maintenance **06:00–06:30
+Europe/London**, with protected export/EV/events deferring installation.
+Use the release bundle and SHA-256 validation; do not force installation
+during active export or a reward session.
+
+**Notifications:** joined events, normal overnight off-peak, observed Ohme
+charger activity, daily/weekly summaries and private warnings are routed
+through KEMS to configured Home Assistant WhatsApp notify entities.
+Observed charging is not represented as an Intelligent cheap-tariff slot.
+
+For current priorities see GitHub issue
+[#449](https://github.com/kylejago/KEMS/issues/449), and for the remaining
+solar-only scope see
+[#365](https://github.com/kylejago/KEMS/issues/365).
+
+---
+
+## Historical Alpha8.0 consolidation notes
+
+The following text is retained as historical architectural and compatibility
+reference, **not the version to install or current live write-authority policy**.
+
 
 KEMS is in the **Observe → Learn → Advise → Simulate → Shadow → Control** engineering sequence. Alpha8.0 is the coordinated cleanup baseline: it preserves the proven Alpha7.52 behaviour while consolidating the Home Assistant, Web/Pi/PWA and managed-panel release families.
 

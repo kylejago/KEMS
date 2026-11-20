@@ -79,18 +79,18 @@ def test_not_an_event_when_unknown_or_stale_or_naive():
     )
 
 
-def test_reporter_keeps_state_and_idempotency_without_affecting_control():
+def test_legacy_intelligent_helper_kept_for_existing_regressions_not_live_alerts():
     source = (ROOT / "whatsapp_notifications.py").read_text()
-    assert '"intelligent_slot_last_state": self._intelligent_slot_last_state' in source
-    assert 'if value not in {"on", "off"}:' in source
-    assert "changed_at < self._slot_setup_at" in source
-    assert "await self._intelligent_slot_alerts(now)" in source
-    assert "await self._send(key, message, private=False, now=now)" in source
+    assert "async def _intelligent_slot_alerts" not in source
+    assert "await self._observed_ohme_charge_alerts(now)" in source
+    assert '"intelligent_slot_alerts_enabled": False' in source
+    assert "ohme_charging_last_state" in source
+    assert "ohme-charge:" in source
     assert "legacy_intelligent_slot_mobile_automations" in source
     assert '"octopus intelligent slot notification on"' in source
     assert '"octopus intelligent slot end notification"' in source
-    assert "No real slot has been started" in source
-    assert "No real slot has ended" in source
+    assert "No real slot has been started" not in source
+    assert "No real slot has ended" not in source
     ast.parse(source)
 
 
@@ -115,16 +115,17 @@ def test_intelligent_slot_messages_have_real_line_breaks() -> None:
         assert r"\n" not in message
 
 
-def test_test_all_intelligent_examples_have_actual_line_breaks() -> None:
+def test_test_all_ohme_examples_have_real_line_breaks_and_no_discount_claim() -> None:
     tree = ast.parse((ROOT / "whatsapp_notifications.py").read_text())
     strings = [
         node.value
         for node in ast.walk(tree)
         if isinstance(node, ast.Constant) and isinstance(node.value, str)
     ]
-    on = next(value for value in strings if "Sample active-slot alert only." in value)
-    off = next(value for value in strings if "Sample ended-slot alert only." in value)
-    assert "*\n🕒 Start: 23:30\n🕓 End: TBC\n" in on
-    assert "*\n🕒 End: 05:30\n" in off
+    on = next(value for value in strings if "Sample charge-start alert only." in value)
+    off = next(value for value in strings if "Sample charge-stop alert only." in value)
+    assert "*\n🕒 Observed: 06:30\n" in on
+    assert "*\n🕒 Observed: 07:00\n" in off
+    assert "Supplier discount is not confirmed." in on + off
     assert r"\n" not in on
     assert r"\n" not in off

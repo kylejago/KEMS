@@ -117,12 +117,12 @@ def test_reporter_persists_independent_offpeak_dedupe_and_no_extra_control():
     source = REPORTER.read_text(encoding="utf-8")
     assert '"regular_offpeak_last_state": self._regular_offpeak_last_state' in source
     assert "await self._regular_offpeak_alerts(now)" in source
-    assert "await self._intelligent_slot_alerts(now)" in source
+    assert "await self._observed_ohme_charge_alerts(now)" in source
     assert "regular_offpeak_transitions_accepted" in source
-    assert "normal_just_ended" in source
+    assert "ohme_charging_transitions_accepted" in source
     assert "tariff_commissioning_blocked" in source
     assert 'not getattr(control, "commissioned", False)' in source
-    assert '"intelligent_slot_last_state": self._intelligent_slot_last_state' in source
+    assert '"intelligent_slot_alerts_enabled": False' in source
     ast.parse(source)
     commission = COMMISSIONING.read_text(encoding="utf-8")
     assert "tariff_data_commissioning_ready(data.snapshot)" in commission

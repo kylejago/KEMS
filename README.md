@@ -1,6 +1,52 @@
 # KEMS — Kyle Energy Management System
 
-KEMS 0.7.0-alpha7 is the pre-installation control-development lab for Home Assistant. It extends the 0.6.0-beta1 baseline into:
+**Current operating baseline (20 November 2026):** Home Assistant KEMS
+`0.9.0-alpha9.239`, commissioned and operating in **Control** mode with
+live FoxESS KH7, solar PV, battery, Octopus tariffs and Ohme charging evidence.
+The version here is the last independently verified installed diagnostic, not a
+promise that this repository always matches the installed integration.
+
+### What actually runs live
+
+- **Live Agile Outgoing** — rolling price/solar/house forecasts inform the
+  approved FoxESS battery-export command path. Physical telemetry, the
+  commissioned **7 kW DNO limit**, the **15% deliberate-export reserve** and
+  separate **10% house-only floor** independently bound every paid export.
+- **Confirmed overnight cheap import** — normal 23:30–05:30 tariff evidence
+  controls authorised grid charging and house supply; no daytime discount is
+  assumed from Ohme charging alone.
+- **Ohme EV protection** — measured charging triggers guarded home-battery
+  protection independent of the retired Octopus Intelligent integration.
+  Protection does **not** prove a discounted supplier tariff.
+- **Happy Hour / Power Down** — confirmed joined events take their dedicated,
+  higher-priority event routes; actual rewards and supplier-settled amounts are
+  distinguished from estimated credits.
+- **Live and No-KEMS reporting** — current physical values plus the explicit
+  counterfactual No-KEMS baseline. The digital twin is planning/reporting
+  evidence, not a second physical meter or an independent inverter writer.
+
+**Not yet live:** price-only *solar-surplus* Self Use ↔ Feed-in First
+mode switching remains in the read-only `solar_routing_shadow.py` evaluator.
+Do not mistake that evaluator for the already-live paid Agile export controller.
+
+**Notifications:** regular off-peak, joined events, daily/weekly reports and
+private technical warnings use configured Home Assistant `notify.` services.
+The retired Intelligent-slot notification cannot certify Ohme extra cheap
+hours; observed Ohme charging alerts explicitly do not claim supplier discounts.
+
+**Updates:** KEMS's safe-first automatic update window is **06:00–06:30
+Europe/London**. Never interrupt active paid export, EV charging, Happy Hour or
+Power Down merely to install a new release.
+
+### Historical development reference
+
+The original Alpha7 proposal/control-lab documentation follows for
+development and migration provenance. Its statements that all FoxESS writes
+are blocked described the *pre-commissioning* alpha, **not today's live system**.
+
+---
+
+KEMS 0.7.0-alpha7 was the pre-installation control-development lab for Home Assistant. It extends the 0.6.0-beta1 baseline into:
 
 **Observe → Learn → Advise → Simulate → Shadow → Control**
 
