@@ -483,7 +483,7 @@ class EfficientAgileSmartExportManager(AgileSmartExportManager):
                 "friendly_name": "Agile Smart Export flow now",
                 "mode": "simulation_only",
                 "mode_scope": "read_only_agile_planning_and_comparison",
-                "physical_dispatch_owner": "foxess_control_backend",
+                "physical_dispatch_owner": "commissioned_control_backend",
                 "protocol": "KEMS panel flow v1",
                 **flow_attrs,
             },
