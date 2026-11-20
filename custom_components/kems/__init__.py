@@ -128,13 +128,26 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             "Unable to update the managed KEMS dashboard; continuing KEMS setup"
         )
 
-    options = _alpha876_planning_options(dict(entry.options))
-    if options != dict(entry.options):
+    previous_options = dict(entry.options)
+    options = _alpha876_planning_options(previous_options)
+    reserve_migrated = options != previous_options
+    # The old megakid Intelligent dispatch source has been retired. Its saved
+    # opt-in MUST NOT remain live tariff authority even on older HA entries.
+    legacy_intelligent_retired = options.get(CONF_INTELLIGENT_SLOTS_ENABLED) is True
+    if legacy_intelligent_retired:
+        options[CONF_INTELLIGENT_SLOTS_ENABLED] = False
+    if options != previous_options:
         hass.config_entries.async_update_entry(entry, options=options)
-        LOGGER.info(
-            "KEMS migrated the legacy battery reserve to a minimum 15%% "
-            "optimiser target; the independent hard safety floor remains 10%%"
-        )
+        if reserve_migrated:
+            LOGGER.info(
+                "KEMS migrated the legacy battery reserve to a minimum 15%% "
+                "optimiser target; the independent hard safety floor remains 10%%"
+            )
+        if legacy_intelligent_retired:
+            LOGGER.info(
+                "KEMS retired unsupported Intelligent daytime tariff authority; "
+                "only independently verified normal off-peak remains eligible"
+            )
 
     # Remove the unsupported megakid Intelligent mappings *before* HA source
     # validation or coordinator construction. Octopus/Ohme cannot prove extra
@@ -287,10 +300,14 @@ async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         options.setdefault(CONF_MANUAL_STANDING_CHARGE, 53.70435)
         options.setdefault(CONF_MANUAL_OFFPEAK_START, "23:30:00")
         options.setdefault(CONF_MANUAL_OFFPEAK_END, "05:30:00")
-        options.setdefault(CONF_INTELLIGENT_SLOTS_ENABLED, True)
+        options.setdefault(CONF_INTELLIGENT_SLOTS_ENABLED, False)
 
     if entry.version < 13:
         options.setdefault(CONF_EXPORT_TARIFF_STATUS, "active")
+
+    # Also retire explicit True stored by later legacy schemas.
+    if options.get(CONF_INTELLIGENT_SLOTS_ENABLED) is True:
+        options[CONF_INTELLIGENT_SLOTS_ENABLED] = False
 
     hass.config_entries.async_update_entry(
         entry,
