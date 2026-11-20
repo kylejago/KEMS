@@ -7,6 +7,7 @@ import logging
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers import entity_registry as er
 
 from .agile_simulation_presentation import install_agile_simulation_presentation
 from .alpha95_presentation import (
@@ -59,6 +60,10 @@ from .providers.octoplus import OctoplusProvider
 from .providers.octopus import OctopusProvider
 from .providers.ohme import OhmeProvider
 from .recorder_hygiene import install_alpha916_recorder_hygiene
+from .retired_intelligent import (
+    retire_unavailable_kems_intelligent_entities,
+    without_retired_intelligent_option,
+)
 from .settings import KEMSSettings
 from .source_authority import async_reconcile_source_mappings
 from .update_orchestrator import async_unload_update_orchestrator
@@ -130,12 +135,17 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     previous_options = dict(entry.options)
     options = _alpha876_planning_options(previous_options)
-    reserve_migrated = options != previous_options
+    reserve_migrated = options.get(CONF_BATTERY_RESERVE) != previous_options.get(
+        CONF_BATTERY_RESERVE
+    )
     # The old megakid Intelligent dispatch source has been retired. Its saved
     # opt-in MUST NOT remain live tariff authority even on older HA entries.
     legacy_intelligent_retired = options.get(CONF_INTELLIGENT_SLOTS_ENABLED) is True
     if legacy_intelligent_retired:
         options[CONF_INTELLIGENT_SLOTS_ENABLED] = False
+    # Remove the retired key altogether; keeping False still exposes a dead
+    # control and later category saves can accidentally copy an old True.
+    options = without_retired_intelligent_option(options)
     if options != previous_options:
         hass.config_entries.async_update_entry(entry, options=options)
         if reserve_migrated:
@@ -248,6 +258,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         await update_orchestrator.async_set_policy(automatic_restart=True)
     install_agile_simulation_presentation()
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+    retired_entities = retire_unavailable_kems_intelligent_entities(
+        er.async_get(hass), hass.states, entry_id=entry.entry_id
+    )
+    if retired_entities:
+        LOGGER.info("Removed obsolete KEMS-only Intelligent entities: %s", retired_entities)
     # No notifications are sent until users explicitly enable them in
     # integration options. Setup failures do not gate physical dispatch.
     await async_setup_kems_whatsapp(hass, entry, coordinator)
@@ -308,6 +323,7 @@ async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # Also retire explicit True stored by later legacy schemas.
     if options.get(CONF_INTELLIGENT_SLOTS_ENABLED) is True:
         options[CONF_INTELLIGENT_SLOTS_ENABLED] = False
+    options = without_retired_intelligent_option(options)
 
     hass.config_entries.async_update_entry(
         entry,
