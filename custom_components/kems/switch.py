@@ -21,6 +21,8 @@ from .const import (
     CONF_EMERGENCY_STOP,
     CONF_EV_SOC_SYNC_ENABLED,
     CONF_HAPPY_HOUR_OHME_CONTROL_ENABLED,
+    CONF_OHME_PRIORITISE_SAVINGS,
+    DEFAULT_OPTIONS,
     CONF_SYSTEM_COMMISSIONED,
 )
 from .entity import KEMSEntity
@@ -29,7 +31,11 @@ from .happy_hour_auto_join import (
     CONF_HAPPY_HOUR_AUTO_JOIN_ENABLED,
     happy_hour_auto_join_state,
 )
-from .runtime_options import async_set_control_gate_option, async_set_runtime_option
+from .runtime_options import (
+    async_set_control_gate_option,
+    async_set_ohme_preference_option,
+    async_set_runtime_option,
+)
 from .update_orchestrator import build_update_switch_entities
 
 # Apply the Alpha9.34 commissioning contract before any switch state is exposed.
@@ -53,10 +59,55 @@ async def async_setup_entry(
         KEMSWeekendHappyHourAutoJoinSwitch(coordinator),
         KEMSHappyHourOhmeControlSwitch(coordinator),
         KEMSEVSOCSyncSwitch(coordinator),
+        KEMSOHMEPrioritiseSavingsSwitch(coordinator),
         KEMSExportCommissioningTestSwitch(coordinator),
     ]
     entities.extend(build_update_switch_entities(hass, coordinator, entry))
     async_add_entities(entities)
+
+
+class KEMSOHMEPrioritiseSavingsSwitch(KEMSEntity, SwitchEntity):
+    """Manually declare the Ohme app preference without controlling the charger."""
+
+    _attr_name = "Ohme Prioritise savings (declared)"
+    _attr_icon = "mdi:leaf-circle-outline"
+    _attr_entity_category = EntityCategory.CONFIG
+
+    def __init__(self, coordinator) -> None:
+        super().__init__(coordinator, "ohme_prioritise_savings_declared")
+
+    @property
+    def is_on(self) -> bool:
+        return (
+            self.coordinator.entry.options.get(
+                CONF_OHME_PRIORITISE_SAVINGS,
+                DEFAULT_OPTIONS[CONF_OHME_PRIORITISE_SAVINGS],
+            )
+            is True
+        )
+
+    @property
+    def extra_state_attributes(self):
+        return {
+            "source": "manual_declaration_not_ohme_app_verification",
+            "must_also_change_in_ohme_app": True,
+            "no_charger_setting_write": True,
+            "supplier_discount_confirmed": False,
+            "extra_daytime_force_charge_authorised": False,
+            "physical_ev_hold_always_independent": True,
+        }
+
+    async def async_turn_on(self, **kwargs) -> None:
+        await async_set_ohme_preference_option(
+            self.hass, self.coordinator.entry, CONF_OHME_PRIORITISE_SAVINGS, True
+        )
+        self.async_write_ha_state()
+
+    async def async_turn_off(self, **kwargs) -> None:
+        await async_set_ohme_preference_option(
+            self.hass, self.coordinator.entry, CONF_OHME_PRIORITISE_SAVINGS, False
+        )
+        self.async_write_ha_state()
 
 
 class KEMSBatteryInstalledSwitch(KEMSEntity, SwitchEntity):

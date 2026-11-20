@@ -37,6 +37,18 @@ CONF_EV_SOC = "ev_soc"
 CONF_VEHICLE_SOC_SOURCE = "vehicle_soc_source"
 CONF_OHME_SOC_INPUT = "ohme_soc_input"
 CONF_OHME_CHARGE_MODE = "ohme_charge_mode"
+# Operator-declared Ohme preference, not an observed app setting.
+CONF_OHME_PRIORITISE_SAVINGS = "ohme_prioritise_savings_confirmed"
+# Supplier reply, not an active cheap-rate dispatch confirmation.
+CONF_OHME_EXTRA_SLOT_TARIFF = "ohme_extra_slot_tariff_treatment"
+OHME_EXTRA_SLOT_UNCONFIRMED = "unconfirmed"
+OHME_EXTRA_SLOT_EV_ONLY = "ev_only"
+OHME_EXTRA_SLOT_WHOLE_HOME = "whole_home"
+OHME_EXTRA_SLOT_TARIFF_LABELS = {
+    OHME_EXTRA_SLOT_UNCONFIRMED: "Unconfirmed",
+    OHME_EXTRA_SLOT_EV_ONLY: "EV only discounted",
+    OHME_EXTRA_SLOT_WHOLE_HOME: "Whole home discounted",
+}
 CONF_EV_SOC_SYNC_ENABLED = "ev_soc_sync_enabled"
 CONF_HAPPY_HOUR_OHME_CONTROL_ENABLED = "happy_hour_ohme_control_enabled"
 CONF_OHME_IDLE_HOUSE_BRIDGE_ENABLED = "ohme_idle_house_bridge_enabled"
@@ -214,6 +226,10 @@ DEFAULT_OPTIONS = {
     CONF_TARIFF_CHANGE_3_OFFPEAK_RATE: 6.60,
     CONF_TARIFF_CHANGE_3_STANDING_CHARGE: 55.52,
     CONF_INTELLIGENT_SLOTS_ENABLED: False,
+    # Owner confirms Ohme is currently configured as Prioritise savings.
+    # This is a manual declaration; KEMS cannot read the actual app preference.
+    CONF_OHME_PRIORITISE_SAVINGS: True,
+    CONF_OHME_EXTRA_SLOT_TARIFF: OHME_EXTRA_SLOT_UNCONFIRMED,
     CONF_HAPPY_HOUR_OHME_CONTROL_ENABLED: False,
     CONF_OHME_IDLE_HOUSE_BRIDGE_ENABLED: False,
     CONF_EV_SOC_SYNC_ENABLED: False,
