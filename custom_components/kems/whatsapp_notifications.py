@@ -31,9 +31,9 @@ from .happy_hour_auto_join import verified_octopus_joined_bookings
 from .kems_core.whatsapp_message_plans import (
     completed_period_message,
     event_notifications,
-    ohme_charging_message,
     morning_report_due,
     notify_entity_readiness,
+    ohme_charging_message,
     regular_offpeak_message,
 )
 
