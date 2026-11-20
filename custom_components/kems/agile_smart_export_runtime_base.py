@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import UTC, date, datetime, time, timedelta
+from time import perf_counter
 from typing import Any
 
 from homeassistant.core import HomeAssistant
@@ -31,7 +32,7 @@ from .tariff import TariffSettings
 
 
 def _record_agile_publication_phase(
-    manager: Any, phase: str, started: float,
+    manager: Any, phase: str, started: float
 ) -> None:
     """Read-only, per-scan timings; no publication or control branching."""
     profile = getattr(manager, "_kems_agile_publication_profile", None)
@@ -40,6 +41,7 @@ def _record_agile_publication_phase(
     entry = profile.setdefault(phase, {"calls": 0, "seconds": 0.0})
     entry["calls"] += 1
     entry["seconds"] += max(perf_counter() - started, 0.0)
+
 
 ANALYSIS_REFRESH = timedelta(minutes=5)
 RECENT_RATE_LOOKBACK = timedelta(days=2)
