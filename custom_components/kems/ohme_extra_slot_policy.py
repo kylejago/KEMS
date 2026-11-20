@@ -92,7 +92,9 @@ def ohme_extra_slot_evidence(
         "whole_home_discount_verified": False,
         "extra_daytime_grid_force_charge_authorised": False,
         "ev_battery_hold_remains_independent": True,
-        "implementation_stage": "read_only_until_octopus_reply_and_reviewed_live_wiring",
+        "implementation_stage": (
+            "read_only_until_octopus_reply_and_reviewed_live_wiring"
+        ),
         "note": (
             "Smart Charge plus measured charging may suggest a managed session, "
             "not prove a supplier-billed whole-home rate. App preference and "

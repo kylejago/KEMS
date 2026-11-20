@@ -32,8 +32,8 @@ from .kems_core.operational_diagnostic_probes import (
     roi_recorder_probe,
 )
 from .kems_core.period_coverage_probe import observation_coverage_probe
-from .panel import panel_health_snapshot
 from .ohme_extra_slot_policy import ohme_extra_slot_evidence
+from .panel import panel_health_snapshot
 from .product_types import (
     EXPORT_TARIFF_TYPE_AGILE,
     export_tariff_type_from_options,

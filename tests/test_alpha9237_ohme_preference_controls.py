@@ -16,7 +16,9 @@ def _load_policy() -> ModuleType:
     package.__path__ = [str(KEMS)]
     sys.modules[package.__name__] = package
     name = f"{package.__name__}.ohme_extra_slot_policy"
-    spec = importlib.util.spec_from_file_location(name, KEMS / "ohme_extra_slot_policy.py")
+    spec = importlib.util.spec_from_file_location(
+        name, KEMS / "ohme_extra_slot_policy.py"
+    )
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     sys.modules[name] = module
@@ -58,7 +60,7 @@ def test_whole_home_selection_is_not_a_live_force_charge_authorisation() -> None
     assert result["whole_home_discount_verified"] is False
 
 
-def test_boost_unknown_stale_overnight_and_manual_off_do_not_trigger_candidate() -> None:
+def test_unknown_stale_overnight_and_manual_off_fail_closed() -> None:
     policy = _load_policy()
     for change in (
         {"charge_mode": "Max charge"},
@@ -85,7 +87,9 @@ def test_options_can_change_without_reloading_commissioned_control() -> None:
         if isinstance(node, ast.AsyncFunctionDef)
         and node.name == "async_set_ohme_preference_option"
     )
-    attrs = [node.attr for node in ast.walk(definition) if isinstance(node, ast.Attribute)]
+    attrs = [
+        node.attr for node in ast.walk(definition) if isinstance(node, ast.Attribute)
+    ]
     assert "async_update_entry" in attrs
     assert "async_reload" not in attrs
     switch = (KEMS / "switch.py").read_text(encoding="utf-8")
