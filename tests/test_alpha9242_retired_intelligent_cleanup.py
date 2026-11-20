@@ -58,12 +58,14 @@ def test_retired_option_removed_without_mutating_caller():
 
 def test_registry_cleanup_touches_only_owned_unavailable_orphaned_entities():
     cleanup = _cleanup()
+
     def entity(entry_id, key, platform="kems"):
         return SimpleNamespace(
             config_entry_id=entry_id,
             unique_id=f"{entry_id}_{key}",
             platform=platform,
         )
+
     own_a = "binary_sensor.kems_intelligent_slot"
     own_b = "binary_sensor.kems_intelligent_slot_source_fresh"
     foreign = "binary_sensor.octopus_intelligent_tariff_octopus_intelligent_slot"
