@@ -27,7 +27,7 @@ def test_agile_manager_keeps_compat_mode_but_labels_its_scope() -> None:
     for text in (source, flow):
         assert '"mode": "simulation_only"' in text
         assert '"mode_scope": "read_only_agile_planning_and_comparison"' in text
-        assert '"physical_dispatch_owner": "foxess_control_backend"' in text
+        assert '"physical_dispatch_owner": "commissioned_control_backend"' in text
     assert '"does_not_authorise_hardware_writes": True' in source
 
 
