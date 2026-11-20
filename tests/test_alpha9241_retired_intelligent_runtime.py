@@ -18,11 +18,14 @@ def _node(name: str) -> ast.AST:
     )
 
 
-def test_main_setup_retires_saved_true_before_source_validation_and_coordinator() -> None:
+def test_setup_retires_old_true_before_source_validation() -> None:
     source = (KEMS / "__init__.py").read_text(encoding="utf-8")
     setup = ast.get_source_segment(source, _node("async_setup_entry"))
     assert setup is not None
-    assert "legacy_intelligent_retired = options.get(CONF_INTELLIGENT_SLOTS_ENABLED) is True" in setup
+    assert (
+        "legacy_intelligent_retired = options.get(CONF_INTELLIGENT_SLOTS_ENABLED) is True"
+        in setup
+    )
     assert "options[CONF_INTELLIGENT_SLOTS_ENABLED] = False" in setup
     assert "hass.config_entries.async_update_entry(entry, options=options)" in setup
     assert setup.index("options[CONF_INTELLIGENT_SLOTS_ENABLED] = False") < setup.index(
