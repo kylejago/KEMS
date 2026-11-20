@@ -1,4 +1,4 @@
-"""Alpha9.238: exact full-input SHA-256 with compact Snapshot pickling.
+"""Alpha9.239: exact full-input SHA-256 with compact Snapshot pickling.
 
 The faster path is historical reporting only. It must validate every field,
 including nested mutable dictionaries, signed floats and London fold timestamps;

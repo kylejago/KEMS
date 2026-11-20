@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import UTC, date, datetime, time, timedelta
+from time import perf_counter
 from typing import Any
 
 from homeassistant.core import HomeAssistant
@@ -28,6 +29,17 @@ from .kems_core import (
 )
 from .kems_core.agile_historical_replay_cache import HistoricalReplayCache
 from .tariff import TariffSettings
+
+
+def _record_agile_publication_phase(manager: Any, phase: str, started: float) -> None:
+    """Read-only, per-scan timings; no publication or control branching."""
+    profile = getattr(manager, "_kems_agile_publication_profile", None)
+    if not isinstance(profile, dict):
+        return
+    entry = profile.setdefault(phase, {"calls": 0, "seconds": 0.0})
+    entry["calls"] += 1
+    entry["seconds"] += max(perf_counter() - started, 0.0)
+
 
 ANALYSIS_REFRESH = timedelta(minutes=5)
 RECENT_RATE_LOOKBACK = timedelta(days=2)
@@ -378,6 +390,7 @@ class EfficientAgileSmartExportManager(AgileSmartExportManager):
 
     def _publish(self, state: dict[str, Any]) -> None:
         """Publish coverage, tariff benchmark, solar routing, and panel flow."""
+        routing_started = perf_counter()
         if self._panel_config is not None:
             _enrich_slot_routing(
                 state.get("today_slots"),
@@ -392,6 +405,8 @@ class EfficientAgileSmartExportManager(AgileSmartExportManager):
                 self._simulation,
             )
         _annotate_solar_first_display(state)
+        _record_agile_publication_phase(self, "routing", routing_started)
+        booked_started = perf_counter()
         # The independent, supplier-joined reward-hour presentation runs
         # AFTER canonical flow formation and before sensor publication.
         # It writes only flow_* fields; original optimizer/settlement slots
@@ -414,6 +429,8 @@ class EfficientAgileSmartExportManager(AgileSmartExportManager):
                 charge_efficiency=getattr(hh_simulation, "charge_efficiency", 0.0),
                 site_import_limit_kw=getattr(hh_control, "site_import_limit_kw", 0.0),
             )
+        _record_agile_publication_phase(self, "booked_happy_hour", booked_started)
+        completed_started = perf_counter()
         # Completed Happy Hour slots receive separately verified physical
         # meter flow only if every source covers the half hour and balances.
         # This reporting audit never changes raw settled Agile records.
@@ -430,6 +447,8 @@ class EfficientAgileSmartExportManager(AgileSmartExportManager):
                 now=datetime.now(UTC),
             )
         )
+        _record_agile_publication_phase(self, "completed_happy_hour", completed_started)
+        sensor_started = perf_counter()
         periods = state.get("periods", {})
         settled_days = sorted(
             day
@@ -586,6 +605,7 @@ class EfficientAgileSmartExportManager(AgileSmartExportManager):
                 **comparison,
             },
         )
+        _record_agile_publication_phase(self, "sensor_chain", sensor_started)
 
     async def async_shutdown(self) -> None:
         """Remove completion-only dashboard states when KEMS unloads."""
