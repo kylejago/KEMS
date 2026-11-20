@@ -31,7 +31,7 @@ from .happy_hour_auto_join import verified_octopus_joined_bookings
 from .kems_core.whatsapp_message_plans import (
     completed_period_message,
     event_notifications,
-    intelligent_slot_message,
+    ohme_charging_message,
     morning_report_due,
     notify_entity_readiness,
     regular_offpeak_message,
@@ -59,7 +59,10 @@ class KEMSWhatsAppNotifications:
         self._warning_since: dict[str, str] = {}
         self._warning_alerted: dict[str, str] = {}
         self._tracked_power_down: dict[str, Any] = {}
-        self._intelligent_slot_last_state: str | None = None
+        # Separate observed charging from the retired Intelligent tariff sensor.
+        # Rebaseline each HA start: never invent retroactive start/end events.
+        self._ohme_charging_last_state: str | None = None
+        self._ohme_charge_off_since: datetime | None = None
         self._regular_offpeak_last_state: str | None = None
         self._slot_setup_at: datetime | None = None
         self._storage_healthy = True
@@ -89,8 +92,8 @@ class KEMSWhatsAppNotifications:
         weekly_keys = sorted(
             key for key in self._delivered if key.startswith("recap:weekly:")
         )
-        slot_keys = sorted(
-            key for key in self._delivered if key.startswith("intelligent-slot:")
+        charge_keys = sorted(
+            key for key in self._delivered if key.startswith("ohme-charge:")
         )
         regular_keys = sorted(
             key for key in self._delivered if key.startswith("regular-offpeak:")
@@ -108,16 +111,20 @@ class KEMSWhatsAppNotifications:
             "daily_enabled": self.options.get(CONF_WHATSAPP_DAILY) is True,
             "weekly_enabled": self.options.get(CONF_WHATSAPP_WEEKLY) is True,
             "joined_events_enabled": self.options.get(CONF_WHATSAPP_SESSIONS) is True,
-            "intelligent_slot_alerts_enabled": (
+            "intelligent_slot_alerts_enabled": False,
+            "ohme_charging_alerts_enabled": (
                 self.options.get(CONF_WHATSAPP_SESSIONS) is True
-                and bool(getattr(self.coordinator.entities, "intelligent_slot", None))
+                and bool(getattr(self.coordinator.entities, "ev_power_kw", None))
             ),
             "regular_offpeak_alerts_enabled": (
                 self.options.get(CONF_WHATSAPP_SESSIONS) is True
                 and bool(getattr(self.coordinator.entities, "off_peak", None))
             ),
-            "intelligent_slot_last_observed_state": self._intelligent_slot_last_state,
-            "intelligent_slot_transitions_accepted": len(slot_keys),
+            "ohme_charging_last_observed_state": self._ohme_charging_last_state,
+            "ohme_charging_transitions_accepted": len(charge_keys),
+            "retired_intelligent_slot_notification_reason": (
+                "Unsupported provider cannot confirm extra discounted slots"
+            ),
             "regular_offpeak_last_observed_state": self._regular_offpeak_last_state,
             "regular_offpeak_transitions_accepted": len(regular_keys),
             "legacy_intelligent_slot_mobile_automations": (
@@ -200,9 +207,6 @@ class KEMSWhatsAppNotifications:
             return
         try:
             stored = await self._store.async_load() or {}
-            slot_state = stored.get("intelligent_slot_last_state")
-            if slot_state in {"on", "off"}:
-                self._intelligent_slot_last_state = slot_state
             regular_state = stored.get("regular_offpeak_last_state")
             if regular_state in {"on", "off"}:
                 self._regular_offpeak_last_state = regular_state
@@ -272,7 +276,7 @@ class KEMSWhatsAppNotifications:
                     "warning_since": self._warning_since,
                     "warning_alerted": self._warning_alerted,
                     "tracked_power_down": self._tracked_power_down,
-                    "intelligent_slot_last_state": self._intelligent_slot_last_state,
+                    "ohme_charging_last_state": self._ohme_charging_last_state,
                     "regular_offpeak_last_state": self._regular_offpeak_last_state,
                 }
             )
@@ -393,15 +397,17 @@ class KEMSWhatsAppNotifications:
             ),
             (
                 False,
-                "🧪 *KEMS Octopus Intelligent — Cheap Slot Active*\n"
-                "🕒 Start: 23:30\n🕓 End: TBC\n"
-                "Sample active-slot alert only. No real slot has been started.",
+                "🧪 *KEMS Ohme — EV Charging Started*\n"
+                "🕒 Observed: 06:30\n"
+                "Sample charge-start alert only. No real charging event was observed.\n"
+                "Supplier discount is not confirmed.",
             ),
             (
                 False,
-                "🧪 *KEMS Octopus Intelligent — Cheap Slot Ended*\n"
-                "🕒 End: 05:30\n"
-                "Sample ended-slot alert only. No real slot has ended.",
+                "🧪 *KEMS Ohme — EV Charging Stopped*\n"
+                "🕒 Observed: 07:00\n"
+                "Sample charge-stop alert only. No real charging event was observed.\n"
+                "Supplier discount is not confirmed.",
             ),
             (
                 True,
@@ -449,63 +455,59 @@ class KEMSWhatsAppNotifications:
             self._regular_offpeak_last_state = value
             await self._persist()
 
-    async def _intelligent_slot_alerts(self, now: datetime) -> None:
-        """Track real binary-sensor transitions with a persistent baseline.
+    async def _observed_ohme_charge_alerts(self, now: datetime) -> None:
+        """Report independently observed Ohme power, never assumed Octopus discounts.
 
-        Ignore unknown/unavailable and integration-startup initial state.
-        Never infer slots from tariff prices or a next-slot timestamp.
+        A missing/stale charger reading is *unknown*, not charging stopped.
+        The first observation after startup becomes the baseline without a
+        notification. A 2-minute confirmed stop ignores brief smart-charge
+        pauses; no inverter or tariff commands are issued here.
         """
-        entity_id = getattr(self.coordinator.entities, "intelligent_slot", None)
-        state = self.hass.states.get(entity_id) if entity_id else None
-        value = getattr(state, "state", None)
-        if value not in {"on", "off"}:
+        data = getattr(self.coordinator, "data", None)
+        snapshot = getattr(data, "snapshot", None)
+        if snapshot is None:
             return
-        if self._intelligent_slot_last_state is None:
-            self._intelligent_slot_last_state = value
-            await self._persist()
-            return
-        if value == self._intelligent_slot_last_state:
-            return
-        # The normal tariff sensor has its own independent start/end alert.
-        # Avoid a duplicate Intelligent notification at the same boundary.
-        offpeak_entity = getattr(self.coordinator.entities, "off_peak", None)
-        offpeak_state = self.hass.states.get(offpeak_entity) if offpeak_entity else None
-        normal_value = getattr(offpeak_state, "state", None)
-        normal_changed = getattr(offpeak_state, "last_changed", None)
-        normal_just_ended = bool(
-            normal_value == "off"
-            and isinstance(normal_changed, datetime)
-            and normal_changed.tzinfo is not None
-            and 0 <= (now - normal_changed).total_seconds() <= 300
-        )
-        if (value == "on" and normal_value == "on") or (
-            value == "off" and normal_just_ended
+        charge = getattr(snapshot, "ev_charging", None)
+        connected = getattr(snapshot, "ev_connected", None)
+        power = getattr(snapshot, "ev_power_kw", None)
+        age = getattr(snapshot, "ev_power_age_seconds", None)
+        if (
+            not isinstance(power, (float, int))
+            or isinstance(power, bool)
+            or not isinstance(age, (float, int))
+            or isinstance(age, bool)
+            or not 0 <= age <= 180
+            or power < 0
         ):
-            self._intelligent_slot_last_state = value
+            return
+        if connected is True and charge is True and power >= 0.25 and age <= 90:
+            state = "on"
+        elif charge is False and power <= 0.1:
+            state = "off"
+        else:
+            return
+        if self._ohme_charging_last_state is None:
+            self._ohme_charging_last_state = state
             await self._persist()
             return
-        changed_at = getattr(state, "last_changed", None)
-        if not isinstance(changed_at, datetime) or changed_at.tzinfo is None:
+        if state == self._ohme_charging_last_state:
+            self._ohme_charge_off_since = None
             return
-        # A change during HA/KEMS downtime is not a witnessed start/end.
-        # Rebaseline rather than send a misleading retroactive event.
-        if self._slot_setup_at is None or changed_at < self._slot_setup_at:
-            self._intelligent_slot_last_state = value
-            await self._persist()
-            return
-        end_entity = getattr(self.coordinator.entities, "offpeak_end", None)
-        end_state = self.hass.states.get(end_entity) if end_entity else None
-        proposal = intelligent_slot_message(
-            state=value,
-            changed_at=changed_at,
-            now=now,
-            end_time=getattr(end_state, "state", None),
-        )
+        if state == "off":
+            if self._ohme_charge_off_since is None:
+                self._ohme_charge_off_since = now
+                return
+            if now - self._ohme_charge_off_since < timedelta(minutes=2):
+                return
+        else:
+            self._ohme_charge_off_since = None
+        proposal = ohme_charging_message(state=state, observed_at=now, now=now)
         if proposal is None:
             return
         key, message = proposal
         if await self._send(key, message, private=False, now=now):
-            self._intelligent_slot_last_state = value
+            self._ohme_charging_last_state = state
+            self._ohme_charge_off_since = None
             await self._persist()
 
     def _current_warnings(self) -> dict[str, str]:
@@ -669,7 +671,7 @@ class KEMSWhatsAppNotifications:
                             await self._send(key, message, private=False, now=now)
                 if self.options.get(CONF_WHATSAPP_SESSIONS) is True:
                     await self._regular_offpeak_alerts(now)
-                    await self._intelligent_slot_alerts(now)
+                    await self._observed_ohme_charge_alerts(now)
                 for weekly, option in (
                     (False, CONF_WHATSAPP_DAILY),
                     (True, CONF_WHATSAPP_WEEKLY),
