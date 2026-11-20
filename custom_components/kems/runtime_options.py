@@ -16,6 +16,7 @@ from .const import (
     CONF_SYSTEM_COMMISSIONED,
     OHME_EXTRA_SLOT_TARIFF_LABELS,
 )
+from .retired_intelligent import without_retired_intelligent_option
 from .settings import KEMSSettings
 
 
@@ -25,7 +26,9 @@ async def async_set_runtime_options(
     changes: Mapping[str, Any],
 ) -> None:
     """Persist related options and reload KEMS once so engines see them atomically."""
-    options = {**dict(entry.options), **dict(changes)}
+    options = without_retired_intelligent_option(
+        {**dict(entry.options), **dict(changes)}
+    )
     hass.config_entries.async_update_entry(entry, options=options)
     await hass.config_entries.async_reload(entry.entry_id)
 
@@ -59,7 +62,8 @@ async def async_set_ohme_preference_option(
     else:
         raise ValueError(f"{key!r} is not an Ohme preference option")
     hass.config_entries.async_update_entry(
-        entry, options={**dict(entry.options), key: value}
+        entry,
+        options=without_retired_intelligent_option({**dict(entry.options), key: value}),
     )
 
 
@@ -83,7 +87,9 @@ async def async_set_control_gate_option(
         raise ValueError(f"{key!r} is not a KEMS control-gate option")
 
     entry = coordinator.entry
-    options = {**dict(entry.options), key: bool(value)}
+    options = without_retired_intelligent_option(
+        {**dict(entry.options), key: bool(value)}
+    )
     hass.config_entries.async_update_entry(entry, options=options)
 
     next_settings = KEMSSettings.from_options(options)

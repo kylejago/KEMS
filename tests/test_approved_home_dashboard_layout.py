@@ -40,7 +40,7 @@ def test_approved_home_layout_is_packaged_without_losing_other_views() -> None:
         "Happy Hour — booking & charging plan",
     ]
     assert "Control plan safe:" in home_cards[0]["content"]
-    assert "Intelligent status fresh:" in home_cards[0]["content"]
+    assert "Intelligent status fresh:" not in home_cards[0]["content"]
     assert "KEMS update status:" in home_cards[0]["content"]
 
     energy = home_cards[3]

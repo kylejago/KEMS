@@ -69,7 +69,6 @@ from .const import (
     CONF_GRID_STABILITY_SECONDS,
     CONF_HISTORY_DAYS,
     CONF_HOUSE_LOAD,
-    CONF_INTELLIGENT_SLOT,
     CONF_INVERTER_LIMIT,
     CONF_ISLAND_RESERVE_PERCENT,
     CONF_MANUAL_DAY_RATE,
@@ -138,6 +137,7 @@ from .kems_core.octopus_source_consolidation import (
     UNVERIFIED_OHME_EXTRA_SLOT_KEYS,
 )
 from .product_types import SYSTEM_TYPE_DEFINITIONS, SYSTEM_TYPES
+from .retired_intelligent import without_retired_intelligent_option
 from .tariff import normalise_october_2026_loyal_options
 
 SENSOR_SELECTOR = EntitySelector(EntitySelectorConfig(domain="sensor"))
@@ -148,7 +148,6 @@ NUMBER_SELECTOR = EntitySelector(EntitySelectorConfig(domain="number"))
 
 BINARY_KEYS = {
     CONF_OFF_PEAK,
-    CONF_INTELLIGENT_SLOT,
     CONF_EV_CONNECTED,
     CONF_EV_CHARGING,
 }
@@ -414,7 +413,7 @@ class KEMSConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         return self.async_create_entry(
             title=NAME,
             data=data,
-            options=self._initial_options,
+            options=without_retired_intelligent_option(self._initial_options),
         )
 
     async def async_step_user(
@@ -453,7 +452,6 @@ class KEMSConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     CONF_CURRENT_EXPORT_RATE,
                     CONF_ELECTRICITY_STANDING_CHARGE,
                     CONF_OFF_PEAK,
-                    CONF_INTELLIGENT_SLOT,
                     CONF_NEXT_OFFPEAK_START,
                     CONF_OFFPEAK_END,
                     CONF_SAVING_SESSION_EVENTS,
@@ -709,7 +707,7 @@ class KEMSOptionsFlow(OptionsFlowWithReload):
             options.pop(CONF_COMMISSIONING_DATE, None)
         if options.get(CONF_SYSTEM_TYPE) == "live_data":
             options[CONF_OPERATING_MODE] = "observe"
-        return self.async_create_entry(data=options)
+        return self.async_create_entry(data=without_retired_intelligent_option(options))
 
     def _show_category(self, step_id: str, schema: vol.Schema):
         """Show a category form with current values prefilled."""

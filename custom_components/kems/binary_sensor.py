@@ -23,7 +23,6 @@ from .const import (
     CONF_GAS_METER_TOTAL,
     CONF_GAS_STANDING_CHARGE,
     CONF_GAS_USAGE_TODAY,
-    CONF_INTELLIGENT_SLOT,
     CONF_OFF_PEAK,
 )
 from .entity import KEMSEntity
@@ -56,20 +55,6 @@ BINARY_SENSORS: tuple[KEMSBinarySensorEntityDescription, ...] = (
         icon="mdi:weather-night",
         source_key=CONF_OFF_PEAK,
         is_on_fn=lambda data: data.snapshot.off_peak,
-    ),
-    KEMSBinarySensorEntityDescription(
-        key="intelligent_slot",
-        name="Intelligent slot",
-        icon="mdi:ev-station",
-        source_key=CONF_INTELLIGENT_SLOT,
-        is_on_fn=lambda data: data.snapshot.intelligent_slot,
-    ),
-    KEMSBinarySensorEntityDescription(
-        key="intelligent_slot_source_fresh",
-        name="Intelligent slot source fresh",
-        icon="mdi:shield-clock-outline",
-        source_key=CONF_INTELLIGENT_SLOT,
-        is_on_fn=lambda data: data.snapshot.intelligent_slot_source_fresh,
     ),
     KEMSBinarySensorEntityDescription(
         key="cheap_period_confirmed",
