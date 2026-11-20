@@ -322,8 +322,11 @@ class HistoricalReplayCache:
         return fingerprint
 
     def _fingerprint_matches(
-        self, key: str, cached: tuple[bytes, dict[str, Any]],
-        inputs: tuple[Any, ...], fingerprint: bytes,
+        self,
+        key: str,
+        cached: tuple[bytes, dict[str, Any]],
+        inputs: tuple[Any, ...],
+        fingerprint: bytes,
     ) -> bool:
         """Convert a verified old digest in place, without replaying 90 days."""
         if key not in self._legacy_digest_days:
