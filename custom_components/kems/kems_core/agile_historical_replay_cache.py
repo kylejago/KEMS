@@ -10,10 +10,10 @@ from collections import OrderedDict
 from collections.abc import Callable
 from copy import deepcopy
 from dataclasses import fields, is_dataclass
-from functools import lru_cache
-from io import BytesIO
 from datetime import date, datetime, time, timedelta
+from functools import lru_cache
 from hashlib import sha256
+from io import BytesIO
 from operator import attrgetter
 from pickle import HIGHEST_PROTOCOL, Pickler, PicklingError, dumps, loads
 from struct import pack
@@ -155,7 +155,9 @@ class HistoricalReplayCache:
             "encoded_result_days": len(self._encoded_results),
             "fast_result_copies": self._fast_result_copies,
             "fallback_result_copies": self._fallback_result_copies,
-            "fingerprint_method": "full_sha256_compact_snapshot_pickle_with_legacy_fallback",
+            "fingerprint_method": (
+                "full_sha256_compact_snapshot_pickle_with_legacy_fallback"
+            ),
             "compact_snapshot_fingerprints": self._compact_snapshot_fingerprints,
             "legacy_digest_days_pending_migration": len(self._legacy_digest_days),
             "legacy_digest_days_migrated": self._legacy_migrations,
