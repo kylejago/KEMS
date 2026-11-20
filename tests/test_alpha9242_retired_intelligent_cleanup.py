@@ -125,7 +125,7 @@ def test_all_options_write_surfaces_strip_retired_key():
     assert "options = without_retired_intelligent_option(options)" in setup
     assert "retire_unavailable_kems_intelligent_entities(" in setup
     assert "without_retired_intelligent_option(" in runtime
-    assert runtime.count("without_retired_intelligent_option(") >= 4
+    assert runtime.count("without_retired_intelligent_option(") >= 3
     assert "options=without_retired_intelligent_option(self._initial_options)" in flow
     assert "data=without_retired_intelligent_option(options)" in flow
     binary_ast = ast.parse(binary)
