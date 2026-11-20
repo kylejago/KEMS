@@ -131,9 +131,8 @@ def test_all_options_write_surfaces_strip_retired_key():
     assert runtime.count("without_retired_intelligent_option(") >= 3
     assert "options=without_retired_intelligent_option(self._initial_options)" in flow
     assert "data=without_retired_intelligent_option(options)" in flow
-    assert "binary_sensor.kems_intelligent_slot_source_fresh" not in (
-        (ROOT / "kems_master_dashboard.yaml").read_text()
-    )
+    dashboard = (ROOT / "kems_master_dashboard.yaml").read_text()
+    assert "binary_sensor.kems_intelligent_slot_source_fresh" not in dashboard
     binary_ast = ast.parse(binary)
     assert not any(
         isinstance(node, ast.keyword)
