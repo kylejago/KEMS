@@ -33,6 +33,7 @@ from .kems_core.operational_diagnostic_probes import (
 )
 from .kems_core.period_coverage_probe import observation_coverage_probe
 from .panel import panel_health_snapshot
+from .ohme_extra_slot_policy import ohme_extra_slot_evidence
 from .product_types import (
     EXPORT_TARIFF_TYPE_AGILE,
     export_tariff_type_from_options,
@@ -173,6 +174,22 @@ async def async_get_config_entry_diagnostics(
         if offpeak_attrs.get(key) is not None
     }
 
+    ohme_mode_state = _state_payload(hass, configured.get("ohme_charge_mode", ""))
+    ohme_status_state = _state_payload(hass, configured.get("ev_status", ""))
+    ohme_power_state = _state_payload(hass, configured.get("ev_power_kw", ""))
+    extra_slot_policy = ohme_extra_slot_evidence(
+        entry.options,
+        charge_mode=ohme_mode_state.get("state"),
+        charger_status=ohme_status_state.get("state"),
+        charging_power_kw=ohme_power_state.get("state"),
+        regular_offpeak_state=(
+            offpeak_state.state if offpeak_state is not None else None
+        ),
+        mode_age_seconds=ohme_mode_state.get("report_age_seconds"),
+        status_age_seconds=ohme_status_state.get("report_age_seconds"),
+        power_age_seconds=ohme_power_state.get("report_age_seconds"),
+    )
+
     update_snapshot = update_orchestrator_snapshot(hass, entry)
     history_coverage = coordinator._lifetime.historical_coverage_audit
     gap_sources = observation_coverage_probe(
@@ -203,6 +220,7 @@ async def async_get_config_entry_diagnostics(
         },
         "configured_entities": configured,
         "ohme_charge_plan_observer": coordinator._ohme_charge_plan.status,
+        "ohme_extra_slot_policy": extra_slot_policy,
         "octopus_source_consolidation": {
             "tariff_provider": "octopus_energy",
             "regular_offpeak_entity": offpeak_entity,
