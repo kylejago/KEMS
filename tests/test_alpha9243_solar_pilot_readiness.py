@@ -124,10 +124,22 @@ def test_missing_pv_attribution_blocks_mode_pilot():
 @pytest.mark.parametrize(
     "key,value,reason",
     [
-        ("bounded_redirectable_solar_kw", 0.1, "redirectable_solar_too_small_or_unknown"),
+        (
+            "bounded_redirectable_solar_kw",
+            0.1,
+            "redirectable_solar_too_small_or_unknown",
+        ),
         ("advantage_pence_per_input_kwh", 0.2, "economic_margin_too_small_or_unknown"),
-        ("expected_advantage_pence", 0.7, "expected_total_benefit_too_small_or_unknown"),
-        ("expected_advantage_pence", float("nan"), "expected_total_benefit_too_small_or_unknown"),
+        (
+            "expected_advantage_pence",
+            0.7,
+            "expected_total_benefit_too_small_or_unknown",
+        ),
+        (
+            "expected_advantage_pence",
+            float("nan"),
+            "expected_total_benefit_too_small_or_unknown",
+        ),
     ],
 )
 def test_noise_and_small_pence_benefits_cannot_qualify(key, value, reason):
@@ -178,6 +190,6 @@ def test_coordinator_publishes_pilot_evidence_outside_physical_writer():
     publish_at = src.index("publish_solar_routing_shadow(", start)
     assert start < pilot_at < publish_at
     assert 'work_mode_observation=balance_probe.get("work_mode")' in src
-    assert "solar_shadow[\"pilot_readiness\"]" in src
+    assert 'solar_shadow["pilot_readiness"]' in src
     physical = (ROOT / "foxess_control_backend.py").read_text(encoding="utf-8")
     assert "solar_routing_pilot" not in physical
