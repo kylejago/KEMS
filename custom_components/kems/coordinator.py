@@ -129,6 +129,7 @@ from .roi_accounting import async_reconcile_financial_commissioning
 from .roi_reward_recorder import ROIRewardRecorder
 from .settings import KEMSSettings
 from .shadow_validation import ShadowValidationRecorder
+from .solar_routing_pilot import assess_solar_pilot_readiness
 from .solar_routing_shadow import (
     evaluate_solar_routing_shadow,
     publish_solar_routing_shadow,
@@ -1164,6 +1165,15 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                     paid_agile_selected=(
                         selected_export_tariff == EXPORT_TARIFF_TYPE_AGILE
                     ),
+                )
+                # #365: advisory pilot evidence is only a read-only overlay.
+                # The KH7 mode select is currently a command_entity observation,
+                # NOT an independent hardware readback. No feed-in-mode writer
+                # consumes either the financial or physical pilot verdict.
+                solar_shadow["pilot_readiness"] = assess_solar_pilot_readiness(
+                    solar_shadow=solar_shadow,
+                    snapshot=snapshot,
+                    work_mode_observation=balance_probe.get("work_mode"),
                 )
                 publish_solar_routing_shadow(self._agile_smart_export, solar_shadow)
             except Exception:
