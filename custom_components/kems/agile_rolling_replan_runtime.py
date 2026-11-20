@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import math
 from datetime import UTC, datetime, timedelta
+from time import perf_counter
 from typing import Any
 
 from . import agile_smart_export as agile
@@ -453,6 +454,7 @@ def _publish_with_rolling(self, state: dict[str, Any]) -> None:
     now = getattr(self, "_rolling_now", None)
     config = getattr(self, "_rolling_config", None)
     tariff = getattr(self, "_rolling_tariff", None)
+    rolling_started = perf_counter()
     if (
         isinstance(now, datetime)
         and isinstance(config, SimulationConfig)
@@ -466,7 +468,11 @@ def _publish_with_rolling(self, state: dict[str, Any]) -> None:
             tariff=tariff,
         )
 
+    runtime._record_agile_publication_phase(self, "rolling_plan", rolling_started)
+    inner_started = perf_counter()
     _ORIGINAL_RUNTIME_PUBLISH(self, state)
+    runtime._record_agile_publication_phase(self, "inherited_chain", inner_started)
+    rolling_sensor_started = perf_counter()
     plan = state.get("rolling_export_plan", {})
     plan = plan if isinstance(plan, dict) else {}
     selected = plan.get("selected_slots", [])
@@ -528,6 +534,11 @@ def _publish_with_rolling(self, state: dict[str, Any]) -> None:
             "slot": next_slot,
             "generated_at": plan.get("generated_at"),
         },
+    )
+
+
+    runtime._record_agile_publication_phase(
+        self, "rolling_sensors", rolling_sensor_started
     )
 
 

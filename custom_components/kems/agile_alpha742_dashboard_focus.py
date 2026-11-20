@@ -17,6 +17,7 @@ forecast, price-horizon or hardware-write behaviour.
 from __future__ import annotations
 
 import math
+from time import perf_counter
 from typing import Any
 
 from . import agile_smart_export_runtime_base as runtime
@@ -344,7 +345,11 @@ def _publish_with_alpha742(self, state: dict[str, Any]) -> None:
         reason=None if snapshot.get("available") else reason,
     )
 
+    integration_started = perf_counter()
     live = _integrate_actual_today(self)
+    runtime._record_agile_publication_phase(
+        self, "actual_today_integration", integration_started
+    )
     self._set(
         _LIVE_SUMMARY,
         "Ready" if live.get("available") else "Waiting for live history",

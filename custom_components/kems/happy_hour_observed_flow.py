@@ -50,8 +50,14 @@ def _integrate(
     samples: list[tuple[datetime, float]] = []
     for item in records:
         timestamp = _dt(getattr(item, "timestamp", None))
+        # Future observations cannot be the <=start seed or contribute to a
+        # bounded [start, end] integral. Filter before parsing value or sorting.
+        # Retain all <=end points (including duplicates and late past samples)
+        # so the stable timestamp+value sort and gap rules stay unchanged.
+        if timestamp is None or timestamp > end:
+            continue
         value = _value(item, field)
-        if timestamp is None or value is None:
+        if value is None:
             continue
         if sign == -1:
             value = max(-value, 0.0)

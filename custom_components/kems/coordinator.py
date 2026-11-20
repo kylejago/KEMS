@@ -1062,6 +1062,9 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                 )
                 else None
             )
+            # Reset bounded per-scan reporting timings before the Agile
+            # publication sequence; no intermediate state is reused.
+            self._agile_smart_export._kems_agile_publication_profile = {}
             agile_planning_started = perf_counter()
             agile_planning_thread_cpu_started = thread_time()
             # The authoritative settled-day pass below republishes the entire
@@ -1133,6 +1136,19 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                         and isfinite(duration)
                     ):
                         detail_seconds[f"agile_live_{owner}_{name}"] = duration
+            for phase, phase_stats in getattr(
+                self._agile_smart_export, "_kems_agile_publication_profile", {}
+            ).items():
+                if not isinstance(phase_stats, dict):
+                    continue
+                seconds = phase_stats.get("seconds")
+                calls = phase_stats.get("calls")
+                if isinstance(seconds, (int, float)) and isfinite(seconds):
+                    detail_seconds[f"agile_publish_{phase}_seconds"] = round(
+                        seconds, 3
+                    )
+                if isinstance(calls, int):
+                    detail_seconds[f"agile_publish_{phase}_calls"] = calls
             checkpoint("agile_rolling_price_optimisation")
 
             # Alpha9.123 financial solar-routing SHADOW. This is deliberately
