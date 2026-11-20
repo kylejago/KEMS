@@ -168,7 +168,8 @@ def test_runtime_physical_authority_remains_independent_of_historical_cache():
     runtime = (ROOT / "agile_smart_export_runtime_base.py").read_text()
     coordinator = (ROOT / "coordinator.py").read_text()
     assert "if today is None or day >= today or projection:" in cache
-    assert "cached[0] != self._fingerprint(" in cache
+    assert "self._fingerprint_matches(" in cache
+    assert "cached[0] != self._legacy_fingerprint(inputs)" in cache
     assert "_historical_cached_comparison" in runtime
     assert "await self._foxess_control.async_update(" in coordinator
     assert "post_shadow_settlement_changed" in coordinator

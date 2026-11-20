@@ -11,8 +11,11 @@ from collections.abc import Callable
 from copy import deepcopy
 from dataclasses import fields, is_dataclass
 from datetime import date, datetime, time, timedelta
+from functools import lru_cache
 from hashlib import sha256
-from pickle import HIGHEST_PROTOCOL, PicklingError, dumps, loads
+from io import BytesIO
+from operator import attrgetter
+from pickle import HIGHEST_PROTOCOL, Pickler, PicklingError, dumps, loads
 from struct import pack
 from time import perf_counter
 from typing import Any
@@ -72,6 +75,38 @@ def exact_snapshot_values_equal(previous: Any, current: Any) -> bool:
 # Bump this whenever the historical comparison algorithm changes.
 PERSISTED_REPLAY_FORMAT = "alpha9.153-historical-replay-v1"
 
+# Preserve the historical cache across the digest optimisation. Each persisted
+# entry declares its exact hash scheme; old unlabelled entries are validated
+# using their original full SHA-256 before being upgraded in place.
+_LEGACY_FINGERPRINT_SCHEME = "binary_pickle_sha256_v1"
+_COMPACT_FINGERPRINT_SCHEME = "snapshot_fields_pickle_sha256_v1"
+
+
+@lru_cache(maxsize=4)
+def _snapshot_field_reducer(snapshot_type: type):
+    """Serialize *all* slots fields, never a selected or partial input subset."""
+    getter = attrgetter(*(field.name for field in fields(snapshot_type)))
+
+    def reduce_snapshot(snapshot):
+        return snapshot_type, getter(snapshot)
+
+    return reduce_snapshot
+
+
+def _replay_snapshot_type(inputs: tuple[Any, ...]) -> type | None:
+    """Identify exactly KEMS' slots Snapshot, not arbitrary mutable objects."""
+    if not inputs or not isinstance(inputs[0], (list, tuple)) or not inputs[0]:
+        return None
+    snapshot_type = type(inputs[0][0])
+    if (
+        snapshot_type.__name__ == "Snapshot"
+        and snapshot_type.__module__.endswith("kems_core.models")
+        and is_dataclass(snapshot_type)
+        and "__slots__" in snapshot_type.__dict__
+    ):
+        return snapshot_type
+    return None
+
 
 class HistoricalReplayCache:
     """Cache historical day results only when every explicit input is unchanged."""
@@ -98,6 +133,9 @@ class HistoricalReplayCache:
         self._fingerprint_seconds = 0.0
         self._pickle_fingerprints = 0
         self._legacy_fingerprints = 0
+        self._compact_snapshot_fingerprints = 0
+        self._legacy_digest_days: set[str] = set()
+        self._legacy_migrations = 0
         self._persist_dirty = False
         self._restored_days = 0
 
@@ -117,7 +155,12 @@ class HistoricalReplayCache:
             "encoded_result_days": len(self._encoded_results),
             "fast_result_copies": self._fast_result_copies,
             "fallback_result_copies": self._fallback_result_copies,
-            "fingerprint_method": "binary_pickle_sha256_with_legacy_fallback",
+            "fingerprint_method": (
+                "full_sha256_compact_snapshot_pickle_with_legacy_fallback"
+            ),
+            "compact_snapshot_fingerprints": self._compact_snapshot_fingerprints,
+            "legacy_digest_days_pending_migration": len(self._legacy_digest_days),
+            "legacy_digest_days_migrated": self._legacy_migrations,
             "fingerprint_seconds_total": round(self._fingerprint_seconds, 3),
             "pickle_fingerprints": self._pickle_fingerprints,
             "legacy_fingerprints": self._legacy_fingerprints,
@@ -174,6 +217,11 @@ class HistoricalReplayCache:
                 {
                     "day": day,
                     "sha256": fingerprint.hex(),
+                    "fingerprint_scheme": (
+                        _LEGACY_FINGERPRINT_SCHEME
+                        if day in self._legacy_digest_days
+                        else _COMPACT_FINGERPRINT_SCHEME
+                    ),
                     "result": deepcopy(result),
                 }
                 for day, (fingerprint, result) in self._entries.items()
@@ -189,6 +237,7 @@ class HistoricalReplayCache:
         """
         self._entries.clear()
         self._encoded_results.clear()
+        self._legacy_digest_days.clear()
         self._restored_days = 0
         self._persist_dirty = False
         if (
@@ -205,6 +254,14 @@ class HistoricalReplayCache:
             day = item.get("day")
             digest = item.get("sha256")
             result = item.get("result")
+            # Previous release JSON carries no per-entry marker. A marker from
+            # an unknown future format cannot be trusted as our current hash.
+            scheme = item.get("fingerprint_scheme", _LEGACY_FINGERPRINT_SCHEME)
+            if scheme not in {
+                _LEGACY_FINGERPRINT_SCHEME,
+                _COMPACT_FINGERPRINT_SCHEME,
+            }:
+                continue
             if not isinstance(day, str) or not isinstance(digest, str):
                 continue
             if not isinstance(result, dict) or len(digest) != 64:
@@ -217,12 +274,14 @@ class HistoricalReplayCache:
             if parsed_day.isoformat() != day or len(fingerprint) != 32:
                 continue
             self._entries[day] = (fingerprint, deepcopy(result))
+            if scheme == _LEGACY_FINGERPRINT_SCHEME:
+                self._legacy_digest_days.add(day)
             self._remember_encoded_result(day, self._entries[day][1])
             self._entries.move_to_end(day)
         self._restored_days = len(self._entries)
 
-    def _fingerprint(self, inputs: tuple[Any, ...]) -> bytes:
-        """Fingerprint exact immutable-in-time values of historical inputs."""
+    def _legacy_fingerprint(self, inputs: tuple[Any, ...]) -> bytes:
+        """Verify legacy persisted entries using their original full digest."""
         started = perf_counter()
         try:
             fingerprint = sha256(dumps(inputs, protocol=HIGHEST_PROTOCOL)).digest()
@@ -233,6 +292,54 @@ class HistoricalReplayCache:
         finally:
             self._fingerprint_seconds += perf_counter() - started
         return fingerprint
+
+    def _fingerprint(self, inputs: tuple[Any, ...]) -> bytes:
+        """SHA-256 every value, with a compact reducer for complete Snapshots.
+
+        The per-call private Pickler does not change Snapshot's application-wide
+        pickle representation. No object identity, timestamps alone, cached
+        source slices, deep-snapshot shortcut, or input-generation guesses are
+        used: all nested values are re-serialized on every hit.
+        """
+        snapshot_type = _replay_snapshot_type(inputs)
+        if snapshot_type is None:
+            return self._legacy_fingerprint(inputs)
+        started = perf_counter()
+        try:
+            stream = BytesIO()
+            pickler = Pickler(stream, protocol=HIGHEST_PROTOCOL)
+            pickler.dispatch_table = {
+                snapshot_type: _snapshot_field_reducer(snapshot_type)
+            }
+            pickler.dump(inputs)
+            fingerprint = sha256(stream.getbuffer()).digest()
+            self._pickle_fingerprints += 1
+            self._compact_snapshot_fingerprints += 1
+        except (PicklingError, TypeError, AttributeError, ValueError, OverflowError):
+            # Never skip historical input verification if a provider introduces
+            # an unusual type; use the original proven full-input digest.
+            self._fingerprint_seconds += perf_counter() - started
+            return self._legacy_fingerprint(inputs)
+        self._fingerprint_seconds += perf_counter() - started
+        return fingerprint
+
+    def _fingerprint_matches(
+        self,
+        key: str,
+        cached: tuple[bytes, dict[str, Any]],
+        inputs: tuple[Any, ...],
+        fingerprint: bytes,
+    ) -> bool:
+        """Convert a verified old digest in place, without replaying 90 days."""
+        if key not in self._legacy_digest_days:
+            return cached[0] == fingerprint
+        if cached[0] != self._legacy_fingerprint(inputs):
+            return False
+        self._entries[key] = (fingerprint, cached[1])
+        self._legacy_digest_days.discard(key)
+        self._legacy_migrations += 1
+        self._persist_dirty = True
+        return True
 
     def get_cached(
         self,
@@ -256,7 +363,9 @@ class HistoricalReplayCache:
             return None
         # Preserve full SHA-256 validation on every historical cache hit;
         # this is cheaper than the recursive deep-snapshot comparison.
-        if cached[0] != self._fingerprint(inputs):
+        if not self._fingerprint_matches(
+            key, cached, inputs, self._fingerprint(inputs)
+        ):
             return None
         self._hits += 1
         self._entries.move_to_end(key)
@@ -290,7 +399,9 @@ class HistoricalReplayCache:
         key = day.isoformat()
         cached = self._entries.get(key)
         fingerprint = self._fingerprint(inputs)
-        if cached is not None and cached[0] == fingerprint:
+        if cached is not None and self._fingerprint_matches(
+            key, cached, inputs, fingerprint
+        ):
             self._hits += 1
             self._entries.move_to_end(key)
             return self._isolated_result(key, cached[1])
@@ -298,10 +409,12 @@ class HistoricalReplayCache:
         self._misses += 1
         result = calculate()
         self._entries[key] = (fingerprint, deepcopy(result))
+        self._legacy_digest_days.discard(key)
         self._remember_encoded_result(key, self._entries[key][1])
         self._persist_dirty = True
         self._entries.move_to_end(key)
         while len(self._entries) > self._max_days:
             evicted_day, _ = self._entries.popitem(last=False)
+            self._legacy_digest_days.discard(evicted_day)
             self._encoded_results.pop(evicted_day, None)
         return result
