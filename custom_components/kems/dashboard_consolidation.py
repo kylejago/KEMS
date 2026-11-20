@@ -52,7 +52,7 @@ _HOME_PREFIX = """      - type: markdown
           **Mode:** {{ states('select.kems_operating_mode') }}  
           **Status:** {{ states('sensor.kems_status') }}  
           **Advice:** {{ states('sensor.kems_advice') }}  
-          **Commissioning:** {{ states('sensor.kems_commissioning_readiness') }}
+          **Commissioning:** {{ 'Ready for Control' if is_state('binary_sensor.kems_system_commissioned_for_control', 'on') else states('sensor.kems_commissioning_readiness') }}
       - type: grid
         columns: 2
         square: false
