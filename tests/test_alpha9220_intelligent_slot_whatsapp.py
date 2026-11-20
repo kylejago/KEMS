@@ -124,8 +124,8 @@ def test_test_all_ohme_examples_have_real_line_breaks_and_no_discount_claim() ->
     ]
     on = next(value for value in strings if "Sample charge-start alert only." in value)
     off = next(value for value in strings if "Sample charge-stop alert only." in value)
-    assert "*\\n🕒 Observed: 06:30\\n" in on
-    assert "*\\n🕒 Observed: 07:00\\n" in off
+    assert "*\n🕒 Observed: 06:30\n" in on
+    assert "*\n🕒 Observed: 07:00\n" in off
     assert "Supplier discount is not confirmed." in on + off
-    assert r"\\n" not in on
-    assert r"\\n" not in off
+    assert r"\n" not in on
+    assert r"\n" not in off
