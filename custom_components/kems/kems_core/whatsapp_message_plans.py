@@ -426,7 +426,6 @@ def intelligent_slot_message(
     )
 
 
-
 def ohme_charging_message(
     *,
     state: str,
