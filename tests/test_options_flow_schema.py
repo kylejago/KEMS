@@ -143,7 +143,7 @@ def test_manual_setup_can_run_without_live_import_rate_entity() -> None:
     assert 'manual = self._initial_options[CONF_TARIFF_MODE] == "manual"' in source
     assert "require_import_rate=not manual" in source
     assert "MANUAL_TARIFF_SCHEMA" in source
-    assert "options=self._initial_options" in source
+    assert "options=without_retired_intelligent_option(self._initial_options)" in source
 
 
 def test_number_selectors_use_home_assistant_supported_steps() -> None:
