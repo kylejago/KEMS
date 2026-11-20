@@ -83,9 +83,12 @@ def test_registry_cleanup_touches_only_owned_unavailable_orphaned_entities():
     )
     assert removed == (own_a, own_b)
     assert set(registry.entities) == {foreign, active}
-    assert cleanup.retire_unavailable_kems_intelligent_entities(
-        registry, states, entry_id="entry-1"
-    ) == ()
+    assert (
+        cleanup.retire_unavailable_kems_intelligent_entities(
+            registry, states, entry_id="entry-1"
+        )
+        == ()
+    )
 
 
 def test_registry_cleanup_never_removes_live_or_other_entry_sensor():
@@ -97,14 +100,20 @@ def test_registry_cleanup_never_removes_live_or_other_entry_sensor():
         platform="kems",
     )
     registry = _Registry({own: candidate})
-    assert cleanup.retire_unavailable_kems_intelligent_entities(
-        registry, _States({own: "on"}), entry_id="entry-1"
-    ) == ()
+    assert (
+        cleanup.retire_unavailable_kems_intelligent_entities(
+            registry, _States({own: "on"}), entry_id="entry-1"
+        )
+        == ()
+    )
     assert registry.removed == []
     candidate.config_entry_id = "other-entry"
-    assert cleanup.retire_unavailable_kems_intelligent_entities(
-        registry, _States({own: "unavailable"}), entry_id="entry-1"
-    ) == ()
+    assert (
+        cleanup.retire_unavailable_kems_intelligent_entities(
+            registry, _States({own: "unavailable"}), entry_id="entry-1"
+        )
+        == ()
+    )
     assert registry.removed == []
 
 

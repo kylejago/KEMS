@@ -63,9 +63,7 @@ async def async_set_ohme_preference_option(
         raise ValueError(f"{key!r} is not an Ohme preference option")
     hass.config_entries.async_update_entry(
         entry,
-        options=without_retired_intelligent_option(
-            {**dict(entry.options), key: value}
-        ),
+        options=without_retired_intelligent_option({**dict(entry.options), key: value}),
     )
 
 

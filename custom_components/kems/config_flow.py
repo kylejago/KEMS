@@ -708,9 +708,7 @@ class KEMSOptionsFlow(OptionsFlowWithReload):
             options.pop(CONF_COMMISSIONING_DATE, None)
         if options.get(CONF_SYSTEM_TYPE) == "live_data":
             options[CONF_OPERATING_MODE] = "observe"
-        return self.async_create_entry(
-            data=without_retired_intelligent_option(options)
-        )
+        return self.async_create_entry(data=without_retired_intelligent_option(options))
 
     def _show_category(self, step_id: str, schema: vol.Schema):
         """Show a category form with current values prefilled."""

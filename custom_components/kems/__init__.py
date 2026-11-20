@@ -262,7 +262,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         er.async_get(hass), hass.states, entry_id=entry.entry_id
     )
     if retired_entities:
-        LOGGER.info("Removed obsolete KEMS-only Intelligent entities: %s", retired_entities)
+        LOGGER.info(
+            "Removed obsolete KEMS-only Intelligent entities: %s", retired_entities
+        )
     # No notifications are sent until users explicitly enable them in
     # integration options. Setup failures do not gate physical dispatch.
     await async_setup_kems_whatsapp(hass, entry, coordinator)
