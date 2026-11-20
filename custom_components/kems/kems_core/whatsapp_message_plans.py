@@ -451,7 +451,8 @@ def ohme_charging_message(
             "🔌 *Ohme — EV Charging Started*\n"
             f"🕒 Observed: {timestamp:%H:%M}\n"
             "KEMS has observed the charger drawing power. "
-            "This does not confirm an Octopus discounted slot or whole-home cheap rate.\n"
+            "This does not confirm an Octopus discounted slot "
+            "or whole-home cheap rate.\n"
             "KEMS continues to protect the home battery.",
         )
     return (
