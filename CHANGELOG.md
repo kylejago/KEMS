@@ -1,3 +1,11 @@
+## 0.9.0-alpha9.238 — #405 full-SHA historical fingerprint CPU optimisation
+
+- Historical *settled-day reporting only*: A per-call private pickle reducer serialises **every field of each KEMS Snapshot** more compactly, then computes the full SHA-256 on **every lookup**. No immutable-object assumption, no timestamps-only short cut, no stale cache waiver, no change to global Snapshot pickling.
+- Restart-safe cache migration: Old persisted binary SHA-256 digests are verified using the **original full-input legacy hash** once before accepting and converting each entry. Mixed legacy/new digests are explicitly labelled per entry; unverified, changed or malformed values are recomputed as before. Avoid gratuitously invalidating all 90 historical days on upgrade.
+- Regression coverage: source nested-field mutations, changed tariff/rates/carried SOC, signed zero, London fold/BST transition, isolated result copies, restart migration and today/tomorrow no-cache policy.
+- **Evidence:** Synthetic representative benchmark indicated a possible reduction in settled historical fingerprint time; this is **not proof of live improvement**. Compare alpha9.237 measured 1.198 seconds / 90 hits against multiple post-install alpha9.238 diagnostics. Repeated Agile publication costs remain separate and unoptimised.
+- **Safety:** Original physical FoxESS/Ohme commands, EV hold, 15% export reserve/10% household floor, 7 kW DNO, Power Down, Happy Hour, regular cheap import authority, Octopus daytime extra-slot Unconfirmed, financial ledger and ROI unchanged. No new hardware or service writes. Existing safe-first 06:00–06:30 update policy remains in force.
+
 ## 0.9.0-alpha9.237 — Ohme savings and supplier tariff declarations
 
 - **#498:** Add a configurable **Ohme Prioritise savings (declared)** switch, default ON to reflect the owner's confirmed app choice. This is a manual assumption, not an Ohme API read or charger command.
