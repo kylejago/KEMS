@@ -66,8 +66,7 @@ def ohme_extra_slot_evidence(
         return isfinite(seconds) and 0 <= seconds <= _SOURCE_FRESH_SECONDS
 
     fresh_evidence = all(
-        fresh(age)
-        for age in (mode_age_seconds, status_age_seconds, power_age_seconds)
+        fresh(age) for age in (mode_age_seconds, status_age_seconds, power_age_seconds)
     )
     measured_charging = status == "charging" and power >= 0.25
     candidate = bool(

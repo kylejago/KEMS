@@ -71,9 +71,9 @@ def test_unknown_stale_overnight_and_manual_off_fail_closed() -> None:
         {"regular_offpeak_state": "on"},
         {"regular_offpeak_state": None},
     ):
-        assert not policy.ohme_extra_slot_evidence(
-            {}, **_sample(**change)
-        )["likely_managed_daytime_charge_candidate"]
+        assert not policy.ohme_extra_slot_evidence({}, **_sample(**change))[
+            "likely_managed_daytime_charge_candidate"
+        ]
     assert not policy.ohme_extra_slot_evidence(
         {"ohme_prioritise_savings_confirmed": False}, **_sample()
     )["likely_managed_daytime_charge_candidate"]
