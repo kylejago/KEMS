@@ -129,9 +129,7 @@ def test_window_bound_filter_parity_for_long_future_tail_and_gap_fail_closed():
 
 
 def test_profile_helper_is_read_only_and_bounded_to_a_scan():
-    source = (ROOT / "agile_smart_export_runtime_base.py").read_text(
-        encoding="utf-8"
-    )
+    source = (ROOT / "agile_smart_export_runtime_base.py").read_text(encoding="utf-8")
     tree = ast.parse(source)
     method = next(
         node
@@ -165,16 +163,10 @@ def test_full_publish_and_physical_control_order_remains_original():
     canonical = (ROOT / "agile_canonical_flow_accounting.py").read_text(
         encoding="utf-8"
     )
-    solar = (ROOT / "agile_live_solar_soc_continuity.py").read_text(
-        encoding="utf-8"
-    )
+    solar = (ROOT / "agile_live_solar_soc_continuity.py").read_text(encoding="utf-8")
     coordinator = (ROOT / "coordinator.py").read_text(encoding="utf-8")
-    runtime = (ROOT / "agile_smart_export_runtime_base.py").read_text(
-        encoding="utf-8"
-    )
-    rolling = (ROOT / "agile_rolling_replan_runtime.py").read_text(
-        encoding="utf-8"
-    )
+    runtime = (ROOT / "agile_smart_export_runtime_base.py").read_text(encoding="utf-8")
+    rolling = (ROOT / "agile_rolling_replan_runtime.py").read_text(encoding="utf-8")
     for layer in (flow, canonical, solar):
         assert "self._publish(self._state)" in layer
         assert "self._kems_suppress_identical_base_publication = True" in layer
@@ -185,8 +177,5 @@ def test_full_publish_and_physical_control_order_remains_original():
     assert coordinator.index("await self._agile_smart_export.async_update(") < (
         coordinator.index("settled_before_shadow = settled_half_hour_snapshot(")
     )
-    assert (
-        'detail_seconds[f"agile_publish_{phase}_seconds"]'
-        in coordinator
-    )
+    assert 'detail_seconds[f"agile_publish_{phase}_seconds"]' in coordinator
     assert "foxess_control = await self._foxess_control.async_update(" in coordinator

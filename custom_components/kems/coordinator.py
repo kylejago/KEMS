@@ -1144,9 +1144,7 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                 seconds = phase_stats.get("seconds")
                 calls = phase_stats.get("calls")
                 if isinstance(seconds, (int, float)) and isfinite(seconds):
-                    detail_seconds[f"agile_publish_{phase}_seconds"] = round(
-                        seconds, 3
-                    )
+                    detail_seconds[f"agile_publish_{phase}_seconds"] = round(seconds, 3)
                 if isinstance(calls, int):
                     detail_seconds[f"agile_publish_{phase}_calls"] = calls
             checkpoint("agile_rolling_price_optimisation")

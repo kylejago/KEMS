@@ -31,9 +31,7 @@ from .kems_core.agile_historical_replay_cache import HistoricalReplayCache
 from .tariff import TariffSettings
 
 
-def _record_agile_publication_phase(
-    manager: Any, phase: str, started: float
-) -> None:
+def _record_agile_publication_phase(manager: Any, phase: str, started: float) -> None:
     """Read-only, per-scan timings; no publication or control branching."""
     profile = getattr(manager, "_kems_agile_publication_profile", None)
     if not isinstance(profile, dict):
@@ -449,9 +447,7 @@ class EfficientAgileSmartExportManager(AgileSmartExportManager):
                 now=datetime.now(UTC),
             )
         )
-        _record_agile_publication_phase(
-            self, "completed_happy_hour", completed_started
-        )
+        _record_agile_publication_phase(self, "completed_happy_hour", completed_started)
         sensor_started = perf_counter()
         periods = state.get("periods", {})
         settled_days = sorted(

@@ -536,7 +536,6 @@ def _publish_with_rolling(self, state: dict[str, Any]) -> None:
         },
     )
 
-
     runtime._record_agile_publication_phase(
         self, "rolling_sensors", rolling_sensor_started
     )
