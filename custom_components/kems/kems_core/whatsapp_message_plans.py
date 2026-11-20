@@ -424,3 +424,41 @@ def intelligent_slot_message(
         "Good news — an Intelligent Octopus cheap slot is active! 🔋💡\n"
         "KEMS will continue to enforce its EV and home-battery protections.",
     )
+
+
+
+def ohme_charging_message(
+    *,
+    state: str,
+    observed_at: datetime,
+    now: datetime,
+) -> tuple[str, str] | None:
+    """Announce *observed charger activity*, never a supplier-discount claim.
+
+    KEMS observes the physical Ohme charge transition after a fresh power and
+    charging-state check. It cannot infer the exact start or end time, so the
+    timestamp is explicitly the time KEMS observed the transition.
+    """
+    if state not in {"on", "off"} or now.tzinfo is None or observed_at.tzinfo is None:
+        return None
+    age = (now - observed_at).total_seconds()
+    if not -15 <= age <= 300:
+        return None
+    timestamp = observed_at.astimezone(LONDON)
+    key = "ohme-charge:" + state + ":" + observed_at.astimezone(UTC).isoformat()
+    if state == "on":
+        return (
+            key,
+            "🔌 *Ohme — EV Charging Started*\n"
+            f"🕒 Observed: {timestamp:%H:%M}\n"
+            "KEMS has observed the charger drawing power. "
+            "This does not confirm an Octopus discounted slot or whole-home cheap rate.\n"
+            "KEMS continues to protect the home battery.",
+        )
+    return (
+        key,
+        "🔌 *Ohme — EV Charging Stopped*\n"
+        f"🕒 Observed: {timestamp:%H:%M}\n"
+        "KEMS has observed charging stop. This is not evidence that an "
+        "Octopus discounted period has ended. Battery protection remains active.",
+    )
