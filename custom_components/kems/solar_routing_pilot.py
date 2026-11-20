@@ -85,7 +85,10 @@ def assess_solar_pilot_readiness(
         reasons.append("physical_source_staleness_reported")
 
     flow = solar_shadow.get("physical_solar_flow")
-    if not isinstance(flow, Mapping) or flow.get("status") != "bounded_physical_inference":
+    if (
+        not isinstance(flow, Mapping)
+        or flow.get("status") != "bounded_physical_inference"
+    ):
         reasons.append("pv_to_battery_contribution_not_physically_bounded")
 
     redirect = _finite_number(solar_shadow.get("bounded_redirectable_solar_kw"))
@@ -112,7 +115,11 @@ def assess_solar_pilot_readiness(
         "status": (
             "not_candidate"
             if not candidate
-            else "candidate_needs_pilot_evidence" if reasons else "prerequisites_observed"
+            else (
+                "candidate_needs_pilot_evidence"
+                if reasons
+                else "prerequisites_observed"
+            )
         ),
         "financial_candidate": candidate,
         "missing_evidence": reasons,
