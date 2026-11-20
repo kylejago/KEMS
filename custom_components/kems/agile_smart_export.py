@@ -417,6 +417,9 @@ class AgileSmartExportManager:
         self._state = {
             "name": "Agile Smart Export",
             "mode": "simulation_only",
+            "mode_scope": "read_only_agile_planning_and_comparison",
+            "physical_dispatch_owner": "commissioned_control_backend",
+            "does_not_authorise_hardware_writes": True,
             "region": REGION,
             "product_code": self._product_code,
             "tariff_code": self._tariff_code,

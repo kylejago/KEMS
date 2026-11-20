@@ -1121,7 +1121,7 @@ views:
               | Plan safe | {{ states('binary_sensor.kems_control_plan_safe') }} |
               | Backend available | {{ states('binary_sensor.kems_real_control_backend_available') }} |
               | Commands permitted | **{{ states('binary_sensor.kems_control_commands_permitted') }}** |
-              | Commissioning | {{ states('sensor.kems_commissioning_readiness') }} |
+              | Readiness | {{ 'Ready for Control' if is_state('binary_sensor.kems_system_commissioned_for_control', 'on') else states('sensor.kems_commissioning_readiness') }} |
 
           - type: markdown
             title: Update
