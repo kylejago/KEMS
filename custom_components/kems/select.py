@@ -13,10 +13,14 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import (
     CONF_EXPORT_TARIFF_STATUS,
+    CONF_OHME_EXTRA_SLOT_TARIFF,
     CONF_OPERATING_MODE,
     CONF_PANEL_LAYOUT,
     CONF_SYSTEM_TYPE,
     CONF_VIRTUAL_SCENARIO,
+    DEFAULT_OPTIONS,
+    OHME_EXTRA_SLOT_TARIFF_LABELS,
+    OHME_EXTRA_SLOT_UNCONFIRMED,
     PANEL_LAYOUT_LABELS,
     PANEL_LAYOUT_V1,
     PANEL_LAYOUTS,
@@ -44,7 +48,11 @@ from .product_types import (
     internal_mode_from_user,
     user_mode_from_internal,
 )
-from .runtime_options import async_set_runtime_option, async_set_runtime_options
+from .runtime_options import (
+    async_set_ohme_preference_option,
+    async_set_runtime_option,
+    async_set_runtime_options,
+)
 from .update_orchestrator import build_update_select_entities
 
 
@@ -60,12 +68,61 @@ async def async_setup_entry(
         KEMSExportTariffSelect(coordinator),
         KEMSOperatingModeSelect(coordinator),
         KEMSEVChargingPolicySelect(coordinator),
+        KEMSOHMEExtraSlotTariffSelect(coordinator),
         KEMSWeekendHappyHourDurationSelect(coordinator),
         KEMSPanelLayoutSelect(coordinator),
         KEMSVirtualScenarioSelect(coordinator),
     ]
     entities.extend(build_update_select_entities(hass, coordinator, entry))
     async_add_entities(entities)
+
+
+class KEMSOHMEExtraSlotTariffSelect(KEMSEntity, SelectEntity):
+    """Record the tariff answer; does not grant extra daytime cheap authority."""
+
+    _attr_name = "Ohme extra-slot tariff (declared)"
+    _attr_icon = "mdi:car-electric-outline"
+    _attr_entity_category = EntityCategory.CONFIG
+    _attr_options = list(OHME_EXTRA_SLOT_TARIFF_LABELS.values())
+
+    def __init__(self, coordinator) -> None:
+        super().__init__(coordinator, "ohme_extra_slot_tariff_declared")
+
+    @property
+    def current_option(self) -> str:
+        key = self.coordinator.entry.options.get(
+            CONF_OHME_EXTRA_SLOT_TARIFF,
+            DEFAULT_OPTIONS[CONF_OHME_EXTRA_SLOT_TARIFF],
+        )
+        return OHME_EXTRA_SLOT_TARIFF_LABELS.get(
+            key, OHME_EXTRA_SLOT_TARIFF_LABELS[OHME_EXTRA_SLOT_UNCONFIRMED]
+        )
+
+    @property
+    def extra_state_attributes(self):
+        return {
+            "source": "operator_declared_supplier_answer",
+            "implementation_stage": "configuration_only",
+            "requires_explicit_future_implementation_and_testing": True,
+            "extra_daytime_force_charge_authorised": False,
+            "no_change_to_overnight_or_ev_battery_hold": True,
+        }
+
+    async def async_select_option(self, option: str) -> None:
+        selected = next(
+            (
+                key
+                for key, label in OHME_EXTRA_SLOT_TARIFF_LABELS.items()
+                if label == option
+            ),
+            None,
+        )
+        if selected is None:
+            raise HomeAssistantError(f"Unsupported Ohme tariff treatment: {option}")
+        await async_set_ohme_preference_option(
+            self.hass, self.coordinator.entry, CONF_OHME_EXTRA_SLOT_TARIFF, selected
+        )
+        self.async_write_ha_state()
 
 
 class KEMSSystemTypeSelect(KEMSEntity, SelectEntity):

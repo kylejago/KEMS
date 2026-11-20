@@ -9,7 +9,13 @@ from typing import Any
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 
-from .const import CONF_CONTROL_ENABLED, CONF_SYSTEM_COMMISSIONED
+from .const import (
+    CONF_CONTROL_ENABLED,
+    CONF_OHME_EXTRA_SLOT_TARIFF,
+    CONF_OHME_PRIORITISE_SAVINGS,
+    CONF_SYSTEM_COMMISSIONED,
+    OHME_EXTRA_SLOT_TARIFF_LABELS,
+)
 from .settings import KEMSSettings
 
 
@@ -32,6 +38,29 @@ async def async_set_runtime_option(
 ) -> None:
     """Persist one option and reload KEMS so every engine sees it atomically."""
     await async_set_runtime_options(hass, entry, {key: value})
+
+
+async def async_set_ohme_preference_option(
+    hass: HomeAssistant,
+    entry: ConfigEntry,
+    key: str,
+    value: Any,
+) -> None:
+    """Persist operator declarations without reloading commissioned control.
+
+    No live tariff or physical charging code consumes these options in alpha9.237.
+    """
+    if key == CONF_OHME_PRIORITISE_SAVINGS:
+        if not isinstance(value, bool):
+            raise ValueError("Ohme savings preference must be a boolean")
+    elif key == CONF_OHME_EXTRA_SLOT_TARIFF:
+        if value not in OHME_EXTRA_SLOT_TARIFF_LABELS:
+            raise ValueError("Unsupported Ohme extra-slot tariff treatment")
+    else:
+        raise ValueError(f"{key!r} is not an Ohme preference option")
+    hass.config_entries.async_update_entry(
+        entry, options={**dict(entry.options), key: value}
+    )
 
 
 _CONTROL_GATE_KEYS = frozenset({CONF_CONTROL_ENABLED, CONF_SYSTEM_COMMISSIONED})

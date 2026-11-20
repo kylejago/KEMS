@@ -1,3 +1,11 @@
+## 0.9.0-alpha9.237 — Ohme savings and supplier tariff declarations
+
+- **#498:** Add a configurable **Ohme Prioritise savings (declared)** switch, default ON to reflect the owner's confirmed app choice. This is a manual assumption, not an Ohme API read or charger command.
+- **#498:** Add **Ohme extra-slot tariff (declared)** select: Unconfirmed (default), EV only discounted, Whole home discounted. Store the awaited supplier answer without treating the selection as live proof of a cheap half-hour.
+- Add a read-only managed Smart Charge candidate in diagnostics: fresh Ohme Smart charge mode, Charging status, measured power >=0.25 kW, normal off-peak OFF, and manual savings confirmation ON. Stale, Max Charge and unknown observations fail closed.
+- **No new daytime Force Charge authority:** The settings and observer never alter tariff rates, dispatch, grid charging, EV whole-site battery hold, FoxESS safety, 7 kW DNO, 15%/10% reserves, ROI or reward accounting. The two entity changes persist without a KEMS reload. Wait for Octopus's tariff answer before enabling the existing whole-home cheap-period path in a separate tested release.
+- Preserve safe-first automatic updates 06:00–06:30 when exporting, EV or protected sessions are inactive. Verify defaults and diagnostics after installation.
+
 ## 0.9.0-alpha9.236 — Backlog evidence: cold startup, historical gap and ordinary Agile export triage
 
 - **#405:** Add per-scan historical replay-cache SHA-256 fingerprint elapsed time and hit/miss counts, plus base-manager and wrapper current-thread CPU versus non-CPU wall-time breakdown. Initial 55.7s post-update scan included 14.2s historical-worker time and 30.9s manager-wrapper wall time; no algorithm, await order or physical dispatch path was changed, **and no speed-up is claimed** without subsequent field evidence.
