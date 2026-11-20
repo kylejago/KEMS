@@ -51,9 +51,12 @@ def _resolve_with_option(enabled: bool):
     return runtime, resolved
 
 
-def test_persisted_true_reaches_runtime_tariff_settings() -> None:
-    runtime, _ = _resolve_with_option(True)
-    assert runtime.tariff.intelligent_slots_enabled is True
+def test_persisted_true_is_retired_before_runtime_tariff_settings() -> None:
+    runtime, resolved = _resolve_with_option(True)
+    assert runtime.tariff.intelligent_slots_enabled is False
+    assert resolved.intelligent_slot is False
+    assert resolved.intelligent_slot_confirmation == "disabled"
+    assert resolved.intelligent_slot_evidence["large_import_permitted"] is False
 
 
 def test_persisted_false_keeps_runtime_tariff_settings_disabled() -> None:
@@ -67,20 +70,13 @@ def test_omitted_legacy_option_defaults_safely_to_disabled() -> None:
     assert runtime.tariff.intelligent_slots_enabled is False
 
 
-def test_enabled_option_reaches_confirmation_gate_and_permits_large_import() -> None:
-    _, resolved = _resolve_with_option(True)
-    assert resolved.intelligent_slot is True
-    assert resolved.intelligent_slot_confirmation == "confirmed"
-    assert resolved.intelligent_slot_evidence["enabled"] is True
-    assert resolved.intelligent_slot_evidence["confirmed"] is True
-    assert resolved.intelligent_slot_evidence["reason"] == "confirmed"
-    assert resolved.intelligent_slot_evidence["large_import_permitted"] is True
-
-
-def test_disabled_option_with_identical_evidence_fails_closed() -> None:
-    _, resolved = _resolve_with_option(False)
-    assert resolved.intelligent_slot is False
-    assert resolved.intelligent_slot_evidence["enabled"] is False
-    assert resolved.intelligent_slot_evidence["confirmed"] is False
-    assert resolved.intelligent_slot_evidence["reason"] == "disabled"
-    assert resolved.intelligent_slot_evidence["large_import_permitted"] is False
+def test_old_true_and_false_are_equally_fail_closed_for_measured_ev() -> None:
+    _, enabled = _resolve_with_option(True)
+    _, disabled = _resolve_with_option(False)
+    for resolved in (enabled, disabled):
+        assert resolved.intelligent_slot is False
+        assert resolved.intelligent_slot_evidence["enabled"] is False
+        assert resolved.intelligent_slot_evidence["confirmed"] is False
+        assert resolved.intelligent_slot_evidence["reason"] == "disabled"
+        assert resolved.intelligent_slot_evidence["large_import_permitted"] is False
+        assert resolved.source != "automatic_intelligent_extra"
