@@ -69,7 +69,7 @@ def test_reporter_is_power_gated_bounded_and_never_gives_tariff_authority() -> N
     assert (
         "connected is True and charge is True and power >= 0.25 and age <= 90" in source
     )
-    assert 'elif charge is False and power <= 0.1:' in source
+    assert "elif charge is False and power <= 0.1:" in source
     assert "self._ohme_charging_last_state is None" in source
     assert "self._ohme_charge_off_since" in source
     assert "timedelta(minutes=2)" in source
