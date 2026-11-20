@@ -18,11 +18,10 @@ spec.loader.exec_module(messages)
 
 def test_ohme_messages_are_observations_not_discounted_tariff_claims() -> None:
     observed = datetime(2026, 11, 21, 6, 40, tzinfo=UTC)
-    on = messages.ohme_charging_message(
-        state="on", observed_at=observed, now=observed
-    )
+    on = messages.ohme_charging_message(state="on", observed_at=observed, now=observed)
     off = messages.ohme_charging_message(
-        state="off", observed_at=observed + timedelta(minutes=30),
+        state="off",
+        observed_at=observed + timedelta(minutes=30),
         now=observed + timedelta(minutes=30),
     )
     assert on is not None and off is not None
@@ -41,23 +40,35 @@ def test_ohme_messages_are_observations_not_discounted_tariff_claims() -> None:
 def test_unknown_or_stale_event_does_not_produce_a_message() -> None:
     observed = datetime(2026, 11, 21, 6, 40, tzinfo=UTC)
     for state in ("unknown", "unavailable", "", "paused"):
-        assert messages.ohme_charging_message(
-            state=state, observed_at=observed, now=observed
-        ) is None
-    assert messages.ohme_charging_message(
-        state="on", observed_at=observed,
-        now=observed + timedelta(minutes=6),
-    ) is None
-    assert messages.ohme_charging_message(
-        state="on", observed_at=observed.replace(tzinfo=None), now=observed
-    ) is None
+        assert (
+            messages.ohme_charging_message(
+                state=state, observed_at=observed, now=observed
+            )
+            is None
+        )
+    assert (
+        messages.ohme_charging_message(
+            state="on",
+            observed_at=observed,
+            now=observed + timedelta(minutes=6),
+        )
+        is None
+    )
+    assert (
+        messages.ohme_charging_message(
+            state="on", observed_at=observed.replace(tzinfo=None), now=observed
+        )
+        is None
+    )
 
 
 def test_reporter_is_power_gated_bounded_and_never_gives_tariff_authority() -> None:
     source = REPORTER.read_text(encoding="utf-8")
     assert "await self._observed_ohme_charge_alerts(now)" in source
     assert "not 0 <= age <= 180" in source
-    assert "connected is True and charge is True and power >= 0.25 and age <= 90" in source
+    assert (
+        "connected is True and charge is True and power >= 0.25 and age <= 90" in source
+    )
     assert 'elif charge is False and power <= 0.1:' in source
     assert "self._ohme_charging_last_state is None" in source
     assert "self._ohme_charge_off_since" in source
@@ -66,7 +77,8 @@ def test_reporter_is_power_gated_bounded_and_never_gives_tariff_authority() -> N
     assert "await self._send(key, message, private=False, now=now)" in source
     tree = ast.parse(source)
     method = next(
-        node for node in ast.walk(tree)
+        node
+        for node in ast.walk(tree)
         if isinstance(node, ast.AsyncFunctionDef)
         and node.name == "_observed_ohme_charge_alerts"
     )
