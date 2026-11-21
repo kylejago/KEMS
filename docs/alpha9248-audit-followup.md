@@ -24,7 +24,7 @@
 - **EV overnight handover (#498/#361):** requires post-23:30 live Ohme/FoxESS diagnostics; repository tests alone cannot prove physical restoration.
 - **Historic gaps and Happy Hour cumulative meter (#487/#352):** require separately recent, independent and consistent meter readings; estimates cannot be promoted to real kWh or awarded credits.
 - **Performance (#405):** previously improved to low single-digit scan seconds; continue to monitor multi-morning p95, not risk state/control mutation for speculative speed gain.
-- **Exact duplicate modules:** The 21 November main Git tree contains **34 groups** of byte-identical Python files under `custom_components/kems`, totalling **461,221 repeated bytes**. These are primarily legacy alpha-named files paired with semantic-named runtime files; preserve them for now until imports, monkey patches and dynamic import compatibility have been independently audited. Their presence alone is not proof that an import or function is unused; deleting them now would pose an unjustified pre-event risk.
+- **Exact duplicate modules:** The 21 November main Git tree contains **34 groups** of byte-identical Python files under `custom_components/kems`, totalling **461,221 repeated bytes**. These are primarily legacy alpha-named files paired with semantic-named runtime files; preserve them for now until imports, monkey patches and dynamic import compatibility have been independently audited. Their presence alone is not proof that an import or function is unused; deleting them now would pose an unjustified pre-event risk. Reproduce the list using the read-only `python scripts/audit_duplicate_runtime_modules.py` command.
 
 ## Acceptance after the booked session
 
