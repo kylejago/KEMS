@@ -47,9 +47,11 @@ def _entry(kind, key, day, value, basis, settled, included, **extra):
         "supplier_award_evidence": (
             "verified_supplier_award"
             if settled is True
-            else "estimated_not_supplier_verified"
-            if value is not None
-            else "no_valued_reward_yet"
+            else (
+                "estimated_not_supplier_verified"
+                if value is not None
+                else "no_valued_reward_yet"
+            )
         ),
         # A stable nullable schema lets older/pending event rows coexist with
         # partially metered receipts without failing dashboard templates.
