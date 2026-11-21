@@ -649,3 +649,31 @@ def test_alpha9108_booking_controller_confirms_two_distinct_services(
         assert len(calls) == 2  # never duplicate a booked reward
 
     asyncio.run(_run())
+
+
+def test_controller_cache_rebinds_on_entry_reload(monkeypatch) -> None:
+    """An HA config-entry reload must never reuse stale booking authority."""
+    class FakeController:
+        def __init__(self, coordinator):
+            self.coordinator = coordinator
+            self.state = {"status": "fresh"}
+
+    monkeypatch.setattr(happy_join, "HappyHourAutoJoinController", FakeController)
+    monkeypatch.setattr(happy_join, "_CONTROLLERS", {})
+    hass = object()
+    entry = SimpleNamespace(entry_id="reloaded-entry")
+    previous = SimpleNamespace(hass=hass, entry=entry)
+    current = SimpleNamespace(hass=hass, entry=entry)
+    original = happy_join._controller_for(previous)
+    assert happy_join._controller_for(previous) is original
+    replacement = happy_join._controller_for(current)
+    assert replacement is not original
+    assert replacement.coordinator is current
+    assert happy_join.happy_hour_auto_join_state(current)["status"] == "fresh"
+    # A late callback from the previous instance must not evict the replacement.
+    happy_join.release_happy_hour_auto_join(previous)
+    assert happy_join._controller_for(current) is replacement
+    happy_join.release_happy_hour_auto_join(current)
+    assert happy_join.happy_hour_auto_join_state(current)["status"] == (
+        "waiting_for_first_planner_update"
+    )
