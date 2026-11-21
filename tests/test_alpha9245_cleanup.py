@@ -64,7 +64,7 @@ def test_legacy_scenario_surface_retired_but_no_kems_costs_retained():
     assert len(module.RETIRED_SCENARIO_SENSOR_KEYS) == 23
     source = ast.parse((KEMS / "sensor.py").read_text())
     keys = {
-        keyword.value.value
+        node.value.value
         for node in ast.walk(source)
         if isinstance(node, ast.keyword)
         and node.arg == "key"
@@ -101,7 +101,9 @@ def test_registry_removes_only_exact_owned_inactive_scenarios():
     states = _States(
         {
             inactive: "unknown",
-            sentinel: "H=-1,S=-1,GI=-1,GE=-1,SH=-1,SB=-1,SE=-1,GB=-1,BH=-1,BE=-1,SOC=-1",
+            sentinel: ",".join(
+                f"{key}=-1" for key in "H S GI GE SH SB SE GB BH BE SOC".split()
+            ),
             active: "12.4",
             foreign: "unavailable",
             no_kems: "138.5",
