@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ast
+import json
 import importlib.util
 from pathlib import Path
 from types import SimpleNamespace
@@ -147,3 +148,19 @@ def test_commissioning_display_does_not_change_underlying_safety_gate():
     entity = (KEMS / "entity.py").read_text()
     assert 'model="Whole-home energy management"' in entity
     assert 'model="Whole-home proposal simulation"' not in entity
+
+
+def test_active_release_note_is_compact_and_history_remains_auditable():
+    manifest = json.loads((KEMS / "manifest.json").read_text())
+    bundle = json.loads((ROOT / "release/kems-bundle.template.json").read_text())
+    current = bundle["maintenance"]["reason"]
+    archive = (ROOT / "docs/archived-release-notes-through-alpha9244.md").read_text()
+    assert manifest["version"] == "0.9.0-alpha9.245"
+    assert current.startswith("Alpha9.245:")
+    assert len(current.encode("utf-8")) < 2000
+    assert "No new FoxESS/Ohme commands" in current
+    assert "15% deliberate export floor / 10% household floor" in current
+    assert "06:00-06:30 safe-first" in current
+    assert archive.startswith("# KEMS release-note history through Alpha9.244")
+    assert "Alpha9.244: Reduce confirmed-cheap FoxESS Force Charge demand" in archive
+    assert "Alpha9.243: Complete original-scope solar-only progress" in archive
