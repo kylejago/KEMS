@@ -118,7 +118,7 @@ def test_dynamic_text_and_large_limits_cannot_bypass_budget() -> None:
 def test_new_projection_only_changes_sensor_presentation_not_real_gates() -> None:
     source = COMMISSIONING.read_text(encoding="utf-8")
     diagnostics = DIAGNOSTICS.read_text(encoding="utf-8")
-    assert "return recorder_safe_commissioning_attributes(payload)" in source
+    assert "attributes = recorder_safe_commissioning_attributes(payload)" in source
     assert "commissioning_operator_state(" in source
     assert 'return "Ready for Control"' in source
     assert "return state" in source
