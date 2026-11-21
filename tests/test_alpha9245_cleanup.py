@@ -103,7 +103,8 @@ def test_registry_removes_only_exact_owned_inactive_scenarios():
         {
             inactive: "unknown",
             sentinel: ",".join(
-                f"{key}=-1" for key in "H S GI GE SH SB SE GB BH BE SOC".split()
+                f"{key}=-1"
+                for key in ["H", "S", "GI", "GE", "SH", "SB", "SE", "GB", "BH", "BE", "SOC"]
             ),
             active: "12.4",
             foreign: "unavailable",
