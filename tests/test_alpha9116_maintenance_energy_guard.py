@@ -186,11 +186,11 @@ def test_install_and_restart_paths_each_recheck_energy_activity() -> None:
 def test_backup_before_update_remains_an_independent_hard_gate() -> None:
     """A safe energy window cannot override a missing or failed HA backup."""
     source = UPDATE.read_text()
-    assert 'backup_before_update: bool = True' in source
+    assert "backup_before_update: bool = True" in source
     assert 'backup_before_update=bool(raw.get("backup_before_update", True))' in source
     assert 'self.hass.services.has_service("backup", "create_automatic")' in source
     assert 'await self._fail_pending(f"Pre-update backup failed: {error}")' in source
     assert '"backup.create_automatic is unavailable"' in source
-    assert source.index('if self.policy.backup_before_update:') < source.index(
+    assert source.index("if self.policy.backup_before_update:") < source.index(
         'if not self.hass.services.has_service("update", "install")'
     )
