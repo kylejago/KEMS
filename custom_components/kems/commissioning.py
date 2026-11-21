@@ -1244,7 +1244,6 @@ def build_commissioning_snapshot(
     }
 
 
-
 def commissioning_operator_state(snapshot: Mapping[str, Any], control: Any) -> str:
     """Present actual commissioned live readiness without granting authority.
 
