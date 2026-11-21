@@ -159,7 +159,7 @@ def test_alpha913_version_and_release_scope() -> None:
         / "docs/archived-release-notes-through-alpha9244.md"
     ).read_text(encoding="utf-8")
 
-    assert manifest["version"] == "0.9.0-alpha9.247"
+    assert manifest["version"] == "0.9.0-alpha9.248"
     assert bundle["maintenance"]["home_assistant_restart_required"] is True
     assert bundle["maintenance"]["reboot_required"] is False
     assert "forecast-aware" in bundle["maintenance"]["reason"].lower()
