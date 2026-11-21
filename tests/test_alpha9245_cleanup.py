@@ -155,7 +155,7 @@ def test_commissioning_display_does_not_change_underlying_safety_gate():
     assert '"ready_for_control": ready_for_control' in source
     assert "commissioning_operator_state(" in source
     assert 'return "Ready for Control"' in source
-    assert 'return state' in source
+    assert "return state" in source
     init = (KEMS / "__init__.py").read_text()
     assert "retire_inactive_scenario_sensors(" in init
     entity = (KEMS / "entity.py").read_text()
