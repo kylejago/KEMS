@@ -55,21 +55,14 @@ def build_ev_trace_sample(
     control = foxess_control or {}
     confirmed_ev_cheap = bool(
         snapshot.cheap_period_confirmed
-        and (
-            snapshot.ev_charging is True
-            or (snapshot.ev_power_kw or 0.0) > 0.25
-        )
+        and (snapshot.ev_charging is True or (snapshot.ev_power_kw or 0.0) > 0.25)
     )
     charge_target = getattr(planned_control, "desired_charge_power_kw", None)
     charging_audit = {
         "confirmed_cheap_ev_charging": confirmed_ev_cheap,
         "desired_battery_charge_power_kw": charge_target,
-        "ev_grid_guard_status": getattr(
-            planned_control, "ev_grid_guard_status", None
-        ),
-        "site_import_limit_kw": getattr(
-            planned_control, "site_import_limit_kw", None
-        ),
+        "ev_grid_guard_status": getattr(planned_control, "ev_grid_guard_status", None),
+        "site_import_limit_kw": getattr(planned_control, "site_import_limit_kw", None),
         "site_import_headroom_kw": getattr(
             planned_control, "site_import_headroom_kw", None
         ),
@@ -164,13 +157,11 @@ class EVChargeTraceRecorder:
             row["ev_cheap_charge_cap_audit"]
             for row in self._records
             if isinstance(row.get("ev_cheap_charge_cap_audit"), dict)
-            and row["ev_cheap_charge_cap_audit"].get(
-                "confirmed_cheap_ev_charging"
-            ) is True
+            and row["ev_cheap_charge_cap_audit"].get("confirmed_cheap_ev_charging")
+            is True
         ]
         discharge_events = sum(
-            item.get("battery_discharging_during_ev_charge") is True
-            for item in audits
+            item.get("battery_discharging_during_ev_charge") is True for item in audits
         )
         cap_exceedances = sum(
             item.get("cap_target_exceeded") is True for item in audits
