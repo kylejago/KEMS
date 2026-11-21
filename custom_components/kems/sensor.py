@@ -93,16 +93,6 @@ def _scenario_attributes(
     return {} if scenario is None else scenario.to_dict()
 
 
-def _scenario_cost(
-    data: KEMSData,
-    scenario_key: str,
-    period_key: str = "today",
-) -> float | None:
-    """Return total electricity cost including the standing charge."""
-    scenario = data.scenarios.scenario(scenario_key, period_key)
-    return None if scenario is None else round(scenario.total_cost_pence, 2)
-
-
 def _no_system_comparison_attributes(data: KEMSData) -> Mapping[str, Any]:
     """Retain the independent replay as evidence, not financial authority."""
     original = dict(_scenario_attributes(data, "no_system"))
@@ -128,72 +118,6 @@ def _forecast_metric(data: KEMSData, attribute: str) -> float | None:
     """Return one numeric forecast-planning metric."""
     value = getattr(data.forecast_plan, attribute, None)
     return None if value is None else float(value)
-
-
-def _scenario_flow_state(
-    data: KEMSData,
-    scenario_key: str,
-    period_key: str = "today",
-) -> str:
-    """Expose compact current-flow values as one ESPHome-friendly state."""
-    scenario = data.scenarios.scenario(scenario_key, period_key)
-    if scenario is None:
-        return "H=-1,S=-1,GI=-1,GE=-1,SH=-1,SB=-1,SE=-1,GB=-1,BH=-1,BE=-1,SOC=-1"
-
-    def value(item: float | None, digits: int = 3) -> str:
-        if item is None:
-            return "-1"
-        return f"{float(item):.{digits}f}"
-
-    return ",".join(
-        (
-            f"H={value(scenario.current_house_load_kw)}",
-            f"S={value(scenario.current_solar_power_kw)}",
-            f"GI={value(scenario.current_grid_import_kw)}",
-            f"GE={value(scenario.current_grid_export_kw)}",
-            f"SH={value(scenario.current_solar_to_home_kw)}",
-            f"SB={value(scenario.current_solar_to_battery_kw)}",
-            f"SE={value(scenario.current_solar_export_kw)}",
-            f"GB={value(scenario.current_grid_to_battery_kw)}",
-            f"BH={value(scenario.current_battery_to_home_kw)}",
-            f"BE={value(scenario.current_battery_export_kw)}",
-            f"SOC={value(scenario.current_battery_soc_percent, 1)}",
-        )
-    )
-
-
-def _island_status(data: KEMSData, period_key: str = "today") -> str:
-    """Return a human-friendly result for the full-grid-outage replay."""
-    scenario = data.scenarios.scenario("full_island", period_key)
-    if scenario is None or not scenario.ready:
-        return "Unavailable"
-    return "Survived" if scenario.outage_survived else "Shortfall"
-
-
-def _island_metric(
-    data: KEMSData,
-    attribute: str,
-    period_key: str = "today",
-) -> float | None:
-    """Return one numeric full-island replay metric."""
-    scenario = data.scenarios.scenario("full_island", period_key)
-    if scenario is None or not scenario.ready:
-        return None
-    value = getattr(scenario, attribute, None)
-    return None if value is None else float(value)
-
-
-def _prepared_island_status(data: KEMSData, period_key: str = "today") -> str:
-    """Return a human-friendly prepared-outage resilience result."""
-    scenario = data.scenarios.scenario("full_island", period_key)
-    if scenario is None or not scenario.ready:
-        return "Unavailable"
-    return {
-        "survived": "Survived",
-        "eps_limited": "EPS limited",
-        "shortfall": "Shortfall",
-        "unavailable": "Unavailable",
-    }.get(scenario.prepared_outage_status or "unavailable", "Unavailable")
 
 
 def _scenario_period_attributes(
