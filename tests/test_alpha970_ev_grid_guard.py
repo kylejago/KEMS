@@ -82,10 +82,10 @@ def test_verified_ev_inside_site_load_preserves_one_count_and_charge_headroom():
     assert state.ev_grid_guard_status == "ev_battery_hold_with_cheap_charge"
     assert state.desired_min_soc_percent == 61.0
     assert state.desired_work_mode == "Force Charge"
-    assert state.desired_charge_power_kw == 6.5
+    assert state.desired_charge_power_kw == 5.0
     assert state.grid_bypass_power_kw == 8.0
-    assert state.total_site_import_kw == 14.5
-    assert state.site_import_headroom_kw == 0
+    assert state.total_site_import_kw == 13.0
+    assert state.site_import_headroom_kw == 1.5
     assert state.plan_safe
     assert state.desired_battery_to_home_power_kw == 0.0
 
@@ -97,10 +97,63 @@ def test_outside_or_unknown_ev_membership_is_counted_conservatively(scope):
         _plan(grid_bypass_power_kw=2.0),
     )
     assert state.grid_bypass_power_kw == 8.5
-    assert state.desired_charge_power_kw == 6.0
-    assert state.total_site_import_kw == 14.5
+    assert state.desired_charge_power_kw == 5.0
+    assert state.total_site_import_kw == 13.5
     assert state.ev_grid_guard_status.endswith("_conservative_scope")
     assert not state.desired_grid_export_allowed
+
+
+def test_real_7_56_kw_ev_and_normal_home_load_leave_measured_import_reserve():
+    state = _guard(
+        _snap(ev_power_kw=7.558, ev_load_in_house_load=None, house_load_kw=1.4),
+        _plan(grid_bypass_power_kw=1.4),
+    )
+    assert state.desired_work_mode == "Force Charge"
+    assert state.desired_charge_power_kw == 4.792
+    assert state.total_site_import_kw == 13.75
+    assert state.site_import_headroom_kw == 0.75
+    assert state.plan_safe
+
+
+def test_high_household_load_reduces_charge_below_five_without_ev_discharge():
+    state = _guard(
+        _snap(ev_power_kw=7.558, ev_load_in_house_load=None, house_load_kw=5.069),
+        _plan(grid_bypass_power_kw=5.069),
+    )
+    assert state.desired_charge_power_kw == 1.123
+    assert state.total_site_import_kw == 13.75
+    assert state.site_import_headroom_kw == 0.75
+    assert state.desired_battery_to_home_power_kw == 0.0
+    assert state.desired_total_discharge_power_kw == 0.0
+    assert state.desired_min_soc_percent == 61.0
+
+
+def test_no_charge_headroom_preserves_existing_physical_ev_hold():
+    state = _guard(
+        _snap(ev_power_kw=7.558, ev_load_in_house_load=None, house_load_kw=6.4),
+        _plan(grid_bypass_power_kw=6.4),
+    )
+    assert state.desired_charge_power_kw == 0.0
+    assert state.desired_work_mode == "Self Use"
+    assert state.desired_min_soc_percent == 61.0
+    assert state.desired_total_discharge_power_kw == 0.0
+    assert state.plan_safe
+
+
+def test_existing_lower_charge_limit_and_inactive_ev_remain_unchanged():
+    active = _guard(
+        _snap(ev_load_in_house_load=None, house_load_kw=1.0),
+        _plan(grid_bypass_power_kw=1.0, desired_charge_power_kw=2.0),
+    )
+    assert active.desired_charge_power_kw == 2.0
+    assert active.desired_work_mode == "Force Charge"
+    assert (
+        _guard(
+            _snap(ev_charging=False, ev_power_kw=0.0),
+            _plan(desired_charge_power_kw=7.0),
+        ).desired_charge_power_kw
+        == 7.0
+    )
 
 
 def test_original_uncapped_cheap_charge_site_failure_is_rebudgeted_safely():
@@ -112,8 +165,8 @@ def test_original_uncapped_cheap_charge_site_failure_is_rebudgeted_safely():
     corrected = _guard(plan=original)
     assert corrected.plan_safe
     assert corrected.site_import_limit_exceeded is False
-    assert corrected.desired_charge_power_kw == 6.5
-    assert corrected.total_site_import_kw == 14.5
+    assert corrected.desired_charge_power_kw == 5.0
+    assert corrected.total_site_import_kw == 13.0
     assert corrected.blocked_reason == ""
 
 
@@ -126,8 +179,8 @@ def test_non_site_safety_failure_is_not_waived_by_headroom_rebudget():
 
 def test_grid_ct_containing_existing_charge_is_not_added_again():
     state = _guard(_snap(grid_import_kw=14.25), _plan())
-    assert state.desired_charge_power_kw == 6.5
-    assert state.total_site_import_kw == 14.5
+    assert state.desired_charge_power_kw == 5.0
+    assert state.total_site_import_kw == 13.0
     assert state.plan_safe
 
 
@@ -251,7 +304,7 @@ def test_charge_and_hold_use_only_old_reviewed_backend_authority():
         )
 
     assert decision(charge).action == "force_charge"
-    assert decision(charge).force_charge_power_kw == 6.5
+    assert decision(charge).force_charge_power_kw == 5.0
     assert decision(hold).action == "self_use"
     assert decision(hold).min_soc_on_grid_percent == 61.0
     assert not decision(
