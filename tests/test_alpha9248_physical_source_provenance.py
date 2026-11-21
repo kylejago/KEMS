@@ -18,7 +18,9 @@ provenance = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(provenance)
 
 
-def test_recent_raw_report_does_not_certify_independent_physical_remeasurement() -> None:
+def test_recent_raw_report_does_not_certify_independent_physical_remeasurement() -> (
+    None
+):
     result = provenance.corroborated_unchanged_sources(
         {"grid_ct": 5.0, "battery": 180.0, "missing": None},
         ("battery",),
@@ -35,15 +37,14 @@ def test_recent_raw_report_does_not_certify_independent_physical_remeasurement()
 
     assert fields["missing"]["status"] == "raw_timestamp_missing"
     assert fields["missing"]["physical_remeasurement_proven"] is False
-    assert result["raw_report_provenance"][
-        "changes_control_freshness_or_foxess_commands"
-    ] is False
+    assert (
+        result["raw_report_provenance"]["changes_control_freshness_or_foxess_commands"]
+        is False
+    )
 
 
 def test_cohort_accepted_unchanged_is_not_a_physical_remeasurement() -> None:
-    result = provenance.corroborated_unchanged_sources(
-        {"pv": 182.0}, (), 90
-    )
+    result = provenance.corroborated_unchanged_sources({"pv": 182.0}, (), 90)
     data = result["raw_report_provenance"]["fields"]["pv"]
     assert data["status"] == "accepted_unchanged_by_device_cohort_not_remeasured"
     assert data["raw_report_within_freshness_limit"] is False

@@ -53,9 +53,11 @@ def _on(states: dict[str, str], key: str) -> bool:
     return states.get(key) == "on"
 
 
-
 def automatic_update_backup_status(
-    *, automatic_updates: bool, backup_before_update: bool, backup_service_available: bool
+    *,
+    automatic_updates: bool,
+    backup_before_update: bool,
+    backup_service_available: bool,
 ) -> str:
     """Report backup readiness without overriding an operator's saved policy."""
     if not automatic_updates:
@@ -65,6 +67,7 @@ def automatic_update_backup_status(
     if not backup_service_available:
         return "backup_service_unavailable"
     return "pre_update_backup_required"
+
 
 def maintenance_energy_blockers(
     *,

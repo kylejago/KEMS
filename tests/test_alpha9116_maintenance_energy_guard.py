@@ -195,6 +195,7 @@ def test_backup_before_update_remains_an_independent_hard_gate() -> None:
         'if not self.hass.services.has_service("update", "install")'
     )
 
+
 def test_backup_protection_diagnostic_never_confuses_default_with_saved_false() -> None:
     """Actual saved backup opt-out must be visibly reported, not auto-overridden."""
     check = guard.automatic_update_backup_status
