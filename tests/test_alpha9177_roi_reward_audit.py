@@ -78,9 +78,7 @@ def test_first_hour_has_joined_id_but_second_hour_remains_unvalued():
         e["supplier_award_evidence"] == "estimated_not_supplier_verified"
         for e in included
     )
-    assert all(
-        e["supplier_award_evidence"] == "no_valued_reward_yet" for e in pending
-    )
+    assert all(e["supplier_award_evidence"] == "no_valued_reward_yet" for e in pending)
     assert all("fixed_export_income" not in e for e in result["entries"])
 
 
