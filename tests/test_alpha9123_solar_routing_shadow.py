@@ -162,7 +162,9 @@ def test_missing_live_rates_and_missing_physical_readings_are_not_authority() ->
     assert evaluate_solar_routing_shadow(**args)["status"] == "insufficient_evidence"
 
 
-def test_solar_export_gap_is_suppressed_while_battery_is_charging_or_discharging() -> None:
+def test_solar_export_gap_is_suppressed_while_battery_is_charging_or_discharging() -> (
+    None
+):
     args = _inputs()
     value = evaluate_solar_routing_shadow(**args)
     assert value["digital_twin_vs_grid_export_gap_kw"] is None
@@ -170,7 +172,9 @@ def test_solar_export_gap_is_suppressed_while_battery_is_charging_or_discharging
     args["snapshot"].battery_power_kw = 2.0
     value = evaluate_solar_routing_shadow(**args)
     assert value["digital_twin_vs_grid_export_gap_kw"] is None
-    assert value["grid_export_comparison_status"] == "not_comparable_battery_discharging"
+    assert (
+        value["grid_export_comparison_status"] == "not_comparable_battery_discharging"
+    )
     args["snapshot"].battery_power_kw = 0.0
     value = evaluate_solar_routing_shadow(**args)
     assert value["digital_twin_vs_grid_export_gap_kw"] == 3.3
@@ -201,7 +205,9 @@ def test_physical_nov21_solar_surplus_is_stored_not_false_missing_export() -> No
     value = evaluate_solar_routing_shadow(**args)
     assert value["digital_twin_vs_grid_export_gap_kw"] is None
     assert value["grid_export_comparison_status"] == "not_comparable_battery_charging"
-    assert value["solar_surplus_capture_evidence_status"] == "bounded_physical_inference"
+    assert (
+        value["solar_surplus_capture_evidence_status"] == "bounded_physical_inference"
+    )
     assert value["estimated_solar_captured_in_battery_kw"] == 1.804
     assert value["reporting_only"] is True
     assert value["hardware_writes"] == "forbidden"
