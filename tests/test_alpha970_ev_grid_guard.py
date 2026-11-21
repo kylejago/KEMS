@@ -147,10 +147,13 @@ def test_existing_lower_charge_limit_and_inactive_ev_remain_unchanged():
     )
     assert active.desired_charge_power_kw == 2.0
     assert active.desired_work_mode == "Force Charge"
-    assert _guard(
-        _snap(ev_charging=False, ev_power_kw=0.0),
-        _plan(desired_charge_power_kw=7.0),
-    ).desired_charge_power_kw == 7.0
+    assert (
+        _guard(
+            _snap(ev_charging=False, ev_power_kw=0.0),
+            _plan(desired_charge_power_kw=7.0),
+        ).desired_charge_power_kw
+        == 7.0
+    )
 
 
 def test_original_uncapped_cheap_charge_site_failure_is_rebudgeted_safely():
