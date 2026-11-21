@@ -105,8 +105,8 @@ def test_alpha961_release_identity_and_scope() -> None:
     ).read_text(encoding="utf-8")
     reason = str(bundle["maintenance"]["reason"])
 
-    assert manifest["version"] == "0.9.0-alpha9.245"
-    assert reason.startswith("Alpha9.245:")
+    assert manifest["version"] == "0.9.0-alpha9.246"
+    assert reason.startswith("Alpha9.246:")
     assert "Alpha9.62 promotes the optional Grid import prevention bias" in reason
     assert "Alpha9.61 fixes Intelligent extra-slot confirmation" in reason
     assert "Grid-demand corroboration" in reason
