@@ -78,7 +78,8 @@ def test_hotfix_release_explains_reversion_and_preserves_safety() -> None:
     )
     # Historical scope checks cover archived notes; current release remains compact.
     bundle["maintenance"]["reason"] += "\n" + (
-        Path(__file__).resolve().parents[1] / "docs/archived-release-notes-through-alpha9244.md"
+        Path(__file__).resolve().parents[1]
+        / "docs/archived-release-notes-through-alpha9244.md"
     ).read_text(encoding="utf-8")
     assert manifest["version"] == "0.9.0-alpha9.245"
     reason = bundle["maintenance"]["reason"]

@@ -149,7 +149,8 @@ def test_release_scope_keeps_existing_hardware_and_auto_update_code() -> None:
     bundle = json.loads((ROOT / "release/kems-bundle.template.json").read_text())
     # Historical scope checks cover archived notes; current release remains compact.
     bundle["maintenance"]["reason"] += "\n" + (
-        Path(__file__).resolve().parents[1] / "docs/archived-release-notes-through-alpha9244.md"
+        Path(__file__).resolve().parents[1]
+        / "docs/archived-release-notes-through-alpha9244.md"
     ).read_text(encoding="utf-8")
     assert manifest["version"] == "0.9.0-alpha9.245"
     assert bundle["maintenance"]["reason"].startswith("Alpha9.245:")

@@ -41,7 +41,8 @@ def test_alpha929_versions_coordinate_core_and_panel3() -> None:
     bundle = json.loads(BUNDLE.read_text(encoding="utf-8"))
     # Historical scope checks cover archived notes; current release remains compact.
     bundle["maintenance"]["reason"] += "\n" + (
-        Path(__file__).resolve().parents[1] / "docs/archived-release-notes-through-alpha9244.md"
+        Path(__file__).resolve().parents[1]
+        / "docs/archived-release-notes-through-alpha9244.md"
     ).read_text(encoding="utf-8")
     panel = PANEL.read_text(encoding="utf-8")
     panel_health = PANEL_HEALTH.read_text(encoding="utf-8")

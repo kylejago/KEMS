@@ -184,7 +184,8 @@ def test_alpha922_release_scope_is_startup_presentation_only() -> None:
     )
     # Historical scope checks cover archived notes; current release remains compact.
     bundle["maintenance"]["reason"] += "\n" + (
-        Path(__file__).resolve().parents[1] / "docs/archived-release-notes-through-alpha9244.md"
+        Path(__file__).resolve().parents[1]
+        / "docs/archived-release-notes-through-alpha9244.md"
     ).read_text(encoding="utf-8")
     source = (INTEGRATION / "agile_flow_reserve_policy.py").read_text(encoding="utf-8")
 
