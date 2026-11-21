@@ -65,3 +65,13 @@ def test_release_rejects_reusing_a_tag_at_another_commit() -> None:
     assert 'existing_commit="$(git rev-parse "$VERSION^{commit}")"' in content
     assert 'if [[ "$existing_commit" != "$GITHUB_SHA" ]]' in content
     assert "bump the manifest first" in content
+
+
+def test_python_314_has_non_hardware_syntax_ci() -> None:
+    """Forward-compatible syntax check must not substitute for HA runtime tests."""
+    workflow = (ROOT / ".github" / "workflows" / "validate.yml").read_text()
+    assert "python-314-syntax:" in workflow
+    assert 'python-version: "3.14"' in workflow
+    assert "python -m compileall -q custom_components tests scripts" in workflow
+    assert 'python-version: "3.13"' in workflow
+    assert "run: python -m pytest" in workflow

@@ -4,19 +4,13 @@
 with established 7 kW/15%/10% physical limits). The historic v0.6/v0.7
 roadmap below documents initial development; it is **not today's to-do list**.
 
-1. **Safe cleanup and notification clarity (#498, #449):** retire remaining
-   unused legacy Intelligent source wiring only after import/reference review;
-   preserve actual Ohme-triggered EV battery hold. Make live WhatsApp events
-   identify observed charging, not assumed supplier cheap rates.
+1. **Legacy Intelligent cleanup (#498, #449):** the obsolete KEMS Intelligent option, KEMS-owned sensors, dashboard display and WhatsApp trigger were retired in alpha9.240–242. Preserve Ohme-triggered EV protection, and keep #498 open only for supplier daytime-rate clarification and actual post-23:30 charging/restoration acceptance. Do not reintroduce unverified tariff authority.
 2. **Complete original price-aware solar-only routing (#365):** the
    read-only candidate currently recommends Self Use versus Feed-in First,
    while live Agile battery Force Discharge already works. Do not duplicate the
    optimiser; require measured benefit, physical command readback, rollback and
    anti-flapping protections before authorising new work-mode writes.
-3. **Close exceptional Happy Hour tests (#349):** normal joined hours and
-   restoration have been demonstrated; exercise full/unavailable/cap/stale
-   conditions with deterministic failure-injection tests instead of unsafe
-   forced live conditions.
+3. **Happy Hour (#349 closed):** normal joined sessions and restoration were accepted on live evidence and the exceptional cases are already regression-tested. New alpha9.248 candidate adds HA coordinator-reload cache invalidation, with no change to event priority or FoxESS commands.
 4. **History and meter provenance (#352, #487):** maintain truthful incomplete
    periods and separately labelled estimated credits; never invent kWh or
    supplier awards. Use independent counter evidence before approving backfill.

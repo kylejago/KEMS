@@ -41,6 +41,22 @@ jobs:
       - name: Compile Python source
         run: python -m compileall -q custom_components tests
 
+  python-314-syntax:
+    name: Python 3.14 source syntax compatibility
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+
+      # Home Assistant hardware/runtime tests remain on the supported 3.13
+      # runner above. This is a forward-compatibility syntax check only.
+      - name: Compile integration and test sources on Python 3.14
+        run: python -m compileall -q custom_components tests scripts
+
   panel-compile:
     name: ESPHome panel compile
     runs-on: ubuntu-latest

@@ -6,6 +6,8 @@ live FoxESS KH7, solar PV, battery, Octopus tariffs and Ohme charging evidence.
 The version here is the last independently verified installed diagnostic, not a
 promise that this repository always matches the installed integration.
 
+**Release provenance:** A GitHub release tag or draft PR is not evidence of a Home Assistant installation. Check KEMS diagnostics for the running version, commissioning and physical restoration. The updater defaults to a pre-update backup and must defer if its backup service is unavailable; the separate safe-first 06:00–06:30 maintenance checks also remain in force. See [current audit follow-up](docs/alpha9248-audit-followup.md) for the staged post-Happy-Hour candidate and remaining evidence gates.
+
 ### What actually runs live
 
 - **Live Agile Outgoing** — rolling price/solar/house forecasts inform the
