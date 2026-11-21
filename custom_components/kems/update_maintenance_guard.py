@@ -101,6 +101,12 @@ def maintenance_energy_blockers(
 
     if _on(states, "off_peak") or _on(states, "intelligent_slot"):
         reasons.append("Cheap or Intelligent Octopus charging window active")
+    # The retired Intelligent entity is deliberately absent; only the live
+    # KEMS off-peak sensor can provide the normal cheap-window status. If it
+    # exists but is unavailable, do not silently assume expensive/idle power
+    # and restart an inverter controller during a possible tariff transition.
+    if states.get("off_peak") in {"unknown", "unavailable"}:
+        reasons.append("Current off-peak state is not verified")
     if getattr(snapshot, "cheap_period_confirmed", False):
         reasons.append("Confirmed cheap charging authority active")
     if _near_window(
