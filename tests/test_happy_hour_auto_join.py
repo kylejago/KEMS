@@ -653,6 +653,7 @@ def test_alpha9108_booking_controller_confirms_two_distinct_services(
 
 def test_controller_cache_rebinds_on_entry_reload(monkeypatch) -> None:
     """An HA config-entry reload must never reuse stale booking authority."""
+
     class FakeController:
         def __init__(self, coordinator):
             self.coordinator = coordinator
