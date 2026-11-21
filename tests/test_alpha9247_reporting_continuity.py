@@ -119,7 +119,9 @@ def test_raw_old_unchanged_sources_are_not_claimed_as_remeasured():
     assert quality["fields"]["battery_power_kw"]["status"] == (
         "raw_timestamp_within_limit"
     )
-    assert quality["reconfirmed_independent_physical_measurement_for_old_values"] is False
+    assert (
+        quality["reconfirmed_independent_physical_measurement_for_old_values"] is False
+    )
     assert quality["changes_control_freshness_or_foxess_commands"] is False
 
 
@@ -143,7 +145,7 @@ def test_stale_or_unknown_raw_sources_are_not_relabeled_corroborated():
 def test_advisory_bundle_does_not_promote_solar_pilot():
     source = (KEMS / "solar_routing_shadow.py").read_text()
     pilot = (KEMS / "solar_routing_pilot.py").read_text()
-    assert 'manager._solar_routing_shadow_latest = dict(payload)' in source
+    assert "manager._solar_routing_shadow_latest = dict(payload)" in source
     assert '"hardware_writes": "forbidden"' in source
     assert "independent" in pilot.lower()
     assert "work_mode" in pilot
