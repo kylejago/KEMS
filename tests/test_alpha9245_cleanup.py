@@ -177,3 +177,14 @@ def test_active_release_note_is_compact_and_history_remains_auditable():
     assert archive.startswith("# KEMS release-note history through Alpha9.244")
     assert "Alpha9.244: Reduce confirmed-cheap FoxESS Force Charge demand" in archive
     assert "Alpha9.243: Complete original-scope solar-only progress" in archive
+
+
+def test_legacy_simulation_dashboard_is_archived_not_installed():
+    old = (KEMS / "dashboard_consolidation.py").read_text()
+    setup = (KEMS / "__init__.py").read_text()
+    current = (KEMS / "kems_master_dashboard.yaml").read_text()
+    assert "Archived Alpha7 product dashboard" in old
+    assert "install_dashboard_consolidation()" not in setup
+    assert "install_dashboard_pipeline()" in setup
+    assert "sensor.kems_compare_solar_and_battery_cost_today" not in current
+    assert "sensor.kems_compare_full_kems_forecast_cost_today" not in current
