@@ -72,6 +72,15 @@ def test_first_hour_has_joined_id_but_second_hour_remains_unvalued():
     }
     assert {e["event_id"] for e in pending} == {"8068", "8135"}
     assert all(e["supplier_status"] == "unsettled" for e in result["entries"])
+    # 'Unsettled' does not mean the supplier acknowledged a reward, nor does
+    # a joined-but-unmetered booking imply that any financial credit exists.
+    assert all(
+        e["supplier_award_evidence"] == "estimated_not_supplier_verified"
+        for e in included
+    )
+    assert all(
+        e["supplier_award_evidence"] == "no_valued_reward_yet" for e in pending
+    )
     assert all("fixed_export_income" not in e for e in result["entries"])
 
 
