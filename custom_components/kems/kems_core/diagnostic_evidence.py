@@ -55,7 +55,11 @@ def corroborated_unchanged_sources(
         observations[name] = {
             "raw_report_age_seconds": round(age, 1) if age is not None else None,
             "status": status,
-            "physical_remeasurement_proven": status == "raw_timestamp_within_limit",
+            # A recent Home Assistant report timestamp is not an independent
+            # physical measurement. Keep the legacy boolean truthful while
+            # exposing exactly the recency fact that can be supported.
+            "raw_report_within_freshness_limit": status == "raw_timestamp_within_limit",
+            "physical_remeasurement_proven": False,
         }
     if stale:
         overall = "one_or_more_sources_rejected_stale"

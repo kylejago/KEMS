@@ -194,3 +194,42 @@ def test_backup_before_update_remains_an_independent_hard_gate() -> None:
     assert source.index("if self.policy.backup_before_update:") < source.index(
         'if not self.hass.services.has_service("update", "install")'
     )
+
+def test_backup_protection_diagnostic_never_confuses_default_with_saved_false() -> None:
+    """Actual saved backup opt-out must be visibly reported, not auto-overridden."""
+    check = guard.automatic_update_backup_status
+    assert (
+        check(
+            automatic_updates=True,
+            backup_before_update=False,
+            backup_service_available=True,
+        )
+        == "backup_disabled"
+    )
+    assert (
+        check(
+            automatic_updates=True,
+            backup_before_update=True,
+            backup_service_available=False,
+        )
+        == "backup_service_unavailable"
+    )
+    assert (
+        check(
+            automatic_updates=True,
+            backup_before_update=True,
+            backup_service_available=True,
+        )
+        == "pre_update_backup_required"
+    )
+    assert (
+        check(
+            automatic_updates=False,
+            backup_before_update=False,
+            backup_service_available=False,
+        )
+        == "automatic_updates_off"
+    )
+    source = UPDATE.read_text()
+    assert '"backup_protection": {' in source
+    assert '"status": automatic_update_backup_status(' in source

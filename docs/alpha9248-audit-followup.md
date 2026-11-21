@@ -4,6 +4,9 @@
 
 ## Confirmed, directly actioned in alpha9.248
 
+- **Source-provenance honesty:** Recent HA raw-source timestamps now support a separate `raw_report_within_freshness_limit` flag but no longer claim independent physical remeasurement; this changes only diagnostic labels, never telemetry acceptance or control.
+- **Live backup policy evidence:** The 21 November last-reviewed installed diagnostic had automatic updates enabled but `backup_before_update=false`, despite the code default being true. The candidate exposes `backup_protection.status=backup_disabled` as a read-only warning. It does not silently change a saved option. Verify HA backup service and available storage, then deliberately turn on the existing `Backup before update` control before relying on unattended maintenance.
+
 - **Release safety:** The publisher requires successful exact-main-SHA Validate (full test suite and ESPHome compile), HACS and hassfest checks, and rejects a stale main commit or a same-name release tag targeting a different commit. Publication only runs on `main` (or a separately authorised manual trigger); draft branch builds cannot expose the next release.
 - **Happy Hour coordinator reload:** The per-config-entry auto-join cache is replaced for a new coordinator and cleared on unload, even in the presence of late old callbacks. Booking authority is not broadened.
 - **Update safety:** Unknown/unavailable *current* off-peak binary now defers unattended maintenance. A removed legacy Intelligent binary is not treated as tariff authority. Existing planned-event, physical charging/export, EV and FoxESS restoration blockers are retained.
