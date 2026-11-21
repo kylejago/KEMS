@@ -1176,8 +1176,28 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                     work_mode_observation=balance_probe.get("work_mode"),
                 )
                 publish_solar_routing_shadow(self._agile_smart_export, solar_shadow)
-            except Exception:
+            except Exception as exc:
                 LOGGER.exception("Read-only Alpha9.123 solar-routing shadow failed")
+                # A missing advisory result is otherwise indistinguishable
+                # from successful evaluation that found no solar opportunity.
+                # Record an explicit fail-closed marker; never enter Control.
+                try:
+                    publish_solar_routing_shadow(
+                        self._agile_smart_export,
+                        {
+                            "status": "evaluation_failed",
+                            "reason": "Read-only solar routing evaluation unavailable",
+                            "error_type": type(exc).__name__,
+                            "generated_at": now.isoformat(),
+                            "scope": "shadow_only",
+                            "reporting_only": True,
+                            "hardware_writes": "forbidden",
+                        },
+                    )
+                except Exception:
+                    LOGGER.exception(
+                        "Read-only solar-routing failure status publication failed"
+                    )
 
             # Reward-hour import cannot use a five-minute cached ledger near
             # the strict hourly cap. Refresh only the physical event budget
