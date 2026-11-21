@@ -51,7 +51,7 @@ def test_release_requires_exact_main_commit_ci_before_creating_tag() -> None:
     assert "for workflow in validate.yml hacs.yml hassfest.yml" in content
     assert '--commit "$GITHUB_SHA" --event push' in content
     assert 'row.get("headSha") == os.environ["EXPECTED_SHA"]' in content
-    assert 'row.get("conclusion") == "success"' in content
+    assert 'current.get("conclusion") == "success"' in content
     assert "current_main=" in content
     assert 'if [[ "$current_main" != "$GITHUB_SHA" ]]' in content
     assert content.index("Gate publication on exact-commit") < content.index(

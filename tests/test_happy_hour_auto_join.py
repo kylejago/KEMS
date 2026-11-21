@@ -662,7 +662,7 @@ def test_controller_cache_rebinds_on_entry_reload(monkeypatch) -> None:
     monkeypatch.setattr(happy_join, "HappyHourAutoJoinController", FakeController)
     monkeypatch.setattr(happy_join, "_CONTROLLERS", {})
     hass = object()
-    entry = SimpleNamespace(entry_id="reloaded-entry")
+    entry = SimpleNamespace(entry_id="reloaded-entry", options={})
     previous = SimpleNamespace(hass=hass, entry=entry)
     current = SimpleNamespace(hass=hass, entry=entry)
     original = happy_join._controller_for(previous)
