@@ -41,3 +41,27 @@ def test_release_workflow_has_write_permission_and_serialises_publication() -> N
     assert "contents: write" in content
     assert "group: publish-kems-release" in content
     assert "cancel-in-progress: false" in content
+
+
+def test_release_requires_exact_main_commit_ci_before_creating_tag() -> None:
+    """A successful earlier PR or unrelated SHA must not authorise publishing."""
+    content = WORKFLOW.read_text(encoding="utf-8")
+
+    assert "actions: read" in content
+    assert "for workflow in validate.yml hacs.yml hassfest.yml" in content
+    assert '--commit "$GITHUB_SHA" --event push' in content
+    assert 'row.get("headSha") == os.environ["EXPECTED_SHA"]' in content
+    assert 'row.get("conclusion") == "success"' in content
+    assert "current_main=" in content
+    assert 'if [[ "$current_main" != "$GITHUB_SHA" ]]' in content
+    assert content.index("Gate publication on exact-commit") < content.index(
+        "Create canonical release when missing"
+    )
+
+
+def test_release_rejects_reusing_a_tag_at_another_commit() -> None:
+    content = WORKFLOW.read_text(encoding="utf-8")
+
+    assert 'existing_commit="$(git rev-parse "$VERSION^{commit}")"' in content
+    assert 'if [[ "$existing_commit" != "$GITHUB_SHA" ]]' in content
+    assert "bump the manifest first" in content
