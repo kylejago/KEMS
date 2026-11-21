@@ -8,10 +8,10 @@ unchanged.
 from __future__ import annotations
 
 import ast
+from collections.abc import Mapping
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
-from collections.abc import Mapping
 
 ROOT = Path(__file__).resolve().parents[1]
 KEMS = ROOT / "custom_components" / "kems"
@@ -23,8 +23,7 @@ def _commissioning_operator_state():
     fn = next(
         n
         for n in module.body
-        if isinstance(n, ast.FunctionDef)
-        and n.name == "commissioning_operator_state"
+        if isinstance(n, ast.FunctionDef) and n.name == "commissioning_operator_state"
     )
     result = {}
     exec(
@@ -77,8 +76,8 @@ def test_bundle_does_not_modify_existing_physical_write_gates():
     assert 'state == "Ready for Shadow"' in commissioning
     assert '"ready_for_control": ready_for_control' in commissioning
     assert 'commissioning.get("ready_for_control")' in coordinator
-    assert 'planned_control=control,' in coordinator
-    assert 'solar_shadow = evaluate_solar_routing_shadow(' in coordinator
+    assert "planned_control=control," in coordinator
+    assert "solar_shadow = evaluate_solar_routing_shadow(" in coordinator
     assert 'solar_shadow["pilot_readiness"]' in coordinator
     assert '"hardware_writes": "forbidden"' in solar
     assert '"new_ev_routing_hardware_authorised": False' in trace
