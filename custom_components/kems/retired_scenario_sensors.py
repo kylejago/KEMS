@@ -46,10 +46,7 @@ def _is_inactive_scenario_presentation(current: Any) -> bool:
         return True
     # The obsolete flow entities report this literal no-data sentinel when
     # scenario simulation is switched off; never remove a real measured flow.
-    return state == (
-        "H=-1,S=-1,GI=-1,GE=-1,SH=-1,SB=-1,SE=-1,"
-        "GB=-1,BH=-1,BE=-1,SOC=-1"
-    )
+    return state == "H=-1,S=-1,GI=-1,GE=-1,SH=-1,SB=-1,SE=-1,GB=-1,BH=-1,BE=-1,SOC=-1"
 
 
 def retire_inactive_scenario_sensors(
