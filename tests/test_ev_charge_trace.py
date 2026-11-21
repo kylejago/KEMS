@@ -147,7 +147,6 @@ def test_plug_charge_stop_and_slot_edges_are_retained_across_restart():
     assert result["new_ev_routing_hardware_authorised"] is False
 
 
-
 def test_cheap_ev_charge_trace_records_plan_and_flags_discharge_without_writes():
     module, _ = _load_trace_module()
     base = _snapshot(connected=True, charging=True, cheap=True)
@@ -175,9 +174,10 @@ def test_cheap_ev_charge_trace_records_plan_and_flags_discharge_without_writes()
     sample = module.build_ev_trace_sample(
         reversed_power, event="scan", planned_control=plan
     )
-    assert sample["ev_cheap_charge_cap_audit"][
-        "battery_discharging_during_ev_charge"
-    ] is True
+    assert (
+        sample["ev_cheap_charge_cap_audit"]["battery_discharging_during_ev_charge"]
+        is True
+    )
     assert sample["new_ev_routing_hardware_authorised"] is False
 
 
