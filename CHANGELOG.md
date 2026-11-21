@@ -1,3 +1,10 @@
+## 0.9.0-alpha9.248 — staged post-Happy-Hour lifecycle and publisher safety (NOT RELEASED)
+
+- **Happy Hour lifecycle:** A Home Assistant reload no longer reuses the previous coordinator's auto-join controller. Booking recommendations, control/commissioning gates and persisted slot evidence are reloaded from the new coordinator; an old shutdown cannot clear the new instance. No changes to live Happy Hour charging policy or join permissions.
+- **Unattended maintenance:** The live KEMS off-peak sensor must report an explicit on/off state; unknown/unavailable now defers automatic update/restart instead of assuming idle. The removed legacy Intelligent sensor is not required. Existing booked-event, Power Down, export, charging, FoxESS restoration and stale-telemetry blockers remain.
+- **Publication integrity:** The main-branch publisher waits for Validate (full pytest plus ESPHome), HACS and hassfest success on the *same SHA*, refuses stale main and refuses reusing a prior version tag at a different commit. This is distinct from the safe-first HA installer.
+- **Not published:** This candidate stays on an isolated draft PR until after the **22 November 2026 booked Happy Hour** and confirmed safe return to normal. No new FoxESS solar mode writes, EV tariff authority, 15%/10% reserve, 7kW DNO, or ROI arithmetic changes.
+
 ## 0.9.0-alpha9.243 — solar-only live-pilot evidence and operator clarity (read-only)
 
 - **Original solar-routing scope (#365) advanced, not switched on:** The live paid-Agile **battery** export controller is unchanged. A separate pure `solar_routing_pilot.py` evaluator now annotates the existing `sensor.kems_solar_routing_shadow` financial advice with missing **physical** prerequisites for surplus-solar Self Use↔Feed-in First: measured redirectable PV charging, material profit, fresh raw solar/battery/house/grid/SOC, EV disconnected/idle, no cheap period or Power Down, independent KH7 mode readback and separately verified rollback. It always reports `hardware_writes=forbidden` and `live_mode_switching_enabled=false`.
