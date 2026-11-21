@@ -119,9 +119,9 @@ def test_new_projection_only_changes_sensor_presentation_not_real_gates() -> Non
     source = COMMISSIONING.read_text(encoding="utf-8")
     diagnostics = DIAGNOSTICS.read_text(encoding="utf-8")
     assert "return recorder_safe_commissioning_attributes(payload)" in source
-    assert 'if snapshot.get("ready_for_control"):' in source
+    assert "commissioning_operator_state(" in source
     assert 'return "Ready for Control"' in source
-    assert 'return str(snapshot["state"])' in source
+    assert 'return state' in source
     assert '"commissioning": build_commissioning_snapshot(' in diagnostics
     assert "recorder_safe_commissioning_attributes" not in diagnostics
     assert '"checks": checks,' in source
