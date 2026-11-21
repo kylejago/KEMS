@@ -309,7 +309,8 @@ def test_dashboard_and_diagnostics_never_confuse_twin_with_physical_flow() -> No
     assert "solar-only export is **not** separately metered" in dashboard
     assert "sensor.kems_physical_solar_to_battery_estimate" in dashboard
     shadow = (KEMS / "solar_routing_shadow.py").read_text()
-    assert '"physical_solar_flow": _physical_solar_flow(snapshot)' in shadow
+    assert "physical_flow = _physical_solar_flow(snapshot)" in shadow
+    assert '"physical_solar_flow": physical_flow' in shadow
     assert '"reporting_only": True' in shadow
     coordinator = (KEMS / "coordinator.py").read_text()
     assert "await self._history.async_record(snapshot)" in coordinator
@@ -323,6 +324,6 @@ def test_dashboard_and_diagnostics_never_confuse_twin_with_physical_flow() -> No
 def test_release_identity_and_unchanged_hardware_versions() -> None:
     manifest = json.loads((KEMS / "manifest.json").read_text())
     bundle = json.loads((ROOT / "release" / "kems-bundle.template.json").read_text())
-    assert manifest["version"] == "0.9.0-alpha9.245"
-    assert bundle["maintenance"]["reason"].startswith("Alpha9.245:")
+    assert manifest["version"] == "0.9.0-alpha9.246"
+    assert bundle["maintenance"]["reason"].startswith("Alpha9.246:")
     assert bundle["components"]["panel"]["version"] == "0.9.0-alpha9-panel.4"

@@ -188,6 +188,27 @@ def evaluate_solar_routing_shadow(
     predicted_export = (
         _num(routing.get("solar_export_kw")) if isinstance(routing, Mapping) else None
     )
+    physical_flow = _physical_solar_flow(snapshot)
+    # A digital-twin *potential* solar export is not lost grid export when
+    # FoxESS actually stores that surplus in the battery. Compare total-grid
+    # export only in a near-idle battery interval; we still have no solar-only
+    # grid export meter and this is NOT physical mode-switch authority.
+    export_comparable = (
+        predicted_export is not None
+        and grid_export is not None
+        and battery_kw is not None
+        and abs(battery_kw) <= 0.05
+    )
+    if battery_kw is None:
+        comparison_status = "not_comparable_battery_reading_missing"
+    elif battery_kw < -0.05:
+        comparison_status = "not_comparable_battery_charging"
+    elif battery_kw > 0.05:
+        comparison_status = "not_comparable_battery_discharging"
+    elif predicted_export is None or grid_export is None:
+        comparison_status = "not_comparable_export_reading_missing"
+    else:
+        comparison_status = "comparable_total_export_only"
     base: dict[str, Any] = {
         "status": "insufficient_evidence",
         "reason": "not evaluated",
@@ -195,7 +216,12 @@ def evaluate_solar_routing_shadow(
         "scope": "shadow_only",
         "reporting_only": True,
         "hardware_writes": "forbidden",
-        "physical_solar_flow": _physical_solar_flow(snapshot),
+        "physical_solar_flow": physical_flow,
+        "solar_surplus_capture_evidence_status": physical_flow["status"],
+        "estimated_solar_captured_in_battery_kw": physical_flow[
+            "estimated_pv_to_battery_kw"
+        ],
+        "grid_export_comparison_status": comparison_status,
         "observed_solar_kw": solar,
         "observed_house_kw": house,
         "observed_battery_power_kw": battery_kw,
@@ -206,16 +232,13 @@ def evaluate_solar_routing_shadow(
         "observed_grid_import_kw": grid_import,
         "digital_twin_solar_export_kw": predicted_export,
         "digital_twin_vs_grid_export_gap_kw": (
-            round(predicted_export - grid_export, 3)
-            if predicted_export is not None
-            and grid_export is not None
-            and battery_kw is not None
-            and battery_kw <= 0
-            else None
+            round(predicted_export - grid_export, 3) if export_comparable else None
         ),
         "flow_comparison_note": (
-            "Estimate versus metered TOTAL export only when battery is not "
-            "discharging; no independently measured solar-to-grid split"
+            "Solar predicted for export may instead be stored in the battery. "
+            "Suppress the apparent export gap while battery power is material. "
+            "Near idle, compare digital-twin potential only against TOTAL "
+            "metered export, never against an unmeasured solar-only split."
         ),
     }
 

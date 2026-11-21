@@ -37,6 +37,7 @@ def build_ev_trace_sample(
     event: str,
     foxess_control: dict[str, Any] | None = None,
     command_shadow: dict[str, Any] | None = None,
+    planned_control: Any = None,
 ) -> dict[str, Any]:
     """Create one compact observation, with labelled *observed* readbacks."""
     command_shadow = command_shadow or {}
@@ -52,6 +53,37 @@ def build_ev_trace_sample(
         if isinstance(entities.get(key), dict)
     }
     control = foxess_control or {}
+    confirmed_ev_cheap = bool(
+        snapshot.cheap_period_confirmed
+        and (snapshot.ev_charging is True or (snapshot.ev_power_kw or 0.0) > 0.25)
+    )
+    charge_target = getattr(planned_control, "desired_charge_power_kw", None)
+    charging_audit = {
+        "confirmed_cheap_ev_charging": confirmed_ev_cheap,
+        "desired_battery_charge_power_kw": charge_target,
+        "ev_grid_guard_status": getattr(planned_control, "ev_grid_guard_status", None),
+        "site_import_limit_kw": getattr(planned_control, "site_import_limit_kw", None),
+        "site_import_headroom_kw": getattr(
+            planned_control, "site_import_headroom_kw", None
+        ),
+        "charge_cap_kw_when_ev_charging": 5.0 if confirmed_ev_cheap else None,
+        "cap_target_exceeded": bool(
+            confirmed_ev_cheap
+            and isinstance(charge_target, (int, float))
+            and charge_target > 5.001
+        ),
+        "battery_discharging_during_ev_charge": bool(
+            confirmed_ev_cheap
+            and snapshot.battery_power_kw is not None
+            and snapshot.battery_power_kw > 0.3
+        ),
+        "source_note": (
+            "KEMS desired target and time-aligned sampled physical power; "
+            "not proof of independent EV circuit isolation or the actual "
+            "FoxESS charge-power setpoint readback."
+        ),
+        "reporting_only": True,
+    }
     return {
         "timestamp": snapshot.timestamp.isoformat(),
         "event": event,
@@ -90,6 +122,7 @@ def build_ev_trace_sample(
         "shared_bus_audit": dict(snapshot.shared_bus_ev_audit),
         "binding_status": binding.get("status"),
         "foxess_readback": readbacks,
+        "ev_cheap_charge_cap_audit": charging_audit,
         "existing_live_control": {
             "decision_action": control.get("decision_action"),
             "commands_permitted": control.get("commands_permitted"),
@@ -119,11 +152,44 @@ class EVChargeTraceRecorder:
 
     @property
     def state(self) -> dict[str, Any]:
-        """Expose a bounded, non-secret passive evidence pack."""
+        """Expose bounded evidence and a compact EV charge-cap audit."""
+        audits = [
+            row["ev_cheap_charge_cap_audit"]
+            for row in self._records
+            if isinstance(row.get("ev_cheap_charge_cap_audit"), dict)
+            and row["ev_cheap_charge_cap_audit"].get("confirmed_cheap_ev_charging")
+            is True
+        ]
+        discharge_events = sum(
+            item.get("battery_discharging_during_ev_charge") is True for item in audits
+        )
+        cap_exceedances = sum(
+            item.get("cap_target_exceeded") is True for item in audits
+        )
         return {
             "scope": "read_only_existing_kems_sources",
             "sample_count": len(self._records),
             "samples": list(self._records),
+            "ev_cheap_charge_cap_summary": {
+                "status": (
+                    "not_yet_observed"
+                    if not audits
+                    else (
+                        "unexpected_battery_discharge_observed"
+                        if discharge_events
+                        else "observations_recorded"
+                    )
+                ),
+                "confirmed_cheap_ev_samples": len(audits),
+                "unexpected_battery_discharge_samples": discharge_events,
+                "charge_target_above_5kw_samples": cap_exceedances,
+                "samples_missing_planned_target": sum(
+                    item.get("desired_battery_charge_power_kw") is None
+                    for item in audits
+                ),
+                "independent_ev_isolation_proven": False,
+                "reporting_only": True,
+            },
             "new_ev_routing_hardware_authorised": False,
             "sampling_note": (
                 "At coordinator scan cadence while plugged/charging and 15 "
@@ -160,6 +226,7 @@ class EVChargeTraceRecorder:
         *,
         foxess_control: dict[str, Any] | None = None,
         command_shadow: dict[str, Any] | None = None,
+        planned_control: Any = None,
     ) -> bool:
         """Record actual scan data; save transitions immediately."""
         now = snapshot.timestamp
@@ -189,6 +256,7 @@ class EVChargeTraceRecorder:
             event=event,
             foxess_control=foxess_control,
             command_shadow=command_shadow,
+            planned_control=planned_control,
         )
         if not self.wants_capture(snapshot):
             self._prelude.append(sample)

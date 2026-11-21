@@ -1244,6 +1244,28 @@ def build_commissioning_snapshot(
     }
 
 
+def commissioning_operator_state(snapshot: Mapping[str, Any], control: Any) -> str:
+    """Present actual commissioned live readiness without granting authority.
+
+    Snapshot evidence may be sampled before the coordinator's current live
+    control result is published. An already commissioned, permitted, PASS
+    control state resolves that reporting-only timing discrepancy; a failed
+    or waiting commissioning state is never overridden. Physical write gates
+    continue using the original unmodified commissioning snapshot.
+    """
+    if snapshot.get("ready_for_control") is True:
+        return "Ready for Control"
+    state = str(snapshot.get("state") or "Unknown")
+    if (
+        state == "Ready for Shadow"
+        and getattr(control, "commissioned", False) is True
+        and getattr(control, "commands_permitted", False) is True
+        and getattr(control, "preflight_status", None) == "PASS"
+    ):
+        return "Ready for Control"
+    return state
+
+
 class KEMSCommissioningReadinessSensor(KEMSEntity, SensorEntity):
     """Expose compact Recorder-safe readiness; full evidence stays diagnostic."""
 
@@ -1258,16 +1280,20 @@ class KEMSCommissioningReadinessSensor(KEMSEntity, SensorEntity):
     @property
     def native_value(self) -> str:
         snapshot = build_commissioning_snapshot(self._hass, self.coordinator)
-        # Presentation only. The raw "Ready for Shadow" commissioning gate
-        # remains unchanged for all physical authority/safety decisions.
-        if snapshot.get("ready_for_control"):
-            return "Ready for Control"
-        return str(snapshot["state"])
+        # Reporting only: the coordinator's last successful live preflight
+        # resolves a transient snapshot/display sampling discrepancy.
+        data = getattr(self.coordinator, "data", None)
+        return commissioning_operator_state(snapshot, getattr(data, "control", None))
 
     @property
     def extra_state_attributes(self) -> Mapping[str, Any]:
         payload = build_commissioning_snapshot(self._hass, self.coordinator)
-        return recorder_safe_commissioning_attributes(payload)
+        data = getattr(self.coordinator, "data", None)
+        attributes = recorder_safe_commissioning_attributes(payload)
+        attributes["operator_display_state"] = commissioning_operator_state(
+            payload, getattr(data, "control", None)
+        )
+        return attributes
 
 
 class KEMSPanelManagementStatusSensor(KEMSEntity, SensorEntity):

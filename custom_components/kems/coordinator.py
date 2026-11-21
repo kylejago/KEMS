@@ -1980,6 +1980,7 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                     snapshot,
                     foxess_control=foxess_control,
                     command_shadow=trace_shadow,
+                    planned_control=control,
                 )
             except Exception:
                 LOGGER.exception("Read-only EV charge trace capture failed")

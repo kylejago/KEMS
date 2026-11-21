@@ -5,9 +5,10 @@ from __future__ import annotations
 import asyncio
 import importlib.util
 import sys
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from types import ModuleType
+from types import ModuleType, SimpleNamespace
 from unittest.mock import patch
 
 from kems_core import Snapshot
@@ -144,6 +145,88 @@ def test_plug_charge_stop_and_slot_edges_are_retained_across_restart():
     assert "unplugged" in events
     assert result["sample_count"] >= 7
     assert result["new_ev_routing_hardware_authorised"] is False
+
+
+def test_cheap_ev_charge_trace_records_plan_and_flags_discharge_without_writes():
+    module, _ = _load_trace_module()
+    base = _snapshot(connected=True, charging=True, cheap=True)
+    charging = replace(
+        base, ev_power_kw=7.558, battery_power_kw=-4.7, grid_import_kw=13.5
+    )
+    plan = SimpleNamespace(
+        desired_charge_power_kw=4.7,
+        ev_grid_guard_status="ev_battery_hold_grid_charging",
+        site_import_limit_kw=14.5,
+        site_import_headroom_kw=1.0,
+    )
+    sample = module.build_ev_trace_sample(
+        charging, event="charge_start", planned_control=plan
+    )
+    audit = sample["ev_cheap_charge_cap_audit"]
+    assert audit["confirmed_cheap_ev_charging"] is True
+    assert audit["desired_battery_charge_power_kw"] == 4.7
+    assert audit["charge_cap_kw_when_ev_charging"] == 5.0
+    assert audit["site_import_headroom_kw"] == 1.0
+    assert audit["battery_discharging_during_ev_charge"] is False
+    assert audit["cap_target_exceeded"] is False
+    assert audit["reporting_only"] is True
+    reversed_power = replace(charging, battery_power_kw=7.56)
+    sample = module.build_ev_trace_sample(
+        reversed_power, event="scan", planned_control=plan
+    )
+    assert (
+        sample["ev_cheap_charge_cap_audit"]["battery_discharging_during_ev_charge"]
+        is True
+    )
+    assert sample["new_ev_routing_hardware_authorised"] is False
+
+
+def test_cheap_ev_charge_trace_summary_persists_violations_across_restart():
+    module, _ = _load_trace_module()
+    recorder = module.EVChargeTraceRecorder(object(), "charge-audit")
+    plan = SimpleNamespace(
+        desired_charge_power_kw=4.5,
+        ev_grid_guard_status="ev_battery_hold_grid_charging",
+        site_import_limit_kw=14.5,
+        site_import_headroom_kw=0.9,
+    )
+
+    async def exercise():
+        healthy = replace(
+            _snapshot(connected=True, charging=True, cheap=True),
+            battery_power_kw=-4.5,
+        )
+        await recorder.async_record(healthy, planned_control=plan)
+        spike = replace(
+            _snapshot(1, connected=True, charging=True, cheap=True),
+            battery_power_kw=7.56,
+        )
+        await recorder.async_record(spike, planned_control=plan)
+        await recorder.async_save()
+        resumed = module.EVChargeTraceRecorder(object(), "charge-audit")
+        await resumed.async_load()
+        return resumed.state["ev_cheap_charge_cap_summary"]
+
+    summary = asyncio.run(exercise())
+    assert summary["confirmed_cheap_ev_samples"] == 2
+    assert summary["unexpected_battery_discharge_samples"] == 1
+    assert summary["charge_target_above_5kw_samples"] == 0
+    assert summary["samples_missing_planned_target"] == 0
+    assert summary["status"] == "unexpected_battery_discharge_observed"
+    assert summary["independent_ev_isolation_proven"] is False
+
+
+def test_unconfirmed_daytime_ohme_charging_never_claims_cheap_charge_cap():
+    module, _ = _load_trace_module()
+    sample = module.build_ev_trace_sample(
+        _snapshot(connected=True, charging=True, cheap=False),
+        event="charge_start",
+        planned_control=SimpleNamespace(desired_charge_power_kw=7.0),
+    )
+    audit = sample["ev_cheap_charge_cap_audit"]
+    assert audit["confirmed_cheap_ev_charging"] is False
+    assert audit["charge_cap_kw_when_ev_charging"] is None
+    assert audit["cap_target_exceeded"] is False
 
 
 def test_trace_fails_safe_when_not_installed_or_ev_data_missing():

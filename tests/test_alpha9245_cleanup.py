@@ -153,9 +153,9 @@ def test_commissioning_display_does_not_change_underlying_safety_gate():
     source = (KEMS / "commissioning.py").read_text()
     assert 'state == "Ready for Shadow"' in source
     assert '"ready_for_control": ready_for_control' in source
-    assert 'if snapshot.get("ready_for_control"):' in source
+    assert "commissioning_operator_state(" in source
     assert 'return "Ready for Control"' in source
-    assert 'return str(snapshot["state"])' in source
+    assert "return state" in source
     init = (KEMS / "__init__.py").read_text()
     assert "retire_inactive_scenario_sensors(" in init
     entity = (KEMS / "entity.py").read_text()
@@ -168,12 +168,12 @@ def test_active_release_note_is_compact_and_history_remains_auditable():
     bundle = json.loads((ROOT / "release/kems-bundle.template.json").read_text())
     current = bundle["maintenance"]["reason"]
     archive = (ROOT / "docs/archived-release-notes-through-alpha9244.md").read_text()
-    assert manifest["version"] == "0.9.0-alpha9.245"
-    assert current.startswith("Alpha9.245:")
+    assert manifest["version"] == "0.9.0-alpha9.246"
+    assert current.startswith("Alpha9.246:")
     assert len(current.encode("utf-8")) < 2000
-    assert "No new FoxESS/Ohme commands" in current
-    assert "15% deliberate export floor / 10% household floor" in current
-    assert "06:00-06:30 safe-first" in current
+    assert "without changing EV or tariff control" in current
+    assert "15% deliberate export reserve / 10% home floor" in current
+    assert "safe-first 06:00-06:30 updater" in current
     assert archive.startswith("# KEMS release-note history through Alpha9.244")
     assert "Alpha9.244: Reduce confirmed-cheap FoxESS Force Charge demand" in archive
     assert "Alpha9.243: Complete original-scope solar-only progress" in archive
