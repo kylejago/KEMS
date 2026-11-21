@@ -162,13 +162,49 @@ def test_missing_live_rates_and_missing_physical_readings_are_not_authority() ->
     assert evaluate_solar_routing_shadow(**args)["status"] == "insufficient_evidence"
 
 
-def test_observed_flow_parity_reports_disagreement_only_when_not_discharging() -> None:
+def test_solar_export_gap_is_suppressed_while_battery_is_charging_or_discharging() -> None:
     args = _inputs()
     value = evaluate_solar_routing_shadow(**args)
-    assert value["digital_twin_vs_grid_export_gap_kw"] == 3.3
+    assert value["digital_twin_vs_grid_export_gap_kw"] is None
+    assert value["grid_export_comparison_status"] == "not_comparable_battery_charging"
     args["snapshot"].battery_power_kw = 2.0
     value = evaluate_solar_routing_shadow(**args)
     assert value["digital_twin_vs_grid_export_gap_kw"] is None
+    assert value["grid_export_comparison_status"] == "not_comparable_battery_discharging"
+    args["snapshot"].battery_power_kw = 0.0
+    value = evaluate_solar_routing_shadow(**args)
+    assert value["digital_twin_vs_grid_export_gap_kw"] == 3.3
+    assert value["grid_export_comparison_status"] == "comparable_total_export_only"
+
+
+def test_physical_nov21_solar_surplus_is_stored_not_false_missing_export() -> None:
+    args = _inputs()
+    snap = args["snapshot"]
+    snap.solar_power_kw = 2.637
+    snap.house_load_kw = 0.833
+    snap.battery_power_kw = -1.806
+    snap.grid_import_kw = 0.016
+    snap.grid_export_kw = 0.0
+    snap.ev_connected = False
+    snap.source_age_seconds = {
+        name: 23.0
+        for name in (
+            "solar_power_kw",
+            "house_load_kw",
+            "battery_power_kw",
+            "grid_import_kw",
+            "grid_export_kw",
+            "battery_soc",
+        )
+    }
+    args["agile_state"]["current_routing_snapshot"]["solar_export_kw"] = 1.804
+    value = evaluate_solar_routing_shadow(**args)
+    assert value["digital_twin_vs_grid_export_gap_kw"] is None
+    assert value["grid_export_comparison_status"] == "not_comparable_battery_charging"
+    assert value["solar_surplus_capture_evidence_status"] == "bounded_physical_inference"
+    assert value["estimated_solar_captured_in_battery_kw"] == 1.804
+    assert value["reporting_only"] is True
+    assert value["hardware_writes"] == "forbidden"
 
 
 def test_stale_raw_100_soc_does_not_falsely_mark_battery_full() -> None:
