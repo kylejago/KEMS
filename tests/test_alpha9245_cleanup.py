@@ -29,8 +29,11 @@ class _Registry:
     def async_get_entity_id(self, domain, platform, unique_id):
         assert (domain, platform) == ("sensor", "kems")
         return next(
-            (key for key, value in self.entities.items()
-             if value.unique_id == unique_id),
+            (
+                key
+                for key, value in self.entities.items()
+                if value.unique_id == unique_id
+            ),
             None,
         )
 
@@ -98,10 +101,7 @@ def test_registry_removes_only_exact_owned_inactive_scenarios():
     states = _States(
         {
             inactive: "unknown",
-            sentinel: (
-                "H=-1,S=-1,GI=-1,GE=-1,SH=-1,SB=-1,SE=-1,"
-                "GB=-1,BH=-1,BE=-1,SOC=-1"
-            ),
+            sentinel: "H=-1,S=-1,GI=-1,GE=-1,SH=-1,SB=-1,SE=-1,GB=-1,BH=-1,BE=-1,SOC=-1",
             active: "12.4",
             foreign: "unavailable",
             no_kems: "138.5",
@@ -112,9 +112,10 @@ def test_registry_removes_only_exact_owned_inactive_scenarios():
     )
     assert set(removed) == {inactive, sentinel}
     assert set(registry.entities) == {active, foreign, no_kems}
-    assert module.retire_inactive_scenario_sensors(
-        registry, states, entry_id="entry-1"
-    ) == ()
+    assert (
+        module.retire_inactive_scenario_sensors(registry, states, entry_id="entry-1")
+        == ()
+    )
 
 
 def test_registry_never_removes_another_entry_or_live_legacy_sensor():
