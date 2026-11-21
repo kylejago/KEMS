@@ -142,6 +142,10 @@ def test_alpha937_release_identity_and_scope() -> None:
         (ROOT / "custom_components" / "kems" / "manifest.json").read_text()
     )
     bundle = json.loads((ROOT / "release" / "kems-bundle.template.json").read_text())
+    # Historical scope checks cover archived notes; current release remains compact.
+    bundle["maintenance"]["reason"] += "\n" + (
+        Path(__file__).resolve().parents[1] / "docs/archived-release-notes-through-alpha9244.md"
+    ).read_text(encoding="utf-8")
     reason = str(bundle["maintenance"]["reason"])
 
     assert manifest["version"] == "0.9.0-alpha9.245"

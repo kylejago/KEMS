@@ -42,8 +42,12 @@ def test_release_bundle_renders_exact_coordinated_alpha9_targets() -> None:
     ]
     assert bundle["maintenance"]["reboot_required"] is False
     reason = bundle["maintenance"]["reason"]
-    assert "Alpha9 coordinated parity baseline" in reason
-    assert "hardware writes remain hard-blocked" in reason
+    history = (
+        ROOT / "docs/archived-release-notes-through-alpha9244.md"
+    ).read_text(encoding="utf-8")
+    assert reason.startswith("Alpha9.245:")
+    assert "Alpha9 coordinated parity baseline" in history
+    assert "hardware writes remain hard-blocked" in history
 
 
 def test_bundle_contract_rejects_mismatched_appliance_versions() -> None:

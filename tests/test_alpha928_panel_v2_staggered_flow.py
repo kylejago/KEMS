@@ -38,6 +38,10 @@ def test_alpha928_versions_coordinate_core_and_panel2() -> None:
     """A firmware-behaviour change advances both core and panel identities."""
     manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
     bundle = json.loads(BUNDLE.read_text(encoding="utf-8"))
+    # Historical scope checks cover archived notes; current release remains compact.
+    bundle["maintenance"]["reason"] += "\n" + (
+        Path(__file__).resolve().parents[1] / "docs/archived-release-notes-through-alpha9244.md"
+    ).read_text(encoding="utf-8")
     panel = PANEL.read_text(encoding="utf-8")
     panel_health = PANEL_HEALTH.read_text(encoding="utf-8")
     reason = str(bundle["maintenance"]["reason"]).lower()

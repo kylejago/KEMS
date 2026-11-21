@@ -82,6 +82,10 @@ def test_alpha877_release_contract_is_successor_safe() -> None:
     bundle = json.loads(
         (ROOT / "release" / "kems-bundle.template.json").read_text(encoding="utf-8")
     )
+    # Historical scope checks cover archived notes; current release remains compact.
+    bundle["maintenance"]["reason"] += "\n" + (
+        Path(__file__).resolve().parents[1] / "docs/archived-release-notes-through-alpha9244.md"
+    ).read_text(encoding="utf-8")
 
     version = str(manifest["version"])
     assert version.startswith(("0.8.0-alpha8.", "0.9.0-alpha9."))

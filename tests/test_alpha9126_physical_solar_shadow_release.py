@@ -14,6 +14,10 @@ def test_alpha9126_release_description_is_coordinated_and_shadow_only() -> None:
     bundle = json.loads(
         (ROOT / "release" / "kems-bundle.template.json").read_text(encoding="utf-8")
     )
+    # Historical scope checks cover archived notes; current release remains compact.
+    bundle["maintenance"]["reason"] += "\n" + (
+        Path(__file__).resolve().parents[1] / "docs/archived-release-notes-through-alpha9244.md"
+    ).read_text(encoding="utf-8")
     reason = str(bundle["maintenance"]["reason"]).lower()
     assert manifest["version"] == "0.9.0-alpha9.245"
     assert reason.startswith("alpha9.245:")

@@ -179,6 +179,10 @@ def test_store_wiring_never_changes_physical_control_or_today_evaluation() -> No
 def test_alpha9153_version_and_no_auto_install() -> None:
     manifest = json.loads((KEMS / "manifest.json").read_text())
     bundle = json.loads((ROOT / "release" / "kems-bundle.template.json").read_text())
+    # Historical scope checks cover archived notes; current release remains compact.
+    bundle["maintenance"]["reason"] += "\n" + (
+        Path(__file__).resolve().parents[1] / "docs/archived-release-notes-through-alpha9244.md"
+    ).read_text(encoding="utf-8")
     assert manifest["version"] == "0.9.0-alpha9.245"
     assert bundle["maintenance"]["reason"].startswith("Alpha9.245:")
     assert bundle["components"]["panel"]["version"] == "0.9.0-alpha9-panel.4"

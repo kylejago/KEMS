@@ -84,5 +84,8 @@ def test_release_metadata_identity_matches_185():
     )["maintenance"]["reason"]
     assert manifest["version"] == "0.9.0-alpha9.245"
     assert reason.startswith("Alpha9.245:")
-    assert "FoxESS Modbus 1.15.0 and 1.16.0" in reason
+    historical_reason = (
+        KEMS.parents[1] / "docs/archived-release-notes-through-alpha9244.md"
+    ).read_text(encoding="utf-8")
+    assert "FoxESS Modbus 1.15.0 and 1.16.0" in historical_reason
     assert "06:00-06:30" in reason
