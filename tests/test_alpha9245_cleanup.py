@@ -171,9 +171,9 @@ def test_active_release_note_is_compact_and_history_remains_auditable():
     assert manifest["version"] == "0.9.0-alpha9.247"
     assert current.startswith("Alpha9.247:")
     assert len(current.encode("utf-8")) < 2000
-    assert "without changing EV or tariff control" in current
-    assert "15% deliberate export reserve / 10% home floor" in current
-    assert "safe-first 06:00-06:30 updater" in current
+    assert "alpha9.244 EV-aware 5 kW Force Charge cap" in current
+    assert "15% deliberate export reserve, 10% household floor" in current
+    assert "06:00-06:30 safe-first updater" in current
     assert archive.startswith("# KEMS release-note history through Alpha9.244")
     assert "Alpha9.244: Reduce confirmed-cheap FoxESS Force Charge demand" in archive
     assert "Alpha9.243: Complete original-scope solar-only progress" in archive
