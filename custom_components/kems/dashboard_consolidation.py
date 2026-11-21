@@ -1,4 +1,8 @@
-"""KEMS Alpha7.35 product-type dashboard consolidation."""
+"""Archived Alpha7 product dashboard. Not installed by current dashboard pipeline.
+
+Retained for historical tests and migrations only. Its old simulation
+comparison references must not be promoted back into the live dashboard.
+"""
 
 # ruff: noqa: E501
 
