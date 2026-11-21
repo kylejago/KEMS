@@ -16,6 +16,11 @@ from .models import ControlConfig, ControlState, Snapshot
 
 _MAX_OHME_AGE_SECONDS = 90.0
 _EV_ACTIVE_KW = 0.25
+# During measured EV charging in an independently confirmed cheap window,
+# leave room for a 7.6 kW Ohme and normal household load. This is a battery
+# Force Charge setpoint cap, not an EV throttle or a grid import-limit write.
+_EV_CHEAP_BATTERY_CHARGE_CAP_KW = 5.0
+_EV_CHEAP_GRID_IMPORT_RESERVE_KW = 0.75
 
 
 def _nonnegative(value: float | None) -> float | None:
@@ -476,11 +481,17 @@ def protect_live_cheap_ev(
     # Actual CT import can already include an existing Force Charge request.
     # Adding it again to planned charge would double-count and oscillate the
     # controller. Use CT import only as an independent over-limit veto.
+    # Limit the *new* charge setpoint while Ohme is measurably charging: the
+    # 5 kW ceiling and spare import margin lower the risk of the inverter
+    # leaving Force Charge as the EV and household load fluctuate. The
+    # measured over-limit veto remains fail-closed; never bypass safety or
+    # assume that reducing charge independently isolates battery from the EV.
     observed_over_limit = grid > limit + 0.001
     charge = min(
         0.0 if observed_over_limit else max(control.desired_charge_power_kw, 0.0),
         max(config.max_charge_kw, 0.0),
-        max(limit - conservative_demand, 0.0),
+        _EV_CHEAP_BATTERY_CHARGE_CAP_KW,
+        max(limit - conservative_demand - _EV_CHEAP_GRID_IMPORT_RESERVE_KW, 0.0),
     )
     total = conservative_demand + charge
     # The reviewed cheap planner may have rejected its *uncapped* 7 kW
@@ -522,8 +533,9 @@ def protect_live_cheap_ev(
             else "" if safe and prior_site_only_failure else control.blocked_reason
         ),
         next_action=(
-            "EV active: hold battery with physical MinSOC and use confirmed "
-            "cheap grid for the shared home/EV bus; this does not provide "
+            f"EV active: cheap battery charging target {charge:.3f} kW, "
+            "capped at 5 kW with 0.75 kW grid-import reserve; "
+            "physical MinSOC protects the shared home/EV bus, not "
             "independent house-only battery output control."
         ),
     )
