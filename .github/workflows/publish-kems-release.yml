@@ -40,8 +40,8 @@ jobs:
           for workflow in validate.yml hacs.yml hassfest.yml; do
             verified=false
             for attempt in $(seq 1 120); do
-              runs="$(gh run list --repo "$GITHUB_REPOSITORY" \\
-                --workflow "$workflow" --commit "$GITHUB_SHA" --event push \\
+              runs="$(gh run list --repo "$GITHUB_REPOSITORY" \
+                --workflow "$workflow" --commit "$GITHUB_SHA" --event push \
                 --limit 20 --json databaseId,headSha,status,conclusion,event)"
               result="$(RUNS_JSON="$runs" EXPECTED_SHA="$GITHUB_SHA" python - <<'PY'
           import json

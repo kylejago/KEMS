@@ -75,3 +75,16 @@ def test_python_314_has_non_hardware_syntax_ci() -> None:
     assert "python -m compileall -q custom_components tests scripts" in workflow
     assert 'python-version: "3.13"' in workflow
     assert "run: python -m pytest" in workflow
+
+
+def test_publisher_gh_run_list_uses_real_shell_line_continuations() -> None:
+    """Two escaped backslashes terminate gh and break CI release verification."""
+    lines = WORKFLOW.read_text(encoding="utf-8").splitlines()
+    gh_command = [
+        line
+        for line in lines
+        if "gh run list --repo" in line or "--event push" in line
+    ]
+    assert len(gh_command) == 2
+    assert all(line.endswith(chr(92)) for line in gh_command)
+    assert all(not line.endswith(chr(92) * 2) for line in gh_command)
