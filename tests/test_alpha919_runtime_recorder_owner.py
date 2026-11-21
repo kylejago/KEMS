@@ -198,7 +198,7 @@ def test_alpha919_release_scope_is_recorder_only() -> None:
     ).read_text(encoding="utf-8")
     hygiene = HYGIENE.read_text(encoding="utf-8")
 
-    assert manifest["version"] == "0.9.0-alpha9.246"
+    assert manifest["version"] == "0.9.0-alpha9.247"
     assert "runtime" in bundle["maintenance"]["reason"].lower()
     assert "recorder" in bundle["maintenance"]["reason"].lower()
     assert "forecast_path_scheduler" not in hygiene

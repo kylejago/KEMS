@@ -107,11 +107,22 @@ class AgileSmartExportManager:
         self._last_error: str | None = None
         self._dirty = False
         self._state: dict[str, Any] = {}
+        # This advisory result has its own lifetime. _state is replaced by
+        # each rate/settlement rebuild and must never silently erase the last
+        # observed solar routing evaluation from diagnostics.
+        self._solar_routing_shadow_latest: dict[str, Any] = {
+            "status": "awaiting_first_evaluation",
+            "reason": "No solar-routing shadow scan has completed since startup",
+            "reporting_only": True,
+            "hardware_writes": "forbidden",
+        }
 
     @property
     def state(self) -> dict[str, Any]:
         """Return the latest dashboard/diagnostic payload."""
-        return dict(self._state)
+        current = dict(self._state)
+        current["solar_routing_shadow"] = dict(self._solar_routing_shadow_latest)
+        return current
 
     async def async_load(self) -> None:
         """Restore persisted rate history and completed daily comparisons."""

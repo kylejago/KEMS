@@ -41,8 +41,39 @@ def corroborated_unchanged_sources(
         and age > stale_timeout_seconds
         and name not in stale
     )
+    observations: dict[str, dict[str, Any]] = {}
+    for name, raw_age in sorted(raw_ages.items()):
+        age = _finite(raw_age)
+        if name in stale:
+            status = "rejected_as_stale"
+        elif age is None or age < 0:
+            status = "raw_timestamp_missing"
+        elif age > stale_timeout_seconds:
+            status = "accepted_unchanged_by_device_cohort_not_remeasured"
+        else:
+            status = "raw_timestamp_within_limit"
+        observations[name] = {
+            "raw_report_age_seconds": round(age, 1) if age is not None else None,
+            "status": status,
+            "physical_remeasurement_proven": status == "raw_timestamp_within_limit",
+        }
+    if stale:
+        overall = "one_or_more_sources_rejected_stale"
+    elif corroborated:
+        overall = "unchanged_source_timestamps_old_but_cohort_accepted"
+    else:
+        overall = "raw_report_ages_within_limit"
     return {
         "raw_age_over_timeout_accepted_by_device_cohort": corroborated,
+        "raw_report_provenance": {
+            "status": overall,
+            "raw_timeout_seconds": stale_timeout_seconds,
+            "fields": observations,
+            "old_raw_timestamp_fields": corroborated,
+            "controller_stale_fields": sorted(stale),
+            "reconfirmed_independent_physical_measurement_for_old_values": False,
+            "changes_control_freshness_or_foxess_commands": False,
+        },
         "corroboration_policy": "same_foxess_modbus_device_fresh_numeric_sibling",
         "caveat": (
             "An old Home Assistant report timestamp may indicate an unchanged "

@@ -85,6 +85,11 @@ async def async_get_config_entry_diagnostics(
         for logical_name, entity_id in sorted(configured.items())
     }
 
+    # Solar shadow is an advisory HA observation, not a physical command.
+    # Its independent manager cache makes missing or failed evaluations explicit.
+    solar_shadow = coordinator.agile_smart_export_state.get("solar_routing_shadow")
+    solar_sensor = _state_payload(hass, "sensor.kems_solar_routing_shadow")
+
     registry = er.async_get(hass)
     baseline_entity_registry = {
         logical: power_down_baseline_probe(
@@ -259,6 +264,31 @@ async def async_get_config_entry_diagnostics(
             if getattr(coordinator, "_kems_whatsapp_reporter", None) is not None
             else {"enabled": False, "status": "not_initialised"}
         ),
+        "solar_routing_shadow_continuity": {
+            "status": (
+                solar_shadow.get("status")
+                if isinstance(solar_shadow, dict)
+                else "missing_cached_observation"
+            ),
+            "generated_at": (
+                solar_shadow.get("generated_at")
+                if isinstance(solar_shadow, dict)
+                else None
+            ),
+            "last_error_type": (
+                solar_shadow.get("error_type")
+                if isinstance(solar_shadow, dict)
+                else None
+            ),
+            "manager_cache_present": isinstance(solar_shadow, dict),
+            "ha_sensor": solar_sensor,
+            "ha_state_matches_cached_status": (
+                isinstance(solar_shadow, dict)
+                and solar_sensor.get("state") == solar_shadow.get("status")
+            ),
+            "scope": "reporting_only",
+            "hardware_writes": "forbidden",
+        },
         "source_freshness": {
             "stale_timeout_seconds": coordinator.settings.control.stale_data_seconds,
             "intelligent_source_stale_timeout_seconds": max(
