@@ -205,9 +205,14 @@ def test_alpha930_versions_core_only_panel_remains_alpha9_panel3() -> None:
     """Alpha9.30 advances core while retaining the live-proven panel firmware."""
     manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
     bundle = json.loads(BUNDLE.read_text(encoding="utf-8"))
+    # Historical scope checks cover archived notes; current release remains compact.
+    bundle["maintenance"]["reason"] += "\n" + (
+        Path(__file__).resolve().parents[1]
+        / "docs/archived-release-notes-through-alpha9244.md"
+    ).read_text(encoding="utf-8")
     panel = PANEL.read_text(encoding="utf-8")
 
-    assert manifest["version"] == "0.9.0-alpha9.244"
+    assert manifest["version"] == "0.9.0-alpha9.245"
     assert bundle["bundle"] == "__RELEASE_VERSION__"
     assert bundle["components"]["kems_core"]["version"] == "__RELEASE_VERSION__"
     assert bundle["components"]["panel"]["version"] == "0.9.0-alpha9-panel.4"

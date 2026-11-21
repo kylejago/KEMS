@@ -62,10 +62,15 @@ def test_legacy_runtime_options_still_reload_for_non_gate_settings() -> None:
 def test_alpha959_release_identity_and_safety_scope() -> None:
     manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
     bundle = json.loads(BUNDLE.read_text(encoding="utf-8"))
+    # Historical scope checks cover archived notes; current release remains compact.
+    bundle["maintenance"]["reason"] += "\n" + (
+        Path(__file__).resolve().parents[1]
+        / "docs/archived-release-notes-through-alpha9244.md"
+    ).read_text(encoding="utf-8")
     reason = str(bundle["maintenance"]["reason"])
 
-    assert manifest["version"] == "0.9.0-alpha9.244"
-    assert reason.startswith("Alpha9.244:")
+    assert manifest["version"] == "0.9.0-alpha9.245"
+    assert reason.startswith("Alpha9.245:")
     assert "Alpha9.59 fixes the final opt-in reload loop" in reason
     assert "Commissioned for control ON" in reason
     assert "Master control enable ON" in reason

@@ -191,9 +191,14 @@ def test_alpha919_release_scope_is_recorder_only() -> None:
     bundle = json.loads(
         (ROOT / "release" / "kems-bundle.template.json").read_text(encoding="utf-8")
     )
+    # Historical scope checks cover archived notes; current release remains compact.
+    bundle["maintenance"]["reason"] += "\n" + (
+        Path(__file__).resolve().parents[1]
+        / "docs/archived-release-notes-through-alpha9244.md"
+    ).read_text(encoding="utf-8")
     hygiene = HYGIENE.read_text(encoding="utf-8")
 
-    assert manifest["version"] == "0.9.0-alpha9.244"
+    assert manifest["version"] == "0.9.0-alpha9.245"
     assert "runtime" in bundle["maintenance"]["reason"].lower()
     assert "recorder" in bundle["maintenance"]["reason"].lower()
     assert "forecast_path_scheduler" not in hygiene

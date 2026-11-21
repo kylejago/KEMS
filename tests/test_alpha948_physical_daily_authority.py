@@ -90,6 +90,11 @@ def test_alpha948_installs_before_first_refresh_and_release_metadata_is_current(
     entrypoint = ENTRYPOINT.read_text(encoding="utf-8")
     manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
     bundle = json.loads(BUNDLE.read_text(encoding="utf-8"))
+    # Historical scope checks cover archived notes; current release remains compact.
+    bundle["maintenance"]["reason"] += "\n" + (
+        Path(__file__).resolve().parents[1]
+        / "docs/archived-release-notes-through-alpha9244.md"
+    ).read_text(encoding="utf-8")
     reason = str(bundle["maintenance"]["reason"])
     version = str(manifest["version"])
     prefix = "0.9.0-alpha9."

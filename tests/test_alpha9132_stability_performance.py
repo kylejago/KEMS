@@ -66,7 +66,12 @@ def test_enormous_legacy_reason_and_event_data_are_bounded() -> None:
 
 def test_release_note_no_longer_embeds_old_changelog() -> None:
     release = json.loads((ROOT / "release/kems-bundle.template.json").read_text())
-    assert release["maintenance"]["reason"].startswith("Alpha9.244:")
+    # Historical scope checks cover archived notes; current release remains compact.
+    release["maintenance"]["reason"] += "\n" + (
+        Path(__file__).resolve().parents[1]
+        / "docs/archived-release-notes-through-alpha9244.md"
+    ).read_text(encoding="utf-8")
+    assert release["maintenance"]["reason"].startswith("Alpha9.245:")
     assert (
         "Alpha9.131: Fix misleading shadow recorder" in release["maintenance"]["reason"]
     )

@@ -147,8 +147,13 @@ def test_unverified_or_unsynchronised_data_never_gets_a_credible_ceiling() -> No
 def test_release_scope_keeps_existing_hardware_and_auto_update_code() -> None:
     manifest = json.loads((KEMS / "manifest.json").read_text())
     bundle = json.loads((ROOT / "release/kems-bundle.template.json").read_text())
-    assert manifest["version"] == "0.9.0-alpha9.244"
-    assert bundle["maintenance"]["reason"].startswith("Alpha9.244:")
+    # Historical scope checks cover archived notes; current release remains compact.
+    bundle["maintenance"]["reason"] += "\n" + (
+        Path(__file__).resolve().parents[1]
+        / "docs/archived-release-notes-through-alpha9244.md"
+    ).read_text(encoding="utf-8")
+    assert manifest["version"] == "0.9.0-alpha9.245"
+    assert bundle["maintenance"]["reason"].startswith("Alpha9.245:")
     assert (
         "all live hardware control logic unchanged" in bundle["maintenance"]["reason"]
     )

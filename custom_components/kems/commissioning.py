@@ -1257,7 +1257,12 @@ class KEMSCommissioningReadinessSensor(KEMSEntity, SensorEntity):
 
     @property
     def native_value(self) -> str:
-        return str(build_commissioning_snapshot(self._hass, self.coordinator)["state"])
+        snapshot = build_commissioning_snapshot(self._hass, self.coordinator)
+        # Presentation only. The raw "Ready for Shadow" commissioning gate
+        # remains unchanged for all physical authority/safety decisions.
+        if snapshot.get("ready_for_control"):
+            return "Ready for Control"
+        return str(snapshot["state"])
 
     @property
     def extra_state_attributes(self) -> Mapping[str, Any]:

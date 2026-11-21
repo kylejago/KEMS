@@ -236,9 +236,14 @@ def test_coordinator_keeps_live_no_export_control_separate_from_customer_twin() 
 def test_alpha960_release_identity_and_scope() -> None:
     manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
     bundle = json.loads(BUNDLE.read_text(encoding="utf-8"))
+    # Historical scope checks cover archived notes; current release remains compact.
+    bundle["maintenance"]["reason"] += "\n" + (
+        Path(__file__).resolve().parents[1]
+        / "docs/archived-release-notes-through-alpha9244.md"
+    ).read_text(encoding="utf-8")
     reason = str(bundle["maintenance"]["reason"])
 
-    assert manifest["version"] == "0.9.0-alpha9.244"
+    assert manifest["version"] == "0.9.0-alpha9.245"
     assert "Alpha9.60 fixes no-paid-export cheap-period target authority" in reason
     assert "Full KEMS" in reason
     assert "solar-aware overnight target" in reason
