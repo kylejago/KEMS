@@ -1494,10 +1494,21 @@ def _controller_key(coordinator: Any) -> tuple[int, str]:
 def _controller_for(coordinator: Any) -> HappyHourAutoJoinController:
     key = _controller_key(coordinator)
     controller = _CONTROLLERS.get(key)
-    if controller is None:
+    # A config-entry reload creates a new coordinator on the same HA instance.
+    # Never re-use a controller still bound to the previous coordinator: that
+    # would evaluate bookings and commissioning against stale live objects.
+    if controller is None or controller.coordinator is not coordinator:
         controller = HappyHourAutoJoinController(coordinator)
         _CONTROLLERS[key] = controller
     return controller
+
+
+def release_happy_hour_auto_join(coordinator: Any) -> None:
+    """Discard a controller only when its owning entry/coordinator unloads."""
+    key = _controller_key(coordinator)
+    controller = _CONTROLLERS.get(key)
+    if controller is not None and controller.coordinator is coordinator:
+        _CONTROLLERS.pop(key, None)
 
 
 def happy_hour_auto_join_state(coordinator: Any) -> dict[str, Any]:
