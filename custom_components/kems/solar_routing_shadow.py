@@ -218,7 +218,9 @@ def evaluate_solar_routing_shadow(
         "hardware_writes": "forbidden",
         "physical_solar_flow": physical_flow,
         "solar_surplus_capture_evidence_status": physical_flow["status"],
-        "estimated_solar_captured_in_battery_kw": physical_flow["estimated_pv_to_battery_kw"],
+        "estimated_solar_captured_in_battery_kw": physical_flow[
+            "estimated_pv_to_battery_kw"
+        ],
         "grid_export_comparison_status": comparison_status,
         "observed_solar_kw": solar,
         "observed_house_kw": house,
