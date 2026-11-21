@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 from pathlib import Path
+import subprocess
+
+import yaml
 
 ROOT = Path(__file__).parents[1]
 WORKFLOW = ROOT / ".github" / "workflows" / "publish-kems-release.yml"
@@ -88,3 +91,30 @@ def test_publisher_gh_run_list_uses_real_shell_line_continuations() -> None:
     assert len(gh_command) == 2
     assert all(line.endswith(chr(92)) for line in gh_command)
     assert all(not line.endswith(chr(92) * 2) for line in gh_command)
+
+
+def test_all_release_publisher_bash_run_blocks_parse() -> None:
+    """Catch malformed heredocs/shell syntax before any release is published."""
+    for filename in (
+        "publish-kems-release.yml",
+        "publish-panel-release.yml",
+        "publish-update-bundle.yml",
+    ):
+        workflow = yaml.safe_load(
+            (ROOT / ".github" / "workflows" / filename).read_text(encoding="utf-8")
+        )
+        for step in workflow["jobs"]["publish"]["steps"]:
+            script = step.get("run")
+            if not script:
+                continue
+            result = subprocess.run(
+                ["bash", "-n"],
+                input=script,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            assert result.returncode == 0, (
+                f"{filename} step {step.get('name')} has invalid Bash syntax: "
+                f"{result.stderr}"
+            )
