@@ -100,7 +100,9 @@ def test_intelligent_and_cheap_windows_are_protected() -> None:
     )
 
 
-def test_missing_live_off_peak_evidence_defers_but_retired_intelligent_does_not() -> None:
+def test_missing_live_off_peak_evidence_defers_but_retired_intelligent_does_not() -> (
+    None
+):
     """Only a present-but-unavailable current source blocks the updater."""
     for unknown in ("unknown", "unavailable"):
         assert "off-peak state is not verified" in " ".join(
