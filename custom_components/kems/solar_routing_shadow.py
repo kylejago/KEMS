@@ -452,6 +452,9 @@ def evaluate_solar_routing_shadow(
 def publish_solar_routing_shadow(manager: Any, result: Mapping[str, Any]) -> None:
     """Attach diagnostic and publish a separate non-controlling HA state."""
     payload = dict(result)
+    # Cached separately: subsequent Agile/settlement state rebuilds replace
+    # manager._state. Keep the last verified advisory observation visible.
+    manager._solar_routing_shadow_latest = dict(payload)
     manager._state["solar_routing_shadow"] = payload
     manager._set(
         "sensor.kems_solar_routing_shadow",
