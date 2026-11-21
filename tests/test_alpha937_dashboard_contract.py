@@ -149,8 +149,8 @@ def test_alpha937_release_identity_and_scope() -> None:
     ).read_text(encoding="utf-8")
     reason = str(bundle["maintenance"]["reason"])
 
-    assert manifest["version"] == "0.9.0-alpha9.247"
-    assert reason.startswith("Alpha9.247:")
+    assert manifest["version"] == "0.9.0-alpha9.248"
+    assert reason.startswith("Alpha9.248:")
     assert "Alpha9.37" in reason
     assert "canonical current-day KEMS cost" in reason
     assert "presentation/reporting only" in reason
