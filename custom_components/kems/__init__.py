@@ -64,6 +64,7 @@ from .retired_intelligent import (
     retire_unavailable_kems_intelligent_entities,
     without_retired_intelligent_option,
 )
+from .retired_scenario_sensors import retire_inactive_scenario_sensors
 from .settings import KEMSSettings
 from .source_authority import async_reconcile_source_mappings
 from .update_orchestrator import async_unload_update_orchestrator
@@ -264,6 +265,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     if retired_entities:
         LOGGER.info(
             "Removed obsolete KEMS-only Intelligent entities: %s", retired_entities
+        )
+    retired_scenarios = retire_inactive_scenario_sensors(
+        er.async_get(hass), hass.states, entry_id=entry.entry_id
+    )
+    if retired_scenarios:
+        LOGGER.info(
+            "Retired %d inactive, KEMS-owned scenario presentation entities",
+            len(retired_scenarios),
         )
     # No notifications are sent until users explicitly enable them in
     # integration options. Setup failures do not gate physical dispatch.
