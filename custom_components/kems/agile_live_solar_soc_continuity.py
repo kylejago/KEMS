@@ -379,6 +379,28 @@ def _rebase_display_soc(
     if not isinstance(routing, dict) or not routing.get("available"):
         return
     current_soc = _number(routing.get("simulated_soc_percent"))
+    # Use physical energy for the live display only when the paid-Agile planner
+    # has fresh, consecutive same-cycle FoxESS evidence. The independent
+    # digital-twin comparison is preserved in the rolling plan unchanged.
+    rolling = state.get("rolling_export_plan")
+    rolling = rolling if isinstance(rolling, dict) else {}
+    proof = rolling.get("physical_planning_evidence")
+    proof = proof if isinstance(proof, dict) else {}
+    physically_proven = False
+    stored = _number(proof.get("physical_energy_lower_bound_kwh"))
+    proof_time = _dt(rolling.get("generated_at"))
+    capacity = float(config.battery_capacity_kwh)
+    if (
+        proof.get("available") is True
+        and (_number(proof.get("physical_samples")) or 0) >= 2
+        and stored is not None
+        and capacity > _EPSILON
+        and 0.0 <= stored <= capacity
+        and proof_time is not None
+        and abs((proof_time - now.astimezone(UTC)).total_seconds()) <= 2.0
+    ):
+        current_soc = 100.0 * stored / capacity
+        physically_proven = True
     start = _dt(routing.get("routing_valid_from"))
     end = _dt(routing.get("routing_valid_to"))
     now_utc = now.astimezone(UTC)
@@ -418,7 +440,9 @@ def _rebase_display_soc(
     corrected_active_soc = 100.0 * battery_kwh / capacity
     active["flow_estimated_soc_percent"] = round(corrected_active_soc, 1)
     active["flow_soc_basis"] = (
-        "canonical current SOC + remaining displayed battery flow"
+        "verified FoxESS physical lower bound + remaining displayed battery flow"
+        if physically_proven
+        else "canonical current SOC + remaining displayed battery flow"
     )
     active["flow_soc_current_percent"] = round(current_soc, 3)
     active["flow_soc_pre_rebase_estimate_percent"] = old_active_soc
@@ -439,7 +463,9 @@ def _rebase_display_soc(
         old_soc = _number(slot.get("flow_estimated_soc_percent"))
         slot["flow_estimated_soc_percent"] = round(100.0 * battery_kwh / capacity, 1)
         slot["flow_soc_basis"] = (
-            "rebased from canonical active SOC through displayed flow deltas"
+            "rebased from verified physical lower bound through displayed flow deltas"
+            if physically_proven
+            else "rebased from canonical active SOC through displayed flow deltas"
         )
         slot["flow_soc_pre_rebase_estimate_percent"] = old_soc
         slot["flow_soc_hardware_writes"] = "blocked"
@@ -452,7 +478,17 @@ def _rebase_display_soc(
         "active_pre_rebase_soc_percent": old_active_soc,
         "active_rebased_soc_percent": round(corrected_active_soc, 3),
         "rebased_rows": rebased_rows,
-        "basis": "canonical SOC + displayed battery-flow deltas",
+        "basis": (
+            "verified FoxESS physical lower bound + displayed battery-flow deltas"
+            if physically_proven
+            else "canonical SOC + displayed battery-flow deltas"
+        ),
+        "physical_same_scan_proven": physically_proven,
+        "independent_digital_twin_soc_percent": (
+            round(float(routing["simulated_soc_percent"]), 3)
+            if _number(routing.get("simulated_soc_percent")) is not None
+            else None
+        ),
         "reporting_only": True,
         "hardware_writes": "blocked",
     }

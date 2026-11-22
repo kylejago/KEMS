@@ -20,8 +20,8 @@ def test_alpha9126_release_description_is_coordinated_and_shadow_only() -> None:
         / "docs/archived-release-notes-through-alpha9244.md"
     ).read_text(encoding="utf-8")
     reason = str(bundle["maintenance"]["reason"]).lower()
-    assert manifest["version"] == "0.9.0-alpha9.248"
-    assert reason.startswith("alpha9.248:")
+    assert manifest["version"] == "0.9.0-alpha9.249"
+    assert reason.startswith("alpha9.249:")
     assert "shadow-only" in reason
     assert "no change to live inverter work-mode commands" in reason
     assert "7 kw" in reason
