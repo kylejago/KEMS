@@ -382,7 +382,7 @@ def _bounded_happy_hour_charge_headroom(
         soc is None
         or not 0.0 <= soc <= 100.0
         or soc_age is None
-        or not 0.0 <= soc_age
+        or soc_age < 0.0
         or (soc_age > 3600.0 and continuous_upper_kwh is None)
         or capacity <= 0.0
         or max_charge <= 0.0
