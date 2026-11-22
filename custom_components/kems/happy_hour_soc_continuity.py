@@ -15,7 +15,6 @@ from datetime import datetime, timedelta
 from math import isfinite
 from typing import Any
 
-
 _MAX_SEED_AGE_S = 3600.0
 _MAX_INTERVAL_S = 120.0
 _MAX_CONTINUITY_GAP_S = 900.0
@@ -165,8 +164,7 @@ class HappyHourChargeHeadroomContinuity:
             and self._previous_charge_kw is not None
         ):
             possible_charge_kw = (
-                max(charge_kw, self._previous_charge_kw) * 1.10
-                + _CHARGE_MARGIN_KW
+                max(charge_kw, self._previous_charge_kw) * 1.10 + _CHARGE_MARGIN_KW
             )
             self._upper_kwh = min(
                 capacity,
