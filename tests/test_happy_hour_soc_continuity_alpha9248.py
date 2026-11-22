@@ -128,3 +128,52 @@ def test_no_hardware_authority_can_be_inferred_from_upper_bound():
         _sample(T0, soc_age=8000),
         capacity=40, max_charge=7,
     ) is None
+
+
+def test_live_headroom_reporting_reuses_verified_continuity(monkeypatch):
+    """The real reporting wrapper passes the bounded upper-energy proof on."""
+    from custom_components.kems import agile_physical_planning
+    from custom_components.kems.happy_hour_budget import (
+        verified_happy_hour_physical_headroom,
+    )
+
+    monkeypatch.setattr(
+        agile_physical_planning, "physical_planning_soc",
+        lambda _manager, *, now, config: (80.0, {"available": True}),
+    )
+    config = SimpleNamespace(
+        battery_capacity_kwh=40.0,
+        max_charge_kw=7.0,
+        battery_power_positive_is_discharge=True,
+    )
+    manager = SimpleNamespace(
+        _kems_physical_planning_context={
+            "snapshot": _sample(T0, soc_age=5),
+            "control": SimpleNamespace(max_charge_kw=7.0),
+        }
+    )
+    first = verified_happy_hour_physical_headroom(
+        manager, now=T0, config=config,
+    )
+    assert first["physical_soc_verified"] is True
+    assert first["physical_headroom_continuity_upper_kwh"] is None
+
+    last = None
+    for i in range(1, 241):
+        now = T0 + timedelta(seconds=i * 30)
+        manager._kems_physical_planning_context["snapshot"] = _sample(
+            now, soc_age=i * 30 + 5
+        )
+        last = verified_happy_hour_physical_headroom(
+            manager, now=now, config=config
+        )
+    assert last is not None
+    assert last["physical_soc_verified"] is True
+    assert last["physical_charge_headroom_verified"] is True
+    assert last["physical_battery_headroom_kwh"] > 4.0
+    assert last["physical_headroom_continuity_status"] == (
+        "continuous_bounded_charge_headroom"
+    )
+    assert last["physical_headroom_continuity_snapshot_at"] == (
+        T0 + timedelta(hours=2)
+    ).isoformat()
