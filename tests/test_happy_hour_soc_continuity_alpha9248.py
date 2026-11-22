@@ -3,8 +3,6 @@
 from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 
-import pytest
-
 from custom_components.kems.happy_hour_budget import (
     _bounded_happy_hour_charge_headroom,
 )
