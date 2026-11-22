@@ -248,12 +248,8 @@ def apply_verified_happy_hour_preparation(
         {
             "selected_slots": selected,
             "allocated_preparation_kwh": round(allocated, 3),
-            "physical_headroom_unplanned_kwh": round(
-                max(needed - allocated, 0.0), 3
-            ),
-            "full_physical_headroom_plan_available": (
-                needed - allocated <= 0.001
-            ),
+            "physical_headroom_unplanned_kwh": round(max(needed - allocated, 0.0), 3),
+            "full_physical_headroom_plan_available": (needed - allocated <= 0.001),
             "preparation_shortfall_kwh": round(
                 max(requested_energy - allocated, 0.0), 3
             ),
