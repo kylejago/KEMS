@@ -494,7 +494,8 @@ def test_22_nov_happy_hour_site_charge_feedback_is_subtracted_only_when_proven(
             booking=_joined(),
             context=plan,
             snapshot=sample,
-            simulation_config=simulation or SimpleNamespace(
+            simulation_config=simulation
+            or SimpleNamespace(
                 battery_capacity_kwh=40.0,
                 battery_power_positive_is_discharge=True,
             ),
