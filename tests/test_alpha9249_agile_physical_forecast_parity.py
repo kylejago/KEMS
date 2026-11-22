@@ -40,7 +40,8 @@ def _number(value):
 def _fn(path: Path, name: str, namespace: dict[str, Any]):
     tree = ast.parse(path.read_text(encoding="utf-8"))
     func = next(
-        node for node in tree.body
+        node
+        for node in tree.body
         if isinstance(node, ast.FunctionDef) and node.name == name
     )
     module = ast.Module(body=[func], type_ignores=[])
@@ -73,15 +74,17 @@ def _slots():
         b = a + timedelta(minutes=30)
         export = 1.862 if 5 <= i <= 12 else 0.0
         house = 1.638 if i > 0 else 0.639
-        result.append({
-            "valid_from": a.isoformat(),
-            "valid_to": b.isoformat(),
-            "label": a.strftime("%H:%M"),
-            "rate_pence": 26.6 if export else 17.3,
-            "planned_battery_to_home_kwh": house,
-            "rolling_planned_battery_export_kwh": export,
-            "planned_total_battery_discharge_kwh": house + export,
-        })
+        result.append(
+            {
+                "valid_from": a.isoformat(),
+                "valid_to": b.isoformat(),
+                "label": a.strftime("%H:%M"),
+                "rate_pence": 26.6 if export else 17.3,
+                "planned_battery_to_home_kwh": house,
+                "rolling_planned_battery_export_kwh": export,
+                "planned_total_battery_discharge_kwh": house + export,
+            }
+        )
     return result
 
 
@@ -89,11 +92,10 @@ def _projection(state):
     fake_agile = SimpleNamespace(
         LONDON=ZoneInfo("Europe/London"),
         BATTERY_WEAR_PENCE_PER_KWH=1.0,
-        _next_cheap=lambda now, tariff: now.replace(
-            hour=23, minute=30, second=0
-        ),
+        _next_cheap=lambda now, tariff: now.replace(hour=23, minute=30, second=0),
         _in_window=lambda *args: False,
     )
+
     # Real separate-reserve wrapper already injects the 10% floor into
     # the home precision helper while preserving the 15% export reserve.
     def house_helper(**kw):
@@ -221,28 +223,35 @@ def test_unverified_or_old_physical_proof_cannot_promote_twin_to_physical():
 
 def test_rebase_prefers_same_scan_physical_soc_and_keeps_twin_auditable():
     ns = {
-        "Any": Any, "UTC": UTC, "datetime": datetime,
-        "_number": _number, "_dt": _dt, "_EPSILON": 1e-6,
+        "Any": Any,
+        "UTC": UTC,
+        "datetime": datetime,
+        "_number": _number,
+        "_dt": _dt,
+        "_EPSILON": 1e-6,
         "SimulationConfig": Any,
     }
     _fn(CONTINUITY, "_clamp", ns)
     _fn(CONTINUITY, "_battery_delta_kwh", ns)
     rebase = _fn(CONTINUITY, "_rebase_display_soc", ns)
-    today = [{
-        "valid_from": "2026-11-22T13:30:00+00:00",
-        "valid_to": "2026-11-22T14:00:00+00:00",
-        "flow_estimated_soc_percent": 57.8,
-        "flow_battery_charge_kwh": 0.0,
-        "flow_battery_to_home_kwh": 0.676,
-        "flow_battery_export_kwh": 0.0,
-    }, {
-        "valid_from": "2026-11-22T16:00:00+00:00",
-        "valid_to": "2026-11-22T16:30:00+00:00",
-        "flow_estimated_soc_percent": 38.7,
-        "flow_battery_charge_kwh": 0.0,
-        "flow_battery_to_home_kwh": 1.531,
-        "flow_battery_export_kwh": 1.862,
-    }]
+    today = [
+        {
+            "valid_from": "2026-11-22T13:30:00+00:00",
+            "valid_to": "2026-11-22T14:00:00+00:00",
+            "flow_estimated_soc_percent": 57.8,
+            "flow_battery_charge_kwh": 0.0,
+            "flow_battery_to_home_kwh": 0.676,
+            "flow_battery_export_kwh": 0.0,
+        },
+        {
+            "valid_from": "2026-11-22T16:00:00+00:00",
+            "valid_to": "2026-11-22T16:30:00+00:00",
+            "flow_estimated_soc_percent": 38.7,
+            "flow_battery_charge_kwh": 0.0,
+            "flow_battery_to_home_kwh": 1.531,
+            "flow_battery_export_kwh": 1.862,
+        },
+    ]
     state = {
         "rolling_export_plan": _plan(),
         "current_routing_snapshot": {
@@ -255,7 +264,9 @@ def test_rebase_prefers_same_scan_physical_soc_and_keeps_twin_auditable():
         "today_slots": today,
     }
     rebase(
-        state, now=NOW, config=SimpleNamespace(
+        state,
+        now=NOW,
+        config=SimpleNamespace(
             battery_capacity_kwh=CAPACITY, discharge_efficiency=0.95
         ),
     )
