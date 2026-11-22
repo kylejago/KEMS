@@ -595,8 +595,6 @@ def test_silent_pv_fallback_requires_fresh_correlated_battery_and_grid():
     assert not verified_live_happy_hour_house_grid_hold(
         **{
             **args,
-            "snapshot": replace(
-                args["snapshot"], stale_fields=("solar_power_kw",)
-            ),
+            "snapshot": replace(args["snapshot"], stale_fields=("solar_power_kw",)),
         }
     )
