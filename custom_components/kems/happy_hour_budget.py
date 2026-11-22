@@ -935,9 +935,7 @@ def verified_live_happy_hour_charge_kw(
         base_grid_demand = max(grid - measured_battery_charge, 0.0)
     # Use the larger of measured non-charge import and observed household/EV
     # demand, then leave a further 0.5 kW for telemetry lag and losses.
-    site_headroom = max(
-        site_limit - max(base_grid_demand, house + ev) - 0.5, 0.0
-    )
+    site_headroom = max(site_limit - max(base_grid_demand, house + ev) - 0.5, 0.0)
     safe_target = min(
         target,
         max_charge,
