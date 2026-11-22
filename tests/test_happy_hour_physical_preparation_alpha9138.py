@@ -359,3 +359,67 @@ def test_long_unchanged_soc_still_consumes_worst_case_charge_budget():
     assert headroom == pytest.approx(
         max(40.0 * 0.2 - 7.0 * 2700.0 / 3600.0 - 0.5, 0.0)
     )
+
+
+def test_22_nov_1111_real_charge_guard_accepts_33_second_battery_power_report():
+    """Prior 30-second cutoff blocked Force Charge on a healthy 33-second scan."""
+    from custom_components.kems.happy_hour_budget import (
+        _bounded_happy_hour_charge_headroom,
+        verified_live_happy_hour_charge_kw,
+    )
+
+    args = _case()
+    now = START + timedelta(minutes=11, seconds=17)
+    snapshot = replace(
+        args["snapshot"],
+        timestamp=now,
+        battery_soc=71.0,
+        battery_power_kw=-5.312,
+        house_load_kw=1.424,
+        solar_power_kw=0.0,
+        grid_import_kw=7.039,
+        grid_export_kw=0.0,
+        ev_connected=False,
+        ev_charging=False,
+        ev_power_kw=0.0,
+        ev_power_age_seconds=23.7,
+        source_age_seconds={
+            "battery_soc": 233.4,
+            "battery_power_kw": 33.4,
+            "house_load_kw": 8.4,
+            "solar_power_kw": 51868.7,
+            "grid_import_kw": 8.4,
+            "grid_export_kw": 608.6,
+        },
+        stale_fields=(),
+    )
+    bounded = _bounded_happy_hour_charge_headroom(
+        snapshot, capacity=40.0, max_charge=7.0,
+    )
+    assert bounded is not None
+    assert 0.0 < bounded[0] < 11.6
+
+    plan = {
+        "source": "octopus_energy",
+        "mode": "charging",
+        "start": START.isoformat(),
+        "end": END.isoformat(),
+        "happy_hour_import_authority_active": True,
+        "current_reward_hour_ledger_complete": True,
+        "current_reward_hour_remaining_kwh": 14.786,
+        "current_reward_hour_start": START.isoformat(),
+        "current_reward_hour_end": (START + timedelta(hours=1)).isoformat(),
+        "charge_target_kw": 7.0,
+    }
+    actual = verified_live_happy_hour_charge_kw(
+        booking=_joined(), context=plan, snapshot=snapshot,
+        simulation_config=SimpleNamespace(battery_capacity_kwh=40.0),
+        control_config=SimpleNamespace(
+            max_charge_kw=7.0, inverter_limit_kw=7.0,
+            site_import_limit_kw=14.5, emergency_stop=False,
+        ),
+        now=now, power_down_active=False, grid_available=True,
+    )
+    assert 0.0 < actual <= 7.0
+    # The independent site-import and remaining-hour guards still cap output.
+    assert actual < 14.5 - snapshot.grid_import_kw
