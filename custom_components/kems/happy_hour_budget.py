@@ -865,7 +865,11 @@ def verified_live_happy_hour_charge_kw(
         if context.get("physical_soc_verified") is True
         and context.get("physical_charge_headroom_verified") is True
         and context.get("physical_headroom_continuity_snapshot_at")
-        == snapshot.timestamp.isoformat()
+        == (
+            timestamp.isoformat()
+            if (timestamp := getattr(snapshot, "timestamp", None)) is not None
+            else None
+        )
         else None
     )
     bounded = _bounded_happy_hour_charge_headroom(
