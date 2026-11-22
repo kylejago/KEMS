@@ -359,7 +359,10 @@ def _home_grid_kw(
 
 
 def _bounded_happy_hour_charge_headroom(
-    snapshot: Any, *, capacity: float, max_charge: float,
+    snapshot: Any,
+    *,
+    capacity: float,
+    max_charge: float,
     continuous_upper_kwh: float | None = None,
 ) -> tuple[float, str] | None:
     """Prove remaining charge space using a worst-case upper SOC bound.
@@ -395,7 +398,8 @@ def _bounded_happy_hour_charge_headroom(
             value = _number(getattr(snapshot, field, None))
             age = _number(ages.get(field))
             if (
-                value is None or age is None
+                value is None
+                or age is None
                 or not 0.0 <= age <= _HAPPY_HOUR_CORRELATED_POWER_MAX_AGE_SECONDS
                 or field in stale
             ):
@@ -476,7 +480,9 @@ def verified_happy_hour_physical_headroom(
         )
     bounded = (
         _bounded_happy_hour_charge_headroom(
-            snapshot, capacity=capacity, max_charge=max_charge,
+            snapshot,
+            capacity=capacity,
+            max_charge=max_charge,
             continuous_upper_kwh=continuity_upper,
         )
         if snapshot is not None and capacity is not None and max_charge is not None
@@ -880,7 +886,9 @@ def verified_live_happy_hour_charge_kw(
         else None
     )
     bounded = _bounded_happy_hour_charge_headroom(
-        snapshot, capacity=capacity, max_charge=max_charge,
+        snapshot,
+        capacity=capacity,
+        max_charge=max_charge,
         continuous_upper_kwh=continuous_upper,
     )
     if bounded is None:
@@ -991,9 +999,12 @@ def verified_live_happy_hour_house_grid_hold(
     if (
         house_age is None
         or not 0.0 <= house_age <= 90.0
-        or house_kw is None or house_kw < 0.0
-        or pv_age is None or pv_age < 0.0
-        or pv_kw is None or pv_kw < 0.0
+        or house_kw is None
+        or house_kw < 0.0
+        or pv_age is None
+        or pv_age < 0.0
+        or pv_kw is None
+        or pv_kw < 0.0
     ):
         return False
     if pv_age <= 90.0:
@@ -1005,7 +1016,8 @@ def verified_live_happy_hour_house_grid_hold(
     battery_kw = _number(getattr(snapshot, "battery_power_kw", None))
     if (
         "battery_power_kw" in stale
-        or battery_age is None or not 0.0 <= battery_age <= 90.0
+        or battery_age is None
+        or not 0.0 <= battery_age <= 90.0
         or battery_kw is None
     ):
         return False
