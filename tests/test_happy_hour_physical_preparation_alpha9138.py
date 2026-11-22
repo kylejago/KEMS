@@ -254,3 +254,38 @@ def test_price_requirements_never_invent_a_slot_or_use_negative_prices():
     new, report = apply_verified_happy_hour_preparation(**args)
     assert new.desired_battery_export_power_kw == 0
     assert report["status"] == "awaiting_selected_physical_preparation_slot"
+
+
+def test_full_physical_headroom_shortfall_is_not_hidden_by_house_budget_cap():
+    """Physical Happy Hour goal can exceed safe export without changing commands."""
+    args = _case()
+    args["context"]["physical_required_headroom_export_kwh"] = 12.635
+    args["agile_state"]["rolling_export_plan"]["physical_house_budget_evidence"][
+        "exportable_ac_kwh"
+    ] = 11.232
+    before = args["control"]
+    control, evidence = apply_verified_happy_hour_preparation(**args)
+    assert evidence["physical_required_headroom_export_kwh"] == 12.635
+    assert evidence["protected_ac_export_budget_kwh"] == 11.232
+    assert evidence["physically_budgeted_preparation_kwh"] == 11.232
+    assert evidence["physical_headroom_unfunded_by_house_budget_kwh"] == 1.403
+    assert evidence["physical_headroom_unplanned_kwh"] >= 1.403
+    assert evidence["full_physical_headroom_plan_available"] is False
+    assert evidence["physical_headroom_shortfall_affects_control"] is False
+    assert control.desired_battery_export_power_kw <= 7.0
+    assert not control.commands_permitted
+    assert before.desired_battery_export_power_kw == 0.0
+
+
+def test_zero_safe_export_budget_discloses_unfunded_physical_headroom():
+    args = _case()
+    args["agile_state"]["rolling_export_plan"]["physical_house_budget_evidence"][
+        "exportable_ac_kwh"
+    ] = 0.0
+    unchanged, evidence = apply_verified_happy_hour_preparation(**args)
+    assert unchanged is args["control"]
+    assert evidence["requested_export_kw"] == 0.0
+    assert evidence["physical_headroom_unfunded_by_house_budget_kwh"] == 9.856
+    assert evidence["physical_headroom_unplanned_kwh"] == 9.856
+    assert evidence["full_physical_headroom_plan_available"] is False
+    assert evidence["status"] == "headroom_ready_or_house_reserve_protected"

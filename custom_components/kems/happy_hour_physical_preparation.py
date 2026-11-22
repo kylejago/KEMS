@@ -212,6 +212,17 @@ def apply_verified_happy_hour_preparation(
     result["protected_ac_export_budget_kwh"] = round(budget, 3)
     requested_energy = min(needed, budget)
     result["physically_budgeted_preparation_kwh"] = round(requested_energy, 3)
+    # The existing preparation_shortfall_kwh compares slots against the
+    # already-capped house-safe request. It can be zero even when the full
+    # physical charge-headroom goal cannot be met without compromising the
+    # household reserve. Expose both facts without relaxing the cap or
+    # generating a new inverter command.
+    result["physical_headroom_unfunded_by_house_budget_kwh"] = round(
+        max(needed - requested_energy, 0.0), 3
+    )
+    result["physical_headroom_unplanned_kwh"] = round(needed, 3)
+    result["full_physical_headroom_plan_available"] = needed <= 0.001
+    result["physical_headroom_shortfall_affects_control"] = False
     if requested_energy <= 0.001:
         return stop("headroom_ready_or_house_reserve_protected")
 
@@ -237,6 +248,12 @@ def apply_verified_happy_hour_preparation(
         {
             "selected_slots": selected,
             "allocated_preparation_kwh": round(allocated, 3),
+            "physical_headroom_unplanned_kwh": round(
+                max(needed - allocated, 0.0), 3
+            ),
+            "full_physical_headroom_plan_available": (
+                needed - allocated <= 0.001
+            ),
             "preparation_shortfall_kwh": round(
                 max(requested_energy - allocated, 0.0), 3
             ),

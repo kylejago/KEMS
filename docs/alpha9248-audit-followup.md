@@ -4,6 +4,8 @@
 
 ## Confirmed, directly actioned in alpha9.248
 
+- **Physical Happy Hour headroom reporting:** Separately publish the unfunded physical charge-headroom goal from the valid but capped house-protected export allocation. This is advisory only, does not add new preparation slots or override the final FoxESS physical guard. In the 22 November 06:09 diagnostic, required **12.635 kWh** against a safe **11.232 kWh** budget, with **1.403 kWh** of requested space unguaranteed before future house discharge.
+
 - **Source-provenance honesty:** Recent HA raw-source timestamps now support a separate `raw_report_within_freshness_limit` flag but no longer claim independent physical remeasurement; this changes only diagnostic labels, never telemetry acceptance or control.
 - **Live backup policy evidence:** The 21 November last-reviewed installed diagnostic had automatic updates enabled but `backup_before_update=false`, despite the code default being true. The candidate exposes `backup_protection.status=backup_disabled` as a read-only warning. It does not silently change a saved option. Verify HA backup service and available storage, then deliberately turn on the existing `Backup before update` control before relying on unattended maintenance.
 
