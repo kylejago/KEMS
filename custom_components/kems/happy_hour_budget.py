@@ -381,13 +381,25 @@ def _bounded_happy_hour_charge_headroom(
     ):
         return None
     if soc_age > 180.0:
-        for field in ("battery_power_kw", "house_load_kw", "grid_import_kw"):
+        # A FoxESS zero-import register can remain unchanged throughout a
+        # healthy export session. A fresh export register corroborates the
+        # same grid interface without requiring the zero register to change.
+        # Continue to require fresh battery and household power evidence.
+        for field in ("battery_power_kw", "house_load_kw"):
             value = _number(getattr(snapshot, field, None))
             age = _number(ages.get(field))
             if value is None or age is None or not 0.0 <= age <= 30.0 or field in stale:
                 return None
-        # In particular, battery power must be measured, not inferred from
-        # simulated SOC, and source age never resets on repeated KEMS scans.
+        grid_fresh = any(
+            field not in stale
+            and _number(getattr(snapshot, field, None)) is not None
+            and (age := _number(ages.get(field))) is not None
+            and 0.0 <= age <= 30.0
+            for field in ("grid_import_kw", "grid_export_kw")
+        )
+        if not grid_fresh:
+            return None
+        # No source timestamp is refreshed by repeated KEMS scans.
     headroom = max(
         capacity * (100.0 - soc) / 100.0 - max_charge * soc_age / 3600.0 - 0.5,
         0.0,
