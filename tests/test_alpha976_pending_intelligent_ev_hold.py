@@ -300,7 +300,7 @@ def test_alpha976_release_identity_and_scope() -> None:
     reason = str(bundle["maintenance"]["reason"])
 
     assert manifest["version"] == "0.9.0-alpha9.249"
-    assert reason.startswith("Alpha9.248:")
+    assert reason.startswith("Alpha9.249:")
     assert "pending Intelligent" in reason
     assert "SOC+1" in reason
     assert "next_offpeak_start" in reason
