@@ -427,3 +427,101 @@ def test_22_nov_1111_real_charge_guard_accepts_33_second_battery_power_report():
     assert 0.0 < actual <= 7.0
     # The independent site-import and remaining-hour guards still cap output.
     assert actual < 14.5 - snapshot.grid_import_kw
+
+
+@pytest.mark.parametrize(
+    "grid_kw,battery_kw,house_kw,expected_kw",
+    [
+        (10.007, -6.816, 3.010, 7.0),  # 11:13: wrong original cap 3.993
+        (5.352, -3.757, 1.476, 7.0),  # 11:14: should remain steady
+        (14.2, -7.0, 7.0, 6.8),  # true site demand leaves only 6.8
+        (14.5, 0.0, 1.5, 0.0),  # no charging credit, site is full
+    ],
+)
+def test_22_nov_happy_hour_site_charge_feedback_is_subtracted_only_when_proven(
+    grid_kw, battery_kw, house_kw, expected_kw
+):
+    """Site cap excludes *existing* verified charging, not whole grid import."""
+    from custom_components.kems.happy_hour_budget import (
+        verified_live_happy_hour_charge_kw,
+    )
+
+    now = START + timedelta(minutes=13, seconds=23)
+    snapshot = replace(
+        _case()["snapshot"],
+        timestamp=now,
+        battery_soc=72.0,
+        battery_power_kw=battery_kw,
+        house_load_kw=house_kw,
+        solar_power_kw=0.0,
+        grid_import_kw=grid_kw,
+        grid_export_kw=0.0,
+        ev_connected=False,
+        ev_charging=False,
+        ev_power_kw=0.0,
+        ev_power_age_seconds=9.0,
+        source_age_seconds={
+            "battery_soc": 9.4,
+            "battery_power_kw": 9.4,
+            "house_load_kw": 9.4,
+            "grid_import_kw": 9.4,
+            "grid_export_kw": 750.0,  # unchanged zero is normal
+            "solar_power_kw": 52000.0,  # no PV all day
+        },
+        stale_fields=(),
+    )
+    plan = {
+        "source": "octopus_energy",
+        "mode": "charging",
+        "start": START.isoformat(),
+        "end": END.isoformat(),
+        "happy_hour_import_authority_active": True,
+        "current_reward_hour_ledger_complete": True,
+        "current_reward_hour_remaining_kwh": 14.66,
+        "current_reward_hour_start": START.isoformat(),
+        "current_reward_hour_end": (START + timedelta(hours=1)).isoformat(),
+        "charge_target_kw": 7.0,
+    }
+    config = SimpleNamespace(
+        max_charge_kw=7.0,
+        inverter_limit_kw=7.0,
+        site_import_limit_kw=14.5,
+        emergency_stop=False,
+    )
+
+    def verify(sample, simulation=None):
+        return verified_live_happy_hour_charge_kw(
+            booking=_joined(),
+            context=plan,
+            snapshot=sample,
+            simulation_config=simulation or SimpleNamespace(
+                battery_capacity_kwh=40.0,
+                battery_power_positive_is_discharge=True,
+            ),
+            control_config=config,
+            now=now,
+            power_down_active=False,
+            grid_available=True,
+        )
+
+    assert verify(snapshot) == pytest.approx(expected_kw, abs=0.001)
+    if grid_kw == 10.007:
+        # No uncorroborated battery-power "credit" can raise site authority.
+        unverified = replace(
+            snapshot,
+            source_age_seconds={
+                **snapshot.source_age_seconds,
+                "battery_power_kw": 180.0,
+            },
+        )
+        assert verify(unverified) == pytest.approx(3.993, abs=0.001)
+        # Positive battery power denotes discharge, not grid charging.
+        discharge = replace(snapshot, battery_power_kw=6.816)
+        assert verify(discharge) == pytest.approx(3.993, abs=0.001)
+        # Reversed physical polarity is accepted only when configured.
+        reversed_charge = replace(snapshot, battery_power_kw=6.816)
+        reverse_config = SimpleNamespace(
+            battery_capacity_kwh=40.0,
+            battery_power_positive_is_discharge=False,
+        )
+        assert verify(reversed_charge, reverse_config) == pytest.approx(7.0)
