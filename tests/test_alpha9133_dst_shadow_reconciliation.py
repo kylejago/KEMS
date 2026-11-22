@@ -163,7 +163,7 @@ def test_release_version_and_read_only_scope() -> None:
         Path(__file__).resolve().parents[1]
         / "docs/archived-release-notes-through-alpha9244.md"
     ).read_text(encoding="utf-8")
-    assert manifest["version"] == "0.9.0-alpha9.248"
+    assert manifest["version"] == "0.9.0-alpha9.249"
     reason = bundle["maintenance"]["reason"]
     assert reason.startswith("Alpha9.248:")
     assert "Alpha9.132: Run pure Agile day replays" in reason
