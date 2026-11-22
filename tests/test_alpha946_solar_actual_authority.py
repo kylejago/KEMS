@@ -52,7 +52,7 @@ def test_alpha946_installs_before_history_refresh_and_remains_reporting_only() -
     ).read_text(encoding="utf-8")
     reason = str(bundle["maintenance"]["reason"])
 
-    assert manifest["version"] == "0.9.0-alpha9.248"
+    assert manifest["version"] == "0.9.0-alpha9.249"
     assert "Alpha9.46" in reason
     assert "Solar Generation Today" in reason
     assert "telemetry gaps" in reason
