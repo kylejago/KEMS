@@ -1,3 +1,10 @@
+## 0.9.0-alpha9.249 — Agile live physical forecast and dashboard parity
+
+- **Physical SOC display:** The upcoming paid-Agile flow forecast and slot SOC continuity now use a same-scan, at-least-two-sample conservative FoxESS battery-energy proof when available. The independent digital-twin SOC remains unchanged for historical and No-KEMS comparison; no stale/restart proof is promoted into live physical authority.
+- **Separate 15% and 10% reserves:** Forecast battery export stays above the 15% deliberate-export stop, while forecast home-only discharge may continue toward the independent 10% household minimum before the 23:30 cheap-rate start. A 10% physical floor remains binding; it is not a compulsory earlier target.
+- **Agile dashboard:** Correct the now-and-next card so positive final battery export is shown alongside battery-to-home instead of being overwritten by a misleading "no deliberate export" label. Show the slot physical SOC estimate when its basis is verified; otherwise retain "—" for unsupported physical estimates.
+- **No control-policy changes:** This is reporting/display reconciliation only; no change to actual FoxESS write authorisation, 7 kW DNO export cap, 14.5 kW site import cap, EV battery isolation, Power Down/Happy Hour precedence, ROI settlement or guarded 06:00–06:30 automatic updates. The evening's hardware execution must still be observed separately.
+
 ## 0.9.0-alpha9.248 — verified post-Happy-Hour safety, charging stability and release integrity
 
 - **Happy Hour lifecycle:** A Home Assistant reload no longer reuses the previous coordinator's auto-join controller. Booking recommendations, control/commissioning gates and persisted slot evidence are reloaded from the new coordinator; an old shutdown cannot clear the new instance. Booking and join permissions remain unchanged.
