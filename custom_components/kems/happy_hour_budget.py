@@ -19,6 +19,7 @@ from typing import Any
 
 from .happy_hour import HAPPY_HOUR_FAIR_USE_KWH_PER_REWARD
 from .happy_hour_auto_join import booked_happy_hour_matches_plan
+from .happy_hour_soc_continuity import HappyHourChargeHeadroomContinuity
 from .kems_core.control_write_authority import assess_happy_hour_charge_authority
 
 _EPSILON = 1e-6
@@ -355,7 +356,8 @@ def _home_grid_kw(
 
 
 def _bounded_happy_hour_charge_headroom(
-    snapshot: Any, *, capacity: float, max_charge: float
+    snapshot: Any, *, capacity: float, max_charge: float,
+    continuous_upper_kwh: float | None = None,
 ) -> tuple[float, str] | None:
     """Prove remaining charge space using a worst-case upper SOC bound.
 
@@ -374,7 +376,8 @@ def _bounded_happy_hour_charge_headroom(
         soc is None
         or not 0.0 <= soc <= 100.0
         or soc_age is None
-        or not 0.0 <= soc_age <= 3600.0
+        or not 0.0 <= soc_age
+        or (soc_age > 3600.0 and continuous_upper_kwh is None)
         or capacity <= 0.0
         or max_charge <= 0.0
         or "battery_soc" in stale
@@ -400,6 +403,15 @@ def _bounded_happy_hour_charge_headroom(
         if not grid_fresh:
             return None
         # No source timestamp is refreshed by repeated KEMS scans.
+    if continuous_upper_kwh is not None:
+        upper = _number(continuous_upper_kwh)
+        if upper is None or not 0.0 <= upper <= capacity:
+            return None
+        return (
+            max(capacity - upper - 0.5, 0.0),
+            "session-local worst-case upper battery energy from continuous "
+            "FoxESS battery, house and grid power, not refreshed SOC",
+        )
     headroom = max(
         capacity * (100.0 - soc) / 100.0 - max_charge * soc_age / 3600.0 - 0.5,
         0.0,
@@ -437,9 +449,28 @@ def verified_happy_hour_physical_headroom(
         else None
     )
     max_charge = _number(getattr(control, "max_charge_kw", None))
+    continuity_upper = None
+    continuity_status = "not_evaluated"
+    if snapshot is not None and capacity is not None and max_charge is not None:
+        tracker = getattr(manager, "_happy_hour_charge_headroom_continuity", None)
+        if tracker is None:
+            tracker = HappyHourChargeHeadroomContinuity()
+            manager._happy_hour_charge_headroom_continuity = tracker
+        continuity_upper, continuity_status = tracker.observe(
+            snapshot,
+            now=now,
+            capacity=capacity,
+            max_charge=max(
+                max_charge, _number(getattr(config, "max_charge_kw", None)) or 0.0
+            ),
+            positive_is_discharge=bool(
+                getattr(config, "battery_power_positive_is_discharge", True)
+            ),
+        )
     bounded = (
         _bounded_happy_hour_charge_headroom(
-            snapshot, capacity=capacity, max_charge=max_charge
+            snapshot, capacity=capacity, max_charge=max_charge,
+            continuous_upper_kwh=continuity_upper,
         )
         if snapshot is not None and capacity is not None and max_charge is not None
         else None
@@ -472,6 +503,13 @@ def verified_happy_hour_physical_headroom(
         "physical_battery_headroom_kwh": round(headroom, 3),
         "physical_headroom_basis": headroom_basis,
         "physical_soc_report_age_seconds": round(soc_age, 1),
+        "physical_headroom_continuity_status": continuity_status,
+        "physical_headroom_continuity_upper_kwh": (
+            round(continuity_upper, 3) if continuity_upper is not None else None
+        ),
+        "physical_headroom_continuity_snapshot_at": (
+            snapshot.timestamp.isoformat() if continuity_upper is not None else None
+        ),
     }
 
 
@@ -822,8 +860,17 @@ def verified_live_happy_hour_charge_kw(
         )
     ):
         return 0.0
+    continuous_upper = (
+        _number(context.get("physical_headroom_continuity_upper_kwh"))
+        if context.get("physical_soc_verified") is True
+        and context.get("physical_charge_headroom_verified") is True
+        and context.get("physical_headroom_continuity_snapshot_at")
+        == snapshot.timestamp.isoformat()
+        else None
+    )
     bounded = _bounded_happy_hour_charge_headroom(
-        snapshot, capacity=capacity, max_charge=max_charge
+        snapshot, capacity=capacity, max_charge=max_charge,
+        continuous_upper_kwh=continuous_upper,
     )
     if bounded is None:
         return 0.0
