@@ -276,7 +276,29 @@ def _future_today_projection(
         return {}
 
     capacity = max(config.battery_capacity_kwh, 0.1)
-    battery = capacity * min(max(soc, 0.0), 100.0) / 100.0
+    # The digital twin remains independent for historical No-KEMS comparison.
+    # For the *live, same-cycle* future flow display, use the identical
+    # conservative FoxESS energy proof which owns paid Agile dispatch. Mixing
+    # twin SOC with physical-ledger house+export allocations fabricated 0% SOC
+    # alongside positive planned battery exports after HA restart.
+    rolling = state.get("rolling_export_plan")
+    rolling = rolling if isinstance(rolling, dict) else {}
+    proof = rolling.get("physical_planning_evidence")
+    proof = proof if isinstance(proof, dict) else {}
+    physical_stored = _number(proof.get("physical_energy_lower_bound_kwh"))
+    proven_at = _dt(rolling.get("generated_at"))
+    physical_projection = bool(
+        proof.get("available") is True
+        and (_number(proof.get("physical_samples")) or 0) >= 2
+        and physical_stored is not None
+        and 0.0 <= physical_stored <= capacity
+        and proven_at is not None
+        and abs((proven_at - now_utc).total_seconds()) <= 2.0
+    )
+    if physical_projection:
+        battery = float(physical_stored)
+    else:
+        battery = capacity * min(max(soc, 0.0), 100.0) / 100.0
     charge_efficiency = max(config.charge_efficiency, 0.01)
     discharge_efficiency = max(config.discharge_efficiency, 0.01)
     house_kw = _conservative_house_kw(self, learned)
@@ -429,7 +451,11 @@ def _future_today_projection(
             "battery_to_home_kwh": battery_home,
             "battery_export_kwh": battery_export,
             "estimated_soc_percent": 100.0 * battery / capacity,
-            "basis": "KEMS forecast + final rolling allocation",
+            "basis": (
+                "verified FoxESS physical lower-bound + final rolling allocation"
+                if physical_projection
+                else "KEMS forecast + final rolling allocation (digital twin)"
+            ),
             "scope": scope,
         }
     return output
