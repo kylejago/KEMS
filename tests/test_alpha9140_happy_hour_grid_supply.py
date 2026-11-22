@@ -525,3 +525,78 @@ def test_distant_happy_hour_cannot_reuse_physical_headroom_across_cheap_window(
         power_down={},
     )
     assert result["physical_required_headroom_export_kwh"] is None
+
+
+def test_22_nov_silent_zero_pv_still_maintains_independent_house_grid_hold():
+    """A PV register at 0 kW since yesterday cannot cancel a joined free hour."""
+    args = _case()
+    args["snapshot"] = replace(
+        args["snapshot"],
+        battery_soc=71.0,
+        battery_power_kw=-5.312,
+        house_load_kw=1.424,
+        solar_power_kw=0.0,
+        grid_import_kw=7.039,
+        grid_export_kw=0.0,
+        source_age_seconds={
+            "battery_soc": 233.4,
+            "battery_power_kw": 33.4,
+            "house_load_kw": 8.4,
+            "solar_power_kw": 51868.7,
+            "grid_import_kw": 8.4,
+            "grid_export_kw": 608.6,
+        },
+        stale_fields=(),
+    )
+    assert verified_live_happy_hour_house_grid_hold(**args)
+    held = apply_happy_hour_control(
+        args["control"],
+        args["snapshot"],
+        {**args["context"], "physical_house_grid_hold_authorised": True},
+    )
+    assert held.desired_min_soc_percent == 100.0
+    assert held.desired_battery_to_home_power_kw == 0.0
+    decision = _decision(held, hold=True)
+    assert decision.commands_permitted
+    assert decision.action == "self_use"
+    assert decision.min_soc_on_grid_percent == 100.0
+
+
+def test_silent_pv_fallback_requires_fresh_correlated_battery_and_grid():
+    args = _case()
+    baseline = {
+        "house_load_kw": 8.4,
+        "solar_power_kw": 51868.7,
+        "battery_power_kw": 33.4,
+        "grid_import_kw": 8.4,
+        "grid_export_kw": 608.6,
+    }
+    args["snapshot"] = replace(
+        args["snapshot"],
+        source_age_seconds=baseline,
+        solar_power_kw=0.0,
+        battery_power_kw=-5.0,
+        grid_import_kw=7.0,
+        stale_fields=(),
+    )
+    assert verified_live_happy_hour_house_grid_hold(**args)
+
+    for change in (
+        {"battery_power_kw": 120.0},
+        {"grid_import_kw": 120.0, "grid_export_kw": 120.0},
+    ):
+        stale_snapshot = replace(
+            args["snapshot"],
+            source_age_seconds={**baseline, **change},
+        )
+        assert not verified_live_happy_hour_house_grid_hold(
+            **{**args, "snapshot": stale_snapshot}
+        )
+    assert not verified_live_happy_hour_house_grid_hold(
+        **{
+            **args,
+            "snapshot": replace(
+                args["snapshot"], stale_fields=("solar_power_kw",)
+            ),
+        }
+    )
