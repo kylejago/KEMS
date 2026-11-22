@@ -668,7 +668,17 @@ def test_alpha9114_soc_reporting_gap_has_bounded_physical_headroom() -> None:
         is None
     )
     snap.source_age_seconds["battery_soc"] = 1200.0
+    # A 60s unchanged power value is allowed only with the full worst-case
+    # charge debit and corroborating fresh house/grid observations. Beyond
+    # 90s of unchanged battery power, independent headroom fails closed.
     snap.source_age_seconds["battery_power_kw"] = 60.0
+    assert (
+        _budget._bounded_happy_hour_charge_headroom(
+            snap, capacity=56.42, max_charge=7.0
+        )
+        is not None
+    )
+    snap.source_age_seconds["battery_power_kw"] = 120.0
     assert (
         _budget._bounded_happy_hour_charge_headroom(
             snap, capacity=56.42, max_charge=7.0

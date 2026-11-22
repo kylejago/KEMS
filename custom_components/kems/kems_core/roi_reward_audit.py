@@ -41,6 +41,18 @@ def _entry(kind, key, day, value, basis, settled, included, **extra):
         "evidence_source": basis,
         "supplier_settled": settled is True,
         "supplier_status": "settled" if settled is True else "unsettled",
+        # The legacy binary field above is retained for dashboard compatibility.
+        # It must not be interpreted as a supplier-confirmed award: an estimate
+        # and a booking with no monetary value have different evidence quality.
+        "supplier_award_evidence": (
+            "verified_supplier_award"
+            if settled is True
+            else (
+                "estimated_not_supplier_verified"
+                if value is not None
+                else "no_valued_reward_yet"
+            )
+        ),
         # A stable nullable schema lets older/pending event rows coexist with
         # partially metered receipts without failing dashboard templates.
         "event_id": None,

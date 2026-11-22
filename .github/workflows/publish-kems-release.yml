@@ -7,6 +7,7 @@ on:
   workflow_dispatch:
 
 permissions:
+  actions: read
   contents: write
 
 concurrency:
@@ -26,6 +27,75 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.13"
+
+      - name: Gate publication on exact-commit Validate, HACS and hassfest
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          # All three independent workflows must succeed for this main commit.
+          # Validate includes the full pytest suite and ESPHome panel compile.
+          # Never rely on a previously green PR head or an unrelated main run.
+          for workflow in validate.yml hacs.yml hassfest.yml; do
+            verified=false
+            for attempt in $(seq 1 120); do
+              runs="$(gh run list --repo "$GITHUB_REPOSITORY" \
+                --workflow "$workflow" --commit "$GITHUB_SHA" --event push \
+                --limit 20 --json databaseId,headSha,status,conclusion,event)"
+              result="$(RUNS_JSON="$runs" EXPECTED_SHA="$GITHUB_SHA" python - <<'PY'
+          import json
+          import os
+
+          runs = json.loads(os.environ["RUNS_JSON"])
+          exact = [
+              row for row in runs
+              if row.get("headSha") == os.environ["EXPECTED_SHA"]
+              and row.get("event") == "push"
+          ]
+          if not exact:
+              print("pending")
+          else:
+              current = exact[0]
+              if current.get("status") != "completed":
+                  print("pending")
+              elif current.get("conclusion") == "success":
+                  print("success")
+              else:
+                  print("failure")
+          PY
+              )"
+              case "$result" in
+                success)
+                  echo "$workflow succeeded on $GITHUB_SHA"
+                  verified=true
+                  break
+                  ;;
+                failure)
+                  echo "$workflow failed on $GITHUB_SHA; no KEMS release will be created." >&2
+                  exit 1
+                  ;;
+                pending)
+                  sleep 20
+                  ;;
+                *)
+                  echo "Unexpected $workflow state: $result" >&2
+                  exit 1
+                  ;;
+              esac
+            done
+            if [[ "$verified" != true ]]; then
+              echo "$workflow did not pass on the exact commit; publication blocked." >&2
+              exit 1
+            fi
+          done
+          # Serialised publisher jobs must not release an older commit after
+          # a newer change to main has arrived during validation.
+          current_main="$(git ls-remote origin refs/heads/main | cut -f1)"
+          if [[ "$current_main" != "$GITHUB_SHA" ]]; then
+            echo "main advanced since validation; refusing stale release." >&2
+            exit 1
+          fi
 
       - name: Resolve canonical KEMS version
         id: version
@@ -56,7 +126,15 @@ jobs:
           VERSION: ${{ steps.version.outputs.value }}
         run: |
           if gh release view "$VERSION" >/dev/null 2>&1; then
-            echo "Release $VERSION already exists; keeping its existing tag target."
+            # An existing version must never be silently re-used for a changed
+            # main commit, or have its immutable release assets overwritten.
+            git fetch --force origin "refs/tags/$VERSION:refs/tags/$VERSION"
+            existing_commit="$(git rev-parse "$VERSION^{commit}")"
+            if [[ "$existing_commit" != "$GITHUB_SHA" ]]; then
+              echo "Version $VERSION already targets $existing_commit; bump the manifest first." >&2
+              exit 1
+            fi
+            echo "Release $VERSION already exists at this exact commit."
             exit 0
           fi
 

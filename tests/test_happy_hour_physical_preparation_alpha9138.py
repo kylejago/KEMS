@@ -254,3 +254,275 @@ def test_price_requirements_never_invent_a_slot_or_use_negative_prices():
     new, report = apply_verified_happy_hour_preparation(**args)
     assert new.desired_battery_export_power_kw == 0
     assert report["status"] == "awaiting_selected_physical_preparation_slot"
+
+
+def test_full_physical_headroom_shortfall_is_not_hidden_by_house_budget_cap():
+    """Physical Happy Hour goal can exceed safe export without changing commands."""
+    args = _case()
+    args["context"]["physical_required_headroom_export_kwh"] = 12.635
+    args["agile_state"]["rolling_export_plan"]["physical_house_budget_evidence"][
+        "exportable_ac_kwh"
+    ] = 11.232
+    before = args["control"]
+    control, evidence = apply_verified_happy_hour_preparation(**args)
+    assert evidence["physical_required_headroom_export_kwh"] == 12.635
+    assert evidence["protected_ac_export_budget_kwh"] == 11.232
+    assert evidence["physically_budgeted_preparation_kwh"] == 11.232
+    assert evidence["physical_headroom_unfunded_by_house_budget_kwh"] == 1.403
+    assert evidence["physical_headroom_unplanned_kwh"] >= 1.403
+    assert evidence["full_physical_headroom_plan_available"] is False
+    assert evidence["physical_headroom_shortfall_affects_control"] is False
+    assert control.desired_battery_export_power_kw <= 7.0
+    assert not control.commands_permitted
+    assert before.desired_battery_export_power_kw == 0.0
+
+
+def test_zero_safe_export_budget_discloses_unfunded_physical_headroom():
+    args = _case()
+    args["agile_state"]["rolling_export_plan"]["physical_house_budget_evidence"][
+        "exportable_ac_kwh"
+    ] = 0.0
+    unchanged, evidence = apply_verified_happy_hour_preparation(**args)
+    assert unchanged is args["control"]
+    assert evidence["requested_export_kw"] == 0.0
+    assert evidence["physical_headroom_unfunded_by_house_budget_kwh"] == 9.856
+    assert evidence["physical_headroom_unplanned_kwh"] == 9.856
+    assert evidence["full_physical_headroom_plan_available"] is False
+    assert evidence["status"] == "headroom_ready_or_house_reserve_protected"
+
+
+def test_unchanged_soc_and_zero_grid_import_allow_fresh_export_corroboration():
+    """Real 22 Nov case: whole-percent SOC and zero import do not update."""
+    from custom_components.kems.happy_hour_budget import (
+        _bounded_happy_hour_charge_headroom,
+    )
+
+    snapshot = SimpleNamespace(
+        battery_soc=80.0,
+        battery_power_kw=7.5,
+        house_load_kw=1.383,
+        grid_import_kw=0.0,
+        grid_export_kw=5.855,
+        source_age_seconds={
+            "battery_soc": 191.6,
+            "battery_power_kw": 16.6,
+            "house_load_kw": 16.6,
+            "grid_import_kw": 441.6,  # constant zero, not a failed sensor
+            "grid_export_kw": 16.6,
+        },
+        stale_fields=(),
+    )
+    bounded = _bounded_happy_hour_charge_headroom(
+        snapshot, capacity=40.0, max_charge=7.0
+    )
+    assert bounded is not None
+    headroom, basis = bounded
+    assert headroom > 0.0
+    assert "worst-case" in basis
+
+    # A genuinely uncorroborated grid source still fails closed.
+    snapshot.source_age_seconds["grid_export_kw"] = 441.6
+    assert (
+        _bounded_happy_hour_charge_headroom(snapshot, capacity=40.0, max_charge=7.0)
+        is None
+    )
+
+
+def test_long_unchanged_soc_still_consumes_worst_case_charge_budget():
+    """SOC's integer-only change reporting must not become a freshness timer."""
+    from custom_components.kems.happy_hour_budget import (
+        _bounded_happy_hour_charge_headroom,
+    )
+
+    snapshot = SimpleNamespace(
+        battery_soc=80.0,
+        battery_power_kw=0.0,
+        house_load_kw=1.0,
+        grid_import_kw=0.0,
+        grid_export_kw=0.0,
+        source_age_seconds={
+            "battery_soc": 2700.0,  # 45 min since last whole-percent change
+            "battery_power_kw": 10.0,
+            "house_load_kw": 10.0,
+            "grid_import_kw": 2700.0,
+            "grid_export_kw": 10.0,
+        },
+        stale_fields=(),
+    )
+    bounded = _bounded_happy_hour_charge_headroom(
+        snapshot, capacity=40.0, max_charge=7.0
+    )
+    assert bounded is not None
+    headroom, _basis = bounded
+    assert headroom == pytest.approx(max(40.0 * 0.2 - 7.0 * 2700.0 / 3600.0 - 0.5, 0.0))
+
+
+def test_22_nov_1111_real_charge_guard_accepts_33_second_battery_power_report():
+    """Prior 30-second cutoff blocked Force Charge on a healthy 33-second scan."""
+    from custom_components.kems.happy_hour_budget import (
+        _bounded_happy_hour_charge_headroom,
+        verified_live_happy_hour_charge_kw,
+    )
+
+    args = _case()
+    now = START + timedelta(minutes=11, seconds=17)
+    snapshot = replace(
+        args["snapshot"],
+        timestamp=now,
+        battery_soc=71.0,
+        battery_power_kw=-5.312,
+        house_load_kw=1.424,
+        solar_power_kw=0.0,
+        grid_import_kw=7.039,
+        grid_export_kw=0.0,
+        ev_connected=False,
+        ev_charging=False,
+        ev_power_kw=0.0,
+        ev_power_age_seconds=23.7,
+        source_age_seconds={
+            "battery_soc": 233.4,
+            "battery_power_kw": 33.4,
+            "house_load_kw": 8.4,
+            "solar_power_kw": 51868.7,
+            "grid_import_kw": 8.4,
+            "grid_export_kw": 608.6,
+        },
+        stale_fields=(),
+    )
+    bounded = _bounded_happy_hour_charge_headroom(
+        snapshot,
+        capacity=40.0,
+        max_charge=7.0,
+    )
+    assert bounded is not None
+    assert 0.0 < bounded[0] < 11.6
+
+    plan = {
+        "source": "octopus_energy",
+        "mode": "charging",
+        "start": START.isoformat(),
+        "end": END.isoformat(),
+        "happy_hour_import_authority_active": True,
+        "current_reward_hour_ledger_complete": True,
+        "current_reward_hour_remaining_kwh": 14.786,
+        "current_reward_hour_start": START.isoformat(),
+        "current_reward_hour_end": (START + timedelta(hours=1)).isoformat(),
+        "charge_target_kw": 7.0,
+    }
+    actual = verified_live_happy_hour_charge_kw(
+        booking=_joined(),
+        context=plan,
+        snapshot=snapshot,
+        simulation_config=SimpleNamespace(battery_capacity_kwh=40.0),
+        control_config=SimpleNamespace(
+            max_charge_kw=7.0,
+            inverter_limit_kw=7.0,
+            site_import_limit_kw=14.5,
+            emergency_stop=False,
+        ),
+        now=now,
+        power_down_active=False,
+        grid_available=True,
+    )
+    assert 0.0 < actual <= 7.0
+    # The independent site-import and remaining-hour guards still cap output.
+    assert actual < 14.5 - snapshot.grid_import_kw
+
+
+@pytest.mark.parametrize(
+    "grid_kw,battery_kw,house_kw,expected_kw",
+    [
+        (10.007, -6.816, 3.010, 7.0),  # 11:13: wrong original cap 3.993
+        (5.352, -3.757, 1.476, 7.0),  # 11:14: should remain steady
+        (14.2, -7.0, 7.0, 6.8),  # true site demand leaves only 6.8
+        (14.5, 0.0, 1.5, 0.0),  # no charging credit, site is full
+    ],
+)
+def test_22_nov_happy_hour_site_charge_feedback_is_subtracted_only_when_proven(
+    grid_kw, battery_kw, house_kw, expected_kw
+):
+    """Site cap excludes *existing* verified charging, not whole grid import."""
+    from custom_components.kems.happy_hour_budget import (
+        verified_live_happy_hour_charge_kw,
+    )
+
+    now = START + timedelta(minutes=13, seconds=23)
+    snapshot = replace(
+        _case()["snapshot"],
+        timestamp=now,
+        battery_soc=72.0,
+        battery_power_kw=battery_kw,
+        house_load_kw=house_kw,
+        solar_power_kw=0.0,
+        grid_import_kw=grid_kw,
+        grid_export_kw=0.0,
+        ev_connected=False,
+        ev_charging=False,
+        ev_power_kw=0.0,
+        ev_power_age_seconds=9.0,
+        source_age_seconds={
+            "battery_soc": 9.4,
+            "battery_power_kw": 9.4,
+            "house_load_kw": 9.4,
+            "grid_import_kw": 9.4,
+            "grid_export_kw": 750.0,  # unchanged zero is normal
+            "solar_power_kw": 52000.0,  # no PV all day
+        },
+        stale_fields=(),
+    )
+    plan = {
+        "source": "octopus_energy",
+        "mode": "charging",
+        "start": START.isoformat(),
+        "end": END.isoformat(),
+        "happy_hour_import_authority_active": True,
+        "current_reward_hour_ledger_complete": True,
+        "current_reward_hour_remaining_kwh": 14.66,
+        "current_reward_hour_start": START.isoformat(),
+        "current_reward_hour_end": (START + timedelta(hours=1)).isoformat(),
+        "charge_target_kw": 7.0,
+    }
+    config = SimpleNamespace(
+        max_charge_kw=7.0,
+        inverter_limit_kw=7.0,
+        site_import_limit_kw=14.5,
+        emergency_stop=False,
+    )
+
+    def verify(sample, simulation=None):
+        return verified_live_happy_hour_charge_kw(
+            booking=_joined(),
+            context=plan,
+            snapshot=sample,
+            simulation_config=simulation
+            or SimpleNamespace(
+                battery_capacity_kwh=40.0,
+                battery_power_positive_is_discharge=True,
+            ),
+            control_config=config,
+            now=now,
+            power_down_active=False,
+            grid_available=True,
+        )
+
+    assert verify(snapshot) == pytest.approx(expected_kw, abs=0.001)
+    if grid_kw == 10.007:
+        # No uncorroborated battery-power "credit" can raise site authority.
+        unverified = replace(
+            snapshot,
+            source_age_seconds={
+                **snapshot.source_age_seconds,
+                "battery_power_kw": 180.0,
+            },
+        )
+        assert verify(unverified) == pytest.approx(3.993, abs=0.001)
+        # Positive battery power denotes discharge, not grid charging.
+        discharge = replace(snapshot, battery_power_kw=6.816)
+        assert verify(discharge) == pytest.approx(3.993, abs=0.001)
+        # Reversed physical polarity is accepted only when configured.
+        reversed_charge = replace(snapshot, battery_power_kw=6.816)
+        reverse_config = SimpleNamespace(
+            battery_capacity_kwh=40.0,
+            battery_power_positive_is_discharge=False,
+        )
+        assert verify(reversed_charge, reverse_config) == pytest.approx(7.0)

@@ -24,10 +24,11 @@ and KEMS has a separately approved live tariff route.
 `solar_routing_shadow` decision to switch Self Use to Feed-in First.
 Ordinary Agile battery export is already live and separate.
 
+**Installation evidence:** The version above is a dated, previously verified diagnostic, not a promise that KEMS on this HA host is always the same as the newest GitHub release. A staged GitHub pull request does not reach HACS or trigger an unattended update. Check the running KEMS version and readiness in current diagnostics before declaring any new change installed.
+
 **Updates:** automatic safe-first maintenance **06:00–06:30
 Europe/London**, with protected export/EV/events deferring installation.
-Use the release bundle and SHA-256 validation; do not force installation
-during active export or a reward session.
+A backup is requested before automatic installation by default, and an unavailable/failed backup stops the install. Use the release bundle and SHA-256 validation; do not force installation during active export or a reward session.
 
 **Notifications:** joined events, normal overnight off-peak, observed Ohme
 charger activity, daily/weekly summaries and private warnings are routed

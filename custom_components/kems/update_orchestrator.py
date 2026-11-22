@@ -31,7 +31,10 @@ from .kems_core.github_release_assets import (
     download_release_asset,
     download_release_asset_pair,
 )
-from .update_maintenance_guard import maintenance_energy_blockers
+from .update_maintenance_guard import (
+    automatic_update_backup_status,
+    maintenance_energy_blockers,
+)
 from .versioning import version_is_newer, version_relation
 
 LOGGER = logging.getLogger(__name__)
@@ -1185,6 +1188,20 @@ class KEMSUpdateOrchestrator:
             "history": self.history[-10:],
             "running_kems_version": _installed_integration_version(),
             "automatic_maintenance_blockers": self._energy_maintenance_blockers(),
+            "backup_protection": {
+                "status": automatic_update_backup_status(
+                    automatic_updates=self.policy.automatic_updates,
+                    backup_before_update=self.policy.backup_before_update,
+                    backup_service_available=self.hass.services.has_service(
+                        "backup", "create_automatic"
+                    ),
+                ),
+                "automatic_updates_enabled": self.policy.automatic_updates,
+                "backup_before_update": self.policy.backup_before_update,
+                "backup_service_available": self.hass.services.has_service(
+                    "backup", "create_automatic"
+                ),
+            },
         }
 
     def _write_legacy_states(self) -> None:

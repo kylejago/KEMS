@@ -19,10 +19,14 @@ from typing import Any
 
 from .happy_hour import HAPPY_HOUR_FAIR_USE_KWH_PER_REWARD
 from .happy_hour_auto_join import booked_happy_hour_matches_plan
+from .happy_hour_soc_continuity import HappyHourChargeHeadroomContinuity
 from .kems_core.control_write_authority import assess_happy_hour_charge_authority
 
 _EPSILON = 1e-6
 _MAX_LEDGER_GAP = timedelta(minutes=10)
+# A 30-second raw value-change age is too tight for normal HA/Modbus scans.
+# The physical tracker already permits a 90-second directly measured interval.
+_HAPPY_HOUR_CORRELATED_POWER_MAX_AGE_SECONDS = 90.0
 
 
 def _number(value: Any) -> float | None:
@@ -355,7 +359,11 @@ def _home_grid_kw(
 
 
 def _bounded_happy_hour_charge_headroom(
-    snapshot: Any, *, capacity: float, max_charge: float
+    snapshot: Any,
+    *,
+    capacity: float,
+    max_charge: float,
+    continuous_upper_kwh: float | None = None,
 ) -> tuple[float, str] | None:
     """Prove remaining charge space using a worst-case upper SOC bound.
 
@@ -374,20 +382,47 @@ def _bounded_happy_hour_charge_headroom(
         soc is None
         or not 0.0 <= soc <= 100.0
         or soc_age is None
-        or not 0.0 <= soc_age <= 3600.0
+        or soc_age < 0.0
+        or (soc_age > 3600.0 and continuous_upper_kwh is None)
         or capacity <= 0.0
         or max_charge <= 0.0
         or "battery_soc" in stale
     ):
         return None
     if soc_age > 180.0:
-        for field in ("battery_power_kw", "house_load_kw", "grid_import_kw"):
+        # A FoxESS zero-import register can remain unchanged throughout a
+        # healthy export session. A fresh export register corroborates the
+        # same grid interface without requiring the zero register to change.
+        # Continue to require fresh battery and household power evidence.
+        for field in ("battery_power_kw", "house_load_kw"):
             value = _number(getattr(snapshot, field, None))
             age = _number(ages.get(field))
-            if value is None or age is None or not 0.0 <= age <= 30.0 or field in stale:
+            if (
+                value is None
+                or age is None
+                or not 0.0 <= age <= _HAPPY_HOUR_CORRELATED_POWER_MAX_AGE_SECONDS
+                or field in stale
+            ):
                 return None
-        # In particular, battery power must be measured, not inferred from
-        # simulated SOC, and source age never resets on repeated KEMS scans.
+        grid_fresh = any(
+            field not in stale
+            and _number(getattr(snapshot, field, None)) is not None
+            and (age := _number(ages.get(field))) is not None
+            and 0.0 <= age <= _HAPPY_HOUR_CORRELATED_POWER_MAX_AGE_SECONDS
+            for field in ("grid_import_kw", "grid_export_kw")
+        )
+        if not grid_fresh:
+            return None
+        # No source timestamp is refreshed by repeated KEMS scans.
+    if continuous_upper_kwh is not None:
+        upper = _number(continuous_upper_kwh)
+        if upper is None or not 0.0 <= upper <= capacity:
+            return None
+        return (
+            max(capacity - upper - 0.5, 0.0),
+            "session-local worst-case upper battery energy from continuous "
+            "FoxESS battery, house and grid power, not refreshed SOC",
+        )
     headroom = max(
         capacity * (100.0 - soc) / 100.0 - max_charge * soc_age / 3600.0 - 0.5,
         0.0,
@@ -425,9 +460,30 @@ def verified_happy_hour_physical_headroom(
         else None
     )
     max_charge = _number(getattr(control, "max_charge_kw", None))
+    continuity_upper = None
+    continuity_status = "not_evaluated"
+    if snapshot is not None and capacity is not None and max_charge is not None:
+        tracker = getattr(manager, "_happy_hour_charge_headroom_continuity", None)
+        if tracker is None:
+            tracker = HappyHourChargeHeadroomContinuity()
+            manager._happy_hour_charge_headroom_continuity = tracker
+        continuity_upper, continuity_status = tracker.observe(
+            snapshot,
+            now=now,
+            capacity=capacity,
+            max_charge=max(
+                max_charge, _number(getattr(config, "max_charge_kw", None)) or 0.0
+            ),
+            positive_is_discharge=bool(
+                getattr(config, "battery_power_positive_is_discharge", True)
+            ),
+        )
     bounded = (
         _bounded_happy_hour_charge_headroom(
-            snapshot, capacity=capacity, max_charge=max_charge
+            snapshot,
+            capacity=capacity,
+            max_charge=max_charge,
+            continuous_upper_kwh=continuity_upper,
         )
         if snapshot is not None and capacity is not None and max_charge is not None
         else None
@@ -460,6 +516,13 @@ def verified_happy_hour_physical_headroom(
         "physical_battery_headroom_kwh": round(headroom, 3),
         "physical_headroom_basis": headroom_basis,
         "physical_soc_report_age_seconds": round(soc_age, 1),
+        "physical_headroom_continuity_status": continuity_status,
+        "physical_headroom_continuity_upper_kwh": (
+            round(continuity_upper, 3) if continuity_upper is not None else None
+        ),
+        "physical_headroom_continuity_snapshot_at": (
+            snapshot.timestamp.isoformat() if continuity_upper is not None else None
+        ),
     }
 
 
@@ -810,8 +873,23 @@ def verified_live_happy_hour_charge_kw(
         )
     ):
         return 0.0
+    continuous_upper = (
+        _number(context.get("physical_headroom_continuity_upper_kwh"))
+        if context.get("physical_soc_verified") is True
+        and context.get("physical_charge_headroom_verified") is True
+        and context.get("physical_headroom_continuity_snapshot_at")
+        == (
+            timestamp.isoformat()
+            if (timestamp := getattr(snapshot, "timestamp", None)) is not None
+            else None
+        )
+        else None
+    )
     bounded = _bounded_happy_hour_charge_headroom(
-        snapshot, capacity=capacity, max_charge=max_charge
+        snapshot,
+        capacity=capacity,
+        max_charge=max_charge,
+        continuous_upper_kwh=continuous_upper,
     )
     if bounded is None:
         return 0.0
@@ -825,7 +903,39 @@ def verified_live_happy_hour_charge_kw(
     # reported SOC. Reserve extra space for delayed FoxESS/meter feedback.
     headroom, _headroom_basis = bounded
     hours_left = max((bucket_end - now).total_seconds() / 3600.0, 0.001)
-    site_headroom = max(site_limit - max(grid, house + ev) - 0.5, 0.0)
+    # Grid import already contains ongoing battery Force Charge. Subtracting
+    # *all* of it from the site allowance produces feedback oscillation:
+    # 7 kW charging -> ~10 kW import -> 4 kW command -> ~5 kW import -> 7 kW.
+    # Only remove independently observed battery charging from measured grid
+    # import when same-scan FoxESS battery, grid and house power are correlated.
+    # Otherwise retain the prior conservative, no-credit limit.
+    base_grid_demand = grid
+    stale = set(getattr(snapshot, "stale_fields", ()) or ())
+    battery_power = _number(getattr(snapshot, "battery_power_kw", None))
+    battery_age = _number(ages.get("battery_power_kw"))
+    grid_age = _number(ages.get("grid_import_kw"))
+    if (
+        battery_power is not None
+        and battery_age is not None
+        and grid_age is not None
+        and house_age is not None
+        and 0.0 <= battery_age <= 90.0
+        and 0.0 <= grid_age <= 90.0
+        and 0.0 <= house_age <= 90.0
+        and abs(battery_age - grid_age) <= 30.0
+        and abs(house_age - grid_age) <= 30.0
+        and not {"battery_power_kw", "grid_import_kw", "house_load_kw"} & stale
+    ):
+        positive_is_discharge = bool(
+            getattr(simulation_config, "battery_power_positive_is_discharge", True)
+        )
+        measured_battery_charge = max(
+            -battery_power if positive_is_discharge else battery_power, 0.0
+        )
+        base_grid_demand = max(grid - measured_battery_charge, 0.0)
+    # Use the larger of measured non-charge import and observed household/EV
+    # demand, then leave a further 0.5 kW for telemetry lag and losses.
+    site_headroom = max(site_limit - max(base_grid_demand, house + ev) - 0.5, 0.0)
     safe_target = min(
         target,
         max_charge,
@@ -911,14 +1021,46 @@ def verified_live_happy_hour_house_grid_hold(
     ages = getattr(snapshot, "source_age_seconds", None)
     if not isinstance(ages, dict) or {"house_load_kw", "solar_power_kw"} & stale:
         return False
-    # An unchanged zero grid-import entity is not by itself a stale meter.
-    # Require fresh physical house and PV signals on the same live device.
-    for key in ("house_load_kw", "solar_power_kw"):
-        age = _number(ages.get(key))
-        value = _number(getattr(snapshot, key, None))
-        if age is None or not 0.0 <= age <= 90.0 or value is None or value < 0.0:
-            return False
-    return True
+    # An unchanged zero PV power register may have last changed yesterday;
+    # this does not mean the integrated FoxESS telemetry has stopped. Require
+    # a fresh house power reading and a valid, non-stale PV value first.
+    house_age = _number(ages.get("house_load_kw"))
+    house_kw = _number(getattr(snapshot, "house_load_kw", None))
+    pv_age = _number(ages.get("solar_power_kw"))
+    pv_kw = _number(getattr(snapshot, "solar_power_kw", None))
+    if (
+        house_age is None
+        or not 0.0 <= house_age <= 90.0
+        or house_kw is None
+        or house_kw < 0.0
+        or pv_age is None
+        or pv_age < 0.0
+        or pv_kw is None
+        or pv_kw < 0.0
+    ):
+        return False
+    if pv_age <= 90.0:
+        return True
+    # A silent PV register needs independent corroboration from the same
+    # FoxESS site: live battery and import/export direction power, not a
+    # fabricated new PV reading. Any stale/missing corroboration fails shut.
+    battery_age = _number(ages.get("battery_power_kw"))
+    battery_kw = _number(getattr(snapshot, "battery_power_kw", None))
+    if (
+        "battery_power_kw" in stale
+        or battery_age is None
+        or not 0.0 <= battery_age <= 90.0
+        or battery_kw is None
+    ):
+        return False
+    return any(
+        field not in stale
+        and (age := _number(ages.get(field))) is not None
+        and 0.0 <= age <= 90.0
+        and (value := _number(getattr(snapshot, field, None))) is not None
+        and value >= 0.0
+        for field in ("grid_import_kw", "grid_export_kw")
+    )
 
 
 def verified_happy_hour_automation_active(

@@ -50,7 +50,10 @@ from .entity_discovery import (
     async_discover_entities,
     async_validate_entity_mappings,
 )
-from .happy_hour_auto_join import install_happy_hour_auto_join
+from .happy_hour_auto_join import (
+    install_happy_hour_auto_join,
+    release_happy_hour_auto_join,
+)
 from .kems_core import configure_ev_charge_policy
 from .kems_core.octopus_source_consolidation import consolidate_octopus_sources
 from .providers.entity_map import KEMSEntities
@@ -289,7 +292,12 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     coordinator: KEMSCoordinator = entry.runtime_data
     await async_unload_kems_whatsapp(coordinator)
     await async_unload_update_orchestrator(hass, entry)
-    await coordinator.async_shutdown()
+    try:
+        await coordinator.async_shutdown()
+    finally:
+        # The Happy Hour planner caches per-entry state. A reload must not
+        # retain the old coordinator, stale booking authority or its HA refs.
+        release_happy_hour_auto_join(coordinator)
     return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
 
 

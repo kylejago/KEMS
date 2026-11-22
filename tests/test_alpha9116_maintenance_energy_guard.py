@@ -100,6 +100,17 @@ def test_intelligent_and_cheap_windows_are_protected() -> None:
     )
 
 
+def test_missing_live_off_peak_evidence_defers_but_retired_intelligent_does_not() -> (
+    None
+):
+    """Only a present-but-unavailable current source blocks the updater."""
+    for unknown in ("unknown", "unavailable"):
+        assert "off-peak state is not verified" in " ".join(
+            _check(states={"off_peak": unknown, "intelligent_slot": "unknown"})
+        )
+    assert _check(states={"off_peak": "off", "intelligent_slot": "unknown"}) == []
+
+
 def test_ev_forced_charge_export_and_restore_block_maintenance() -> None:
     assert "EV" in " ".join(_check(snapshot=_snapshot(ev_power_kw=4.0)))
     assert "EV" in " ".join(_check(states={"ev_charging": "on"}))
@@ -170,3 +181,56 @@ def test_install_and_restart_paths_each_recheck_energy_activity() -> None:
         code.rfind("blockers = self._energy_maintenance_blockers()", 0, restart_check)
         >= 0
     )
+
+
+def test_backup_before_update_remains_an_independent_hard_gate() -> None:
+    """A safe energy window cannot override a missing or failed HA backup."""
+    source = UPDATE.read_text()
+    assert "backup_before_update: bool = True" in source
+    assert 'backup_before_update=bool(raw.get("backup_before_update", True))' in source
+    assert 'self.hass.services.has_service("backup", "create_automatic")' in source
+    assert 'await self._fail_pending(f"Pre-update backup failed: {error}")' in source
+    assert '"backup.create_automatic is unavailable"' in source
+    assert source.index("if self.policy.backup_before_update:") < source.index(
+        'if not self.hass.services.has_service("update", "install")'
+    )
+
+
+def test_backup_protection_diagnostic_never_confuses_default_with_saved_false() -> None:
+    """Actual saved backup opt-out must be visibly reported, not auto-overridden."""
+    check = guard.automatic_update_backup_status
+    assert (
+        check(
+            automatic_updates=True,
+            backup_before_update=False,
+            backup_service_available=True,
+        )
+        == "backup_disabled"
+    )
+    assert (
+        check(
+            automatic_updates=True,
+            backup_before_update=True,
+            backup_service_available=False,
+        )
+        == "backup_service_unavailable"
+    )
+    assert (
+        check(
+            automatic_updates=True,
+            backup_before_update=True,
+            backup_service_available=True,
+        )
+        == "pre_update_backup_required"
+    )
+    assert (
+        check(
+            automatic_updates=False,
+            backup_before_update=False,
+            backup_service_available=False,
+        )
+        == "automatic_updates_off"
+    )
+    source = UPDATE.read_text()
+    assert '"backup_protection": {' in source
+    assert '"status": automatic_update_backup_status(' in source
