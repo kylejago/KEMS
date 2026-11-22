@@ -13,8 +13,16 @@ from custom_components.kems.happy_hour_soc_continuity import (
 T0 = datetime(2026, 11, 22, 6, tzinfo=UTC)
 
 
-def _sample(now, *, soc_age, battery_kw=0.0, power_age=5.0,
-            grid_age=5.0, house_age=5.0, soc=80.0):
+def _sample(
+    now,
+    *,
+    soc_age,
+    battery_kw=0.0,
+    power_age=5.0,
+    grid_age=5.0,
+    house_age=5.0,
+    soc=80.0,
+):
     return SimpleNamespace(
         timestamp=now,
         battery_soc=soc,
@@ -35,8 +43,11 @@ def _sample(now, *, soc_age, battery_kw=0.0, power_age=5.0,
 
 def _observe(tracker, snapshot):
     return tracker.observe(
-        snapshot, now=snapshot.timestamp, capacity=40.0,
-        max_charge=7.0, positive_is_discharge=True,
+        snapshot,
+        now=snapshot.timestamp,
+        capacity=40.0,
+        max_charge=7.0,
+        positive_is_discharge=True,
     )
 
 
@@ -55,7 +66,8 @@ def test_integer_soc_constant_for_over_two_hours_with_fresh_grid_and_power():
     # Still useful after two hours, despite a raw SOC age beyond one hour.
     bounded = _bounded_happy_hour_charge_headroom(
         _sample(T0 + timedelta(hours=2), soc_age=7205),
-        capacity=40.0, max_charge=7.0,
+        capacity=40.0,
+        max_charge=7.0,
         continuous_upper_kwh=last_upper,
     )
     assert bounded is not None
@@ -68,14 +80,12 @@ def test_full_charge_margin_preserves_finite_headroom():
     tracker = HappyHourChargeHeadroomContinuity()
     _observe(tracker, _sample(T0, soc_age=5))
     value, _ = _observe(
-        tracker, _sample(T0 + timedelta(seconds=30), soc_age=35,
-                         battery_kw=-7.0)
+        tracker, _sample(T0 + timedelta(seconds=30), soc_age=35, battery_kw=-7.0)
     )
     assert value is not None
     assert value >= 32.0  # charged energy is never interpreted as discharge
     later, _ = _observe(
-        tracker, _sample(T0 + timedelta(seconds=60), soc_age=65,
-                         battery_kw=-7.0)
+        tracker, _sample(T0 + timedelta(seconds=60), soc_age=65, battery_kw=-7.0)
     )
     assert later is not None and later >= value
 
@@ -95,21 +105,18 @@ def test_power_and_grid_sensor_provenance_fail_closed():
     )
     assert value is None
     assert state == "missing_current_correlated_physical_telemetry"
-    value, _ = _observe(
-        tracker, _sample(T0 + timedelta(seconds=60), soc_age=65)
-    )
+    value, _ = _observe(tracker, _sample(T0 + timedelta(seconds=60), soc_age=65))
     assert value is None  # restarted tracker requires two physical samples
 
 
 def test_interrupted_long_gap_does_not_inherit_previous_proof():
     tracker = HappyHourChargeHeadroomContinuity()
     _observe(tracker, _sample(T0, soc_age=5))
-    assert _observe(
-        tracker, _sample(T0 + timedelta(seconds=30), soc_age=35)
-    )[0] is not None
-    value, state = _observe(
-        tracker, _sample(T0 + timedelta(minutes=20), soc_age=1205)
+    assert (
+        _observe(tracker, _sample(T0 + timedelta(seconds=30), soc_age=35))[0]
+        is not None
     )
+    value, state = _observe(tracker, _sample(T0 + timedelta(minutes=20), soc_age=1205))
     assert value is None
     assert state == "observation_gap_needs_new_soc_anchor"
 
@@ -119,13 +126,20 @@ def test_no_hardware_authority_can_be_inferred_from_upper_bound():
     # A claimed upper bound never overrides absent physical corroboration.
     snapshot.source_age_seconds["grid_import_kw"] = 8000
     snapshot.source_age_seconds["grid_export_kw"] = 8000
-    assert _bounded_happy_hour_charge_headroom(
-        snapshot, capacity=40, max_charge=7, continuous_upper_kwh=32
-    ) is None
-    assert _bounded_happy_hour_charge_headroom(
-        _sample(T0, soc_age=8000),
-        capacity=40, max_charge=7,
-    ) is None
+    assert (
+        _bounded_happy_hour_charge_headroom(
+            snapshot, capacity=40, max_charge=7, continuous_upper_kwh=32
+        )
+        is None
+    )
+    assert (
+        _bounded_happy_hour_charge_headroom(
+            _sample(T0, soc_age=8000),
+            capacity=40,
+            max_charge=7,
+        )
+        is None
+    )
 
 
 def test_live_headroom_reporting_reuses_verified_continuity(monkeypatch):
@@ -136,7 +150,8 @@ def test_live_headroom_reporting_reuses_verified_continuity(monkeypatch):
     )
 
     monkeypatch.setattr(
-        agile_physical_planning, "physical_planning_soc",
+        agile_physical_planning,
+        "physical_planning_soc",
         lambda _manager, *, now, config: (80.0, {"available": True}),
     )
     config = SimpleNamespace(
@@ -151,7 +166,9 @@ def test_live_headroom_reporting_reuses_verified_continuity(monkeypatch):
         }
     )
     first = verified_happy_hour_physical_headroom(
-        manager, now=T0, config=config,
+        manager,
+        now=T0,
+        config=config,
     )
     assert first["physical_soc_verified"] is True
     assert first["physical_headroom_continuity_upper_kwh"] is None
@@ -162,9 +179,7 @@ def test_live_headroom_reporting_reuses_verified_continuity(monkeypatch):
         manager._kems_physical_planning_context["snapshot"] = _sample(
             now, soc_age=i * 30 + 5
         )
-        last = verified_happy_hour_physical_headroom(
-            manager, now=now, config=config
-        )
+        last = verified_happy_hour_physical_headroom(manager, now=now, config=config)
     assert last is not None
     assert last["physical_soc_verified"] is True
     assert last["physical_charge_headroom_verified"] is True
@@ -172,6 +187,7 @@ def test_live_headroom_reporting_reuses_verified_continuity(monkeypatch):
     assert last["physical_headroom_continuity_status"] == (
         "continuous_bounded_charge_headroom"
     )
-    assert last["physical_headroom_continuity_snapshot_at"] == (
-        T0 + timedelta(hours=2)
-    ).isoformat()
+    assert (
+        last["physical_headroom_continuity_snapshot_at"]
+        == (T0 + timedelta(hours=2)).isoformat()
+    )
