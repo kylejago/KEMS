@@ -168,7 +168,7 @@ def test_active_release_note_is_compact_and_history_remains_auditable():
     bundle = json.loads((ROOT / "release/kems-bundle.template.json").read_text())
     current = bundle["maintenance"]["reason"]
     archive = (ROOT / "docs/archived-release-notes-through-alpha9244.md").read_text()
-    assert manifest["version"] == "0.9.0-alpha9.248"
+    assert manifest["version"] == "0.9.0-alpha9.249"
     assert current.startswith("Alpha9.248:")
     assert len(current.encode("utf-8")) < 2000
     assert "alpha9.244 EV-aware 5 kW Force Charge cap" in current
