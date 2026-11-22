@@ -289,3 +289,73 @@ def test_zero_safe_export_budget_discloses_unfunded_physical_headroom():
     assert evidence["physical_headroom_unplanned_kwh"] == 9.856
     assert evidence["full_physical_headroom_plan_available"] is False
     assert evidence["status"] == "headroom_ready_or_house_reserve_protected"
+
+
+def test_unchanged_soc_and_zero_grid_import_allow_fresh_export_corroboration():
+    """Real 22 Nov case: whole-percent SOC and zero import do not update."""
+    from custom_components.kems.happy_hour_budget import (
+        _bounded_happy_hour_charge_headroom,
+    )
+
+    snapshot = SimpleNamespace(
+        battery_soc=80.0,
+        battery_power_kw=7.5,
+        house_load_kw=1.383,
+        grid_import_kw=0.0,
+        grid_export_kw=5.855,
+        source_age_seconds={
+            "battery_soc": 191.6,
+            "battery_power_kw": 16.6,
+            "house_load_kw": 16.6,
+            "grid_import_kw": 441.6,  # constant zero, not a failed sensor
+            "grid_export_kw": 16.6,
+        },
+        stale_fields=(),
+    )
+    bounded = _bounded_happy_hour_charge_headroom(
+        snapshot, capacity=40.0, max_charge=7.0
+    )
+    assert bounded is not None
+    headroom, basis = bounded
+    assert headroom > 0.0
+    assert "worst-case" in basis
+
+    # A genuinely uncorroborated grid source still fails closed.
+    snapshot.source_age_seconds["grid_export_kw"] = 441.6
+    assert (
+        _bounded_happy_hour_charge_headroom(
+            snapshot, capacity=40.0, max_charge=7.0
+        )
+        is None
+    )
+
+
+def test_long_unchanged_soc_still_consumes_worst_case_charge_budget():
+    """SOC's integer-only change reporting must not become a freshness timer."""
+    from custom_components.kems.happy_hour_budget import (
+        _bounded_happy_hour_charge_headroom,
+    )
+
+    snapshot = SimpleNamespace(
+        battery_soc=80.0,
+        battery_power_kw=0.0,
+        house_load_kw=1.0,
+        grid_import_kw=0.0,
+        grid_export_kw=0.0,
+        source_age_seconds={
+            "battery_soc": 2700.0,  # 45 min since last whole-percent change
+            "battery_power_kw": 10.0,
+            "house_load_kw": 10.0,
+            "grid_import_kw": 2700.0,
+            "grid_export_kw": 10.0,
+        },
+        stale_fields=(),
+    )
+    bounded = _bounded_happy_hour_charge_headroom(
+        snapshot, capacity=40.0, max_charge=7.0
+    )
+    assert bounded is not None
+    headroom, _basis = bounded
+    assert headroom == pytest.approx(
+        max(40.0 * 0.2 - 7.0 * 2700.0 / 3600.0 - 0.5, 0.0)
+    )
