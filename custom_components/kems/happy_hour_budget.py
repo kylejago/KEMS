@@ -903,7 +903,41 @@ def verified_live_happy_hour_charge_kw(
     # reported SOC. Reserve extra space for delayed FoxESS/meter feedback.
     headroom, _headroom_basis = bounded
     hours_left = max((bucket_end - now).total_seconds() / 3600.0, 0.001)
-    site_headroom = max(site_limit - max(grid, house + ev) - 0.5, 0.0)
+    # Grid import already contains ongoing battery Force Charge. Subtracting
+    # *all* of it from the site allowance produces feedback oscillation:
+    # 7 kW charging -> ~10 kW import -> 4 kW command -> ~5 kW import -> 7 kW.
+    # Only remove independently observed battery charging from measured grid
+    # import when same-scan FoxESS battery, grid and house power are correlated.
+    # Otherwise retain the prior conservative, no-credit limit.
+    base_grid_demand = grid
+    stale = set(getattr(snapshot, "stale_fields", ()) or ())
+    battery_power = _number(getattr(snapshot, "battery_power_kw", None))
+    battery_age = _number(ages.get("battery_power_kw"))
+    grid_age = _number(ages.get("grid_import_kw"))
+    if (
+        battery_power is not None
+        and battery_age is not None
+        and grid_age is not None
+        and house_age is not None
+        and 0.0 <= battery_age <= 90.0
+        and 0.0 <= grid_age <= 90.0
+        and 0.0 <= house_age <= 90.0
+        and abs(battery_age - grid_age) <= 30.0
+        and abs(house_age - grid_age) <= 30.0
+        and not {"battery_power_kw", "grid_import_kw", "house_load_kw"} & stale
+    ):
+        positive_is_discharge = bool(
+            getattr(simulation_config, "battery_power_positive_is_discharge", True)
+        )
+        measured_battery_charge = max(
+            -battery_power if positive_is_discharge else battery_power, 0.0
+        )
+        base_grid_demand = max(grid - measured_battery_charge, 0.0)
+    # Use the larger of measured non-charge import and observed household/EV
+    # demand, then leave a further 0.5 kW for telemetry lag and losses.
+    site_headroom = max(
+        site_limit - max(base_grid_demand, house + ev) - 0.5, 0.0
+    )
     safe_target = min(
         target,
         max_charge,
