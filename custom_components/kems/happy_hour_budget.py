@@ -24,6 +24,9 @@ from .kems_core.control_write_authority import assess_happy_hour_charge_authorit
 
 _EPSILON = 1e-6
 _MAX_LEDGER_GAP = timedelta(minutes=10)
+# A 30-second raw value-change age is too tight for normal HA/Modbus scans.
+# The physical tracker already permits a 90-second directly measured interval.
+_HAPPY_HOUR_CORRELATED_POWER_MAX_AGE_SECONDS = 90.0
 
 
 def _number(value: Any) -> float | None:
@@ -391,13 +394,17 @@ def _bounded_happy_hour_charge_headroom(
         for field in ("battery_power_kw", "house_load_kw"):
             value = _number(getattr(snapshot, field, None))
             age = _number(ages.get(field))
-            if value is None or age is None or not 0.0 <= age <= 30.0 or field in stale:
+            if (
+                value is None or age is None
+                or not 0.0 <= age <= _HAPPY_HOUR_CORRELATED_POWER_MAX_AGE_SECONDS
+                or field in stale
+            ):
                 return None
         grid_fresh = any(
             field not in stale
             and _number(getattr(snapshot, field, None)) is not None
             and (age := _number(ages.get(field))) is not None
-            and 0.0 <= age <= 30.0
+            and 0.0 <= age <= _HAPPY_HOUR_CORRELATED_POWER_MAX_AGE_SECONDS
             for field in ("grid_import_kw", "grid_export_kw")
         )
         if not grid_fresh:
@@ -974,14 +981,42 @@ def verified_live_happy_hour_house_grid_hold(
     ages = getattr(snapshot, "source_age_seconds", None)
     if not isinstance(ages, dict) or {"house_load_kw", "solar_power_kw"} & stale:
         return False
-    # An unchanged zero grid-import entity is not by itself a stale meter.
-    # Require fresh physical house and PV signals on the same live device.
-    for key in ("house_load_kw", "solar_power_kw"):
-        age = _number(ages.get(key))
-        value = _number(getattr(snapshot, key, None))
-        if age is None or not 0.0 <= age <= 90.0 or value is None or value < 0.0:
-            return False
-    return True
+    # An unchanged zero PV power register may have last changed yesterday;
+    # this does not mean the integrated FoxESS telemetry has stopped. Require
+    # a fresh house power reading and a valid, non-stale PV value first.
+    house_age = _number(ages.get("house_load_kw"))
+    house_kw = _number(getattr(snapshot, "house_load_kw", None))
+    pv_age = _number(ages.get("solar_power_kw"))
+    pv_kw = _number(getattr(snapshot, "solar_power_kw", None))
+    if (
+        house_age is None
+        or not 0.0 <= house_age <= 90.0
+        or house_kw is None or house_kw < 0.0
+        or pv_age is None or pv_age < 0.0
+        or pv_kw is None or pv_kw < 0.0
+    ):
+        return False
+    if pv_age <= 90.0:
+        return True
+    # A silent PV register needs independent corroboration from the same
+    # FoxESS site: live battery and import/export direction power, not a
+    # fabricated new PV reading. Any stale/missing corroboration fails shut.
+    battery_age = _number(ages.get("battery_power_kw"))
+    battery_kw = _number(getattr(snapshot, "battery_power_kw", None))
+    if (
+        "battery_power_kw" in stale
+        or battery_age is None or not 0.0 <= battery_age <= 90.0
+        or battery_kw is None
+    ):
+        return False
+    return any(
+        field not in stale
+        and (age := _number(ages.get(field))) is not None
+        and 0.0 <= age <= 90.0
+        and (value := _number(getattr(snapshot, field, None))) is not None
+        and value >= 0.0
+        for field in ("grid_import_kw", "grid_export_kw")
+    )
 
 
 def verified_happy_hour_automation_active(
