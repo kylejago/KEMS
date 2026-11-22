@@ -116,3 +116,13 @@ def test_all_release_publisher_bash_run_blocks_parse() -> None:
                 f"{filename} step {step.get('name')} has invalid Bash syntax: "
                 f"{result.stderr}"
             )
+
+
+def test_real_ha_python314_runtime_requires_full_unit_suite() -> None:
+    """Syntax compilation alone cannot prove KEMS on installed HA Python 3.14."""
+    workflow = (ROOT / ".github" / "workflows" / "validate.yml").read_text()
+    assert "python-314-full-tests:" in workflow
+    assert 'python-version: "3.14"' in workflow
+    assert "Full KEMS unit tests on Python 3.14" in workflow
+    assert "run: python -m pytest" in workflow
+    assert workflow.count("run: python -m pytest") >= 2
