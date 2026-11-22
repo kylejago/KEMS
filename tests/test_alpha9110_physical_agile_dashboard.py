@@ -132,7 +132,7 @@ def test_live_card_uses_physical_action_and_soc_not_simulated_fields() -> None:
     assert "physical_live_slot_outlook" in card
     assert "physical.get('estimated_soc_percent')" in card
     assert "physical.get('action')" in card
-    assert "flow_estimated_soc_percent" not in card
+    # The live fallback is allowed only after the per-slot flow explicitly\n    # proves a verified physical battery-energy basis, not a digital twin.\n    assert "flow_estimated_soc_percent" in card\n    assert "physical_soc_from_flow" in card\n    assert "verified FoxESS physical lower bound" in card\n    assert "if not is_tomorrow and physical_soc_from_flow" in card\n    assert "simulated_soc_percent" not in card
     assert "rolling_action" not in card
     assert "unavailable" in card.lower()
 
