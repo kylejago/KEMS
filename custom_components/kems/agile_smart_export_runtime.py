@@ -90,9 +90,6 @@ install_deadline_integrity()
 from .agile_active_elapsed_soc_continuity import (  # noqa: E402,F401
     ActiveElapsedSocContinuityAgileSmartExportManager,
 )
-from .agile_routing_card_labels import (
-    install_alpha9250_routing_card_labels,
-)  # noqa: E402
 from .agile_flow_total_discharge_parity import (  # noqa: E402,F401
     TotalDischargeFlowParityAgileSmartExportManager,
 )
@@ -106,6 +103,9 @@ from .agile_observability_clarity import install_observability_clarity  # noqa: 
 from .agile_restart_soc_anchor import (  # noqa: E402
     RestartSocAnchorAgileSmartExportManager,
 )
+from .agile_routing_card_labels import (
+    install_alpha9250_routing_card_labels,
+)  # noqa: E402
 from .agile_safety_floor import (  # noqa: E402
     build_safety_floor_manager,
     install_agile_safety_floor,
