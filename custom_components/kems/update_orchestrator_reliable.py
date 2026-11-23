@@ -183,7 +183,9 @@ class ReliableKEMSUpdateOrchestrator(base.KEMSUpdateOrchestrator):
         try:
             bundle = base._validated_bundle(json.loads(manifest_bytes))
         except (ValueError, TypeError, json.JSONDecodeError) as error:
-            raise HomeAssistantError(f"Invalid public KEMS release bundle: {error}") from error
+            raise HomeAssistantError(
+                f"Invalid public KEMS release bundle: {error}"
+            ) from error
         target = base._component_target(bundle, "kems_core")
         if not target or not base._version_matches(tag, target):
             raise HomeAssistantError(
