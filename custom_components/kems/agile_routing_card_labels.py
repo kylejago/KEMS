@@ -19,27 +19,58 @@ _REPLACEMENTS = (
     ),
     (
         "| Grid import | {{ state_attr(e, 'current_grid_import_kw')",
-        "| Proposed grid import (before physical guard) | {{ state_attr(e, 'current_grid_import_kw')",
+        (
+            "| Proposed grid import (before physical guard) | "
+            "{{ state_attr(e, 'current_grid_import_kw')"
+        ),
     ),
     (
         "| Grid export | {{ state_attr(e, 'current_grid_export_kw')",
-        "| Proposed grid export (before physical guard) | {{ state_attr(e, 'current_grid_export_kw')",
+        (
+            "| Proposed grid export (before physical guard) | "
+            "{{ state_attr(e, 'current_grid_export_kw')"
+        ),
     ),
     (
         "| Battery → export | {{ state_attr(e, 'current_battery_export_kw')",
-        "| Proposed battery → export (before physical guard) | {{ state_attr(e, 'current_battery_export_kw')",
+        (
+            "| Proposed battery → export (before physical guard) | "
+            "{{ state_attr(e, 'current_battery_export_kw')"
+        ),
     ),
     (
         "          | Agile simulated SOC now |",
-        """          | Final KEMS battery export target (after physical guard) | {{ states('sensor.kems_desired_battery_export_power') }} kW |
-          | Grid export measured (FoxESS CT) | {{ states('sensor.kems_grid_export') }} kW |
-          | Physical SOC (FoxESS) | {{ states('sensor.kems_battery_state_of_charge') }}% |
-          | Guarded conditional SOC at cheap start | {{ state_attr('sensor.kems_agile_rolling_export_plan', 'forecast_path_reconciled_ending_soc_percent') if state_attr('sensor.kems_agile_rolling_export_plan', 'forecast_path_reconciled_ending_soc_percent') is not none else '—' }}% |
-          | Agile simulated SOC now |""",
+        (
+            "          | Final KEMS battery export target (after physical guard) | "
+            "{{ states('sensor.kems_desired_battery_export_power') }} kW |\n"
+            "          | Grid export measured (FoxESS CT) | "
+            "{{ states('sensor.kems_grid_export') }} kW |\n"
+            "          | Physical SOC (FoxESS) | "
+            "{{ states('sensor.kems_battery_state_of_charge') }}% |\n"
+            "          | Guarded conditional SOC at cheap start | "
+            "{{ state_attr('sensor.kems_agile_rolling_export_plan', "
+            "'forecast_path_reconciled_ending_soc_percent') "
+            "if state_attr('sensor.kems_agile_rolling_export_plan', "
+            "'forecast_path_reconciled_ending_soc_percent') is not none "
+            "else '—' }}% |\n"
+            "          | Agile simulated SOC now |"
+        ),
     ),
     (
-        "**Power basis:** one current KEMS coordinator routing snapshot. The proposal digital twin supplies current solar/routing context and the exact Agile rolling battery candidate is substituted before grid/export totals are shown.",
-        "**Power basis:** one current KEMS coordinator routing snapshot; proposals are before the physical guard, final KEMS targets are post-guard, and actual grid export is FoxESS CT-measured. The values can differ during discharge ramps; measured export is not supplier settlement. Guarded SOC is conditional on predicted house demand, not a guaranteed 10% landing.",
+        (
+            "**Power basis:** one current KEMS coordinator routing snapshot. "
+            "The proposal digital twin supplies current solar/routing context "
+            "and the exact Agile rolling battery candidate is substituted "
+            "before grid/export totals are shown."
+        ),
+        (
+            "**Power basis:** one current KEMS coordinator routing snapshot; "
+            "proposals are before the physical guard, final KEMS targets "
+            "are post-guard, and actual grid export is FoxESS CT-measured. "
+            "The values can differ during discharge ramps; measured export "
+            "is not supplier settlement. Guarded SOC is conditional on "
+            "predicted house demand, not a guaranteed 10% landing."
+        ),
     ),
 )
 
