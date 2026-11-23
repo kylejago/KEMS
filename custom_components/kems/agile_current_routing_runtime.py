@@ -31,7 +31,7 @@ _HOUSE_SENSOR = "sensor.kems_house_load"
 _EPSILON = 1e-6
 
 
-_CURRENT_ROUTING_CARD = r"""        title: Current Agile Smart Export power routing
+_CURRENT_ROUTING_CARD = r"""        title: Current Agile routing — proposal, permitted and measured
         content: |
           {% set e = 'sensor.kems_agile_live_scenario' %}
           | Flow | Current power |
@@ -39,17 +39,21 @@ _CURRENT_ROUTING_CARD = r"""        title: Current Agile Smart Export power rout
           | House demand (live) | {{ states('sensor.kems_house_load') }} kW |
           | Digital-twin house demand | {{ state_attr(e, 'simulated_house_load_kw') if state_attr(e, 'simulated_house_load_kw') is not none else '—' }} kW |
           | Solar generation | {{ state_attr(e, 'current_solar_power_kw') if state_attr(e, 'current_solar_power_kw') is not none else '—' }} kW |
-          | Grid import | {{ state_attr(e, 'current_grid_import_kw') if state_attr(e, 'current_grid_import_kw') is not none else '—' }} kW |
-          | Grid export | {{ state_attr(e, 'current_grid_export_kw') if state_attr(e, 'current_grid_export_kw') is not none else '—' }} kW |
+          | Proposed grid import (before physical guard) | {{ state_attr(e, 'current_grid_import_kw') if state_attr(e, 'current_grid_import_kw') is not none else '—' }} kW |
+          | Proposed grid export (before physical guard) | {{ state_attr(e, 'current_grid_export_kw') if state_attr(e, 'current_grid_export_kw') is not none else '—' }} kW |
           | Solar → home | {{ state_attr(e, 'current_solar_to_home_kw') if state_attr(e, 'current_solar_to_home_kw') is not none else '—' }} kW |
           | Solar → battery | {{ state_attr(e, 'current_solar_to_battery_kw') if state_attr(e, 'current_solar_to_battery_kw') is not none else '—' }} kW |
           | Solar → export | {{ state_attr(e, 'current_solar_export_kw') if state_attr(e, 'current_solar_export_kw') is not none else '—' }} kW |
           | Grid → battery | {{ state_attr(e, 'current_grid_to_battery_kw') if state_attr(e, 'current_grid_to_battery_kw') is not none else '—' }} kW |
           | Battery → home | {{ state_attr(e, 'current_battery_to_home_kw') if state_attr(e, 'current_battery_to_home_kw') is not none else '—' }} kW |
-          | Battery → export | {{ state_attr(e, 'current_battery_export_kw') if state_attr(e, 'current_battery_export_kw') is not none else '—' }} kW |
+          | Proposed battery → export (before physical guard) | {{ state_attr(e, 'current_battery_export_kw') if state_attr(e, 'current_battery_export_kw') is not none else '—' }} kW |
+          | Final KEMS battery export target (after physical guard) | {{ states('sensor.kems_desired_battery_export_power') }} kW |
+          | Grid export measured (FoxESS CT) | {{ states('sensor.kems_grid_export') }} kW |
+          | Physical SOC (FoxESS) | {{ states('sensor.kems_battery_state_of_charge') }}% |
+          | Guarded conditional SOC at cheap start | {{ state_attr('sensor.kems_agile_rolling_export_plan', 'forecast_path_reconciled_ending_soc_percent') if state_attr('sensor.kems_agile_rolling_export_plan', 'forecast_path_reconciled_ending_soc_percent') is not none else '—' }}% |
           | Agile simulated SOC now | {{ states('sensor.kems_agile_simulated_battery_soc_now') }}% |
 
-          **Power basis:** one current KEMS coordinator routing snapshot. The proposal digital twin supplies current solar/routing context and the exact Agile rolling battery candidate is substituted before grid/export totals are shown.  
+          **Power basis:** proposed power comes from the current coordinator digital twin and rolling candidate **before the independent FoxESS physical guard**. The final KEMS target is post-guard; measured grid export is a separate CT observation and can differ during ramps. Never treat proposed power as a hardware instruction or settled export. Guarded SOC is conditional on forecast house usage, not a guaranteed 10% arrival.  
           **Current decision:** {{ state_attr(e, 'routing_action') or '—' }}  
           **Current Agile rate:** {{ state_attr(e, 'current_agile_rate_pence') if state_attr(e, 'current_agile_rate_pence') is not none else states('sensor.kems_agile_export_rate_now') }} p/kWh  
           **Routing basis:** {{ state_attr(e, 'routing_basis') or '—' }}  
