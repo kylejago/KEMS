@@ -25,7 +25,11 @@ _ALPHA_TAG = re.compile(
 )
 _ALLOWED_ASSETS = frozenset({"kems-bundle.json", "kems-bundle.json.sha256"})
 _ALLOWED_HOSTS = frozenset(
-    {"github.com", "release-assets.githubusercontent.com", "objects.githubusercontent.com"}
+    {
+        "github.com",
+        "release-assets.githubusercontent.com",
+        "objects.githubusercontent.com",
+    }
 )
 
 
@@ -61,7 +65,7 @@ def select_public_alpha_tag(atom_bytes: bytes) -> str | None:
             root_path = "/kylejago/KEMS/releases/tag/"
             if not parsed.path.startswith(root_path):
                 continue
-            tag = parsed.path[len(root_path):]
+            tag = parsed.path[len(root_path) :]
             match = _ALPHA_TAG.fullmatch(tag)
             if match is None:
                 continue
@@ -91,7 +95,9 @@ async def fetch_public_alpha_release_pair(
     headers = {"User-Agent": user_agent, "Accept": "application/atom+xml"}
     async with session.get(_ATOM_URL, headers=headers, timeout=20) as response:
         if response.status != 200:
-            raise ValueError(f"KEMS public release feed returned HTTP {response.status}")
+            raise ValueError(
+                f"KEMS public release feed returned HTTP {response.status}"
+            )
         atom_bytes = await response.content.read(_ATOM_LIMIT + 1)
     tag = select_public_alpha_tag(atom_bytes)
     if tag is None:
