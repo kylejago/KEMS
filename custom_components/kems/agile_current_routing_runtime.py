@@ -53,7 +53,7 @@ _CURRENT_ROUTING_CARD = r"""        title: Current Agile routing — proposal, p
           | Guarded conditional SOC at cheap start | {{ state_attr('sensor.kems_agile_rolling_export_plan', 'forecast_path_reconciled_ending_soc_percent') if state_attr('sensor.kems_agile_rolling_export_plan', 'forecast_path_reconciled_ending_soc_percent') is not none else '—' }}% |
           | Agile simulated SOC now | {{ states('sensor.kems_agile_simulated_battery_soc_now') }}% |
 
-          **Power basis:** proposed power comes from the current coordinator digital twin and rolling candidate **before the independent FoxESS physical guard**. The final KEMS target is post-guard; measured grid export is a separate CT observation and can differ during ramps. Never treat proposed power as a hardware instruction or settled export. Guarded SOC is conditional on forecast house usage, not a guaranteed 10% arrival.  
+          **Power basis:** one current KEMS coordinator routing snapshot; proposed power comes from the digital twin and rolling candidate **before the independent FoxESS physical guard**. The final KEMS target is post-guard; measured grid export is a separate CT observation and can differ during ramps. Never treat proposed power as a hardware instruction or settled export. Guarded SOC is conditional on forecast house usage, not a guaranteed 10% arrival.  
           **Current decision:** {{ state_attr(e, 'routing_action') or '—' }}  
           **Current Agile rate:** {{ state_attr(e, 'current_agile_rate_pence') if state_attr(e, 'current_agile_rate_pence') is not none else states('sensor.kems_agile_export_rate_now') }} p/kWh  
           **Routing basis:** {{ state_attr(e, 'routing_basis') or '—' }}  
