@@ -92,6 +92,42 @@ class ConvergentKEMSUpdateOrchestrator(reliable.ReliableKEMSUpdateOrchestrator):
     async def async_verify_pending(self, *, save: bool = True) -> None:
         """Converge the dashboard only after the pending target core is active."""
         if self.pending and self.latest_bundle is None:
+            # A manual HACS installation can activate the *exact* pending
+            # target before the REST release index can be fetched again.
+            # Reconcile only independently verified local core+dashboard
+            # state; do not claim that external bundle components installed.
+            target = str(self.pending.get("target") or "").strip()
+            running = base._installed_integration_version()
+            disk = reliable._read_integration_version_from_disk()
+            if (
+                target
+                and base._version_matches(target, running)
+                and base._version_matches(target, disk)
+                and self._dashboard_current() is True
+            ):
+                previous = self.pending
+                self.pending = None
+                self.maintenance = {"status": "none"}
+                reconciled = {
+                    "bundle": previous.get("bundle"),
+                    "target": target,
+                    "completed_at": base.dt_util.now().isoformat(),
+                    "result": "already_active_local_core_and_dashboard",
+                    "external_components_verified": False,
+                    "reason": (
+                        "Local running core, files and managed dashboard match "
+                        "the scheduled target; no installation was attempted."
+                    ),
+                }
+                self.last_result = reconciled
+                self.history.append(reconciled)
+                self.history = self.history[-20:]
+                # Preserve any metadata lookup error: local reconciliation
+                # is not proof that the GitHub update source recovered.
+                if save:
+                    await self._async_save()
+                self._write_legacy_states()
+                return
             if save:
                 await self._async_save()
             self._write_legacy_states()

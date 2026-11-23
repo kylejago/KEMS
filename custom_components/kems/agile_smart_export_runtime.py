@@ -103,6 +103,9 @@ from .agile_observability_clarity import install_observability_clarity  # noqa: 
 from .agile_restart_soc_anchor import (  # noqa: E402
     RestartSocAnchorAgileSmartExportManager,
 )
+from .agile_routing_card_labels import (  # noqa: E402
+    install_alpha9250_routing_card_labels,
+)
 from .agile_safety_floor import (  # noqa: E402
     build_safety_floor_manager,
     install_agile_safety_floor,
@@ -112,6 +115,7 @@ from .agile_smart_export_runtime_base import *  # noqa: E402,F403
 install_intelligent_dispatch_replan()
 install_agile_safety_floor()
 install_observability_clarity()
+install_alpha9250_routing_card_labels()
 
 EfficientAgileSmartExportManager = build_safety_floor_manager(
     RestartSocAnchorAgileSmartExportManager
