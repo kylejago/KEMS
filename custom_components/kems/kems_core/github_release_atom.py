@@ -13,7 +13,6 @@ import re
 import xml.etree.ElementTree as ET
 from collections.abc import Mapping
 from urllib.parse import quote, urlsplit
-from typing import Any
 
 from .github_release_assets import ASSET_LIMIT_BYTES, download_release_asset_pair
 
