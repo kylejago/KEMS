@@ -10,7 +10,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
-from aiohttp import ClientError
+from aiohttp import ClientError, ClientSession
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.exceptions import HomeAssistantError
@@ -23,6 +23,7 @@ from .kems_core.github_release_assets import (
     download_release_asset,
     download_release_asset_pair,
 )
+from .kems_core.github_release_atom import fetch_public_alpha_release_pair
 
 _UPDATE_DASHBOARD_MARKER = (
     "          **Automatic updates are opt-in.** Turn them on below when you are happy "
@@ -153,6 +154,51 @@ class ReliableKEMSUpdateOrchestrator(base.KEMSUpdateOrchestrator):
             self._window_edit_guard_until = None
         await super()._maybe_run_pending()
 
+    async def _async_public_alpha_bundle(self) -> dict[str, Any]:
+        """Recover from REST 403/429 without lowering release integrity.
+
+        Only published canonical KEMS alpha tags are accepted; both public
+        release assets are downloaded from a dedicated large-header session
+        and must pass the same SHA-256 and exact-version checks as REST assets.
+        This fallback never installs from a branch, an unverified HTML page,
+        or an unknown third-party release location.
+        """
+        async with ClientSession(max_field_size=65536, max_line_size=65536) as session:
+            try:
+                tag, manifest_bytes, checksum_bytes = (
+                    await fetch_public_alpha_release_pair(
+                        session, user_agent="KEMS-Home-Assistant-Update-Orchestrator"
+                    )
+                )
+            except (ValueError, ClientError, OSError, TimeoutError) as error:
+                raise HomeAssistantError(
+                    f"GitHub REST index unavailable; verified public release "
+                    f"fallback failed: {error}"
+                ) from error
+
+        expected = checksum_bytes.decode("utf-8", errors="replace").strip().split()
+        observed = hashlib.sha256(manifest_bytes).hexdigest()
+        if not expected or expected[0].lower() != observed:
+            raise HomeAssistantError("KEMS public release bundle SHA-256 mismatch")
+        try:
+            bundle = base._validated_bundle(json.loads(manifest_bytes))
+        except (ValueError, TypeError, json.JSONDecodeError) as error:
+            raise HomeAssistantError(f"Invalid public KEMS release bundle: {error}") from error
+        target = base._component_target(bundle, "kems_core")
+        if not target or not base._version_matches(tag, target):
+            raise HomeAssistantError(
+                f"KEMS public release tag {tag} disagrees with bundle core {target}"
+            )
+        bundle["release"] = {
+            "tag": tag,
+            "name": f"KEMS {tag}",
+            "published_at": None,
+            "prerelease": True,
+            "sha256": observed,
+            "transport": "public_atom_published_asset_pair_sha256_verified",
+        }
+        return bundle
+
     async def _async_fetch_bundle(self) -> dict[str, Any] | None:
         """Fetch the highest complete canonical KEMS bundle release."""
         session = async_get_clientsession(self.hass)
@@ -170,6 +216,10 @@ class ReliableKEMSUpdateOrchestrator(base.KEMSUpdateOrchestrator):
                     headers=headers,
                     timeout=15,
                 ) as response:
+                    if response.status in (403, 429) and self.policy.channel == "alpha":
+                        # Shared public IPs can exhaust GitHub's unauthenticated
+                        # REST quota. This does not justify trusting branch files.
+                        return await self._async_public_alpha_bundle()
                     if response.status >= 400:
                         raise HomeAssistantError(
                             f"GitHub bundle lookup returned HTTP {response.status}"
