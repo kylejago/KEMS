@@ -12,6 +12,7 @@ from __future__ import annotations
 import re
 import xml.etree.ElementTree as ET
 from collections.abc import Mapping
+from typing import Any
 from urllib.parse import quote, urlsplit
 
 from .github_release_assets import ASSET_LIMIT_BYTES, download_release_asset_pair

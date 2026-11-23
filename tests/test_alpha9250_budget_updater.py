@@ -9,7 +9,6 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
-
 from kems_core.github_release_atom import (
     fetch_public_alpha_release_pair,
     public_release_asset_url,
