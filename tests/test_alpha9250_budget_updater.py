@@ -25,9 +25,7 @@ BUDGET = KEMS / "agile_physical_export_budget.py"
 
 
 def _budget_module():
-    spec = importlib.util.spec_from_file_location(
-        "alpha9250_physical_budget", BUDGET
-    )
+    spec = importlib.util.spec_from_file_location("alpha9250_physical_budget", BUDGET)
     assert spec and spec.loader
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
@@ -65,9 +63,9 @@ def test_conditional_physical_projection_does_not_claim_ten_percent_arrival():
     )
     assert projection["status"] == "guarded_physical_budget_projection"
     assert projection["theoretical_model_ending_soc_percent"] == 10.0
-    assert projection["theoretical_export_above_guarded_budget_ac_kwh"] == pytest.approx(
-        3.625
-    )
+    assert projection[
+        "theoretical_export_above_guarded_budget_ac_kwh"
+    ] == pytest.approx(3.625)
     assert 17.0 < projection["guarded_conditional_ending_soc_percent"] < 19.0
     assert projection["arrival_guaranteed"] is False
     assert projection["reporting_only"] is True
@@ -86,9 +84,7 @@ def test_physical_projection_requires_verified_same_scan_budget_and_zero_solar()
             plan["forecast_path_scheduler"]["forecast_solar_stored_kwh"] = 1.0
         else:
             plan["physical_house_budget_evidence"]["exportable_stored_kwh"] = 0.0
-        result = module.reconcile_guarded_arrival_soc(
-            plan, final_export_ac_kwh=0.638
-        )
+        result = module.reconcile_guarded_arrival_soc(plan, final_export_ac_kwh=0.638)
         assert result["status"] == "unavailable"
         assert result["guarded_conditional_ending_soc_percent"] is None
 
@@ -126,36 +122,38 @@ def _atom(*tags: str) -> bytes:
         f'releases/tag/{tag}"/></entry>'
         for tag in tags
     )
-    return (
-        '<feed xmlns="http://www.w3.org/2005/Atom">'
-        + body
-        + "</feed>"
-    ).encode()
+    return ('<feed xmlns="http://www.w3.org/2005/Atom">' + body + "</feed>").encode()
 
 
 def test_atom_feed_selects_highest_canonical_published_alpha_tag():
-    assert select_public_alpha_tag(
-        _atom(
-            "0.9.0-alpha9.248",
-            "v0.9.0-alpha9.300",
-            "0.9.0-alpha9.249",
-            "0.9.0-alpha9.250",
+    assert (
+        select_public_alpha_tag(
+            _atom(
+                "0.9.0-alpha9.248",
+                "v0.9.0-alpha9.300",
+                "0.9.0-alpha9.249",
+                "0.9.0-alpha9.250",
+            )
         )
-    ) == "0.9.0-alpha9.250"
-    assert select_public_alpha_tag(
-        b'<feed xmlns="http://www.w3.org/2005/Atom">'
-        b'<entry><link href="https://evil.example/kylejago/KEMS/releases/tag/'
-        b'0.9.0-alpha9.999"/></entry></feed>'
-    ) is None
+        == "0.9.0-alpha9.250"
+    )
+    assert (
+        select_public_alpha_tag(
+            b'<feed xmlns="http://www.w3.org/2005/Atom">'
+            b'<entry><link href="https://evil.example/kylejago/KEMS/releases/tag/'
+            b'0.9.0-alpha9.999"/></entry></feed>'
+        )
+        is None
+    )
     assert select_public_alpha_tag(_atom("0.9.0-alpha9.249%2Ffake")) is None
     with pytest.raises(ValueError, match="unexpected root"):
         select_public_alpha_tag(b"<html/>")
 
 
 def test_atom_asset_urls_are_fixed_repository_and_bounded_files():
-    assert public_release_asset_url(
-        "0.9.0-alpha9.250", "kems-bundle.json"
-    ).startswith("https://github.com/kylejago/KEMS/releases/download/")
+    assert public_release_asset_url("0.9.0-alpha9.250", "kems-bundle.json").startswith(
+        "https://github.com/kylejago/KEMS/releases/download/"
+    )
     for tag, name in (
         ("0.9.0-alpha9.250/../../other", "kems-bundle.json"),
         ("v0.9.0-alpha9.250", "kems-bundle.json"),
@@ -166,7 +164,9 @@ def test_atom_asset_urls_are_fixed_repository_and_bounded_files():
 
 
 class _PublicResponse:
-    def __init__(self, body: bytes, url: str, *, status=200, media="application/octet-stream"):
+    def __init__(
+        self, body: bytes, url: str, *, status=200, media="application/octet-stream"
+    ):
         self.content = SimpleNamespace(read=self._read)
         self.body = body
         self.url = url
@@ -214,12 +214,12 @@ def test_public_fallback_fetches_only_published_release_pair():
     manifest = b'{"bundle":"0.9.0-alpha9.250"}'
     digest = hashlib.sha256(manifest).hexdigest().encode()
     session = _PublicSession(tag, manifest, digest)
-    got = asyncio.run(
-        fetch_public_alpha_release_pair(session, user_agent="KEMS-test")
-    )
+    got = asyncio.run(fetch_public_alpha_release_pair(session, user_agent="KEMS-test"))
     assert got == (tag, manifest, digest)
     assert len(session.calls) == 3
-    assert all(url.startswith("https://github.com/kylejago/KEMS/") for url in session.calls)
+    assert all(
+        url.startswith("https://github.com/kylejago/KEMS/") for url in session.calls
+    )
 
 
 def test_public_fallback_rejects_login_or_html_instead_of_bundle():
@@ -227,9 +227,7 @@ def test_public_fallback_rejects_login_or_html_instead_of_bundle():
         "0.9.0-alpha9.250", b"<html>login</html>", b"unused", html=True
     )
     with pytest.raises(ValueError, match="HTML"):
-        asyncio.run(
-            fetch_public_alpha_release_pair(session, user_agent="KEMS-test")
-        )
+        asyncio.run(fetch_public_alpha_release_pair(session, user_agent="KEMS-test"))
 
 
 def test_active_manual_install_requires_running_files_and_dashboard_match():
@@ -248,6 +246,6 @@ def test_fallback_remains_alpha_only_and_sha256_pinned():
     assert 'response.status in (403, 429) and self.policy.channel == "alpha"' in source
     assert "fetch_public_alpha_release_pair" in source
     assert "max_field_size=65536" in source
-    assert 'hashlib.sha256(manifest_bytes).hexdigest()' in source
-    assert 'base._version_matches(tag, target)' in source
-    assert 'download_release_asset_pair(' in source
+    assert "hashlib.sha256(manifest_bytes).hexdigest()" in source
+    assert "base._version_matches(tag, target)" in source
+    assert "download_release_asset_pair(" in source
