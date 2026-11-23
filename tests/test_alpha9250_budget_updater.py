@@ -113,7 +113,9 @@ def test_current_routing_dashboard_distinguishes_proposal_guard_and_ct():
     assert "sensor.kems_desired_battery_export_power" in source
     assert "sensor.kems_grid_export" in source
     assert "sensor.kems_agile_rolling_export_plan" in source
-    assert "install_alpha9250_routing_card_labels()" in (KEMS / "agile_smart_export_runtime.py").read_text(encoding="utf-8")
+    assert "install_alpha9250_routing_card_labels()" in (
+        KEMS / "agile_smart_export_runtime.py"
+    ).read_text(encoding="utf-8")
     assert "providers.foxess" not in source
 
 
