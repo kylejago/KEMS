@@ -188,7 +188,9 @@ class ReliableKEMSUpdateOrchestrator(base.KEMSUpdateOrchestrator):
             ) from error
         target = base._component_target(bundle, "kems_core")
         if not base._version_matches(tag, bundle.get("bundle")):
-            raise HomeAssistantError("KEMS public release tag disagrees with bundle version")
+            raise HomeAssistantError(
+                "KEMS public release tag disagrees with bundle version"
+            )
         if not target or not base._version_matches(tag, target):
             raise HomeAssistantError(
                 f"KEMS public release tag {tag} disagrees with bundle core {target}"
