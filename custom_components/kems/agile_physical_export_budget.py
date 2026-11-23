@@ -106,9 +106,7 @@ def reconcile_guarded_arrival_soc(
             "guarded_conditional_ending_soc_percent": round(projected, 3),
             "physical_planning_soc_percent": round(soc, 3),
             "forecast_house_battery_ac_kwh": round(house_ac, 3),
-            "theoretical_model_battery_export_ac_kwh": round(
-                theoretical_export_ac, 3
-            ),
+            "theoretical_model_battery_export_ac_kwh": round(theoretical_export_ac, 3),
             "guarded_battery_export_ac_kwh": round(guarded_ac, 3),
             "theoretical_export_above_guarded_budget_ac_kwh": round(
                 max(theoretical_export_ac - guarded_ac, 0.0), 3
@@ -124,6 +122,7 @@ def reconcile_guarded_arrival_soc(
         }
     )
     return result
+
 
 def cap_physical_ac_export(
     state: dict[str, Any], plan: dict[str, Any], *, now: datetime
@@ -247,14 +246,12 @@ def cap_physical_ac_export(
             _num(house_total) + total, 3
         )
     # This must be the last projection: all physical AC export cuts are final.
-    projection = reconcile_guarded_arrival_soc(
-        plan, final_export_ac_kwh=total
-    )
+    projection = reconcile_guarded_arrival_soc(plan, final_export_ac_kwh=total)
     plan["forecast_path_budget_reconciliation"] = projection
-    plan["forecast_path_reconciled_ending_soc_percent"] = (
-        projection.get("guarded_conditional_ending_soc_percent")
+    plan["forecast_path_reconciled_ending_soc_percent"] = projection.get(
+        "guarded_conditional_ending_soc_percent"
     )
-    plan["forecast_path_theoretical_ending_soc_percent"] = (
-        projection.get("theoretical_model_ending_soc_percent")
+    plan["forecast_path_theoretical_ending_soc_percent"] = projection.get(
+        "theoretical_model_ending_soc_percent"
     )
     return plan
