@@ -20,7 +20,7 @@ ROOT = Path(__file__).resolve().parents[1]
 KEMS = ROOT / "custom_components/kems"
 BRANCH_RELIABLE = KEMS / "update_orchestrator_reliable.py"
 BRANCH_CONVERGENT = KEMS / "update_orchestrator_convergent.py"
-ROUTING = KEMS / "agile_current_routing_runtime.py"
+ROUTING = KEMS / "agile_alpha9250_routing_card.py"
 BUDGET = KEMS / "agile_physical_export_budget.py"
 
 
@@ -114,6 +114,8 @@ def test_current_routing_dashboard_distinguishes_proposal_guard_and_ct():
     assert "sensor.kems_desired_battery_export_power" in source
     assert "sensor.kems_grid_export" in source
     assert "sensor.kems_agile_rolling_export_plan" in source
+    assert "install_alpha9250_routing_card_labels()" in (KEMS / "agile_smart_export_runtime.py").read_text(encoding="utf-8")
+    assert "providers.foxess" not in source
 
 
 def _atom(*tags: str) -> bytes:
