@@ -163,5 +163,7 @@ def test_panel_health_is_persistent_and_diagnostic_visible() -> None:
     assert "last_ota_success" in panel
     assert "esphome_job_id" in panel
     assert '"commissioning": commissioning,' in diagnostics
-    assert "commissioning = build_commissioning_snapshot(hass, coordinator)" in diagnostics
+    assert (
+        "commissioning = build_commissioning_snapshot(hass, coordinator)" in diagnostics
+    )
     assert '"panel_health": panel_health_snapshot' in diagnostics
