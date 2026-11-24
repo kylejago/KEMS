@@ -662,8 +662,7 @@ def agile_current_export_execution_observation(
     # A new SOC anchor is as valid as continuity when accepted by the guard.
     physical_same_scan = bool(
         snapshot_at is not None
-        and physical_guard.get("physical_bound_snapshot_at")
-        == snapshot_at.isoformat()
+        and physical_guard.get("physical_bound_snapshot_at") == snapshot_at.isoformat()
         and physical_soc is not None
         and _finite(physical_guard.get("physical_soc_percent")) == physical_soc
         and bound is not None
@@ -699,9 +698,7 @@ def agile_current_export_execution_observation(
             "measured_grid_import_kw": imported,
             "legacy_routing_schema_version": routing.get("version"),
             "physical_soc_percent": physical_soc,
-            "physical_lower_bound_soc_percent": (
-                bound if physical_same_scan else None
-            ),
+            "physical_lower_bound_soc_percent": (bound if physical_same_scan else None),
             "physical_lower_bound_same_scan": physical_same_scan,
             "physical_lower_bound_ledger_accepted": ledger_accepted,
             "physical_lower_bound_basis": (

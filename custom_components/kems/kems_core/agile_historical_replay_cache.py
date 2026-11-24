@@ -204,9 +204,7 @@ class HistoricalReplayCache:
             self._fallback_result_copies += 1
         return deepcopy(result)
 
-    def _isolated_summary(
-        self, day: str, result: dict[str, Any]
-    ) -> dict[str, Any]:
+    def _isolated_summary(self, day: str, result: dict[str, Any]) -> dict[str, Any]:
         """Copy only the exact settled-day fields consumed by aggregation."""
         summary = {key: value for key, value in result.items() if key != "slot_plan"}
         try:
@@ -218,7 +216,14 @@ class HistoricalReplayCache:
             if isinstance(isolated, dict):
                 self._summary_hits += 1
                 return isolated
-        except (PicklingError, TypeError, ValueError, EOFError, ImportError, AttributeError):
+        except (
+            PicklingError,
+            TypeError,
+            ValueError,
+            EOFError,
+            ImportError,
+            AttributeError,
+        ):
             self._encoded_summaries.pop(day, None)
         return deepcopy(summary)
 
@@ -452,5 +457,7 @@ class HistoricalReplayCache:
             self._encoded_results.pop(evicted_day, None)
             self._encoded_summaries.pop(evicted_day, None)
         if summary_only:
-            return {name: value for name, value in result.items() if name != "slot_plan"}
+            return {
+                name: value for name, value in result.items() if name != "slot_plan"
+            }
         return result

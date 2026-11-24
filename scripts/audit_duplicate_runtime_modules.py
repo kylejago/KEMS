@@ -38,15 +38,9 @@ def duplicate_reference_inventory(
     root: Path, groups: list[dict[str, object]]
 ) -> list[dict[str, object]]:
     """Find literal module-name references; absence never proves unused."""
-    candidates = {
-        Path(path).stem
-        for group in groups
-        for path in group["paths"]
-    }
+    candidates = {Path(path).stem for group in groups for path in group["paths"]}
     references: dict[str, list[str]] = {name: [] for name in candidates}
-    patterns = {
-        name: re.compile(rf"\b{re.escape(name)}\b") for name in candidates
-    }
+    patterns = {name: re.compile(rf"\b{re.escape(name)}\b") for name in candidates}
     for directory in ("custom_components", "tests", "scripts"):
         for path in sorted((root / directory).rglob("*.py")):
             if path.is_symlink():
