@@ -175,9 +175,15 @@ def allocate_physical_export_slots(
             )
             if hours <= _EPSILON:
                 continue
-            solar_to_home_kw = min(house, max(solar_kw, 0.0))
+            profile_house = _number(segment.get("house_kw"))
+            segment_house = (
+                profile_house
+                if profile_house is not None and profile_house >= 0
+                else house
+            )
+            solar_to_home_kw = min(segment_house, max(solar_kw, 0.0))
             house_battery_kw = min(
-                max(house - solar_to_home_kw, 0.0),
+                max(segment_house - solar_to_home_kw, 0.0),
                 max(battery_kw, 0.0),
             )
             export_kw = min(

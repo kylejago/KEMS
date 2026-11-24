@@ -324,6 +324,6 @@ def test_dashboard_and_diagnostics_never_confuse_twin_with_physical_flow() -> No
 def test_release_identity_and_unchanged_hardware_versions() -> None:
     manifest = json.loads((KEMS / "manifest.json").read_text())
     bundle = json.loads((ROOT / "release" / "kems-bundle.template.json").read_text())
-    assert manifest["version"] == "0.9.0-alpha9.250"
-    assert bundle["maintenance"]["reason"].startswith("Alpha9.250:")
+    assert manifest["version"] == "0.9.0-alpha9.251"
+    assert bundle["maintenance"]["reason"].startswith("Alpha9.251:")
     assert bundle["components"]["panel"]["version"] == "0.9.0-alpha9-panel.4"

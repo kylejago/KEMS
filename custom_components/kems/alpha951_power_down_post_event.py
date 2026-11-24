@@ -87,6 +87,19 @@ def _result_dict(result: PowerDownResult) -> dict[str, Any]:
         )
     payload["reward_evidence_status"] = status
     payload["bonus_evidence_available"] = result.bonus_pence is not None
+    payload["matched_net_baseline_evidence"] = bool(
+        result.reward_samples_observed > 0
+        and status == "modelled_reward_inputs_observed"
+    )
+    payload["bonus_value_basis"] = (
+        "unvalued"
+        if result.bonus_pence is None
+        else (
+            "modelled_with_observed_net_baseline"
+            if payload["matched_net_baseline_evidence"]
+            else "provisional_modelled_estimate_without_matched_net_baseline"
+        )
+    )
     payload["agile_export_income_already_counted"] = True
     duration = 0.0
     if result.session_start is not None and result.session_end is not None:
@@ -126,7 +139,15 @@ def _bonus_evidence_status(results: list[PowerDownResult]) -> str:
     known = sum(event.bonus_pence is not None for event in results)
     if not known:
         return "unvalued"
-    return "complete" if known == len(results) else "partial"
+    if known != len(results):
+        return "partial"
+    if any(
+        event.reward_evidence_status
+        in {"octopus_net_baseline_unavailable", "octopus_bonus_rate_unavailable"}
+        for event in results
+    ):
+        return "provisional_estimates"
+    return "complete"
 
 
 def _authoritative_today_bonus(simulation: SimulationState) -> float | None:

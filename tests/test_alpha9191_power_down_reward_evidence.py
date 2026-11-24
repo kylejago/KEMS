@@ -136,3 +136,17 @@ def test_release_changes_do_not_add_inverter_or_octopus_write_authority() -> Non
     assert "foxess_modbus" not in source
     assert "confirmed_supplier_credit_today_pence" in source
     assert "bonus_evidence_available_today" in source
+
+
+def test_numeric_estimate_without_matched_baseline_stays_provisional() -> None:
+    event = completed_event(bonus=15.37, status="octopus_net_baseline_unavailable")
+    shown = reporting._result_dict(event)
+    assert shown["estimated_bonus_pence"] == 15.37
+    assert shown["matched_net_baseline_evidence"] is False
+    assert (
+        shown["bonus_value_basis"]
+        == "provisional_modelled_estimate_without_matched_net_baseline"
+    )
+    assert reporting._bonus_evidence_status([event]) == "provisional_estimates"
+    assert reporting._known_bonus_total([event]) == 15.37
+    assert not shown["supplier_settled"]

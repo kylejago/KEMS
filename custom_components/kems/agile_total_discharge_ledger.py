@@ -32,6 +32,7 @@ from typing import Any
 
 from . import agile_deadline_guard, agile_rolling_planning
 from . import agile_smart_export as agile
+from .agile_physical_planning import apply_learned_house_profile
 from .kems_core import SimulationConfig
 from .kems_core.agile_live_reserve import total_discharge_deadline_goal_soc_percent
 from .kems_core.discharge_slot_ledger import (
@@ -281,6 +282,7 @@ def _apply_total_discharge_ledger(
         deadline=deadline,
         config=config,
     )
+    segments = apply_learned_house_profile(self, segments, plan, now=now)
     planning_house_kw = _planning_house_kw(self, plan)
     safety_headroom = (
         min(

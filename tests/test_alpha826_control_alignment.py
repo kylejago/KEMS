@@ -242,3 +242,59 @@ def test_coordinator_aligns_after_agile_update_before_shadow_validation() -> Non
         "commands_permitted=False"
         in (ROOT / "custom_components/kems/agile_control_alignment.py").read_text()
     )
+
+
+def test_power_down_shadow_uses_event_route_without_replacing_control() -> None:
+    module = _alignment_module()
+    original = replace(_base_simulation(), saving_session_active=True)
+    state = _state(routed_house=2.0, routed_export=4.0)
+    state["current_routing_snapshot"].update(
+        {
+            "dispatch_mode": "power_down_session",
+            "solar_power_kw": 0.0,
+            "simulated_house_load_kw": 2.0,
+            "solar_to_home_kw": 0.0,
+            "solar_export_kw": 0.0,
+            "grid_export_kw": 4.0,
+            "normalised_kh7_ac_output_kw": 6.0,
+        }
+    )
+    control_view, shadow_view, context = module.aligned_agile_control_views(
+        original, state
+    )
+    assert control_view is original
+    assert context["active"] is False
+    assert context["hardware_writes"] == "blocked"
+    assert shadow_view.current_simulated_battery_export_power_kw == 4.0
+    assert shadow_view.current_simulated_battery_to_home_power_kw == 2.0
+    assert shadow_view.current_simulated_battery_power_kw == 6.0
+    assert shadow_view.current_simulated_grid_export_kw == 4.0
+    assert original.current_simulated_battery_export_power_kw == 0.892
+    control = ControlState(
+        operating_reason="power_down_session",
+        desired_battery_export_power_kw=4.0,
+        desired_battery_to_home_power_kw=2.0,
+        desired_total_discharge_power_kw=6.0,
+    )
+    assert (
+        module.align_agile_control_state(control, original, state, ControlConfig())
+        is control
+    )
+    assert (
+        shadow_plan_vs_outcome(control, shadow_view)["outcome"]["battery_export_kw"]
+        == 4.0
+    )
+
+
+def test_incomplete_power_down_route_does_not_replace_shadow() -> None:
+    module = _alignment_module()
+    original = replace(_base_simulation(), saving_session_active=True)
+    state = _state(routed_export=4.0)
+    state["current_routing_snapshot"]["dispatch_mode"] = "power_down_session"
+    for invalid in (None, -1.0, float("nan"), True):
+        state["current_routing_snapshot"]["battery_to_home_kw"] = invalid
+        control_view, shadow_view, _ = module.aligned_agile_control_views(
+            original, state
+        )
+        assert control_view is original
+        assert shadow_view is original

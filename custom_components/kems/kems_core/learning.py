@@ -5,7 +5,8 @@ from __future__ import annotations
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime, time, timedelta
-from statistics import fmean
+from math import isfinite
+from statistics import fmean, median
 
 from .models import LearnedState, Snapshot
 
@@ -52,9 +53,24 @@ class LearningEngine:
         days = {record.timestamp.date() for record in records}
         import_rates: list[float] = []
         all_loads: list[float] = []
+        historical_house: dict[int, dict[object, list[float]]] = defaultdict(
+            lambda: defaultdict(list)
+        )
+        today_type = _slot_key(now)[0]
 
         for record in records:
             slot = profiles[_slot_key(record.timestamp)]
+            local = record.timestamp.astimezone(now.tzinfo)
+            day_type, local_slot = _slot_key(local)
+            if (
+                local.date() < now.date()
+                and day_type == today_type
+                and record.house_load_kw is not None
+                and isfinite(record.house_load_kw)
+                and record.house_load_kw >= 0.0
+                and "house_load_kw" not in record.stale_fields
+            ):
+                historical_house[local_slot][local.date()].append(record.house_load_kw)
             if record.house_load_kw is not None:
                 load = max(record.house_load_kw, 0.0)
                 slot.house_load.append(load)
@@ -138,6 +154,16 @@ class LearningEngine:
             predicted_house_tomorrow_hourly_kwh=predicted_tomorrow_hourly,
             average_import_rate_pence=_mean(import_rates),
             profile_slots=len(profiles),
+            today_house_profile_date=now.date().isoformat(),
+            today_house_profile_kw=tuple(
+                (
+                    round(median(fmean(day) for day in daily.values()), 3)
+                    if len(daily) >= 3
+                    else None
+                )
+                for index in range(96)
+                for daily in (historical_house.get(index, {}),)
+            ),
         )
 
     def _predict_hourly_energy(

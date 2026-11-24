@@ -20,6 +20,7 @@ from typing import Any
 from . import agile_deadline_guard, agile_rolling_planning
 from . import agile_smart_export as agile
 from . import agile_total_discharge_ledger as total_ledger
+from .agile_physical_planning import apply_learned_house_profile
 from .kems_core import SimulationConfig
 from .kems_core.agile_live_reserve import total_discharge_deadline_goal_soc_percent
 from .kems_core.forecast_path_scheduler import allocate_forecast_path_exports
@@ -182,6 +183,7 @@ def _apply_forecast_path(
         deadline=deadline,
         config=config,
     )
+    segments = apply_learned_house_profile(self, segments, plan, now=now)
     if not any(item.get("basis") == "KEMS hourly solar forecast" for item in segments):
         return plan
 

@@ -97,8 +97,8 @@ def test_alpha974_release_identity_and_scope() -> None:
     ).read_text(encoding="utf-8")
     reason = str(bundle["maintenance"]["reason"])
 
-    assert manifest["version"] == "0.9.0-alpha9.250"
-    assert reason.startswith("Alpha9.250:")
+    assert manifest["version"] == "0.9.0-alpha9.251"
+    assert reason.startswith("Alpha9.251:")
     assert "Alpha9.75" in reason
     assert "transient" in reason.lower()
     assert "confirmed-cheap EV" in reason
