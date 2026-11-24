@@ -177,9 +177,12 @@ class AgileSmartExportManager:
         """
         calculated: dict[str, dict[str, Any]] = {}
         lookup = getattr(self, "_historical_cached_comparison", None)
+        summary = getattr(self, "_historical_batch_summary", None)
         for day, day_records in ordered_days:
             compare_args = (day_records, config, tariff, agile_soc, full_soc, None)
-            result = lookup(*compare_args, today=today) if callable(lookup) else None
+            result = summary(*compare_args, today=today) if callable(summary) else None
+            if result is None and callable(lookup):
+                result = lookup(*compare_args, today=today)
             if result is None:
                 result = self._compare_day(*compare_args)
             calculated[day.isoformat()] = result

@@ -64,6 +64,10 @@ def test_routing_authorities_remain_separate_and_fail_closed():
         "requested_export_kw": 0.899,
         "permitted_export_kw": 0.469,
         "physical_soc_lower_bound_percent": 19.362,
+        "physical_soc_percent": 20.0,
+        "physical_bound_snapshot_at": now.isoformat(),
+        "physical_bound_guard_at": now.isoformat(),
+        "physical_bound_ledger_accepted": True,
         "status": "capped",
         "physical_energy_evidence": {
             "status": "verified_power_continuity_with_margin",
@@ -85,7 +89,7 @@ def test_routing_authorities_remain_separate_and_fail_closed():
     assert state["current_routing_snapshot"]["battery_export_kw"] == 0.899
 
     control.commands_permitted = False
-    guard["physical_energy_evidence"]["observed_at"] = "old"
+    guard["physical_bound_snapshot_at"] = "old"
     route = agile_current_export_execution_observation(
         snapshot=snapshot, control=control, agile_state=state, physical_guard=guard
     )["routing_provenance"]

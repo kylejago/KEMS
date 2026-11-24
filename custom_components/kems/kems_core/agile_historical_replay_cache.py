@@ -121,6 +121,8 @@ class HistoricalReplayCache:
         # Keeping a private serialized representation makes read isolation much
         # cheaper than recursively deepcopying every historic slot per scan.
         self._encoded_results: dict[str, bytes] = {}
+        self._encoded_summaries: dict[str, bytes] = {}
+        self._summary_hits = 0
         self._fast_result_copies = 0
         self._fallback_result_copies = 0
         self._snapshot_hits = 0
@@ -153,6 +155,7 @@ class HistoricalReplayCache:
             "hardware_writes": "unchanged",
             "result_copy_method": "local_pickle_loads_with_deepcopy_fallback",
             "encoded_result_days": len(self._encoded_results),
+            "historical_summary_hits": self._summary_hits,
             "fast_result_copies": self._fast_result_copies,
             "fallback_result_copies": self._fallback_result_copies,
             "fingerprint_method": (
@@ -176,6 +179,7 @@ class HistoricalReplayCache:
 
     def _remember_encoded_result(self, day: str, value: dict[str, Any]) -> None:
         """Encode only a privately owned result; failure retains deep-copy path."""
+        self._encoded_summaries.pop(day, None)
         try:
             self._encoded_results[day] = dumps(value, protocol=HIGHEST_PROTOCOL)
         except (PicklingError, TypeError, AttributeError, ValueError, OverflowError):
@@ -199,6 +203,24 @@ class HistoricalReplayCache:
         if count_copy:
             self._fallback_result_copies += 1
         return deepcopy(result)
+
+    def _isolated_summary(
+        self, day: str, result: dict[str, Any]
+    ) -> dict[str, Any]:
+        """Copy only the exact settled-day fields consumed by aggregation."""
+        summary = {key: value for key, value in result.items() if key != "slot_plan"}
+        try:
+            encoded = self._encoded_summaries.get(day)
+            if encoded is None:
+                encoded = dumps(summary, protocol=HIGHEST_PROTOCOL)
+                self._encoded_summaries[day] = encoded
+            isolated = loads(encoded)
+            if isinstance(isolated, dict):
+                self._summary_hits += 1
+                return isolated
+        except (PicklingError, TypeError, ValueError, EOFError, ImportError, AttributeError):
+            self._encoded_summaries.pop(day, None)
+        return deepcopy(summary)
 
     @property
     def needs_persist(self) -> bool:
@@ -244,6 +266,7 @@ class HistoricalReplayCache:
         """
         self._entries.clear()
         self._encoded_results.clear()
+        self._encoded_summaries.clear()
         self._legacy_digest_days.clear()
         self._restored_days = 0
         self._persist_dirty = False
@@ -386,6 +409,7 @@ class HistoricalReplayCache:
         projection: bool,
         inputs: tuple[Any, ...],
         calculate: Callable[[], dict[str, Any]],
+        summary_only: bool = False,
     ) -> dict[str, Any]:
         """Return isolated historical results, recomputing on any input change.
 
@@ -411,6 +435,8 @@ class HistoricalReplayCache:
         ):
             self._hits += 1
             self._entries.move_to_end(key)
+            if summary_only:
+                return self._isolated_summary(key, cached[1])
             return self._isolated_result(key, cached[1])
 
         self._misses += 1
@@ -424,4 +450,7 @@ class HistoricalReplayCache:
             evicted_day, _ = self._entries.popitem(last=False)
             self._legacy_digest_days.discard(evicted_day)
             self._encoded_results.pop(evicted_day, None)
+            self._encoded_summaries.pop(evicted_day, None)
+        if summary_only:
+            return {name: value for name, value in result.items() if name != "slot_plan"}
         return result
