@@ -10,7 +10,10 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_registry as er
 from homeassistant.util import dt as dt_util
 
-from .commissioning import build_commissioning_snapshot
+from .commissioning import (
+    build_commissioning_snapshot,
+    commissioning_operator_state,
+)
 from .coordinator import KEMSCoordinator
 from .foxess_command_shadow import build_foxess_command_shadow_snapshot
 from .foxess_modbus_contract import foxess_modbus_contract_snapshot
@@ -87,7 +90,8 @@ async def async_get_config_entry_diagnostics(
 
     # Solar shadow is an advisory HA observation, not a physical command.
     # Its independent manager cache makes missing or failed evaluations explicit.
-    solar_shadow = coordinator.agile_smart_export_state.get("solar_routing_shadow")
+    agile_state = coordinator.agile_smart_export_state
+    solar_shadow = agile_state.get("solar_routing_shadow")
     solar_sensor = _state_payload(hass, "sensor.kems_solar_routing_shadow")
 
     registry = er.async_get(hass)
@@ -140,12 +144,24 @@ async def async_get_config_entry_diagnostics(
         )
 
     commissioning = build_commissioning_snapshot(hass, coordinator)
+    # One evidence snapshot for both diagnostic sections. Display the same
+    # operator readiness as the HA sensor without changing the source gate.
+    evidence_state = commissioning.get("state")
+    operator_state = commissioning_operator_state(commissioning, data.control)
+    commissioning = {
+        **commissioning,
+        "evidence_state": evidence_state,
+        "state": operator_state,
+        "operator_display_state": operator_state,
+        "operator_state_reporting_only": True,
+    }
     shadow_validation = _shadow_validation_state(coordinator)
     shadow_readiness = {
         "digital_twin_ready": bool(shadow_validation.get("ready_for_shadow")),
         "digital_twin_status": shadow_validation.get("status"),
         "hardware_shadow_ready": bool(commissioning.get("ready_for_shadow")),
-        "hardware_status": commissioning.get("state"),
+        "hardware_status": operator_state,
+        "hardware_evidence_status": evidence_state,
         "maximum_allowed_hardware_stage": commissioning.get("maximum_allowed_stage"),
         "real_hardware_writes": commissioning.get(
             "real_hardware_writes",
@@ -378,7 +394,7 @@ async def async_get_config_entry_diagnostics(
         "agile_export_interval_audit": (
             agile_export_interval_audit(
                 records=coordinator._history.records,
-                agile_state=coordinator.agile_smart_export_state,
+                agile_state=agile_state,
                 now=dt_util.now(),
                 reported_grid_export_kwh=data.simulation.actual_grid_export_kwh,
                 reported_income_pence=data.simulation.actual_export_income_pence,
@@ -395,7 +411,7 @@ async def async_get_config_entry_diagnostics(
             agile_current_export_execution_observation(
                 snapshot=data.snapshot,
                 control=data.control,
-                agile_state=coordinator.agile_smart_export_state,
+                agile_state=agile_state,
                 physical_guard=getattr(coordinator, "_agile_live_reserve_status", {}),
             )
             if export_tariff_type_from_options(entry.options)
@@ -403,12 +419,12 @@ async def async_get_config_entry_diagnostics(
             else {"status": "not_agile_tariff", "reporting_only": True}
         ),
         "reward_settlement_evidence": reward_settlement_evidence(data.roi.reward_audit),
-        "agile_smart_export": coordinator.agile_smart_export_state,
+        "agile_smart_export": agile_state,
         "agile_physical_export_reserve": getattr(
             coordinator, "_agile_live_reserve_status", {"status": "not_yet_evaluated"}
         ),
         "agile_budget_reconciliation": reconcile_agile_budget(
-            coordinator.agile_smart_export_state,
+            agile_state,
             getattr(
                 coordinator,
                 "_agile_live_reserve_status",
@@ -457,7 +473,7 @@ async def async_get_config_entry_diagnostics(
         "alpha969_shadow_plan": dict(data.alpha969_shadow_plan),
         "shadow_validation": shadow_validation,
         "shadow_readiness": shadow_readiness,
-        "commissioning": build_commissioning_snapshot(hass, coordinator),
+        "commissioning": commissioning,
         "panel_health": panel_health_snapshot(hass),
         "updates": update_snapshot,
         "last_power_down": data.last_power_down.to_dict(),

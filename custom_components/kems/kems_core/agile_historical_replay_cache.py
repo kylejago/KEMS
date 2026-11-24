@@ -181,19 +181,23 @@ class HistoricalReplayCache:
         except (PicklingError, TypeError, AttributeError, ValueError, OverflowError):
             self._encoded_results.pop(day, None)
 
-    def _isolated_result(self, day: str, result: dict[str, Any]) -> dict[str, Any]:
+    def _isolated_result(
+        self, day: str, result: dict[str, Any], *, count_copy: bool = True
+    ) -> dict[str, Any]:
         """Never hand callers the cached result or a shared mutable child."""
         encoded = self._encoded_results.get(day)
         if encoded is not None:
             try:
                 isolated = loads(encoded)
                 if isinstance(isolated, dict):
-                    self._fast_result_copies += 1
+                    if count_copy:
+                        self._fast_result_copies += 1
                     return isolated
             except (TypeError, ValueError, EOFError, ImportError, AttributeError):
                 # Result copy only. Cached SHA-256 verification stays intact.
                 self._encoded_results.pop(day, None)
-        self._fallback_result_copies += 1
+        if count_copy:
+            self._fallback_result_copies += 1
         return deepcopy(result)
 
     @property
@@ -222,7 +226,10 @@ class HistoricalReplayCache:
                         if day in self._legacy_digest_days
                         else _COMPACT_FINGERPRINT_SCHEME
                     ),
-                    "result": deepcopy(result),
+                    # Reuse the private local encoding for checkpoint copies.
+                    # The persisted format stays JSON and cache-hit metrics
+                    # continue to describe replay lookups only.
+                    "result": self._isolated_result(day, result, count_copy=False),
                 }
                 for day, (fingerprint, result) in self._entries.items()
             ],
