@@ -1,3 +1,10 @@
+## 0.9.0-alpha9.253 — physical SOC provenance and settled history efficiency
+
+- **SOC provenance:** The guard now identifies the exact physical snapshot used for its lower bound and whether its independent energy ledger was accepted. Diagnostic reporting accepts fresh SOC re-anchors as well as continuous tracking, distinguishes the guard's conservative age-based fallback, and rejects stale/mismatched snapshot evidence. The 24 November alpha9.252 observation had a valid 17.935% guard bound at 18% physical SOC but the diagnostic omitted it because the tracker status was new_verified_soc_anchor. No change to export permissions or SOC floors.
+- **Settled replay:** For the canonical inherited comparison owner only, combine exact cache validation and replay on a miss into one operation. Reuse isolated compact historical summaries without copying discarded slot plans. Full SHA-256 fingerprints still validate every settled day on every pass; complete cached results, persistence, chronological SOC carry, current/tomorrow results and compatibility overrides are retained. No performance claim until measured.
+- **Legacy review:** Extend the read-only duplicate module audit with conservative source-reference inventory; no deletion or automated migration from static evidence. External dependencies and existing published entity contracts unchanged.
+- **Safety and validation:** Retain alpha9.252 HA Core 2026.11.3 import smoke and full Python 3.13/3.14 regressions, independent 15% export/10% house floors, 7 kW DNO, 14.5 kW import, EV protection, Happy Hour/Power Down, ROI and safe-first updates. Historical SOC truth and missing meter intervals are not reconstructed.
+
 ## 0.9.0-alpha9.252 — KEMS maintenance and diagnostic coherence
 
 - **Commissioning and diagnostic consistency:** Reuse a single commissioning evidence snapshot and Agile state reference per diagnostic. Present the existing operator readiness label consistently with the HA sensor while retaining the raw evidence state and readiness booleans. No physical gate changes.

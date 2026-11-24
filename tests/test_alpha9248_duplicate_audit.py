@@ -4,7 +4,10 @@ from pathlib import Path
 
 import pytest
 
-from scripts.audit_duplicate_runtime_modules import duplicate_python_modules
+from scripts.audit_duplicate_runtime_modules import (
+    duplicate_python_modules,
+    duplicate_reference_inventory,
+)
 
 
 def test_exact_duplicate_inventory_does_not_modify_modules(tmp_path: Path) -> None:
@@ -30,3 +33,25 @@ def test_exact_duplicate_inventory_does_not_modify_modules(tmp_path: Path) -> No
 def test_duplicate_inventory_rejects_missing_repo(tmp_path: Path) -> None:
     with pytest.raises(ValueError, match="KEMS integration directory not found"):
         duplicate_python_modules(tmp_path)
+
+
+def test_reference_inventory_never_authorises_deletion(tmp_path: Path) -> None:
+    directory = tmp_path / "custom_components" / "kems"
+    directory.mkdir(parents=True)
+    for name in ("alpha_legacy", "semantic_runtime"):
+        (directory / f"{name}.py").write_text("VALUE = 7\n")
+    (directory / "loader.py").write_text("from .semantic_runtime import VALUE\n")
+    groups = duplicate_python_modules(tmp_path)
+    inventory = duplicate_reference_inventory(tmp_path, groups)
+    assert inventory == [
+        {
+            "module": "alpha_legacy",
+            "literal_reference_paths": [],
+            "safe_to_delete": False,
+        },
+        {
+            "module": "semantic_runtime",
+            "literal_reference_paths": ["custom_components/kems/loader.py"],
+            "safe_to_delete": False,
+        },
+    ]
