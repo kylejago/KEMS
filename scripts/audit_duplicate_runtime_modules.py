@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import re
 from collections import defaultdict
 from pathlib import Path
 
@@ -30,6 +31,32 @@ def duplicate_python_modules(root: Path) -> list[dict[str, object]]:
         {"bytes_per_file": size, "sha256": digest, "paths": paths}
         for (size, digest), paths in sorted(groups.items(), key=lambda item: item[1][0])
         if len(paths) > 1
+    ]
+
+
+def duplicate_reference_inventory(
+    root: Path, groups: list[dict[str, object]]
+) -> list[dict[str, object]]:
+    """Find literal module-name references; absence never proves unused."""
+    candidates = {Path(path).stem for group in groups for path in group["paths"]}
+    references: dict[str, list[str]] = {name: [] for name in candidates}
+    patterns = {name: re.compile(rf"\b{re.escape(name)}\b") for name in candidates}
+    for directory in ("custom_components", "tests", "scripts"):
+        for path in sorted((root / directory).rglob("*.py")):
+            if path.is_symlink():
+                continue
+            source = path.read_text(encoding="utf-8")
+            relative = path.relative_to(root).as_posix()
+            for name, pattern in patterns.items():
+                if path.stem != name and pattern.search(source):
+                    references[name].append(relative)
+    return [
+        {
+            "module": name,
+            "literal_reference_paths": references[name],
+            "safe_to_delete": False,
+        }
+        for name in sorted(candidates)
     ]
 
 
@@ -54,6 +81,10 @@ def main() -> int:
                 "groups": len(groups),
                 "repeated_bytes": repeated_bytes,
                 "candidate_groups": groups,
+                "literal_reference_inventory": duplicate_reference_inventory(
+                    arguments.root, groups
+                ),
+                "reference_scope": "literal Python source references only",
                 "runtime_files_deleted": 0,
                 "requires_import_graph_review": True,
             },

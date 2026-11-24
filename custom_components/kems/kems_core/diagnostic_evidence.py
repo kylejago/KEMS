@@ -655,12 +655,23 @@ def agile_current_export_execution_observation(
     routing = routing if isinstance(routing, Mapping) else {}
     proof = physical_guard.get("physical_energy_evidence")
     proof = proof if isinstance(proof, Mapping) else {}
-    physical_same_scan = bool(
-        proof.get("status") == "verified_power_continuity_with_margin"
-        and routing.get("generated_at")
-        and routing.get("generated_at") == proof.get("observed_at")
-    )
     physical_soc = _finite(getattr(snapshot, "battery_soc", None))
+    snapshot_at = getattr(snapshot, "timestamp", None)
+    bound = _finite(physical_guard.get("physical_soc_lower_bound_percent"))
+    # The guard owns this proof, not the earlier advisory routing publisher.
+    # A new SOC anchor is as valid as continuity when accepted by the guard.
+    physical_same_scan = bool(
+        snapshot_at is not None
+        and physical_guard.get("physical_bound_snapshot_at") == snapshot_at.isoformat()
+        and physical_soc is not None
+        and _finite(physical_guard.get("physical_soc_percent")) == physical_soc
+        and bound is not None
+        and 0.0 <= bound <= physical_soc <= 100.0
+    )
+    ledger_accepted = bool(
+        physical_same_scan
+        and physical_guard.get("physical_bound_ledger_accepted") is True
+    )
     twin_soc = _finite(plan.get("simulated_soc_percent"))
     soc_difference = (
         round(twin_soc - physical_soc, 3)
@@ -687,12 +698,20 @@ def agile_current_export_execution_observation(
             "measured_grid_import_kw": imported,
             "legacy_routing_schema_version": routing.get("version"),
             "physical_soc_percent": physical_soc,
-            "physical_lower_bound_soc_percent": (
-                _finite(physical_guard.get("physical_soc_lower_bound_percent"))
+            "physical_lower_bound_soc_percent": (bound if physical_same_scan else None),
+            "physical_lower_bound_same_scan": physical_same_scan,
+            "physical_lower_bound_ledger_accepted": ledger_accepted,
+            "physical_lower_bound_basis": (
+                physical_guard.get("soc_freshness_basis")
                 if physical_same_scan
                 else None
             ),
-            "physical_lower_bound_same_scan": physical_same_scan,
+            "physical_energy_tracker_status": proof.get("status"),
+            "physical_bound_guard_at": (
+                physical_guard.get("physical_bound_guard_at")
+                if physical_same_scan
+                else None
+            ),
             "independent_twin_soc_percent": twin_soc,
             "twin_minus_physical_soc_percentage_points": soc_difference,
             "guarded_conditional_arrival_soc_percent": _finite(

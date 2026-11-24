@@ -1098,6 +1098,9 @@ def guard_paid_agile_physical_export(
         {
             "physical_battery_energy_kwh": round(measured_energy_kwh, 3),
             "physical_soc_lower_bound_percent": round(soc_lower_bound, 3),
+            "physical_bound_snapshot_at": snapshot.timestamp.isoformat(),
+            "physical_bound_guard_at": now.isoformat(),
+            "physical_bound_ledger_accepted": energy_proven,
             "pessimistic_soc_aging_discharge_kwh": round(pessimistic_discharge_kwh, 3),
             "minimum_battery_reserve_kwh": round(reserve_kwh, 3),
             "house_safety_floor_kwh": round(capacity * 0.10, 3),

@@ -70,6 +70,8 @@ class EfficientAgileSmartExportManager(AgileSmartExportManager):
         full_soc: float,
         learned_forecast: float | None,
         projection: bool = False,
+        *,
+        historical_summary: bool = False,
     ) -> dict[str, Any]:
         """Reuse only exact-input historical replay, never live or future results."""
         if not records:
@@ -107,6 +109,7 @@ class EfficientAgileSmartExportManager(AgileSmartExportManager):
             day=day,
             today=today,
             projection=projection,
+            summary_only=historical_summary,
             inputs=(
                 records,
                 config,
@@ -130,6 +133,32 @@ class EfficientAgileSmartExportManager(AgileSmartExportManager):
                 projection,
             ),
         )
+
+    def _historical_batch_summary(
+        self,
+        *args: Any,
+        today: date,
+    ) -> dict[str, Any] | None:
+        """Use one exact lookup/replay only for the known canonical owner.
+
+        Other compatibility wrappers may transform the full comparison.
+        Preserve their old lookup and replay path rather than bypassing them.
+        """
+        analysis = getattr(self, "_last_analysis", None)
+        if (
+            getattr(self._compare_day, "__func__", None)
+            is not EfficientAgileSmartExportManager._compare_day
+            or getattr(self._historical_cached_comparison, "__func__", None)
+            is not EfficientAgileSmartExportManager._historical_cached_comparison
+            or getattr(self, "_historical_replay_cache", None) is None
+            or not isinstance(analysis, datetime)
+            or analysis.astimezone(LONDON).date() != today
+            or not args
+            or not args[0]
+            or args[0][0].timestamp.astimezone(LONDON).date() >= today
+        ):
+            return None
+        return self._compare_day(*args, historical_summary=True)
 
     def _historical_cached_comparison(
         self,
