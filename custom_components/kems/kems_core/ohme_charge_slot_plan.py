@@ -101,8 +101,11 @@ def observe_ohme_slot_response(
             invalid += 1
             continue
         naive_count += int(start_naive or end_naive)
-        power = _nonnegative_number(item.get("power"), 22000.0)
-        energy = _nonnegative_number(item.get("energy"), 500000.0)
+        # Native ohme.list_charge_slots serialises ohmepy ChargeSlot:
+        # energy is already kWh, and power is energy / hours (kW).
+        # See ohmepy v1.9.1 ohme/utils.py. Never guess legacy W/Wh units.
+        power = _nonnegative_number(item.get("power"), 22.0)
+        energy = _nonnegative_number(item.get("energy"), 500.0)
         rows.append((start, end, power, energy))
 
     rows.sort(key=lambda entry: (entry[0], entry[1], entry[2] or 0))
@@ -118,8 +121,8 @@ def observe_ohme_slot_response(
         {
             "start": start.isoformat(),
             "end": end.isoformat(),
-            "power_kw": round(power / 1000, 3) if power is not None else None,
-            "energy_kwh": round(energy / 1000, 3) if energy is not None else None,
+            "power_kw": round(power, 3) if power is not None else None,
+            "energy_kwh": round(energy, 3) if energy is not None else None,
             "active_at_observation": start <= reference < end,
             "expired_at_observation": end <= reference,
         }

@@ -188,11 +188,39 @@ def aligned_agile_control_views(
 ) -> tuple[SimulationState, SimulationState, dict[str, Any]]:
     """Return transient control-target and shadow-outcome simulation views.
 
-    The helper is deliberately inert when the rolling plan is unavailable or a
-    Power Down session is active. Event-specific control keeps its established
-    priority path. The original SimulationState remains untouched for finance
-    and history.
+    Event-specific control keeps its established priority path. During Power
+    Down only the shadow outcome may use the final event routing. The original
+    SimulationState remains untouched for finance and history.
     """
+    if simulation.saving_session_active:
+        routing = agile_state.get("current_routing_snapshot")
+        if (
+            isinstance(routing, dict)
+            and routing.get("available")
+            and routing.get("dispatch_mode") == "power_down_session"
+            and all(
+                (_number(routing.get(field)) is not None)
+                and float(routing[field]) >= 0.0
+                for field in (
+                    "battery_to_home_kw",
+                    "battery_export_kw",
+                    "solar_to_battery_kw",
+                    "grid_to_battery_kw",
+                    "grid_import_kw",
+                    "grid_export_kw",
+                )
+            )
+        ):
+            return (
+                simulation,
+                _replace_known(simulation, _routing_values(simulation, agile_state)),
+                {
+                    "active": False,
+                    "reason": "Power Down retains event control priority",
+                    "shadow_outcome_basis": "final Full KEMS Agile Power Down route",
+                    "hardware_writes": "blocked",
+                },
+            )
     rolling = _rolling_target(simulation, agile_state)
     if rolling is None:
         return (

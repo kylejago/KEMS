@@ -28,14 +28,14 @@ def test_ohme_structured_extra_slot_matches_owner_17_nov_trace_not_tariff():
                 {
                     "start": "2026-11-17T06:51:00",
                     "end": "2026-11-17T07:00:00",
-                    "power": 3001,
-                    "energy": 450,
+                    "power": 3.001,
+                    "energy": 0.45,
                 },
                 {
                     "start": "2026-11-17T06:30:00",
                     "end": "2026-11-17T06:50:00",
-                    "power": 3000,
-                    "energy": 1000,
+                    "power": 3.0,
+                    "energy": 1.0,
                 },
             ]
         },
@@ -62,20 +62,20 @@ def test_past_and_overlapping_rescheduled_slots_do_not_become_cheap():
                 {
                     "start": "2026-11-17T06:30:00+00:00",
                     "end": "2026-11-17T06:50:00+00:00",
-                    "power": 3000,
-                    "energy": 1000,
+                    "power": 3.0,
+                    "energy": 1.0,
                 },
                 {
                     "start": "2026-11-17T06:30:00+00:00",
                     "end": "2026-11-17T06:50:00+00:00",
-                    "power": 3000,
-                    "energy": 1000,
+                    "power": 3.0,
+                    "energy": 1.0,
                 },
                 {
                     "start": "2026-11-17T06:41:00+00:00",
                     "end": "2026-11-17T06:43:00+00:00",
-                    "power": 3000,
-                    "energy": 100,
+                    "power": 3.0,
+                    "energy": 0.1,
                 },
             ]
         },
@@ -93,7 +93,7 @@ def test_invalid_undated_and_unbounded_plan_values_are_rejected():
     mod = _load()
     now = datetime(2026, 11, 18, 3, 49, tzinfo=UTC)
     rows = [
-        {"start": "06:30", "end": "07:00", "power": 3000, "energy": 1500},
+        {"start": "06:30", "end": "07:00", "power": 3.0, "energy": 1.5},
         {"start": "unknown", "end": "unavailable"},
         {
             "start": "2026-11-18T07:00:00+00:00",
@@ -163,3 +163,32 @@ def test_observer_is_independent_from_coordinator_control_and_uses_read_only_api
     assert "self._ohme_charge_plan" not in (ROOT / "commissioning.py").read_text()
     for source in (obs, coordinator, diag):
         ast.parse(source)
+
+
+def test_native_ohme_kilowatt_values_not_divided_again() -> None:
+    mod = _load()
+    now = datetime(2026, 11, 24, 18, 9, tzinfo=UTC)
+    output = mod.observe_ohme_slot_response(
+        {
+            "slots": [
+                {
+                    "start": "2026-11-24T23:00:00+00:00",
+                    "end": "2026-11-24T23:30:00+00:00",
+                    "power": 7.6,
+                    "energy": 3.8,
+                },
+                {
+                    "start": "2026-11-25T02:00:00+00:00",
+                    "end": "2026-11-25T02:30:00+00:00",
+                    "power": 7600,
+                    "energy": 3800,
+                },
+            ]
+        },
+        now=now,
+    )
+    assert output["slots"][0]["power_kw"] == 7.6
+    assert output["slots"][0]["energy_kwh"] == 3.8
+    assert output["slots"][1]["power_kw"] is None
+    assert output["slots"][1]["energy_kwh"] is None
+    assert output["discount_authority"] is False
