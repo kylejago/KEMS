@@ -148,7 +148,15 @@ class AgileSmartExportManager:
         # is revalidated against the complete current input SHA-256 digest.
         cache = getattr(self, "_historical_replay_cache", None)
         if cache is not None:
-            cache.restore_state(data.get("historical_replay_cache"))
+            # Restoring and encoding settled replay results is CPU work, not
+            # HA state access. Await it before startup continues, but keep it
+            # off the event loop. Small test/compatibility hosts may lack an
+            # executor; retain the exact synchronous fallback.
+            executor = getattr(self._hass, "async_add_executor_job", None)
+            if callable(executor):
+                await executor(cache.restore_state, data.get("historical_replay_cache"))
+            else:
+                cache.restore_state(data.get("historical_replay_cache"))
 
     def _historical_comparison_batch(
         self,

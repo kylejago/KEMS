@@ -58,7 +58,7 @@ jobs:
         run: python -m compileall -q custom_components tests scripts
 
   python-314-full-tests:
-    name: Python 3.14 full unit suite (HA 2026.11.2 runtime)
+    name: Python 3.14 full unit suite (HA 2026.11.3 runtime)
     runs-on: ubuntu-latest
 
     steps:

@@ -651,10 +651,59 @@ def agile_current_export_execution_observation(
     else:
         status = "grid_export_observed"
 
+    routing = agile_state.get("current_routing_snapshot")
+    routing = routing if isinstance(routing, Mapping) else {}
+    proof = physical_guard.get("physical_energy_evidence")
+    proof = proof if isinstance(proof, Mapping) else {}
+    physical_same_scan = bool(
+        proof.get("status") == "verified_power_continuity_with_margin"
+        and routing.get("generated_at")
+        and routing.get("generated_at") == proof.get("observed_at")
+    )
+    physical_soc = _finite(getattr(snapshot, "battery_soc", None))
+    twin_soc = _finite(plan.get("simulated_soc_percent"))
+    soc_difference = (
+        round(twin_soc - physical_soc, 3)
+        if twin_soc is not None and physical_soc is not None
+        else None
+    )
     return {
         "status": status,
         "reporting_only": True,
         "physical_dispatch_verified": False,
+        "routing_provenance": {
+            "proposal_scope": "pre_guard_digital_twin_not_hardware_command",
+            "proposal_battery_export_kw": _finite(routing.get("battery_export_kw")),
+            "proposal_grid_export_kw": _finite(routing.get("grid_export_kw")),
+            "guard_permitted_battery_export_kw": permitted,
+            "final_desired_battery_export_kw": desired,
+            "authorised_battery_export_kw": (
+                desired if getattr(control, "commands_permitted", False) else None
+            ),
+            "final_desired_total_discharge_kw": _finite(
+                getattr(control, "desired_total_discharge_power_kw", None)
+            ),
+            "measured_grid_export_kw": observed,
+            "measured_grid_import_kw": imported,
+            "legacy_routing_schema_version": routing.get("version"),
+            "physical_soc_percent": physical_soc,
+            "physical_lower_bound_soc_percent": (
+                _finite(physical_guard.get("physical_soc_lower_bound_percent"))
+                if physical_same_scan
+                else None
+            ),
+            "physical_lower_bound_same_scan": physical_same_scan,
+            "independent_twin_soc_percent": twin_soc,
+            "twin_minus_physical_soc_percentage_points": soc_difference,
+            "guarded_conditional_arrival_soc_percent": _finite(
+                plan.get("forecast_path_reconciled_ending_soc_percent")
+            ),
+            "theoretical_arrival_soc_percent": _finite(
+                plan.get("forecast_path_theoretical_ending_soc_percent")
+            ),
+            "arrival_guaranteed": False,
+            "hardware_writes": "forbidden",
+        },
         "observation_timestamp": (
             getattr(snapshot, "timestamp", None).isoformat()
             if getattr(snapshot, "timestamp", None) is not None
