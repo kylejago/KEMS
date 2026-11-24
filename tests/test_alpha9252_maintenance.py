@@ -25,13 +25,14 @@ def test_checkpoint_isolation_retains_digest_and_copy_metrics():
     saved["entries"][0]["result"]["slot_plan"][0]["kw"] = 99.0
     assert cache.status == before
     assert cache.export_state()["entries"][0]["result"] == result
-    assert cache.get_cached(
-        day=day, today=today, projection=False, inputs=inputs
-    ) == result
+    assert (
+        cache.get_cached(day=day, today=today, projection=False, inputs=inputs)
+        == result
+    )
     inputs[0][0]["kw"] = 3.0
-    assert cache.get_cached(
-        day=day, today=today, projection=False, inputs=inputs
-    ) is None
+    assert (
+        cache.get_cached(day=day, today=today, projection=False, inputs=inputs) is None
+    )
 
 
 def test_routing_authorities_remain_separate_and_fail_closed():

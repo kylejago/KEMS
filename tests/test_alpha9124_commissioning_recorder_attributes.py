@@ -122,7 +122,11 @@ def test_new_projection_only_changes_sensor_presentation_not_real_gates() -> Non
     assert "commissioning_operator_state(" in source
     assert 'return "Ready for Control"' in source
     assert "return state" in source
-    assert '"commissioning": build_commissioning_snapshot(' in diagnostics
+    assert '"commissioning": commissioning,' in diagnostics
+    assert diagnostics.count("build_commissioning_snapshot(hass, coordinator)") == 1
+    assert "commissioning_operator_state(commissioning, data.control)" in diagnostics
+    assert '"evidence_state": evidence_state,' in diagnostics
+    assert '"operator_state_reporting_only": True,' in diagnostics
     assert "recorder_safe_commissioning_attributes" not in diagnostics
     assert '"checks": checks,' in source
     assert '"ready_for_control": ready_for_control,' in source

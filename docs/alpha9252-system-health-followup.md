@@ -18,9 +18,10 @@ Scope: KEMS and its dependencies, not unrelated HA integrations. Reviewed the
   SHA-256 input checks, cache version, SOC carry, future/current-day exclusion,
   fallback and numerical outputs remain unchanged. Await cache restoration in a
   HA executor when available, rather than blocking the event loop during startup.
-- Update the CI runtime description to the observed HA 2026.11.3/Python 3.14.10
-  family; this is the existing full unit suite on Python 3.14, not a real HA
-  2026.11.3 hardware integration test.
+- Retain the complete Python 3.14 unit suite and add a separate exact-version
+  Home Assistant Core 2026.11.3 import smoke test using real HA APIs.
+  This checks import compatibility, not setup against a live installation,
+  real FoxESS/Ohme devices, or external custom integration compatibility.
 
 ## Evidence and remaining limits
 
