@@ -1,4 +1,4 @@
-"""Read-only maintenance regressions for Alpha9.252."""
+"""Read-only maintenance regressions for Alpha9.253."""
 
 from datetime import UTC, date, datetime
 from types import SimpleNamespace
