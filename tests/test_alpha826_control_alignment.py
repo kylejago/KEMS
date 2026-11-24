@@ -280,9 +280,10 @@ def test_power_down_shadow_uses_event_route_without_replacing_control() -> None:
         module.align_agile_control_state(control, original, state, ControlConfig())
         is control
     )
-    assert shadow_plan_vs_outcome(control, shadow_view)["outcome"][
-        "battery_export_kw"
-    ] == 4.0
+    assert (
+        shadow_plan_vs_outcome(control, shadow_view)["outcome"]["battery_export_kw"]
+        == 4.0
+    )
 
 
 def test_incomplete_power_down_route_does_not_replace_shadow() -> None:

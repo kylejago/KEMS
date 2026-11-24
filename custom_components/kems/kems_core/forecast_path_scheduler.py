@@ -220,12 +220,18 @@ def allocate_forecast_path_exports(
         active_end = min(end, deadline_utc)
         if active_end <= active_start:
             continue
+        profile_house = _number(item.get("house_kw"))
         raw_segments.append(
             {
                 "start": active_start,
                 "end": active_end,
                 "solar_kw": max(solar_kw, 0.0),
                 "battery_kw": max(battery_kw, 0.0),
+                "house_kw": (
+                    profile_house
+                    if profile_house is not None and profile_house >= 0
+                    else house
+                ),
             }
         )
     raw_segments.sort(key=lambda item: item["start"])
@@ -281,8 +287,11 @@ def allocate_forecast_path_exports(
         seg_end = segment["end"]
         solar_kw = segment["solar_kw"]
         battery_kw = segment["battery_kw"]
-        solar_to_home_kw = min(house, solar_kw)
-        house_battery_kw = min(max(house - solar_to_home_kw, 0.0), battery_kw)
+        segment_house = segment["house_kw"]
+        solar_to_home_kw = min(segment_house, solar_kw)
+        house_battery_kw = min(
+            max(segment_house - solar_to_home_kw, 0.0), battery_kw
+        )
         export_kw = min(
             max(battery_kw - house_battery_kw, 0.0),
             export_limit,
@@ -319,8 +328,11 @@ def allocate_forecast_path_exports(
             hours = (segment["end"] - segment["start"]).total_seconds() / 3600.0
             solar_kw = segment["solar_kw"]
             battery_kw = segment["battery_kw"]
-            solar_to_home_kw = min(house, solar_kw)
-            house_battery_kw = min(max(house - solar_to_home_kw, 0.0), battery_kw)
+            segment_house = segment["house_kw"]
+            solar_to_home_kw = min(segment_house, solar_kw)
+            house_battery_kw = min(
+                max(segment_house - solar_to_home_kw, 0.0), battery_kw
+            )
             house_ac = house_battery_kw * hours
             house_battery_total += house_ac
 

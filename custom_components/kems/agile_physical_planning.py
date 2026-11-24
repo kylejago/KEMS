@@ -8,7 +8,7 @@ uses the exact same proof as the final hardware export reserve guard.
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime, timedelta
 from math import isfinite
 from typing import Any
 
@@ -198,3 +198,74 @@ def conservative_physical_export_budget(
         "exportable_stored_kwh": round(budget, 3),
         "exportable_ac_kwh": round(budget * efficiency, 3),
     }
+
+
+
+def apply_learned_house_profile(
+    manager: Any,
+    segments: list[dict[str, Any]],
+    plan: dict[str, Any],
+    *,
+    now: datetime,
+) -> list[dict[str, Any]]:
+    """Annotate future slot capacity only; keep current demand and guard intact."""
+    proof = plan.get("physical_house_budget_evidence")
+    learned = getattr(manager, "_kems_forecast_arbitrage_learned", None)
+    profile = getattr(learned, "today_house_profile_kw", ())
+    if (
+        not isinstance(proof, dict)
+        or not proof.get("available")
+        or not getattr(learned, "ready", False)
+        or (_number(getattr(learned, "confidence", None)) or 0.0) < 70.0
+        or getattr(learned, "today_house_profile_date", None)
+        != now.date().isoformat()
+        or len(profile) != 96
+    ):
+        return segments
+
+    current_slot_end = now.astimezone(UTC).replace(
+        minute=(now.minute // 30) * 30, second=0, microsecond=0
+    ) + timedelta(minutes=30)
+    output = []
+    forecast_count = 0
+    for segment in segments:
+        start = segment.get("start")
+        end = segment.get("end")
+        if (
+            not isinstance(start, datetime)
+            or not isinstance(end, datetime)
+            or start.tzinfo is None
+            or end.tzinfo is None
+            or start < current_slot_end
+            or end <= start
+        ):
+            output.append(segment)
+            continue
+        local_start = start.astimezone(now.tzinfo)
+        local_end = (end - timedelta(microseconds=1)).astimezone(now.tzinfo)
+        if local_start.date() != now.date() or local_end.date() != now.date():
+            output.append(segment)
+            continue
+        first = (local_start.hour * 60 + local_start.minute) // 15
+        last = (local_end.hour * 60 + local_end.minute) // 15
+        values = [_number(profile[index]) for index in {first, last}]
+        if any(value is None or value < 0 for value in values):
+            output.append(segment)
+            continue
+        output.append(
+            {
+                **segment,
+                "house_kw": max(value for value in values if value is not None),
+                "house_basis": "median of at least three prior matching day-type days",
+            }
+        )
+        forecast_count += 1
+    plan["future_house_capacity_profile"] = {
+        "active": forecast_count > 0,
+        "forecast_segments": forecast_count,
+        "fallback_segments": len(segments) - forecast_count,
+        "basis": "prior-day quarter-hour household profile; active slot unchanged",
+        "independent_house_reserve_unchanged": True,
+        "hardware_writes": "blocked",
+    }
+    return output

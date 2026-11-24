@@ -189,6 +189,8 @@ class LearnedState:
     predicted_house_tomorrow_hourly_kwh: tuple[float, ...] = ()
     average_import_rate_pence: float | None = None
     profile_slots: int = 0
+    today_house_profile_date: str | None = None
+    today_house_profile_kw: tuple[float | None, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)

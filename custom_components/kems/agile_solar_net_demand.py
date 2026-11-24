@@ -28,6 +28,7 @@ from typing import Any
 
 from . import agile_deadline_guard, agile_rolling_planning, agile_routing
 from . import agile_smart_export as agile
+from .agile_physical_planning import apply_learned_house_profile
 from .kems_core import (
     ForecastPlanState,
     LearnedState,
@@ -276,6 +277,7 @@ def _apply_physical_slot_allocations(
         deadline=deadline,
         config=config,
     )
+    segments = apply_learned_house_profile(self, segments, plan, now=now)
     desired = max(_number(plan.get("planned_battery_export_kwh")) or 0.0, 0.0)
     future_house_kw = _physical_house_kw(self)
     current_house_kw = _current_house_kw(self, fallback=future_house_kw)

@@ -235,9 +235,15 @@ def allocate_total_discharge_slots(
                 continue
 
             battery_headroom_kw = max(battery_kw, 0.0)
-            solar_to_home_kw = min(house, max(solar_kw, 0.0))
+            profile_house = _number(segment.get("house_kw"))
+            segment_house = (
+                profile_house
+                if profile_house is not None and profile_house >= 0
+                else house
+            )
+            solar_to_home_kw = min(segment_house, max(solar_kw, 0.0))
             house_battery_kw = min(
-                max(house - solar_to_home_kw, 0.0),
+                max(segment_house - solar_to_home_kw, 0.0),
                 battery_headroom_kw,
             )
             export_kw = min(
