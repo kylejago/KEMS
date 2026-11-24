@@ -70,9 +70,7 @@ class LearningEngine:
                 and record.house_load_kw >= 0.0
                 and "house_load_kw" not in record.stale_fields
             ):
-                historical_house[local_slot][local.date()].append(
-                    record.house_load_kw
-                )
+                historical_house[local_slot][local.date()].append(record.house_load_kw)
             if record.house_load_kw is not None:
                 load = max(record.house_load_kw, 0.0)
                 slot.house_load.append(load)

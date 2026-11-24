@@ -138,11 +138,8 @@ def test_release_changes_do_not_add_inverter_or_octopus_write_authority() -> Non
     assert "bonus_evidence_available_today" in source
 
 
-
 def test_numeric_estimate_without_matched_baseline_stays_provisional() -> None:
-    event = completed_event(
-        bonus=15.37, status="octopus_net_baseline_unavailable"
-    )
+    event = completed_event(bonus=15.37, status="octopus_net_baseline_unavailable")
     shown = reporting._result_dict(event)
     assert shown["estimated_bonus_pence"] == 15.37
     assert shown["matched_net_baseline_evidence"] is False

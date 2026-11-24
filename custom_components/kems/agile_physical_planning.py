@@ -200,7 +200,6 @@ def conservative_physical_export_budget(
     }
 
 
-
 def apply_learned_house_profile(
     manager: Any,
     segments: list[dict[str, Any]],
@@ -217,8 +216,7 @@ def apply_learned_house_profile(
         or not proof.get("available")
         or not getattr(learned, "ready", False)
         or (_number(getattr(learned, "confidence", None)) or 0.0) < 70.0
-        or getattr(learned, "today_house_profile_date", None)
-        != now.date().isoformat()
+        or getattr(learned, "today_house_profile_date", None) != now.date().isoformat()
         or len(profile) != 96
     ):
         return segments

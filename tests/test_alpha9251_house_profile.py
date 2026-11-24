@@ -61,9 +61,7 @@ def test_capacity_profile_only_changes_future_with_verified_budget():
     assert updated[1]["house_kw"] == 1.0
     assert "house_kw" not in segments[1]
     assert plan["future_house_capacity_profile"]["forecast_segments"] == 1
-    assert (
-        apply_learned_house_profile(manager, segments, {}, now=NOW) is segments
-    )
+    assert apply_learned_house_profile(manager, segments, {}, now=NOW) is segments
 
     slots = [
         {"valid_from": s["start"], "valid_to": s["end"], "rate_pence": 25.0}

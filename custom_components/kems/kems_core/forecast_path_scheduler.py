@@ -289,9 +289,7 @@ def allocate_forecast_path_exports(
         battery_kw = segment["battery_kw"]
         segment_house = segment["house_kw"]
         solar_to_home_kw = min(segment_house, solar_kw)
-        house_battery_kw = min(
-            max(segment_house - solar_to_home_kw, 0.0), battery_kw
-        )
+        house_battery_kw = min(max(segment_house - solar_to_home_kw, 0.0), battery_kw)
         export_kw = min(
             max(battery_kw - house_battery_kw, 0.0),
             export_limit,
