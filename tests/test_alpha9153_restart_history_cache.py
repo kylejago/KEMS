@@ -184,8 +184,8 @@ def test_alpha9153_version_and_no_auto_install() -> None:
         Path(__file__).resolve().parents[1]
         / "docs/archived-release-notes-through-alpha9244.md"
     ).read_text(encoding="utf-8")
-    assert manifest["version"] == "0.9.0-alpha9.253"
-    assert bundle["maintenance"]["reason"].startswith("Alpha9.253:")
+    assert manifest["version"] == "0.9.0-alpha9.254"
+    assert bundle["maintenance"]["reason"].startswith("Alpha9.254:")
     assert bundle["components"]["panel"]["version"] == "0.9.0-alpha9-panel.4"
     assert (
         "no changes to chronological soc carry"

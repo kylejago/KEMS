@@ -333,7 +333,9 @@ class EVChargeTraceRecorder:
             self._records.append(sample)
             if exception:
                 self._exception_records.append(sample)
-                self._exception_records = self._exception_records[-MAX_EXCEPTION_RECORDS:]
+                self._exception_records = self._exception_records[
+                    -MAX_EXCEPTION_RECORDS:
+                ]
             cutoff = now - timedelta(hours=RETENTION_HOURS)
             self._records = [
                 item

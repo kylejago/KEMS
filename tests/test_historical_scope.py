@@ -18,10 +18,7 @@ def test_financial_day_presence_excludes_partial_and_earlier_days():
     )
     assert result["completed_financial_days_expected"] == 3
     assert result["completed_financial_days_with_native_observations"] == 2
-    assert (
-        result["completed_financial_days_without_retained_native_observations"]
-        == 1
-    )
+    assert result["completed_financial_days_without_retained_native_observations"] == 1
     assert result["earlier_native_days_retained"] == 1
     assert result["physical_installation_date_verified"] is False
     assert result["historical_backfill_or_roi_changed"] is False

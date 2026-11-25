@@ -338,8 +338,8 @@ def test_alpha975_release_identity_and_scope() -> None:
     ).read_text(encoding="utf-8")
     reason = str(bundle["maintenance"]["reason"])
 
-    assert manifest["version"] == "0.9.0-alpha9.253"
-    assert reason.startswith("Alpha9.253:")
+    assert manifest["version"] == "0.9.0-alpha9.254"
+    assert reason.startswith("Alpha9.254:")
     assert "Alpha9.75" in reason
     assert "physically verified" in reason
     assert "90-second" in reason

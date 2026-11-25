@@ -1,3 +1,11 @@
+## 0.9.0-alpha9.254 — EV evidence and historical reconciliation groundwork
+
+- Preserve a separate bounded, persisted EV exception trace across normal trace rollover; include outside-cheap charging grid shortfalls as possible battery contribution, not circuit-isolation proof. Record explicit unplugged observation in legacy parity without promoting missing tariff data.
+- Distinguish user-declared EV-only extra-slot policy from individual supplier settlement. Expose measured household-only discharge and EV grid-import candidates only when power-balance, load scope, SOC freshness and site limit agree. Live household-only discharge, EV-specific billing changes, automatic tariff credits and prearming remain unapproved by physical evidence; the existing physical battery-hold fallback stays in force.
+- Reuse compact exact historical cache hits when the canonical lookup is available even if the full comparison owner is wrapped; retain existing fallback on misses, exact SHA-256 invalidation, full stored results and live/tomorrow replay. Report the selected summary path.
+- Report retained full-day observation presence since the configured financial commissioning date separately from the optional 365-day replay window. Do not infer meter completeness, rewrite history, or treat the financial date as independently verified installation. Supplier interval recovery and Power Down accounting reconciliation remain outstanding.
+- Existing 15% export floor, 10% house floor, 7 kW DNO, 14.5 kW site limit, 5 kW overnight EV charge cap, Happy Hour, Power Down, safe-first update and all physical-control authority unchanged.
+
 ## 0.9.0-alpha9.253 — physical SOC provenance and settled history efficiency
 
 - **SOC provenance:** The guard now identifies the exact physical snapshot used for its lower bound and whether its independent energy ledger was accepted. Diagnostic reporting accepts fresh SOC re-anchors as well as continuous tracking, distinguishes the guard's conservative age-based fallback, and rejects stale/mismatched snapshot evidence. The 24 November alpha9.252 observation had a valid 17.935% guard bound at 18% physical SOC but the diagnostic omitted it because the tracker status was new_verified_soc_anchor. No change to export permissions or SOC floors.

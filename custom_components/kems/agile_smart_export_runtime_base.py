@@ -167,9 +167,7 @@ class EfficientAgileSmartExportManager(AgileSmartExportManager):
         # calling compatibility replay wrappers. Compact only that same hit;
         # preserve the ordinary fallback on a miss and all live comparisons.
         self._historical_summary_path = "canonical_cache_hit_only"
-        return self._historical_cached_comparison(
-            *args, today=today, summary_only=True
-        )
+        return self._historical_cached_comparison(*args, today=today, summary_only=True)
 
     def _historical_cached_comparison(
         self,
