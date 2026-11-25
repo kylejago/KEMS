@@ -45,6 +45,7 @@ def _load_trace_module():
     fake_const.DOMAIN = "kems"
     fake_const.STORAGE_NAMESPACE = "kems_test"
     import kems_core
+    from kems_core import shared_bus_balance
 
     spec = importlib.util.spec_from_file_location(
         "kems_ev_trace_test.ev_charge_trace", KEMS / "ev_charge_trace.py"
@@ -56,6 +57,7 @@ def _load_trace_module():
         "kems_ev_trace_test.const": fake_const,
         "kems_ev_trace_test.kems_core": kems_core,
         "kems_ev_trace_test.kems_core.models": sys.modules["kems_core.models"],
+        "kems_ev_trace_test.kems_core.shared_bus_balance": shared_bus_balance,
         "homeassistant": fake_ha,
         "homeassistant.core": fake_core,
         "homeassistant.helpers": fake_helpers,
@@ -227,6 +229,9 @@ def test_unconfirmed_daytime_ohme_charging_never_claims_cheap_charge_cap():
     assert audit["confirmed_cheap_ev_charging"] is False
     assert audit["charge_cap_kw_when_ev_charging"] is None
     assert audit["cap_target_exceeded"] is False
+    assert sample["extra_slot_house_routing_candidate"]["status"] == (
+        "hold_fallback_required"
+    )
 
 
 def test_trace_fails_safe_when_not_installed_or_ev_data_missing():
@@ -247,3 +252,57 @@ def test_trace_fails_safe_when_not_installed_or_ev_data_missing():
     assert "ev_trace = dict(coordinator.ev_charge_trace_state)" in diagnostics
     assert 'ev_trace["samples"] = ev_trace_samples[-64:]' in diagnostics
     assert '"ev_charge_trace": ev_trace' in diagnostics
+
+
+def test_cheap_charge_exception_survives_regular_trace_rollover_and_restart():
+    module, _ = _load_trace_module()
+    module.MAX_RECORDS = 3
+    recorder = module.EVChargeTraceRecorder(object(), "exception_rollover")
+
+    async def exercise():
+        await recorder.async_record(
+            _snapshot(connected=True, charging=True, cheap=True)
+        )
+        for minute in range(1, 6):
+            await recorder.async_record(
+                replace(
+                    _snapshot(minute, connected=True, charging=True, cheap=True),
+                    battery_power_kw=-4.0,
+                )
+            )
+        await recorder.async_save()
+        recovered = module.EVChargeTraceRecorder(object(), "exception_rollover")
+        await recovered.async_load()
+        return recovered.state
+
+    state = asyncio.run(exercise())
+    assert len(state["samples"]) == 3
+    assert len(state["exception_samples"]) == 1
+    exception = state["exception_samples"][0]
+    assert exception["timestamp"] == NOW.isoformat()
+    assert exception["battery_power_kw"] == 1.0
+    assert state["new_ev_routing_hardware_authorised"] is False
+
+
+def test_outside_cheap_grid_shortfall_is_retained_without_tariff_authority():
+    module, _ = _load_trace_module()
+    recorder = module.EVChargeTraceRecorder(object(), "extra_slot_risk")
+
+    async def exercise():
+        await recorder.async_record(
+            replace(
+                _snapshot(connected=True, charging=True),
+                battery_power_kw=7.6,
+                grid_import_kw=3.0,
+            )
+        )
+        recovered = module.EVChargeTraceRecorder(object(), "extra_slot_risk")
+        await recovered.async_load()
+        return recovered.state
+
+    state = asyncio.run(exercise())
+    assert state["outside_cheap_ev_risk_samples_retained"] == 1
+    sample = state["exception_samples"][0]
+    assert sample["outside_cheap_ev_startup_risk"] is True
+    assert sample["cheap_period_confirmed"] is False
+    assert sample["new_ev_routing_hardware_authorised"] is False

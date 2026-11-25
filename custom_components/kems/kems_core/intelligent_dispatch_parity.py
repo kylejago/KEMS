@@ -28,6 +28,7 @@ def compare_intelligent_and_ohme(
     ohme_power_kw: float | None,
     ohme_charging: bool | None,
     ohme_plan_active: bool | None,
+    ohme_status: str | None = None,
 ) -> dict[str, Any]:
     """Classify a point-in-time observation without changing KEMS decisions."""
     mode = (
@@ -49,6 +50,16 @@ def compare_intelligent_and_ohme(
     overnight = fixed_overnight_offpeak(now)
     if overnight:
         classification = "overnight_excluded"
+    elif (
+        ohme_status is not None
+        and ohme_status.strip().casefold() == "unplugged"
+        and ohme_power_kw == 0.0
+        and ohme_charging is False
+        and legacy_planned_dispatch is False
+        and legacy_slot is False
+        and ohme_plan_active is not True
+    ):
+        classification = "confirmed_unplugged_inactive"
     elif legacy_planned_dispatch is None or smart_charging_now is None:
         classification = "evidence_incomplete"
     elif legacy_planned_dispatch and smart_charging_now:
@@ -65,6 +76,7 @@ def compare_intelligent_and_ohme(
         "fixed_overnight": overnight,
         "legacy_intelligent_slot": legacy_slot,
         "legacy_planned_dispatch": legacy_planned_dispatch,
+        "ohme_status": ohme_status,
         "ohme_charge_mode": ohme_charge_mode,
         "ohme_smart_mode": smart_mode,
         "ohme_charging_status": ohme_charging,

@@ -383,6 +383,7 @@ class HistoricalReplayCache:
         today: date | None,
         projection: bool,
         inputs: tuple[Any, ...],
+        summary_only: bool = False,
     ) -> dict[str, Any] | None:
         """Return an exact settled-day hit without scheduling an executor job.
 
@@ -404,6 +405,8 @@ class HistoricalReplayCache:
             return None
         self._hits += 1
         self._entries.move_to_end(key)
+        if summary_only:
+            return self._isolated_summary(key, cached[1])
         return self._isolated_result(key, cached[1])
 
     def evaluate(

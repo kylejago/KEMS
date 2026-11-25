@@ -110,6 +110,7 @@ class LegacyIntelligentParityMonitor:
             ohme_power_kw=ohme.power_kw,
             ohme_charging=ohme.charging,
             ohme_plan_active=ohme_plan_active,
+            ohme_status=ohme.status,
         )
         observation["legacy_slot_age_seconds"] = slot_age
         observation["legacy_planned_age_seconds"] = planned_age

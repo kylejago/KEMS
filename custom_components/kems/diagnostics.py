@@ -27,6 +27,7 @@ from .kems_core.diagnostic_evidence import (
     corroborated_unchanged_sources,
     reward_settlement_evidence,
 )
+from .kems_core.historical_scope import commissioning_history_scope
 from .kems_core.history_gap_provenance import history_gap_provenance
 from .kems_core.meter_gap_anchor_evidence import meter_gap_anchor_evidence
 from .kems_core.operational_diagnostic_probes import (
@@ -253,7 +254,11 @@ async def async_get_config_entry_diagnostics(
                 key in configured
                 for key in ("intelligent_slot", "next_offpeak_start", "offpeak_end")
             ),
-            "ohme_extra_daytime_discount": "not_supplier_confirmed_fail_closed",
+            "ohme_extra_daytime_discount": (
+                "ev_only_policy_declared_session_unsettled"
+                if extra_slot_policy["supplier_policy_declared_ev_only"]
+                else "not_supplier_confirmed_fail_closed"
+            ),
             "ohme_charge_plan_proves_discount": False,
             "extra_daytime_grid_force_charge_authorised": False,
             "other_integration_uninstall_automated": False,
@@ -275,6 +280,12 @@ async def async_get_config_entry_diagnostics(
             coordinator._export_counter_evidence.status
         ),
         "historical_two_way_meter_gap_anchors": gap_meter_anchors,
+        "supplier_interval_recovery": coordinator._supplier_intervals.status,
+        "commissioning_history_scope": commissioning_history_scope(
+            configured_date=entry.options.get("commissioning_date"),
+            records=coordinator._history.records,
+            now=dt_util.now(),
+        ),
         "whatsapp_notifications": (
             coordinator._kems_whatsapp_reporter.status
             if getattr(coordinator, "_kems_whatsapp_reporter", None) is not None
@@ -372,6 +383,11 @@ async def async_get_config_entry_diagnostics(
         "core_lifecycle_evidence": coordinator.lifecycle_evidence_state,
         "agile_historical_replay_cache": {
             **coordinator._agile_smart_export._historical_replay_cache.status,
+            "historical_summary_path": getattr(
+                coordinator._agile_smart_export,
+                "_historical_summary_path",
+                "not_evaluated",
+            ),
             "day_rate_index_builds": getattr(
                 coordinator._agile_smart_export, "_day_rate_index_builds", 0
             ),

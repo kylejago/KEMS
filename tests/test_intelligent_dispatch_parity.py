@@ -100,3 +100,30 @@ def test_comparison_is_not_wired_into_control() -> None:
     assert "ControlEngine.plan" not in source
     assert "resolve_tariff(" not in source
     assert "set_state(" not in source
+
+
+def test_confirmed_unplugged_idle_is_not_missing_mode_evidence() -> None:
+    result = _sample(14, ohme_status="unplugged", ohme_charge_mode=None)
+    assert result["classification"] == "confirmed_unplugged_inactive"
+    assert result["ohme_smart_charging_now"] is None
+    assert result["supplier_discount_confirmed"] is False
+    assert result["controls_tariff_or_battery"] is False
+
+
+def test_unplugged_does_not_hide_conflicting_or_missing_evidence() -> None:
+    for updates in (
+        {"legacy_planned_dispatch": True},
+        {"legacy_slot": None},
+        {"ohme_power_kw": None},
+        {"ohme_power_kw": 3.0},
+        {"ohme_charging": None},
+        {"ohme_plan_active": True},
+        {"ohme_status": "unknown"},
+    ):
+        assert (
+            _sample(
+                14,
+                **({"ohme_status": "unplugged", "ohme_charge_mode": None} | updates),
+            )["classification"]
+            == "evidence_incomplete"
+        )

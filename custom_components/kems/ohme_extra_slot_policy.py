@@ -10,6 +10,7 @@ from .const import (
     CONF_OHME_EXTRA_SLOT_TARIFF,
     CONF_OHME_PRIORITISE_SAVINGS,
     DEFAULT_OPTIONS,
+    OHME_EXTRA_SLOT_EV_ONLY,
     OHME_EXTRA_SLOT_TARIFF_LABELS,
     OHME_EXTRA_SLOT_UNCONFIRMED,
 )
@@ -87,12 +88,25 @@ def ohme_extra_slot_evidence(
         "input_fresh": fresh_evidence,
         "regular_offpeak_state": regular_offpeak_state,
         "likely_managed_daytime_charge_candidate": candidate,
+        "supplier_policy_declared_ev_only": treatment == OHME_EXTRA_SLOT_EV_ONLY,
+        "estimated_ev_only_discount_candidate": bool(
+            candidate and treatment == OHME_EXTRA_SLOT_EV_ONLY
+        ),
         "supplier_discount_confirmed": False,
+        "household_cheap_rate_authorised": False,
+        "desired_extra_slot_allocation": (
+            "grid_to_ev_solar_and_battery_to_house"
+            if treatment == OHME_EXTRA_SLOT_EV_ONLY
+            else "protect_battery_without_tariff_assumption"
+        ),
+        "live_house_only_discharge_authorised": False,
         "whole_home_discount_verified": False,
         "extra_daytime_grid_force_charge_authorised": False,
         "ev_battery_hold_remains_independent": True,
         "implementation_stage": (
-            "read_only_until_octopus_reply_and_reviewed_live_wiring"
+            "ev_only_policy_declared_pending_reviewed_live_wiring"
+            if treatment == OHME_EXTRA_SLOT_EV_ONLY
+            else "read_only_until_octopus_reply_and_reviewed_live_wiring"
         ),
         "note": (
             "Smart Charge plus measured charging may suggest a managed session, "

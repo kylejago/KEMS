@@ -8,6 +8,7 @@ from pathlib import Path
 from kems_core.models import Snapshot
 from kems_core.shared_bus_balance import (
     assess_shared_bus_balance,
+    candidate_extra_slot_house_routing,
     summarise_shared_bus_audits,
 )
 
@@ -178,3 +179,39 @@ def test_historical_evidence_is_bounded_and_never_implies_write_authority() -> N
     assert '"shared_bus_ev_evidence": coordinator.shared_bus_ev_evidence' in (
         ROOT / "diagnostics.py"
     ).read_text(encoding="utf-8")
+
+
+def test_extra_slot_candidate_is_house_only_and_never_live_authority():
+    result = candidate_extra_slot_house_routing(
+        _snapshot(
+            off_peak=False,
+            source_age_seconds=dict(AGES, battery_soc=10.0),
+        ),
+        site_import_limit_kw=14.5,
+    )
+    assert result["status"] == "candidate_only"
+    assert result["candidate_battery_to_home_kw"] == 2.0
+    assert result["candidate_ev_grid_import_kw"] == 6.0
+    assert result["hardware_write_authorised"] is False
+    assert result["supplier_discount_confirmed"] is False
+
+
+def test_extra_slot_candidate_fails_closed_on_conflicting_or_missing_evidence():
+    for overrides in (
+        {"ev_load_in_house_load": None},
+        {"house_load_kw": 12.0},
+        {"grid_export_kw": 0.5},
+        {"battery_soc": 10.0},
+        {"source_age_seconds": dict(AGES, battery_soc=181.0)},
+    ):
+        values = {
+            "off_peak": False,
+            "source_age_seconds": dict(AGES, battery_soc=10.0),
+            **overrides,
+        }
+        result = candidate_extra_slot_house_routing(
+            _snapshot(**values), site_import_limit_kw=14.5
+        )
+        assert result["status"] == "hold_fallback_required"
+        assert result["candidate_battery_to_home_kw"] is None
+        assert result["hardware_write_authorised"] is False

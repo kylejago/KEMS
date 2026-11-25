@@ -199,3 +199,90 @@ def summarise_shared_bus_audits(
             "charging transitions need separate time-aligned observation"
         ),
     }
+
+
+def candidate_extra_slot_house_routing(
+    snapshot: Snapshot, *, site_import_limit_kw: float | None
+) -> dict[str, object]:
+    """Estimate the non-EV discharge ceiling, without authorising a write.
+
+    The same bus cannot prove independent circuit isolation. Demand membership,
+    source freshness and measured power balance must all agree before even a
+    candidate is exposed. No smart-charge tariff or supplier settlement inferred.
+    """
+    result: dict[str, object] = {
+        "status": "not_applicable",
+        "candidate_battery_to_home_kw": None,
+        "candidate_ev_grid_import_kw": None,
+        "hardware_write_authorised": False,
+        "supplier_discount_confirmed": False,
+        "physical_isolation_proven": False,
+    }
+    if (
+        snapshot.cheap_period_confirmed
+        or snapshot.saving_session_active
+        or snapshot.ev_charging is not True
+    ):
+        return result
+    result["status"] = "hold_fallback_required"
+    if (
+        site_import_limit_kw is None
+        or not isfinite(site_import_limit_kw)
+        or site_import_limit_kw <= 0.0
+        or snapshot.battery_soc is None
+        or not isfinite(snapshot.battery_soc)
+        or not 10.0 < snapshot.battery_soc <= 100.0
+        or "battery_soc" in snapshot.stale_fields
+        or snapshot.source_age_seconds.get("battery_soc", float("inf")) > 180.0
+    ):
+        result["reason"] = "SOC or site limit unavailable for candidate"
+        return result
+    # Reuse the exact same observation-only measurement checks for the
+    # non-export EV interval, even on a property with a paid export tariff.
+    audit = assess_shared_bus_balance(
+        snapshot,
+        no_paid_export_mode=True,
+        battery_positive_is_discharge=True,
+        inverter_limit_kw=7.0,
+    )
+    if audit.status not in {"net_allocation_consistent", "deviation"}:
+        result["reason"] = audit.reason
+        return result
+    if (
+        snapshot.grid_export_kw is None
+        or snapshot.grid_export_kw > 0.05
+        or snapshot.grid_import_kw is None
+        or snapshot.grid_import_kw > site_import_limit_kw
+        or snapshot.battery_power_kw is None
+        or snapshot.solar_power_kw is None
+        or audit.site_load_kw is None
+        or audit.ev_power_kw is None
+        or audit.house_battery_allowance_kw is None
+    ):
+        result["reason"] = "Grid direction or power limit unavailable for candidate"
+        return result
+    net_supply = (
+        snapshot.solar_power_kw
+        + snapshot.battery_power_kw
+        + snapshot.grid_import_kw
+        - snapshot.grid_export_kw
+    )
+    # DC/AC losses and non-atomic reports can invalidate the bus observation.
+    # Do not use a plausible load-scope flag alone to grant a target.
+    if abs(net_supply - audit.site_load_kw) > 0.4:
+        result["reason"] = "Time-aligned power balance does not close"
+        return result
+    if audit.ev_power_kw > site_import_limit_kw:
+        result["reason"] = "EV demand alone exceeds site import limit"
+        return result
+    result.update(
+        {
+            "status": "candidate_only",
+            "reason": "Measured shared-bus allocation; live control unverified",
+            "candidate_battery_to_home_kw": round(
+                min(audit.house_battery_allowance_kw, 7.0), 3
+            ),
+            "candidate_ev_grid_import_kw": audit.ev_power_kw,
+        }
+    )
+    return result

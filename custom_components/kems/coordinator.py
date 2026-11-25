@@ -134,6 +134,7 @@ from .solar_routing_shadow import (
     evaluate_solar_routing_shadow,
     publish_solar_routing_shadow,
 )
+from .supplier_interval_recorder import SupplierIntervalRecorder
 
 LOGGER = logging.getLogger(__name__)
 
@@ -259,6 +260,7 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
             lambda: getattr(self._shadow_validation, "_agile_decisions", [])
         )
         self._lifetime = LifetimeLedgerRecorder(hass, entry.entry_id)
+        self._supplier_intervals = SupplierIntervalRecorder(hass, entry.entry_id)
         self._power_down = PowerDownHistoryRecorder(hass, entry.entry_id)
         self._roi = ROIEngine()
         self._roi_rewards = ROIRewardRecorder(hass, entry.entry_id)
@@ -630,6 +632,7 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
         await self._ev_grid_hold.async_load()
         await self._forecast_validation.async_load()
         await self._lifetime.async_load()
+        await self._supplier_intervals.async_load()
         if (
             export_tariff_type_from_options(self.entry.options)
             == EXPORT_TARIFF_TYPE_NONE
@@ -2030,6 +2033,7 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                 if snapshot.cheap_period_confirmed and forecast_plan.ready
                 else forecast_plan
             )
+            await self._supplier_intervals.async_observe(now, self.entities)
             return replace(provisional, control=control, forecast_plan=display_forecast)
         except Exception as err:
             raise UpdateFailed(f"KEMS analysis failed: {err}") from err
