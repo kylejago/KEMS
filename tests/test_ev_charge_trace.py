@@ -45,6 +45,7 @@ def _load_trace_module():
     fake_const.DOMAIN = "kems"
     fake_const.STORAGE_NAMESPACE = "kems_test"
     import kems_core
+    from kems_core import shared_bus_balance
 
     spec = importlib.util.spec_from_file_location(
         "kems_ev_trace_test.ev_charge_trace", KEMS / "ev_charge_trace.py"
@@ -56,6 +57,7 @@ def _load_trace_module():
         "kems_ev_trace_test.const": fake_const,
         "kems_ev_trace_test.kems_core": kems_core,
         "kems_ev_trace_test.kems_core.models": sys.modules["kems_core.models"],
+        "kems_ev_trace_test.kems_core.shared_bus_balance": shared_bus_balance,
         "homeassistant": fake_ha,
         "homeassistant.core": fake_core,
         "homeassistant.helpers": fake_helpers,
@@ -227,6 +229,9 @@ def test_unconfirmed_daytime_ohme_charging_never_claims_cheap_charge_cap():
     assert audit["confirmed_cheap_ev_charging"] is False
     assert audit["charge_cap_kw_when_ev_charging"] is None
     assert audit["cap_target_exceeded"] is False
+    assert sample["extra_slot_house_routing_candidate"]["status"] == (
+        "hold_fallback_required"
+    )
 
 
 def test_trace_fails_safe_when_not_installed_or_ev_data_missing():

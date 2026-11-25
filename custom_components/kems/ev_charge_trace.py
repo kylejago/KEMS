@@ -14,6 +14,7 @@ from homeassistant.helpers.storage import Store
 
 from .const import DOMAIN, STORAGE_NAMESPACE
 from .kems_core.models import Snapshot
+from .kems_core.shared_bus_balance import candidate_extra_slot_house_routing
 
 STORAGE_VERSION = 1
 MAX_RECORDS = 960
@@ -124,6 +125,10 @@ def build_ev_trace_sample(
         "binding_status": binding.get("status"),
         "foxess_readback": readbacks,
         "ev_cheap_charge_cap_audit": charging_audit,
+        "extra_slot_house_routing_candidate": candidate_extra_slot_house_routing(
+            snapshot,
+            site_import_limit_kw=getattr(planned_control, "site_import_limit_kw", None),
+        ),
         "existing_live_control": {
             "decision_action": control.get("decision_action"),
             "commands_permitted": control.get("commands_permitted"),
