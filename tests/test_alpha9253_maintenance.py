@@ -82,3 +82,19 @@ def test_summary_reuses_full_digest_and_preserves_full_cached_result():
     assert len(calls) == 2
     assert "slot_plan" in evaluate(projection=True)
     assert len(calls) == 3
+
+
+def test_explicit_compact_cache_lookup_keeps_full_results_and_exact_digest():
+    cache = HistoricalReplayCache(max_days=1)
+    day = date(2026, 11, 23)
+    today = date(2026, 11, 24)
+    kwargs = dict(day=day, today=today, projection=False, inputs=([1],))
+    result = {"ready": True, "slot_plan": [{"kwh": 1.0}], "other": {"soc": 30}}
+    cache.evaluate(**kwargs, calculate=lambda: result)
+    summary = cache.get_cached(**kwargs, summary_only=True)
+    assert summary == {"ready": True, "other": {"soc": 30}}
+    summary["other"]["soc"] = 99
+    assert cache.get_cached(**kwargs) == result
+    assert cache.get_cached(**{**kwargs, "inputs": ([2],)}, summary_only=True) is None
+    assert cache.get_cached(**{**kwargs, "today": day}, summary_only=True) is None
+    assert cache.status["historical_summary_hits"] == 1

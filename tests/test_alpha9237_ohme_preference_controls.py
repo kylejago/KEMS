@@ -99,3 +99,22 @@ def test_options_can_change_without_reloading_commissioned_control() -> None:
     assert "KEMSOHMEExtraSlotTariffSelect(coordinator)" in select
     assert '"ohme_extra_slot_policy": extra_slot_policy' in diagnostics
     assert '"extra_daytime_grid_force_charge_authorised": False' in diagnostics
+
+
+def test_declared_ev_only_policy_does_not_grant_tariff_or_hardware_authority():
+    policy = _load_policy()
+    options = {"ohme_extra_slot_tariff_treatment": "ev_only"}
+    result = policy.ohme_extra_slot_evidence(options, **_sample())
+    assert result["supplier_policy_declared_ev_only"] is True
+    assert result["estimated_ev_only_discount_candidate"] is True
+    assert result["desired_extra_slot_allocation"] == (
+        "grid_to_ev_solar_and_battery_to_house"
+    )
+    assert result["supplier_discount_confirmed"] is False
+    assert result["household_cheap_rate_authorised"] is False
+    assert result["live_house_only_discharge_authorised"] is False
+    assert result["extra_daytime_grid_force_charge_authorised"] is False
+    stopped = policy.ohme_extra_slot_evidence(
+        options, **_sample(charger_status="plugged_in", charging_power_kw=0)
+    )
+    assert stopped["estimated_ev_only_discount_candidate"] is False

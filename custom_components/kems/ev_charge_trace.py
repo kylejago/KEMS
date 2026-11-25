@@ -231,7 +231,7 @@ class EVChargeTraceRecorder:
         # schema version. A separate bounded tail survives normal trace rollover.
         exceptions = [
             row
-            for row in (*data.get("exception_records", []), *self._records)
+            for row in (*(data.get("exception_records") or []), *self._records)
             if isinstance(row, dict)
             and isinstance(row.get("timestamp"), str)
             and _is_cheap_charge_exception(row)
@@ -303,13 +303,12 @@ class EVChargeTraceRecorder:
             now - datetime.fromisoformat(self._records[-1]["timestamp"])
         ) >= timedelta(seconds=MIN_INTERVAL_SECONDS)
         transition = event != "scan"
+        exception = _is_cheap_charge_exception(sample)
         if due or transition:
             self._records.append(sample)
-            if _is_cheap_charge_exception(sample):
+            if exception:
                 self._exception_records.append(sample)
-                self._exception_records = self._exception_records[
-                    -MAX_EXCEPTION_RECORDS:
-                ]
+                self._exception_records = self._exception_records[-MAX_EXCEPTION_RECORDS:]
             cutoff = now - timedelta(hours=RETENTION_HOURS)
             self._records = [
                 item
@@ -320,7 +319,7 @@ class EVChargeTraceRecorder:
         self._previous_connected = connected
         self._previous_charging = charging
         self._previous_cheap = cheap
-        if transition or self._unsaved >= SAVE_EVERY:
+        if transition or (due and exception) or self._unsaved >= SAVE_EVERY:
             await self.async_save()
         return bool(due or transition)
 

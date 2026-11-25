@@ -146,19 +146,30 @@ class EfficientAgileSmartExportManager(AgileSmartExportManager):
         """
         analysis = getattr(self, "_last_analysis", None)
         if (
-            getattr(self._compare_day, "__func__", None)
-            is not EfficientAgileSmartExportManager._compare_day
-            or getattr(self._historical_cached_comparison, "__func__", None)
+            getattr(self._historical_cached_comparison, "__func__", None)
             is not EfficientAgileSmartExportManager._historical_cached_comparison
             or getattr(self, "_historical_replay_cache", None) is None
-            or not isinstance(analysis, datetime)
-            or analysis.astimezone(LONDON).date() != today
             or not args
             or not args[0]
             or args[0][0].timestamp.astimezone(LONDON).date() >= today
         ):
+            self._historical_summary_path = "noncanonical_lookup_or_nonhistorical"
             return None
-        return self._compare_day(*args, historical_summary=True)
+        if (
+            getattr(self._compare_day, "__func__", None)
+            is EfficientAgileSmartExportManager._compare_day
+            and isinstance(analysis, datetime)
+            and analysis.astimezone(LONDON).date() == today
+        ):
+            self._historical_summary_path = "canonical_combined_lookup_replay"
+            return self._compare_day(*args, historical_summary=True)
+        # The original batch already accepts exact cached results before
+        # calling compatibility replay wrappers. Compact only that same hit;
+        # preserve the ordinary fallback on a miss and all live comparisons.
+        self._historical_summary_path = "canonical_cache_hit_only"
+        return self._historical_cached_comparison(
+            *args, today=today, summary_only=True
+        )
 
     def _historical_cached_comparison(
         self,
@@ -170,6 +181,7 @@ class EfficientAgileSmartExportManager(AgileSmartExportManager):
         learned_forecast: float | None,
         *,
         today: date,
+        summary_only: bool = False,
     ) -> dict[str, Any] | None:
         """Short-circuit exact historical hits before creating executor jobs.
 
@@ -183,6 +195,7 @@ class EfficientAgileSmartExportManager(AgileSmartExportManager):
             day=day,
             today=today,
             projection=False,
+            summary_only=summary_only,
             inputs=(
                 records,
                 config,

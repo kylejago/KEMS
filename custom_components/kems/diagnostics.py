@@ -253,7 +253,11 @@ async def async_get_config_entry_diagnostics(
                 key in configured
                 for key in ("intelligent_slot", "next_offpeak_start", "offpeak_end")
             ),
-            "ohme_extra_daytime_discount": "not_supplier_confirmed_fail_closed",
+            "ohme_extra_daytime_discount": (
+                "ev_only_policy_declared_session_unsettled"
+                if extra_slot_policy["supplier_policy_declared_ev_only"]
+                else "not_supplier_confirmed_fail_closed"
+            ),
             "ohme_charge_plan_proves_discount": False,
             "extra_daytime_grid_force_charge_authorised": False,
             "other_integration_uninstall_automated": False,
@@ -372,6 +376,11 @@ async def async_get_config_entry_diagnostics(
         "core_lifecycle_evidence": coordinator.lifecycle_evidence_state,
         "agile_historical_replay_cache": {
             **coordinator._agile_smart_export._historical_replay_cache.status,
+            "historical_summary_path": getattr(
+                coordinator._agile_smart_export,
+                "_historical_summary_path",
+                "not_evaluated",
+            ),
             "day_rate_index_builds": getattr(
                 coordinator._agile_smart_export, "_day_rate_index_builds", 0
             ),
