@@ -111,9 +111,10 @@ class SupplierIntervalRecorder:
                     or not mapped.unique_id.casefold().endswith("_current_rate")
                 ):
                     continue
-                expected_uid = mapped.unique_id.casefold().removesuffix(
-                    "_current_rate"
-                ) + "_previous_accumulative_consumption"
+                expected_uid = (
+                    mapped.unique_id.casefold().removesuffix("_current_rate")
+                    + "_previous_accumulative_consumption"
+                )
                 if kind == "gas":
                     expected_uid += "_kwh"
                 if uid != expected_uid:
