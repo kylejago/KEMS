@@ -34,6 +34,7 @@ from .kems_core.operational_diagnostic_probes import (
     power_down_baseline_probe,
     roi_recorder_probe,
 )
+from .kems_core.historical_scope import commissioning_history_scope
 from .kems_core.period_coverage_probe import observation_coverage_probe
 from .ohme_extra_slot_policy import ohme_extra_slot_evidence
 from .panel import panel_health_snapshot
@@ -279,6 +280,11 @@ async def async_get_config_entry_diagnostics(
             coordinator._export_counter_evidence.status
         ),
         "historical_two_way_meter_gap_anchors": gap_meter_anchors,
+        "commissioning_history_scope": commissioning_history_scope(
+            configured_date=entry.options.get("commissioning_date"),
+            records=coordinator._history.records,
+            now=dt_util.now(),
+        ),
         "whatsapp_notifications": (
             coordinator._kems_whatsapp_reporter.status
             if getattr(coordinator, "_kems_whatsapp_reporter", None) is not None

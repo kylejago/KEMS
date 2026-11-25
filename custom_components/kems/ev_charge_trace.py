@@ -125,6 +125,15 @@ def build_ev_trace_sample(
         "binding_status": binding.get("status"),
         "foxess_readback": readbacks,
         "ev_cheap_charge_cap_audit": charging_audit,
+        "outside_cheap_ev_startup_risk": bool(
+            not snapshot.cheap_period_confirmed
+            and snapshot.ev_charging is True
+            and snapshot.ev_power_kw is not None
+            and snapshot.grid_import_kw is not None
+            and snapshot.battery_power_kw is not None
+            and snapshot.ev_power_kw - snapshot.grid_import_kw > 0.3
+            and snapshot.battery_power_kw > 0.3
+        ),
         "extra_slot_house_routing_candidate": candidate_extra_slot_house_routing(
             snapshot,
             site_import_limit_kw=getattr(planned_control, "site_import_limit_kw", None),
@@ -141,11 +150,14 @@ def build_ev_trace_sample(
     }
 
 
-def _is_cheap_charge_exception(row: dict[str, Any]) -> bool:
+def _is_ev_trace_exception(row: dict[str, Any]) -> bool:
     audit = row.get("ev_cheap_charge_cap_audit")
-    return isinstance(audit, dict) and (
-        audit.get("battery_discharging_during_ev_charge") is True
-        or audit.get("cap_target_exceeded") is True
+    return row.get("outside_cheap_ev_startup_risk") is True or (
+        isinstance(audit, dict)
+        and (
+            audit.get("battery_discharging_during_ev_charge") is True
+            or audit.get("cap_target_exceeded") is True
+        )
     )
 
 
@@ -188,6 +200,14 @@ class EVChargeTraceRecorder:
             "exception_samples": list(self._exception_records),
             "exception_sample_limit": MAX_EXCEPTION_RECORDS,
             "exception_scope": "observed_samples_not_continuous_duration",
+            "outside_cheap_ev_risk_samples_retained": sum(
+                row.get("outside_cheap_ev_startup_risk") is True
+                for row in self._exception_records
+            ),
+            "outside_cheap_risk_note": (
+                "Potential shared-bus battery contribution; non-atomic reports "
+                "and solar may explain differences. Not tariff or isolation proof."
+            ),
             "ev_cheap_charge_cap_summary": {
                 "status": (
                     "not_yet_observed"
@@ -239,7 +259,7 @@ class EVChargeTraceRecorder:
             for row in (*(data.get("exception_records") or []), *self._records)
             if isinstance(row, dict)
             and isinstance(row.get("timestamp"), str)
-            and _is_cheap_charge_exception(row)
+            and _is_ev_trace_exception(row)
         ]
         by_timestamp = {row["timestamp"]: row for row in exceptions}
         self._exception_records = sorted(
@@ -308,7 +328,7 @@ class EVChargeTraceRecorder:
             now - datetime.fromisoformat(self._records[-1]["timestamp"])
         ) >= timedelta(seconds=MIN_INTERVAL_SECONDS)
         transition = event != "scan"
-        exception = _is_cheap_charge_exception(sample)
+        exception = _is_ev_trace_exception(sample)
         if due or transition:
             self._records.append(sample)
             if exception:

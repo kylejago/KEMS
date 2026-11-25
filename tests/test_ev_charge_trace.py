@@ -282,3 +282,27 @@ def test_cheap_charge_exception_survives_regular_trace_rollover_and_restart():
     assert exception["timestamp"] == NOW.isoformat()
     assert exception["battery_power_kw"] == 1.0
     assert state["new_ev_routing_hardware_authorised"] is False
+
+
+def test_outside_cheap_grid_shortfall_is_retained_without_tariff_authority():
+    module, _ = _load_trace_module()
+    recorder = module.EVChargeTraceRecorder(object(), "extra_slot_risk")
+
+    async def exercise():
+        await recorder.async_record(
+            replace(
+                _snapshot(connected=True, charging=True),
+                battery_power_kw=7.6,
+                grid_import_kw=3.0,
+            )
+        )
+        recovered = module.EVChargeTraceRecorder(object(), "extra_slot_risk")
+        await recovered.async_load()
+        return recovered.state
+
+    state = asyncio.run(exercise())
+    assert state["outside_cheap_ev_risk_samples_retained"] == 1
+    sample = state["exception_samples"][0]
+    assert sample["outside_cheap_ev_startup_risk"] is True
+    assert sample["cheap_period_confirmed"] is False
+    assert sample["new_ev_routing_hardware_authorised"] is False
