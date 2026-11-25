@@ -280,6 +280,7 @@ async def async_get_config_entry_diagnostics(
             coordinator._export_counter_evidence.status
         ),
         "historical_two_way_meter_gap_anchors": gap_meter_anchors,
+        "supplier_interval_recovery": coordinator._supplier_intervals.status,
         "commissioning_history_scope": commissioning_history_scope(
             configured_date=entry.options.get("commissioning_date"),
             records=coordinator._history.records,

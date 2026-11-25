@@ -5,6 +5,7 @@
 - Reuse compact exact historical cache hits when the canonical lookup is available even if the full comparison owner is wrapped; retain existing fallback on misses, exact SHA-256 invalidation, full stored results and live/tomorrow replay. Report the selected summary path.
 - Report retained full-day observation presence since the configured financial commissioning date separately from the optional 365-day replay window. Do not infer meter completeness, rewrite history, or treat the financial date as independently verified installation. Supplier interval recovery and Power Down accounting reconciliation remain outstanding.
 - Power Down baseline matching now rejects different import/export period windows and validates full-event totals against complete contiguous supplier baseline rows, without changing physical dispatch or treating estimates as settled rewards.
+- Retain validated, UTC-keyed supplier half-hour readings in a separate persistent ledger. Optional local CSV-derived bootstrap JSON and unambiguous Octopus previous-consumption entity observations fill absent intervals idempotently; conflicting values remain excluded from usable coverage. No existing daily financial ledger or control authority is changed.
 - Existing 15% export floor, 10% house floor, 7 kW DNO, 14.5 kW site limit, 5 kW overnight EV charge cap, Happy Hour, Power Down, safe-first update and all physical-control authority unchanged.
 
 ## 0.9.0-alpha9.253 — physical SOC provenance and settled history efficiency

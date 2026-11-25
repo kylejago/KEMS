@@ -125,9 +125,10 @@ class OctoplusProvider(HomeAssistantStateReader):
         export_period, export_total, export_start, export_end, export_incomplete = (
             export_baseline
         )
-        if (
-            export_period is None
-            or import_start is None
+        if export_period is None:
+            import_period = None
+        elif (
+            import_start is None
             or import_end is None
             or import_start != export_start
             or import_end != export_end
