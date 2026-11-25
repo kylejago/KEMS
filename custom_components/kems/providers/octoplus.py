@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from math import isfinite
 from typing import Any
 
 from homeassistant.core import HomeAssistant, State
@@ -52,12 +53,13 @@ class OctoplusProvider(HomeAssistantStateReader):
         reference = now or dt_util.now()
         event_state = self._state(self._entities.saving_session_events)
         event = self._select_joined_event(event_state, reference)
-        import_baseline = self._baseline(
-            self._state(self._entities.saving_session_import_baseline)
-        )
-        export_baseline = self._baseline(
-            self._state(self._entities.saving_session_export_baseline)
-        )
+        import_state = self._state(self._entities.saving_session_import_baseline)
+        export_state = self._state(self._entities.saving_session_export_baseline)
+        import_baseline = self._baseline(import_state)
+        export_baseline = self._baseline(export_state)
+        if event is not None:
+            import_baseline = self._event_baseline(import_state, event, reference)
+            export_baseline = self._event_baseline(export_state, event, reference)
         import_baseline, export_baseline = self._reward_baselines(
             import_baseline,
             export_baseline,
@@ -123,8 +125,14 @@ class OctoplusProvider(HomeAssistantStateReader):
         export_period, export_total, export_start, export_end, export_incomplete = (
             export_baseline
         )
-        if export_period is None:
-            import_period = None
+        if (
+            export_period is None
+            or import_start is None
+            or import_end is None
+            or import_start != export_start
+            or import_end != export_end
+        ):
+            import_period = export_period = None
         if export_total is None:
             import_total = None
         return (
@@ -143,6 +151,75 @@ class OctoplusProvider(HomeAssistantStateReader):
                 export_incomplete,
             ),
         )
+
+    @classmethod
+    def _event_baseline(
+        cls, state: State | None, event: dict[str, Any], now: datetime
+    ) -> BaselineTuple:
+        """Validate the supplier integration's period and full event window.
+
+        The upstream sensor describes its current/next target with start/end
+        and a separate baselines list. A scalar total alone cannot establish
+        which event it belongs to or whether every period is complete.
+        """
+        period, total, start, end, incomplete = cls._baseline(state)
+        event_start = cls._parse_datetime(event.get("start"))
+        event_end = cls._parse_datetime(event.get("end"))
+        if (
+            state is None
+            or event_start is None
+            or event_end is None
+            or event_end <= event_start
+        ):
+            return None, None, None, None, True
+
+        target = max(now, event_start)
+        if (
+            start is None
+            or end is None
+            or not event_start <= start <= target < end <= event_end
+            or period is None
+            or period < 0
+        ):
+            period = None
+
+        # Full-event totals require exact contiguous coverage, without gaps,
+        # duplicates, incomplete estimates, or a stale previous-event list.
+        rows = state.attributes.get("baselines")
+        verified: list[tuple[datetime, datetime, float]] = []
+        if isinstance(rows, list):
+            for row in rows:
+                if not isinstance(row, dict):
+                    break
+                left = cls._parse_datetime(row.get("start"))
+                right = cls._parse_datetime(row.get("end"))
+                amount = cls._number(row.get("baseline"))
+                if (
+                    left is None
+                    or right is None
+                    or not event_start <= left < right <= event_end
+                    or amount is None
+                    or amount < 0
+                    or row.get("is_incomplete_calculation") is not False
+                ):
+                    break
+                verified.append((left, right, amount))
+            else:
+                verified.sort(key=lambda row: row[0])
+                cursor = event_start
+                for left, right, _ in verified:
+                    if left != cursor:
+                        break
+                    cursor = right
+                else:
+                    calculated = sum(row[2] for row in verified)
+                    if (
+                        cursor == event_end
+                        and total is not None
+                        and abs(total - calculated) <= 0.001
+                    ):
+                        return period, total, start, end, incomplete
+        return period, None, start, end, incomplete
 
     @classmethod
     def _select_joined_event(
@@ -211,9 +288,10 @@ class OctoplusProvider(HomeAssistantStateReader):
     @staticmethod
     def _number(value: Any) -> float | None:
         try:
-            return float(value)
-        except (TypeError, ValueError):
+            result = float(value)
+        except (TypeError, ValueError, OverflowError):
             return None
+        return result if isfinite(result) else None
 
     @staticmethod
     def _bool_value(value: Any) -> bool | None:

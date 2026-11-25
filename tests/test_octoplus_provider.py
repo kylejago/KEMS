@@ -196,3 +196,70 @@ def test_mapped_export_baseline_combines_with_import_when_available() -> None:
 
     assert safe_import == imported
     assert safe_export == exported
+
+
+def test_mismatched_import_export_periods_cannot_be_combined() -> None:
+    octoplus, _ = _load_octoplus()
+    start = datetime(2026, 11, 25, 16, tzinfo=UTC)
+    middle = start + timedelta(minutes=30)
+    end = start + timedelta(hours=1)
+    imported = (0.4, 1.0, start, middle, False)
+    exported = (0.1, 0.25, middle, end, False)
+    safe_import, safe_export = octoplus.OctoplusProvider._reward_baselines(
+        imported, exported, export_configured=True
+    )
+    assert safe_import[0] is None
+    assert safe_export[0] is None
+    assert safe_import[1] == 1.0
+    assert safe_export[1] == 0.25
+
+
+def test_event_baseline_requires_exact_complete_event_coverage() -> None:
+    octoplus, State = _load_octoplus()
+    start = datetime(2026, 11, 25, 16, tzinfo=UTC)
+    middle = start + timedelta(minutes=30)
+    end = start + timedelta(hours=1)
+    event = {"start": start, "end": end}
+    rows = [
+        {
+            "start": start,
+            "end": middle,
+            "baseline": 0.4,
+            "is_incomplete_calculation": False,
+        },
+        {
+            "start": middle,
+            "end": end,
+            "baseline": 0.6,
+            "is_incomplete_calculation": False,
+        },
+    ]
+    attrs = {
+        "start": start,
+        "end": middle,
+        "total_baseline": 1.0,
+        "baselines": rows,
+        "is_incomplete_calculation": False,
+    }
+    read = octoplus.OctoplusProvider._event_baseline
+    assert read(State("0.4", attrs), event, start) == (
+        0.4,
+        1.0,
+        start,
+        middle,
+        False,
+    )
+    for altered in (
+        [rows[0]],
+        [rows[0], rows[0]],
+        [rows[0], {**rows[1], "is_incomplete_calculation": True}],
+        [rows[0], {**rows[1], "baseline": float("nan")}],
+    ):
+        value = read(State("0.4", {**attrs, "baselines": altered}), event, start)
+        assert value[1] is None
+    assert read(State("0.4", attrs), event, middle)[0] is None
+    next_event = {
+        "start": start + timedelta(days=1),
+        "end": end + timedelta(days=1),
+    }
+    assert read(State("0.4", attrs), next_event, start)[:2] == (None, None)
