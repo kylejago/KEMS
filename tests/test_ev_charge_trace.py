@@ -247,3 +247,33 @@ def test_trace_fails_safe_when_not_installed_or_ev_data_missing():
     assert "ev_trace = dict(coordinator.ev_charge_trace_state)" in diagnostics
     assert 'ev_trace["samples"] = ev_trace_samples[-64:]' in diagnostics
     assert '"ev_charge_trace": ev_trace' in diagnostics
+
+
+def test_cheap_charge_exception_survives_regular_trace_rollover_and_restart():
+    module, _ = _load_trace_module()
+    module.MAX_RECORDS = 3
+    recorder = module.EVChargeTraceRecorder(object(), "exception_rollover")
+
+    async def exercise():
+        await recorder.async_record(
+            _snapshot(connected=True, charging=True, cheap=True)
+        )
+        for minute in range(1, 6):
+            await recorder.async_record(
+                replace(
+                    _snapshot(minute, connected=True, charging=True, cheap=True),
+                    battery_power_kw=-4.0,
+                )
+            )
+        await recorder.async_save()
+        recovered = module.EVChargeTraceRecorder(object(), "exception_rollover")
+        await recovered.async_load()
+        return recovered.state
+
+    state = asyncio.run(exercise())
+    assert len(state["samples"]) == 3
+    assert len(state["exception_samples"]) == 1
+    exception = state["exception_samples"][0]
+    assert exception["timestamp"] == NOW.isoformat()
+    assert exception["battery_power_kw"] == 1.0
+    assert state["new_ev_routing_hardware_authorised"] is False
