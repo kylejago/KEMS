@@ -40,6 +40,7 @@ class SupplierIntervalRecorder:
             hass, 1, f"{DOMAIN}.{entry_id}.{STORAGE_NAMESPACE}.supplier_intervals"
         )
         self._next_at: datetime | None = None
+        self._dirty = False
         self._status: dict[str, Any] = {"status": "not_loaded"}
 
     @property
@@ -102,14 +103,22 @@ class SupplierIntervalRecorder:
                     kind = "gas"
                 else:
                     continue
-                # A configured Octopus tariff entity scopes automatic intake
-                # to that same integration account/config entry.
+                # Require the same account AND meter prefix as the configured
+                # tariff sensor, not just a plausible name in another account.
                 mapped = registry.async_get(mapping[kind] or "")
                 if (
                     mapped is None
                     or mapped.platform != "octopus_energy"
                     or mapped.config_entry_id != item.config_entry_id
+                    or not mapped.unique_id.casefold().endswith("_current_rate")
                 ):
+                    continue
+                expected_uid = mapped.unique_id.casefold().removesuffix(
+                    "_current_rate"
+                ) + "_previous_accumulative_consumption"
+                if kind == "gas":
+                    expected_uid += "_kwh"
+                if uid != expected_uid:
                     continue
                 found[kind].append(item.entity_id)
             changed = False
@@ -152,13 +161,16 @@ class SupplierIntervalRecorder:
                 )
                 changed |= self._ledger.ingest(rows, source=source, now=now)
                 availability[kind] = "observed"
-            if changed:
+            self._dirty |= changed
+            if self._dirty:
                 await self._store.async_save(self._ledger.dump())
+                self._dirty = False
                 self._status = await self._hass.async_add_executor_job(
                     self._ledger.summary
                 )
             self._status["automatic_source_status"] = availability
             self._status["last_scan_at"] = now.isoformat()
+            self._status.pop("automatic_observation_failed", None)
         except Exception:
             _LOGGER.exception("KEMS supplier interval observation failed")
             self._status["automatic_observation_failed"] = True

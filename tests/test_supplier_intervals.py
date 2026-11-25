@@ -23,9 +23,7 @@ def test_idempotent_ingestion_and_conflicts_preserve_first_observation():
     source = "octopus_csv"
     assert ledger.ingest([first], source=source, now=NOW)
     assert not ledger.ingest([first], source=source, now=NOW)
-    assert ledger.ingest(
-        [_row(start + timedelta(hours=1))], source=source, now=NOW
-    )
+    assert ledger.ingest([_row(start + timedelta(hours=1))], source=source, now=NOW)
     assert ledger.ingest([_row(start, 2.0)], source=source, now=NOW)
     result = ledger.summary()["kinds"]["electricity_import"]
     assert result["retained_intervals"] == 2
@@ -45,6 +43,7 @@ def test_fall_back_day_keeps_both_clock_hours_and_never_zero_fills():
     result = ledger.summary()["kinds"]["electricity_import"]
     assert result["complete_local_days"] == 1
     assert result["usable_intervals"] == 50
+    assert result["recent_complete_day_totals_kwh"] == {"2026-10-25": 0.0}
     assert ledger.summary()["missing_intervals_zero_filled"] is False
 
 

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections import Counter
+from collections import Counter, defaultdict
 from collections.abc import Iterable, Mapping
 from datetime import UTC, datetime, timedelta
 from math import isfinite
@@ -66,9 +66,7 @@ class SupplierIntervalLedger:
         self.rows: dict[tuple[str, str], dict[str, Any]] = {}
         self.conflicts: set[tuple[str, str]] = set()
 
-    def ingest(
-        self, rows: Iterable[Any], *, source: str, now: datetime
-    ) -> bool:
+    def ingest(self, rows: Iterable[Any], *, source: str, now: datetime) -> bool:
         changed = False
         for raw in rows:
             if not isinstance(raw, Mapping):
@@ -117,12 +115,13 @@ class SupplierIntervalLedger:
                 row for row in rows if (kind, row["start"]) not in self.conflicts
             ]
             starts = sorted(datetime.fromisoformat(row["start"]) for row in rows)
-            counts = Counter(
-                datetime.fromisoformat(row["start"]).astimezone(_LONDON).date()
-                for row in usable
-            )
+            by_day: dict[Any, list[dict[str, Any]]] = defaultdict(list)
+            for row in usable:
+                day = datetime.fromisoformat(row["start"]).astimezone(_LONDON).date()
+                by_day[day].append(row)
             complete_days = 0
-            for day, count in counts.items():
+            daily_totals = {}
+            for day, day_rows in sorted(by_day.items()):
                 start = datetime.combine(day, datetime.min.time(), _LONDON)
                 end = datetime.combine(
                     day + timedelta(days=1), datetime.min.time(), _LONDON
@@ -130,7 +129,11 @@ class SupplierIntervalLedger:
                 expected = int(
                     (end.astimezone(UTC) - start.astimezone(UTC)) / _HALF_HOUR
                 )
-                complete_days += count == expected
+                if len(day_rows) == expected:
+                    complete_days += 1
+                    daily_totals[day.isoformat()] = round(
+                        sum(row["kwh"] for row in day_rows), 6
+                    )
             expected_internal = (
                 int((starts[-1] - starts[0]) / _HALF_HOUR) + 1 if starts else 0
             )
@@ -142,6 +145,9 @@ class SupplierIntervalLedger:
                     expected_internal - len(usable)
                 ),
                 "complete_local_days": complete_days,
+                "recent_complete_day_totals_kwh": dict(
+                    list(daily_totals.items())[-7:]
+                ),
                 "first_start": starts[0].isoformat() if starts else None,
                 "last_end": (
                     (starts[-1] + _HALF_HOUR).isoformat() if starts else None
