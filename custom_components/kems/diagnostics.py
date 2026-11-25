@@ -27,6 +27,7 @@ from .kems_core.diagnostic_evidence import (
     corroborated_unchanged_sources,
     reward_settlement_evidence,
 )
+from .kems_core.historical_scope import commissioning_history_scope
 from .kems_core.history_gap_provenance import history_gap_provenance
 from .kems_core.meter_gap_anchor_evidence import meter_gap_anchor_evidence
 from .kems_core.operational_diagnostic_probes import (
@@ -34,7 +35,6 @@ from .kems_core.operational_diagnostic_probes import (
     power_down_baseline_probe,
     roi_recorder_probe,
 )
-from .kems_core.historical_scope import commissioning_history_scope
 from .kems_core.period_coverage_probe import observation_coverage_probe
 from .ohme_extra_slot_policy import ohme_extra_slot_evidence
 from .panel import panel_health_snapshot
