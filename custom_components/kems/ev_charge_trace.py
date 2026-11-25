@@ -17,6 +17,7 @@ from .kems_core.models import Snapshot
 
 STORAGE_VERSION = 1
 MAX_RECORDS = 960
+MAX_EXCEPTION_RECORDS = 64
 RETENTION_HOURS = 72
 PRELUDE_MINUTES = 15
 POSTLUDE_MINUTES = 15
@@ -135,6 +136,14 @@ def build_ev_trace_sample(
     }
 
 
+def _is_cheap_charge_exception(row: dict[str, Any]) -> bool:
+    audit = row.get("ev_cheap_charge_cap_audit")
+    return isinstance(audit, dict) and (
+        audit.get("battery_discharging_during_ev_charge") is True
+        or audit.get("cap_target_exceeded") is True
+    )
+
+
 class EVChargeTraceRecorder:
     """Keep prelude, charging and stop samples without changing hardware."""
 
@@ -143,6 +152,7 @@ class EVChargeTraceRecorder:
             hass, STORAGE_VERSION, f"{DOMAIN}.{entry_id}.{STORAGE_NAMESPACE}.ev_trace"
         )
         self._records: list[dict[str, Any]] = []
+        self._exception_records: list[dict[str, Any]] = []
         self._prelude: list[dict[str, Any]] = []
         self._previous_connected = False
         self._previous_charging = False
@@ -170,6 +180,9 @@ class EVChargeTraceRecorder:
             "scope": "read_only_existing_kems_sources",
             "sample_count": len(self._records),
             "samples": list(self._records),
+            "exception_samples": list(self._exception_records),
+            "exception_sample_limit": MAX_EXCEPTION_RECORDS,
+            "exception_scope": "observed_samples_not_continuous_duration",
             "ev_cheap_charge_cap_summary": {
                 "status": (
                     "not_yet_observed"
@@ -214,6 +227,19 @@ class EVChargeTraceRecorder:
         self._records = [
             item for item in data.get("records", []) if isinstance(item, dict)
         ][-MAX_RECORDS:]
+        # Migrate retained observations from older storage without changing its
+        # schema version. A separate bounded tail survives normal trace rollover.
+        exceptions = [
+            row
+            for row in (*data.get("exception_records", []), *self._records)
+            if isinstance(row, dict)
+            and isinstance(row.get("timestamp"), str)
+            and _is_cheap_charge_exception(row)
+        ]
+        by_timestamp = {row["timestamp"]: row for row in exceptions}
+        self._exception_records = sorted(
+            by_timestamp.values(), key=lambda row: row["timestamp"]
+        )[-MAX_EXCEPTION_RECORDS:]
         if self._records:
             last = self._records[-1]
             self._previous_connected = last.get("ev_connected") is True
@@ -279,6 +305,11 @@ class EVChargeTraceRecorder:
         transition = event != "scan"
         if due or transition:
             self._records.append(sample)
+            if _is_cheap_charge_exception(sample):
+                self._exception_records.append(sample)
+                self._exception_records = self._exception_records[
+                    -MAX_EXCEPTION_RECORDS:
+                ]
             cutoff = now - timedelta(hours=RETENTION_HOURS)
             self._records = [
                 item
@@ -295,5 +326,10 @@ class EVChargeTraceRecorder:
 
     async def async_save(self) -> None:
         """Persist the bounded trace; never write to FoxESS/Ohme."""
-        await self._store.async_save({"records": self._records})
+        await self._store.async_save(
+            {
+                "records": self._records,
+                "exception_records": self._exception_records,
+            }
+        )
         self._unsaved = 0
