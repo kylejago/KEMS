@@ -64,9 +64,7 @@ class SupplierIntervalRecorder:
                 )
                 if changed:
                     await self._store.async_save(self._ledger.dump())
-            self._status = await self._hass.async_add_executor_job(
-                self._ledger.summary
-            )
+            self._status = await self._hass.async_add_executor_job(self._ledger.summary)
         except Exception:
             _LOGGER.exception("KEMS supplier interval recovery unavailable")
             self._status = {"status": "load_failed"}

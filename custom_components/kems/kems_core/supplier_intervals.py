@@ -111,9 +111,7 @@ class SupplierIntervalLedger:
         kinds = {}
         for kind in KINDS:
             rows = [row for key, row in self.rows.items() if key[0] == kind]
-            usable = [
-                row for row in rows if (kind, row["start"]) not in self.conflicts
-            ]
+            usable = [row for row in rows if (kind, row["start"]) not in self.conflicts]
             starts = sorted(datetime.fromisoformat(row["start"]) for row in rows)
             by_day: dict[Any, list[dict[str, Any]]] = defaultdict(list)
             for row in usable:
@@ -145,13 +143,9 @@ class SupplierIntervalLedger:
                     expected_internal - len(usable)
                 ),
                 "complete_local_days": complete_days,
-                "recent_complete_day_totals_kwh": dict(
-                    list(daily_totals.items())[-7:]
-                ),
+                "recent_complete_day_totals_kwh": dict(list(daily_totals.items())[-7:]),
                 "first_start": starts[0].isoformat() if starts else None,
-                "last_end": (
-                    (starts[-1] + _HALF_HOUR).isoformat() if starts else None
-                ),
+                "last_end": ((starts[-1] + _HALF_HOUR).isoformat() if starts else None),
                 "source_counts": dict(Counter(row["source"] for row in usable)),
             }
         return {
