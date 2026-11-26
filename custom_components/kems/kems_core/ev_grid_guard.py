@@ -331,6 +331,106 @@ def protect_pending_intelligent_ev_hold(
     )
 
 
+def _balanced_overnight_site_demand(
+    snapshot: Snapshot, house: float, ev: float, grid: float
+) -> float | None:
+    """Corroborate a no-charge hold, not new charging or EV isolation.
+
+    Only use this narrow fallback when the physical readings agree that
+    FoxESS Load already represents total demand. At night, unchanged zero
+    PV/export readings may be cohort-corroborated; changing load, battery
+    and CT readings must have fresh, closely matched raw timestamps.
+    """
+    if (
+        snapshot.off_peak is not True
+        or snapshot.ev_load_in_house_load is not None
+        or snapshot.solar_power_kw != 0.0
+        or snapshot.grid_export_kw != 0.0
+        or snapshot.battery_power_kw is None
+        or not isfinite(snapshot.battery_power_kw)
+        or snapshot.battery_power_kw < 0.0
+        or house < ev
+        or {"solar_power_kw", "grid_export_kw", "battery_power_kw"}
+        & set(snapshot.stale_fields)
+    ):
+        return None
+    ages = [
+        snapshot.source_age_seconds.get(key)
+        for key in ("house_load_kw", "battery_power_kw", "grid_import_kw")
+    ]
+    if any(age is None or not isfinite(age) or not 0 <= age <= 30 for age in ages):
+        return None
+    if max(ages) - min(ages) > 5:
+        return None
+    supply = grid + snapshot.battery_power_kw
+    if abs(supply - house) > 0.5 or supply < ev:
+        return None
+    return max(supply, house)
+
+
+def protect_fixed_overnight_grid_supply(
+    snapshot: Snapshot, control: ControlState, config: ControlConfig
+) -> ControlState:
+    """Keep the whole bus on grid during the confirmed regular cheap window.
+
+    The reviewed 100% on-grid MinSOC hold is independent of EV presence and
+    the requested charge target. This does not authorise charging outside
+    the regular window, waive a failed plan, or alter Happy Hour dispatch.
+    """
+    if (
+        snapshot.off_peak is not True
+        or not snapshot.cheap_period_confirmed
+        or "off_peak" in snapshot.tariff_stale_fields
+        or snapshot.saving_session_active
+        or control.operating_mode != "control"
+        or control.operating_reason
+        not in {
+            "awaiting_export_tariff_charge",
+            "confirmed_cheap_charge",
+            "agile_rolling_cheap_charge",
+        }
+        or control.desired_work_mode not in {"Self Use", "Force Charge"}
+        or not control.data_fresh
+        or not control.plan_safe
+        or control.site_import_limit_exceeded
+        or control.desired_grid_export_allowed
+        or control.desired_battery_export_power_kw > 0.001
+        or control.alpha969_routing_shadow_only
+        or not config.control_enabled
+        or not config.commissioned
+        or config.emergency_stop
+        or control.island_mode_active
+        or not control.grid_available
+        or control.eps_critical
+    ):
+        return control
+    grid = _nonnegative(snapshot.grid_import_kw)
+    limit = config.site_import_limit_kw
+    if grid is None or (
+        limit is not None and (not isfinite(limit) or grid > limit + 0.001)
+    ):
+        return replace(
+            control,
+            desired_charge_power_kw=0.0,
+            desired_work_mode="No change",
+            plan_safe=False,
+            site_import_limit_exceeded=True,
+            blocked_reason="Regular cheap-period physical site-import safety veto",
+        )
+    charge = max(control.desired_charge_power_kw, 0.0)
+    return replace(
+        control,
+        desired_min_soc_percent=100.0,
+        desired_work_mode="Force Charge" if charge > 0.001 else "Self Use",
+        desired_battery_to_home_power_kw=0.0,
+        desired_total_discharge_power_kw=0.0,
+        next_action=(
+            control.next_action
+            + "; regular cheap window: maintain 100% on-grid MinSOC discharge hold"
+        ),
+    )
+
+
 def protect_live_cheap_ev(
     snapshot: Snapshot,
     control: ControlState,
@@ -487,8 +587,27 @@ def protect_live_cheap_ev(
     # measured over-limit veto remains fail-closed; never bypass safety or
     # assume that reducing charge independently isolates battery from the EV.
     observed_over_limit = grid > limit + 0.001
+    balanced_hold_demand = (
+        _balanced_overnight_site_demand(snapshot, house, ev, grid)
+        if conservative_demand > limit and not observed_over_limit
+        else None
+    )
+    if (
+        balanced_hold_demand is not None
+        and balanced_hold_demand + _EV_CHEAP_GRID_IMPORT_RESERVE_KW <= limit
+    ):
+        # Avoid releasing the protective floor on a false double count.
+        # This snapshot can support a hold only; wait for proven membership
+        # before resuming any additional battery charging.
+        conservative_demand = balanced_hold_demand
+    else:
+        balanced_hold_demand = None
     charge = min(
-        0.0 if observed_over_limit else max(control.desired_charge_power_kw, 0.0),
+        (
+            0.0
+            if observed_over_limit or balanced_hold_demand is not None
+            else max(control.desired_charge_power_kw, 0.0)
+        ),
         max(config.max_charge_kw, 0.0),
         _EV_CHEAP_BATTERY_CHARGE_CAP_KW,
         max(limit - conservative_demand - _EV_CHEAP_GRID_IMPORT_RESERVE_KW, 0.0),
@@ -537,5 +656,11 @@ def protect_live_cheap_ev(
             "capped at 5 kW with 0.75 kW grid-import reserve; "
             "physical MinSOC protects the shared home/EV bus, not "
             "independent house-only battery output control."
+            + (
+                " Corroborated overnight CT/battery balance: suspend charge "
+                "without releasing the battery hold while EV scope is uncertain."
+                if balanced_hold_demand is not None
+                else ""
+            )
         ),
     )

@@ -10,7 +10,10 @@ from zoneinfo import ZoneInfo
 import pytest
 from kems_core import ControlConfig, ControlState, Snapshot
 from kems_core.control_write_authority import assess_foxess_control_write_authority
-from kems_core.ev_grid_guard import protect_live_cheap_ev
+from kems_core.ev_grid_guard import (
+    protect_fixed_overnight_grid_supply,
+    protect_live_cheap_ev,
+)
 
 WHEN = datetime(2026, 9, 27, 23, 30, tzinfo=ZoneInfo("Europe/London"))
 
@@ -340,3 +343,106 @@ def test_coordinator_routes_guard_only_into_reviewed_existing_backend():
     assert '"import_power_limit"' not in live
     assert "export_power_limit_write" in backend
     assert 'key="ev_grid_guard"' in (root / "sensor.py").read_text(encoding="utf-8")
+
+
+def test_november_26_false_double_count_suspends_charge_without_release():
+    snapshot = _snap(
+        ev_power_kw=7.459,
+        ev_load_in_house_load=None,
+        house_load_kw=8.689,
+        grid_import_kw=1.456,
+        battery_power_kw=7.622,
+        grid_export_kw=0.0,
+        battery_soc=59.0,
+        source_age_seconds={
+            "house_load_kw": 4.9,
+            "battery_power_kw": 4.9,
+            "grid_import_kw": 4.9,
+        },
+    )
+    plan = _plan(grid_bypass_power_kw=8.689)
+    guarded = _guard(snapshot, plan)
+    state = protect_fixed_overnight_grid_supply(snapshot, guarded, _config())
+    assert state.plan_safe
+    assert not state.site_import_limit_exceeded
+    assert state.desired_work_mode == "Self Use"
+    assert state.desired_charge_power_kw == 0.0
+    assert state.desired_min_soc_percent == 100.0
+    assert state.total_site_import_kw == 9.078
+    assert state.desired_total_discharge_power_kw == 0.0
+    decision = assess_foxess_control_write_authority(
+        state,
+        technical_ready=True,
+        binding_ready=True,
+        reviewed_version_matches=True,
+        no_paid_export_mode=False,
+        cheap_period_confirmed=True,
+        user_commissioned=True,
+        master_control_enabled=True,
+        emergency_stop=False,
+    )
+    assert decision.commands_permitted
+    assert decision.action == "self_use"
+    assert decision.min_soc_on_grid_percent == 100.0
+
+
+@pytest.mark.parametrize("battery_power", [1.0, 13.5])
+def test_unbalanced_or_genuinely_over_limit_load_is_not_waived(battery_power):
+    snapshot = _snap(
+        ev_power_kw=7.459,
+        ev_load_in_house_load=None,
+        house_load_kw=8.689,
+        grid_import_kw=1.456,
+        battery_power_kw=battery_power,
+        grid_export_kw=0.0,
+        source_age_seconds={
+            "house_load_kw": 4.9,
+            "battery_power_kw": 4.9,
+            "grid_import_kw": 4.9,
+        },
+    )
+    assert not _guard(snapshot, _plan(grid_bypass_power_kw=8.689)).plan_safe
+
+
+@pytest.mark.parametrize("charge", [0.0, 5.0])
+def test_fixed_overnight_hold_independent_of_ev_presence(charge):
+    snapshot = _snap(ev_connected=False, ev_charging=False, ev_power_kw=0.0)
+    plan = _plan(desired_charge_power_kw=charge)
+    state = protect_fixed_overnight_grid_supply(snapshot, plan, _config())
+    assert state.desired_min_soc_percent == 100.0
+    assert state.desired_charge_power_kw == charge
+    assert state.desired_work_mode == ("Force Charge" if charge else "Self Use")
+    assert state.desired_total_discharge_power_kw == 0.0
+
+
+@pytest.mark.parametrize(
+    ("snap_updates", "plan_updates", "config_updates"),
+    [
+        ({"off_peak": False}, {}, {}),
+        ({"saving_session_active": True}, {}, {}),
+        ({}, {"operating_reason": "happy_hour_reward_hour"}, {}),
+        ({}, {"site_import_limit_exceeded": True, "plan_safe": False}, {}),
+        ({}, {"grid_available": False}, {}),
+        ({}, {}, {"emergency_stop": True}),
+        ({}, {"data_fresh": False}, {}),
+    ],
+)
+def test_regular_hold_does_not_override_other_safety_or_tariff_paths(
+    snap_updates, plan_updates, config_updates
+):
+    plan = _plan(**plan_updates)
+    assert (
+        protect_fixed_overnight_grid_supply(
+            _snap(**snap_updates), plan, _config(**config_updates)
+        )
+        is plan
+    )
+
+
+def test_regular_hold_keeps_measured_overload_veto():
+    state = protect_fixed_overnight_grid_supply(
+        _snap(grid_import_kw=14.8), _plan(), _config()
+    )
+    assert not state.plan_safe
+    assert state.site_import_limit_exceeded
+    assert state.desired_charge_power_kw == 0.0

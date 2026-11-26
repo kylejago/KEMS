@@ -1797,6 +1797,21 @@ class FoxESSControlBackend:
                             or happy_hour_house_grid_hold_authorised
                         ),
                     )
+                    if (
+                        cheap_period_confirmed
+                        and snapshot.off_peak is True
+                        and decision.action in {"self_use", "force_charge"}
+                        and decision.min_soc_on_grid_percent == 100.0
+                        and control.operating_reason
+                        in {
+                            "awaiting_export_tariff_charge",
+                            "confirmed_cheap_charge",
+                            "agile_rolling_cheap_charge",
+                        }
+                    ):
+                        # Reuse the existing independent floor-readback and
+                        # no-rollback handover path even with no EV connected.
+                        ev_restart_floor_target = 100.0
                     if ev_restart_floor_target is not None:
                         effective_min_soc = max(
                             float(effective_min_soc or 0.0),
@@ -1916,7 +1931,7 @@ class FoxESSControlBackend:
                         ev_restart_floor_verified = bool(min_soc_ok)
                         if not min_soc_ok:
                             self._last_write_result = (
-                                "Connected EV restart MinSOC not verified: "
+                                "Protective cheap-period MinSOC not verified: "
                                 "retaining existing FoxESS work mode"
                             )
                     action_ok = False
