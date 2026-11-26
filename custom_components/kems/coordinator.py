@@ -95,7 +95,10 @@ from .kems_core.control_event_refresh import (
     meaningful_ev_power_transition,
 )
 from .kems_core.control_write_authority import active_joined_power_down_window
-from .kems_core.ev_grid_guard import measured_ohme_ev_charge_active
+from .kems_core.ev_grid_guard import (
+    measured_ohme_ev_charge_active,
+    protect_fixed_overnight_grid_supply,
+)
 from .kems_core.happy_hour_financial import estimate_happy_hour_credit
 from .kems_core.historical_reward_backfill import (
     estimate_historical_happy_hour_credits,
@@ -1586,6 +1589,9 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                 source_uncertain=ev_hold_source_uncertain,
                 source_grace_seconds=_ALPHA975_EV_HOLD_SOURCE_GRACE_SECONDS,
                 ohme_finished=ohme_finished,
+            )
+            control = protect_fixed_overnight_grid_supply(
+                snapshot, control, self.settings.control
             )
             ev_hold_state = self._ev_grid_hold.status
             control, stress_started = (

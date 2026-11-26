@@ -143,8 +143,8 @@ def test_alpha967_release_identity_and_scope() -> None:
     ).read_text(encoding="utf-8")
     reason = str(bundle["maintenance"]["reason"])
 
-    assert manifest["version"] == "0.9.0-alpha9.254"
-    assert reason.startswith("Alpha9.254:")
+    assert manifest["version"] == "0.9.0-alpha9.255"
+    assert reason.startswith("Alpha9.255:")
     assert "simulated SOC" in reason
     assert "solar-aware no-export target" in reason
     assert "site-import headroom" in reason

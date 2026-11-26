@@ -1,3 +1,9 @@
+## 0.9.0-alpha9.255 — regular cheap-period discharge protection hotfix
+
+- Maintain the reviewed 100% on-grid MinSOC discharge hold throughout a safe confirmed regular cheap period, independent of EV presence or battery charge target. Require physical floor readback before applying the work mode, using the existing protective handover path.
+- Avoid the observed false EV double count only with a closely matched fresh overnight CT/battery/load balance; suspend additional charging until load membership is proven. Do not waive real overload, inconsistent readings, other safety failures, or commissioning gates.
+- Preserve the 5 kW EV battery charging cap, 14.5 kW site import and 7 kW DNO limits, ordinary 10% household and 15% export floors, and all Happy Hour, Power Down, and daytime EV-only tariff logic.
+
 ## 0.9.0-alpha9.254 — EV evidence and historical reconciliation groundwork
 
 - Preserve a separate bounded, persisted EV exception trace across normal trace rollover; include outside-cheap charging grid shortfalls as possible battery contribution, not circuit-isolation proof. Record explicit unplugged observation in legacy parity without promoting missing tariff data.

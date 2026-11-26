@@ -15,7 +15,7 @@ RELEASE = ROOT / "release" / "kems-bundle.template.json"
 def test_release_version_bundle_and_optional_component_versions_are_pinned() -> None:
     manifest = json.loads((KEMS / "manifest.json").read_text(encoding="utf-8"))
     bundle = json.loads(RELEASE.read_text(encoding="utf-8"))
-    assert manifest["version"] == "0.9.0-alpha9.254"
+    assert manifest["version"] == "0.9.0-alpha9.255"
     assert bundle["bundle"] == "__RELEASE_VERSION__"
     assert bundle["components"]["kems_core"]["version"] == "__RELEASE_VERSION__"
     assert bundle["components"]["dashboard"]["version"] == "__RELEASE_VERSION__"
@@ -35,7 +35,7 @@ def test_reason_explicitly_guards_original_safety_and_provenance() -> None:
         / "docs/archived-release-notes-through-alpha9244.md"
     ).read_text(encoding="utf-8")
     reason = bundle["maintenance"]["reason"]
-    assert reason.startswith("Alpha9.254:")
+    assert reason.startswith("Alpha9.255:")
     for statement in (
         "all three original",
         "identical Home Assistant sensor state+complete-attribute writes",
