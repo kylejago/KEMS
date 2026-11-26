@@ -1931,7 +1931,7 @@ class FoxESSControlBackend:
                         ev_restart_floor_verified = bool(min_soc_ok)
                         if not min_soc_ok:
                             self._last_write_result = (
-                                "Protective cheap-period MinSOC not verified: "
+                                "Connected EV restart MinSOC not verified: "
                                 "retaining existing FoxESS work mode"
                             )
                     action_ok = False

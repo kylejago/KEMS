@@ -348,7 +348,6 @@ def _balanced_overnight_site_demand(
         or snapshot.grid_export_kw != 0.0
         or snapshot.battery_power_kw is None
         or not isfinite(snapshot.battery_power_kw)
-        or snapshot.battery_power_kw < 0.0
         or house < ev
         or {"solar_power_kw", "grid_export_kw", "battery_power_kw"}
         & set(snapshot.stale_fields)
@@ -362,6 +361,8 @@ def _balanced_overnight_site_demand(
         return None
     if max(ages) - min(ages) > 5:
         return None
+    # Signed battery power also subtracts existing charge demand from CT
+    # import. AC conversion losses remain conservatively in the bound.
     supply = grid + snapshot.battery_power_kw
     if abs(supply - house) > 0.5 or supply < ev:
         return None

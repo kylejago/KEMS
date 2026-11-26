@@ -20,7 +20,7 @@ def test_alpha9128_manifest_bundle_and_replay_scope() -> None:
         / "docs/archived-release-notes-through-alpha9244.md"
     ).read_text(encoding="utf-8")
     reason = str(bundle["maintenance"]["reason"]).lower()
-    assert manifest["version"] == "0.9.0-alpha9.254"
+    assert manifest["version"] == "0.9.0-alpha9.255"
     assert reason.startswith("alpha9.254:")
     assert "current and tomorrow" in reason
     assert "physical/ev/dno/export safety authority unchanged" in reason

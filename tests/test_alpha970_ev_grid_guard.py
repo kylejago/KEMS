@@ -446,3 +446,26 @@ def test_regular_hold_keeps_measured_overload_veto():
     assert not state.plan_safe
     assert state.site_import_limit_exceeded
     assert state.desired_charge_power_kw == 0.0
+
+
+def test_unknown_scope_can_suspend_an_existing_charge_without_releasing():
+    snapshot = _snap(
+        ev_power_kw=7.459,
+        ev_load_in_house_load=None,
+        house_load_kw=8.689,
+        grid_import_kw=13.689,
+        battery_power_kw=-5.0,
+        grid_export_kw=0.0,
+        source_age_seconds={
+            "house_load_kw": 4.9,
+            "battery_power_kw": 4.9,
+            "grid_import_kw": 4.9,
+        },
+    )
+    guarded = _guard(snapshot, _plan(grid_bypass_power_kw=8.689))
+    state = protect_fixed_overnight_grid_supply(snapshot, guarded, _config())
+    assert state.plan_safe
+    assert state.desired_work_mode == "Self Use"
+    assert state.desired_charge_power_kw == 0.0
+    assert state.desired_min_soc_percent == 100.0
+    assert state.total_site_import_kw == 8.689
