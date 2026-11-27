@@ -91,17 +91,12 @@ class SupplierIntervalLedger:
             if previous is None:
                 target[key] = row
                 changed = True
-            elif (
-                abs(previous["kwh"] - row["kwh"]) > 0.000001
-                and key not in conflicts
-            ):
+            elif abs(previous["kwh"] - row["kwh"]) > 0.000001 and key not in conflicts:
                 conflicts.add(key)
                 changed = True
         return changed
 
-    def ingest_gas_daily_reference(
-        self, rows: Iterable[Any], *, now: datetime
-    ) -> bool:
+    def ingest_gas_daily_reference(self, rows: Iterable[Any], *, now: datetime) -> bool:
         """Retain corroborated daily HA observations, never synthetic intervals."""
         changed = False
         for row in rows:
@@ -166,9 +161,7 @@ class SupplierIntervalLedger:
                 and row.get("source") != "octopus_csv"
             ):
                 self.ingest([row], source=row.get("source"), now=now)
-        self.ingest_gas_daily_reference(
-            data.get("gas_daily_reference") or [], now=now
-        )
+        self.ingest_gas_daily_reference(data.get("gas_daily_reference") or [], now=now)
         for day in data.get("gas_daily_reference_conflicts") or []:
             if isinstance(day, str) and day in self.gas_daily_reference:
                 self.gas_daily_reference_conflicts.add(day)
@@ -255,9 +248,7 @@ class SupplierIntervalLedger:
                 "comparable_recorded_days": len(matched),
                 "missing_recorded_days": len(comparisons) - len(matched),
                 "net_difference_kwh": (
-                    round(
-                        sum(row["supplier_minus_recorded_kwh"] for row in matched), 6
-                    )
+                    round(sum(row["supplier_minus_recorded_kwh"] for row in matched), 6)
                     if matched
                     else None
                 ),

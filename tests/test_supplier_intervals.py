@@ -79,9 +79,7 @@ def test_migrate_automatic_gas_without_poisoning_csv_or_electricity():
     )
     assert ledger.summary()["gas_quarantine"]["retained_raw_intervals"] == 1
     assert ledger.summary()["kinds"]["gas"]["usable_intervals"] == 0
-    assert ledger.ingest(
-        [_row(start, 0.1, kind="gas")], source="octopus_csv", now=NOW
-    )
+    assert ledger.ingest([_row(start, 0.1, kind="gas")], source="octopus_csv", now=NOW)
     assert not ledger.ingest([gas], source="octopus_estimated_gas", now=NOW)
     assert ledger.summary()["kinds"]["gas"]["usable_intervals"] == 1
     assert ledger.summary()["kinds"]["electricity_import"]["usable_intervals"] == 1
