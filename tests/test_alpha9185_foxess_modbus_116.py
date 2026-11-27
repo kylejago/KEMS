@@ -83,7 +83,7 @@ def test_release_metadata_identity_matches_185():
         )
     )["maintenance"]["reason"]
     assert manifest["version"] == "0.9.0-alpha9.260"
-    assert reason.startswith("Alpha9.259:")
+    assert reason.startswith("Alpha9.260:")
     historical_reason = (
         KEMS.parents[1] / "docs/archived-release-notes-through-alpha9244.md"
     ).read_text(encoding="utf-8")

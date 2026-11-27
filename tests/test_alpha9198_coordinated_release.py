@@ -35,7 +35,7 @@ def test_reason_explicitly_guards_original_safety_and_provenance() -> None:
         / "docs/archived-release-notes-through-alpha9244.md"
     ).read_text(encoding="utf-8")
     reason = bundle["maintenance"]["reason"]
-    assert reason.startswith("Alpha9.259:")
+    assert reason.startswith("Alpha9.260:")
     for statement in (
         "all three original",
         "identical Home Assistant sensor state+complete-attribute writes",

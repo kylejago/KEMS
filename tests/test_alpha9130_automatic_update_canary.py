@@ -19,7 +19,7 @@ def test_canary_targets_only_update_version_and_preserves_energy_safety() -> Non
     ).read_text(encoding="utf-8")
     assert manifest["version"] == "0.9.0-alpha9.260"
     reason = bundle["maintenance"]["reason"]
-    assert reason.startswith("Alpha9.259:")
+    assert reason.startswith("Alpha9.260:")
     assert "separate physical readback" in reason
     assert "Maintain all safety deferrals" in reason
 
