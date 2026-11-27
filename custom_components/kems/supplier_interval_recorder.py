@@ -18,6 +18,7 @@ from .kems_core.supplier_charges import (
     SupplierChargeEvidence,
     capture_completed_baseline,
     completed_power_down_estimate,
+    merge_completed_baseline,
 )
 from .kems_core.supplier_intervals import FORMAT, KINDS, SupplierIntervalLedger, _utc
 from .providers.entity_map import KEMSEntities
@@ -128,6 +129,11 @@ class SupplierIntervalRecorder:
                     )
                 )
                 self._dirty |= changed
+                self._dirty |= await self._hass.async_add_executor_job(
+                    lambda: self._charges.ingest(
+                        data.get("rows") or [], source="octopus_csv", now=now
+                    )
+                )
             # Persist the migration even if the original CSV is unchanged.
             self._dirty |= (
                 bool(self._ledger.quarantined_gas)
@@ -314,12 +320,19 @@ class SupplierIntervalRecorder:
                 entities.saving_session_export_baseline or ""
             )
             event_state = self._hass.states.get(entities.saving_session_events or "")
-            if (
-                import_state is not None
-                and export_state is not None
-                and import_state.state not in {"unknown", "unavailable"}
-                and export_state.state not in {"unknown", "unavailable"}
-            ):
+            if completed_events:
+                import_attrs = (
+                    import_state.attributes
+                    if import_state is not None
+                    and import_state.state not in {"unknown", "unavailable"}
+                    else {}
+                )
+                export_attrs = (
+                    export_state.attributes
+                    if export_state is not None
+                    and export_state.state not in {"unknown", "unavailable"}
+                    else {}
+                )
                 joined = (
                     event_state.attributes.get("joined_events", [])
                     if event_state
@@ -343,10 +356,11 @@ class SupplierIntervalRecorder:
                             break
                     evidence = capture_completed_baseline(
                         event,
-                        import_state.attributes,
-                        export_state.attributes,
+                        import_attrs,
+                        export_attrs,
                         now=now,
                         points_per_kwh=points,
+                        allow_partial=True,
                     )
                     if evidence is None:
                         continue
@@ -355,26 +369,10 @@ class SupplierIntervalRecorder:
                     if prior is None:
                         self._late_events[key] = evidence
                         changed = True
-                    elif not prior.get("conflict"):
-                        comparable = (
-                            "session_start",
-                            "session_end",
-                            "import_baseline_kwh",
-                            "export_baseline_kwh",
-                        )
-                        if any(prior.get(k) != evidence.get(k) for k in comparable) or (
-                            prior.get("octopoints_per_kwh") is not None
-                            and evidence.get("octopoints_per_kwh") is not None
-                            and prior["octopoints_per_kwh"]
-                            != evidence["octopoints_per_kwh"]
-                        ):
-                            self._late_events[key] = {**prior, "conflict": True}
-                            changed = True
-                        elif (
-                            prior.get("octopoints_per_kwh") is None
-                            and evidence.get("octopoints_per_kwh") is not None
-                        ):
-                            self._late_events[key] = evidence
+                    else:
+                        merged = merge_completed_baseline(prior, evidence)
+                        if merged != prior:
+                            self._late_events[key] = merged
                             changed = True
                 if len(self._late_events) > 64:
                     self._late_events = dict(list(self._late_events.items())[-64:])

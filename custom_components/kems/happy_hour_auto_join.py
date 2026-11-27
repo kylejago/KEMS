@@ -1102,11 +1102,10 @@ class HappyHourAutoJoinController:
             }
             for window in windows
         ]
-        if windows:
-            current_or_next = next(
-                (window for window in windows if window["end"] > now),
-                windows[-1],
-            )
+        current_or_next = next(
+            (window for window in windows if window["end"] > now), None
+        )
+        if current_or_next is not None:
             state.update(
                 {
                     "status": "booked",
@@ -1134,7 +1133,7 @@ class HappyHourAutoJoinController:
             )
             if upcoming_days:
                 state["next_candidate_day"] = upcoming_days[0].isoformat()
-            if not windows:
+            if current_or_next is None:
                 state["status"] = (
                     "waiting_for_night_before"
                     if upcoming_days
@@ -1165,7 +1164,7 @@ class HappyHourAutoJoinController:
         )
         if state["booking_limit_reached"]:
             # A joined pair remains "booked"; the cap is an independent flag.
-            if not windows:
+            if current_or_next is None:
                 state["status"] = "weekend_booking_limit_reached"
             self.state = state
             return

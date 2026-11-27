@@ -71,7 +71,7 @@ def test_release_note_no_longer_embeds_old_changelog() -> None:
         Path(__file__).resolve().parents[1]
         / "docs/archived-release-notes-through-alpha9244.md"
     ).read_text(encoding="utf-8")
-    assert release["maintenance"]["reason"].startswith("Alpha9.257:")
+    assert release["maintenance"]["reason"].startswith("Alpha9.258:")
     assert (
         "Alpha9.131: Fix misleading shadow recorder" in release["maintenance"]["reason"]
     )
