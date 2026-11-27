@@ -1,0 +1,6 @@
+# Alpha9.264 recovery work
+
+- Gas: a separate local `kems_supplier_gas_intervals.json` reference file is accepted without replacing existing electricity evidence. Four nonzero CSV overlaps and no contradictory overlap are required per calorific setting before complete observed days can be reported as provisional. CSV wins; conflicts, incomplete days and ambiguous settings fail closed. Same-day observed rates provide labelled cost scenarios, not settlement or ROI adjustments.
+- Historical charge recovery: skip empty Recorder windows within the existing 84-day maximum. Recover explicitly complete Power Down baseline rows for known completed event windows from matched configured supplier entities; merge using the existing conflict rules. No inferred average or supplier award.
+- EV routing review: distinguish an unavailable limit, low/missing SOC and old raw SOC. The observed daytime session had a valid 14.5 kW limit but a raw SOC report older than 180 seconds and unproven EV load membership. Keep verified battery-hold fallback, no new commands or tariff authority.
+- The private gas CSV must be imported locally, not bundled into the public repository. Further hardware evidence and supplier settlement remain outstanding.

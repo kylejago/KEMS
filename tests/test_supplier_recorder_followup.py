@@ -142,7 +142,7 @@ def test_baseline_capture_runs_between_slow_supplier_scans():
     asyncio.run(exercise())
 
 
-def test_history_batches_use_fixed_anchor_and_stop_at_empty_window():
+def test_history_batches_use_fixed_anchor_and_skip_empty_window():
     module = _load_recorder_module()
     queries = []
     start = NOW - timedelta(days=1)
@@ -185,16 +185,18 @@ def test_history_batches_use_fixed_anchor_and_stop_at_empty_window():
             (entities, NOW - timedelta(days=7), NOW),
             (entities, NOW - timedelta(days=14), NOW - timedelta(days=7)),
         ]
-        assert (
-            recorder.status["historical_charge_recovery"]["stop_reason"]
-            == "empty_window"
-        )
+        assert recorder.status["historical_charge_recovery"]["empty_batches"] == 1
         assert recorder.status["historical_charge_recovery"]["candidate_rows"] == 1
         assert len(recorder._charges.rows) == 1
-        assert not await recorder._consume_recorded_charges(
-            NOW + timedelta(hours=2), entities
-        )
+        for batch in range(2, 12):
+            await recorder._history_task
+            await recorder._consume_recorded_charges(
+                NOW + timedelta(hours=batch), entities
+            )
         assert recorder._history_task is None
-        assert len(queries) == 2
+        assert len(queries) == 12
+        assert recorder.status["historical_charge_recovery"]["stop_reason"] == (
+            "batch_limit"
+        )
 
     asyncio.run(exercise())

@@ -21,6 +21,7 @@ from .kems_core.supplier_charges import (
     capture_joined_baseline,
     completed_power_down_estimate,
     merge_completed_baseline,
+    recover_historical_baselines,
     supplier_cost_rows,
 )
 from .kems_core.supplier_intervals import (
@@ -39,6 +40,7 @@ _HISTORY_BATCH_DAYS = 7
 _HISTORY_MAX_BATCHES = 12
 _FILE_NAME = "kems_supplier_intervals.json"
 _GAS_REFERENCE_FILE = "kems_gas_daily_reference.json"
+_GAS_CSV_FILE = "kems_supplier_gas_intervals.json"
 _CHARGE_FILE = "kems_supplier_charges.json"
 _MAX_FILE_BYTES = 10_000_000
 
@@ -70,6 +72,8 @@ class SupplierIntervalRecorder:
         self._history_entities: dict[str, str] = {}
         self._history_batches = 0
         self._history_candidate_rows = 0
+        self._history_empty_batches = 0
+        self._history_baseline_rows = 0
         self._history_changed = False
         self._next_baseline_at: datetime | None = None
         self._baseline_status: dict[str, Any] = {}
@@ -86,6 +90,9 @@ class SupplierIntervalRecorder:
 
     def electricity_reconciliation(self, daily_records, *, now):
         return self._ledger.electricity_reconciliation(daily_records, now=now)
+
+    def provisional_gas_reconciliation(self, records, *, now):
+        return self._ledger.provisional_gas_reconciliation(records, now=now)
 
     def financial_reconciliation(self, daily_records, *, now, commissioning_date):
         return self._charges.reconciliation(
@@ -132,6 +139,24 @@ class SupplierIntervalRecorder:
         except (OSError, ValueError, TypeError):
             _LOGGER.warning("KEMS supplier charge reference file not accepted")
 
+    async def _async_read_gas_csv_file(self, now):
+        try:
+            data = await self._hass.async_add_executor_job(
+                _read_bootstrap, Path(self._hass.config.path(_GAS_CSV_FILE))
+            )
+            if isinstance(data, dict) and data.get("format") == FORMAT:
+                rows = data.get("rows")
+                if not isinstance(rows, list) or any(
+                    not isinstance(row, dict) or row.get("kind") != "gas"
+                    for row in rows
+                ):
+                    raise ValueError("Gas reference must contain only gas rows")
+                self._dirty |= await self._hass.async_add_executor_job(
+                    lambda: self._ledger.ingest(rows, source="octopus_csv", now=now)
+                )
+        except (OSError, ValueError, TypeError):
+            _LOGGER.warning("KEMS gas CSV reference file not accepted")
+
     async def async_load(self) -> None:
         now = datetime.now(UTC)
         try:
@@ -163,6 +188,7 @@ class SupplierIntervalRecorder:
                     else set(self._late_events)
                 )
             await self._async_read_charge_file(now)
+            await self._async_read_gas_csv_file(now)
             path = Path(self._hass.config.path(_FILE_NAME))
             data = await self._hass.async_add_executor_job(_read_bootstrap, path)
             if isinstance(data, dict) and data.get("format") == FORMAT:
@@ -220,6 +246,12 @@ class SupplierIntervalRecorder:
         """One bounded, read-only query outside the live coordinator scan."""
         from homeassistant.components.recorder import get_instance, history
 
+        completed = [
+            dict(item)
+            for key, item in self._late_events.items()
+            if key in self._completed_ids
+        ]
+
         def read():
             states = history.get_significant_states(
                 self._hass,
@@ -238,6 +270,13 @@ class SupplierIntervalRecorder:
                 for state in states.get(entity_id, []):
                     if state.state in {"unknown", "unavailable"}:
                         continue
+                    if kind in ("baseline_import", "baseline_export"):
+                        for evidence in recover_historical_baselines(
+                            completed, state.attributes, kind.removeprefix("baseline_")
+                        ):
+                            key = json.dumps(evidence, sort_keys=True)
+                            result[key] = {"baseline_evidence": evidence}
+                        continue
                     for row in supplier_cost_rows(kind, state.attributes):
                         key = tuple(str(value) for value in row.values())
                         result[key] = row
@@ -254,33 +293,45 @@ class SupplierIntervalRecorder:
             task, self._history_task = self._history_task, None
             try:
                 rows = task.result()
+                charges = [row for row in rows if "baseline_evidence" not in row]
+                baselines = [
+                    row["baseline_evidence"]
+                    for row in rows
+                    if "baseline_evidence" in row
+                ]
                 changed = await self._hass.async_add_executor_job(
                     lambda: self._charges.ingest(
-                        rows, source="octopus_integration", now=now
+                        charges, source="octopus_integration", now=now
                     )
                 )
-                self._history_candidate_rows += len(rows)
+                for evidence in baselines:
+                    if evidence["session_id"] in self._completed_ids:
+                        changed |= self._retain_baseline(evidence)
+                self._history_candidate_rows += len(charges)
+                self._history_baseline_rows += len(baselines)
+                self._history_empty_batches += int(not rows)
                 self._history_changed |= changed
                 self._history_batches += 1
                 self._history_status = {
                     "status": (
                         "observed"
-                        if self._history_candidate_rows
+                        if self._history_candidate_rows or self._history_baseline_rows
                         else "no_retained_attributes"
                     ),
                     "candidate_rows": self._history_candidate_rows,
-                    "last_batch_candidate_rows": len(rows),
+                    "last_batch_candidate_rows": len(charges),
+                    "baseline_candidate_observations": self._history_baseline_rows,
+                    "empty_batches": self._history_empty_batches,
                     "evidence_changed": self._history_changed,
                     "lookback_days": self._history_batches * _HISTORY_BATCH_DAYS,
                     "completed_batches": self._history_batches,
                     "max_batches": _HISTORY_MAX_BATCHES,
                     "supplier_settlement_verified": False,
                 }
-                # An empty historical window is not proof older data exist.
-                # Stop here to avoid repeated queries against purged history.
-                if not rows:
-                    self._history_status["stop_reason"] = "empty_window"
-                    return changed
+                # Empty windows can be gaps rather than the end of retained
+                # history. Scan the full bounded horizon, never beyond it.
+                if self._history_batches >= _HISTORY_MAX_BATCHES:
+                    self._history_status["stop_reason"] = "batch_limit"
             except Exception as err:
                 self._history_status = {
                     **self._history_status,
@@ -298,6 +349,8 @@ class SupplierIntervalRecorder:
             self._history_anchor = now
             self._history_batches = 0
             self._history_candidate_rows = 0
+            self._history_empty_batches = 0
+            self._history_baseline_rows = 0
             self._history_changed = False
             self._history_status = {"status": "not_attempted"}
         if self._history_batches >= _HISTORY_MAX_BATCHES or self._history_status.get(
@@ -510,6 +563,7 @@ class SupplierIntervalRecorder:
             gas_source_shape = None
             history_entities = {}
             await self._async_read_charge_file(now)
+            await self._async_read_gas_csv_file(now)
             for kind, candidates in found.items():
                 availability[kind] = "ambiguous_or_unmapped"
                 if len(candidates) != 1:
@@ -602,6 +656,26 @@ class SupplierIntervalRecorder:
                     priced, source="octopus_integration", now=now
                 )
                 charge_availability[kind] = "estimated_charges_observed"
+
+            for kind, entity_id in (
+                ("electricity_import", entities.saving_session_import_baseline),
+                ("electricity_export", entities.saving_session_export_baseline),
+            ):
+                meter = registry.async_get(mapping[kind] or "")
+                baseline = registry.async_get(entity_id or "")
+                if (
+                    meter is not None
+                    and baseline is not None
+                    and meter.platform == baseline.platform == "octopus_energy"
+                    and meter.config_entry_id == baseline.config_entry_id
+                    and baseline.disabled_by is None
+                    and meter.unique_id.casefold().endswith("_current_rate")
+                    and baseline.unique_id.casefold()
+                    == meter.unique_id.casefold().removesuffix("_current_rate")
+                    + "_octoplus_power_down_baseline"
+                ):
+                    direction = kind.removeprefix("electricity_")
+                    history_entities[baseline.entity_id] = f"baseline_{direction}"
 
             changed |= await self._consume_recorded_charges(now, history_entities)
 

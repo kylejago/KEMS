@@ -303,3 +303,45 @@ def test_gas_conversion_complete_day_requires_all_intervals_same_setting():
     assert report["nonzero_rows"] == 0
     assert report["nonzero_csv_overlap_rows"] == 0
     assert ledger.complete_day_totals("gas") == {}
+
+
+
+def test_provisional_gas_requires_nonzero_csv_corroboration_and_prefers_csv():
+    from types import SimpleNamespace
+
+    ledger = SupplierIntervalLedger()
+    start = NOW - timedelta(days=2)
+    rows = [
+        {
+            **_row(start + timedelta(minutes=30 * n), 11.164 if n < 4 else 0, "gas"),
+            "consumption_m3": 1 if n < 4 else 0,
+        }
+        for n in range(96)
+    ]
+    # The second day has independent observed readings, not copied CSV.
+    rows[48]["consumption_m3"] = 1
+    rows[48]["kwh"] = 11.164
+    assert ledger.ingest_gas_conversion(
+        rows, source="octopus_estimated_gas", calorific_value=39.3, now=NOW
+    )
+    assert ledger.provisional_gas_reconciliation([], now=NOW)["provisional_days"] == 0
+    csv = [{**row, "kwh": 11.192 if row["kwh"] else 0} for row in rows[:48]]
+    assert ledger.ingest(csv, source="octopus_csv", now=NOW)
+    record = SimpleNamespace(
+        timestamp=start + timedelta(days=1),
+        gas_current_rate=8.0,
+        gas_standing_charge=28.0,
+    )
+    report = ledger.provisional_gas_reconciliation([record], now=NOW)
+    assert report["csv_corroborated_settings"] == [39.3]
+    assert report["provisional_days"] == 1
+    assert report["recent_days"][0]["kwh"] == 44.768
+    assert report["recent_days"][1]["kwh"] == 11.164
+    assert report["recent_days"][1]["estimated_total_cost_pence"] == 117.312
+    assert report["roi_or_ledger_write_authorised"] is False
+    assert ledger.ingest([rows[48]], source="octopus_csv", now=NOW)
+    report = ledger.provisional_gas_reconciliation([], now=NOW)
+    assert report["recent_days"][1]["csv_intervals"] == 1
+    assert report["recent_days"][1]["estimated_total_cost_pence"] is None
+    assert ledger.ingest(rows[49:], source="octopus_csv", now=NOW)
+    assert ledger.provisional_gas_reconciliation([], now=NOW)["provisional_days"] == 0

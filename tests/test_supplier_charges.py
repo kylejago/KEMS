@@ -307,3 +307,33 @@ def test_joined_identity_survives_missing_or_incomplete_baseline():
     assert audit["rows_explicitly_incomplete"] == 1
     assert audit["accepted_half_hours"] == 0
     assert audit["exact_total_available"] is False
+
+
+
+def test_historical_baseline_recovery_requires_exact_complete_rows():
+    from kems_core.supplier_charges import recover_historical_baselines
+
+    start = datetime(2026, 11, 25, 16, tzinfo=UTC)
+    end = start + timedelta(hours=1)
+    event = {
+        "session_id": "known",
+        "session_start": start.isoformat(),
+        "session_end": end.isoformat(),
+    }
+    attrs = {
+        "baselines": [
+            {
+                "start": start.isoformat(),
+                "end": (start + timedelta(minutes=30)).isoformat(),
+                "baseline": 0.5,
+                "is_incomplete_calculation": False,
+            }
+        ]
+    }
+    result = recover_historical_baselines([event], attrs, "import")
+    assert result[0]["import_baseline_rows"] == {start.isoformat(): 0.5}
+    assert result[0]["import_baseline_kwh"] is None
+    assert result[0]["export_baseline_rows"] == {}
+    attrs["baselines"][0]["is_incomplete_calculation"] = True
+    assert not recover_historical_baselines([event], attrs, "import")
+    assert not recover_historical_baselines([], attrs, "import")
