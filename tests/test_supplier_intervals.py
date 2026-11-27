@@ -137,6 +137,8 @@ def test_gas_quarantine_compares_only_matching_unconflicted_intervals():
     report = ledger.gas_quarantine_comparison()
     assert report["matched_nonconflicting_intervals"] == 1
     assert report["recent_overlap_days"][0]["difference_kwh"] == 4.5
+    assert report["recent_overlap_days"][0]["nonzero_matched_intervals"] == 1
+    assert report["recent_raw_days"][0]["raw_first_seen_kwh"] == 5.0
     assert report["automatic_gas_financially_usable"] is False
     ledger.ingest(
         [_row(start, 6.0, kind="gas")], source="octopus_estimated_gas", now=NOW

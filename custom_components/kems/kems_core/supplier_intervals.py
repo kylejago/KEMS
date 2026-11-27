@@ -282,12 +282,40 @@ class SupplierIntervalLedger:
                 {
                     "date": day.isoformat(),
                     "matched_intervals": len(pairs),
+                    "nonzero_matched_intervals": sum(
+                        left > 0 or right > 0 for left, right in pairs
+                    ),
                     "automatic_kwh": round(automatic, 6),
                     "csv_kwh": round(reference, 6),
                     "difference_kwh": round(automatic - reference, 6),
                 }
             )
+        raw_by_day = defaultdict(list)
+        for key, row in self.quarantined_gas.items():
+            day = datetime.fromisoformat(key[1]).astimezone(_LONDON).date()
+            raw_by_day[day.isoformat()].append((key, row["kwh"]))
+        csv_days = self.complete_day_totals("gas")
+        daily = []
+        for day, pairs in sorted(raw_by_day.items())[-14:]:
+            raw_total = round(sum(value for _, value in pairs), 6)
+            conflicts = sum(key in self.quarantined_gas_conflicts for key, _ in pairs)
+            reference = (
+                self.gas_daily_reference.get(day)
+                if day not in self.gas_daily_reference_conflicts
+                else None
+            )
+            daily.append(
+                {
+                    "date": day,
+                    "raw_intervals": len(pairs),
+                    "raw_conflicts": conflicts,
+                    "raw_first_seen_kwh": raw_total,
+                    "complete_csv_day_kwh": csv_days.get(day),
+                    "corroborated_daily_reference_kwh": reference,
+                }
+            )
         return {
+            "recent_raw_days": daily,
             "matched_nonconflicting_intervals": sum(
                 len(pairs) for pairs in by_day.values()
             ),
