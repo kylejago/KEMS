@@ -17,6 +17,7 @@ from .kems_core.supplier_charges import (
     CHARGE_FORMAT,
     SupplierChargeEvidence,
     capture_completed_baseline,
+    capture_joined_baseline,
     completed_power_down_estimate,
     merge_completed_baseline,
 )
@@ -47,6 +48,7 @@ class SupplierIntervalRecorder:
         self._ledger = SupplierIntervalLedger()
         self._charges = SupplierChargeEvidence()
         self._late_events: dict[str, Any] = {}
+        self._completed_ids: set[str] = set()
         self._store = Store(
             hass, 1, f"{DOMAIN}.{entry_id}.{STORAGE_NAMESPACE}.supplier_intervals"
         )
@@ -73,6 +75,12 @@ class SupplierIntervalRecorder:
             "events": [
                 completed_power_down_estimate(self._ledger, item)
                 for item in list(self._late_events.values())[-64:]
+                if item.get("session_id") in self._completed_ids
+            ],
+            "joined_baselines_retained": [
+                item
+                for item in self._late_events.values()
+                if item.get("session_id") not in self._completed_ids
             ],
             "supplier_settled": False,
             "roi_or_ledger_write_authorised": False,
@@ -83,6 +91,7 @@ class SupplierIntervalRecorder:
             **self._ledger.dump(),
             "charge_evidence": self._charges.dump(),
             "late_power_down_evidence": self._late_events,
+            "completed_power_down_ids": sorted(self._completed_ids),
         }
 
     async def _async_read_charge_file(self, now):
@@ -119,6 +128,16 @@ class SupplierIntervalRecorder:
                         for key, value in events.items()
                         if isinstance(key, str) and isinstance(value, dict)
                     }
+                completed_ids = stored.get("completed_power_down_ids")
+                self._completed_ids = (
+                    {
+                        key
+                        for key in completed_ids
+                        if isinstance(key, str) and key in self._late_events
+                    }
+                    if isinstance(completed_ids, list)
+                    else set(self._late_events)
+                )
             await self._async_read_charge_file(now)
             path = Path(self._hass.config.path(_FILE_NAME))
             data = await self._hass.async_add_executor_job(_read_bootstrap, path)
@@ -164,6 +183,15 @@ class SupplierIntervalRecorder:
             _LOGGER.exception("KEMS supplier interval recovery unavailable")
             self._status = {"status": "load_failed"}
 
+    def _retain_baseline(self, evidence):
+        key = evidence["session_id"]
+        prior = self._late_events.get(key)
+        merged = merge_completed_baseline(prior, evidence) if prior else evidence
+        if merged == prior:
+            return False
+        self._late_events[key] = merged
+        return True
+
     async def async_observe(
         self, now: datetime, entities: KEMSEntities, completed_events=()
     ) -> None:
@@ -180,10 +208,13 @@ class SupplierIntervalRecorder:
                 "gas": entities.gas_current_rate,
             }
             found = {kind: [] for kind in KINDS}
+            cost_index = {}
             for item in registry.entities.values():
                 if item.platform != "octopus_energy" or item.disabled_by is not None:
                     continue
                 uid = item.unique_id.casefold()
+                if uid.endswith("_previous_accumulative_cost"):
+                    cost_index.setdefault((item.config_entry_id, uid), []).append(item)
                 if uid.startswith("octopus_energy_electricity_") and uid.endswith(
                     "_previous_accumulative_consumption"
                 ):
@@ -220,6 +251,7 @@ class SupplierIntervalRecorder:
             changed = False
             availability = {}
             charge_availability = {}
+            gas_source_shape = None
             await self._async_read_charge_file(now)
             for kind, candidates in found.items():
                 availability[kind] = "ambiguous_or_unmapped"
@@ -262,20 +294,28 @@ class SupplierIntervalRecorder:
                     "quarantined_unverified" if kind == "gas" else "observed"
                 )
                 if kind == "gas":
+                    gas_source_shape = {
+                        "reported_unit": state.attributes.get("unit_of_measurement"),
+                        "estimated": attrs.get("is_estimated"),
+                        "charge_rows": len(charges),
+                        "row_fields": sorted(
+                            {
+                                str(field)
+                                for row in charges
+                                if isinstance(row, dict)
+                                for field in row
+                            }
+                        ),
+                        "used_consumption_field": key,
+                        "financially_usable": False,
+                    }
                     continue
                 meter = registry.async_get(mapping[kind] or "")
                 expected = (
                     meter.unique_id.casefold().removesuffix("_current_rate")
                     + "_previous_accumulative_cost"
                 )
-                cost_matches = [
-                    item
-                    for item in registry.entities.values()
-                    if item.platform == "octopus_energy"
-                    and item.disabled_by is None
-                    and item.config_entry_id == meter.config_entry_id
-                    and item.unique_id.casefold() == expected
-                ]
+                cost_matches = cost_index.get((meter.config_entry_id, expected), [])
                 charge_availability[kind] = "unavailable_or_ambiguous"
                 if len(cost_matches) != 1:
                     continue
@@ -320,7 +360,7 @@ class SupplierIntervalRecorder:
                 entities.saving_session_export_baseline or ""
             )
             event_state = self._hass.states.get(entities.saving_session_events or "")
-            if completed_events:
+            if completed_events or event_state is not None:
                 import_attrs = (
                     import_state.attributes
                     if import_state is not None
@@ -340,6 +380,14 @@ class SupplierIntervalRecorder:
                 )
                 if not isinstance(joined, list):
                     joined = []
+                for item in joined:
+                    if not isinstance(item, dict):
+                        continue
+                    evidence = capture_joined_baseline(
+                        item, import_attrs, export_attrs, now=now
+                    )
+                    if evidence is not None:
+                        changed |= self._retain_baseline(evidence)
                 for result in completed_events:
                     event = result.to_dict()
                     # Only the exact retained joined event may provide a rate.
@@ -365,17 +413,13 @@ class SupplierIntervalRecorder:
                     if evidence is None:
                         continue
                     key = evidence["session_id"]
-                    prior = self._late_events.get(key)
-                    if prior is None:
-                        self._late_events[key] = evidence
+                    if key not in self._completed_ids:
+                        self._completed_ids.add(key)
                         changed = True
-                    else:
-                        merged = merge_completed_baseline(prior, evidence)
-                        if merged != prior:
-                            self._late_events[key] = merged
-                            changed = True
+                    changed |= self._retain_baseline(evidence)
                 if len(self._late_events) > 64:
                     self._late_events = dict(list(self._late_events.items())[-64:])
+                    self._completed_ids.intersection_update(self._late_events)
                     changed = True
             self._dirty |= changed
             if self._dirty:
@@ -386,6 +430,7 @@ class SupplierIntervalRecorder:
                 )
             self._status["automatic_source_status"] = availability
             self._status["automatic_charge_source_status"] = charge_availability
+            self._status["gas_source_shape"] = gas_source_shape
             self._status["last_scan_at"] = now.isoformat()
             self._status.pop("automatic_observation_failed", None)
         except Exception:

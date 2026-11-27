@@ -217,7 +217,7 @@ def test_alpha920_release_scope_is_recorder_only() -> None:
     ).read_text(encoding="utf-8")
     hygiene = HYGIENE.read_text(encoding="utf-8")
 
-    assert manifest["version"] == "0.9.0-alpha9.258"
+    assert manifest["version"] == "0.9.0-alpha9.259"
     reason = bundle["maintenance"]["reason"].lower()
     assert "shadowvalidationrecorder" in reason
     assert "recorder" in reason

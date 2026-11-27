@@ -22,6 +22,7 @@ from .providers.ohme import OhmeProvider
 LEGACY_MAX_AGE_SECONDS = 45 * 60
 RECORD_LIMIT = 40
 SAMPLE_INTERVAL_FLOOR_SECONDS = 45
+_ACTIVE_CLASSES = ("both_active", "legacy_only", "ohme_only")
 
 _LEGACY_UNIQUE_IDS = {
     "intelligent_slot": "octopus_intelligent_slot",
@@ -36,6 +37,7 @@ class LegacyIntelligentParityMonitor:
         self._hass = hass
         self._ohme = OhmeProvider(hass, entities)
         self._counts: Counter[str] = Counter()
+        self._retained_active_counts: Counter[str] = Counter()
         self._last: dict[str, Any] = {}
         self._last_sample: datetime | None = None
         self._last_signature: tuple[Any, ...] | None = None
@@ -117,6 +119,8 @@ class LegacyIntelligentParityMonitor:
         observation["ohme_power_age_seconds"] = ohme.power_age_seconds
         classification = observation["classification"]
         self._counts[classification] += 1
+        if classification in _ACTIVE_CLASSES:
+            self._retained_active_counts[classification] += 1
         self._last = observation
         signature = (
             classification,
@@ -127,6 +131,18 @@ class LegacyIntelligentParityMonitor:
         if signature != self._last_signature:
             self._transitions.append(observation)
             self._last_signature = signature
+
+    def active_checkpoint(self) -> dict[str, int]:
+        """Persist only comparable daytime evidence, never tariff authority."""
+        return dict(self._retained_active_counts)
+
+    def restore_active_checkpoint(self, data: Any) -> None:
+        if not isinstance(data, dict):
+            return
+        for key in _ACTIVE_CLASSES:
+            value = data.get(key)
+            if type(value) is int and 0 <= value <= 10_000_000:
+                self._retained_active_counts[key] = value
 
     @property
     def status(self) -> dict[str, Any]:
@@ -140,6 +156,10 @@ class LegacyIntelligentParityMonitor:
             "legacy_version_requirement": "update to v1.9.1 and restart HA",
             "sampling_seconds": 90,
             "counts": dict(self._counts),
+            "retained_active_daytime_counts": self.active_checkpoint(),
+            "retained_active_daytime_samples": sum(
+                self._retained_active_counts.values()
+            ),
             "active_daytime_comparable_samples": (
                 both_active + legacy_only + ohme_only
             ),

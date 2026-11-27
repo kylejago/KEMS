@@ -181,6 +181,7 @@ class SupplierChargeEvidence:
                 "complete_energy_post_commissioning_days": len(complete_energy_days),
                 "complete_energy_days_missing_valid_prices": len(missing_priced_days),
                 "recent_missing_priced_dates": missing_priced_days[-14:],
+                "missing_priced_dates": missing_priced_days,
                 "complete_priced_post_commissioning_days": len(comparisons),
                 "excluded_before_or_unknown_commissioning_days": before_commissioning,
                 "comparable_days": len(matched),
@@ -308,6 +309,41 @@ def capture_completed_baseline(
     if not allow_partial and (imported is None or exported is None):
         return None
     rate = _finite(points_per_kwh)
+    return {
+        "session_id": str(event_id),
+        "session_start": start.isoformat(),
+        "session_end": end.isoformat(),
+        "import_baseline_kwh": imported,
+        "export_baseline_kwh": exported,
+        "octopoints_per_kwh": rate if rate is not None and rate >= 0 else None,
+    }
+
+
+def capture_joined_baseline(
+    event: Mapping[str, Any],
+    import_attrs: Any,
+    export_attrs: Any,
+    *,
+    now: datetime,
+) -> dict[str, Any] | None:
+    """Preserve exact joined-event baselines before the provider replaces them."""
+    start, end = _utc(event.get("start")), _utc(event.get("end"))
+    event_id = event.get("id")
+    if (
+        not event_id
+        or start is None
+        or end is None
+        or not start < end
+        or start > now + timedelta(days=1)
+        or end < now - timedelta(days=1)
+        or end - start > timedelta(hours=24)
+    ):
+        return None
+    imported = exact_completed_baseline(import_attrs, start, end)
+    exported = exact_completed_baseline(export_attrs, start, end)
+    if imported is None and exported is None:
+        return None
+    rate = _finite(event.get("octopoints_per_kwh"))
     return {
         "session_id": str(event_id),
         "session_start": start.isoformat(),

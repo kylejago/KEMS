@@ -194,7 +194,7 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
         self._ev_charge_trace = EVChargeTraceRecorder(hass, entry.entry_id)
         # Independent Ohme read-only observer; its network calls never hold up
         # the physical KEMS control scan or provide cheap tariff authority.
-        self._ohme_charge_plan = OhmeChargeSlotObserver(hass, entities)
+        self._ohme_charge_plan = OhmeChargeSlotObserver(hass, entities, entry.entry_id)
         self._happy_hour_import_ledger = HappyHourImportLedgerRecorder(
             hass, entry.entry_id, grid_import_entity=entities.grid_import_kw
         )

@@ -5,6 +5,7 @@ from datetime import UTC, datetime, timedelta
 from kems_core.supplier_charges import (
     SupplierChargeEvidence,
     capture_completed_baseline,
+    capture_joined_baseline,
     completed_power_down_estimate,
     merge_completed_baseline,
 )
@@ -174,3 +175,31 @@ def test_late_baseline_survives_until_both_meter_windows_are_available():
         )
         is None
     )
+
+
+def test_joined_baseline_capture_before_event_completion():
+    start = NOW + timedelta(hours=1)
+    end = start + timedelta(hours=1)
+    event = {
+        "id": "future",
+        "start": start.isoformat(),
+        "end": end.isoformat(),
+        "octopoints_per_kwh": 80,
+    }
+    baseline = {
+        "baselines": [
+            {
+                "start": start.isoformat(),
+                "end": end.isoformat(),
+                "baseline": 0.4,
+                "is_incomplete_calculation": False,
+            }
+        ]
+    }
+    evidence = capture_joined_baseline(event, baseline, {}, now=NOW)
+    assert evidence is not None
+    assert evidence["import_baseline_kwh"] == 0.4
+    assert evidence["export_baseline_kwh"] is None
+    assert capture_joined_baseline(event, {}, {}, now=NOW) is None
+    assert capture_joined_baseline(event, baseline, {}, now=START) is None
+    assert capture_joined_baseline(event, baseline, {}, now=end) == evidence

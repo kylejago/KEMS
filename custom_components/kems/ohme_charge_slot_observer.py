@@ -15,8 +15,10 @@ from typing import Any
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.event import async_track_time_interval
+from homeassistant.helpers.storage import Store
 from homeassistant.util import dt as dt_util
 
+from .const import DOMAIN, STORAGE_NAMESPACE
 from .kems_core.ohme_charge_slot_plan import observe_ohme_slot_response
 from .legacy_intelligent_parity_monitor import LegacyIntelligentParityMonitor
 from .providers.entity_map import KEMSEntities
@@ -28,7 +30,9 @@ PLAN_FRESH_SECONDS = 180
 class OhmeChargeSlotObserver:
     """Read-only, best-effort independent of critical control refresh cadence."""
 
-    def __init__(self, hass: HomeAssistant, entities: KEMSEntities) -> None:
+    def __init__(
+        self, hass: HomeAssistant, entities: KEMSEntities, entry_id: str
+    ) -> None:
         self._hass = hass
         self._entities = entities
         self._unsubscribe: Any = None
@@ -43,6 +47,11 @@ class OhmeChargeSlotObserver:
         self._sensor_entity_id: str | None = None
         self._legacy_parity = LegacyIntelligentParityMonitor(hass, entities)
         self._legacy_parity_error: str | None = None
+        self._parity_store = Store(
+            hass, 1, f"{DOMAIN}.{entry_id}.{STORAGE_NAMESPACE}.legacy_parity"
+        )
+        self._parity_storage_error: str | None = None
+        self._parity_dirty = False
 
     def _resolve_ohme_sources(self) -> str | None:
         """Select only the Ohme account owning the configured EV status."""
@@ -90,6 +99,7 @@ class OhmeChargeSlotObserver:
             "read_only": True,
             "legacy_intelligent_comparison": self._legacy_parity.status,
             "legacy_comparison_error_type": self._legacy_parity_error,
+            "legacy_comparison_storage_error_type": self._parity_storage_error,
             "uses_service": "ohme.list_charge_slots",
             "poll_seconds": POLL_INTERVAL_SECONDS,
             "last_state": self._last_state,
@@ -119,6 +129,11 @@ class OhmeChargeSlotObserver:
 
     async def async_setup(self) -> None:
         """Schedule independent reads; never hold up first KEMS control scan."""
+        try:
+            checkpoint = await self._parity_store.async_load()
+            self._legacy_parity.restore_active_checkpoint(checkpoint)
+        except Exception as error:
+            self._parity_storage_error = type(error).__name__
         self._unsubscribe = async_track_time_interval(
             self._hass, self._schedule_poll, timedelta(seconds=POLL_INTERVAL_SECONDS)
         )
@@ -142,7 +157,13 @@ class OhmeChargeSlotObserver:
         ):
             plan_active = bool(self._last_result.get("active_count", 0))
         try:
+            prior = self._legacy_parity.active_checkpoint()
             self._legacy_parity.observe(now=_now, ohme_plan_active=plan_active)
+            if prior != self._legacy_parity.active_checkpoint():
+                self._parity_dirty = True
+                self._parity_store.async_delay_save(
+                    self._legacy_parity.active_checkpoint, 10
+                )
             self._legacy_parity_error = None
         except Exception as error:
             # A comparison is optional diagnostics; it must not stop Ohme
@@ -201,3 +222,10 @@ class OhmeChargeSlotObserver:
             self._task.cancel()
             with suppress(asyncio.CancelledError):
                 await self._task
+        if self._parity_dirty:
+            try:
+                await self._parity_store.async_save(
+                    self._legacy_parity.active_checkpoint()
+                )
+            except Exception as error:
+                self._parity_storage_error = type(error).__name__
