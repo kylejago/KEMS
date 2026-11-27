@@ -144,3 +144,32 @@ def test_gas_quarantine_compares_only_matching_unconflicted_intervals():
         [_row(start, 6.0, kind="gas")], source="octopus_estimated_gas", now=NOW
     )
     assert ledger.gas_quarantine_comparison()["matched_nonconflicting_intervals"] == 0
+
+
+def test_paired_gas_volume_is_retained_but_never_promoted():
+    ledger = SupplierIntervalLedger()
+    start = NOW - timedelta(days=1)
+    raw = _row(start, 11.2, kind="gas")
+    assert ledger.ingest([raw], source="octopus_estimated_gas", now=NOW)
+    paired = {**raw, "consumption_m3": 1.0}
+    assert ledger.ingest([paired], source="octopus_estimated_gas", now=NOW)
+    assert not ledger.ingest([paired], source="octopus_estimated_gas", now=NOW)
+    ledger.ingest([_row(start, 1.0, kind="gas")], source="octopus_csv", now=NOW)
+    result = ledger.gas_quarantine_comparison()
+    assert result["paired_nonzero_observations"] == 1
+    row = result["recent_paired_nonzero_observations"][0]
+    assert row["automatic_m3"] == 1.0
+    assert row["automatic_kwh"] == 11.2
+    assert row["observed_kwh_per_m3"] == 11.2
+    assert row["csv_kwh"] == 1.0
+    assert result["conversion_validated"] is False
+    assert result["automatic_gas_financially_usable"] is False
+    restored = SupplierIntervalLedger()
+    restored.restore(ledger.dump(), now=NOW)
+    assert restored.gas_quarantine_comparison() == result
+    assert restored.ingest(
+        [{**paired, "consumption_m3": 2.0}],
+        source="octopus_estimated_gas",
+        now=NOW,
+    )
+    assert restored.gas_quarantine_comparison()["matched_nonconflicting_intervals"] == 0

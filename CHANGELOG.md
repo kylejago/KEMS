@@ -1,3 +1,10 @@
+## 0.9.0-alpha9.260
+
+- Preserve individually valid Power Down half-hour baselines and merge only exact non-conflicting coverage. No estimated award without complete evidence.
+- Retain paired automatic gas kWh/m3 observations, separate from the CSV ledger.
+- Attempt bounded read-only recovery of historical supplier charge attributes from Home Assistant Recorder once per setup; absent or conflicted evidence remains unresolved.
+- Add read-only EV routing readiness counts and granular rolling Agile budget/allocation timing; no live routing or tariff changes.
+
 ## 0.9.0-alpha9.259 — evidence continuity and recovery readiness
 
 - Retain exact independently complete Power Down baselines for joined events before or during the event; separate pending evidence from completed results. Merge without overwriting conflicts; no inferred rewards or settlement.

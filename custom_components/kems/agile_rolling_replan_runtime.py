@@ -217,6 +217,11 @@ def _rolling_plan(
     tariff: TariffSettings,
 ) -> dict[str, Any]:
     """Allocate currently exportable battery energy across remaining Agile slots."""
+    budget_started = (
+        perf_counter()
+        if isinstance(getattr(self, "_kems_agile_publication_profile", None), dict)
+        else None
+    )
     soc = _current_agile_soc(state)
     soc_source = _current_agile_soc_source(state)
     physical_planning: dict[str, Any] = {"available": False}
@@ -275,6 +280,12 @@ def _rolling_plan(
                 float(physical_house_budget["protected_house_stored_kwh"]) * efficiency,
             )
 
+    allocation_started = None
+    if budget_started is not None:
+        runtime._record_agile_publication_phase(
+            self, "rolling_physical_budget", budget_started
+        )
+        allocation_started = perf_counter()
     slots = state.get("today_slots")
     if not isinstance(slots, list):
         slots = []
@@ -378,6 +389,10 @@ def _rolling_plan(
         selected[0] if selected else None,
     )
     planned = sum(item["planned_battery_export_kwh"] for item in selected)
+    if allocation_started is not None:
+        runtime._record_agile_publication_phase(
+            self, "rolling_slot_allocation", allocation_started
+        )
     return {
         "available": True,
         "generated_at": now.isoformat(),

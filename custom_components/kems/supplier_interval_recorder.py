@@ -20,6 +20,7 @@ from .kems_core.supplier_charges import (
     capture_joined_baseline,
     completed_power_down_estimate,
     merge_completed_baseline,
+    supplier_cost_rows,
 )
 from .kems_core.supplier_intervals import FORMAT, KINDS, SupplierIntervalLedger, _utc
 from .providers.entity_map import KEMSEntities
@@ -54,11 +55,17 @@ class SupplierIntervalRecorder:
         )
         self._next_at: datetime | None = None
         self._dirty = False
+        self._history_task = None
+        self._history_attempted = False
+        self._history_status = {"status": "not_attempted"}
         self._status: dict[str, Any] = {"status": "not_loaded"}
 
     @property
     def status(self) -> dict[str, Any]:
-        return dict(self._status)
+        return {
+            **self._status,
+            "historical_charge_recovery": dict(self._history_status),
+        }
 
     def electricity_reconciliation(self, daily_records, *, now):
         return self._ledger.electricity_reconciliation(daily_records, now=now)
@@ -192,6 +199,67 @@ class SupplierIntervalRecorder:
         self._late_events[key] = merged
         return True
 
+    async def _recover_recorded_charges(self, entities, now):
+        """One bounded, read-only query outside the live coordinator scan."""
+        from homeassistant.components.recorder import get_instance, history
+
+        def read():
+            states = history.get_significant_states(
+                self._hass,
+                now - timedelta(days=7),
+                now,
+                entity_ids=list(entities),
+                include_start_time_state=False,
+                significant_changes_only=False,
+                minimal_response=False,
+                no_attributes=False,
+            )
+            # Repeated HA states can contain identical charge attributes.
+            # Collapse only byte-equivalent observations; retain revisions.
+            result = {}
+            for entity_id, kind in entities.items():
+                for state in states.get(entity_id, []):
+                    if state.state in {"unknown", "unavailable"}:
+                        continue
+                    for row in supplier_cost_rows(kind, state.attributes):
+                        key = tuple(str(value) for value in row.values())
+                        result[key] = row
+            return list(result.values())
+
+        return await get_instance(self._hass).async_add_executor_job(read)
+
+    async def _consume_recorded_charges(self, now, entities):
+        if self._history_task is not None and self._history_task.done():
+            task, self._history_task = self._history_task, None
+            try:
+                rows = task.result()
+                changed = await self._hass.async_add_executor_job(
+                    lambda: self._charges.ingest(
+                        rows, source="octopus_integration", now=now
+                    )
+                )
+                self._history_status = {
+                    "status": "observed" if rows else "no_retained_attributes",
+                    "candidate_rows": len(rows),
+                    "evidence_changed": changed,
+                    "lookback_days": 7,
+                    "supplier_settlement_verified": False,
+                }
+                return changed
+            except Exception as err:
+                self._history_status = {
+                    "status": "unavailable",
+                    "error_type": type(err).__name__,
+                }
+        if not self._history_attempted and entities:
+            self._history_attempted = True
+            self._history_status = {"status": "querying", "lookback_days": 7}
+            self._history_task = self._hass.async_create_background_task(
+                self._recover_recorded_charges(dict(entities), now),
+                "KEMS read-only supplier charge history recovery",
+            )
+        return False
+
     async def async_observe(
         self, now: datetime, entities: KEMSEntities, completed_events=()
     ) -> None:
@@ -252,6 +320,7 @@ class SupplierIntervalRecorder:
             availability = {}
             charge_availability = {}
             gas_source_shape = None
+            history_entities = {}
             await self._async_read_charge_file(now)
             for kind, candidates in found.items():
                 availability[kind] = "ambiguous_or_unmapped"
@@ -280,6 +349,7 @@ class SupplierIntervalRecorder:
                         "start": row.get("start"),
                         "end": row.get("end"),
                         "kwh": row.get(key),
+                        "consumption_m3": row.get("consumption_m3"),
                     }
                     for row in charges
                     if isinstance(row, dict)
@@ -319,6 +389,7 @@ class SupplierIntervalRecorder:
                 charge_availability[kind] = "unavailable_or_ambiguous"
                 if len(cost_matches) != 1:
                     continue
+                history_entities[cost_matches[0].entity_id] = kind
                 cost_state = self._hass.states.get(cost_matches[0].entity_id)
                 if (
                     cost_state is None
@@ -328,30 +399,13 @@ class SupplierIntervalRecorder:
                     is not (kind == "electricity_export")
                 ):
                     continue
-                cost_rows = cost_state.attributes.get("charges")
-                if not isinstance(cost_rows, list):
-                    continue
-                priced = []
-                for row in cost_rows:
-                    if not isinstance(row, dict):
-                        continue
-                    try:
-                        cost = float(row.get("raw_cost")) * 100
-                    except (TypeError, ValueError, OverflowError):
-                        continue
-                    priced.append(
-                        {
-                            "kind": kind,
-                            "start": row.get("start"),
-                            "end": row.get("end"),
-                            "kwh": row.get("consumption"),
-                            "charge_pence": cost,
-                        }
-                    )
+                priced = supplier_cost_rows(kind, cost_state.attributes)
                 changed |= self._charges.ingest(
                     priced, source="octopus_integration", now=now
                 )
                 charge_availability[kind] = "estimated_charges_observed"
+
+            changed |= await self._consume_recorded_charges(now, history_entities)
 
             import_state = self._hass.states.get(
                 entities.saving_session_import_baseline or ""
@@ -375,7 +429,8 @@ class SupplierIntervalRecorder:
                 )
                 joined = (
                     event_state.attributes.get("joined_events", [])
-                    if event_state
+                    if event_state is not None
+                    and event_state.state not in {"unknown", "unavailable"}
                     else []
                 )
                 if not isinstance(joined, list):

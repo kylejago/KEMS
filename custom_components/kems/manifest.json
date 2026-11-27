@@ -2,7 +2,8 @@
   "domain": "kems",
   "name": "KEMS",
   "after_dependencies": [
-    "energy"
+    "energy",
+    "recorder"
   ],
   "codeowners": [
     "@kylejago"
@@ -13,5 +14,5 @@
   "iot_class": "calculated",
   "issue_tracker": "https://github.com/kylejago/KEMS/issues",
   "single_config_entry": true,
-  "version": "0.9.0-alpha9.259"
+  "version": "0.9.0-alpha9.260"
 }

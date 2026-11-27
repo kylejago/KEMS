@@ -24,6 +24,35 @@ def _finite(value: Any) -> float | None:
     return value if isfinite(value) else None
 
 
+def supplier_cost_rows(kind, attributes):
+    """Extract actual provider charge rows, not rates inferred from daily totals."""
+    if (
+        kind not in ELECTRICITY
+        or not isinstance(attributes, Mapping)
+        or attributes.get("unit_of_measurement") != "GBP"
+        or attributes.get("is_export") is not (kind == "electricity_export")
+        or not isinstance(attributes.get("charges"), list)
+    ):
+        return []
+    result = []
+    for row in attributes["charges"]:
+        if not isinstance(row, Mapping):
+            continue
+        cost = _finite(row.get("raw_cost"))
+        if cost is None or not isfinite(cost * 100):
+            continue
+        result.append(
+            {
+                "kind": kind,
+                "start": row.get("start"),
+                "end": row.get("end"),
+                "kwh": row.get("consumption"),
+                "charge_pence": cost * 100,
+            }
+        )
+    return result
+
+
 class SupplierChargeEvidence:
     """First-seen estimates with independent energy matching and conflict checks."""
 
@@ -284,6 +313,59 @@ def exact_completed_baseline(
     return total
 
 
+def _partial_baseline_rows(attributes, start, end):
+    """Retain only valid exact half-hours, never incomplete calculations."""
+    if not isinstance(attributes, Mapping):
+        return {}
+    rows = attributes.get("baselines")
+    if not isinstance(rows, list):
+        return {}
+    result = {}
+    for row in rows:
+        if not isinstance(row, Mapping):
+            return {}
+        left, right = _utc(row.get("start")), _utc(row.get("end"))
+        value = _finite(row.get("baseline"))
+        if (
+            left is None
+            or right is None
+            or not start <= left < right <= end
+            or right - left != _HALF_HOUR
+            or (left - start) % _HALF_HOUR
+        ):
+            return {}
+        if row.get("is_incomplete_calculation") is not False:
+            continue
+        if value is None or value < 0 or left.isoformat() in result:
+            return {}
+        result[left.isoformat()] = value
+    # When every row is valid, respect any provider total as well.
+    reported = _finite(attributes.get("total_baseline"))
+    if (
+        len(result) == len(rows)
+        and reported is not None
+        and abs(reported - sum(result.values())) > 0.001
+    ):
+        return {}
+    return result
+
+
+def _complete_retained_rows(rows, start, end):
+    if end <= start or end - start > timedelta(hours=24):
+        return None
+    cursor = start
+    total = 0.0
+    while cursor < end:
+        value = _finite(rows.get(cursor.isoformat()))
+        if value is None or value < 0 or cursor + _HALF_HOUR > end:
+            return None
+        total += value
+        cursor += _HALF_HOUR
+    if len(rows) != int((end - start) / _HALF_HOUR):
+        return None
+    return total
+
+
 def capture_completed_baseline(
     event: Mapping[str, Any],
     import_attrs: Any,
@@ -316,6 +398,8 @@ def capture_completed_baseline(
         "import_baseline_kwh": imported,
         "export_baseline_kwh": exported,
         "octopoints_per_kwh": rate if rate is not None and rate >= 0 else None,
+        "import_baseline_rows": _partial_baseline_rows(import_attrs, start, end),
+        "export_baseline_rows": _partial_baseline_rows(export_attrs, start, end),
     }
 
 
@@ -341,7 +425,9 @@ def capture_joined_baseline(
         return None
     imported = exact_completed_baseline(import_attrs, start, end)
     exported = exact_completed_baseline(export_attrs, start, end)
-    if imported is None and exported is None:
+    import_rows = _partial_baseline_rows(import_attrs, start, end)
+    export_rows = _partial_baseline_rows(export_attrs, start, end)
+    if imported is None and exported is None and not import_rows and not export_rows:
         return None
     rate = _finite(event.get("octopoints_per_kwh"))
     return {
@@ -351,6 +437,8 @@ def capture_joined_baseline(
         "import_baseline_kwh": imported,
         "export_baseline_kwh": exported,
         "octopoints_per_kwh": rate if rate is not None and rate >= 0 else None,
+        "import_baseline_rows": import_rows,
+        "export_baseline_rows": export_rows,
     }
 
 
@@ -375,6 +463,26 @@ def merge_completed_baseline(
         if old is not None and old != new:
             return {**prior, "conflict": True}
         merged[key] = new
+    start = _utc(merged.get("session_start"))
+    end = _utc(merged.get("session_end"))
+    if start is None or end is None:
+        return {**prior, "conflict": True}
+    for direction in ("import", "export"):
+        key = f"{direction}_baseline_rows"
+        total_key = f"{direction}_baseline_kwh"
+        rows = dict(prior.get(key) or {})
+        for stamp, value in (evidence.get(key) or {}).items():
+            if stamp in rows and abs(rows[stamp] - value) > 0.000001:
+                return {**prior, "conflict": True}
+            rows[stamp] = value
+        merged[key] = rows
+        total = _complete_retained_rows(rows, start, end)
+        if total is not None:
+            old = merged.get(total_key)
+            if old is not None and abs(old - total) > 0.001:
+                return {**prior, "conflict": True}
+            if old is None:
+                merged[total_key] = total
     return merged
 
 

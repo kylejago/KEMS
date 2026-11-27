@@ -6,6 +6,7 @@ charger nor changes inverter work mode, power, reserve or tariff settings.
 
 from __future__ import annotations
 
+from collections import Counter
 from datetime import datetime, timedelta
 from typing import Any
 
@@ -193,7 +194,34 @@ class EVChargeTraceRecorder:
         cap_exceedances = sum(
             item.get("cap_target_exceeded") is True for item in audits
         )
+        daytime = [
+            row
+            for row in self._records
+            if row.get("ev_charging") is True
+            and row.get("cheap_period_confirmed") is False
+            and row.get("saving_session_active") is False
+        ]
+        candidates = [
+            item
+            for row in daytime
+            if isinstance(item := row.get("extra_slot_house_routing_candidate"), dict)
+        ]
         return {
+            "extra_slot_routing_readiness": {
+                "outside_confirmed_cheap_charging_samples": len(daytime),
+                "candidate_status_counts": dict(
+                    Counter(str(item.get("status")) for item in candidates)
+                ),
+                "fallback_reason_counts": dict(
+                    Counter(
+                        str(item.get("reason"))
+                        for item in candidates
+                        if item.get("status") == "hold_fallback_required"
+                    )
+                ),
+                "candidate_is_not_supplier_discount_proof": True,
+                "hardware_write_authorised": False,
+            },
             "scope": "read_only_existing_kems_sources",
             "sample_count": len(self._records),
             "samples": list(self._records),
