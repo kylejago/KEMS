@@ -189,7 +189,7 @@ def test_alpha922_release_scope_is_startup_presentation_only() -> None:
     ).read_text(encoding="utf-8")
     source = (INTEGRATION / "agile_flow_reserve_policy.py").read_text(encoding="utf-8")
 
-    assert manifest["version"] == "0.9.0-alpha9.256"
+    assert manifest["version"] == "0.9.0-alpha9.257"
     reason = bundle["maintenance"]["reason"].lower()
     assert "startup hotfix" in reason
     assert "build_slot_flow" in reason
