@@ -131,7 +131,7 @@ def test_incomplete_or_unmatched_supplier_award_is_not_invented(joined) -> None:
 
 
 @pytest.mark.parametrize("physical, completed", [(False, True), (True, False)])
-def test_unverified_kems_event_is_not_mistaken_for_roi_supplier_award(
+def test_confirmed_supplier_award_is_independent_of_physical_kems_success(
     physical: bool, completed: bool
 ) -> None:
     recorder = _recorder()
@@ -140,7 +140,8 @@ def test_unverified_kems_event_is_not_mistaken_for_roi_supplier_award(
         [_event(physical=physical, completed=completed)],
         [_joined(800)],
     )
-    assert recorder._power_downs == {}
+    assert recorder._power_downs["8447"]["pence"] == 100.0
+    assert recorder._power_downs["8447"]["supplier_settled"] is True
 
 
 def test_missing_octopus_rate_baseline_and_award_remains_pending() -> None:
@@ -177,3 +178,52 @@ def test_supplier_power_down_award_does_not_stack_with_agile_export_or_repeat() 
     assert rewards["total"] != 100.0 + event.fixed_export_income_pence
     audit = recorder.audit(now, date(2026, 9, 12), events=[event])
     assert audit["entries"][0]["agile_export_income_already_counted"] is True
+
+
+def test_local_awards_match_existing_events_and_discover_missing_ones():
+    recorder = _recorder()
+    event = _event()
+    extra = {
+        "start": "2026-11-10T17:00:00Z",
+        "end": "2026-11-10T18:00:00Z",
+        "rewarded_octopoints": 80,
+    }
+    recorder._local_power_down_awards = [_joined(112), extra]
+    now = datetime(2026, 11, 12, 19, tzinfo=UTC)
+    asyncio.run(recorder.async_observe([], [event], now=now))
+    assert recorder._power_downs["8447"]["pence"] == 14.0
+    assert recorder.totals(now, date(2026, 9, 12))["power_down"] == 24.0
+    before = len(recorder._store.saved)
+    asyncio.run(recorder.async_observe([], [event], now=now))
+    assert len(recorder._store.saved) == before
+    new_event = _event(identifier="new")
+    new_event.session_start = datetime(2026, 11, 10, 17, tzinfo=UTC)
+    new_event.session_end = datetime(2026, 11, 10, 18, tzinfo=UTC)
+    asyncio.run(recorder.async_observe([], [event, new_event], now=now))
+    assert recorder._power_downs["new"]["pence"] == 10.0
+    assert len(recorder._power_downs) == 2
+    _observe(recorder, [event, new_event], [_joined(160)])
+    assert recorder._power_downs["8447"]["pence"] == 20.0
+    assert recorder.totals(now, date(2026, 9, 12))["power_down"] == 30.0
+
+
+def test_late_complete_meter_estimate_is_replaced_by_award():
+    recorder = _recorder()
+    event = _event()
+    late = {
+        "session_id": "8447",
+        "session_start": event.session_start.isoformat(),
+        "session_end": event.session_end.isoformat(),
+        "status": "unsettled_event_estimate",
+        "reward_calculation_basis": "complete_half_hour_baselines_and_supplier_meter",
+        "estimated_bonus_pence": 60.0,
+    }
+    asyncio.run(recorder.async_observe([], [event], late_power_down_estimates=[late]))
+    assert recorder._power_downs["8447"]["pence"] == 60.0
+    before = len(recorder._store.saved)
+    asyncio.run(recorder.async_observe([], [event], late_power_down_estimates=[late]))
+    assert len(recorder._store.saved) == before
+    _observe(recorder, [event], [_joined(112)])
+    asyncio.run(recorder.async_observe([], [event], late_power_down_estimates=[late]))
+    assert recorder._power_downs["8447"]["pence"] == 14.0
+    assert recorder._power_downs["8447"]["supplier_settled"] is True

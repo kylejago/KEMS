@@ -1,7 +1,7 @@
 """Persistent once-per-event financial rewards for ROI only.
 
 This ledger cannot authorise Octopus bookings, free import or FoxESS writes.
-The upstream integration does not publish per-event supplier settlement.
+Confirmed awards are point entitlements, not proof of cash redemption.
 """
 
 from __future__ import annotations
@@ -17,6 +17,7 @@ from .const import DOMAIN, STORAGE_NAMESPACE
 from .kems_core.power_down_awards import (
     FILE_NAME,
     apply_imported_awards,
+    reconcile_window_aliases,
     award_window,
     read_awards,
 )
@@ -202,6 +203,7 @@ class ROIRewardRecorder:
                 self._happy_hours[key] = saved
                 changed = True
 
+        changed |= reconcile_window_aliases(self._power_downs, events)
         for event in events:
             if not event or not getattr(event, "session_id", None):
                 continue
@@ -228,8 +230,10 @@ class ROIRewardRecorder:
             # The supplier's later awarded points replace this estimate.
             # Repeated scans must never downgrade a settled award.
             previous = self._power_downs.get(key, {})
-            if previous.get("supplier_settled") is True or previous.get("basis") == (
-                "meter_supported_supplier_interval_power_down_bonus"
+            if (
+                previous.get("supplier_settled") is True
+                or previous.get("basis")
+                == "meter_supported_supplier_interval_power_down_bonus"
             ):
                 continue
             if self._power_downs.get(key) != saved:
@@ -237,8 +241,8 @@ class ROIRewardRecorder:
                 changed = True
 
         # Joined Octopus Power Down events can retain a later supplier award.
-        # Match immutable event identity AND event window against KEMS'
-        # completed physical session; never turn a pending/absent award into 0.
+        # Match immutable event identity AND window against KEMS' event.
+        # Never turn a pending/absent award into 0.
         known_events = {
             str(event.session_id): event
             for event in events
@@ -268,7 +272,10 @@ class ROIRewardRecorder:
                 != "complete_half_hour_baselines_and_supplier_meter"
                 or bonus is None
             ):
-                if previous.get("basis") == "meter_supported_supplier_interval_power_down_bonus":
+                if (
+                    previous.get("basis")
+                    == "meter_supported_supplier_interval_power_down_bonus"
+                ):
                     del self._power_downs[key]
                     changed = True
                 continue
@@ -316,6 +323,7 @@ class ROIRewardRecorder:
                 or event_end.tzinfo is None
                 or joined_start != event_start
                 or joined_end != event_end
+                or (now is not None and joined_end > now)
                 or date_of(event_end) is None
             ):
                 continue

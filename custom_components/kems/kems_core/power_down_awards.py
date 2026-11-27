@@ -1,7 +1,7 @@
 """Financial-only Octopus Power Down award import and exact-window deduplication."""
 
-from datetime import UTC, datetime, timedelta
 import json
+from datetime import UTC, datetime, timedelta
 
 from .roi_rewards import date_of
 from .supplier_intervals import _utc
@@ -47,7 +47,8 @@ def read_awards(path):
         points = row.get("rewarded_octopoints")
         if (
             window is None
-            or type(points) is not int
+            or not isinstance(points, int)
+            or isinstance(points, bool)
             or not 0 <= points <= 2_000_000
         ):
             raise ValueError("Invalid Power Down award row")
@@ -60,13 +61,41 @@ def read_awards(path):
     ]
 
 
+def reconcile_window_aliases(ledger, events):
+    """Migrate imported window identities when KEMS learns the provider ID."""
+    known = {}
+    for event in events:
+        key = getattr(event, "session_id", None)
+        window = award_window(
+            getattr(event, "session_start", None),
+            getattr(event, "session_end", None),
+        )
+        if key and window:
+            known.setdefault(window, set()).add(str(key))
+    changed = False
+    for (start, end), keys in known.items():
+        alias = f"octopus-window:{start}|{end}"
+        if alias not in ledger or len(keys) != 1:
+            continue
+        key = next(iter(keys))
+        previous = ledger.get(key, {})
+        previous_window = award_window(previous.get("start"), previous.get("end"))
+        if previous_window is not None and previous_window != (start, end):
+            continue
+        if previous.get("supplier_settled") is not True:
+            ledger[key] = ledger[alias]
+        del ledger[alias]
+        changed = True
+    return changed
+
+
 def apply_imported_awards(ledger, events, rows, *, now):
     """Match known IDs by exact window; keep unknown events financially separate.
 
     A local snapshot never overwrites an existing confirmed supplier award.
     Unidentified legacy ledger records on the same date fail closed.
     """
-    changed = False
+    changed = reconcile_window_aliases(ledger, events)
     known = {}
     for event in events:
         key = getattr(event, "session_id", None)
@@ -81,7 +110,8 @@ def apply_imported_awards(ledger, events, rows, *, now):
         points = row.get("rewarded_octopoints")
         if (
             window is None
-            or type(points) is not int
+            or not isinstance(points, int)
+            or isinstance(points, bool)
             or not 0 <= points <= 2_000_000
             or datetime.fromisoformat(window[1]) > now.astimezone(UTC)
         ):
@@ -105,6 +135,9 @@ def apply_imported_awards(ledger, events, rows, *, now):
                 continue
             key = f"octopus-window:{start}|{end}"
         previous = ledger.get(key, {})
+        previous_window = award_window(previous.get("start"), previous.get("end"))
+        if previous_window is not None and previous_window != window:
+            continue
         if previous.get("supplier_settled") is True:
             continue
         saved = {
