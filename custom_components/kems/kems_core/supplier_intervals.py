@@ -14,6 +14,9 @@ KINDS = ("electricity_import", "electricity_export", "gas")
 SOURCES = ("octopus_csv", "octopus_integration", "octopus_estimated_gas")
 _HALF_HOUR = timedelta(minutes=30)
 _LONDON = ZoneInfo("Europe/London")
+_MAX_GAS_CONVERSION_ROWS = 8192
+# Provider v19.3.0 rounds converted half-hour kWh to three decimal places.
+_GAS_ROUNDING_TOLERANCE_KWH = 0.000501
 
 
 def _utc(value: Any) -> datetime | None:
@@ -77,6 +80,8 @@ class SupplierIntervalLedger:
         self.conflicts: set[tuple[str, str]] = set()
         self.quarantined_gas: dict[tuple[str, str], dict[str, Any]] = {}
         self.quarantined_gas_conflicts: set[tuple[str, str]] = set()
+        self.gas_conversion_rows: dict[tuple[str, float], dict[str, Any]] = {}
+        self.gas_conversion_conflicts: set[tuple[str, float]] = set()
         self.gas_daily_reference: dict[str, float] = {}
         self.gas_daily_reference_conflicts: set[str] = set()
 
@@ -116,6 +121,134 @@ class SupplierIntervalLedger:
                     previous["consumption_m3"] = new_volume
                     changed = True
         return changed
+
+    def ingest_gas_conversion(
+        self, rows: Iterable[Any], *, source: str, calorific_value: Any, now: datetime
+    ) -> bool:
+        """Keep observed formula-consistent rows without changing raw evidence."""
+        if source not in {"octopus_integration", "octopus_estimated_gas"}:
+            return False
+        audit = gas_calorific_value_diagnostic({"calorific_value": calorific_value})
+        if audit["setting_plausible_for_uk_metric_gas"] is not True:
+            return False
+        value = audit["provider_calorific_value"]
+        changed = False
+        for raw in rows:
+            if not isinstance(raw, Mapping) or raw.get("kind") != "gas":
+                continue
+            row = normalise_interval(raw, source=source, now=now)
+            if row is None or "consumption_m3" not in row:
+                continue
+            expected = row["consumption_m3"] * 1.02264 * value / 3.6
+            if (
+                not isfinite(expected)
+                or abs(row["kwh"] - expected) > _GAS_ROUNDING_TOLERANCE_KWH
+                or (row["consumption_m3"] == 0 and row["kwh"] != 0)
+            ):
+                continue
+            key = (row["start"], value)
+            prior = self.gas_conversion_rows.get(key)
+            if prior is None:
+                self.gas_conversion_rows[key] = {**row, "calorific_value": value}
+                changed = True
+            elif (
+                abs(prior["kwh"] - row["kwh"]) > 0.000001
+                or abs(prior["consumption_m3"] - row["consumption_m3"]) > 0.000001
+            ):
+                if key not in self.gas_conversion_conflicts:
+                    self.gas_conversion_conflicts.add(key)
+                    changed = True
+        if len(self.gas_conversion_rows) > _MAX_GAS_CONVERSION_ROWS:
+            keep = sorted(self.gas_conversion_rows)[-_MAX_GAS_CONVERSION_ROWS:]
+            self.gas_conversion_rows = {
+                key: self.gas_conversion_rows[key] for key in keep
+            }
+            self.gas_conversion_conflicts.intersection_update(self.gas_conversion_rows)
+        return changed
+
+    def gas_conversion_comparison(self) -> dict[str, Any]:
+        """Report observed revisions separately, without settlement authority."""
+        usable = [
+            (key, row)
+            for key, row in sorted(self.gas_conversion_rows.items())
+            if key not in self.gas_conversion_conflicts
+        ]
+        by_day = defaultdict(list)
+        nonzero = []
+        matched = []
+        same_volume_revisions = 0
+        different_volume = 0
+        for (start, value), row in usable:
+            day = datetime.fromisoformat(start).astimezone(_LONDON).date()
+            by_day[(day, value)].append(row)
+            original = self.quarantined_gas.get(("gas", start))
+            csv = self.rows.get(("gas", start))
+            if ("gas", start) in self.conflicts:
+                csv = None
+            original_volume = original.get("consumption_m3") if original else None
+            same_volume = (
+                abs(original_volume - row["consumption_m3"]) <= 0.000001
+                if original_volume is not None
+                else None
+            )
+            if same_volume is True and abs(original["kwh"] - row["kwh"]) > 0.000001:
+                same_volume_revisions += 1
+            if same_volume is False:
+                different_volume += 1
+            if csv is not None and (row["kwh"] > 0 or csv["kwh"] > 0):
+                matched.append(row["kwh"] - csv["kwh"])
+            if row["consumption_m3"] > 0 or row["kwh"] > 0:
+                nonzero.append(
+                    {
+                        **row,
+                        "raw_first_seen_kwh": original["kwh"] if original else None,
+                        "raw_volume_matches": same_volume,
+                        "raw_conflict_retained": ("gas", start)
+                        in self.quarantined_gas_conflicts,
+                        "csv_kwh": csv["kwh"] if csv else None,
+                        "csv_difference_kwh": (
+                            round(row["kwh"] - csv["kwh"], 6) if csv else None
+                        ),
+                    }
+                )
+        daily = []
+        for (day, value), rows in sorted(by_day.items())[-14:]:
+            start = datetime.combine(day, datetime.min.time(), _LONDON)
+            end = datetime.combine(
+                day + timedelta(days=1), datetime.min.time(), _LONDON
+            )
+            expected = int((end.astimezone(UTC) - start.astimezone(UTC)) / _HALF_HOUR)
+            daily.append(
+                {
+                    "date": day.isoformat(),
+                    "calorific_value": value,
+                    "observed_intervals": len(rows),
+                    "expected_intervals": expected,
+                    "complete_observed_day": len(rows) == expected,
+                    "observed_kwh": round(sum(row["kwh"] for row in rows), 6),
+                    "observed_m3": round(sum(row["consumption_m3"] for row in rows), 6),
+                }
+            )
+        return {
+            "scope": "separate_formula_consistent_provider_observations",
+            "retained_rows": len(self.gas_conversion_rows),
+            "conflicting_rows": len(self.gas_conversion_conflicts),
+            "nonconflicting_rows": len(usable),
+            "nonzero_rows": len(nonzero),
+            "same_volume_changed_kwh_rows": same_volume_revisions,
+            "different_raw_volume_rows": different_volume,
+            "nonzero_csv_overlap_rows": len(matched),
+            "max_absolute_nonzero_csv_difference_kwh": (
+                round(max(abs(value) for value in matched), 6) if matched else None
+            ),
+            "recent_days_by_setting": daily,
+            "recent_nonzero_rows": nonzero[-48:],
+            "retained_row_limit": _MAX_GAS_CONVERSION_ROWS,
+            "conversion_formula_consistency_is_not_supplier_validation": True,
+            "supplier_conversion_validated": False,
+            "automatic_gas_financially_usable": False,
+            "historical_correction_authorised": False,
+        }
 
     def ingest_gas_daily_reference(self, rows: Iterable[Any], *, now: datetime) -> bool:
         """Retain corroborated daily HA observations, never synthetic intervals."""
@@ -162,6 +295,10 @@ class SupplierIntervalLedger:
             "quarantined_gas_conflicts": [
                 list(key) for key in sorted(self.quarantined_gas_conflicts)
             ],
+            "gas_conversion_rows": list(self.gas_conversion_rows.values()),
+            "gas_conversion_conflicts": [
+                list(key) for key in sorted(self.gas_conversion_conflicts)
+            ],
             "gas_daily_reference": [
                 {"date": day, "daily_kwh": value, "lifetime_delta_kwh": value}
                 for day, value in sorted(self.gas_daily_reference.items())
@@ -182,6 +319,23 @@ class SupplierIntervalLedger:
                 and row.get("source") != "octopus_csv"
             ):
                 self.ingest([row], source=row.get("source"), now=now)
+        for row in data.get("gas_conversion_rows") or []:
+            if isinstance(row, dict):
+                self.ingest_gas_conversion(
+                    [row],
+                    source=row.get("source"),
+                    calorific_value=row.get("calorific_value"),
+                    now=now,
+                )
+        for item in data.get("gas_conversion_conflicts") or []:
+            if (
+                isinstance(item, list)
+                and len(item) == 2
+                and isinstance(item[0], str)
+                and type(item[1]) in (int, float)
+                and tuple(item) in self.gas_conversion_rows
+            ):
+                self.gas_conversion_conflicts.add(tuple(item))
         self.ingest_gas_daily_reference(data.get("gas_daily_reference") or [], now=now)
         for day in data.get("gas_daily_reference_conflicts") or []:
             if isinstance(day, str) and day in self.gas_daily_reference:
@@ -418,6 +572,7 @@ class SupplierIntervalLedger:
             "gas_quarantine": {
                 "status": "automatic_gas_unverified",
                 "overlap_comparison": self.gas_quarantine_comparison(),
+                "corrected_observation_comparison": self.gas_conversion_comparison(),
                 "retained_raw_intervals": len(self.quarantined_gas),
                 "conflicting_raw_intervals": len(self.quarantined_gas_conflicts),
                 "recent_daily_reference_kwh": {
