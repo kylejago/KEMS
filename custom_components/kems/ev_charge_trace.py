@@ -424,7 +424,7 @@ def _append_cost_segment(buckets, segment):
 def summarise_extra_slot_cost(records):
     """Pure short-trace estimate helper for deterministic regression tests."""
     buckets = {}
-    for left, right in zip(records, records[1:]):
+    for left, right in zip(records, records[1:], strict=False):
         segment = extra_slot_interval(left, right)
         if segment is not None:
             _append_cost_segment(buckets, segment)
