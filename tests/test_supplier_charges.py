@@ -4,6 +4,7 @@ from datetime import UTC, datetime, timedelta
 
 from kems_core.supplier_charges import (
     SupplierChargeEvidence,
+    baseline_capture_diagnostic,
     capture_completed_baseline,
     capture_joined_baseline,
     completed_power_down_estimate,
@@ -275,3 +276,34 @@ def test_recorded_cost_rows_require_explicit_direction_unit_and_raw_cost():
     assert not supplier_cost_rows(
         "electricity_import", {**attrs, "unit_of_measurement": "p"}
     )
+
+
+def test_joined_identity_survives_missing_or_incomplete_baseline():
+    start = NOW + timedelta(hours=1)
+    end = start + timedelta(hours=1)
+    event = {
+        "id": "future",
+        "start": start.isoformat(),
+        "end": end.isoformat(),
+        "octopoints_per_kwh": 136,
+    }
+    attrs = {
+        "baselines": [
+            {
+                "start": start.isoformat(),
+                "end": (start + timedelta(minutes=30)).isoformat(),
+                "baseline": 0.4,
+                "is_incomplete_calculation": True,
+            }
+        ],
+    }
+    retained = capture_joined_baseline(
+        event, attrs, {}, now=NOW, retain_event_identity=True
+    )
+    assert retained["octopoints_per_kwh"] == 136
+    assert retained["import_baseline_kwh"] is None
+    assert retained["import_baseline_rows"] == {}
+    audit = baseline_capture_diagnostic(attrs, start, end)
+    assert audit["rows_explicitly_incomplete"] == 1
+    assert audit["accepted_half_hours"] == 0
+    assert audit["exact_total_available"] is False

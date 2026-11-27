@@ -162,6 +162,41 @@ def _is_ev_trace_exception(row: dict[str, Any]) -> bool:
     )
 
 
+def _discharge_exception_context(records):
+    """Attribute sample context without inferring duration or cause."""
+    actions = Counter()
+    modes = Counter()
+    writes_after_sample = 0
+    samples = 0
+    for row in records:
+        audit = row.get("ev_cheap_charge_cap_audit")
+        if not isinstance(audit, dict) or not audit.get(
+            "battery_discharging_during_ev_charge"
+        ):
+            continue
+        samples += 1
+        control = row.get("existing_live_control") or {}
+        readback = row.get("foxess_readback") or {}
+        mode = readback.get("work_mode") or {}
+        actions[str(control.get("decision_action"))] += 1
+        modes[str(mode.get("value"))] += 1
+        try:
+            sampled = datetime.fromisoformat(row["timestamp"])
+            written = datetime.fromisoformat(control["last_write_at"])
+            if sampled.tzinfo is not None and written.tzinfo is not None:
+                writes_after_sample += written > sampled
+        except (KeyError, TypeError, ValueError):
+            pass
+    return {
+        "samples": samples,
+        "control_action_counts": dict(actions),
+        "work_mode_readback_counts": dict(modes),
+        "command_written_after_physical_sample": writes_after_sample,
+        "persistent_discharge_proven": False,
+        "hardware_write_authorised": False,
+    }
+
+
 class EVChargeTraceRecorder:
     """Keep prelude, charging and stop samples without changing hardware."""
 
@@ -222,6 +257,9 @@ class EVChargeTraceRecorder:
                 "candidate_is_not_supplier_discount_proof": True,
                 "hardware_write_authorised": False,
             },
+            "discharge_exception_context": _discharge_exception_context(
+                self._exception_records
+            ),
             "scope": "read_only_existing_kems_sources",
             "sample_count": len(self._records),
             "samples": list(self._records),

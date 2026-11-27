@@ -434,3 +434,29 @@ class SupplierIntervalLedger:
             "existing_financial_ledger_modified": False,
             "hardware_write_authorised": False,
         }
+
+
+def gas_calorific_value_diagnostic(attributes):
+    """Expose the upstream setting and implied conversion, never correct data."""
+    value = attributes.get("calorific_value")
+    try:
+        value = float(value) if not isinstance(value, bool) else None
+    except (TypeError, ValueError, OverflowError):
+        value = None
+    if value is not None and (not isfinite(value) or value <= 0):
+        value = None
+    ratio = value * 1.02264 / 3.6 if value is not None else None
+    if ratio is not None and not isfinite(ratio):
+        ratio = None
+    return {
+        "provider_calorific_value": value,
+        "expected_kwh_per_m3_from_setting": (
+            round(ratio, 6) if ratio is not None else None
+        ),
+        "setting_plausible_for_uk_metric_gas": (
+            35.0 <= value <= 45.0 if value is not None else None
+        ),
+        "provider_default_calorific_value": 40.0,
+        "conversion_validated": False,
+        "automatic_correction_authorised": False,
+    }

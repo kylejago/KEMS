@@ -1,3 +1,11 @@
+## 0.9.0-alpha9.261
+
+- Capture Power Down baseline observations independently of the 30-minute supplier scan; retain exact event identity even when baselines are incomplete, and report rejection evidence.
+- Extend exact supplier charge recovery in bounded seven-day Recorder windows (up to 84 days per setup, stopping at an empty window or failure).
+- Report the upstream gas calorific value and implied conversion, without promoting or modifying quarantined observations.
+- Attribute retained EV discharge exceptions to the observed command/readback timing; preserve the existing overnight and daytime safety controls.
+- Avoid rebuilding already encoded historical summaries and separate compact serialization from SHA-256 timing. Preserve full exact-input verification.
+
 ## 0.9.0-alpha9.260
 
 - Preserve individually valid Power Down half-hour baselines and merge only exact non-conflicting coverage. No estimated award without complete evidence.
