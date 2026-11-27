@@ -1,3 +1,9 @@
+## 0.9.0-alpha9.262
+
+- Retain separate, provisional EV-only charging cost evidence in bounded UTC half-hour buckets, using fresh Ohme smart-charge observations, the declared EV-only tariff and corroborated pricing. Exclude ordinary cheap periods, reward events, ambiguous grid allocation, gaps and half-hour boundary crossings. Do not change supplier settlement, household tariff, actual cost/ROI ledger or inverter control.
+- Preserve sampled estimates independently of the short EV trace and do not bridge restarts or duplicate covered seconds.
+- Document confirmed upstream gas calorific setting fault, Power Down Recorder attribute exclusion and accepted reactive EV hold.
+
 ## 0.9.0-alpha9.261
 
 - Capture Power Down baseline observations independently of the 30-minute supplier scan; retain exact event identity even when baselines are incomplete, and report rejection evidence.

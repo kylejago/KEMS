@@ -392,7 +392,7 @@ def _restore_cost_buckets(payload, *, now):
                     for field in _COST_TOTAL_FIELDS
                 )
                 or not 0 < row["covered_seconds"] <= 1800
-                or row["covered_seconds"] > (last_end - start).total_seconds()
+                or row["covered_seconds"] > (last_end - start).total_seconds() + 1e-6
                 or row["estimated_candidate_ev_kwh"] <= 0
                 or row["estimated_ev_charge_pence"] > row["day_rate_comparison_pence"]
             ):
@@ -633,12 +633,20 @@ class EVChargeTraceRecorder:
         if self._cost_previous is not None:
             segment = extra_slot_interval(self._cost_previous, sample)
             if segment is not None:
+                new_slot = segment["slot"] not in self._cost_buckets
                 cost_changed = _append_cost_segment(self._cost_buckets, segment)
+                if cost_changed and new_slot:
+                    # Existing buckets already passed restore/append checks.
+                    # Prune once per new half-hour rather than every scan.
+                    cutoff = (
+                        now.astimezone(UTC) - timedelta(days=COST_RETENTION_DAYS)
+                    ).isoformat()
+                    self._cost_buckets = {
+                        key: self._cost_buckets[key]
+                        for key in sorted(self._cost_buckets)[-MAX_COST_BUCKETS:]
+                        if key >= cutoff
+                    }
         self._cost_previous = sample
-        if cost_changed:
-            self._cost_buckets = _restore_cost_buckets(
-                self._cost_buckets, now=now
-            )
         if not self.wants_capture(snapshot):
             self._prelude.append(sample)
             cutoff = now - timedelta(minutes=PRELUDE_MINUTES)

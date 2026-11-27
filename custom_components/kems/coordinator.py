@@ -768,6 +768,16 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
 
         try:
             snapshot = self._collector.collect()
+            # Capture mode and tariff evidence alongside the physical snapshot,
+            # before the asynchronous control and reporting stages.
+            extra_slot_policy = None
+            if snapshot.ev_charging is True:
+                try:
+                    extra_slot_policy = observe_extra_slot_policy(
+                        self.hass, self.entities, self.entry.options, snapshot
+                    )
+                except Exception:
+                    LOGGER.exception("Read-only Ohme tariff observation failed")
             # Read-only timing correlation for commissioning outliers. This
             # captures the inverter command mode alongside each physical
             # observation; its metadata never participates in readiness.
@@ -2011,13 +2021,7 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                     foxess_control=foxess_control,
                     command_shadow=trace_shadow,
                     planned_control=control,
-                    extra_slot_policy=(
-                        observe_extra_slot_policy(
-                            self.hass, self.entities, self.entry.options, snapshot
-                        )
-                        if snapshot.ev_charging is True
-                        else None
-                    ),
+                    extra_slot_policy=extra_slot_policy,
                     reward_event_active=bool(
                         happy_hour_plan.get("happy_hour_import_authority_active")
                         or happy_hour_house_grid_hold
