@@ -197,3 +197,109 @@ def test_gas_conversion_diagnostic_never_corrects_provider_data():
         ]
         is None
     )
+
+
+def test_corrected_gas_observations_retain_original_conflict_and_survive_restart():
+    ledger = SupplierIntervalLedger()
+    start = NOW - timedelta(days=1)
+    source = "octopus_estimated_gas"
+    original = {**_row(start, 184.238, "gas"), "consumption_m3": 0.665}
+    revised = {**original, "kwh": round(0.665 * 1.02264 * 39.3 / 3.6, 3)}
+    assert ledger.ingest([original], source=source, now=NOW)
+    assert not ledger.ingest_gas_conversion(
+        [original], source=source, calorific_value=975.3, now=NOW
+    )
+    assert ledger.ingest([revised], source=source, now=NOW)
+    assert ledger.ingest_gas_conversion(
+        [revised], source=source, calorific_value=39.3, now=NOW
+    )
+    assert not ledger.ingest_gas_conversion(
+        [revised], source=source, calorific_value=39.3, now=NOW
+    )
+    assert ledger.ingest([_row(start, 7.42, "gas")], source="octopus_csv", now=NOW)
+    report = ledger.gas_conversion_comparison()
+    assert report["same_volume_changed_kwh_rows"] == 1
+    assert report["nonzero_csv_overlap_rows"] == 1
+    assert report["max_absolute_nonzero_csv_difference_kwh"] == round(
+        abs(revised["kwh"] - 7.42), 6
+    )
+    assert report["recent_nonzero_rows"][0]["raw_first_seen_kwh"] == 184.238
+    assert report["recent_nonzero_rows"][0]["raw_conflict_retained"] is True
+    assert report["supplier_conversion_validated"] is False
+    assert report["automatic_gas_financially_usable"] is False
+    assert ledger.rows[("gas", start.isoformat())]["kwh"] == 7.42
+    restored = SupplierIntervalLedger()
+    restored.restore(ledger.dump(), now=NOW)
+    assert restored.summary() == ledger.summary()
+
+
+def test_gas_conversion_rejects_bad_values_and_keeps_distinct_settings():
+    ledger = SupplierIntervalLedger()
+    start = NOW - timedelta(days=1)
+    source = "octopus_estimated_gas"
+    good = {
+        **_row(start, round(0.665 * 1.02264 * 39.3 / 3.6, 3), "gas"),
+        "consumption_m3": 0.665,
+    }
+    for value in (None, True, 975.3, float("nan")):
+        assert not ledger.ingest_gas_conversion(
+            [good], source=source, calorific_value=value, now=NOW
+        )
+    for bad in (
+        {**good, "kwh": 184.238},
+        {**good, "consumption_m3": True},
+        {**good, "consumption_m3": None},
+        {**good, "consumption_m3": 0},
+        _row(NOW, 7.424, "gas"),
+        {**good, "kind": "electricity_import"},
+    ):
+        assert not ledger.ingest_gas_conversion(
+            [bad], source=source, calorific_value=39.3, now=NOW
+        )
+    assert not ledger.ingest_gas_conversion(
+        [good], source="octopus_csv", calorific_value=39.3, now=NOW
+    )
+    assert ledger.ingest_gas_conversion(
+        [good], source=source, calorific_value=39.3, now=NOW
+    )
+    different_setting = {**good, "kwh": round(0.665 * 1.02264 * 40 / 3.6, 3)}
+    assert ledger.ingest_gas_conversion(
+        [different_setting], source=source, calorific_value=40, now=NOW
+    )
+    conflicting = {**good, "consumption_m3": 1.0, "kwh": 11.164}
+    assert ledger.ingest_gas_conversion(
+        [conflicting], source=source, calorific_value=39.3, now=NOW
+    )
+    report = ledger.gas_conversion_comparison()
+    assert report["retained_rows"] == 2
+    assert report["conflicting_rows"] == 1
+    assert report["nonzero_rows"] == 1
+    assert ledger.complete_day_totals("gas") == {}
+
+
+def test_gas_conversion_complete_day_requires_all_intervals_same_setting():
+    ledger = SupplierIntervalLedger()
+    start = datetime(2026, 10, 24, 23, tzinfo=UTC)
+    rows = [
+        {**_row(start + timedelta(minutes=30 * n), 0, "gas"), "consumption_m3": 0}
+        for n in range(50)
+    ]
+    source = "octopus_estimated_gas"
+    assert ledger.ingest_gas_conversion(
+        rows[:-1], source=source, calorific_value=39.3, now=NOW
+    )
+    assert ledger.ingest_gas_conversion(
+        rows[-1:], source=source, calorific_value=40, now=NOW
+    )
+    assert not any(
+        row["complete_observed_day"]
+        for row in ledger.gas_conversion_comparison()["recent_days_by_setting"]
+    )
+    assert ledger.ingest_gas_conversion(
+        rows[-1:], source=source, calorific_value=39.3, now=NOW
+    )
+    report = ledger.gas_conversion_comparison()
+    assert report["recent_days_by_setting"][0]["complete_observed_day"] is True
+    assert report["nonzero_rows"] == 0
+    assert report["nonzero_csv_overlap_rows"] == 0
+    assert ledger.complete_day_totals("gas") == {}

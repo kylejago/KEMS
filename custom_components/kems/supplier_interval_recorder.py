@@ -562,6 +562,13 @@ class SupplierIntervalRecorder:
                     "quarantined_unverified" if kind == "gas" else "observed"
                 )
                 if kind == "gas":
+                    # Keep observed revisions, not synthetic recalculations.
+                    changed |= self._ledger.ingest_gas_conversion(
+                        rows,
+                        source=source,
+                        calorific_value=attrs.get("calorific_value"),
+                        now=now,
+                    )
                     gas_source_shape = {
                         "reported_unit": state.attributes.get("unit_of_measurement"),
                         "estimated": attrs.get("is_estimated"),

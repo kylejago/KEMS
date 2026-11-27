@@ -1,3 +1,8 @@
+## 0.9.0-alpha9.263
+
+- Preserve observed formula-consistent gas revisions separately from quarantined first-seen readings, keyed by UTC interval and reported calorific value. Report nonzero CSV overlap, same-volume revisions, conflicts and complete observed days by setting.
+- Keep original raw conflicts, trusted CSV, finances, ROI and physical control unchanged; never synthesize corrected readings or grant automatic settlement authority.
+
 ## 0.9.0-alpha9.262
 
 - Retain separate, provisional EV-only charging cost evidence in bounded UTC half-hour buckets, using fresh Ohme smart-charge observations, the declared EV-only tariff and corroborated pricing. Exclude ordinary cheap periods, reward events, ambiguous grid allocation, gaps and half-hour boundary crossings. Do not change supplier settlement, household tariff, actual cost/ROI ledger or inverter control.
