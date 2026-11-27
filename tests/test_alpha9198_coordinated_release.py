@@ -15,7 +15,7 @@ RELEASE = ROOT / "release" / "kems-bundle.template.json"
 def test_release_version_bundle_and_optional_component_versions_are_pinned() -> None:
     manifest = json.loads((KEMS / "manifest.json").read_text(encoding="utf-8"))
     bundle = json.loads(RELEASE.read_text(encoding="utf-8"))
-    assert manifest["version"] == "0.9.0-alpha9.259"
+    assert manifest["version"] == "0.9.0-alpha9.260"
     assert bundle["bundle"] == "__RELEASE_VERSION__"
     assert bundle["components"]["kems_core"]["version"] == "__RELEASE_VERSION__"
     assert bundle["components"]["dashboard"]["version"] == "__RELEASE_VERSION__"

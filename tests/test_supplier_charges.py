@@ -8,6 +8,7 @@ from kems_core.supplier_charges import (
     capture_joined_baseline,
     completed_power_down_estimate,
     merge_completed_baseline,
+    supplier_cost_rows,
 )
 from kems_core.supplier_intervals import SupplierIntervalLedger
 
@@ -203,3 +204,75 @@ def test_joined_baseline_capture_before_event_completion():
     assert capture_joined_baseline(event, {}, {}, now=NOW) is None
     assert capture_joined_baseline(event, baseline, {}, now=START) is None
     assert capture_joined_baseline(event, baseline, {}, now=end) == evidence
+
+
+def test_joined_baseline_merges_only_exact_nonconflicting_half_hours():
+    start = NOW + timedelta(hours=1)
+    middle = start + timedelta(minutes=30)
+    end = start + timedelta(hours=1)
+    event = {
+        "id": "split",
+        "start": start.isoformat(),
+        "end": end.isoformat(),
+        "octopoints_per_kwh": 136,
+    }
+
+    def attrs(left, right, value, incomplete=False):
+        return {
+            "baselines": [
+                {
+                    "start": left.isoformat(),
+                    "end": right.isoformat(),
+                    "baseline": value,
+                    "is_incomplete_calculation": incomplete,
+                }
+            ],
+            "total_baseline": value,
+        }
+
+    first = attrs(start, middle, 0.25)
+    second = attrs(middle, end, 0.5)
+    early = capture_joined_baseline(event, first, first, now=NOW)
+    late = capture_joined_baseline(event, second, second, now=middle)
+    assert early["import_baseline_kwh"] is None
+    assert early["import_baseline_rows"] == {start.isoformat(): 0.25}
+    assert late["export_baseline_kwh"] is None
+    merged = merge_completed_baseline(early, late)
+    assert merged["import_baseline_kwh"] == 0.75
+    assert merged["export_baseline_kwh"] == 0.75
+    assert merge_completed_baseline(merged, late) == merged
+    revised = capture_joined_baseline(event, attrs(start, middle, 0.3), {}, now=NOW)
+    assert merge_completed_baseline(merged, revised)["conflict"] is True
+    assert (
+        capture_joined_baseline(
+            event, attrs(start, middle, 0.25, incomplete=True), {}, now=NOW
+        )
+        is None
+    )
+    assert (
+        capture_joined_baseline(event, attrs(START, middle, 0.25), {}, now=NOW)
+        is None
+    )
+
+
+def test_recorded_cost_rows_require_explicit_direction_unit_and_raw_cost():
+    attrs = {
+        "unit_of_measurement": "GBP",
+        "is_export": False,
+        "charges": [
+            {
+                "start": START.isoformat(),
+                "end": (START + timedelta(minutes=30)).isoformat(),
+                "consumption": 1.0,
+                "raw_cost": 0.066,
+            }
+        ],
+    }
+    rows = supplier_cost_rows("electricity_import", attrs)
+    assert len(rows) == 1
+    assert abs(rows[0]["charge_pence"] - 6.6) < 0.000001
+    assert not supplier_cost_rows("electricity_export", attrs)
+    assert not supplier_cost_rows("electricity_import", {**attrs, "charges": []})
+    assert not supplier_cost_rows(
+        "electricity_import", {**attrs, "unit_of_measurement": "p"}
+    )

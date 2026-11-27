@@ -50,13 +50,23 @@ def normalise_interval(
         return None
     if not isfinite(energy) or energy < 0:
         return None
-    return {
+    result = {
         "kind": kind,
         "start": start.isoformat(),
         "end": end.isoformat(),
         "kwh": energy,
         "source": source,
     }
+    if kind == "gas" and source != "octopus_csv":
+        volume = row.get("consumption_m3")
+        if not isinstance(volume, bool):
+            try:
+                volume = float(volume)
+            except (TypeError, ValueError, OverflowError):
+                volume = None
+            if volume is not None and isfinite(volume) and volume >= 0:
+                result["consumption_m3"] = volume
+    return result
 
 
 class SupplierIntervalLedger:
@@ -91,9 +101,23 @@ class SupplierIntervalLedger:
             if previous is None:
                 target[key] = row
                 changed = True
-            elif abs(previous["kwh"] - row["kwh"]) > 0.000001 and key not in conflicts:
-                conflicts.add(key)
-                changed = True
+            else:
+                old_volume = previous.get("consumption_m3")
+                new_volume = row.get("consumption_m3")
+                if (
+                    abs(previous["kwh"] - row["kwh"]) > 0.000001
+                    or (
+                        old_volume is not None
+                        and new_volume is not None
+                        and abs(old_volume - new_volume) > 0.000001
+                    )
+                ):
+                    if key not in conflicts:
+                        conflicts.add(key)
+                        changed = True
+                elif old_volume is None and new_volume is not None:
+                    previous["consumption_m3"] = new_volume
+                    changed = True
         return changed
 
     def ingest_gas_daily_reference(self, rows: Iterable[Any], *, now: datetime) -> bool:
@@ -314,7 +338,33 @@ class SupplierIntervalLedger:
                     "corroborated_daily_reference_kwh": reference,
                 }
             )
+        paired = []
+        for key, row in sorted(self.quarantined_gas.items()):
+            volume = row.get("consumption_m3")
+            if volume is None or (volume == 0 and row["kwh"] == 0):
+                continue
+            csv = self.rows.get(key)
+            paired.append(
+                {
+                    "start": row["start"],
+                    "end": row["end"],
+                    "automatic_kwh": row["kwh"],
+                    "automatic_m3": volume,
+                    "observed_kwh_per_m3": (
+                        round(row["kwh"] / volume, 6) if volume > 0 else None
+                    ),
+                    "csv_kwh": (
+                        csv["kwh"]
+                        if csv is not None and key not in self.conflicts
+                        else None
+                    ),
+                    "automatic_conflict": key in self.quarantined_gas_conflicts,
+                }
+            )
         return {
+            "paired_nonzero_observations": len(paired),
+            "recent_paired_nonzero_observations": paired[-48:],
+            "conversion_validated": False,
             "recent_raw_days": daily,
             "matched_nonconflicting_intervals": sum(
                 len(pairs) for pairs in by_day.values()
