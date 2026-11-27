@@ -114,3 +114,35 @@ def ohme_extra_slot_evidence(
             "tariff declarations cannot enable Force Charge."
         ),
     }
+
+
+def observe_extra_slot_policy(hass, entities, options, snapshot):
+    """Read fresh charger mode, status and supplier off-peak for a trace."""
+
+    def state_and_age(entity_id):
+        state = hass.states.get(entity_id) if entity_id else None
+        if state is None:
+            return None, None
+        reported = getattr(state, "last_reported", None)
+        age = (
+            (snapshot.timestamp - reported).total_seconds()
+            if reported is not None
+            else None
+        )
+        return state.state, age
+
+    mode, mode_age = state_and_age(entities.ohme_charge_mode)
+    status, status_age = state_and_age(entities.ev_status)
+    offpeak, offpeak_age = state_and_age(entities.off_peak)
+    if offpeak_age is None or not 0 <= offpeak_age <= _SOURCE_FRESH_SECONDS:
+        offpeak = None
+    return ohme_extra_slot_evidence(
+        options,
+        charge_mode=mode,
+        charger_status=status,
+        charging_power_kw=snapshot.ev_power_kw,
+        regular_offpeak_state=offpeak,
+        mode_age_seconds=mode_age,
+        status_age_seconds=status_age,
+        power_age_seconds=snapshot.ev_power_age_seconds,
+    )

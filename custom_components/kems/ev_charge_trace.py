@@ -7,7 +7,8 @@ charger nor changes inverter work mode, power, reserve or tariff settings.
 from __future__ import annotations
 
 from collections import Counter
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
+from math import isfinite
 from typing import Any
 
 from homeassistant.core import HomeAssistant
@@ -20,6 +21,8 @@ from .kems_core.shared_bus_balance import candidate_extra_slot_house_routing
 STORAGE_VERSION = 1
 MAX_RECORDS = 960
 MAX_EXCEPTION_RECORDS = 64
+MAX_COST_BUCKETS = 4320
+COST_RETENTION_DAYS = 90
 RETENTION_HOURS = 72
 PRELUDE_MINUTES = 15
 POSTLUDE_MINUTES = 15
@@ -41,6 +44,8 @@ def build_ev_trace_sample(
     foxess_control: dict[str, Any] | None = None,
     command_shadow: dict[str, Any] | None = None,
     planned_control: Any = None,
+    extra_slot_policy: dict[str, Any] | None = None,
+    reward_event_active: bool = False,
 ) -> dict[str, Any]:
     """Create one compact observation, with labelled *observed* readbacks."""
     command_shadow = command_shadow or {}
@@ -139,6 +144,9 @@ def build_ev_trace_sample(
             snapshot,
             site_import_limit_kw=getattr(planned_control, "site_import_limit_kw", None),
         ),
+        "extra_slot_cost_sample": extra_slot_cost_sample(
+            snapshot, extra_slot_policy, reward_event_active=reward_event_active
+        ),
         "existing_live_control": {
             "decision_action": control.get("decision_action"),
             "commands_permitted": control.get("commands_permitted"),
@@ -197,6 +205,232 @@ def _discharge_exception_context(records):
     }
 
 
+def _finite_number(value):
+    return (
+        isinstance(value, (int, float))
+        and not isinstance(value, bool)
+        and isfinite(value)
+    )
+
+
+def extra_slot_cost_sample(snapshot, policy, *, reward_event_active=False):
+    """Conservative, non-authoritative price and power evidence for one scan."""
+    if not policy or policy.get("estimated_ev_only_discount_candidate") is not True:
+        return {"status": "not_qualified"}
+    if (
+        reward_event_active
+        or snapshot.saving_session_active
+        or snapshot.off_peak is not False
+        or snapshot.cheap_period_confirmed
+        or snapshot.ev_charging is not True
+    ):
+        return {"status": "other_event_or_tariff"}
+    ev = snapshot.ev_power_kw
+    grid = snapshot.grid_import_kw
+    battery = snapshot.battery_power_kw
+    solar = snapshot.solar_power_kw
+    export = snapshot.grid_export_kw
+    if not all(_finite_number(value) for value in (ev, grid, battery, solar, export)):
+        return {"status": "incomplete_power"}
+    for field in (
+        "grid_import_kw",
+        "grid_export_kw",
+        "battery_power_kw",
+        "solar_power_kw",
+    ):
+        age = snapshot.source_age_seconds.get(field)
+        if (
+            field in snapshot.stale_fields
+            or not _finite_number(age)
+            or not 0 <= age <= 120
+        ):
+            return {"status": "stale_power"}
+    # Require grid supply at least as large as measured EV demand, no material
+    # battery discharge, PV or export. This is not independent circuit metering.
+    if (
+        ev < 0.25
+        or grid < ev
+        or battery > 0.1
+        or not 0 <= solar <= 0.1
+        or not 0 <= export <= 0.1
+    ):
+        return {"status": "ambiguous_grid_allocation"}
+    day = snapshot.current_import_rate
+    cheap = snapshot.intelligent_slot_evidence.get(
+        "effective_fallback_offpeak_rate_pence"
+    )
+    next_rate = snapshot.next_import_rate
+    for field in ("current_import_rate", "next_import_rate", "off_peak"):
+        age = snapshot.tariff_source_age_seconds.get(field)
+        if (
+            field in snapshot.tariff_stale_fields
+            or not _finite_number(age)
+            or not 0 <= age <= 120
+        ):
+            return {"status": "stale_tariff"}
+    if (
+        not all(_finite_number(value) for value in (day, cheap, next_rate))
+        or not 0 <= cheap < day
+        or abs(next_rate - cheap) > 0.01
+    ):
+        return {"status": "price_not_corroborated"}
+    return {
+        "status": "candidate",
+        "ev_kw": ev,
+        "day_rate_pence": day,
+        "estimated_ev_rate_pence": cheap,
+        "supplier_discount_confirmed": False,
+    }
+
+
+def extra_slot_interval(left, right):
+    """Return a short, qualified UTC half-hour segment or no evidence."""
+    a = left.get("extra_slot_cost_sample") or {}
+    b = right.get("extra_slot_cost_sample") or {}
+    if a.get("status") != "candidate" or b.get("status") != "candidate":
+        return None
+    if right.get("event") not in ("scan", None):
+        return None
+    try:
+        start = datetime.fromisoformat(left["timestamp"])
+        end = datetime.fromisoformat(right["timestamp"])
+        if start.tzinfo is None or end.tzinfo is None:
+            return None
+        elapsed = (end - start).total_seconds()
+        if not 0 < elapsed <= 90:
+            return None
+        slot = int(start.timestamp() // 1800)
+        if slot != int(end.timestamp() // 1800):
+            return None
+        rates = ("day_rate_pence", "estimated_ev_rate_pence")
+        if any(a.get(key) != b.get(key) for key in rates):
+            return None
+        if not all(
+            _finite_number(row.get(key)) for row in (a, b) for key in (*rates, "ev_kw")
+        ):
+            return None
+        kwh = min(a["ev_kw"], b["ev_kw"]) * elapsed / 3600
+        if kwh <= 0 or not 0 <= a[rates[1]] < a[rates[0]]:
+            return None
+        return {
+            "slot": datetime.fromtimestamp(slot * 1800, UTC).isoformat(),
+            "start": start.astimezone(UTC).isoformat(),
+            "end": end.astimezone(UTC).isoformat(),
+            "covered_seconds": elapsed,
+            "estimated_candidate_ev_kwh": kwh,
+            "day_rate_comparison_pence": kwh * a[rates[0]],
+            "estimated_ev_charge_pence": kwh * a[rates[1]],
+        }
+    except (KeyError, TypeError, ValueError, OverflowError, OSError):
+        return None
+
+
+_COST_TOTAL_FIELDS = (
+    "covered_seconds",
+    "estimated_candidate_ev_kwh",
+    "day_rate_comparison_pence",
+    "estimated_ev_charge_pence",
+)
+
+
+def _cost_summary(buckets, records):
+    counts = Counter(
+        str((row.get("extra_slot_cost_sample") or {}).get("status", "not_recorded"))
+        for row in records
+    )
+    totals = {
+        key: sum(row[key] for row in buckets.values()) for key in _COST_TOTAL_FIELDS
+    }
+    return {
+        "scope": "persistent_sampled_ev_only_estimate",
+        "sample_status_counts_recent_trace": dict(counts),
+        "retained_half_hours": len(buckets),
+        "retention_days": COST_RETENTION_DAYS,
+        "qualified_sample_interval_seconds": round(totals["covered_seconds"], 3),
+        "estimated_candidate_ev_kwh": round(totals["estimated_candidate_ev_kwh"], 6),
+        "day_rate_comparison_pence": round(totals["day_rate_comparison_pence"], 4),
+        "estimated_ev_charge_pence": round(totals["estimated_ev_charge_pence"], 4),
+        "estimated_discount_pence": round(
+            totals["day_rate_comparison_pence"] - totals["estimated_ev_charge_pence"],
+            4,
+        ),
+        "recent_half_hours": [dict(buckets[key]) for key in sorted(buckets)[-64:]],
+        "complete_session_energy_verified": False,
+        "supplier_discount_confirmed": False,
+        "household_tariff_changed": False,
+        "roi_or_ledger_write_authorised": False,
+    }
+
+
+def _restore_cost_buckets(payload, *, now):
+    """Accept only bounded, nonnegative, internally consistent saved estimates."""
+    result = {}
+    if not isinstance(payload, dict):
+        return result
+    for key, row in payload.items():
+        if not isinstance(key, str) or not isinstance(row, dict):
+            continue
+        try:
+            start = datetime.fromisoformat(key)
+            last_end = datetime.fromisoformat(row["last_end"])
+            if (
+                start.tzinfo is None
+                or last_end.tzinfo is None
+                or key != start.astimezone(UTC).isoformat()
+                or start.timestamp() % 1800 != 0
+                or not now - timedelta(days=COST_RETENTION_DAYS) <= start <= now
+                or not start < last_end < start + timedelta(minutes=30)
+                or last_end > now
+                or not all(
+                    _finite_number(row.get(field)) and row[field] >= 0
+                    for field in _COST_TOTAL_FIELDS
+                )
+                or not 0 < row["covered_seconds"] <= 1800
+                or row["covered_seconds"] > (last_end - start).total_seconds() + 1e-6
+                or row["estimated_candidate_ev_kwh"] <= 0
+                or row["estimated_ev_charge_pence"] > row["day_rate_comparison_pence"]
+            ):
+                continue
+        except (TypeError, ValueError, KeyError, OverflowError, OSError):
+            continue
+        result[key] = {
+            "slot": key,
+            "last_end": last_end.astimezone(UTC).isoformat(),
+            **{field: row[field] for field in _COST_TOTAL_FIELDS},
+        }
+    return {key: result[key] for key in sorted(result)[-MAX_COST_BUCKETS:]}
+
+
+def _append_cost_segment(buckets, segment):
+    """Accumulate disjoint evidence only, even across repeated timestamps."""
+    key = segment["slot"]
+    prior = buckets.get(key)
+    if prior is not None and segment["start"] < prior["last_end"]:
+        return False
+    new = {
+        "slot": key,
+        "last_end": segment["end"],
+        **{
+            field: segment[field] + (prior[field] if prior else 0.0)
+            for field in _COST_TOTAL_FIELDS
+        },
+    }
+    if new["covered_seconds"] > 1800:
+        return False
+    buckets[key] = new
+    return True
+
+
+def summarise_extra_slot_cost(records):
+    """Pure short-trace estimate helper for deterministic regression tests."""
+    buckets = {}
+    for left, right in zip(records, records[1:], strict=False):
+        segment = extra_slot_interval(left, right)
+        if segment is not None:
+            _append_cost_segment(buckets, segment)
+    return _cost_summary(buckets, records)
+
+
 class EVChargeTraceRecorder:
     """Keep prelude, charging and stop samples without changing hardware."""
 
@@ -212,6 +446,8 @@ class EVChargeTraceRecorder:
         self._previous_cheap = False
         self._post_until: datetime | None = None
         self._unsaved = 0
+        self._cost_buckets: dict[str, Any] = {}
+        self._cost_previous: dict[str, Any] | None = None
 
     @property
     def state(self) -> dict[str, Any]:
@@ -257,6 +493,9 @@ class EVChargeTraceRecorder:
                 "candidate_is_not_supplier_discount_proof": True,
                 "hardware_write_authorised": False,
             },
+            "extra_slot_cost_evidence": _cost_summary(
+                self._cost_buckets, self._records
+            ),
             "discharge_exception_context": _discharge_exception_context(
                 self._exception_records
             ),
@@ -315,6 +554,11 @@ class EVChargeTraceRecorder:
     async def async_load(self) -> None:
         """Recover retained evidence across Home Assistant restart."""
         data = await self._store.async_load() or {}
+        self._cost_buckets = _restore_cost_buckets(
+            data.get("extra_slot_cost_buckets"), now=datetime.now(UTC)
+        )
+        # Never bridge a restart using a previously persisted sample.
+        self._cost_previous = None
         self._records = [
             item for item in data.get("records", []) if isinstance(item, dict)
         ][-MAX_RECORDS:]
@@ -344,6 +588,8 @@ class EVChargeTraceRecorder:
         foxess_control: dict[str, Any] | None = None,
         command_shadow: dict[str, Any] | None = None,
         planned_control: Any = None,
+        extra_slot_policy: dict[str, Any] | None = None,
+        reward_event_active: bool = False,
     ) -> bool:
         """Record actual scan data; save transitions immediately."""
         now = snapshot.timestamp
@@ -374,7 +620,27 @@ class EVChargeTraceRecorder:
             foxess_control=foxess_control,
             command_shadow=command_shadow,
             planned_control=planned_control,
+            extra_slot_policy=extra_slot_policy,
+            reward_event_active=reward_event_active,
         )
+        cost_changed = False
+        if self._cost_previous is not None:
+            segment = extra_slot_interval(self._cost_previous, sample)
+            if segment is not None:
+                new_slot = segment["slot"] not in self._cost_buckets
+                cost_changed = _append_cost_segment(self._cost_buckets, segment)
+                if cost_changed and new_slot:
+                    # Existing buckets already passed restore/append checks.
+                    # Prune once per new half-hour rather than every scan.
+                    cutoff = (
+                        now.astimezone(UTC) - timedelta(days=COST_RETENTION_DAYS)
+                    ).isoformat()
+                    self._cost_buckets = {
+                        key: self._cost_buckets[key]
+                        for key in sorted(self._cost_buckets)[-MAX_COST_BUCKETS:]
+                        if key >= cutoff
+                    }
+        self._cost_previous = sample
         if not self.wants_capture(snapshot):
             self._prelude.append(sample)
             cutoff = now - timedelta(minutes=PRELUDE_MINUTES)
@@ -409,6 +675,8 @@ class EVChargeTraceRecorder:
                 if datetime.fromisoformat(item["timestamp"]) >= cutoff
             ][-MAX_RECORDS:]
             self._unsaved += 1
+        if cost_changed and not (due or transition):
+            self._unsaved += 1
         self._previous_connected = connected
         self._previous_charging = charging
         self._previous_cheap = cheap
@@ -422,6 +690,7 @@ class EVChargeTraceRecorder:
             {
                 "records": self._records,
                 "exception_records": self._exception_records,
+                "extra_slot_cost_buckets": self._cost_buckets,
             }
         )
         self._unsaved = 0
