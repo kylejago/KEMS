@@ -1,3 +1,12 @@
+## 0.9.0-alpha9.259 — evidence continuity and recovery readiness
+
+- Retain exact independently complete Power Down baselines for joined events before or during the event; separate pending evidence from completed results. Merge without overwriting conflicts; no inferred rewards or settlement.
+- Expose all post-commissioning dates with missing matched supplier prices. No inferred historical prices or ledger writes.
+- Report nonzero gas overlap, first-seen raw daily sums, CSV and corroborated daily references, conflict counts and automatic provider row shape; keep automatic gas quarantined.
+- Index eligible supplier cost entities in one registry pass, retaining exact account/meter matching.
+- Retain comparable active daytime Ohme/legacy observations across restarts without tariff or control authority.
+- Keep EV-only house routing shadow-only pending measured circuit/load evidence and safe physical command validation. Preserve live physical control, tariff resolution, reward accounting and safety gates.
+
 ## 0.9.0-alpha9.258 — booking status and supplier evidence coverage
 
 - Report only current or future confirmed Happy Hour bookings as booked; preserve completed bookings for historical evidence and weekend limits.
