@@ -324,9 +324,7 @@ class ROIRewardRecorder:
                 # never witnessed. Only accept them with a completed exact
                 # window, no competing event ID and no ambiguous legacy row.
                 if now is None or any(
-                    window == award_window(
-                        other.session_start, other.session_end
-                    )
+                    window == award_window(other.session_start, other.session_end)
                     for other in known_events.values()
                 ):
                     continue
@@ -334,13 +332,10 @@ class ROIRewardRecorder:
                 if any(
                     key not in (event_id, alias)
                     and (
-                        award_window(receipt.get("start"), receipt.get("end"))
-                        == window
+                        award_window(receipt.get("start"), receipt.get("end")) == window
                         or (
                             receipt.get("day") == date_of(joined_end)
-                            and award_window(
-                                receipt.get("start"), receipt.get("end")
-                            )
+                            and award_window(receipt.get("start"), receipt.get("end"))
                             is None
                         )
                     )
