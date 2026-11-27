@@ -306,3 +306,24 @@ def test_outside_cheap_grid_shortfall_is_retained_without_tariff_authority():
     assert sample["outside_cheap_ev_startup_risk"] is True
     assert sample["cheap_period_confirmed"] is False
     assert sample["new_ev_routing_hardware_authorised"] is False
+
+
+def test_discharge_context_distinguishes_post_sample_command_readback():
+    module, _ = _load_trace_module()
+    row = {
+        "timestamp": NOW.isoformat(),
+        "ev_cheap_charge_cap_audit": {
+            "battery_discharging_during_ev_charge": True
+        },
+        "existing_live_control": {
+            "decision_action": "force_charge",
+            "last_write_at": (NOW + timedelta(seconds=4)).isoformat(),
+        },
+        "foxess_readback": {"work_mode": {"value": "Force Charge"}},
+    }
+    audit = module._discharge_exception_context([row, {}])
+    assert audit["samples"] == 1
+    assert audit["command_written_after_physical_sample"] == 1
+    assert audit["control_action_counts"] == {"force_charge": 1}
+    assert audit["persistent_discharge_proven"] is False
+    assert audit["hardware_write_authorised"] is False

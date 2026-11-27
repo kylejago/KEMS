@@ -16,17 +16,27 @@ from .const import DOMAIN, STORAGE_NAMESPACE
 from .kems_core.supplier_charges import (
     CHARGE_FORMAT,
     SupplierChargeEvidence,
+    baseline_capture_diagnostic,
     capture_completed_baseline,
     capture_joined_baseline,
     completed_power_down_estimate,
     merge_completed_baseline,
     supplier_cost_rows,
 )
-from .kems_core.supplier_intervals import FORMAT, KINDS, SupplierIntervalLedger, _utc
+from .kems_core.supplier_intervals import (
+    FORMAT,
+    KINDS,
+    SupplierIntervalLedger,
+    _utc,
+    gas_calorific_value_diagnostic,
+)
 from .providers.entity_map import KEMSEntities
 
 _LOGGER = logging.getLogger(__name__)
 _REFRESH = timedelta(minutes=30)
+_BASELINE_REFRESH = timedelta(seconds=60)
+_HISTORY_BATCH_DAYS = 7
+_HISTORY_MAX_BATCHES = 12
 _FILE_NAME = "kems_supplier_intervals.json"
 _GAS_REFERENCE_FILE = "kems_gas_daily_reference.json"
 _CHARGE_FILE = "kems_supplier_charges.json"
@@ -56,7 +66,13 @@ class SupplierIntervalRecorder:
         self._next_at: datetime | None = None
         self._dirty = False
         self._history_task = None
-        self._history_attempted = False
+        self._history_anchor: datetime | None = None
+        self._history_entities: dict[str, str] = {}
+        self._history_batches = 0
+        self._history_candidate_rows = 0
+        self._history_changed = False
+        self._next_baseline_at: datetime | None = None
+        self._baseline_status: dict[str, Any] = {}
         self._history_status = {"status": "not_attempted"}
         self._status: dict[str, Any] = {"status": "not_loaded"}
 
@@ -65,6 +81,7 @@ class SupplierIntervalRecorder:
         return {
             **self._status,
             "historical_charge_recovery": dict(self._history_status),
+            "power_down_baseline_capture": dict(self._baseline_status),
         }
 
     def electricity_reconciliation(self, daily_records, *, now):
@@ -199,15 +216,15 @@ class SupplierIntervalRecorder:
         self._late_events[key] = merged
         return True
 
-    async def _recover_recorded_charges(self, entities, now):
+    async def _recover_recorded_charges(self, entities, start, end):
         """One bounded, read-only query outside the live coordinator scan."""
         from homeassistant.components.recorder import get_instance, history
 
         def read():
             states = history.get_significant_states(
                 self._hass,
-                now - timedelta(days=7),
-                now,
+                start,
+                end,
                 entity_ids=list(entities),
                 include_start_time_state=False,
                 significant_changes_only=False,
@@ -229,7 +246,11 @@ class SupplierIntervalRecorder:
         return await get_instance(self._hass).async_add_executor_job(read)
 
     async def _consume_recorded_charges(self, now, entities):
-        if self._history_task is not None and self._history_task.done():
+        """Read at most one seven-day batch per normal supplier scan."""
+        changed = False
+        if self._history_task is not None:
+            if not self._history_task.done():
+                return False
             task, self._history_task = self._history_task, None
             try:
                 rows = task.result()
@@ -238,33 +259,204 @@ class SupplierIntervalRecorder:
                         rows, source="octopus_integration", now=now
                     )
                 )
+                self._history_candidate_rows += len(rows)
+                self._history_changed |= changed
+                self._history_batches += 1
                 self._history_status = {
-                    "status": "observed" if rows else "no_retained_attributes",
-                    "candidate_rows": len(rows),
-                    "evidence_changed": changed,
-                    "lookback_days": 7,
+                    "status": (
+                        "observed"
+                        if self._history_candidate_rows
+                        else "no_retained_attributes"
+                    ),
+                    "candidate_rows": self._history_candidate_rows,
+                    "last_batch_candidate_rows": len(rows),
+                    "evidence_changed": self._history_changed,
+                    "lookback_days": self._history_batches * _HISTORY_BATCH_DAYS,
+                    "completed_batches": self._history_batches,
+                    "max_batches": _HISTORY_MAX_BATCHES,
                     "supplier_settlement_verified": False,
                 }
-                return changed
+                # An empty historical window is not proof older data exist.
+                # Stop here to avoid repeated queries against purged history.
+                if not rows:
+                    self._history_status["stop_reason"] = "empty_window"
+                    return changed
             except Exception as err:
                 self._history_status = {
+                    **self._history_status,
                     "status": "unavailable",
                     "error_type": type(err).__name__,
+                    "stop_reason": "query_failed",
                 }
-        if not self._history_attempted and entities:
-            self._history_attempted = True
-            self._history_status = {"status": "querying", "lookback_days": 7}
-            self._history_task = self._hass.async_create_background_task(
-                self._recover_recorded_charges(dict(entities), now),
-                "KEMS read-only supplier charge history recovery",
+                return False
+        if not entities:
+            return changed
+        # Resolve a new meter mapping with a fresh cursor. Existing evidence
+        # is retained and duplicate charge rows are idempotent.
+        if dict(entities) != self._history_entities:
+            self._history_entities = dict(entities)
+            self._history_anchor = now
+            self._history_batches = 0
+            self._history_candidate_rows = 0
+            self._history_changed = False
+            self._history_status = {"status": "not_attempted"}
+        if (
+            self._history_batches >= _HISTORY_MAX_BATCHES
+            or self._history_status.get("stop_reason")
+        ):
+            return changed
+        if self._history_anchor is None:
+            self._history_anchor = now
+        end = self._history_anchor - timedelta(
+            days=self._history_batches * _HISTORY_BATCH_DAYS
+        )
+        start = end - timedelta(days=_HISTORY_BATCH_DAYS)
+        self._history_status.update(
+            {
+                "status": "querying",
+                "query_start": start.isoformat(),
+                "query_end": end.isoformat(),
+                "max_batches": _HISTORY_MAX_BATCHES,
+                "supplier_settlement_verified": False,
+            }
+        )
+        self._history_task = self._hass.async_create_background_task(
+            self._recover_recorded_charges(dict(entities), start, end),
+            "KEMS read-only supplier charge history recovery",
+        )
+        return changed
+
+    def _observe_baselines(self, now, entities, completed_events):
+        changed = False
+        observations = []
+        import_state = self._hass.states.get(
+            entities.saving_session_import_baseline or ""
+        )
+        export_state = self._hass.states.get(
+            entities.saving_session_export_baseline or ""
+        )
+        event_state = self._hass.states.get(entities.saving_session_events or "")
+        if completed_events or event_state is not None:
+            import_attrs = (
+                import_state.attributes
+                if import_state is not None
+                and import_state.state not in {"unknown", "unavailable"}
+                else {}
             )
-        return False
+            export_attrs = (
+                export_state.attributes
+                if export_state is not None
+                and export_state.state not in {"unknown", "unavailable"}
+                else {}
+            )
+            joined = (
+                event_state.attributes.get("joined_events", [])
+                if event_state is not None
+                and event_state.state not in {"unknown", "unavailable"}
+                else []
+            )
+            if not isinstance(joined, list):
+                joined = []
+            for item in joined:
+                if not isinstance(item, dict):
+                    continue
+                evidence = capture_joined_baseline(
+                    item,
+                    import_attrs,
+                    export_attrs,
+                    now=now,
+                    retain_event_identity=True,
+                )
+                if evidence is not None:
+                    changed |= self._retain_baseline(evidence)
+                    start = _utc(evidence["session_start"])
+                    end = _utc(evidence["session_end"])
+                    observations.append(
+                        {
+                            "session_id": evidence["session_id"],
+                            "import": baseline_capture_diagnostic(
+                                import_attrs, start, end
+                            ),
+                            "export": baseline_capture_diagnostic(
+                                export_attrs, start, end
+                            ),
+                        }
+                    )
+            for result in completed_events:
+                event = result.to_dict()
+                # Only the exact retained joined event may provide a rate.
+                points = None
+                for item in joined:
+                    if (
+                        isinstance(item, dict)
+                        and str(item.get("id")) == str(event.get("session_id"))
+                        and _utc(item.get("start"))
+                        == _utc(event.get("session_start"))
+                        and _utc(item.get("end")) == _utc(event.get("session_end"))
+                    ):
+                        points = item.get("octopoints_per_kwh")
+                        break
+                evidence = capture_completed_baseline(
+                    event,
+                    import_attrs,
+                    export_attrs,
+                    now=now,
+                    points_per_kwh=points,
+                    allow_partial=True,
+                )
+                if evidence is None:
+                    continue
+                key = evidence["session_id"]
+                if key not in self._completed_ids:
+                    self._completed_ids.add(key)
+                    changed = True
+                changed |= self._retain_baseline(evidence)
+            if len(self._late_events) > 64:
+                self._late_events = dict(
+                    sorted(
+                        self._late_events.items(),
+                        key=lambda pair: str(pair[1].get("session_end") or ""),
+                    )[-64:]
+                )
+                self._completed_ids.intersection_update(self._late_events)
+                changed = True
+        last_nonempty = self._baseline_status.get(
+            "last_nonempty_source_observations", []
+        )
+        if any(
+            item[direction]["rows_reported"]
+            for item in observations
+            for direction in ("import", "export")
+        ):
+            last_nonempty = observations[-8:]
+        self._baseline_status = {
+            "last_nonempty_source_observations": last_nonempty,
+            "last_scan_at": now.isoformat(),
+            "scan_interval_seconds": int(_BASELINE_REFRESH.total_seconds()),
+            "joined_event_observations": observations[-8:],
+            "supplier_settlement_verified": False,
+        }
+        return changed
 
     async def async_observe(
         self, now: datetime, entities: KEMSEntities, completed_events=()
     ) -> None:
         if self._status.get("status") == "load_failed":
             return
+        # Baseline attributes may disappear immediately after an event.
+        # Observe them independently of the slower historical intake.
+        if self._next_baseline_at is None or now >= self._next_baseline_at:
+            self._next_baseline_at = now + _BASELINE_REFRESH
+            try:
+                self._dirty |= self._observe_baselines(
+                    now, entities, completed_events
+                )
+                if self._dirty:
+                    await self._store.async_save(self._dump())
+                    self._dirty = False
+            except Exception:
+                _LOGGER.exception("KEMS Power Down baseline observation failed")
+                self._baseline_status["observation_failed"] = True
         if self._next_at is not None and now < self._next_at:
             return
         self._next_at = now + _REFRESH
@@ -326,6 +518,16 @@ class SupplierIntervalRecorder:
                 availability[kind] = "ambiguous_or_unmapped"
                 if len(candidates) != 1:
                     continue
+                if kind != "gas":
+                    meter = registry.async_get(mapping[kind] or "")
+                    expected = (
+                        meter.unique_id.casefold().removesuffix("_current_rate")
+                        + "_previous_accumulative_cost"
+                    )
+                    cost_matches = cost_index.get((meter.config_entry_id, expected), [])
+                    charge_availability[kind] = "unavailable_or_ambiguous"
+                    if len(cost_matches) == 1:
+                        history_entities[cost_matches[0].entity_id] = kind
                 state = self._hass.states.get(candidates[0])
                 if (
                     state is None
@@ -378,18 +580,11 @@ class SupplierIntervalRecorder:
                         ),
                         "used_consumption_field": key,
                         "financially_usable": False,
+                        "conversion_setting": gas_calorific_value_diagnostic(attrs),
                     }
                     continue
-                meter = registry.async_get(mapping[kind] or "")
-                expected = (
-                    meter.unique_id.casefold().removesuffix("_current_rate")
-                    + "_previous_accumulative_cost"
-                )
-                cost_matches = cost_index.get((meter.config_entry_id, expected), [])
-                charge_availability[kind] = "unavailable_or_ambiguous"
                 if len(cost_matches) != 1:
                     continue
-                history_entities[cost_matches[0].entity_id] = kind
                 cost_state = self._hass.states.get(cost_matches[0].entity_id)
                 if (
                     cost_state is None
@@ -407,75 +602,6 @@ class SupplierIntervalRecorder:
 
             changed |= await self._consume_recorded_charges(now, history_entities)
 
-            import_state = self._hass.states.get(
-                entities.saving_session_import_baseline or ""
-            )
-            export_state = self._hass.states.get(
-                entities.saving_session_export_baseline or ""
-            )
-            event_state = self._hass.states.get(entities.saving_session_events or "")
-            if completed_events or event_state is not None:
-                import_attrs = (
-                    import_state.attributes
-                    if import_state is not None
-                    and import_state.state not in {"unknown", "unavailable"}
-                    else {}
-                )
-                export_attrs = (
-                    export_state.attributes
-                    if export_state is not None
-                    and export_state.state not in {"unknown", "unavailable"}
-                    else {}
-                )
-                joined = (
-                    event_state.attributes.get("joined_events", [])
-                    if event_state is not None
-                    and event_state.state not in {"unknown", "unavailable"}
-                    else []
-                )
-                if not isinstance(joined, list):
-                    joined = []
-                for item in joined:
-                    if not isinstance(item, dict):
-                        continue
-                    evidence = capture_joined_baseline(
-                        item, import_attrs, export_attrs, now=now
-                    )
-                    if evidence is not None:
-                        changed |= self._retain_baseline(evidence)
-                for result in completed_events:
-                    event = result.to_dict()
-                    # Only the exact retained joined event may provide a rate.
-                    points = None
-                    for item in joined:
-                        if (
-                            isinstance(item, dict)
-                            and str(item.get("id")) == str(event.get("session_id"))
-                            and _utc(item.get("start"))
-                            == _utc(event.get("session_start"))
-                            and _utc(item.get("end")) == _utc(event.get("session_end"))
-                        ):
-                            points = item.get("octopoints_per_kwh")
-                            break
-                    evidence = capture_completed_baseline(
-                        event,
-                        import_attrs,
-                        export_attrs,
-                        now=now,
-                        points_per_kwh=points,
-                        allow_partial=True,
-                    )
-                    if evidence is None:
-                        continue
-                    key = evidence["session_id"]
-                    if key not in self._completed_ids:
-                        self._completed_ids.add(key)
-                        changed = True
-                    changed |= self._retain_baseline(evidence)
-                if len(self._late_events) > 64:
-                    self._late_events = dict(list(self._late_events.items())[-64:])
-                    self._completed_ids.intersection_update(self._late_events)
-                    changed = True
             self._dirty |= changed
             if self._dirty:
                 await self._store.async_save(self._dump())

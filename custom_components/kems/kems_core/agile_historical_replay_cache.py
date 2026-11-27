@@ -133,6 +133,8 @@ class HistoricalReplayCache:
         self._misses = 0
         self._live_evaluations = 0
         self._fingerprint_seconds = 0.0
+        self._compact_serialization_seconds = 0.0
+        self._compact_digest_seconds = 0.0
         self._pickle_fingerprints = 0
         self._legacy_fingerprints = 0
         self._compact_snapshot_fingerprints = 0
@@ -162,6 +164,10 @@ class HistoricalReplayCache:
                 "full_sha256_compact_snapshot_pickle_with_legacy_fallback"
             ),
             "compact_snapshot_fingerprints": self._compact_snapshot_fingerprints,
+            "compact_serialization_seconds_total": round(
+                self._compact_serialization_seconds, 3
+            ),
+            "compact_digest_seconds_total": round(self._compact_digest_seconds, 3),
             "legacy_digest_days_pending_migration": len(self._legacy_digest_days),
             "legacy_digest_days_migrated": self._legacy_migrations,
             "fingerprint_seconds_total": round(self._fingerprint_seconds, 3),
@@ -206,10 +212,12 @@ class HistoricalReplayCache:
 
     def _isolated_summary(self, day: str, result: dict[str, Any]) -> dict[str, Any]:
         """Copy only the exact settled-day fields consumed by aggregation."""
-        summary = {key: value for key, value in result.items() if key != "slot_plan"}
         try:
             encoded = self._encoded_summaries.get(day)
             if encoded is None:
+                summary = {
+                    key: value for key, value in result.items() if key != "slot_plan"
+                }
                 encoded = dumps(summary, protocol=HIGHEST_PROTOCOL)
                 self._encoded_summaries[day] = encoded
             isolated = loads(encoded)
@@ -225,7 +233,9 @@ class HistoricalReplayCache:
             AttributeError,
         ):
             self._encoded_summaries.pop(day, None)
-        return deepcopy(summary)
+        return deepcopy(
+            {key: value for key, value in result.items() if key != "slot_plan"}
+        )
 
     @property
     def needs_persist(self) -> bool:
@@ -347,7 +357,10 @@ class HistoricalReplayCache:
                 snapshot_type: _snapshot_field_reducer(snapshot_type)
             }
             pickler.dump(inputs)
+            digest_started = perf_counter()
+            self._compact_serialization_seconds += digest_started - started
             fingerprint = sha256(stream.getbuffer()).digest()
+            self._compact_digest_seconds += perf_counter() - digest_started
             self._pickle_fingerprints += 1
             self._compact_snapshot_fingerprints += 1
         except (PicklingError, TypeError, AttributeError, ValueError, OverflowError):

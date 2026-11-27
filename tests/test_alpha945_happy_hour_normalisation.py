@@ -145,8 +145,8 @@ def test_alpha945_release_identity_and_scope() -> None:
         / "docs/archived-release-notes-through-alpha9244.md"
     ).read_text(encoding="utf-8")
     reason = str(bundle["maintenance"]["reason"])
-    assert manifest["version"] == "0.9.0-alpha9.260"
-    assert reason.startswith("Alpha9.260:")
+    assert manifest["version"] == "0.9.0-alpha9.261"
+    assert reason.startswith("Alpha9.261:")
     assert "Alpha9.45" in reason
     assert "raw 6 reports 3 rewards rather than 6" in reason
     assert "two-one-hour-reward event-day limit" in reason

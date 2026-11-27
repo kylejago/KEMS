@@ -409,6 +409,7 @@ def capture_joined_baseline(
     export_attrs: Any,
     *,
     now: datetime,
+    retain_event_identity: bool = False,
 ) -> dict[str, Any] | None:
     """Preserve exact joined-event baselines before the provider replaces them."""
     start, end = _utc(event.get("start")), _utc(event.get("end"))
@@ -427,7 +428,13 @@ def capture_joined_baseline(
     exported = exact_completed_baseline(export_attrs, start, end)
     import_rows = _partial_baseline_rows(import_attrs, start, end)
     export_rows = _partial_baseline_rows(export_attrs, start, end)
-    if imported is None and exported is None and not import_rows and not export_rows:
+    if (
+        not retain_event_identity
+        and imported is None
+        and exported is None
+        and not import_rows
+        and not export_rows
+    ):
         return None
     rate = _finite(event.get("octopoints_per_kwh"))
     return {
@@ -545,3 +552,40 @@ def completed_power_down_estimate(
         }
     )
     return result
+
+
+def baseline_capture_diagnostic(attributes, start, end):
+    """Explain rejected rows without treating incomplete estimates as valid."""
+    attributes = attributes if isinstance(attributes, Mapping) else {}
+    rows = attributes.get("baselines")
+    valid = _partial_baseline_rows(attributes, start, end)
+    rows = rows if isinstance(rows, list) else []
+    return {
+        "rows_reported": len(rows),
+        "rows_explicitly_incomplete": sum(
+            isinstance(row, Mapping)
+            and row.get("is_incomplete_calculation") is True
+            for row in rows
+        ),
+        "rows_without_explicit_complete_flag": sum(
+            isinstance(row, Mapping)
+            and row.get("is_incomplete_calculation") is not False
+            and row.get("is_incomplete_calculation") is not True
+            for row in rows
+        ),
+        "accepted_half_hours": len(valid),
+        "exact_total_available": (
+            exact_completed_baseline(attributes, start, end) is not None
+        ),
+        "source_period_start": (
+            stamp.isoformat()
+            if (stamp := _utc(attributes.get("start"))) is not None
+            else None
+        ),
+        "source_period_end": (
+            stamp.isoformat()
+            if (stamp := _utc(attributes.get("end"))) is not None
+            else None
+        ),
+        "supplier_settlement_verified": False,
+    }

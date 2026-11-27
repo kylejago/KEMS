@@ -2,7 +2,10 @@
 
 from datetime import UTC, datetime, timedelta
 
-from kems_core.supplier_intervals import SupplierIntervalLedger
+from kems_core.supplier_intervals import (
+    SupplierIntervalLedger,
+    gas_calorific_value_diagnostic,
+)
 
 NOW = datetime(2026, 11, 26, tzinfo=UTC)
 
@@ -173,3 +176,18 @@ def test_paired_gas_volume_is_retained_but_never_promoted():
         now=NOW,
     )
     assert restored.gas_quarantine_comparison()["matched_nonconflicting_intervals"] == 0
+
+
+def test_gas_conversion_diagnostic_never_corrects_provider_data():
+    audit = gas_calorific_value_diagnostic({"calorific_value": 975})
+    assert audit["provider_calorific_value"] == 975
+    assert abs(audit["expected_kwh_per_m3_from_setting"] - 277.0) < 0.1
+    assert audit["setting_plausible_for_uk_metric_gas"] is False
+    assert audit["automatic_correction_authorised"] is False
+    assert audit["conversion_validated"] is False
+    assert gas_calorific_value_diagnostic(
+        {"calorific_value": 40}
+    )["setting_plausible_for_uk_metric_gas"] is True
+    assert gas_calorific_value_diagnostic(
+        {"calorific_value": True}
+    )["provider_calorific_value"] is None
