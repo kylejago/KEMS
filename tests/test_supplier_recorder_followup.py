@@ -130,13 +130,14 @@ def test_baseline_capture_runs_between_slow_supplier_scans():
         retained = recorder._late_events["9019"]
         assert retained["import_baseline_kwh"] == 1.0
         assert retained["export_baseline_kwh"] == 1.5
-        assert recorder._store.saved["late_power_down_evidence"]["9019"] == (
-            retained
-        )
+        assert recorder._store.saved["late_power_down_evidence"]["9019"] == (retained)
         assert recorder._next_at == end + timedelta(minutes=30)
-        assert recorder.status["power_down_baseline_capture"][
-            "joined_event_observations"
-        ][0]["import"]["accepted_half_hours"] == 1
+        assert (
+            recorder.status["power_down_baseline_capture"]["joined_event_observations"][
+                0
+            ]["import"]["accepted_half_hours"]
+            == 1
+        )
 
     asyncio.run(exercise())
 
@@ -184,12 +185,11 @@ def test_history_batches_use_fixed_anchor_and_stop_at_empty_window():
             (entities, NOW - timedelta(days=7), NOW),
             (entities, NOW - timedelta(days=14), NOW - timedelta(days=7)),
         ]
-        assert recorder.status["historical_charge_recovery"][
-            "stop_reason"
-        ] == "empty_window"
-        assert recorder.status["historical_charge_recovery"][
-            "candidate_rows"
-        ] == 1
+        assert (
+            recorder.status["historical_charge_recovery"]["stop_reason"]
+            == "empty_window"
+        )
+        assert recorder.status["historical_charge_recovery"]["candidate_rows"] == 1
         assert len(recorder._charges.rows) == 1
         assert not await recorder._consume_recorded_charges(
             NOW + timedelta(hours=2), entities

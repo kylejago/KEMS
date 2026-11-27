@@ -300,9 +300,8 @@ class SupplierIntervalRecorder:
             self._history_candidate_rows = 0
             self._history_changed = False
             self._history_status = {"status": "not_attempted"}
-        if (
-            self._history_batches >= _HISTORY_MAX_BATCHES
-            or self._history_status.get("stop_reason")
+        if self._history_batches >= _HISTORY_MAX_BATCHES or self._history_status.get(
+            "stop_reason"
         ):
             return changed
         if self._history_anchor is None:
@@ -390,8 +389,7 @@ class SupplierIntervalRecorder:
                     if (
                         isinstance(item, dict)
                         and str(item.get("id")) == str(event.get("session_id"))
-                        and _utc(item.get("start"))
-                        == _utc(event.get("session_start"))
+                        and _utc(item.get("start")) == _utc(event.get("session_start"))
                         and _utc(item.get("end")) == _utc(event.get("session_end"))
                     ):
                         points = item.get("octopoints_per_kwh")
@@ -448,9 +446,7 @@ class SupplierIntervalRecorder:
         if self._next_baseline_at is None or now >= self._next_baseline_at:
             self._next_baseline_at = now + _BASELINE_REFRESH
             try:
-                self._dirty |= self._observe_baselines(
-                    now, entities, completed_events
-                )
+                self._dirty |= self._observe_baselines(now, entities, completed_events)
                 if self._dirty:
                     await self._store.async_save(self._dump())
                     self._dirty = False

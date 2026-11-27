@@ -563,8 +563,7 @@ def baseline_capture_diagnostic(attributes, start, end):
     return {
         "rows_reported": len(rows),
         "rows_explicitly_incomplete": sum(
-            isinstance(row, Mapping)
-            and row.get("is_incomplete_calculation") is True
+            isinstance(row, Mapping) and row.get("is_incomplete_calculation") is True
             for row in rows
         ),
         "rows_without_explicit_complete_flag": sum(

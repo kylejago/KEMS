@@ -312,9 +312,7 @@ def test_discharge_context_distinguishes_post_sample_command_readback():
     module, _ = _load_trace_module()
     row = {
         "timestamp": NOW.isoformat(),
-        "ev_cheap_charge_cap_audit": {
-            "battery_discharging_during_ev_charge": True
-        },
+        "ev_cheap_charge_cap_audit": {"battery_discharging_during_ev_charge": True},
         "existing_live_control": {
             "decision_action": "force_charge",
             "last_write_at": (NOW + timedelta(seconds=4)).isoformat(),

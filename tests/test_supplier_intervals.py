@@ -185,9 +185,15 @@ def test_gas_conversion_diagnostic_never_corrects_provider_data():
     assert audit["setting_plausible_for_uk_metric_gas"] is False
     assert audit["automatic_correction_authorised"] is False
     assert audit["conversion_validated"] is False
-    assert gas_calorific_value_diagnostic(
-        {"calorific_value": 40}
-    )["setting_plausible_for_uk_metric_gas"] is True
-    assert gas_calorific_value_diagnostic(
-        {"calorific_value": True}
-    )["provider_calorific_value"] is None
+    assert (
+        gas_calorific_value_diagnostic({"calorific_value": 40})[
+            "setting_plausible_for_uk_metric_gas"
+        ]
+        is True
+    )
+    assert (
+        gas_calorific_value_diagnostic({"calorific_value": True})[
+            "provider_calorific_value"
+        ]
+        is None
+    )
