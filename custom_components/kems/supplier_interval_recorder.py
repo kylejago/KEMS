@@ -130,7 +130,11 @@ class SupplierIntervalRecorder:
                     }
                 completed_ids = stored.get("completed_power_down_ids")
                 self._completed_ids = (
-                    {key for key in completed_ids if key in self._late_events}
+                    {
+                        key
+                        for key in completed_ids
+                        if isinstance(key, str) and key in self._late_events
+                    }
                     if isinstance(completed_ids, list)
                     else set(self._late_events)
                 )
@@ -204,10 +208,13 @@ class SupplierIntervalRecorder:
                 "gas": entities.gas_current_rate,
             }
             found = {kind: [] for kind in KINDS}
+            cost_index = {}
             for item in registry.entities.values():
                 if item.platform != "octopus_energy" or item.disabled_by is not None:
                     continue
                 uid = item.unique_id.casefold()
+                if uid.endswith("_previous_accumulative_cost"):
+                    cost_index.setdefault((item.config_entry_id, uid), []).append(item)
                 if uid.startswith("octopus_energy_electricity_") and uid.endswith(
                     "_previous_accumulative_consumption"
                 ):
@@ -244,6 +251,7 @@ class SupplierIntervalRecorder:
             changed = False
             availability = {}
             charge_availability = {}
+            gas_source_shape = None
             await self._async_read_charge_file(now)
             for kind, candidates in found.items():
                 availability[kind] = "ambiguous_or_unmapped"
@@ -286,20 +294,28 @@ class SupplierIntervalRecorder:
                     "quarantined_unverified" if kind == "gas" else "observed"
                 )
                 if kind == "gas":
+                    gas_source_shape = {
+                        "reported_unit": state.attributes.get("unit_of_measurement"),
+                        "estimated": attrs.get("is_estimated"),
+                        "charge_rows": len(charges),
+                        "row_fields": sorted(
+                            {
+                                str(field)
+                                for row in charges
+                                if isinstance(row, dict)
+                                for field in row
+                            }
+                        ),
+                        "used_consumption_field": key,
+                        "financially_usable": False,
+                    }
                     continue
                 meter = registry.async_get(mapping[kind] or "")
                 expected = (
                     meter.unique_id.casefold().removesuffix("_current_rate")
                     + "_previous_accumulative_cost"
                 )
-                cost_matches = [
-                    item
-                    for item in registry.entities.values()
-                    if item.platform == "octopus_energy"
-                    and item.disabled_by is None
-                    and item.config_entry_id == meter.config_entry_id
-                    and item.unique_id.casefold() == expected
-                ]
+                cost_matches = cost_index.get((meter.config_entry_id, expected), [])
                 charge_availability[kind] = "unavailable_or_ambiguous"
                 if len(cost_matches) != 1:
                     continue
@@ -414,6 +430,7 @@ class SupplierIntervalRecorder:
                 )
             self._status["automatic_source_status"] = availability
             self._status["automatic_charge_source_status"] = charge_availability
+            self._status["gas_source_shape"] = gas_source_shape
             self._status["last_scan_at"] = now.isoformat()
             self._status.pop("automatic_observation_failed", None)
         except Exception:
