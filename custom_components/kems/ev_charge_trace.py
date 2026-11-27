@@ -306,9 +306,7 @@ def extra_slot_interval(left, right):
         if any(a.get(key) != b.get(key) for key in rates):
             return None
         if not all(
-            _finite_number(row.get(key))
-            for row in (a, b)
-            for key in (*rates, "ev_kw")
+            _finite_number(row.get(key)) for row in (a, b) for key in (*rates, "ev_kw")
         ):
             return None
         kwh = min(a["ev_kw"], b["ev_kw"]) * elapsed / 3600
@@ -349,18 +347,14 @@ def _cost_summary(buckets, records):
         "retained_half_hours": len(buckets),
         "retention_days": COST_RETENTION_DAYS,
         "qualified_sample_interval_seconds": round(totals["covered_seconds"], 3),
-        "estimated_candidate_ev_kwh": round(
-            totals["estimated_candidate_ev_kwh"], 6
-        ),
+        "estimated_candidate_ev_kwh": round(totals["estimated_candidate_ev_kwh"], 6),
         "day_rate_comparison_pence": round(totals["day_rate_comparison_pence"], 4),
         "estimated_ev_charge_pence": round(totals["estimated_ev_charge_pence"], 4),
         "estimated_discount_pence": round(
             totals["day_rate_comparison_pence"] - totals["estimated_ev_charge_pence"],
             4,
         ),
-        "recent_half_hours": [
-            dict(buckets[key]) for key in sorted(buckets)[-64:]
-        ],
+        "recent_half_hours": [dict(buckets[key]) for key in sorted(buckets)[-64:]],
         "complete_session_energy_verified": False,
         "supplier_discount_confirmed": False,
         "household_tariff_changed": False,

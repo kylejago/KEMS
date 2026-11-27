@@ -390,9 +390,9 @@ def test_extra_slot_cost_estimates_only_qualified_adjacent_samples():
 def test_ev_cost_evidence_persists_and_never_bridges_restart():
     module, _ = _load_trace_module()
     policy = {"estimated_ev_only_discount_candidate": True}
-    now = datetime.now(UTC).replace(
-        minute=1, second=0, microsecond=0
-    ) - timedelta(hours=1)
+    now = datetime.now(UTC).replace(minute=1, second=0, microsecond=0) - timedelta(
+        hours=1
+    )
     snap = replace(
         _snapshot(connected=True, charging=True),
         timestamp=now,
@@ -430,23 +430,32 @@ def test_ev_cost_evidence_persists_and_never_bridges_restart():
 
         recovered = module.EVChargeTraceRecorder(object(), "cost_evidence")
         await recovered.async_load()
-        assert recovered.state["extra_slot_cost_evidence"][
-            "qualified_sample_interval_seconds"
-        ] == 30
+        assert (
+            recovered.state["extra_slot_cost_evidence"][
+                "qualified_sample_interval_seconds"
+            ]
+            == 30
+        )
         await recovered.async_record(
             replace(snap, timestamp=now + timedelta(seconds=60)),
             extra_slot_policy=policy,
         )
-        assert recovered.state["extra_slot_cost_evidence"][
-            "qualified_sample_interval_seconds"
-        ] == 30
+        assert (
+            recovered.state["extra_slot_cost_evidence"][
+                "qualified_sample_interval_seconds"
+            ]
+            == 30
+        )
         await recovered.async_record(
             replace(snap, timestamp=now + timedelta(seconds=90)),
             extra_slot_policy=policy,
         )
-        assert recovered.state["extra_slot_cost_evidence"][
-            "qualified_sample_interval_seconds"
-        ] == 60
+        assert (
+            recovered.state["extra_slot_cost_evidence"][
+                "qualified_sample_interval_seconds"
+            ]
+            == 60
+        )
         # Repeated/reordered observations cannot accrue the same seconds.
         await recovered.async_record(
             replace(snap, timestamp=now + timedelta(seconds=60)),
@@ -456,8 +465,11 @@ def test_ev_cost_evidence_persists_and_never_bridges_restart():
             replace(snap, timestamp=now + timedelta(seconds=90)),
             extra_slot_policy=policy,
         )
-        assert recovered.state["extra_slot_cost_evidence"][
-            "qualified_sample_interval_seconds"
-        ] == 60
+        assert (
+            recovered.state["extra_slot_cost_evidence"][
+                "qualified_sample_interval_seconds"
+            ]
+            == 60
+        )
 
     asyncio.run(exercise())
