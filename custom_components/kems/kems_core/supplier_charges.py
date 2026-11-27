@@ -475,7 +475,9 @@ def recover_historical_baselines(events, attributes, direction):
             "export_baseline_rows": {},
         }
         evidence[f"{direction}_baseline_rows"] = rows
-        evidence[f"{direction}_baseline_kwh"] = _complete_retained_rows(rows, start, end)
+        evidence[f"{direction}_baseline_kwh"] = _complete_retained_rows(
+            rows, start, end
+        )
         result.append(evidence)
     return result
 

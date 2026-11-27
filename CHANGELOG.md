@@ -1,3 +1,9 @@
+## 0.9.0-alpha9.264
+
+- Add a separate CSV-first complete-day gas reconciliation projection and labelled same-day observed-rate cost scenarios after nonzero overlap corroboration.
+- Recover historical electricity charge evidence across empty Recorder windows and exact completed Power Down baseline rows from the configured supplier entities.
+- Distinguish EV routing SOC, raw freshness and site-limit blockers. Keep the existing protective hold and all physical authority unchanged.
+
 ## 0.9.0-alpha9.263
 
 - Preserve observed formula-consistent gas revisions separately from quarantined first-seen readings, keyed by UTC interval and reported calorific value. Report nonzero CSV overlap, same-volume revisions, conflicts and complete observed days by setting.

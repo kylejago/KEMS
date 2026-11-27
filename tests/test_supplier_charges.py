@@ -309,7 +309,6 @@ def test_joined_identity_survives_missing_or_incomplete_baseline():
     assert audit["exact_total_available"] is False
 
 
-
 def test_historical_baseline_recovery_requires_exact_complete_rows():
     from kems_core.supplier_charges import recover_historical_baselines
 

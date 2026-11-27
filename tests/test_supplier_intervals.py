@@ -305,7 +305,6 @@ def test_gas_conversion_complete_day_requires_all_intervals_same_setting():
     assert ledger.complete_day_totals("gas") == {}
 
 
-
 def test_provisional_gas_requires_nonzero_csv_corroboration_and_prefers_csv():
     from types import SimpleNamespace
 
