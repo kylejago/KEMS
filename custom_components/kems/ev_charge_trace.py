@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from collections import Counter
 from datetime import datetime, timedelta
+from math import isfinite
 from typing import Any
 
 from homeassistant.core import HomeAssistant
@@ -41,6 +42,8 @@ def build_ev_trace_sample(
     foxess_control: dict[str, Any] | None = None,
     command_shadow: dict[str, Any] | None = None,
     planned_control: Any = None,
+    extra_slot_policy: dict[str, Any] | None = None,
+    reward_event_active: bool = False,
 ) -> dict[str, Any]:
     """Create one compact observation, with labelled *observed* readbacks."""
     command_shadow = command_shadow or {}
@@ -139,6 +142,9 @@ def build_ev_trace_sample(
             snapshot,
             site_import_limit_kw=getattr(planned_control, "site_import_limit_kw", None),
         ),
+        "extra_slot_cost_sample": extra_slot_cost_sample(
+            snapshot, extra_slot_policy, reward_event_active=reward_event_active
+        ),
         "existing_live_control": {
             "decision_action": control.get("decision_action"),
             "commands_permitted": control.get("commands_permitted"),
@@ -194,6 +200,141 @@ def _discharge_exception_context(records):
         "command_written_after_physical_sample": writes_after_sample,
         "persistent_discharge_proven": False,
         "hardware_write_authorised": False,
+    }
+
+
+def _finite_number(value):
+    return (
+        isinstance(value, (int, float))
+        and not isinstance(value, bool)
+        and isfinite(value)
+    )
+
+
+def extra_slot_cost_sample(snapshot, policy, *, reward_event_active=False):
+    """Conservative, non-authoritative price and power evidence for one scan."""
+    if not policy or policy.get("estimated_ev_only_discount_candidate") is not True:
+        return {"status": "not_qualified"}
+    if (
+        reward_event_active
+        or snapshot.saving_session_active
+        or snapshot.off_peak is not False
+        or snapshot.cheap_period_confirmed
+        or snapshot.ev_charging is not True
+    ):
+        return {"status": "other_event_or_tariff"}
+    ev = snapshot.ev_power_kw
+    grid = snapshot.grid_import_kw
+    battery = snapshot.battery_power_kw
+    solar = snapshot.solar_power_kw
+    export = snapshot.grid_export_kw
+    if not all(_finite_number(value) for value in (ev, grid, battery, solar, export)):
+        return {"status": "incomplete_power"}
+    for field in (
+        "grid_import_kw",
+        "grid_export_kw",
+        "battery_power_kw",
+        "solar_power_kw",
+    ):
+        age = snapshot.source_age_seconds.get(field)
+        if (
+            field in snapshot.stale_fields
+            or not _finite_number(age)
+            or not 0 <= age <= 120
+        ):
+            return {"status": "stale_power"}
+    # Require grid supply at least as large as measured EV demand, no material
+    # battery discharge, PV or export. This is not independent circuit metering.
+    if (
+        ev < 0.25
+        or grid < ev
+        or battery > 0.1
+        or not 0 <= solar <= 0.1
+        or not 0 <= export <= 0.1
+    ):
+        return {"status": "ambiguous_grid_allocation"}
+    day = snapshot.current_import_rate
+    cheap = snapshot.intelligent_slot_evidence.get(
+        "effective_fallback_offpeak_rate_pence"
+    )
+    next_rate = snapshot.next_import_rate
+    for field in ("current_import_rate", "next_import_rate", "off_peak"):
+        age = snapshot.tariff_source_age_seconds.get(field)
+        if (
+            field in snapshot.tariff_stale_fields
+            or not _finite_number(age)
+            or not 0 <= age <= 120
+        ):
+            return {"status": "stale_tariff"}
+    if (
+        not all(_finite_number(value) for value in (day, cheap, next_rate))
+        or not 0 <= cheap < day
+        or abs(next_rate - cheap) > 0.01
+    ):
+        return {"status": "price_not_corroborated"}
+    return {
+        "status": "candidate",
+        "ev_kw": ev,
+        "day_rate_pence": day,
+        "estimated_ev_rate_pence": cheap,
+        "supplier_discount_confirmed": False,
+    }
+
+
+def summarise_extra_slot_cost(records):
+    """Estimate only short adjacent qualified intervals, never bridge gaps."""
+    counts = Counter()
+    energy = gross = estimated = seconds = 0.0
+    for row in records:
+        sample = row.get("extra_slot_cost_sample") or {}
+        counts[str(sample.get("status", "not_recorded"))] += 1
+    for left, right in zip(records, records[1:]):
+        a = left.get("extra_slot_cost_sample") or {}
+        b = right.get("extra_slot_cost_sample") or {}
+        if a.get("status") != "candidate" or b.get("status") != "candidate":
+            continue
+        if right.get("event") not in ("scan", None):
+            continue
+        try:
+            start = datetime.fromisoformat(left["timestamp"])
+            end = datetime.fromisoformat(right["timestamp"])
+            if start.tzinfo is None or end.tzinfo is None:
+                continue
+            elapsed = (end - start).total_seconds()
+            if not 0 < elapsed <= 90:
+                continue
+            if int(start.timestamp() // 1800) != int(end.timestamp() // 1800):
+                continue
+            rates = ("day_rate_pence", "estimated_ev_rate_pence")
+            if any(a.get(key) != b.get(key) for key in rates):
+                continue
+            if not all(
+                _finite_number(row.get(key))
+                for row in (a, b)
+                for key in (*rates, "ev_kw")
+            ):
+                continue
+            kwh = min(a["ev_kw"], b["ev_kw"]) * elapsed / 3600
+            if kwh <= 0 or not 0 <= a[rates[1]] < a[rates[0]]:
+                continue
+            energy += kwh
+            gross += kwh * a[rates[0]]
+            estimated += kwh * a[rates[1]]
+            seconds += elapsed
+        except (KeyError, TypeError, ValueError, OverflowError):
+            continue
+    return {
+        "scope": "retained_trace_sample_estimate_only",
+        "sample_status_counts": dict(counts),
+        "qualified_sample_interval_seconds": round(seconds, 3),
+        "estimated_candidate_ev_kwh": round(energy, 6),
+        "day_rate_comparison_pence": round(gross, 4),
+        "estimated_ev_charge_pence": round(estimated, 4),
+        "estimated_discount_pence": round(gross - estimated, 4),
+        "complete_session_energy_verified": False,
+        "supplier_discount_confirmed": False,
+        "household_tariff_changed": False,
+        "roi_or_ledger_write_authorised": False,
     }
 
 
@@ -257,6 +398,7 @@ class EVChargeTraceRecorder:
                 "candidate_is_not_supplier_discount_proof": True,
                 "hardware_write_authorised": False,
             },
+            "extra_slot_cost_evidence": summarise_extra_slot_cost(self._records),
             "discharge_exception_context": _discharge_exception_context(
                 self._exception_records
             ),
@@ -344,6 +486,8 @@ class EVChargeTraceRecorder:
         foxess_control: dict[str, Any] | None = None,
         command_shadow: dict[str, Any] | None = None,
         planned_control: Any = None,
+        extra_slot_policy: dict[str, Any] | None = None,
+        reward_event_active: bool = False,
     ) -> bool:
         """Record actual scan data; save transitions immediately."""
         now = snapshot.timestamp
@@ -374,6 +518,8 @@ class EVChargeTraceRecorder:
             foxess_control=foxess_control,
             command_shadow=command_shadow,
             planned_control=planned_control,
+            extra_slot_policy=extra_slot_policy,
+            reward_event_active=reward_event_active,
         )
         if not self.wants_capture(snapshot):
             self._prelude.append(sample)

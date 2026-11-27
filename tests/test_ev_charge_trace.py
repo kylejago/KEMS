@@ -325,3 +325,58 @@ def test_discharge_context_distinguishes_post_sample_command_readback():
     assert audit["control_action_counts"] == {"force_charge": 1}
     assert audit["persistent_discharge_proven"] is False
     assert audit["hardware_write_authorised"] is False
+
+
+def test_extra_slot_cost_estimates_only_qualified_adjacent_samples():
+    module, _ = _load_trace_module()
+    policy = {"estimated_ev_only_discount_candidate": True}
+    ages = {
+        field: 8.0
+        for field in (
+            "grid_import_kw",
+            "grid_export_kw",
+            "battery_power_kw",
+            "solar_power_kw",
+        )
+    }
+    snap = replace(
+        _snapshot(connected=True, charging=True),
+        battery_power_kw=-0.03,
+        current_import_rate=35.88,
+        next_import_rate=6.6,
+        intelligent_slot_evidence={"effective_fallback_offpeak_rate_pence": 6.6},
+        source_age_seconds=ages,
+        tariff_source_age_seconds={
+            "current_import_rate": 8,
+            "next_import_rate": 8,
+            "off_peak": 8,
+        },
+    )
+    a = module.build_ev_trace_sample(
+        snap, event="charge_start", extra_slot_policy=policy
+    )
+    b = module.build_ev_trace_sample(
+        replace(snap, timestamp=NOW + timedelta(seconds=60)),
+        event="scan",
+        extra_slot_policy=policy,
+    )
+    result = module.summarise_extra_slot_cost([a, b])
+    assert result["qualified_sample_interval_seconds"] == 60
+    assert result["estimated_candidate_ev_kwh"] == 0.111667
+    assert result["estimated_discount_pence"] == 3.2696
+    assert result["supplier_discount_confirmed"] is False
+    assert result["roi_or_ledger_write_authorised"] is False
+    assert module.extra_slot_cost_sample(
+        snap, policy, reward_event_active=True
+    )["status"] == "other_event_or_tariff"
+    assert module.extra_slot_cost_sample(
+        replace(snap, battery_power_kw=7.0), policy
+    )["status"] == "ambiguous_grid_allocation"
+    assert module.extra_slot_cost_sample(
+        replace(snap, source_age_seconds={}), policy
+    )["status"] == "stale_power"
+    assert module.extra_slot_cost_sample(snap, None)["status"] == "not_qualified"
+    b["timestamp"] = (NOW + timedelta(minutes=2)).isoformat()
+    assert module.summarise_extra_slot_cost([a, b])[
+        "estimated_candidate_ev_kwh"
+    ] == 0

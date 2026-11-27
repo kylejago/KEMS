@@ -120,6 +120,7 @@ from .kems_core.shared_bus_balance import (
 from .lifecycle_evidence import CoreLifecycleEvidenceRecorder
 from .lifetime import LifetimeLedgerRecorder
 from .ohme_charge_slot_observer import OhmeChargeSlotObserver
+from .ohme_extra_slot_policy import observe_extra_slot_policy
 from .power_down import PowerDownHistoryRecorder
 from .product_types import (
     EXPORT_TARIFF_TYPE_AGILE,
@@ -2010,6 +2011,19 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                     foxess_control=foxess_control,
                     command_shadow=trace_shadow,
                     planned_control=control,
+                    extra_slot_policy=(
+                        observe_extra_slot_policy(
+                            self.hass, self.entities, self.entry.options, snapshot
+                        )
+                        if snapshot.ev_charging is True
+                        else None
+                    ),
+                    reward_event_active=bool(
+                        happy_hour_plan.get("happy_hour_import_authority_active")
+                        or happy_hour_house_grid_hold
+                        or happy_hour_live_charge_kw > 0.001
+                        or power_down_plan.get("active")
+                    ),
                 )
             except Exception:
                 LOGGER.exception("Read-only EV charge trace capture failed")
