@@ -622,8 +622,20 @@ def test_alpha9108_booking_controller_confirms_two_distinct_services(
             snapshot=SimpleNamespace(battery_soc=91.0),
             forecast_plan=None,
         )
-        # Friday: available reward choices are visible, but no selection or join.
+        # Friday: an expired booking must not mask future available rewards.
+        controller._persisted = {
+            "bookings": [
+                {
+                    "event_code": "OLD",
+                    "start": "2026-10-11T10:00:00+00:00",
+                    "end": "2026-10-11T11:00:00+00:00",
+                }
+            ]
+        }
         await controller.async_update(data)
+        assert "booked_start" not in controller.state
+        assert controller.state["bookings"][0]["event_code"] == "OLD"
+        controller._persisted = {}
         assert calls == []
         assert controller.state["status"] == "waiting_for_night_before"
         assert controller.state["candidate_count"] == 4

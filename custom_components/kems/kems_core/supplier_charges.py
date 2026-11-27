@@ -168,7 +168,19 @@ class SupplierChargeEvidence:
                 for row in comparisons
                 if row["supplier_minus_recorded_pence"] is not None
             ]
+            complete_energy_days = {
+                day
+                for day in energy.complete_day_totals(kind)
+                if commissioned is not None
+                and commissioned.isoformat() < day < today.isoformat()
+            }
+            missing_priced_days = sorted(
+                complete_energy_days - {row["date"] for row in comparisons}
+            )
             result[kind] = {
+                "complete_energy_post_commissioning_days": len(complete_energy_days),
+                "complete_energy_days_missing_valid_prices": len(missing_priced_days),
+                "recent_missing_priced_dates": missing_priced_days[-14:],
                 "complete_priced_post_commissioning_days": len(comparisons),
                 "excluded_before_or_unknown_commissioning_days": before_commissioning,
                 "comparable_days": len(matched),
@@ -278,8 +290,9 @@ def capture_completed_baseline(
     *,
     now: datetime,
     points_per_kwh: Any = None,
+    allow_partial: bool = False,
 ) -> dict[str, Any] | None:
-    """Retain both exact baseline windows even before meter readings arrive."""
+    """Retain exact baseline windows even before meter readings arrive."""
     start, end = _utc(event.get("session_start")), _utc(event.get("session_end"))
     event_id = event.get("session_id")
     if (
@@ -292,7 +305,7 @@ def capture_completed_baseline(
         return None
     imported = exact_completed_baseline(import_attrs, start, end)
     exported = exact_completed_baseline(export_attrs, start, end)
-    if imported is None or exported is None:
+    if not allow_partial and (imported is None or exported is None):
         return None
     rate = _finite(points_per_kwh)
     return {
@@ -303,6 +316,30 @@ def capture_completed_baseline(
         "export_baseline_kwh": exported,
         "octopoints_per_kwh": rate if rate is not None and rate >= 0 else None,
     }
+
+
+def merge_completed_baseline(
+    prior: Mapping[str, Any], evidence: Mapping[str, Any]
+) -> dict[str, Any]:
+    """Merge independently exact event evidence without overwriting conflicts."""
+    if prior.get("conflict"):
+        return dict(prior)
+    merged = dict(prior)
+    for key in ("session_id", "session_start", "session_end"):
+        if prior.get(key) != evidence.get(key):
+            return {**prior, "conflict": True}
+    for key in (
+        "import_baseline_kwh",
+        "export_baseline_kwh",
+        "octopoints_per_kwh",
+    ):
+        old, new = prior.get(key), evidence.get(key)
+        if new is None:
+            continue
+        if old is not None and old != new:
+            return {**prior, "conflict": True}
+        merged[key] = new
+    return merged
 
 
 def completed_power_down_estimate(
@@ -323,16 +360,19 @@ def completed_power_down_estimate(
     start, end = _utc(baseline.get("session_start")), _utc(baseline.get("session_end"))
     imported = _finite(baseline.get("import_baseline_kwh"))
     exported = _finite(baseline.get("export_baseline_kwh"))
-    if (
-        start is None
-        or end is None
-        or imported is None
-        or exported is None
-        or min(imported, exported) < 0
-    ):
+    if start is None or end is None or start >= end:
         result["status"] = "invalid_retained_baseline"
         return result
     actual = exact_event_meter_totals(energy, start, end)
+    if actual is not None:
+        result["supplier_import_kwh"] = actual["electricity_import"]
+        result["supplier_export_kwh"] = actual["electricity_export"]
+    if imported is None or exported is None:
+        result["status"] = "awaiting_exact_baseline_evidence"
+        return result
+    if min(imported, exported) < 0:
+        result["status"] = "invalid_retained_baseline"
+        return result
     if actual is None:
         return result
     reduction = max(

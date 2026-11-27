@@ -125,3 +125,21 @@ def test_electricity_reconciliation_does_not_rewrite_or_infer_missing_days():
     assert result["kinds"]["electricity_export"]["net_difference_kwh"] is None
     assert result["cost_or_roi_adjustment_authorised"] is False
     assert ledger.dump() == before
+
+
+
+def test_gas_quarantine_compares_only_matching_unconflicted_intervals():
+    ledger = SupplierIntervalLedger()
+    start = datetime(2026, 11, 24, tzinfo=UTC)
+    ledger.ingest([_row(start, 0.5, kind="gas")], source="octopus_csv", now=NOW)
+    ledger.ingest(
+        [_row(start, 5.0, kind="gas")], source="octopus_estimated_gas", now=NOW
+    )
+    report = ledger.gas_quarantine_comparison()
+    assert report["matched_nonconflicting_intervals"] == 1
+    assert report["recent_overlap_days"][0]["difference_kwh"] == 4.5
+    assert report["automatic_gas_financially_usable"] is False
+    ledger.ingest(
+        [_row(start, 6.0, kind="gas")], source="octopus_estimated_gas", now=NOW
+    )
+    assert ledger.gas_quarantine_comparison()["matched_nonconflicting_intervals"] == 0

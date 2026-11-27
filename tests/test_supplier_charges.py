@@ -6,6 +6,7 @@ from kems_core.supplier_charges import (
     SupplierChargeEvidence,
     capture_completed_baseline,
     completed_power_down_estimate,
+    merge_completed_baseline,
 )
 from kems_core.supplier_intervals import SupplierIntervalLedger
 
@@ -47,6 +48,8 @@ def test_matched_complete_priced_day_is_read_only_and_restart_safe():
     result = _compare(charges, energy)
     data = result["kinds"]["electricity_import"]
     assert data["complete_priced_post_commissioning_days"] == 1
+    assert data["complete_energy_post_commissioning_days"] == 1
+    assert data["complete_energy_days_missing_valid_prices"] == 0
     assert data["difference_pence"] == 16.8
     assert result["roi_or_ledger_write_authorised"] is False
     assert result["standing_charges_and_event_rewards_excluded"] is True
@@ -117,7 +120,22 @@ def test_late_baseline_survives_until_both_meter_windows_are_available():
         event, baseline, baseline, now=NOW, points_per_kwh=800
     )
     assert captured is not None
+    partial = capture_completed_baseline(
+        event, baseline, {}, now=NOW, allow_partial=True
+    )
+    other = capture_completed_baseline(
+        event, {}, baseline, now=NOW, points_per_kwh=800, allow_partial=True
+    )
+    assert partial is not None and other is not None
+    assert merge_completed_baseline(partial, other) == captured
+    assert merge_completed_baseline(
+        captured, {**other, "export_baseline_kwh": 2.0}
+    )["conflict"]
     energy = SupplierIntervalLedger()
+    assert (
+        completed_power_down_estimate(energy, partial)["status"]
+        == "awaiting_exact_baseline_evidence"
+    )
     assert (
         completed_power_down_estimate(energy, captured)["estimated_bonus_pence"] is None
     )

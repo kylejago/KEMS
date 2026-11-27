@@ -261,6 +261,40 @@ class SupplierIntervalLedger:
             "interval_gap_assignment_authorised": False,
         }
 
+    def gas_quarantine_comparison(self) -> dict[str, Any]:
+        """Compare only exact overlapping, non-conflicting gas intervals."""
+        by_day = defaultdict(list)
+        for key, raw in self.quarantined_gas.items():
+            csv = self.rows.get(key)
+            if (
+                csv is None
+                or key in self.conflicts
+                or key in self.quarantined_gas_conflicts
+            ):
+                continue
+            day = datetime.fromisoformat(key[1]).astimezone(_LONDON).date()
+            by_day[day].append((raw["kwh"], csv["kwh"]))
+        recent = []
+        for day, pairs in sorted(by_day.items())[-14:]:
+            automatic = sum(pair[0] for pair in pairs)
+            reference = sum(pair[1] for pair in pairs)
+            recent.append(
+                {
+                    "date": day.isoformat(),
+                    "matched_intervals": len(pairs),
+                    "automatic_kwh": round(automatic, 6),
+                    "csv_kwh": round(reference, 6),
+                    "difference_kwh": round(automatic - reference, 6),
+                }
+            )
+        return {
+            "matched_nonconflicting_intervals": sum(
+                len(pairs) for pairs in by_day.values()
+            ),
+            "recent_overlap_days": recent,
+            "automatic_gas_financially_usable": False,
+        }
+
     def summary(self) -> dict[str, Any]:
         """Count missing half-hours without inventing zero usage or full days."""
         kinds = {}
@@ -308,6 +342,7 @@ class SupplierIntervalLedger:
             "kinds": kinds,
             "gas_quarantine": {
                 "status": "automatic_gas_unverified",
+                "overlap_comparison": self.gas_quarantine_comparison(),
                 "retained_raw_intervals": len(self.quarantined_gas),
                 "conflicting_raw_intervals": len(self.quarantined_gas_conflicts),
                 "recent_daily_reference_kwh": {
