@@ -657,26 +657,9 @@ class SupplierIntervalRecorder:
                 )
                 charge_availability[kind] = "estimated_charges_observed"
 
-            for kind, entity_id in (
-                ("electricity_import", entities.saving_session_import_baseline),
-                ("electricity_export", entities.saving_session_export_baseline),
-            ):
-                meter = registry.async_get(mapping[kind] or "")
-                baseline = registry.async_get(entity_id or "")
-                if (
-                    meter is not None
-                    and baseline is not None
-                    and meter.platform == baseline.platform == "octopus_energy"
-                    and meter.config_entry_id == baseline.config_entry_id
-                    and baseline.disabled_by is None
-                    and meter.unique_id.casefold().endswith("_current_rate")
-                    and baseline.unique_id.casefold()
-                    == meter.unique_id.casefold().removesuffix("_current_rate")
-                    + "_octoplus_power_down_baseline"
-                ):
-                    direction = kind.removeprefix("electricity_")
-                    history_entities[baseline.entity_id] = f"baseline_{direction}"
-
+            # BottlecapDave excludes the timestamped baseline rows from
+            # Recorder. Preserve live baseline capture and existing evidence,
+            # but do not query those entities for historical reconstruction.
             changed |= await self._consume_recorded_charges(now, history_entities)
 
             self._dirty |= changed

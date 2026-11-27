@@ -1,25 +1,37 @@
 """Persistent once-per-event financial rewards for ROI only.
 
 This ledger cannot authorise Octopus bookings, free import or FoxESS writes.
-The upstream integration does not publish per-event supplier settlement.
+Confirmed awards are point entitlements, not proof of cash redemption.
 """
 
 from __future__ import annotations
 
-from datetime import datetime
+import logging
+from datetime import UTC, datetime
+from pathlib import Path
 from zoneinfo import ZoneInfo
 
 from homeassistant.helpers.storage import Store
 
 from .const import DOMAIN, STORAGE_NAMESPACE
+from .kems_core.power_down_awards import (
+    FILE_NAME,
+    apply_imported_awards,
+    award_window,
+    read_awards,
+    reconcile_window_aliases,
+)
 from .kems_core.roi_reward_audit import build_reward_audit
 from .kems_core.roi_rewards import date_of, number
 
 _LONDON = ZoneInfo("Europe/London")
+_LOGGER = logging.getLogger(__name__)
 
 
 class ROIRewardRecorder:
     def __init__(self, hass, entry_id: str) -> None:
+        self._hass = hass
+        self._local_power_down_awards = []
         self._store = Store(
             hass, 1, f"{DOMAIN}.{entry_id}.{STORAGE_NAMESPACE}.roi_rewards"
         )
@@ -42,6 +54,13 @@ class ROIRewardRecorder:
                     (str(k), v) for k, v in entries.items() if isinstance(v, dict)
                 )
 
+        try:
+            self._local_power_down_awards = await self._hass.async_add_executor_job(
+                read_awards, Path(self._hass.config.path(FILE_NAME))
+            )
+        except (OSError, ValueError, TypeError):
+            _LOGGER.warning("KEMS local Power Down awards not accepted")
+
     async def async_observe(
         self,
         receipts: list,
@@ -50,6 +69,8 @@ class ROIRewardRecorder:
         provisional_happy_hours=(),
         historical_bookings=(),
         supplier_power_down_events=(),
+        late_power_down_estimates=(),
+        now=None,
     ) -> None:
         changed = False
         for item in historical_bookings:
@@ -182,6 +203,7 @@ class ROIRewardRecorder:
                 self._happy_hours[key] = saved
                 changed = True
 
+        changed |= reconcile_window_aliases(self._power_downs, events)
         for event in events:
             if not event or not getattr(event, "session_id", None):
                 continue
@@ -207,30 +229,77 @@ class ROIRewardRecorder:
             key = str(event.session_id)
             # The supplier's later awarded points replace this estimate.
             # Repeated scans must never downgrade a settled award.
-            if self._power_downs.get(key, {}).get("supplier_settled") is True:
+            previous = self._power_downs.get(key, {})
+            if (
+                previous.get("supplier_settled") is True
+                or previous.get("basis")
+                == "meter_supported_supplier_interval_power_down_bonus"
+            ):
                 continue
             if self._power_downs.get(key) != saved:
                 self._power_downs[key] = saved
                 changed = True
 
         # Joined Octopus Power Down events can retain a later supplier award.
-        # Match immutable event identity AND event window against KEMS'
-        # completed physical session; never turn a pending/absent award into 0.
+        # Match immutable event identity AND window against KEMS' event.
+        # Never turn a pending/absent award into 0.
         known_events = {
             str(event.session_id): event
             for event in events
             if event is not None and getattr(event, "session_id", None)
         }
+        # Complete supplier half-hours improve a provisional physical estimate.
+        # Never override a confirmed award, or include ordinary export income.
+        for item in late_power_down_estimates:
+            if not isinstance(item, dict):
+                continue
+            key = str(item.get("session_id") or "")
+            event = known_events.get(key)
+            previous = self._power_downs.get(key, {})
+            window = award_window(item.get("session_start"), item.get("session_end"))
+            if (
+                window is None
+                or event is None
+                or getattr(event, "completed_successfully", None) is not True
+                or getattr(event, "physical_export_verified", None) is not True
+                or previous.get("supplier_settled") is True
+                or window != award_window(event.session_start, event.session_end)
+            ):
+                continue
+            bonus = number(item.get("estimated_bonus_pence"))
+            if (
+                item.get("status") != "unsettled_event_estimate"
+                or item.get("reward_calculation_basis")
+                != "complete_half_hour_baselines_and_supplier_meter"
+                or bonus is None
+            ):
+                if (
+                    previous.get("basis")
+                    == "meter_supported_supplier_interval_power_down_bonus"
+                ):
+                    del self._power_downs[key]
+                    changed = True
+                continue
+            saved = {
+                "day": date_of(event.session_end),
+                "start": event.session_start.isoformat(),
+                "end": event.session_end.isoformat(),
+                "pence": round(bonus, 6),
+                "supplier_settled": False,
+                "basis": "meter_supported_supplier_interval_power_down_bonus",
+            }
+            if previous != saved:
+                self._power_downs[key] = saved
+                changed = True
+
         for item in supplier_power_down_events:
             if not isinstance(item, dict):
                 continue
             event_id = str(item.get("id") or "")
             event = known_events.get(event_id)
-            if (
-                event is None
-                or getattr(event, "completed_successfully", None) is not True
-                or getattr(event, "physical_export_verified", None) is not True
-            ):
+            # A supplier-confirmed award is financial evidence, not proof
+            # of successful KEMS dispatch.
+            if not event_id:
                 continue
             points = item.get("rewarded_octopoints")
             if (
@@ -244,32 +313,69 @@ class ROIRewardRecorder:
                 joined_end = datetime.fromisoformat(str(item.get("end")))
             except (ValueError, TypeError):
                 continue
-            event_start = getattr(event, "session_start", None)
-            event_end = getattr(event, "session_end", None)
-            if (
-                joined_start.tzinfo is None
-                or joined_end.tzinfo is None
-                or not isinstance(event_start, datetime)
-                or not isinstance(event_end, datetime)
-                or event_start.tzinfo is None
-                or event_end.tzinfo is None
-                or joined_start != event_start
-                or joined_end != event_end
-                or date_of(event_end) is None
-            ):
+            window = award_window(joined_start, joined_end)
+            if window is None or (now is not None and joined_end > now):
                 continue
+            if event is not None:
+                if window != award_window(event.session_start, event.session_end):
+                    continue
+            else:
+                # The configured provider may know joined events that KEMS
+                # never witnessed. Only accept them with a completed exact
+                # window, no competing event ID and no ambiguous legacy row.
+                if now is None or any(
+                    window == award_window(other.session_start, other.session_end)
+                    for other in known_events.values()
+                ):
+                    continue
+                alias = f"octopus-window:{window[0]}|{window[1]}"
+                if any(
+                    key not in (event_id, alias)
+                    and (
+                        award_window(receipt.get("start"), receipt.get("end")) == window
+                        or (
+                            receipt.get("day") == date_of(joined_end)
+                            and award_window(receipt.get("start"), receipt.get("end"))
+                            is None
+                        )
+                    )
+                    for key, receipt in self._power_downs.items()
+                ):
+                    continue
+            previous = self._power_downs.get(event_id, {})
+            previous_window = award_window(previous.get("start"), previous.get("end"))
+            if previous_window is not None and previous_window != window:
+                continue
+            if previous and previous.get("day") != date_of(joined_end):
+                continue
+            event_start, event_end = joined_start, joined_end
             # Octopus publishes 800 points = £1 = 100 pence.
             saved = {
                 "day": date_of(event_end),
                 "pence": round(points / 8.0, 6),
                 "supplier_settled": True,
                 "basis": "supplier_awarded_octopoints",
+                "start": event_start.astimezone(UTC).isoformat(),
+                "end": event_end.astimezone(UTC).isoformat(),
+                "award_source": "octopus_joined_events",
                 "awarded_octopoints": points,
             }
+            # An account-history-only event may later acquire its provider ID.
+            # Migrate rather than count the same session twice.
+            alias = f"octopus-window:{window[0]}|{window[1]}"
+            if alias in self._power_downs:
+                del self._power_downs[alias]
+                changed = True
             if self._power_downs.get(event_id) != saved:
                 self._power_downs[event_id] = saved
                 changed = True
 
+        changed |= apply_imported_awards(
+            self._power_downs,
+            events,
+            getattr(self, "_local_power_down_awards", ()),
+            now=now or datetime.now(UTC),
+        )
         if changed:
             await self._store.async_save(
                 {

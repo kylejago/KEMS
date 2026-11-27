@@ -336,3 +336,36 @@ def test_historical_baseline_recovery_requires_exact_complete_rows():
     attrs["baselines"][0]["is_incomplete_calculation"] = True
     assert not recover_historical_baselines([event], attrs, "import")
     assert not recover_historical_baselines([], attrs, "import")
+
+
+def test_power_down_reward_is_clipped_per_half_hour():
+    end = START + timedelta(hours=1)
+    baseline = {
+        "session_id": "test",
+        "session_start": START.isoformat(),
+        "session_end": end.isoformat(),
+        "import_baseline_kwh": 1.0,
+        "export_baseline_kwh": 1.0,
+        "octopoints_per_kwh": 800,
+        "import_baseline_rows": {
+            (START + timedelta(minutes=30 * n)).isoformat(): 0.5 for n in range(2)
+        },
+        "export_baseline_rows": {
+            (START + timedelta(minutes=30 * n)).isoformat(): 0.5 for n in range(2)
+        },
+    }
+    energy = SupplierIntervalLedger()
+    energy.ingest(
+        [
+            _row(START, kwh=2.0),
+            _row(START + timedelta(minutes=30), kwh=0.0),
+            _row(START, "electricity_export", 0.0),
+            _row(START + timedelta(minutes=30), "electricity_export", 2.0),
+        ],
+        source="octopus_csv",
+        now=NOW,
+    )
+    result = completed_power_down_estimate(energy, baseline)
+    assert result["estimated_rewardable_reduction_kwh"] == 2.0
+    assert result["estimated_bonus_pence"] == 200.0
+    assert result["supplier_settled"] is False
