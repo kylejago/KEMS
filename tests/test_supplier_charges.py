@@ -250,8 +250,7 @@ def test_joined_baseline_merges_only_exact_nonconflicting_half_hours():
         is None
     )
     assert (
-        capture_joined_baseline(event, attrs(START, middle, 0.25), {}, now=NOW)
-        is None
+        capture_joined_baseline(event, attrs(START, middle, 0.25), {}, now=NOW) is None
     )
 
 

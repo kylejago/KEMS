@@ -104,13 +104,10 @@ class SupplierIntervalLedger:
             else:
                 old_volume = previous.get("consumption_m3")
                 new_volume = row.get("consumption_m3")
-                if (
-                    abs(previous["kwh"] - row["kwh"]) > 0.000001
-                    or (
-                        old_volume is not None
-                        and new_volume is not None
-                        and abs(old_volume - new_volume) > 0.000001
-                    )
+                if abs(previous["kwh"] - row["kwh"]) > 0.000001 or (
+                    old_volume is not None
+                    and new_volume is not None
+                    and abs(old_volume - new_volume) > 0.000001
                 ):
                     if key not in conflicts:
                         conflicts.add(key)
