@@ -2039,7 +2039,11 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                 if snapshot.cheap_period_confirmed and forecast_plan.ready
                 else forecast_plan
             )
-            await self._supplier_intervals.async_observe(now, self.entities)
+            await self._supplier_intervals.async_observe(
+                now,
+                self.entities,
+                getattr(self._power_down, "_completed_history", ()),
+            )
             return replace(provisional, control=control, forecast_plan=display_forecast)
         except Exception as err:
             raise UpdateFailed(f"KEMS analysis failed: {err}") from err

@@ -100,7 +100,12 @@ class LifetimeLedgerRecorder:
         return {
             day: {
                 key: values[key]
-                for key in ("grid_import_kwh", "grid_export_kwh")
+                for key in (
+                    "grid_import_kwh",
+                    "grid_export_kwh",
+                    "import_cost_pence",
+                    "export_income_pence",
+                )
                 if key in values
             }
             for day, values in self._daily_records.items()
