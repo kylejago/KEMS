@@ -214,7 +214,9 @@ class SupplierIntervalLedger:
         daily = []
         for (day, value), rows in sorted(by_day.items())[-14:]:
             start = datetime.combine(day, datetime.min.time(), _LONDON)
-            end = datetime.combine(day + timedelta(days=1), datetime.min.time(), _LONDON)
+            end = datetime.combine(
+                day + timedelta(days=1), datetime.min.time(), _LONDON
+            )
             expected = int((end.astimezone(UTC) - start.astimezone(UTC)) / _HALF_HOUR)
             daily.append(
                 {
