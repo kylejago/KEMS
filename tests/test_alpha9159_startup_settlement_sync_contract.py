@@ -81,9 +81,9 @@ def test_hotfix_release_explains_reversion_and_preserves_safety() -> None:
         Path(__file__).resolve().parents[1]
         / "docs/archived-release-notes-through-alpha9244.md"
     ).read_text(encoding="utf-8")
-    assert manifest["version"] == "0.9.0-alpha9.256"
+    assert manifest["version"] == "0.9.0-alpha9.257"
     reason = bundle["maintenance"]["reason"]
-    assert reason.startswith("Alpha9.256:")
+    assert reason.startswith("Alpha9.257:")
     assert "Alpha9.158" in reason
     assert "7 kW" in reason
     assert "10%" in reason

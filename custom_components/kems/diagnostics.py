@@ -286,6 +286,16 @@ async def async_get_config_entry_diagnostics(
                 coordinator._lifetime.completed_daily_meter_totals, now=dt_util.now()
             )
         ),
+        "supplier_financial_reconciliation": (
+            coordinator._supplier_intervals.financial_reconciliation(
+                coordinator._lifetime.completed_daily_meter_totals,
+                now=dt_util.now(),
+                commissioning_date=entry.options.get("commissioning_date"),
+            )
+        ),
+        "late_power_down_supplier_evidence": (
+            coordinator._supplier_intervals.late_power_down_evidence
+        ),
         "commissioning_history_scope": commissioning_history_scope(
             configured_date=entry.options.get("commissioning_date"),
             records=coordinator._history.records,

@@ -309,6 +309,33 @@ def allocate_forecast_path_exports(
             if export_capacity > _EPSILON:
                 candidate["segment_caps"][index] = export_capacity
 
+    # Each trial replays the same five-minute segments. Pre-index only the
+    # overlapping slot shares, keeping original candidate order and arithmetic.
+    # This removes the dense segment × slot search from every binary-search
+    # trial without caching SOC, allocation decisions or safety authority.
+    segment_shares = [[] for _ in raw_segments]
+    for candidate in candidates:
+        slot_capacity = candidate["export_capacity_kwh"]
+        if slot_capacity <= _EPSILON:
+            continue
+        for index, share in candidate["segment_caps"].items():
+            if share > _EPSILON:
+                segment_shares[index].append(
+                    (candidate["valid_from"], share, slot_capacity)
+                )
+    segment_energy = []
+    for segment in raw_segments:
+        hours = (segment["end"] - segment["start"]).total_seconds() / 3600.0
+        solar_kw = segment["solar_kw"]
+        solar_to_home_kw = min(segment["house_kw"], solar_kw)
+        house_kw = min(
+            max(segment["house_kw"] - solar_to_home_kw, 0.0), segment["battery_kw"]
+        )
+        surplus_ac = max(solar_kw - solar_to_home_kw, 0.0) * hours
+        segment_energy.append(
+            (house_kw * hours, surplus_ac, min(surplus_ac, charge_limit * hours))
+        )
+
     def simulate(
         allocations: dict[datetime, float], *, capture_slot_ends: bool = False
     ) -> dict[str, Any]:
@@ -323,24 +350,13 @@ def allocate_forecast_path_exports(
 
         for index, segment in enumerate(raw_segments):
             battery_before_segment = battery
-            hours = (segment["end"] - segment["start"]).total_seconds() / 3600.0
-            solar_kw = segment["solar_kw"]
-            battery_kw = segment["battery_kw"]
-            segment_house = segment["house_kw"]
-            solar_to_home_kw = min(segment_house, solar_kw)
-            house_battery_kw = min(
-                max(segment_house - solar_to_home_kw, 0.0), battery_kw
-            )
-            house_ac = house_battery_kw * hours
+            house_ac, surplus_solar_ac, charge_ac = segment_energy[index]
             house_battery_total += house_ac
 
             export_ac = 0.0
-            for candidate in candidates:
-                capacity_share = candidate["segment_caps"].get(index, 0.0)
-                slot_capacity = candidate["export_capacity_kwh"]
-                allocation = allocations.get(candidate["valid_from"], 0.0)
-                if capacity_share > _EPSILON and slot_capacity > _EPSILON:
-                    export_ac += allocation * capacity_share / slot_capacity
+            for slot_key, capacity_share, slot_capacity in segment_shares[index]:
+                allocation = allocations.get(slot_key, 0.0)
+                export_ac += allocation * capacity_share / slot_capacity
 
             # House load may spend the independently allowed 15% to 10%
             # stored-energy band. Discretionary export must instead respect
@@ -360,9 +376,7 @@ def allocate_forecast_path_exports(
             battery -= export_ac / discharge_eff
             minimum = min(minimum, battery)
 
-            surplus_solar_ac = max(solar_kw - solar_to_home_kw, 0.0) * hours
             solar_input += surplus_solar_ac
-            charge_ac = min(surplus_solar_ac, charge_limit * hours)
             stored_gain = min(charge_ac * charge_eff, max(capacity - battery, 0.0))
             battery += stored_gain
             stored_solar += stored_gain

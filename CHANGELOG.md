@@ -1,3 +1,9 @@
+## 0.9.0-alpha9.257 — supplier financial evidence and rolling replay performance
+
+- Retain independently matched half-hour electricity charge estimates from a local supplier CSV reference and the Octopus previous accumulative cost sensors. Compare complete priced post-commissioning days to recorded gross energy charges; exclude standing charges and event rewards. No inferred tariffs, financial ledger or ROI writes.
+- Retain complete import and export baseline windows for completed Power Down events even before corresponding supplier meter intervals arrive; evaluate only matched non-conflicting evidence. Bonus rates require the exact joined event. No supplier-settled status inferred.
+- Pre-index forecast path replay segment/slot overlaps and invariant house and solar arithmetic before allocation trials. Preserve chronological SOC checks, candidate order, operation order, iteration count and all physical-control policies.
+
 ## 0.9.0-alpha9.256 — supplier evidence integrity
 
 - Quarantine automatic previous-day gas intervals, including stored legacy observations, separately from the original CSV. Retain raw evidence and conflicts; do not guess a conversion or allocate daily gas totals across half-hours.
