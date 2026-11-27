@@ -308,7 +308,7 @@ def capture_completed_baseline(
 def completed_power_down_estimate(
     energy, baseline: Mapping[str, Any]
 ) -> dict[str, Any]:
-    """Evaluate retained exact baseline against current non-conflicting meter evidence."""
+    """Evaluate retained baseline against current non-conflicting meter evidence."""
     result = {
         **baseline,
         "supplier_settled": False,

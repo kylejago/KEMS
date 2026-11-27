@@ -332,16 +332,15 @@ class SupplierIntervalRecorder:
                     # Only the exact retained joined event may provide a rate.
                     points = None
                     for item in joined:
-                        if isinstance(item, dict) and str(item.get("id")) == str(
-                            event.get("session_id")
+                        if (
+                            isinstance(item, dict)
+                            and str(item.get("id")) == str(event.get("session_id"))
+                            and _utc(item.get("start"))
+                            == _utc(event.get("session_start"))
+                            and _utc(item.get("end")) == _utc(event.get("session_end"))
                         ):
-                            if _utc(item.get("start")) == _utc(
-                                event.get("session_start")
-                            ) and _utc(item.get("end")) == _utc(
-                                event.get("session_end")
-                            ):
-                                points = item.get("octopoints_per_kwh")
-                                break
+                            points = item.get("octopoints_per_kwh")
+                            break
                     evidence = capture_completed_baseline(
                         event,
                         import_state.attributes,
