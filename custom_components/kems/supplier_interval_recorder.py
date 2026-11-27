@@ -16,9 +16,10 @@ from .const import DOMAIN, STORAGE_NAMESPACE
 from .kems_core.supplier_charges import (
     CHARGE_FORMAT,
     SupplierChargeEvidence,
+    capture_completed_baseline,
     completed_power_down_estimate,
 )
-from .kems_core.supplier_intervals import FORMAT, KINDS, SupplierIntervalLedger
+from .kems_core.supplier_intervals import FORMAT, KINDS, SupplierIntervalLedger, _utc
 from .providers.entity_map import KEMSEntities
 
 _LOGGER = logging.getLogger(__name__)
@@ -68,7 +69,10 @@ class SupplierIntervalRecorder:
     def late_power_down_evidence(self):
         return {
             "scope": "supplier_meter_and_exact_baseline_estimates",
-            "events": list(self._late_events.values())[-64:],
+            "events": [
+                completed_power_down_estimate(self._ledger, item)
+                for item in list(self._late_events.values())[-64:]
+            ],
             "supplier_settled": False,
             "roi_or_ledger_write_authorised": False,
         }
@@ -311,28 +315,41 @@ class SupplierIntervalRecorder:
                     points = None
                     for item in joined:
                         if isinstance(item, dict) and str(item.get("id")) == str(event.get("session_id")):
-                            from .kems_core.supplier_intervals import _utc
-
                             if (
                                 _utc(item.get("start")) == _utc(event.get("session_start"))
                                 and _utc(item.get("end")) == _utc(event.get("session_end"))
                             ):
                                 points = item.get("octopoints_per_kwh")
                                 break
-                    estimate = completed_power_down_estimate(
-                        self._ledger, event, import_state.attributes,
-                        export_state.attributes, now=now, points_per_kwh=points,
+                    evidence = capture_completed_baseline(
+                        event, import_state.attributes, export_state.attributes,
+                        now=now, points_per_kwh=points,
                     )
-                    if estimate is None:
+                    if evidence is None:
                         continue
-                    key = estimate["session_id"]
+                    key = evidence["session_id"]
                     prior = self._late_events.get(key)
-                    if prior is None or (
-                        prior.get("estimated_bonus_pence") is None
-                        and estimate.get("estimated_bonus_pence") is not None
-                    ):
-                        self._late_events[key] = estimate
+                    if prior is None:
+                        self._late_events[key] = evidence
                         changed = True
+                    elif not prior.get("conflict"):
+                        comparable = (
+                            "session_start", "session_end",
+                            "import_baseline_kwh", "export_baseline_kwh",
+                        )
+                        if any(prior.get(k) != evidence.get(k) for k in comparable) or (
+                            prior.get("octopoints_per_kwh") is not None
+                            and evidence.get("octopoints_per_kwh") is not None
+                            and prior["octopoints_per_kwh"] != evidence["octopoints_per_kwh"]
+                        ):
+                            self._late_events[key] = {**prior, "conflict": True}
+                            changed = True
+                        elif (
+                            prior.get("octopoints_per_kwh") is None
+                            and evidence.get("octopoints_per_kwh") is not None
+                        ):
+                            self._late_events[key] = evidence
+                            changed = True
                 if len(self._late_events) > 64:
                     self._late_events = dict(list(self._late_events.items())[-64:])
                     changed = True

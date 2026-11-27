@@ -247,11 +247,11 @@ def exact_completed_baseline(attributes: Any, start: datetime, end: datetime) ->
     return total
 
 
-def completed_power_down_estimate(
-    energy, event: Mapping[str, Any], import_attrs: Any, export_attrs: Any,
+def capture_completed_baseline(
+    event: Mapping[str, Any], import_attrs: Any, export_attrs: Any,
     *, now: datetime, points_per_kwh: Any = None,
 ) -> dict[str, Any] | None:
-    """Estimate a completed event from two exact meter and baseline windows."""
+    """Retain both exact baseline windows even before meter readings arrive."""
     start, end = _utc(event.get("session_start")), _utc(event.get("session_end"))
     event_id = event.get("session_id")
     if (
@@ -263,13 +263,6 @@ def completed_power_down_estimate(
     exported = exact_completed_baseline(export_attrs, start, end)
     if imported is None or exported is None:
         return None
-    actual = exact_event_meter_totals(energy, start, end)
-    if actual is None:
-        return None
-    reduction = max(
-        imported - exported - actual["electricity_import"] + actual["electricity_export"],
-        0.0,
-    )
     rate = _finite(points_per_kwh)
     return {
         "session_id": str(event_id),
@@ -277,13 +270,47 @@ def completed_power_down_estimate(
         "session_end": end.isoformat(),
         "import_baseline_kwh": imported,
         "export_baseline_kwh": exported,
+        "octopoints_per_kwh": rate if rate is not None and rate >= 0 else None,
+    }
+
+
+def completed_power_down_estimate(energy, baseline: Mapping[str, Any]) -> dict[str, Any]:
+    """Evaluate retained exact baseline against current non-conflicting meter evidence."""
+    result = {
+        **baseline,
+        "supplier_settled": False,
+        "roi_or_ledger_write_authorised": False,
+        "estimated_bonus_pence": None,
+        "estimated_rewardable_reduction_kwh": None,
+        "status": "awaiting_complete_supplier_meter_intervals",
+    }
+    if baseline.get("conflict"):
+        result["status"] = "conflicting_baseline_evidence"
+        return result
+    start, end = _utc(baseline.get("session_start")), _utc(baseline.get("session_end"))
+    imported = _finite(baseline.get("import_baseline_kwh"))
+    exported = _finite(baseline.get("export_baseline_kwh"))
+    if start is None or end is None or imported is None or exported is None:
+        result["status"] = "invalid_retained_baseline"
+        return result
+    actual = exact_event_meter_totals(energy, start, end)
+    if actual is None:
+        return result
+    reduction = max(
+        imported - exported - actual["electricity_import"] + actual["electricity_export"],
+        0.0,
+    )
+    rate = _finite(baseline.get("octopoints_per_kwh"))
+    result.update({
         "supplier_import_kwh": actual["electricity_import"],
         "supplier_export_kwh": actual["electricity_export"],
         "estimated_rewardable_reduction_kwh": round(reduction, 6),
-        "octopoints_per_kwh": rate if rate is not None and rate >= 0 else None,
         "estimated_bonus_pence": (
             round(reduction * rate / 8, 6) if rate is not None and rate >= 0 else None
         ),
-        "supplier_settled": False,
-        "roi_or_ledger_write_authorised": False,
-    }
+        "status": (
+            "unsettled_event_estimate"
+            if rate is not None and rate >= 0 else "matched_energy_rate_unavailable"
+        ),
+    })
+    return result
