@@ -1,3 +1,11 @@
+## 0.9.0-alpha9.258 — booking status and supplier evidence coverage
+
+- Report only current or future confirmed Happy Hour bookings as booked; preserve completed bookings for historical evidence and weekend limits.
+- Show complete supplier electricity days still missing valid matched prices. Accept explicit charge_pence rows in the local supplier interval reference as well as the existing dedicated charge file; never infer historical prices.
+- Compare exact overlapping, non-conflicting gas observations against CSV intervals, retaining quarantine and excluding automatic gas from financial use.
+- Retain individually complete import/export Power Down baselines and exact event rates across separate scans. Report missing evidence and conflicting observations; no ledger, ROI or settlement authority.
+- Preserve existing physical-control, tariff, safety and update policies.
+
 ## 0.9.0-alpha9.257 — supplier financial evidence and rolling replay performance
 
 - Retain independently matched half-hour electricity charge estimates from a local supplier CSV reference and the Octopus previous accumulative cost sensors. Compare complete priced post-commissioning days to recorded gross energy charges; exclude standing charges and event rewards. No inferred tariffs, financial ledger or ROI writes.
