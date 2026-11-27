@@ -140,7 +140,9 @@ class SupplierChargeEvidence:
                 end = datetime.combine(
                     day + timedelta(days=1), datetime.min.time(), _LONDON
                 )
-                expected = int((end.astimezone(UTC) - start.astimezone(UTC)) / _HALF_HOUR)
+                expected = int(
+                    (end.astimezone(UTC) - start.astimezone(UTC)) / _HALF_HOUR
+                )
                 if len(charges) != expected:
                     continue
                 if commissioned is None or day <= commissioned:
@@ -172,15 +174,20 @@ class SupplierChargeEvidence:
                 "comparable_days": len(matched),
                 "supplier_estimate_on_comparable_days_pence": (
                     round(sum(row["supplier_estimate_pence"] for row in matched), 6)
-                    if matched else None
+                    if matched
+                    else None
                 ),
                 "recorded_on_comparable_days_pence": (
                     round(sum(row["recorded_pence"] for row in matched), 6)
-                    if matched else None
+                    if matched
+                    else None
                 ),
                 "difference_pence": (
-                    round(sum(row["supplier_minus_recorded_pence"] for row in matched), 6)
-                    if matched else None
+                    round(
+                        sum(row["supplier_minus_recorded_pence"] for row in matched), 6
+                    )
+                    if matched
+                    else None
                 ),
                 "recent_days": comparisons[-14:],
             }
@@ -219,11 +226,7 @@ def exact_event_meter_totals(
         for kind in ELECTRICITY:
             key = (kind, cursor.isoformat())
             row = energy.rows.get(key)
-            if (
-                row is None
-                or key in energy.conflicts
-                or _utc(row["end"]) != following
-            ):
+            if row is None or key in energy.conflicts or _utc(row["end"]) != following:
                 return None
             totals[kind] += row["kwh"]
         cursor = following
@@ -302,7 +305,9 @@ def capture_completed_baseline(
     }
 
 
-def completed_power_down_estimate(energy, baseline: Mapping[str, Any]) -> dict[str, Any]:
+def completed_power_down_estimate(
+    energy, baseline: Mapping[str, Any]
+) -> dict[str, Any]:
     """Evaluate retained exact baseline against current non-conflicting meter evidence."""
     result = {
         **baseline,

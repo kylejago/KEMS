@@ -54,12 +54,18 @@ def test_matched_complete_priced_day_is_read_only_and_restart_safe():
     restored = SupplierChargeEvidence()
     restored.restore(charges.dump(), now=NOW)
     assert _compare(restored, energy) == result
-    assert _compare(charges, energy, commission="2026-11-25")["kinds"][
-        "electricity_import"
-    ]["complete_priced_post_commissioning_days"] == 0
-    assert _compare(charges, energy, commission=None)["kinds"][
-        "electricity_import"
-    ]["complete_priced_post_commissioning_days"] == 0
+    assert (
+        _compare(charges, energy, commission="2026-11-25")["kinds"][
+            "electricity_import"
+        ]["complete_priced_post_commissioning_days"]
+        == 0
+    )
+    assert (
+        _compare(charges, energy, commission=None)["kinds"]["electricity_import"][
+            "complete_priced_post_commissioning_days"
+        ]
+        == 0
+    )
 
 
 def test_missing_energy_or_pricing_and_conflict_withhold_day():
@@ -68,17 +74,23 @@ def test_missing_energy_or_pricing_and_conflict_withhold_day():
     rows = _day(START)
     energy.ingest(rows[:-1], source="octopus_csv", now=NOW)
     charges.ingest(rows, source="octopus_csv", now=NOW)
-    assert _compare(charges, energy)["kinds"]["electricity_import"][
-        "complete_priced_post_commissioning_days"
-    ] == 0
+    assert (
+        _compare(charges, energy)["kinds"]["electricity_import"][
+            "complete_priced_post_commissioning_days"
+        ]
+        == 0
+    )
     energy.ingest(rows[-1:], source="octopus_csv", now=NOW)
     charges.ingest(
         [{**rows[0], "charge_pence": 7.6}], source="octopus_integration", now=NOW
     )
     assert _compare(charges, energy)["unmatched_or_conflicted_intervals"] == 1
-    assert _compare(charges, energy)["kinds"]["electricity_import"][
-        "complete_priced_post_commissioning_days"
-    ] == 0
+    assert (
+        _compare(charges, energy)["kinds"]["electricity_import"][
+            "complete_priced_post_commissioning_days"
+        ]
+        == 0
+    )
 
 
 def test_late_baseline_survives_until_both_meter_windows_are_available():
@@ -106,25 +118,42 @@ def test_late_baseline_survives_until_both_meter_windows_are_available():
     )
     assert captured is not None
     energy = SupplierIntervalLedger()
-    assert completed_power_down_estimate(energy, captured)["estimated_bonus_pence"] is None
-    imports = [_row(START + timedelta(minutes=30 * n), kwh=0.0, charge=0.0) for n in range(2)]
-    exports = [_row(START + timedelta(minutes=30 * n), "electricity_export", 2.0) for n in range(2)]
+    assert (
+        completed_power_down_estimate(energy, captured)["estimated_bonus_pence"] is None
+    )
+    imports = [
+        _row(START + timedelta(minutes=30 * n), kwh=0.0, charge=0.0) for n in range(2)
+    ]
+    exports = [
+        _row(START + timedelta(minutes=30 * n), "electricity_export", 2.0)
+        for n in range(2)
+    ]
     energy.ingest(imports, source="octopus_csv", now=NOW)
-    assert completed_power_down_estimate(energy, captured)["estimated_bonus_pence"] is None
+    assert (
+        completed_power_down_estimate(energy, captured)["estimated_bonus_pence"] is None
+    )
     energy.ingest(exports, source="octopus_csv", now=NOW)
     estimate = completed_power_down_estimate(energy, captured)
     assert estimate["estimated_bonus_pence"] == 400.0
     assert estimate["supplier_settled"] is False
     assert estimate["roi_or_ledger_write_authorised"] is False
-    assert completed_power_down_estimate(
-        energy, {**captured, "octopoints_per_kwh": None}
-    )["estimated_bonus_pence"] is None
+    assert (
+        completed_power_down_estimate(energy, {**captured, "octopoints_per_kwh": None})[
+            "estimated_bonus_pence"
+        ]
+        is None
+    )
     energy.ingest([{**exports[0], "kwh": 3.0}], source="octopus_csv", now=NOW)
-    assert completed_power_down_estimate(energy, captured)["estimated_bonus_pence"] is None
+    assert (
+        completed_power_down_estimate(energy, captured)["estimated_bonus_pence"] is None
+    )
     assert capture_completed_baseline(event, baseline, {}, now=NOW) is None
-    assert capture_completed_baseline(
-        event,
-        baseline,
-        {**baseline, "baselines": baseline["baselines"][:1]},
-        now=NOW,
-    ) is None
+    assert (
+        capture_completed_baseline(
+            event,
+            baseline,
+            {**baseline, "baselines": baseline["baselines"][:1]},
+            now=NOW,
+        )
+        is None
+    )

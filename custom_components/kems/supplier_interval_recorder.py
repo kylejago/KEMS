@@ -107,7 +107,9 @@ class SupplierIntervalRecorder:
             )
             if isinstance(stored, dict):
                 await self._hass.async_add_executor_job(
-                    lambda: self._charges.restore(stored.get("charge_evidence"), now=now)
+                    lambda: self._charges.restore(
+                        stored.get("charge_evidence"), now=now
+                    )
                 )
                 events = stored.get("late_power_down_evidence")
                 if isinstance(events, dict):
@@ -256,9 +258,10 @@ class SupplierIntervalRecorder:
                 if kind == "gas":
                     continue
                 meter = registry.async_get(mapping[kind] or "")
-                expected = meter.unique_id.casefold().removesuffix(
-                    "_current_rate"
-                ) + "_previous_accumulative_cost"
+                expected = (
+                    meter.unique_id.casefold().removesuffix("_current_rate")
+                    + "_previous_accumulative_cost"
+                )
                 cost_matches = [
                     item
                     for item in registry.entities.values()
@@ -275,9 +278,8 @@ class SupplierIntervalRecorder:
                     cost_state is None
                     or cost_state.state in {"unknown", "unavailable"}
                     or cost_state.attributes.get("unit_of_measurement") != "GBP"
-                    or cost_state.attributes.get("is_export") is not (
-                        kind == "electricity_export"
-                    )
+                    or cost_state.attributes.get("is_export")
+                    is not (kind == "electricity_export")
                 ):
                     continue
                 cost_rows = cost_state.attributes.get("charges")
@@ -319,7 +321,9 @@ class SupplierIntervalRecorder:
                 and export_state.state not in {"unknown", "unavailable"}
             ):
                 joined = (
-                    event_state.attributes.get("joined_events", []) if event_state else []
+                    event_state.attributes.get("joined_events", [])
+                    if event_state
+                    else []
                 )
                 if not isinstance(joined, list):
                     joined = []
@@ -331,9 +335,10 @@ class SupplierIntervalRecorder:
                         if isinstance(item, dict) and str(item.get("id")) == str(
                             event.get("session_id")
                         ):
-                            if (
-                                _utc(item.get("start")) == _utc(event.get("session_start"))
-                                and _utc(item.get("end")) == _utc(event.get("session_end"))
+                            if _utc(item.get("start")) == _utc(
+                                event.get("session_start")
+                            ) and _utc(item.get("end")) == _utc(
+                                event.get("session_end")
                             ):
                                 points = item.get("octopoints_per_kwh")
                                 break
@@ -358,12 +363,11 @@ class SupplierIntervalRecorder:
                             "import_baseline_kwh",
                             "export_baseline_kwh",
                         )
-                        if any(
-                            prior.get(k) != evidence.get(k) for k in comparable
-                        ) or (
+                        if any(prior.get(k) != evidence.get(k) for k in comparable) or (
                             prior.get("octopoints_per_kwh") is not None
                             and evidence.get("octopoints_per_kwh") is not None
-                            and prior["octopoints_per_kwh"] != evidence["octopoints_per_kwh"]
+                            and prior["octopoints_per_kwh"]
+                            != evidence["octopoints_per_kwh"]
                         ):
                             self._late_events[key] = {**prior, "conflict": True}
                             changed = True
