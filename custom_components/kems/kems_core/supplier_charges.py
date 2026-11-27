@@ -33,6 +33,8 @@ class SupplierChargeEvidence:
 
     def ingest(self, rows: Iterable[Any], *, source: str, now: datetime) -> bool:
         changed = False
+        if source not in ("octopus_csv", "octopus_integration"):
+            return False
         for raw in rows:
             if not isinstance(raw, Mapping) or raw.get("kind") not in ELECTRICITY:
                 continue
@@ -82,7 +84,11 @@ class SupplierChargeEvidence:
                 self.conflicts.add(tuple(key))
 
     def reconciliation(
-        self, energy, daily_records: Mapping[str, Any], *, now: datetime,
+        self,
+        energy,
+        daily_records: Mapping[str, Any],
+        *,
+        now: datetime,
         commissioning_date: Any,
     ) -> dict[str, Any]:
         """Compare complete, matching priced days; no estimate becomes settlement."""
@@ -142,7 +148,9 @@ class SupplierChargeEvidence:
                     continue
                 value = round(sum(charges), 6)
                 stored = daily_records.get(day.isoformat())
-                recorded = _finite(stored.get(field)) if isinstance(stored, Mapping) else None
+                recorded = (
+                    _finite(stored.get(field)) if isinstance(stored, Mapping) else None
+                )
                 comparisons.append(
                     {
                         "date": day.isoformat(),
@@ -154,7 +162,8 @@ class SupplierChargeEvidence:
                     }
                 )
             matched = [
-                row for row in comparisons
+                row
+                for row in comparisons
                 if row["supplier_minus_recorded_pence"] is not None
             ]
             result[kind] = {
@@ -179,7 +188,9 @@ class SupplierChargeEvidence:
             "scope": "supplier_estimated_gross_energy_charge_comparison",
             "retained_charge_observations": len(self.rows),
             "unmatched_or_conflicted_intervals": invalid,
-            "financial_commissioning_date": commissioned.isoformat() if commissioned else None,
+            "financial_commissioning_date": (
+                commissioned.isoformat() if commissioned else None
+            ),
             "kinds": result,
             "standing_charges_and_event_rewards_excluded": True,
             "supplier_settlement_verified": False,
@@ -187,10 +198,14 @@ class SupplierChargeEvidence:
         }
 
 
-def exact_event_meter_totals(energy, start: datetime, end: datetime) -> dict[str, Any] | None:
+def exact_event_meter_totals(
+    energy, start: datetime, end: datetime
+) -> dict[str, Any] | None:
     """No partial half-hours, missing meter readings, or implicit zero export."""
     if (
-        start.tzinfo is None or end.tzinfo is None or end <= start
+        start.tzinfo is None
+        or end.tzinfo is None
+        or end <= start
         or end - start > timedelta(hours=24)
     ):
         return None
@@ -205,7 +220,8 @@ def exact_event_meter_totals(energy, start: datetime, end: datetime) -> dict[str
             key = (kind, cursor.isoformat())
             row = energy.rows.get(key)
             if (
-                row is None or key in energy.conflicts
+                row is None
+                or key in energy.conflicts
                 or _utc(row["end"]) != following
             ):
                 return None
@@ -214,7 +230,9 @@ def exact_event_meter_totals(energy, start: datetime, end: datetime) -> dict[str
     return totals
 
 
-def exact_completed_baseline(attributes: Any, start: datetime, end: datetime) -> float | None:
+def exact_completed_baseline(
+    attributes: Any, start: datetime, end: datetime
+) -> float | None:
     """Require complete, contiguous supplier baseline rows for this exact event."""
     if not isinstance(attributes, Mapping):
         return None
@@ -228,8 +246,11 @@ def exact_completed_baseline(attributes: Any, start: datetime, end: datetime) ->
         left, right = _utc(row.get("start")), _utc(row.get("end"))
         value = _finite(row.get("baseline"))
         if (
-            left is None or right is None or not start <= left < right <= end
-            or value is None or value < 0
+            left is None
+            or right is None
+            or not start <= left < right <= end
+            or value is None
+            or value < 0
             or row.get("is_incomplete_calculation") is not False
         ):
             return None
@@ -248,15 +269,22 @@ def exact_completed_baseline(attributes: Any, start: datetime, end: datetime) ->
 
 
 def capture_completed_baseline(
-    event: Mapping[str, Any], import_attrs: Any, export_attrs: Any,
-    *, now: datetime, points_per_kwh: Any = None,
+    event: Mapping[str, Any],
+    import_attrs: Any,
+    export_attrs: Any,
+    *,
+    now: datetime,
+    points_per_kwh: Any = None,
 ) -> dict[str, Any] | None:
     """Retain both exact baseline windows even before meter readings arrive."""
     start, end = _utc(event.get("session_start")), _utc(event.get("session_end"))
     event_id = event.get("session_id")
     if (
-        event.get("available") is not True or not event_id
-        or start is None or end is None or not start < end <= now
+        event.get("available") is not True
+        or not event_id
+        or start is None
+        or end is None
+        or not start < end <= now
     ):
         return None
     imported = exact_completed_baseline(import_attrs, start, end)
@@ -290,27 +318,41 @@ def completed_power_down_estimate(energy, baseline: Mapping[str, Any]) -> dict[s
     start, end = _utc(baseline.get("session_start")), _utc(baseline.get("session_end"))
     imported = _finite(baseline.get("import_baseline_kwh"))
     exported = _finite(baseline.get("export_baseline_kwh"))
-    if start is None or end is None or imported is None or exported is None:
+    if (
+        start is None
+        or end is None
+        or imported is None
+        or exported is None
+        or min(imported, exported) < 0
+    ):
         result["status"] = "invalid_retained_baseline"
         return result
     actual = exact_event_meter_totals(energy, start, end)
     if actual is None:
         return result
     reduction = max(
-        imported - exported - actual["electricity_import"] + actual["electricity_export"],
+        imported
+        - exported
+        - actual["electricity_import"]
+        + actual["electricity_export"],
         0.0,
     )
     rate = _finite(baseline.get("octopoints_per_kwh"))
-    result.update({
-        "supplier_import_kwh": actual["electricity_import"],
-        "supplier_export_kwh": actual["electricity_export"],
-        "estimated_rewardable_reduction_kwh": round(reduction, 6),
-        "estimated_bonus_pence": (
-            round(reduction * rate / 8, 6) if rate is not None and rate >= 0 else None
-        ),
-        "status": (
-            "unsettled_event_estimate"
-            if rate is not None and rate >= 0 else "matched_energy_rate_unavailable"
-        ),
-    })
+    result.update(
+        {
+            "supplier_import_kwh": actual["electricity_import"],
+            "supplier_export_kwh": actual["electricity_export"],
+            "estimated_rewardable_reduction_kwh": round(reduction, 6),
+            "estimated_bonus_pence": (
+                round(reduction * rate / 8, 6)
+                if rate is not None and rate >= 0
+                else None
+            ),
+            "status": (
+                "unsettled_event_estimate"
+                if rate is not None and rate >= 0
+                else "matched_energy_rate_unavailable"
+            ),
+        }
+    )
     return result

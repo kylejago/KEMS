@@ -112,7 +112,8 @@ class SupplierIntervalRecorder:
                 events = stored.get("late_power_down_evidence")
                 if isinstance(events, dict):
                     self._late_events = {
-                        key: value for key, value in events.items()
+                        key: value
+                        for key, value in events.items()
                         if isinstance(key, str) and isinstance(value, dict)
                     }
             await self._async_read_charge_file(now)
@@ -259,7 +260,8 @@ class SupplierIntervalRecorder:
                     "_current_rate"
                 ) + "_previous_accumulative_cost"
                 cost_matches = [
-                    item for item in registry.entities.values()
+                    item
+                    for item in registry.entities.values()
                     if item.platform == "octopus_energy"
                     and item.disabled_by is None
                     and item.config_entry_id == meter.config_entry_id
@@ -289,24 +291,36 @@ class SupplierIntervalRecorder:
                         cost = float(row.get("raw_cost")) * 100
                     except (TypeError, ValueError, OverflowError):
                         continue
-                    priced.append({
-                        "kind": kind, "start": row.get("start"), "end": row.get("end"),
-                        "kwh": row.get("consumption"), "charge_pence": cost,
-                    })
+                    priced.append(
+                        {
+                            "kind": kind,
+                            "start": row.get("start"),
+                            "end": row.get("end"),
+                            "kwh": row.get("consumption"),
+                            "charge_pence": cost,
+                        }
+                    )
                 changed |= self._charges.ingest(
                     priced, source="octopus_integration", now=now
                 )
                 charge_availability[kind] = "estimated_charges_observed"
 
-            import_state = self._hass.states.get(entities.saving_session_import_baseline or "")
-            export_state = self._hass.states.get(entities.saving_session_export_baseline or "")
+            import_state = self._hass.states.get(
+                entities.saving_session_import_baseline or ""
+            )
+            export_state = self._hass.states.get(
+                entities.saving_session_export_baseline or ""
+            )
             event_state = self._hass.states.get(entities.saving_session_events or "")
             if (
-                import_state is not None and export_state is not None
+                import_state is not None
+                and export_state is not None
                 and import_state.state not in {"unknown", "unavailable"}
                 and export_state.state not in {"unknown", "unavailable"}
             ):
-                joined = event_state.attributes.get("joined_events", []) if event_state else []
+                joined = (
+                    event_state.attributes.get("joined_events", []) if event_state else []
+                )
                 if not isinstance(joined, list):
                     joined = []
                 for result in completed_events:
@@ -314,7 +328,9 @@ class SupplierIntervalRecorder:
                     # Only the exact retained joined event may provide a rate.
                     points = None
                     for item in joined:
-                        if isinstance(item, dict) and str(item.get("id")) == str(event.get("session_id")):
+                        if isinstance(item, dict) and str(item.get("id")) == str(
+                            event.get("session_id")
+                        ):
                             if (
                                 _utc(item.get("start")) == _utc(event.get("session_start"))
                                 and _utc(item.get("end")) == _utc(event.get("session_end"))
@@ -322,8 +338,11 @@ class SupplierIntervalRecorder:
                                 points = item.get("octopoints_per_kwh")
                                 break
                     evidence = capture_completed_baseline(
-                        event, import_state.attributes, export_state.attributes,
-                        now=now, points_per_kwh=points,
+                        event,
+                        import_state.attributes,
+                        export_state.attributes,
+                        now=now,
+                        points_per_kwh=points,
                     )
                     if evidence is None:
                         continue
@@ -334,10 +353,14 @@ class SupplierIntervalRecorder:
                         changed = True
                     elif not prior.get("conflict"):
                         comparable = (
-                            "session_start", "session_end",
-                            "import_baseline_kwh", "export_baseline_kwh",
+                            "session_start",
+                            "session_end",
+                            "import_baseline_kwh",
+                            "export_baseline_kwh",
                         )
-                        if any(prior.get(k) != evidence.get(k) for k in comparable) or (
+                        if any(
+                            prior.get(k) != evidence.get(k) for k in comparable
+                        ) or (
                             prior.get("octopoints_per_kwh") is not None
                             and evidence.get("octopoints_per_kwh") is not None
                             and prior["octopoints_per_kwh"] != evidence["octopoints_per_kwh"]
