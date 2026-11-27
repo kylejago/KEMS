@@ -1,3 +1,9 @@
+## 0.9.0-alpha9.256 — supplier evidence integrity
+
+- Quarantine automatic previous-day gas intervals, including stored legacy observations, separately from the original CSV. Retain raw evidence and conflicts; do not guess a conversion or allocate daily gas totals across half-hours.
+- Optional local kems_gas_daily_reference.json retains completed-day gas observations corroborated by current daily consumption and lifetime-register deltas, separately from supplier settlement.
+- Add read-only complete supplier electricity day comparison against recorded KEMS import/export totals, including missing recorded days and differences. No cost, reward or ROI changes; no physical-control changes.
+
 ## 0.9.0-alpha9.255 — regular cheap-period discharge protection hotfix
 
 - Maintain the reviewed 100% on-grid MinSOC discharge hold throughout a safe confirmed regular cheap period, independent of EV presence or battery charge target. Require physical floor readback before applying the work mode, using the existing protective handover path.

@@ -95,6 +95,19 @@ class LifetimeLedgerRecorder:
         return self._loaded_existing
 
     @property
+    def completed_daily_meter_totals(self) -> dict[str, dict[str, float]]:
+        """Copy recorded totals, without promoting simulation completeness."""
+        return {
+            day: {
+                key: values[key]
+                for key in ("grid_import_kwh", "grid_export_kwh")
+                if key in values
+            }
+            for day, values in self._daily_records.items()
+            if isinstance(values, dict) and recorded_totals_present(values)
+        }
+
+    @property
     def historical_coverage_audit(self) -> dict[str, Any]:
         """Bounded read-only evidence for the daily completeness classifier.
 
