@@ -449,6 +449,39 @@ def capture_joined_baseline(
     }
 
 
+def recover_historical_baselines(events, attributes, direction):
+    """Recover only explicitly complete baseline rows for known completed events."""
+    if direction not in ("import", "export") or not isinstance(attributes, Mapping):
+        return []
+    baselines = attributes.get("baselines")
+    if not isinstance(baselines, list) or not baselines:
+        return []
+    result = []
+    for event in events:
+        start, end = _utc(event.get("session_start")), _utc(event.get("session_end"))
+        if start is None or end is None or not start < end:
+            continue
+        rows = _partial_baseline_rows(attributes, start, end)
+        if not rows:
+            continue
+        evidence = {
+            "session_id": event["session_id"],
+            "session_start": event["session_start"],
+            "session_end": event["session_end"],
+            "import_baseline_kwh": None,
+            "export_baseline_kwh": None,
+            "octopoints_per_kwh": None,
+            "import_baseline_rows": {},
+            "export_baseline_rows": {},
+        }
+        evidence[f"{direction}_baseline_rows"] = rows
+        evidence[f"{direction}_baseline_kwh"] = _complete_retained_rows(
+            rows, start, end
+        )
+        result.append(evidence)
+    return result
+
+
 def merge_completed_baseline(
     prior: Mapping[str, Any], evidence: Mapping[str, Any]
 ) -> dict[str, Any]:

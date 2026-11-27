@@ -250,6 +250,139 @@ class SupplierIntervalLedger:
             "historical_correction_authorised": False,
         }
 
+    def provisional_gas_reconciliation(self, records, *, now):
+        """Separate complete-day estimates from supplier settlement."""
+        by_setting = defaultdict(list)
+        by_day = defaultdict(list)
+
+        def agrees(observed, csv):
+            return abs(observed - csv) <= max(0.005, 0.01 * csv)
+
+        for (stamp, setting), row in self.gas_conversion_rows.items():
+            if (stamp, setting) in self.gas_conversion_conflicts:
+                continue
+            key = ("gas", stamp)
+            csv = self.rows.get(key)
+            if csv is not None and key not in self.conflicts:
+                by_setting[setting].append((row["kwh"], csv["kwh"]))
+            day = datetime.fromisoformat(stamp).astimezone(_LONDON).date()
+            by_day[(day, setting)].append(row)
+        # Require genuine nonzero evidence, not a day of matching zeros.
+        verified = {
+            setting
+            for setting, pairs in by_setting.items()
+            if sum(a > 0 and b > 0 for a, b in pairs) >= 4
+            and all(agrees(a, b) and ((a == 0) == (b == 0)) for a, b in pairs)
+        }
+        today = now.astimezone(_LONDON).date()
+        csv_days = self.complete_day_totals("gas")
+        selected = {
+            day: {
+                "date": day,
+                "kwh": kwh,
+                "source": "octopus_csv",
+                "provisional": False,
+            }
+            for day, kwh in csv_days.items()
+            if day < today.isoformat()
+        }
+        candidates = defaultdict(list)
+        for (day, setting), rows in by_day.items():
+            if setting not in verified or day >= today or day.isoformat() in selected:
+                continue
+            start = datetime.combine(day, datetime.min.time(), _LONDON)
+            end = datetime.combine(
+                day + timedelta(days=1), datetime.min.time(), _LONDON
+            )
+            expected = int((end.astimezone(UTC) - start.astimezone(UTC)) / _HALF_HOUR)
+            if len(rows) != expected:
+                continue
+            values = []
+            csv_count = 0
+            for row in rows:
+                key = ("gas", row["start"])
+                csv = self.rows.get(key)
+                raw = self.quarantined_gas.get(key)
+                if key in self.conflicts or (
+                    raw is not None
+                    and raw.get("consumption_m3") is not None
+                    and abs(raw["consumption_m3"] - row["consumption_m3"]) > 0.000001
+                ):
+                    break
+                if csv is not None:
+                    if not agrees(row["kwh"], csv["kwh"]) or (
+                        (row["kwh"] == 0) != (csv["kwh"] == 0)
+                    ):
+                        break
+                    values.append(csv["kwh"])
+                    csv_count += 1
+                else:
+                    values.append(row["kwh"])
+            if len(values) == expected:
+                candidates[day.isoformat()].append(
+                    {
+                        "date": day.isoformat(),
+                        "kwh": round(sum(values), 6),
+                        "source": "csv_preferred_formula_consistent_estimate",
+                        "provisional": True,
+                        "calorific_value": setting,
+                        "csv_intervals": csv_count,
+                        "estimated_intervals": expected - csv_count,
+                    }
+                )
+        for day, options in candidates.items():
+            if len(options) == 1:
+                selected[day] = options[0]
+
+        # Same-day observed rates only; no retroactive use of today's tariff.
+        rates = defaultdict(set)
+        standing = defaultdict(set)
+        recent = dict(sorted(selected.items())[-14:])
+        for record in records:
+            stamp = getattr(record, "timestamp", None)
+            if stamp is None or stamp.tzinfo is None:
+                continue
+            day = stamp.astimezone(_LONDON).date().isoformat()
+            if day not in recent:
+                continue
+            for field, target in (
+                ("gas_current_rate", rates),
+                ("gas_standing_charge", standing),
+            ):
+                value = getattr(record, field, None)
+                if (
+                    isinstance(value, (float, int))
+                    and not isinstance(value, bool)
+                    and isfinite(value)
+                    and value >= 0
+                ):
+                    target[day].add(round(value, 6))
+        for day, row in recent.items():
+            rate = next(iter(rates[day])) if len(rates[day]) == 1 else None
+            charge = next(iter(standing[day])) if len(standing[day]) == 1 else None
+            row["observed_day_rate_pence_per_kwh"] = rate
+            row["estimated_usage_cost_pence"] = (
+                round(row["kwh"] * rate, 4) if rate is not None else None
+            )
+            row["estimated_total_cost_pence"] = (
+                round(row["kwh"] * rate + charge, 4)
+                if rate is not None and charge is not None
+                else None
+            )
+        return {
+            "scope": "provisional_gas_complete_days_and_observed_rate_scenarios",
+            "csv_corroborated_settings": sorted(verified),
+            "minimum_nonzero_overlap": 4,
+            "relative_overlap_tolerance": 0.01,
+            "absolute_overlap_tolerance_kwh": 0.005,
+            "complete_csv_days": len(csv_days),
+            "provisional_days": sum(row["provisional"] for row in selected.values()),
+            "recent_days": list(recent.values()),
+            "cost_is_observed_rate_scenario_not_billed": True,
+            "supplier_settlement_verified": False,
+            "roi_or_ledger_write_authorised": False,
+        }
+
     def ingest_gas_daily_reference(self, rows: Iterable[Any], *, now: datetime) -> bool:
         """Retain corroborated daily HA observations, never synthetic intervals."""
         changed = False

@@ -286,6 +286,11 @@ async def async_get_config_entry_diagnostics(
                 coordinator._lifetime.completed_daily_meter_totals, now=dt_util.now()
             )
         ),
+        "provisional_gas_reconciliation": (
+            coordinator._supplier_intervals.provisional_gas_reconciliation(
+                coordinator._history.records, now=dt_util.now()
+            )
+        ),
         "supplier_financial_reconciliation": (
             coordinator._supplier_intervals.financial_reconciliation(
                 coordinator._lifetime.completed_daily_meter_totals,

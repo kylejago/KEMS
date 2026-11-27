@@ -229,13 +229,21 @@ def candidate_extra_slot_house_routing(
         site_import_limit_kw is None
         or not isfinite(site_import_limit_kw)
         or site_import_limit_kw <= 0.0
-        or snapshot.battery_soc is None
+    ):
+        result["reason"] = "Site import limit unavailable for candidate"
+        return result
+    if (
+        snapshot.battery_soc is None
         or not isfinite(snapshot.battery_soc)
         or not 10.0 < snapshot.battery_soc <= 100.0
-        or "battery_soc" in snapshot.stale_fields
+    ):
+        result["reason"] = "Battery SOC unavailable or at household floor"
+        return result
+    if (
+        "battery_soc" in snapshot.stale_fields
         or snapshot.source_age_seconds.get("battery_soc", float("inf")) > 180.0
     ):
-        result["reason"] = "SOC or site limit unavailable for candidate"
+        result["reason"] = "Raw battery SOC report too old for routing candidate"
         return result
     # Reuse the exact same observation-only measurement checks for the
     # non-export EV interval, even on a property with a paid export tariff.

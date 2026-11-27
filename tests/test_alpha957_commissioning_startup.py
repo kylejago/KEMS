@@ -38,7 +38,7 @@ def test_alpha957_release_identity_and_scope() -> None:
     ).read_text(encoding="utf-8")
     reason = str(bundle["maintenance"]["reason"])
 
-    assert manifest["version"] == "0.9.0-alpha9.263"
+    assert manifest["version"] == "0.9.0-alpha9.264"
     assert (
         "Alpha9.57 fixes the first-refresh startup regression exposed immediately "
         "after installing Alpha9.56" in reason
