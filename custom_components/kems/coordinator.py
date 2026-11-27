@@ -1880,6 +1880,10 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
             await self._roi_rewards.async_observe(
                 verified_happy_hour_receipts,
                 list(completed_power_downs),
+                now=now,
+                late_power_down_estimates=self._supplier_intervals.late_power_down_evidence[
+                    "events"
+                ],
                 supplier_power_down_events=(
                     supplier_joined_events
                     if isinstance(supplier_joined_events, (list, tuple))

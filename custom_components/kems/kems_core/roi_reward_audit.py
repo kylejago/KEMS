@@ -185,15 +185,16 @@ def build_reward_audit(
                 included,
                 event_id=str(key),
                 awarded_octopoints=receipt.get("awarded_octopoints"),
+                award_source=receipt.get("award_source"),
                 start=(
                     _get(event, "session_start").isoformat()
                     if isinstance(_get(event, "session_start"), datetime)
-                    else None
+                    else receipt.get("start")
                 ),
                 end=(
                     _get(event, "session_end").isoformat()
                     if isinstance(_get(event, "session_end"), datetime)
-                    else None
+                    else receipt.get("end")
                 ),
                 physical_export_verified=_get(event, "physical_export_verified"),
                 physical_grid_export_kwh=_get(event, "physical_grid_export_kwh"),
@@ -201,7 +202,7 @@ def build_reward_audit(
                 modelled_agile_export_income_pence=_get(
                     event, "fixed_export_income_pence"
                 ),
-                agile_export_income_already_counted=True,
+                agile_export_income_already_counted=event is not None,
                 reward_evidence_status=_get(event, "reward_evidence_status"),
                 status=(
                     "included_supplier_awarded_octopoints"
@@ -287,7 +288,7 @@ def build_reward_audit(
         ),
         "all_historical_sessions_discovered": False,
         "note": (
-            "Counts include only historically witnessed and independently booked "
+            "Counts include witnessed, booked and confirmed account-history "
             "events. The supplier joined-event feed may omit older sessions; "
             "no historical coverage or payment is assumed without evidence."
         ),
@@ -316,7 +317,7 @@ def build_reward_audit(
             "are never interpolated. Power Down Agile earnings "
             "are displayed for context but never added to ROI twice. "
             "Octopus awards are marked supplier-awarded only when the "
-            "matched joined event explicitly exposes awarded Octopoints; "
+            "matched joined event or local Octopus account history explicitly exposes awarded Octopoints; "
             "remaining event bonuses are provisional or unknown."
         ),
     }

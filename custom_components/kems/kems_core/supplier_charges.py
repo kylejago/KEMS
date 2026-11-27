@@ -559,12 +559,30 @@ def completed_power_down_estimate(
         return result
     if actual is None:
         return result
-    reduction = max(
-        imported
-        - exported
-        - actual["electricity_import"]
-        + actual["electricity_export"],
-        0.0,
+    # Octopus assesses the reduction separately for each half-hour.
+    # Complete retained rows are required for a financially usable estimate.
+    import_rows = baseline.get("import_baseline_rows") or {}
+    export_rows = baseline.get("export_baseline_rows") or {}
+    if (
+        _complete_retained_rows(import_rows, start, end) is None
+        or _complete_retained_rows(export_rows, start, end) is None
+    ):
+        result["status"] = "awaiting_exact_baseline_evidence"
+        return result
+    reduction = 0.0
+    cursor = start
+    while cursor < end:
+        key = cursor.isoformat()
+        reduction += max(
+            import_rows[key]
+            - export_rows[key]
+            - energy.rows[("electricity_import", key)]["kwh"]
+            + energy.rows[("electricity_export", key)]["kwh"],
+            0.0,
+        )
+        cursor += _HALF_HOUR
+    result["reward_calculation_basis"] = (
+        "complete_half_hour_baselines_and_supplier_meter"
     )
     rate = _finite(baseline.get("octopoints_per_kwh"))
     result.update(
