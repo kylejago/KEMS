@@ -68,15 +68,20 @@ class SupplierIntervalRecorder:
                 )
                 self._dirty |= changed
             # Persist the migration even if the original CSV is unchanged.
-            self._dirty |= bool(self._ledger.quarantined_gas) and isinstance(
-                stored, dict
-            ) and "quarantined_gas_rows" not in stored
+            self._dirty |= (
+                bool(self._ledger.quarantined_gas)
+                and isinstance(stored, dict)
+                and "quarantined_gas_rows" not in stored
+            )
             reference_path = Path(self._hass.config.path(_GAS_REFERENCE_FILE))
             try:
                 reference = await self._hass.async_add_executor_job(
                     _read_bootstrap, reference_path
                 )
-                if isinstance(reference, dict) and reference.get("format") == "kems-gas-daily-reference-v1":
+                if (
+                    isinstance(reference, dict)
+                    and reference.get("format") == "kems-gas-daily-reference-v1"
+                ):
                     self._dirty |= await self._hass.async_add_executor_job(
                         lambda: self._ledger.ingest_gas_daily_reference(
                             reference.get("rows") or [], now=now

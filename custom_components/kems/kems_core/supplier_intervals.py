@@ -129,7 +129,10 @@ class SupplierIntervalLedger:
             if prior is None:
                 self.gas_daily_reference[key] = daily
                 changed = True
-            elif abs(prior - daily) > 0.0001 and key not in self.gas_daily_reference_conflicts:
+            elif (
+                abs(prior - daily) > 0.0001
+                and key not in self.gas_daily_reference_conflicts
+            ):
                 self.gas_daily_reference_conflicts.add(key)
                 changed = True
         return changed
@@ -157,19 +160,33 @@ class SupplierIntervalLedger:
             if isinstance(row, dict):
                 self.ingest([row], source=row.get("source"), now=now)
         for row in data.get("quarantined_gas_rows") or []:
-            if isinstance(row, dict) and row.get("kind") == "gas" and row.get("source") != "octopus_csv":
+            if (
+                isinstance(row, dict)
+                and row.get("kind") == "gas"
+                and row.get("source") != "octopus_csv"
+            ):
                 self.ingest([row], source=row.get("source"), now=now)
-        self.ingest_gas_daily_reference(data.get("gas_daily_reference") or [], now=now)
+        self.ingest_gas_daily_reference(
+            data.get("gas_daily_reference") or [], now=now
+        )
         for day in data.get("gas_daily_reference_conflicts") or []:
             if isinstance(day, str) and day in self.gas_daily_reference:
                 self.gas_daily_reference_conflicts.add(day)
         for item in data.get("quarantined_gas_conflicts") or []:
-            if isinstance(item, list) and len(item) == 2 and all(isinstance(x, str) for x in item):
+            if (
+                isinstance(item, list)
+                and len(item) == 2
+                and all(isinstance(x, str) for x in item)
+            ):
                 key = tuple(item)
                 if key in self.quarantined_gas:
                     self.quarantined_gas_conflicts.add(key)
         for item in data.get("conflicts") or []:
-            if isinstance(item, list) and len(item) == 2:
+            if (
+                isinstance(item, list)
+                and len(item) == 2
+                and all(isinstance(x, str) for x in item)
+            ):
                 key = tuple(item)
                 if key in self.rows:
                     self.conflicts.add(key)
@@ -216,25 +233,34 @@ class SupplierIntervalLedger:
                     or recorded < 0
                 ):
                     recorded = None
-                comparisons.append({
-                    "date": day,
-                    "supplier_kwh": supplier,
-                    "recorded_kwh": recorded,
-                    "supplier_minus_recorded_kwh": (
-                        round(supplier - recorded, 6) if recorded is not None else None
-                    ),
-                })
+                comparisons.append(
+                    {
+                        "date": day,
+                        "supplier_kwh": supplier,
+                        "recorded_kwh": recorded,
+                        "supplier_minus_recorded_kwh": (
+                            round(supplier - recorded, 6)
+                            if recorded is not None
+                            else None
+                        ),
+                    }
+                )
             matched = [
-                row for row in comparisons
+                row
+                for row in comparisons
                 if row["supplier_minus_recorded_kwh"] is not None
             ]
             result[kind] = {
                 "complete_supplier_days": len(comparisons),
                 "comparable_recorded_days": len(matched),
                 "missing_recorded_days": len(comparisons) - len(matched),
-                "net_difference_kwh": round(
-                    sum(row["supplier_minus_recorded_kwh"] for row in matched), 6
-                ) if matched else None,
+                "net_difference_kwh": (
+                    round(
+                        sum(row["supplier_minus_recorded_kwh"] for row in matched), 6
+                    )
+                    if matched
+                    else None
+                ),
                 "recent_days": comparisons[-14:],
             }
         return {
@@ -293,11 +319,11 @@ class SupplierIntervalLedger:
                 "status": "automatic_gas_unverified",
                 "retained_raw_intervals": len(self.quarantined_gas),
                 "conflicting_raw_intervals": len(self.quarantined_gas_conflicts),
-                "recent_daily_reference_kwh": dict(
-                    (day, value)
+                "recent_daily_reference_kwh": {
+                    day: value
                     for day, value in sorted(self.gas_daily_reference.items())[-14:]
                     if day not in self.gas_daily_reference_conflicts
-                ),
+                },
                 "daily_reference_conflicts": len(self.gas_daily_reference_conflicts),
                 "daily_reference_is_not_supplier_settlement": True,
                 "automatic_gas_financially_usable": False,
