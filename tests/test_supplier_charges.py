@@ -128,9 +128,8 @@ def test_late_baseline_survives_until_both_meter_windows_are_available():
     )
     assert partial is not None and other is not None
     assert merge_completed_baseline(partial, other) == captured
-    assert merge_completed_baseline(
-        captured, {**other, "export_baseline_kwh": 2.0}
-    )["conflict"]
+    conflicting = {**other, "export_baseline_kwh": 2.0}
+    assert merge_completed_baseline(captured, conflicting)["conflict"]
     energy = SupplierIntervalLedger()
     assert (
         completed_power_down_estimate(energy, partial)["status"]

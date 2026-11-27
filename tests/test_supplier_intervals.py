@@ -127,7 +127,6 @@ def test_electricity_reconciliation_does_not_rewrite_or_infer_missing_days():
     assert ledger.dump() == before
 
 
-
 def test_gas_quarantine_compares_only_matching_unconflicted_intervals():
     ledger = SupplierIntervalLedger()
     start = datetime(2026, 11, 24, tzinfo=UTC)
