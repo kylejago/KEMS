@@ -385,3 +385,79 @@ def test_extra_slot_cost_estimates_only_qualified_adjacent_samples():
     assert module.extra_slot_cost_sample(snap, None)["status"] == "not_qualified"
     b["timestamp"] = (NOW + timedelta(minutes=2)).isoformat()
     assert module.summarise_extra_slot_cost([a, b])["estimated_candidate_ev_kwh"] == 0
+
+
+def test_ev_cost_evidence_persists_and_never_bridges_restart():
+    module, _ = _load_trace_module()
+    policy = {"estimated_ev_only_discount_candidate": True}
+    now = datetime.now(UTC).replace(minute=1, second=0, microsecond=0)
+    snap = replace(
+        _snapshot(connected=True, charging=True),
+        timestamp=now,
+        battery_power_kw=0.0,
+        current_import_rate=35.88,
+        next_import_rate=6.6,
+        intelligent_slot_evidence={"effective_fallback_offpeak_rate_pence": 6.6},
+        source_age_seconds={
+            field: 8.0
+            for field in (
+                "grid_import_kw",
+                "grid_export_kw",
+                "battery_power_kw",
+                "solar_power_kw",
+            )
+        },
+        tariff_source_age_seconds={
+            "current_import_rate": 8,
+            "next_import_rate": 8,
+            "off_peak": 8,
+        },
+    )
+
+    async def exercise():
+        recorder = module.EVChargeTraceRecorder(object(), "cost_evidence")
+        await recorder.async_record(snap, extra_slot_policy=policy)
+        await recorder.async_record(
+            replace(snap, timestamp=now + timedelta(seconds=30)),
+            extra_slot_policy=policy,
+        )
+        await recorder.async_save()
+        before = recorder.state["extra_slot_cost_evidence"]
+        assert before["qualified_sample_interval_seconds"] == 30
+        assert before["retained_half_hours"] == 1
+
+        # Restore with an explicit reference instant to avoid wall clock
+        # dependence in this unit test.
+        recovered = module.EVChargeTraceRecorder(object(), "cost_evidence")
+        await recovered.async_load()
+        recovered._cost_buckets = module._restore_cost_buckets(
+            recorder._cost_buckets, now=now + timedelta(seconds=30)
+        )
+        await recovered.async_record(
+            replace(snap, timestamp=now + timedelta(seconds=60)),
+            extra_slot_policy=policy,
+        )
+        assert recovered.state["extra_slot_cost_evidence"][
+            "qualified_sample_interval_seconds"
+        ] == 30
+        await recovered.async_record(
+            replace(snap, timestamp=now + timedelta(seconds=90)),
+            extra_slot_policy=policy,
+        )
+        assert recovered.state["extra_slot_cost_evidence"][
+            "qualified_sample_interval_seconds"
+        ] == 60
+        # Repeated/reordered observations cannot accrue the same seconds.
+        await recovered.async_record(
+            replace(snap, timestamp=now + timedelta(seconds=60)),
+            extra_slot_policy=policy,
+        )
+        await recovered.async_record(
+            replace(snap, timestamp=now + timedelta(seconds=90)),
+            extra_slot_policy=policy,
+        )
+        assert recovered.state["extra_slot_cost_evidence"][
+            "qualified_sample_interval_seconds"
+        ] == 60
+
+    asyncio.run(exercise())
