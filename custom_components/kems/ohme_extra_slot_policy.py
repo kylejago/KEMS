@@ -118,6 +118,7 @@ def ohme_extra_slot_evidence(
 
 def observe_extra_slot_policy(hass, entities, options, snapshot):
     """Read fresh charger mode, status and supplier off-peak for a trace."""
+
     def state_and_age(entity_id):
         state = hass.states.get(entity_id) if entity_id else None
         if state is None:

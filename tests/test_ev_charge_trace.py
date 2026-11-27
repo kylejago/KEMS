@@ -366,17 +366,22 @@ def test_extra_slot_cost_estimates_only_qualified_adjacent_samples():
     assert result["estimated_discount_pence"] == 3.2696
     assert result["supplier_discount_confirmed"] is False
     assert result["roi_or_ledger_write_authorised"] is False
-    assert module.extra_slot_cost_sample(
-        snap, policy, reward_event_active=True
-    )["status"] == "other_event_or_tariff"
-    assert module.extra_slot_cost_sample(
-        replace(snap, battery_power_kw=7.0), policy
-    )["status"] == "ambiguous_grid_allocation"
-    assert module.extra_slot_cost_sample(
-        replace(snap, source_age_seconds={}), policy
-    )["status"] == "stale_power"
+    assert (
+        module.extra_slot_cost_sample(snap, policy, reward_event_active=True)["status"]
+        == "other_event_or_tariff"
+    )
+    assert (
+        module.extra_slot_cost_sample(replace(snap, battery_power_kw=7.0), policy)[
+            "status"
+        ]
+        == "ambiguous_grid_allocation"
+    )
+    assert (
+        module.extra_slot_cost_sample(replace(snap, source_age_seconds={}), policy)[
+            "status"
+        ]
+        == "stale_power"
+    )
     assert module.extra_slot_cost_sample(snap, None)["status"] == "not_qualified"
     b["timestamp"] = (NOW + timedelta(minutes=2)).isoformat()
-    assert module.summarise_extra_slot_cost([a, b])[
-        "estimated_candidate_ev_kwh"
-    ] == 0
+    assert module.summarise_extra_slot_cost([a, b])["estimated_candidate_ev_kwh"] == 0
