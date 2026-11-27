@@ -1,3 +1,10 @@
+## 0.9.0-alpha9.265
+
+- Reconcile explicit historical Power Down awards from a private local account-history reference by exact session window; replace estimates, retain confirmed points and discover missing financial-only events without assuming physical success.
+- Calculate late provisional bonuses separately for complete matched half-hours and reconcile them into the existing reward-only ROI ledger; supplier awards supersede estimates.
+- Stop querying timestamped baseline attributes excluded from upstream Recorder. Retain existing live baseline capture and independent historical electricity charge recovery.
+- No inverter, EV, tariff, Happy Hour or physical dispatch changes.
+
 ## 0.9.0-alpha9.264
 
 - Add a separate CSV-first complete-day gas reconciliation projection and labelled same-day observed-rate cost scenarios after nonzero overlap corroboration.

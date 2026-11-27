@@ -231,8 +231,8 @@ def test_alpha982_release_identity_and_dormant_no_export_contract() -> None:
     ).read_text(encoding="utf-8")
     reason = str(bundle["maintenance"]["reason"])
 
-    assert manifest["version"] == "0.9.0-alpha9.264"
-    assert reason.startswith("Alpha9.264:")
+    assert manifest["version"] == "0.9.0-alpha9.265"
+    assert reason.startswith("Alpha9.265:")
     assert "1.0 kW" in reason
     assert "two low-solar samples" in reason
     assert "15% planning/export target" in reason

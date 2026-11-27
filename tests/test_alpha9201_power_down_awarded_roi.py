@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import asyncio
+import json
 from datetime import UTC, date, datetime
 from types import SimpleNamespace
 
 import pytest
 
+from custom_components.kems.kems_core.power_down_awards import read_awards
 from custom_components.kems.roi_reward_recorder import ROIRewardRecorder
 
 
@@ -227,3 +229,51 @@ def test_late_complete_meter_estimate_is_replaced_by_award():
     asyncio.run(recorder.async_observe([], [event], late_power_down_estimates=[late]))
     assert recorder._power_downs["8447"]["pence"] == 14.0
     assert recorder._power_downs["8447"]["supplier_settled"] is True
+
+
+def test_confirmed_joined_event_without_physical_history_migrates_window_alias():
+    recorder = _recorder()
+    now = datetime(2026, 11, 12, 19, tzinfo=UTC)
+    recorder._local_power_down_awards = [_joined(80)]
+    asyncio.run(recorder.async_observe([], [], now=now))
+    assert len(recorder._power_downs) == 1
+    asyncio.run(
+        recorder.async_observe(
+            [], [], supplier_power_down_events=[_joined(112)], now=now
+        )
+    )
+    assert list(recorder._power_downs) == ["8447"]
+    assert recorder._power_downs["8447"]["pence"] == 14.0
+    assert recorder._power_downs["8447"]["award_source"] == "octopus_joined_events"
+
+
+def test_unknown_supplier_id_conflicting_with_known_window_is_rejected():
+    recorder = _recorder()
+    asyncio.run(
+        recorder.async_observe(
+            [],
+            [_event(bonus=None, reduction=None)],
+            supplier_power_down_events=[_joined(800, identifier=9999)],
+            now=datetime(2026, 11, 12, 19, tzinfo=UTC),
+        )
+    )
+    assert not recorder._power_downs
+
+
+def test_local_award_file_rejects_pending_and_conflicts(tmp_path):
+    path = tmp_path / "awards.json"
+
+    def write(rows):
+        path.write_text(
+            json.dumps({"format": "kems-power-down-awards-v1", "rows": rows})
+        )
+
+    write([_joined(0), _joined(0)])
+    assert read_awards(path)[0]["rewarded_octopoints"] == 0
+    assert len(read_awards(path)) == 1
+    write([_joined(0), _joined(8)])
+    with pytest.raises(ValueError):
+        read_awards(path)
+    write([_joined(None)])
+    with pytest.raises(ValueError):
+        read_awards(path)

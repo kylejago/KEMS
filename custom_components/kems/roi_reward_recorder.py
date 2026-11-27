@@ -17,9 +17,9 @@ from .const import DOMAIN, STORAGE_NAMESPACE
 from .kems_core.power_down_awards import (
     FILE_NAME,
     apply_imported_awards,
-    reconcile_window_aliases,
     award_window,
     read_awards,
+    reconcile_window_aliases,
 )
 from .kems_core.roi_reward_audit import build_reward_audit
 from .kems_core.roi_rewards import date_of, number
@@ -256,13 +256,14 @@ class ROIRewardRecorder:
             key = str(item.get("session_id") or "")
             event = known_events.get(key)
             previous = self._power_downs.get(key, {})
+            window = award_window(item.get("session_start"), item.get("session_end"))
             if (
-                event is None
+                window is None
+                or event is None
                 or getattr(event, "completed_successfully", None) is not True
                 or getattr(event, "physical_export_verified", None) is not True
                 or previous.get("supplier_settled") is True
-                or award_window(item.get("session_start"), item.get("session_end"))
-                != award_window(event.session_start, event.session_end)
+                or window != award_window(event.session_start, event.session_end)
             ):
                 continue
             bonus = number(item.get("estimated_bonus_pence"))
@@ -297,8 +298,8 @@ class ROIRewardRecorder:
             event_id = str(item.get("id") or "")
             event = known_events.get(event_id)
             # A supplier-confirmed award is financial evidence, not proof
-            # of successful KEMS dispatch. Keep the exact ID/window check.
-            if event is None:
+            # of successful KEMS dispatch.
+            if not event_id:
                 continue
             points = item.get("rewarded_octopoints")
             if (
@@ -312,21 +313,47 @@ class ROIRewardRecorder:
                 joined_end = datetime.fromisoformat(str(item.get("end")))
             except (ValueError, TypeError):
                 continue
-            event_start = getattr(event, "session_start", None)
-            event_end = getattr(event, "session_end", None)
-            if (
-                joined_start.tzinfo is None
-                or joined_end.tzinfo is None
-                or not isinstance(event_start, datetime)
-                or not isinstance(event_end, datetime)
-                or event_start.tzinfo is None
-                or event_end.tzinfo is None
-                or joined_start != event_start
-                or joined_end != event_end
-                or (now is not None and joined_end > now)
-                or date_of(event_end) is None
-            ):
+            window = award_window(joined_start, joined_end)
+            if window is None or (now is not None and joined_end > now):
                 continue
+            if event is not None:
+                if window != award_window(event.session_start, event.session_end):
+                    continue
+            else:
+                # The configured provider may know joined events that KEMS
+                # never witnessed. Only accept them with a completed exact
+                # window, no competing event ID and no ambiguous legacy row.
+                if now is None or any(
+                    window == award_window(
+                        other.session_start, other.session_end
+                    )
+                    for other in known_events.values()
+                ):
+                    continue
+                alias = f"octopus-window:{window[0]}|{window[1]}"
+                if any(
+                    key not in (event_id, alias)
+                    and (
+                        award_window(receipt.get("start"), receipt.get("end"))
+                        == window
+                        or (
+                            receipt.get("day") == date_of(joined_end)
+                            and award_window(
+                                receipt.get("start"), receipt.get("end")
+                            )
+                            is None
+                        )
+                    )
+                    for key, receipt in self._power_downs.items()
+                ):
+                    continue
+            previous = self._power_downs.get(event_id, {})
+            previous_window = award_window(previous.get("start"), previous.get("end"))
+            if previous_window is not None and previous_window != window:
+                continue
+            if previous and previous.get("day") != date_of(joined_end):
+                continue
+            event_start, event_end = joined_start, joined_end
             # Octopus publishes 800 points = £1 = 100 pence.
             saved = {
                 "day": date_of(event_end),
@@ -338,11 +365,10 @@ class ROIRewardRecorder:
                 "award_source": "octopus_joined_events",
                 "awarded_octopoints": points,
             }
-            window = award_window(joined_start, joined_end)
             # An account-history-only event may later acquire its provider ID.
             # Migrate rather than count the same session twice.
-            alias = f"octopus-window:{window[0]}|{window[1]}" if window else None
-            if alias and alias in self._power_downs:
+            alias = f"octopus-window:{window[0]}|{window[1]}"
+            if alias in self._power_downs:
                 del self._power_downs[alias]
                 changed = True
             if self._power_downs.get(event_id) != saved:

@@ -152,8 +152,8 @@ def test_release_scope_keeps_existing_hardware_and_auto_update_code() -> None:
         Path(__file__).resolve().parents[1]
         / "docs/archived-release-notes-through-alpha9244.md"
     ).read_text(encoding="utf-8")
-    assert manifest["version"] == "0.9.0-alpha9.264"
-    assert bundle["maintenance"]["reason"].startswith("Alpha9.264:")
+    assert manifest["version"] == "0.9.0-alpha9.265"
+    assert bundle["maintenance"]["reason"].startswith("Alpha9.265:")
     assert (
         "all live hardware control logic unchanged" in bundle["maintenance"]["reason"]
     )

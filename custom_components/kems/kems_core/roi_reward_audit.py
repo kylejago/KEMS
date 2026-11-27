@@ -183,7 +183,7 @@ def build_reward_audit(
                 receipt.get("basis"),
                 receipt.get("supplier_settled"),
                 included,
-                event_id=str(key),
+                event_id=None if str(key).startswith("octopus-window:") else str(key),
                 awarded_octopoints=receipt.get("awarded_octopoints"),
                 award_source=receipt.get("award_source"),
                 start=(
@@ -317,7 +317,8 @@ def build_reward_audit(
             "are never interpolated. Power Down Agile earnings "
             "are displayed for context but never added to ROI twice. "
             "Octopus awards are marked supplier-awarded only when the "
-            "matched joined event or local Octopus account history explicitly exposes awarded Octopoints; "
+            "matched joined event or local Octopus account history "
+            "explicitly exposes awarded Octopoints; "
             "remaining event bonuses are provisional or unknown."
         ),
     }
