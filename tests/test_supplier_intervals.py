@@ -60,3 +60,68 @@ def test_invalid_incomplete_and_future_intervals_rejected():
     ]
     assert not ledger.ingest(invalid, source="octopus_csv", now=NOW)
     assert not ledger.rows
+
+
+def test_migrate_automatic_gas_without_poisoning_csv_or_electricity():
+    start = datetime(2026, 11, 24, tzinfo=UTC)
+    gas = _row(start, 6.5, kind="gas")
+    ledger = SupplierIntervalLedger()
+    ledger.restore(
+        {
+            "format": "kems-supplier-intervals-v1",
+            "rows": [
+                {**gas, "source": "octopus_estimated_gas"},
+                {**_row(start), "source": "octopus_integration"},
+            ],
+            "conflicts": [["gas", start.isoformat()]],
+        },
+        now=NOW,
+    )
+    assert ledger.summary()["gas_quarantine"]["retained_raw_intervals"] == 1
+    assert ledger.summary()["kinds"]["gas"]["usable_intervals"] == 0
+    assert ledger.ingest([_row(start, 0.1, kind="gas")], source="octopus_csv", now=NOW)
+    assert not ledger.ingest([gas], source="octopus_estimated_gas", now=NOW)
+    assert ledger.summary()["kinds"]["gas"]["usable_intervals"] == 1
+    assert ledger.summary()["kinds"]["electricity_import"]["usable_intervals"] == 1
+    restored = SupplierIntervalLedger()
+    restored.restore(ledger.dump(), now=NOW)
+    assert restored.summary() == ledger.summary()
+
+
+def test_gas_daily_reference_does_not_create_half_hours_or_accept_bad_totals():
+    ledger = SupplierIntervalLedger()
+    good = {"date": "2026-11-24", "daily_kwh": 6.5, "lifetime_delta_kwh": 6.5}
+    assert ledger.ingest_gas_daily_reference([good], now=NOW)
+    assert not ledger.ingest_gas_daily_reference(
+        [
+            {**good, "date": "2026-11-25", "lifetime_delta_kwh": 160.689},
+            {**good, "date": "2026-11-26"},
+        ],
+        now=NOW,
+    )
+    assert ledger.summary()["gas_quarantine"]["recent_daily_reference_kwh"] == {
+        "2026-11-24": 6.5
+    }
+    assert ledger.summary()["kinds"]["gas"]["retained_intervals"] == 0
+    assert ledger.ingest_gas_daily_reference(
+        [{**good, "daily_kwh": 7.0, "lifetime_delta_kwh": 7.0}], now=NOW
+    )
+    assert ledger.summary()["gas_quarantine"]["recent_daily_reference_kwh"] == {}
+
+
+def test_electricity_reconciliation_does_not_rewrite_or_infer_missing_days():
+    ledger = SupplierIntervalLedger()
+    start = datetime(2026, 11, 24, tzinfo=UTC)
+    rows = [_row(start + timedelta(minutes=30 * n)) for n in range(48)] + [
+        _row(start + timedelta(days=1))
+    ]
+    ledger.ingest(rows, source="octopus_csv", now=NOW)
+    before = ledger.dump()
+    result = ledger.electricity_reconciliation(
+        {"2026-11-24": {"grid_import_kwh": 47.0}}, now=NOW
+    )
+    assert result["kinds"]["electricity_import"]["complete_supplier_days"] == 1
+    assert result["kinds"]["electricity_import"]["net_difference_kwh"] == 1.0
+    assert result["kinds"]["electricity_export"]["net_difference_kwh"] is None
+    assert result["cost_or_roi_adjustment_authorised"] is False
+    assert ledger.dump() == before

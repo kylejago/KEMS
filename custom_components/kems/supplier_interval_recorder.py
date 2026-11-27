@@ -19,6 +19,7 @@ from .providers.entity_map import KEMSEntities
 _LOGGER = logging.getLogger(__name__)
 _REFRESH = timedelta(minutes=30)
 _FILE_NAME = "kems_supplier_intervals.json"
+_GAS_REFERENCE_FILE = "kems_gas_daily_reference.json"
 _MAX_FILE_BYTES = 10_000_000
 
 
@@ -47,6 +48,9 @@ class SupplierIntervalRecorder:
     def status(self) -> dict[str, Any]:
         return dict(self._status)
 
+    def electricity_reconciliation(self, daily_records, *, now):
+        return self._ledger.electricity_reconciliation(daily_records, now=now)
+
     async def async_load(self) -> None:
         now = datetime.now(UTC)
         try:
@@ -62,8 +66,32 @@ class SupplierIntervalRecorder:
                         data.get("rows") or [], source="octopus_csv", now=now
                     )
                 )
-                if changed:
-                    await self._store.async_save(self._ledger.dump())
+                self._dirty |= changed
+            # Persist the migration even if the original CSV is unchanged.
+            self._dirty |= (
+                bool(self._ledger.quarantined_gas)
+                and isinstance(stored, dict)
+                and "quarantined_gas_rows" not in stored
+            )
+            reference_path = Path(self._hass.config.path(_GAS_REFERENCE_FILE))
+            try:
+                reference = await self._hass.async_add_executor_job(
+                    _read_bootstrap, reference_path
+                )
+                if (
+                    isinstance(reference, dict)
+                    and reference.get("format") == "kems-gas-daily-reference-v1"
+                ):
+                    self._dirty |= await self._hass.async_add_executor_job(
+                        lambda: self._ledger.ingest_gas_daily_reference(
+                            reference.get("rows") or [], now=now
+                        )
+                    )
+            except (OSError, ValueError, TypeError):
+                _LOGGER.warning("KEMS gas daily reference file not accepted")
+            if self._dirty:
+                await self._store.async_save(self._ledger.dump())
+                self._dirty = False
             self._status = await self._hass.async_add_executor_job(self._ledger.summary)
         except Exception:
             _LOGGER.exception("KEMS supplier interval recovery unavailable")
@@ -159,7 +187,9 @@ class SupplierIntervalRecorder:
                     else "octopus_integration"
                 )
                 changed |= self._ledger.ingest(rows, source=source, now=now)
-                availability[kind] = "observed"
+                availability[kind] = (
+                    "quarantined_unverified" if kind == "gas" else "observed"
+                )
             self._dirty |= changed
             if self._dirty:
                 await self._store.async_save(self._ledger.dump())
