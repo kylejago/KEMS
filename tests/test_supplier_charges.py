@@ -633,3 +633,42 @@ def test_happy_hour_overlap_survives_reward_audit_row_limit():
     )
     assert result["known_happy_hour_import_overlap_dates"] == [day]
     assert result["reward_overlap_resolved"] is False
+
+
+def test_charge_audit_distinguishes_csv_and_integration_estimated_intervals():
+    energy = SupplierIntervalLedger()
+    charges = SupplierChargeEvidence()
+    rows = _day(START)
+    energy.ingest(rows, source="octopus_csv", now=NOW)
+    charges.ingest(rows, source="octopus_integration", now=NOW)
+    charges.ingest(rows[:12], source="octopus_csv", now=NOW)
+    native = {"2026-11-25": {"import_cost_pence": 300.0}}
+    audit = charges.reconciliation(
+        energy,
+        native,
+        now=NOW,
+        commissioning_date="2026-11-24",
+        include_daily_audit=True,
+    )
+    result = audit["kinds"]["electricity_import"]
+    assert result["complete_csv_priced_days"] == 0
+    assert result["complete_days_with_integration_estimates"] == 1
+    proposal = historical_charge_adjustment_preview(audit)["days"]["2026-11-25"][
+        "import_cost_pence"
+    ]
+    assert proposal["csv_priced_intervals"] == 12
+    assert proposal["integration_estimated_intervals"] == 36
+    assert proposal["proposed_delta_pence"] == 16.8
+    charges.ingest(rows[12:], source="octopus_csv", now=NOW)
+    audit = charges.reconciliation(
+        energy,
+        native,
+        now=NOW,
+        commissioning_date="2026-11-24",
+        include_daily_audit=True,
+    )
+    result = audit["kinds"]["electricity_import"]
+    assert result["complete_csv_priced_days"] == 1
+    assert result["complete_days_with_integration_estimates"] == 0
+    assert result["difference_pence"] == 16.8
+    assert audit["roi_or_ledger_write_authorised"] is False
