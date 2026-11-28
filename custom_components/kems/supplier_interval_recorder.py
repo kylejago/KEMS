@@ -523,6 +523,7 @@ class SupplierIntervalRecorder:
                 and item["complete_energy_days_missing_valid_prices"] == 0
                 for item in coverage["kinds"].values()
             )
+
             # Inspect the full bounded recovery horizon after each direction's
             # first complete retained day. Allow three days for publication;
             # do not infer that earlier export readings ought to exist.

@@ -502,8 +502,9 @@ def test_history_mapping_change_discards_old_result_even_if_mapping_returns():
         assert queries == [original, original]
         assert not recorder._charges.rows
         assert not recorder._ledger.rows
-        assert recorder.status["historical_charge_recovery"][
-            "discarded_mapping_batches"
-        ] == 1
+        assert (
+            recorder.status["historical_charge_recovery"]["discarded_mapping_batches"]
+            == 1
+        )
 
     asyncio.run(exercise())
