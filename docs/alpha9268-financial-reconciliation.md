@@ -15,7 +15,7 @@ After normal current supplier and local CSV intake, stop scheduling Recorder bac
 - Confirm preview totals against local supplier file and full dated audit.
 - Confirm no double application of Happy Hour / Intelligent EV-only credits and no counterfactual changes.
 - Implement and test one reversible reporting projection across the native period, ROI, canonical bill and WhatsApp consumers; do not silently alter the original ledger.
-- Do not retire the legacy observer until dependency checks are complete; no third-party uninstall.
+- Archive-only legacy comparison polling is retired; preserve checkpoint and native Ohme polling. Do not remove residual configured control mappings or uninstall the third-party integration.
 - Do not install a new release before the overnight Alpha9.267 control acceptance.
 
 ## Legacy Intelligent dependency review (partial, 2026-11-28)
@@ -26,3 +26,11 @@ After normal current supplier and local CSV intake, stop scheduling Recorder bac
 - Before retiring mappings or the observer, trace every downstream tariff, EV-hold, notification, diagnostics and configuration consumer, test absent/stale legacy sources and native Ohme-only transitions, and preserve the regular overnight authority. Do not delete saved parity evidence or uninstall the external integration as part of this financial bundle.
 
 The above is a source inspection, not live acceptance or a complete repository-wide reference audit. The Alpha9.267 overnight run and 05:30 handover remain independent release gates; no controller changes are made by this note.
+
+## Charge provenance and reward review
+
+The dated audit distinguishes selected Octopus CSV charge intervals from integration-calculated estimates. A complete day of prices is not necessarily a day of verified supplier billing. The full known Happy Hour date set is retained independently of the itemised reward audit display limit, including booked hours awaiting credit evidence. Missing event history does not establish absence of rewards.
+
+Octopus documents Happy Hour as a normal usage charge followed by a separate account refund: https://octopus.energy/help-and-faqs/articles/when-do-i-get-weekend-happy-hour-refund/ . The upstream Home Assistant Octopus Energy integration documents that it cannot reliably adjust costs for extra Intelligent dispatches when planned dispatch data is unavailable, including Ohme: https://bottlecapdave.github.io/HomeAssistant-OctopusEnergy/faq/ and https://bottlecapdave.github.io/HomeAssistant-OctopusEnergy/entities/electricity/ . Therefore integration-only estimated import charges must not automatically replace native amounts. A CSV-backed day also requires confirmation of its gross-charge basis and applicable tariff treatment before any reporting approval. Keep separate reward ledgers intact. No approval is inferred from source type or from a missing reward row.
+
+The hypothetical reporting projection is implemented and exercised in tests; it is not a publication of corrected live values. Final live financial activation and release identity remain held pending reviewed evidence and the overnight control acceptance.
