@@ -395,7 +395,8 @@ class SupplierIntervalRecorder:
                 }
                 return changed
         if (
-            self._history_status.get("stop_reason") == "all_retained_complete_days_priced"
+            self._history_status.get("stop_reason")
+            == "all_retained_complete_days_priced"
         ):
             # A later incomplete price day, conflict or changed scope must
             # allow a new bounded search instead of retaining the old stop.
