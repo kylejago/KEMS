@@ -296,6 +296,77 @@ def historical_charge_adjustment_preview(reconciliation: Mapping[str, Any]) -> d
     }
 
 
+def project_reviewed_historical_charges(
+    daily_records: Mapping[str, Any],
+    preview: Mapping[str, Any],
+    *,
+    reviewed_import_days: frozenset[str] = frozenset(),
+    reviewed_export_days: frozenset[str] = frozenset(),
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Build a reversible reporting copy, never a persisted ledger update.
+
+    Review must establish the same gross-charge basis, including any free
+    hours or EV discounts, before a date is eligible. An unreviewed date,
+    changed native value or absent commissioned ROI value is withheld.
+    Rebuild from the native rows on each invocation; never chain projections.
+    """
+    projected = {
+        day: dict(row) if isinstance(row, Mapping) else row
+        for day, row in daily_records.items()
+    }
+    audit: dict[str, Any] = {"applied": {}, "withheld": {}}
+    for day, proposals in preview.get("days", {}).items():
+        native = daily_records.get(day)
+        row = projected.get(day)
+        for field, reviewed in (
+            ("import_cost_pence", reviewed_import_days),
+            ("export_income_pence", reviewed_export_days),
+        ):
+            if field not in proposals:
+                continue
+            proposal = proposals[field]
+            original = _finite(proposal.get("recorded_pence"))
+            estimate = _finite(proposal.get("supplier_estimate_pence"))
+            current = (
+                _finite(native.get(field)) if isinstance(native, Mapping) else None
+            )
+            system_value = (
+                _finite(row.get("actual_system_value_pence"))
+                if isinstance(row, Mapping)
+                else None
+            )
+            avoided = (
+                _finite(row.get("actual_avoided_import_value_pence"))
+                if isinstance(row, Mapping)
+                else None
+            )
+            reason = None
+            if day not in reviewed:
+                reason = "charge_basis_not_reviewed"
+            elif original is None or estimate is None or current is None:
+                reason = "native_or_supplier_charge_missing"
+            elif abs(current - original) > 0.000001:
+                reason = "native_charge_changed_since_review"
+            elif system_value is None or (
+                field == "import_cost_pence" and avoided is None
+            ):
+                reason = "commissioned_roi_values_missing"
+            if reason is not None:
+                audit["withheld"].setdefault(day, {})[field] = reason
+                continue
+            delta = round(estimate - current, 6)
+            row[field] = estimate
+            if field == "import_cost_pence":
+                row["actual_avoided_import_value_pence"] = round(avoided - delta, 6)
+                row["actual_system_value_pence"] = round(system_value - delta, 6)
+            else:
+                row["actual_system_value_pence"] = round(system_value + delta, 6)
+            audit["applied"].setdefault(day, {})[field] = delta
+    audit["supplier_settlement_verified"] = False
+    audit["ledger_write_authorised"] = False
+    return projected, audit
+
+
 def exact_event_meter_totals(
     energy, start: datetime, end: datetime
 ) -> dict[str, Any] | None:
