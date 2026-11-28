@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -29,6 +29,7 @@ from .kems_core.supplier_intervals import (
     FORMAT,
     KINDS,
     SupplierIntervalLedger,
+    _LONDON,
     _utc,
     gas_calorific_value_diagnostic,
 )
@@ -75,6 +76,7 @@ class SupplierIntervalRecorder:
         self._history_entities: dict[str, str] = {}
         self._history_batches = 0
         self._history_candidate_rows = 0
+        self._history_consumption_rows = 0
         self._history_empty_batches = 0
         self._history_baseline_rows = 0
         self._history_changed = False
@@ -377,6 +379,7 @@ class SupplierIntervalRecorder:
                     if evidence["session_id"] in self._completed_ids:
                         changed |= self._retain_baseline(evidence)
                 self._history_candidate_rows += len(charges)
+                self._history_consumption_rows += len(consumption)
                 self._history_baseline_rows += len(baselines)
                 self._history_empty_batches += int(not rows)
                 self._history_changed |= changed
@@ -384,12 +387,17 @@ class SupplierIntervalRecorder:
                 self._history_status = {
                     "status": (
                         "observed"
-                        if (self._history_candidate_rows or self._history_baseline_rows or consumption)
+                        if (
+                            self._history_candidate_rows
+                            or self._history_baseline_rows
+                            or self._history_consumption_rows
+                        )
                         else "no_retained_attributes"
                     ),
                     "candidate_rows": self._history_candidate_rows,
                     "last_batch_candidate_rows": len(charges),
                     "last_batch_consumption_rows": len(consumption),
+                    "consumption_candidate_rows": self._history_consumption_rows,
                     "baseline_candidate_observations": self._history_baseline_rows,
                     "empty_batches": self._history_empty_batches,
                     "evidence_changed": self._history_changed,
@@ -421,6 +429,7 @@ class SupplierIntervalRecorder:
             self._history_anchor = now
             self._history_batches = 0
             self._history_candidate_rows = 0
+            self._history_consumption_rows = 0
             self._history_empty_batches = 0
             self._history_baseline_rows = 0
             self._history_changed = False
@@ -448,7 +457,30 @@ class SupplierIntervalRecorder:
                 and item["complete_energy_days_missing_valid_prices"] == 0
                 for item in coverage["kinds"].values()
             )
-            if covered:
+            # Do not stop simply because every *retained* day has prices.
+            # Check recent missing meter days after the first complete day,
+            # allowing three calendar days for normal upstream publication.
+            def recent_missing_meter_days():
+                last_expected = now.astimezone(_LONDON).date() - timedelta(days=3)
+                first_expected = last_expected - timedelta(days=6)
+                gaps = {}
+                for kind in ("electricity_import", "electricity_export"):
+                    if f"consumption:{kind}" not in entities.values():
+                        continue
+                    retained = self._ledger.complete_day_totals(kind)
+                    if not retained:
+                        continue
+                    first = max(first_expected, date.fromisoformat(min(retained)))
+                    gaps[kind] = [
+                        (first + timedelta(days=offset)).isoformat()
+                        for offset in range(max(0, (last_expected - first).days + 1))
+                        if (first + timedelta(days=offset)).isoformat() not in retained
+                    ]
+                return gaps
+
+            gaps = await self._hass.async_add_executor_job(recent_missing_meter_days)
+            self._history_status["recent_missing_meter_days"] = gaps
+            if covered and not any(gaps.values()):
                 self._history_retry_at = None
                 self._history_status = {
                     **self._history_status,
