@@ -307,8 +307,8 @@ def project_reviewed_historical_charges(
     """Build a reversible reporting copy, never a persisted ledger update.
 
     Review must establish the same gross-charge basis, including any free
-    hours or EV discounts, for the exact original and estimated charge pair. An unreviewed date,
-    changed native value or absent commissioned ROI value is withheld.
+    hours or EV discounts, for the exact original and estimated charge pair.
+    An unreviewed date, changed value or absent commissioned ROI is withheld.
     Rebuild from the native rows on each invocation; never chain projections.
     """
     projected = {
@@ -376,6 +376,7 @@ def project_historical_reporting_totals(lifetime, periods, audit):
     Preserve existing coverage metadata, counterfactuals and reward amounts.
     The caller must supply native, not previously projected, totals.
     """
+
     def adjustments(start, end):
         imported = exported = 0.0
         for day_text, fields in audit.get("applied", {}).items():
@@ -413,7 +414,9 @@ def project_historical_reporting_totals(lifetime, periods, audit):
     }
 
 
-def historical_reporting_what_if(daily_records, preview, lifetime, periods):
+def historical_reporting_what_if(
+    daily_records, preview, lifetime, periods, *, reward_audit=None
+):
     """Quantify the gross-charge scenario without authorising any correction."""
     pairs = {}
     for field in ("import_cost_pence", "export_income_pence"):
@@ -434,6 +437,11 @@ def historical_reporting_what_if(daily_records, preview, lifetime, periods):
     candidate_lifetime, candidate_periods = project_historical_reporting_totals(
         lifetime, periods, audit
     )
+    known_reward_dates = {
+        entry.get("date")
+        for entry in (reward_audit or {}).get("entries", [])
+        if entry.get("type") == "happy_hour"
+    }
     return {
         "scope": "hypothetical_gross_charge_reporting_only",
         "charge_basis_reviewed": False,
@@ -441,13 +449,16 @@ def historical_reporting_what_if(daily_records, preview, lifetime, periods):
         "supplier_settlement_verified": False,
         "ledger_write_authorised": False,
         "reward_overlap_resolved": False,
+        "known_happy_hour_import_overlap_dates": sorted(
+            known_reward_dates & pairs["import_cost_pence"].keys()
+        ),
+        "all_import_charge_bases_require_review": True,
+        "happy_hour_absence_does_not_prove_no_overlap": True,
         "hypothetical_daily_deltas": audit["applied"],
         "withheld_incomplete_native_values": audit["withheld"],
         "native_lifetime": lifetime.to_dict(),
         "hypothetical_lifetime": candidate_lifetime.to_dict(),
-        "native_periods": {
-            key: totals.to_dict() for key, totals in periods.items()
-        },
+        "native_periods": {key: totals.to_dict() for key, totals in periods.items()},
         "hypothetical_periods": {
             key: totals.to_dict() for key, totals in candidate_periods.items()
         },
