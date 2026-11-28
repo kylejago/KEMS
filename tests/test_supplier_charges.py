@@ -672,3 +672,48 @@ def test_charge_audit_distinguishes_csv_and_integration_estimated_intervals():
     assert result["complete_days_with_integration_estimates"] == 0
     assert result["difference_pence"] == 16.8
     assert audit["roi_or_ledger_write_authorised"] is False
+
+
+def test_happy_hour_exact_csv_charge_comparison_preserves_reward_receipt():
+    energy = SupplierIntervalLedger()
+    charges = SupplierChargeEvidence()
+    start = START + timedelta(hours=12)
+    end = start + timedelta(hours=1)
+    rows = [
+        _row(start, kwh=1.0, charge=35.8),
+        _row(start + timedelta(minutes=30), kwh=2.0, charge=13.2),
+    ]
+    audit = {
+        "entries": [
+            {
+                "type": "happy_hour",
+                "date": start.date().isoformat(),
+                "reward_key": "example",
+                "start": start.isoformat(),
+                "end": end.isoformat(),
+                "estimated_reward_pence": 80.0,
+            }
+        ],
+        "entries_omitted": 0,
+    }
+    energy.ingest(rows, source="octopus_csv", now=NOW)
+    charges.ingest(rows, source="octopus_integration", now=NOW)
+    result = charges.happy_hour_charge_comparison(energy, audit, now=NOW)
+    assert result["events"][0]["status"] == "awaiting_exact_csv_priced_intervals"
+    charges.ingest(rows[:1], source="octopus_csv", now=NOW)
+    result = charges.happy_hour_charge_comparison(energy, audit, now=NOW)
+    assert result["events"][0]["csv_estimated_import_charge_pence"] is None
+    charges.ingest(rows[1:], source="octopus_csv", now=NOW)
+    result = charges.happy_hour_charge_comparison(energy, audit, now=NOW)
+    event = result["events"][0]
+    assert event["csv_estimated_import_charge_pence"] == 49.0
+    assert event["csv_import_kwh"] == 3.0
+    assert event["charge_minus_credit_pence"] == -31.0
+    assert result["supplier_settlement_verified"] is False
+    assert result["reward_or_ledger_write_authorised"] is False
+    assert audit["entries"][0]["estimated_reward_pence"] == 80.0
+    charges.ingest(
+        [{**rows[1], "charge_pence": 14.0}], source="octopus_csv", now=NOW
+    )
+    result = charges.happy_hour_charge_comparison(energy, audit, now=NOW)
+    assert result["events"][0]["csv_estimated_import_charge_pence"] is None
