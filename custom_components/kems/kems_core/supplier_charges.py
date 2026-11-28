@@ -113,6 +113,71 @@ class SupplierChargeEvidence:
             ):
                 self.conflicts.add(tuple(key))
 
+    def happy_hour_charge_comparison(self, energy, reward_audit, *, now):
+        """Compare exact CSV-priced event windows to estimated reward receipts."""
+        events = []
+        for entry in reward_audit.get("entries", []):
+            if entry.get("type") != "happy_hour":
+                continue
+            start = _utc(entry.get("start"))
+            end = _utc(entry.get("end"))
+            receipt = _finite(entry.get("estimated_reward_pence"))
+            if (
+                start is None
+                or end is None
+                or end - start != timedelta(hours=1)
+                or end > now
+            ):
+                continue
+            result = {
+                "reward_key": entry.get("reward_key"),
+                "date": entry.get("date"),
+                "start": start.isoformat(),
+                "end": end.isoformat(),
+                "recorded_estimated_credit_pence": receipt,
+                "csv_estimated_import_charge_pence": None,
+                "csv_import_kwh": None,
+                "charge_minus_credit_pence": None,
+                "status": "awaiting_exact_csv_priced_intervals",
+            }
+            cursor = start
+            rows = []
+            while cursor < end:
+                key = ("electricity_import", cursor.isoformat())
+                csv_key = (*key, "octopus_csv")
+                row = self.rows.get(csv_key)
+                physical = energy.rows.get(key)
+                if (
+                    row is None
+                    or csv_key in self.conflicts
+                    or physical is None
+                    or key in energy.conflicts
+                    or _utc(row["end"]) != cursor + _HALF_HOUR
+                    or row["end"] != physical["end"]
+                    or abs(row["kwh"] - physical["kwh"]) > 0.000001
+                ):
+                    break
+                rows.append(row)
+                cursor += _HALF_HOUR
+            if cursor == end:
+                charge = round(sum(row["charge_pence"] for row in rows), 6)
+                result.update(
+                    csv_estimated_import_charge_pence=charge,
+                    csv_import_kwh=round(sum(row["kwh"] for row in rows), 6),
+                    charge_minus_credit_pence=(
+                        round(charge - receipt, 6) if receipt is not None else None
+                    ),
+                    status="estimated_charge_comparison_only",
+                )
+            events.append(result)
+        return {
+            "scope": "known_completed_happy_hour_csv_charge_comparison",
+            "events": events,
+            "itemised_reward_rows_omitted": reward_audit.get("entries_omitted", 0),
+            "supplier_settlement_verified": False,
+            "reward_or_ledger_write_authorised": False,
+        }
+
     def reconciliation(
         self,
         energy,
