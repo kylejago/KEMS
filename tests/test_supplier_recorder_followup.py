@@ -319,3 +319,68 @@ def test_failed_history_batch_retries_original_window_without_restart():
         assert queries[0] == queries[1]
 
     asyncio.run(exercise())
+
+
+def test_automatic_recovery_recovers_missing_meter_rows_even_if_priced_days_exist():
+    module = _load_recorder_module()
+    queries = []
+
+    class FakeHass:
+        async def async_add_executor_job(self, func, *args):
+            return func(*args)
+
+        def async_create_background_task(self, coroutine, _name):
+            return asyncio.create_task(coroutine)
+
+    async def exercise():
+        recorder = module.SupplierIntervalRecorder(FakeHass(), "test")
+        entities = {
+            "sensor.import_cost": "electricity_import",
+            "sensor.export_cost": "electricity_export",
+            "sensor.import_energy": "consumption:electricity_import",
+            "sensor.export_energy": "consumption:electricity_export",
+        }
+        start = NOW.replace(hour=0) - timedelta(days=4)
+        rows = []
+        for day in (start, start + timedelta(days=1)):
+            for kind in ("electricity_import", "electricity_export"):
+                for n in range(48):
+                    left = day + timedelta(minutes=30 * n)
+                    rows.append(
+                        {
+                            "kind": kind,
+                            "start": left.isoformat(),
+                            "end": (left + timedelta(minutes=30)).isoformat(),
+                            "kwh": 1.0,
+                            "charge_pence": 6.6,
+                        }
+                    )
+        recorder._ledger.ingest(rows[:96], source="octopus_integration", now=NOW)
+        recorder._charges.ingest(rows, source="octopus_integration", now=NOW)
+
+        async def read(mapped, left, right):
+            queries.append((mapped, left, right))
+            return [{"consumption_evidence": row} for row in rows[96:]]
+
+        recorder._recover_recorded_charges = read
+        await recorder._consume_recorded_charges(
+            NOW, entities, commissioning_date="2026-11-22"
+        )
+        assert recorder._history_task is not None
+        await recorder._history_task
+        assert await recorder._consume_recorded_charges(
+            NOW + timedelta(minutes=30), entities, commissioning_date="2026-11-22"
+        )
+        status = recorder.status["historical_charge_recovery"]
+        assert status["stop_reason"] == "all_retained_complete_days_priced"
+        assert status["last_batch_consumption_rows"] == 96
+        assert status["recent_missing_meter_days"] == {
+            "electricity_import": [],
+            "electricity_export": [],
+        }
+        assert len(queries) == 1
+        assert len(recorder._ledger.rows) == 192
+        assert len(recorder._charges.rows) == 192
+        assert recorder._history_task is None
+
+    asyncio.run(exercise())
