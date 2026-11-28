@@ -12,7 +12,7 @@ After normal current supplier and local CSV intake, stop scheduling Recorder bac
 
 ## Remaining acceptance
 
-- Confirm preview totals against local supplier file and full dated audit.
+- Confirm automatic preview totals against retained matched meter and price evidence; optional historical CSVs can corroborate but are not a recurring requirement.
 - Confirm no double application of Happy Hour / Intelligent EV-only credits and no counterfactual changes.
 - Implement and test one reversible reporting projection across the native period, ROI, canonical bill and WhatsApp consumers; do not silently alter the original ledger.
 - Archive-only legacy comparison polling is retired; preserve checkpoint and native Ohme polling. Do not remove residual configured control mappings or uninstall the third-party integration.
@@ -33,4 +33,10 @@ The dated audit distinguishes selected Octopus CSV charge intervals from integra
 
 Octopus documents Happy Hour as a normal usage charge followed by a separate account refund: https://octopus.energy/help-and-faqs/articles/when-do-i-get-weekend-happy-hour-refund/ . The upstream Home Assistant Octopus Energy integration documents that it cannot reliably adjust costs for extra Intelligent dispatches when planned dispatch data is unavailable, including Ohme: https://bottlecapdave.github.io/HomeAssistant-OctopusEnergy/faq/ and https://bottlecapdave.github.io/HomeAssistant-OctopusEnergy/entities/electricity/ . Therefore integration-only estimated import charges must not automatically replace native amounts. A CSV-backed day also requires confirmation of its gross-charge basis and applicable tariff treatment before any reporting approval. Keep separate reward ledgers intact. No approval is inferred from source type or from a missing reward row.
 
-The hypothetical reporting projection is implemented and exercised in tests; it is not a publication of corrected live values. Final live financial activation and release identity remain held pending reviewed evidence and the overnight control acceptance.
+The hypothetical reporting projection is implemented and exercised in tests; it is not a publication of corrected live values. Final live financial activation remains held for unverified charge bases. Release identity and publication remain subject to the overnight control acceptance and final CI, not to recurring CSV uploads.
+
+## Autonomous operation requirement
+
+Normal operation must not depend on manually supplied CSV exports, statements, local bootstrap files or a ChatGPT session. The existing 30-minute supplier observation and persistent interval store remain the primary intake; Recorder recovery fills eligible retained gaps. Exact Happy Hour charge comparisons now work with matching automatic integration charges alone. Optional CSV observations are separate corroboration, not a gate; disagreements are reported instead of silently selecting a correction. Incomplete or unavailable automatic evidence remains pending, and estimates never become supplier-settled by inference.
+
+The automatic comparison is reporting-only. A future automatic adjustment must use the same gross charge and reward basis and a single canonical publication path for actual ROI, dashboard and WhatsApp. Until then preserve native operational estimates, existing credits and separate provenance. A supplier settlement feed is not currently implemented; lack of settlement evidence is an accounting status, not a reason to require recurring uploads or interrupt energy management.
