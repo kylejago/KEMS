@@ -188,7 +188,9 @@ class SupplierChargeEvidence:
                         else None
                     ),
                     comparison_source=(
-                        "octopus_integration" if automatic is not None else "octopus_csv"
+                        "octopus_integration"
+                        if automatic is not None
+                        else "octopus_csv"
                     ),
                     status="estimated_charge_comparison_only",
                 )
