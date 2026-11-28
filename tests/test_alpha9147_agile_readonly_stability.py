@@ -181,7 +181,7 @@ def test_release_scope_preserves_control_safety() -> None:
         Path(__file__).resolve().parents[1]
         / "docs/archived-release-notes-through-alpha9244.md"
     ).read_text(encoding="utf-8")
-    assert manifest["version"] == "0.9.0-alpha9.265"
+    assert manifest["version"] == "0.9.0-alpha9.266"
     assert "Alpha9.147" in bundle["maintenance"]["reason"]
     coordinator = (KEMS / "coordinator.py").read_text()
     assert "guard_paid_agile_physical_export(" in coordinator

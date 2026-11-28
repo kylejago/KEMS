@@ -369,6 +369,65 @@ def _balanced_overnight_site_demand(
     return max(supply, house)
 
 
+def _charging_overnight_hold_bound(
+    snapshot: Snapshot,
+    control: ControlState,
+    config: ControlConfig,
+    house: float,
+    ev: float,
+    grid: float,
+) -> float | None:
+    """Suspend existing charge on a bounded CT-only hold, not new charge.
+
+    FoxESS may not report an unchanged negative battery power at the same
+    instant as its load and CT. Only accept this fallback for a recent
+    charging reading, independently fresh aligned CT/load, and a consistent
+    night-time balance. Use the entire measured CT import as the conservative
+    bound; never infer a new charging setpoint or relax the discharge proof.
+    """
+    battery = snapshot.battery_power_kw
+    limit = config.site_import_limit_kw
+    if (
+        snapshot.off_peak is not True
+        or "off_peak" in snapshot.tariff_stale_fields
+        or snapshot.ev_load_in_house_load is not None
+        or snapshot.solar_power_kw != 0.0
+        or snapshot.grid_export_kw != 0.0
+        or battery is None
+        or not isfinite(battery)
+        or battery >= -0.001
+        or limit is None
+        or not isfinite(limit)
+        or grid + _EV_CHEAP_GRID_IMPORT_RESERVE_KW > limit
+        or not control.data_fresh
+        or not config.control_enabled
+        or not config.commissioned
+        or control.eps_critical
+        or control.desired_grid_export_allowed
+        or control.desired_battery_export_power_kw > 0.001
+        or control.operating_reason == "agile_rolling_happy_hour_charge"
+        or {"solar_power_kw", "grid_export_kw", "battery_power_kw"}
+        & set(snapshot.stale_fields)
+        or not ev <= house <= grid
+        or abs(grid + battery - house) > 0.5
+    ):
+        return None
+    ages = snapshot.source_age_seconds
+    ct = ages.get("grid_import_kw")
+    load = ages.get("house_load_kw")
+    bat = ages.get("battery_power_kw")
+    if any(age is None or not isfinite(age) or not 0 <= age <= 30 for age in (ct, load)):
+        return None
+    if (
+        abs(ct - load) > 5
+        or bat is None
+        or not isfinite(bat)
+        or not 0 <= bat <= min(config.stale_data_seconds, 90.0)
+    ):
+        return None
+    return grid
+
+
 def protect_fixed_overnight_grid_supply(
     snapshot: Snapshot, control: ControlState, config: ControlConfig
 ) -> ControlState:
@@ -593,6 +652,15 @@ def protect_live_cheap_ev(
         if conservative_demand > limit and not observed_over_limit
         else None
     )
+    charging_hold_bound = (
+        _charging_overnight_hold_bound(snapshot, control, config, house, ev, grid)
+        if conservative_demand > limit
+        and not observed_over_limit
+        and balanced_hold_demand is None
+        else None
+    )
+    if charging_hold_bound is not None:
+        balanced_hold_demand = charging_hold_bound
     if (
         balanced_hold_demand is not None
         and balanced_hold_demand + _EV_CHEAP_GRID_IMPORT_RESERVE_KW <= limit
@@ -658,10 +726,16 @@ def protect_live_cheap_ev(
             "physical MinSOC protects the shared home/EV bus, not "
             "independent house-only battery output control."
             + (
-                " Corroborated overnight CT/battery balance: suspend charge "
-                "without releasing the battery hold while EV scope is uncertain."
-                if balanced_hold_demand is not None
-                else ""
+                " Overnight CT-only no-charge hold: recent charging report "
+                "is asynchronous; keep the entire measured CT import as the "
+                "bound without assuming EV load membership."
+                if charging_hold_bound is not None
+                else (
+                    " Corroborated overnight CT/battery balance: suspend charge "
+                    "without releasing the battery hold while EV scope is uncertain."
+                    if balanced_hold_demand is not None
+                    else ""
+                )
             )
         ),
     )
