@@ -699,10 +699,14 @@ def test_happy_hour_exact_csv_charge_comparison_preserves_reward_receipt():
     energy.ingest(rows, source="octopus_csv", now=NOW)
     charges.ingest(rows, source="octopus_integration", now=NOW)
     result = charges.happy_hour_charge_comparison(energy, audit, now=NOW)
-    assert result["events"][0]["status"] == "awaiting_exact_csv_priced_intervals"
+    assert result["events"][0]["status"] == "estimated_charge_comparison_only"
+    assert result["events"][0]["comparison_source"] == "octopus_integration"
+    assert result["events"][0]["charge_minus_credit_pence"] == -31.0
+    assert result["manual_csv_required"] is False
     charges.ingest(rows[:1], source="octopus_csv", now=NOW)
     result = charges.happy_hour_charge_comparison(energy, audit, now=NOW)
     assert result["events"][0]["csv_estimated_import_charge_pence"] is None
+    assert result["events"][0]["comparison_source"] == "octopus_integration"
     charges.ingest(rows[1:], source="octopus_csv", now=NOW)
     result = charges.happy_hour_charge_comparison(energy, audit, now=NOW)
     event = result["events"][0]
@@ -717,3 +721,41 @@ def test_happy_hour_exact_csv_charge_comparison_preserves_reward_receipt():
     )
     result = charges.happy_hour_charge_comparison(energy, audit, now=NOW)
     assert result["events"][0]["csv_estimated_import_charge_pence"] is None
+
+
+def test_happy_hour_automatic_comparison_does_not_need_csv_or_guess_missing_rows():
+    energy = SupplierIntervalLedger()
+    charges = SupplierChargeEvidence()
+    start = START + timedelta(hours=12)
+    end = start + timedelta(hours=1)
+    rows = [_row(start), _row(start + timedelta(minutes=30))]
+    audit = {
+        "entries": [
+            {
+                "type": "happy_hour",
+                "start": start.isoformat(),
+                "end": end.isoformat(),
+                "estimated_reward_pence": 15.0,
+            }
+        ]
+    }
+    energy.ingest(rows, source="octopus_integration", now=NOW)
+    charges.ingest(rows[:1], source="octopus_integration", now=NOW)
+    result = charges.happy_hour_charge_comparison(energy, audit, now=NOW)
+    assert result["events"][0]["status"] == "awaiting_exact_priced_intervals"
+    charges.ingest(rows[1:], source="octopus_integration", now=NOW)
+    result = charges.happy_hour_charge_comparison(energy, audit, now=NOW)
+    assert result["events"][0]["charge_minus_credit_pence"] == -1.8
+    assert result["events"][0]["optional_csv_estimate"] is None
+    restored = SupplierChargeEvidence()
+    restored.restore(charges.dump(), now=NOW)
+    assert restored.happy_hour_charge_comparison(energy, audit, now=NOW) == result
+    charges.ingest(
+        [{**rows[0], "charge_pence": 7.6}, rows[1]],
+        source="octopus_csv",
+        now=NOW,
+    )
+    result = charges.happy_hour_charge_comparison(energy, audit, now=NOW)
+    assert result["events"][0]["status"] == "source_estimates_disagree"
+    assert result["events"][0]["charge_minus_credit_pence"] is None
+    assert result["reward_or_ledger_write_authorised"] is False
