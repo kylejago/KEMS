@@ -10,6 +10,7 @@ from kems_core.supplier_charges import (
     completed_power_down_estimate,
     historical_charge_adjustment_preview,
     merge_completed_baseline,
+    project_reviewed_historical_charges,
     supplier_cost_rows,
 )
 from kems_core.supplier_intervals import SupplierIntervalLedger
@@ -416,3 +417,83 @@ def test_full_dated_adjustment_preview_excludes_missing_native_cost():
         include_daily_audit=True,
     )
     assert historical_charge_adjustment_preview(audit)["days"] == {}
+
+
+def test_reviewed_charge_projection_preserves_native_and_reward_rows():
+    day = "2026-11-25"
+    native = {
+        day: {
+            "import_cost_pence": 300.0,
+            "export_income_pence": 320.0,
+            "actual_avoided_import_value_pence": 100.0,
+            "actual_system_value_pence": 420.0,
+            "simulated_import_cost_pence": 200.0,
+            "happy_hour_estimated_credit_pence": 70.0,
+        }
+    }
+    preview = {
+        "days": {
+            day: {
+                "import_cost_pence": {
+                    "recorded_pence": 300.0,
+                    "supplier_estimate_pence": 316.8,
+                },
+                "export_income_pence": {
+                    "recorded_pence": 320.0,
+                    "supplier_estimate_pence": 316.8,
+                },
+            }
+        }
+    }
+    copy, audit = project_reviewed_historical_charges(native, preview)
+    assert copy == native
+    assert not audit["applied"]
+    assert audit["withheld"][day]["import_cost_pence"] == "charge_basis_not_reviewed"
+    copy, audit = project_reviewed_historical_charges(
+        native, preview, reviewed_export_days=frozenset({day})
+    )
+    assert copy[day]["import_cost_pence"] == 300.0
+    assert copy[day]["actual_system_value_pence"] == 416.8
+    reviewed = dict(
+        reviewed_import_days=frozenset({day}),
+        reviewed_export_days=frozenset({day}),
+    )
+    copy, audit = project_reviewed_historical_charges(native, preview, **reviewed)
+    assert copy[day]["actual_avoided_import_value_pence"] == 83.2
+    assert copy[day]["actual_system_value_pence"] == 400.0
+    assert copy[day]["happy_hour_estimated_credit_pence"] == 70.0
+    assert copy[day]["simulated_import_cost_pence"] == 200.0
+    assert native[day]["actual_system_value_pence"] == 420.0
+    assert audit["ledger_write_authorised"] is False
+    assert project_reviewed_historical_charges(native, preview, **reviewed) == (
+        copy,
+        audit,
+    )
+    repeated, audit = project_reviewed_historical_charges(copy, preview, **reviewed)
+    assert repeated == copy
+    assert not audit["applied"]
+    assert audit["withheld"][day]["import_cost_pence"] == (
+        "native_charge_changed_since_review"
+    )
+
+
+def test_reviewed_projection_withholds_missing_commissioned_value():
+    day = "2026-11-25"
+    native = {day: {"import_cost_pence": 100.0}}
+    preview = {
+        "days": {
+            day: {
+                "import_cost_pence": {
+                    "recorded_pence": 100.0,
+                    "supplier_estimate_pence": 110.0,
+                }
+            }
+        }
+    }
+    copy, audit = project_reviewed_historical_charges(
+        native, preview, reviewed_import_days=frozenset({day})
+    )
+    assert copy == native
+    assert audit["withheld"][day]["import_cost_pence"] == (
+        "commissioned_roi_values_missing"
+    )
