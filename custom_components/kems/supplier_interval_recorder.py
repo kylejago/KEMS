@@ -460,6 +460,7 @@ class SupplierIntervalRecorder:
             # Do not stop simply because every *retained* day has prices.
             # Check recent missing meter days after the first complete day,
             # allowing three calendar days for normal upstream publication.
+
             def recent_missing_meter_days():
                 last_expected = now.astimezone(_LONDON).date() - timedelta(days=3)
                 first_expected = last_expected - timedelta(days=6)
@@ -498,6 +499,7 @@ class SupplierIntervalRecorder:
             self._history_anchor = now
             self._history_batches = 0
             self._history_candidate_rows = 0
+            self._history_consumption_rows = 0
             self._history_empty_batches = 0
             self._history_baseline_rows = 0
             self._history_changed = False
@@ -513,6 +515,7 @@ class SupplierIntervalRecorder:
                 self._history_anchor = now
                 self._history_batches = 0
                 self._history_candidate_rows = 0
+                self._history_consumption_rows = 0
                 self._history_empty_batches = 0
                 self._history_baseline_rows = 0
                 self._history_changed = False
