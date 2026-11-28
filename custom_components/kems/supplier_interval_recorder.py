@@ -482,7 +482,9 @@ class SupplierIntervalRecorder:
                 self._history_retry_at = now + _HISTORY_FAILURE_RETRY
                 return False
         if not entities:
+            self._history_entities = {}
             self._history_coverage = {}
+            self._history_retry_at = None
             self._history_status = {"status": "unmapped"}
             return changed
         # Resolve a new meter mapping with a fresh cursor. Existing evidence
