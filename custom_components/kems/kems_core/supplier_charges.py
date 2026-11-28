@@ -129,6 +129,7 @@ class SupplierChargeEvidence:
             commissioned = None
         today = now.astimezone(_LONDON).date()
         grouped: dict[tuple[str, date], list[float]] = defaultdict(list)
+        csv_counts: dict[tuple[str, date], int] = defaultdict(int)
         invalid = 0
         overlapping = defaultdict(list)
         for key, row in self.rows.items():
@@ -157,6 +158,8 @@ class SupplierChargeEvidence:
             )
             day = datetime.fromisoformat(key[1]).astimezone(_LONDON).date()
             grouped[(key[0], day)].append(selected["charge_pence"])
+            if selected["source"] == "octopus_csv":
+                csv_counts[(key[0], day)] += 1
         result = {}
         for kind, field in (
             ("electricity_import", "import_cost_pence"),
@@ -188,6 +191,10 @@ class SupplierChargeEvidence:
                     {
                         "date": day.isoformat(),
                         "supplier_estimate_pence": value,
+                        "csv_priced_intervals": csv_counts[(kind, day)],
+                        "integration_estimated_intervals": (
+                            expected - csv_counts[(kind, day)]
+                        ),
                         "recorded_pence": recorded,
                         "supplier_minus_recorded_pence": (
                             round(value - recorded, 6) if recorded is not None else None
@@ -216,6 +223,14 @@ class SupplierChargeEvidence:
                 "complete_priced_post_commissioning_days": len(comparisons),
                 "excluded_before_or_unknown_commissioning_days": before_commissioning,
                 "comparable_days": len(matched),
+                "complete_csv_priced_days": sum(
+                    row["integration_estimated_intervals"] == 0
+                    for row in comparisons
+                ),
+                "complete_days_with_integration_estimates": sum(
+                    row["integration_estimated_intervals"] > 0
+                    for row in comparisons
+                ),
                 "supplier_estimate_on_comparable_days_pence": (
                     round(sum(row["supplier_estimate_pence"] for row in matched), 6)
                     if matched
@@ -275,6 +290,10 @@ def historical_charge_adjustment_preview(reconciliation: Mapping[str, Any]) -> d
                 "recorded_pence": original,
                 "supplier_estimate_pence": proposed,
                 "proposed_delta_pence": round(proposed - original, 6),
+                "csv_priced_intervals": row.get("csv_priced_intervals"),
+                "integration_estimated_intervals": row.get(
+                    "integration_estimated_intervals"
+                ),
             }
     import_delta = 0.0
     export_delta = 0.0
