@@ -435,11 +435,15 @@ def historical_reporting_what_if(
     candidate_lifetime, candidate_periods = project_historical_reporting_totals(
         lifetime, periods, audit
     )
+    rewards = reward_audit or {}
     known_reward_dates = {
         entry.get("date")
-        for entry in (reward_audit or {}).get("entries", [])
+        for entry in rewards.get("entries", [])
         if entry.get("type") == "happy_hour"
     }
+    known_reward_dates.update(
+        rewards.get("historical_coverage", {}).get("known_happy_hour_dates", [])
+    )
     return {
         "scope": "hypothetical_gross_charge_reporting_only",
         "charge_basis_reviewed": False,
