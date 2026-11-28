@@ -20,6 +20,7 @@ from .kems_core.supplier_charges import (
     capture_completed_baseline,
     capture_joined_baseline,
     completed_power_down_estimate,
+    historical_charge_adjustment_preview,
     merge_completed_baseline,
     recover_historical_baselines,
     supplier_cost_rows,
@@ -97,13 +98,20 @@ class SupplierIntervalRecorder:
     def financial_reconciliation(
         self, daily_records, *, now, commissioning_date, include_daily_audit=False
     ):
-        return self._charges.reconciliation(
+        result = self._charges.reconciliation(
             self._ledger,
             daily_records,
             now=now,
             commissioning_date=commissioning_date,
             include_daily_audit=include_daily_audit,
         )
+        if include_daily_audit:
+            result["historical_adjustment_preview"] = (
+                historical_charge_adjustment_preview(result)
+            )
+            for item in result["kinds"].values():
+                item.pop("daily_charge_audit", None)
+        return result
 
     @property
     def late_power_down_evidence(self):
@@ -363,10 +371,11 @@ class SupplierIntervalRecorder:
             self._history_status = {"status": "not_attempted"}
         # Re-evaluate after current provider and CSV intake. A completed
         # search is not a permanent assertion about future charge coverage.
-        if commissioning_date is not None and set(entities.values()) == {
-            "electricity_import",
-            "electricity_export",
-        }:
+        if (
+            commissioning_date is not None
+            and len(entities) == 2
+            and set(entities.values()) == {"electricity_import", "electricity_export"}
+        ):
             coverage = await self._hass.async_add_executor_job(
                 lambda: self._charges.reconciliation(
                     self._ledger, {}, now=now, commissioning_date=commissioning_date
@@ -385,7 +394,9 @@ class SupplierIntervalRecorder:
                     "supplier_settlement_verified": False,
                 }
                 return changed
-        if self._history_status.get("stop_reason") == "all_retained_complete_days_priced":
+        if (
+            self._history_status.get("stop_reason") == "all_retained_complete_days_priced"
+        ):
             # A later incomplete price day, conflict or changed scope must
             # allow a new bounded search instead of retaining the old stop.
             self._history_anchor = now
