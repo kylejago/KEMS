@@ -1,3 +1,9 @@
+## 0.9.0-alpha9.268
+
+- Automatically retain and recover independently mapped supplier electricity meter and estimated cost observations, retry failed or exhausted Recorder recovery, and detect recent missing meter days without manual CSV uploads.
+- Add dated historical charge reconciliation, source provenance, a reversible exact-value review gate, shared lifetime/period what-if and automatic Happy Hour charge comparisons; preserve native accounting, separate rewards and unverified settlement status. Optional CSVs remain historical corroboration only.
+- Retire read-only legacy Intelligent parity polling while preserving archived evidence, native Ohme polling and configured control mappings. No new physical control authority or automatic unverified financial corrections. Supplier-confirmed settlement retrieval remains outstanding.
+
 ## 0.9.0-alpha9.267
 
 - Separate confirmed regular overnight grid supply from the EV session latch. Keep 100% on-grid MinSOC when the safe plan suspends charging; use bounded physical replacement import for uncertain EV membership, with true import-limit veto.

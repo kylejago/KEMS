@@ -301,9 +301,7 @@ def test_failed_history_batch_retries_original_window_without_restart():
             await recorder._history_task
         except RuntimeError:
             pass
-        await recorder._consume_recorded_charges(
-            NOW + timedelta(minutes=30), entities
-        )
+        await recorder._consume_recorded_charges(NOW + timedelta(minutes=30), entities)
         status = recorder.status["historical_charge_recovery"]
         assert status["stop_reason"] == "query_failed"
         assert status["manual_csv_required"] is False
