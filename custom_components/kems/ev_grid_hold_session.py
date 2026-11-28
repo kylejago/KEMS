@@ -114,6 +114,7 @@ class EVGridHoldSession:
         source_uncertain: bool = False,
         source_grace_seconds: int = 90,
         ohme_finished: bool = False,
+        verified_overnight_hold: bool = False,
     ) -> Any:
         """Apply reviewed guard and preserve only a bounded uncertain-source hold."""
         now = snapshot.timestamp
@@ -244,6 +245,7 @@ class EVGridHoldSession:
             config,
             no_paid_export_mode=no_paid_export_mode,
             held_floor_percent=self._held_floor,
+            verified_overnight_hold=verified_overnight_hold,
         )
         self._last_status = guarded.ev_grid_guard_status
         if guarded.ev_grid_guard_status in {

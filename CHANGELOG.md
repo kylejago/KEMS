@@ -1,3 +1,8 @@
+## 0.9.0-alpha9.266
+
+- Prevent the confirmed overnight EV hold from releasing on the November 28 asynchronous battery-charging report when EV load membership is uncertain. A fresh aligned CT/load and a bounded recent charging reading support only suspending charging, using full measured CT import as the conservative bound.
+- Retain the 100% regular cheap-window MinSOC hold, actual import-limit veto, unrelated safety gates, and strict discharge evidence. No daytime EV-only routing or financial changes.
+
 ## 0.9.0-alpha9.265
 
 - Reconcile explicit historical Power Down awards from a private local account-history reference by exact session window; replace estimates, retain confirmed points and discover missing financial-only events without assuming physical success.

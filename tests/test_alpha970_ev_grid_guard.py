@@ -71,12 +71,20 @@ def _config(**updates) -> ControlConfig:
     return ControlConfig(**data)
 
 
-def _guard(snapshot=None, plan=None, config=None, *, no_paid_export_mode=True):
+def _guard(
+    snapshot=None,
+    plan=None,
+    config=None,
+    *,
+    no_paid_export_mode=True,
+    verified_overnight_hold=False,
+):
     return protect_live_cheap_ev(
         snapshot or _snap(),
         plan or _plan(),
         config or _config(),
         no_paid_export_mode=no_paid_export_mode,
+        verified_overnight_hold=verified_overnight_hold,
     )
 
 
@@ -469,3 +477,120 @@ def test_unknown_scope_can_suspend_an_existing_charge_without_releasing():
     assert state.desired_charge_power_kw == 0.0
     assert state.desired_min_soc_percent == 100.0
     assert state.total_site_import_kw == 8.689
+
+
+def _november_28_snapshot(**updates):
+    data = dict(
+        ev_power_kw=7.224,
+        ev_load_in_house_load=None,
+        house_load_kw=10.732,
+        grid_import_kw=12.719,
+        battery_power_kw=-2.093,
+        grid_export_kw=0.0,
+        battery_soc=17.0,
+        source_data_age_seconds=54.6,
+        source_age_seconds={
+            "house_load_kw": 4.6,
+            "battery_power_kw": 54.6,
+            "grid_import_kw": 4.6,
+        },
+    )
+    data.update(updates)
+    return _snap(**data)
+
+
+def test_november_28_delayed_charging_report_does_not_release_overnight_hold():
+    snapshot = _november_28_snapshot()
+    plan = _plan(grid_bypass_power_kw=10.732)
+    state = protect_fixed_overnight_grid_supply(
+        snapshot, _guard(snapshot, plan, verified_overnight_hold=True), _config()
+    )
+    assert state.plan_safe
+    assert not state.site_import_limit_exceeded
+    assert state.desired_work_mode == "Self Use"
+    assert state.desired_charge_power_kw == 0.0
+    assert state.desired_min_soc_percent == 100.0
+    assert state.total_site_import_kw == 12.719
+    assert state.desired_total_discharge_power_kw == 0.0
+    assert "CT-only no-charge hold" in state.next_action
+    decision = assess_foxess_control_write_authority(
+        state,
+        technical_ready=True,
+        binding_ready=True,
+        reviewed_version_matches=True,
+        no_paid_export_mode=False,
+        cheap_period_confirmed=True,
+        user_commissioned=True,
+        master_control_enabled=True,
+        emergency_stop=False,
+    )
+    assert decision.commands_permitted
+    assert decision.action == "self_use"
+    assert decision.min_soc_on_grid_percent == 100.0
+
+
+@pytest.mark.parametrize(
+    "updates",
+    [
+        {"grid_import_kw": 14.8},
+        {"battery_power_kw": 2.093},
+        {"battery_power_kw": -0.1},
+        {"ev_load_in_house_load": False},
+        {
+            "source_age_seconds": {
+                "house_load_kw": 4.6,
+                "battery_power_kw": 91.0,
+                "grid_import_kw": 4.6,
+            }
+        },
+        {
+            "source_age_seconds": {
+                "house_load_kw": 15.0,
+                "battery_power_kw": 54.6,
+                "grid_import_kw": 4.6,
+            }
+        },
+        {"tariff_stale_fields": ("off_peak",)},
+    ],
+)
+def test_delayed_charge_hold_does_not_waive_real_or_unverified_overload(updates):
+    state = _guard(
+        _november_28_snapshot(**updates),
+        _plan(grid_bypass_power_kw=10.732),
+        verified_overnight_hold=True,
+    )
+    assert not state.plan_safe
+    assert state.desired_charge_power_kw == 0.0
+
+
+def test_delayed_charge_hold_does_not_waive_unrelated_failure():
+    state = _guard(
+        _november_28_snapshot(),
+        _plan(
+            grid_bypass_power_kw=10.732,
+            plan_safe=False,
+            blocked_reason="Other safety gate failed",
+        ),
+        verified_overnight_hold=True,
+    )
+    assert not state.plan_safe
+
+
+def test_confirmed_scope_resumes_capped_charge_after_delayed_report():
+    snapshot = _november_28_snapshot(ev_load_in_house_load=True)
+    state = protect_fixed_overnight_grid_supply(
+        snapshot, _guard(snapshot, _plan(grid_bypass_power_kw=10.732)), _config()
+    )
+    assert state.plan_safe
+    assert state.desired_work_mode == "Force Charge"
+    assert state.desired_charge_power_kw == 3.018
+    assert state.desired_min_soc_percent == 100.0
+
+
+def test_delayed_charge_report_cannot_establish_new_unverified_hold():
+    state = _guard(
+        _november_28_snapshot(),
+        _plan(grid_bypass_power_kw=10.732),
+    )
+    assert not state.plan_safe
+    assert state.desired_charge_power_kw == 0.0
