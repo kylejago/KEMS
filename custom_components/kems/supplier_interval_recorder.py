@@ -39,6 +39,8 @@ _REFRESH = timedelta(minutes=30)
 _BASELINE_REFRESH = timedelta(seconds=60)
 _HISTORY_BATCH_DAYS = 7
 _HISTORY_MAX_BATCHES = 12
+_HISTORY_FAILURE_RETRY = timedelta(hours=1)
+_HISTORY_EXHAUSTED_RETRY = timedelta(days=7)
 _FILE_NAME = "kems_supplier_intervals.json"
 _GAS_REFERENCE_FILE = "kems_gas_daily_reference.json"
 _GAS_CSV_FILE = "kems_supplier_gas_intervals.json"
@@ -79,13 +81,22 @@ class SupplierIntervalRecorder:
         self._next_baseline_at: datetime | None = None
         self._baseline_status: dict[str, Any] = {}
         self._history_status = {"status": "not_attempted"}
+        self._history_retry_at: datetime | None = None
         self._status: dict[str, Any] = {"status": "not_loaded"}
 
     @property
     def status(self) -> dict[str, Any]:
         return {
             **self._status,
-            "historical_charge_recovery": dict(self._history_status),
+            "historical_charge_recovery": {
+                **self._history_status,
+                "next_retry_at": (
+                    self._history_retry_at.isoformat()
+                    if self._history_retry_at is not None
+                    else None
+                ),
+                "manual_csv_required": False,
+            },
             "power_down_baseline_capture": dict(self._baseline_status),
         }
 
@@ -353,6 +364,7 @@ class SupplierIntervalRecorder:
                 # history. Scan the full bounded horizon, never beyond it.
                 if self._history_batches >= _HISTORY_MAX_BATCHES:
                     self._history_status["stop_reason"] = "batch_limit"
+                    self._history_retry_at = now + _HISTORY_EXHAUSTED_RETRY
             except Exception as err:
                 self._history_status = {
                     **self._history_status,
@@ -360,6 +372,7 @@ class SupplierIntervalRecorder:
                     "error_type": type(err).__name__,
                     "stop_reason": "query_failed",
                 }
+                self._history_retry_at = now + _HISTORY_FAILURE_RETRY
                 return False
         if not entities:
             return changed
@@ -374,6 +387,7 @@ class SupplierIntervalRecorder:
             self._history_baseline_rows = 0
             self._history_changed = False
             self._history_status = {"status": "not_attempted"}
+            self._history_retry_at = None
         # Re-evaluate after current provider and CSV intake. A completed
         # search is not a permanent assertion about future charge coverage.
         if (
@@ -392,6 +406,7 @@ class SupplierIntervalRecorder:
                 for item in coverage["kinds"].values()
             )
             if covered:
+                self._history_retry_at = None
                 self._history_status = {
                     **self._history_status,
                     "status": "complete_retained_price_coverage",
@@ -412,6 +427,22 @@ class SupplierIntervalRecorder:
             self._history_baseline_rows = 0
             self._history_changed = False
             self._history_status = {"status": "not_attempted"}
+            self._history_retry_at = None
+        if self._history_retry_at is not None and now >= self._history_retry_at:
+            if self._history_status.get("stop_reason") == "query_failed":
+                # Retry the failed batch at the original cursor after backoff.
+                self._history_status.pop("stop_reason", None)
+                self._history_status.pop("error_type", None)
+            elif self._history_status.get("stop_reason") == "batch_limit":
+                # Periodic bounded retry for evidence published late upstream.
+                self._history_anchor = now
+                self._history_batches = 0
+                self._history_candidate_rows = 0
+                self._history_empty_batches = 0
+                self._history_baseline_rows = 0
+                self._history_changed = False
+                self._history_status = {"status": "not_attempted"}
+            self._history_retry_at = None
         if self._history_batches >= _HISTORY_MAX_BATCHES or self._history_status.get(
             "stop_reason"
         ):
