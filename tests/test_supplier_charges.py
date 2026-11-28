@@ -563,7 +563,17 @@ def test_hypothetical_reporting_uses_same_delta_for_roi_bill_and_periods():
         ),
         "today": PeriodTotals(start_date=NOW.date(), end_date=NOW.date()),
     }
-    result = historical_reporting_what_if(native, preview, lifetime, periods)
+    reward_audit = {
+        "entries": [
+            {"date": day, "type": "happy_hour"},
+            {"date": "2026-11-24", "type": "power_down"},
+        ]
+    }
+    result = historical_reporting_what_if(
+        native, preview, lifetime, periods, reward_audit=reward_audit
+    )
+    assert result["known_happy_hour_import_overlap_dates"] == [day]
+    assert result["all_import_charge_bases_require_review"] is True
     assert result["live_reporting_authorised"] is False
     assert result["reward_overlap_resolved"] is False
     assert result["hypothetical_lifetime"]["actual_system_value_pence"] == 980.0
@@ -575,4 +585,9 @@ def test_hypothetical_reporting_uses_same_delta_for_roi_bill_and_periods():
     assert result["hypothetical_periods"]["today"] == periods["today"].to_dict()
     assert lifetime.actual_system_value_pence == 1000.0
     assert native[day]["import_cost_pence"] == 300.0
-    assert historical_reporting_what_if(native, preview, lifetime, periods) == result
+    assert (
+        historical_reporting_what_if(
+            native, preview, lifetime, periods, reward_audit=reward_audit
+        )
+        == result
+    )
