@@ -72,6 +72,9 @@ class SupplierIntervalRecorder:
         self._next_at: datetime | None = None
         self._dirty = False
         self._history_task = None
+        self._history_task_obsolete = False
+        self._history_discarded_batches = 0
+        self._history_coverage: dict[str, Any] = {}
         self._history_anchor: datetime | None = None
         self._history_entities: dict[str, str] = {}
         self._history_batches = 0
@@ -98,8 +101,52 @@ class SupplierIntervalRecorder:
                     else None
                 ),
                 "manual_csv_required": False,
+                "discarded_mapping_batches": self._history_discarded_batches,
+                **self._history_coverage,
             },
             "power_down_baseline_capture": dict(self._baseline_status),
+        }
+
+    def financial_recovery_summary(self, reward_audit):
+        """Bounded cached reporting state; no extra supplier query or ledger write."""
+        recovery = self._history_status
+        coverage = self._history_coverage
+        missing_meter = coverage.get("missing_meter_days", {})
+        missing_price = coverage.get("missing_priced_days", {})
+        conflicts = coverage.get("unmatched_or_conflicted_intervals")
+        if self._status.get("status") == "load_failed":
+            state = "unavailable"
+        elif self._history_task_obsolete:
+            state = "mapping_changed"
+        elif conflicts:
+            state = "conflicting_or_unmatched_evidence"
+        elif recovery.get("stop_reason") == "all_retained_complete_days_priced":
+            state = "retained_estimates_complete"
+        else:
+            state = "recovery_pending"
+        return {
+            "state": state,
+            "recovery_status": recovery.get("status"),
+            "stop_reason": recovery.get("stop_reason"),
+            "missing_meter_day_counts": {
+                kind: len(days) for kind, days in missing_meter.items()
+            },
+            "missing_priced_day_counts": dict(missing_price),
+            "unmatched_or_conflicted_intervals": conflicts,
+            "complete_meter_day_counts": dict(coverage.get("complete_energy_days", {})),
+            "automatic_charge_source_status": dict(
+                self._status.get("automatic_charge_source_status", {})
+            ),
+            "next_retry_at": (
+                self._history_retry_at.isoformat()
+                if self._history_retry_at is not None
+                else None
+            ),
+            "pending_reward_count": reward_audit.get("pending_count"),
+            "unsettled_reward_pence": reward_audit.get("unsettled_total_pence"),
+            "manual_csv_required": False,
+            "supplier_settlement_verified": False,
+            "live_financial_adjustment_authorised": False,
         }
 
     def electricity_reconciliation(self, daily_records, *, now):
@@ -344,8 +391,22 @@ class SupplierIntervalRecorder:
         """Read at most one seven-day batch per normal supplier scan."""
         changed = False
         if self._history_task is not None:
+            if dict(entities) != self._history_entities:
+                self._history_task_obsolete = True
+                self._history_coverage = {}
             if not self._history_task.done():
                 return False
+            if self._history_task_obsolete:
+                # Drain the old task without accepting any result, even if
+                # the mapping changed away and then returned while it ran.
+                if not self._history_task.cancelled():
+                    self._history_task.exception()
+                self._history_task = None
+                self._history_task_obsolete = False
+                self._history_discarded_batches += 1
+                self._history_entities = {}
+                self._history_status = {"status": "mapping_changed"}
+        if self._history_task is not None:
             task, self._history_task = self._history_task, None
             try:
                 rows = task.result()
@@ -421,11 +482,14 @@ class SupplierIntervalRecorder:
                 self._history_retry_at = now + _HISTORY_FAILURE_RETRY
                 return False
         if not entities:
+            self._history_coverage = {}
+            self._history_status = {"status": "unmapped"}
             return changed
         # Resolve a new meter mapping with a fresh cursor. Existing evidence
         # is retained and duplicate charge rows are idempotent.
         if dict(entities) != self._history_entities:
             self._history_entities = dict(entities)
+            self._history_coverage = {}
             self._history_anchor = now
             self._history_batches = 0
             self._history_candidate_rows = 0
@@ -457,13 +521,17 @@ class SupplierIntervalRecorder:
                 and item["complete_energy_days_missing_valid_prices"] == 0
                 for item in coverage["kinds"].values()
             )
-            # Do not stop simply because every *retained* day has prices.
-            # Check recent missing meter days after the first complete day,
-            # allowing three calendar days for normal upstream publication.
-
-            def recent_missing_meter_days():
+            # Inspect the full bounded recovery horizon after each direction's
+            # first complete retained day. Allow three days for publication;
+            # do not infer that earlier export readings ought to exist.
+            def missing_meter_days():
                 last_expected = now.astimezone(_LONDON).date() - timedelta(days=3)
-                first_expected = last_expected - timedelta(days=6)
+                first_expected = now.astimezone(_LONDON).date() - timedelta(
+                    days=_HISTORY_BATCH_DAYS * _HISTORY_MAX_BATCHES
+                )
+                commissioned = date.fromisoformat(
+                    coverage["financial_commissioning_date"]
+                )
                 gaps = {}
                 for kind in ("electricity_import", "electricity_export"):
                     if f"consumption:{kind}" not in entities.values():
@@ -471,7 +539,11 @@ class SupplierIntervalRecorder:
                     retained = self._ledger.complete_day_totals(kind)
                     if not retained:
                         continue
-                    first = max(first_expected, date.fromisoformat(min(retained)))
+                    first = max(
+                        first_expected,
+                        commissioned + timedelta(days=1),
+                        date.fromisoformat(min(retained)),
+                    )
                     gaps[kind] = [
                         (first + timedelta(days=offset)).isoformat()
                         for offset in range(max(0, (last_expected - first).days + 1))
@@ -479,8 +551,33 @@ class SupplierIntervalRecorder:
                     ]
                 return gaps
 
-            gaps = await self._hass.async_add_executor_job(recent_missing_meter_days)
-            self._history_status["recent_missing_meter_days"] = gaps
+            if coverage["financial_commissioning_date"] is None:
+                gaps = {}
+            else:
+                gaps = await self._hass.async_add_executor_job(missing_meter_days)
+            recent_start = (
+                now.astimezone(_LONDON).date() - timedelta(days=9)
+            ).isoformat()
+            self._history_coverage = {
+                "missing_meter_days": gaps,
+                "recent_missing_meter_days": {
+                    kind: [day for day in days if day >= recent_start]
+                    for kind, days in gaps.items()
+                },
+                "coverage_window_days": _HISTORY_BATCH_DAYS * _HISTORY_MAX_BATCHES,
+                "publication_allowance_days": 3,
+                "unmatched_or_conflicted_intervals": coverage[
+                    "unmatched_or_conflicted_intervals"
+                ],
+                "complete_energy_days": {
+                    kind: item["complete_energy_post_commissioning_days"]
+                    for kind, item in coverage["kinds"].items()
+                },
+                "missing_priced_days": {
+                    kind: item["complete_energy_days_missing_valid_prices"]
+                    for kind, item in coverage["kinds"].items()
+                },
+            }
             if covered and not any(gaps.values()):
                 self._history_retry_at = None
                 self._history_status = {

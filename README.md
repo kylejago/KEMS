@@ -63,10 +63,11 @@ EV charging or a reward session.
 ## Autonomous financial evidence (Alpha9.268)
 
 KEMS retains mapped supplier consumption and estimated costs locally,
-recovers available Recorder history, detects recent missing meter days and
+recovers available Recorder history, detects missing meter days across the bounded 84-day recovery window and
 retries failed or exhausted recovery scans. CSV files are optional historical
 corroboration, not a recurring maintenance requirement. Happy Hour comparison
-works with automatic data alone. Missing or conflicting evidence stays
+works with automatic data alone. Financial Recovery exposes cached gaps,
+retry status and unsettled rewards in Home Assistant. Missing or conflicting evidence stays
 pending; estimates never become supplier-settled by inference. The historical
 what-if audit preserves native accounting, existing credits and counterfactual
 costs; it does not change live ROI, dashboard bills or WhatsApp totals.

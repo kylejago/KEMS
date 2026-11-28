@@ -46,7 +46,9 @@ Normal operation does not require CSV uploads or statements. KEMS collects
 available supplier estimates every 30 minutes and retains observations
 locally; Alpha9.268 recovers independent electricity meter/cost history from
 Recorder, retries failures after an hour and retries exhausted searches
-after seven days. Exact Happy Hour comparisons work without CSVs.
+after seven days. The bounded 84-day recovery window detects missing meter days;
+Financial Recovery exposes missing data, conflicts and unsettled rewards.
+Exact Happy Hour comparisons work without CSVs.
 Power Down baseline observation is independent. Missing evidence is
 reported as pending, not invented; gas conversion and supplier settlement
 limitations remain explicit. Historical what-if adjustments do not yet
