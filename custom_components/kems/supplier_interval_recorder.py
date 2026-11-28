@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -20,11 +20,13 @@ from .kems_core.supplier_charges import (
     capture_completed_baseline,
     capture_joined_baseline,
     completed_power_down_estimate,
+    historical_charge_adjustment_preview,
     merge_completed_baseline,
     recover_historical_baselines,
     supplier_cost_rows,
 )
 from .kems_core.supplier_intervals import (
+    _LONDON,
     FORMAT,
     KINDS,
     SupplierIntervalLedger,
@@ -38,6 +40,8 @@ _REFRESH = timedelta(minutes=30)
 _BASELINE_REFRESH = timedelta(seconds=60)
 _HISTORY_BATCH_DAYS = 7
 _HISTORY_MAX_BATCHES = 12
+_HISTORY_FAILURE_RETRY = timedelta(hours=1)
+_HISTORY_EXHAUSTED_RETRY = timedelta(days=7)
 _FILE_NAME = "kems_supplier_intervals.json"
 _GAS_REFERENCE_FILE = "kems_gas_daily_reference.json"
 _GAS_CSV_FILE = "kems_supplier_gas_intervals.json"
@@ -68,24 +72,81 @@ class SupplierIntervalRecorder:
         self._next_at: datetime | None = None
         self._dirty = False
         self._history_task = None
+        self._history_task_obsolete = False
+        self._history_discarded_batches = 0
+        self._history_coverage: dict[str, Any] = {}
         self._history_anchor: datetime | None = None
         self._history_entities: dict[str, str] = {}
         self._history_batches = 0
         self._history_candidate_rows = 0
+        self._history_consumption_rows = 0
         self._history_empty_batches = 0
         self._history_baseline_rows = 0
         self._history_changed = False
         self._next_baseline_at: datetime | None = None
         self._baseline_status: dict[str, Any] = {}
         self._history_status = {"status": "not_attempted"}
+        self._history_retry_at: datetime | None = None
         self._status: dict[str, Any] = {"status": "not_loaded"}
 
     @property
     def status(self) -> dict[str, Any]:
         return {
             **self._status,
-            "historical_charge_recovery": dict(self._history_status),
+            "historical_charge_recovery": {
+                **self._history_status,
+                "next_retry_at": (
+                    self._history_retry_at.isoformat()
+                    if self._history_retry_at is not None
+                    else None
+                ),
+                "manual_csv_required": False,
+                "discarded_mapping_batches": self._history_discarded_batches,
+                **self._history_coverage,
+            },
             "power_down_baseline_capture": dict(self._baseline_status),
+        }
+
+    def financial_recovery_summary(self, reward_audit):
+        """Bounded cached reporting state; no extra supplier query or ledger write."""
+        recovery = self._history_status
+        coverage = self._history_coverage
+        missing_meter = coverage.get("missing_meter_days", {})
+        missing_price = coverage.get("missing_priced_days", {})
+        conflicts = coverage.get("unmatched_or_conflicted_intervals")
+        if self._status.get("status") == "load_failed":
+            state = "unavailable"
+        elif self._history_task_obsolete:
+            state = "mapping_changed"
+        elif conflicts:
+            state = "conflicting_or_unmatched_evidence"
+        elif recovery.get("stop_reason") == "all_retained_complete_days_priced":
+            state = "retained_estimates_complete"
+        else:
+            state = "recovery_pending"
+        return {
+            "state": state,
+            "recovery_status": recovery.get("status"),
+            "stop_reason": recovery.get("stop_reason"),
+            "missing_meter_day_counts": {
+                kind: len(days) for kind, days in missing_meter.items()
+            },
+            "missing_priced_day_counts": dict(missing_price),
+            "unmatched_or_conflicted_intervals": conflicts,
+            "complete_meter_day_counts": dict(coverage.get("complete_energy_days", {})),
+            "automatic_charge_source_status": dict(
+                self._status.get("automatic_charge_source_status", {})
+            ),
+            "next_retry_at": (
+                self._history_retry_at.isoformat()
+                if self._history_retry_at is not None
+                else None
+            ),
+            "pending_reward_count": reward_audit.get("pending_count"),
+            "unsettled_reward_pence": reward_audit.get("unsettled_total_pence"),
+            "manual_csv_required": False,
+            "supplier_settlement_verified": False,
+            "live_financial_adjustment_authorised": False,
         }
 
     def electricity_reconciliation(self, daily_records, *, now):
@@ -94,9 +155,27 @@ class SupplierIntervalRecorder:
     def provisional_gas_reconciliation(self, records, *, now):
         return self._ledger.provisional_gas_reconciliation(records, now=now)
 
-    def financial_reconciliation(self, daily_records, *, now, commissioning_date):
-        return self._charges.reconciliation(
-            self._ledger, daily_records, now=now, commissioning_date=commissioning_date
+    def financial_reconciliation(
+        self, daily_records, *, now, commissioning_date, include_daily_audit=False
+    ):
+        result = self._charges.reconciliation(
+            self._ledger,
+            daily_records,
+            now=now,
+            commissioning_date=commissioning_date,
+            include_daily_audit=include_daily_audit,
+        )
+        if include_daily_audit:
+            result["historical_adjustment_preview"] = (
+                historical_charge_adjustment_preview(result)
+            )
+            for item in result["kinds"].values():
+                item.pop("daily_charge_audit", None)
+        return result
+
+    def happy_hour_charge_comparison(self, reward_audit, *, now):
+        return self._charges.happy_hour_charge_comparison(
+            self._ledger, reward_audit, now=now
         )
 
     @property
@@ -277,6 +356,28 @@ class SupplierIntervalRecorder:
                             key = json.dumps(evidence, sort_keys=True)
                             result[key] = {"baseline_evidence": evidence}
                         continue
+                    if kind.startswith("consumption:"):
+                        direction = kind.removeprefix("consumption:")
+                        attrs = state.attributes
+                        if (
+                            attrs.get("unit_of_measurement") != "kWh"
+                            or attrs.get("is_export")
+                            is not (direction == "electricity_export")
+                            or not isinstance(attrs.get("charges"), list)
+                        ):
+                            continue
+                        for item in attrs["charges"]:
+                            if not isinstance(item, dict):
+                                continue
+                            energy = {
+                                "kind": direction,
+                                "start": item.get("start"),
+                                "end": item.get("end"),
+                                "kwh": item.get("consumption"),
+                            }
+                            key = ("consumption", *map(str, energy.values()))
+                            result[key] = {"consumption_evidence": energy}
+                        continue
                     for row in supplier_cost_rows(kind, state.attributes):
                         key = tuple(str(value) for value in row.values())
                         result[key] = row
@@ -284,16 +385,42 @@ class SupplierIntervalRecorder:
 
         return await get_instance(self._hass).async_add_executor_job(read)
 
-    async def _consume_recorded_charges(self, now, entities):
+    async def _consume_recorded_charges(
+        self, now, entities, *, commissioning_date=None
+    ):
         """Read at most one seven-day batch per normal supplier scan."""
         changed = False
         if self._history_task is not None:
+            if dict(entities) != self._history_entities:
+                self._history_task_obsolete = True
+                self._history_coverage = {}
             if not self._history_task.done():
                 return False
+            if self._history_task_obsolete:
+                # Drain the old task without accepting any result, even if
+                # the mapping changed away and then returned while it ran.
+                if not self._history_task.cancelled():
+                    self._history_task.exception()
+                self._history_task = None
+                self._history_task_obsolete = False
+                self._history_discarded_batches += 1
+                self._history_entities = {}
+                self._history_status = {"status": "mapping_changed"}
+        if self._history_task is not None:
             task, self._history_task = self._history_task, None
             try:
                 rows = task.result()
-                charges = [row for row in rows if "baseline_evidence" not in row]
+                charges = [
+                    row
+                    for row in rows
+                    if "baseline_evidence" not in row
+                    and "consumption_evidence" not in row
+                ]
+                consumption = [
+                    row["consumption_evidence"]
+                    for row in rows
+                    if "consumption_evidence" in row
+                ]
                 baselines = [
                     row["baseline_evidence"]
                     for row in rows
@@ -304,10 +431,16 @@ class SupplierIntervalRecorder:
                         charges, source="octopus_integration", now=now
                     )
                 )
+                changed |= await self._hass.async_add_executor_job(
+                    lambda: self._ledger.ingest(
+                        consumption, source="octopus_integration", now=now
+                    )
+                )
                 for evidence in baselines:
                     if evidence["session_id"] in self._completed_ids:
                         changed |= self._retain_baseline(evidence)
                 self._history_candidate_rows += len(charges)
+                self._history_consumption_rows += len(consumption)
                 self._history_baseline_rows += len(baselines)
                 self._history_empty_batches += int(not rows)
                 self._history_changed |= changed
@@ -315,11 +448,17 @@ class SupplierIntervalRecorder:
                 self._history_status = {
                     "status": (
                         "observed"
-                        if self._history_candidate_rows or self._history_baseline_rows
+                        if (
+                            self._history_candidate_rows
+                            or self._history_baseline_rows
+                            or self._history_consumption_rows
+                        )
                         else "no_retained_attributes"
                     ),
                     "candidate_rows": self._history_candidate_rows,
                     "last_batch_candidate_rows": len(charges),
+                    "last_batch_consumption_rows": len(consumption),
+                    "consumption_candidate_rows": self._history_consumption_rows,
                     "baseline_candidate_observations": self._history_baseline_rows,
                     "empty_batches": self._history_empty_batches,
                     "evidence_changed": self._history_changed,
@@ -332,6 +471,7 @@ class SupplierIntervalRecorder:
                 # history. Scan the full bounded horizon, never beyond it.
                 if self._history_batches >= _HISTORY_MAX_BATCHES:
                     self._history_status["stop_reason"] = "batch_limit"
+                    self._history_retry_at = now + _HISTORY_EXHAUSTED_RETRY
             except Exception as err:
                 self._history_status = {
                     **self._history_status,
@@ -339,20 +479,148 @@ class SupplierIntervalRecorder:
                     "error_type": type(err).__name__,
                     "stop_reason": "query_failed",
                 }
+                self._history_retry_at = now + _HISTORY_FAILURE_RETRY
                 return False
         if not entities:
+            self._history_entities = {}
+            self._history_coverage = {}
+            self._history_retry_at = None
+            self._history_status = {"status": "unmapped"}
             return changed
         # Resolve a new meter mapping with a fresh cursor. Existing evidence
         # is retained and duplicate charge rows are idempotent.
         if dict(entities) != self._history_entities:
             self._history_entities = dict(entities)
+            self._history_coverage = {}
             self._history_anchor = now
             self._history_batches = 0
             self._history_candidate_rows = 0
+            self._history_consumption_rows = 0
             self._history_empty_batches = 0
             self._history_baseline_rows = 0
             self._history_changed = False
             self._history_status = {"status": "not_attempted"}
+            self._history_retry_at = None
+        # Re-evaluate after current provider and CSV intake. A completed
+        # search is not a permanent assertion about future charge coverage.
+        if (
+            commissioning_date is not None
+            and {v for v in entities.values() if not v.startswith("consumption:")}
+            == {"electricity_import", "electricity_export"}
+            and sum(
+                v in {"electricity_import", "electricity_export"}
+                for v in entities.values()
+            )
+            == 2
+        ):
+            coverage = await self._hass.async_add_executor_job(
+                lambda: self._charges.reconciliation(
+                    self._ledger, {}, now=now, commissioning_date=commissioning_date
+                )
+            )
+            covered = all(
+                item["complete_energy_post_commissioning_days"] > 0
+                and item["complete_energy_days_missing_valid_prices"] == 0
+                for item in coverage["kinds"].values()
+            )
+
+            # Inspect the full bounded recovery horizon after each direction's
+            # first complete retained day. Allow three days for publication;
+            # do not infer that earlier export readings ought to exist.
+            def missing_meter_days():
+                last_expected = now.astimezone(_LONDON).date() - timedelta(days=3)
+                first_expected = now.astimezone(_LONDON).date() - timedelta(
+                    days=_HISTORY_BATCH_DAYS * _HISTORY_MAX_BATCHES
+                )
+                commissioned = date.fromisoformat(
+                    coverage["financial_commissioning_date"]
+                )
+                gaps = {}
+                for kind in ("electricity_import", "electricity_export"):
+                    if f"consumption:{kind}" not in entities.values():
+                        continue
+                    retained = self._ledger.complete_day_totals(kind)
+                    if not retained:
+                        continue
+                    first = max(
+                        first_expected,
+                        commissioned + timedelta(days=1),
+                        date.fromisoformat(min(retained)),
+                    )
+                    gaps[kind] = [
+                        (first + timedelta(days=offset)).isoformat()
+                        for offset in range(max(0, (last_expected - first).days + 1))
+                        if (first + timedelta(days=offset)).isoformat() not in retained
+                    ]
+                return gaps
+
+            if coverage["financial_commissioning_date"] is None:
+                gaps = {}
+            else:
+                gaps = await self._hass.async_add_executor_job(missing_meter_days)
+            recent_start = (
+                now.astimezone(_LONDON).date() - timedelta(days=9)
+            ).isoformat()
+            self._history_coverage = {
+                "missing_meter_days": gaps,
+                "recent_missing_meter_days": {
+                    kind: [day for day in days if day >= recent_start]
+                    for kind, days in gaps.items()
+                },
+                "coverage_window_days": _HISTORY_BATCH_DAYS * _HISTORY_MAX_BATCHES,
+                "publication_allowance_days": 3,
+                "unmatched_or_conflicted_intervals": coverage[
+                    "unmatched_or_conflicted_intervals"
+                ],
+                "complete_energy_days": {
+                    kind: item["complete_energy_post_commissioning_days"]
+                    for kind, item in coverage["kinds"].items()
+                },
+                "missing_priced_days": {
+                    kind: item["complete_energy_days_missing_valid_prices"]
+                    for kind, item in coverage["kinds"].items()
+                },
+            }
+            if covered and not any(gaps.values()):
+                self._history_retry_at = None
+                self._history_status = {
+                    **self._history_status,
+                    "status": "complete_retained_price_coverage",
+                    "stop_reason": "all_retained_complete_days_priced",
+                    "supplier_settlement_verified": False,
+                }
+                return changed
+        if (
+            self._history_status.get("stop_reason")
+            == "all_retained_complete_days_priced"
+        ):
+            # A later incomplete price day, conflict or changed scope must
+            # allow a new bounded search instead of retaining the old stop.
+            self._history_anchor = now
+            self._history_batches = 0
+            self._history_candidate_rows = 0
+            self._history_consumption_rows = 0
+            self._history_empty_batches = 0
+            self._history_baseline_rows = 0
+            self._history_changed = False
+            self._history_status = {"status": "not_attempted"}
+            self._history_retry_at = None
+        if self._history_retry_at is not None and now >= self._history_retry_at:
+            if self._history_status.get("stop_reason") == "query_failed":
+                # Retry the failed batch at the original cursor after backoff.
+                self._history_status.pop("stop_reason", None)
+                self._history_status.pop("error_type", None)
+            elif self._history_status.get("stop_reason") == "batch_limit":
+                # Periodic bounded retry for evidence published late upstream.
+                self._history_anchor = now
+                self._history_batches = 0
+                self._history_candidate_rows = 0
+                self._history_consumption_rows = 0
+                self._history_empty_batches = 0
+                self._history_baseline_rows = 0
+                self._history_changed = False
+                self._history_status = {"status": "not_attempted"}
+            self._history_retry_at = None
         if self._history_batches >= _HISTORY_MAX_BATCHES or self._history_status.get(
             "stop_reason"
         ):
@@ -490,7 +758,12 @@ class SupplierIntervalRecorder:
         return changed
 
     async def async_observe(
-        self, now: datetime, entities: KEMSEntities, completed_events=()
+        self,
+        now: datetime,
+        entities: KEMSEntities,
+        completed_events=(),
+        *,
+        commissioning_date=None,
     ) -> None:
         if self._status.get("status") == "load_failed":
             return
@@ -569,6 +842,7 @@ class SupplierIntervalRecorder:
                 if len(candidates) != 1:
                     continue
                 if kind != "gas":
+                    history_entities[candidates[0]] = f"consumption:{kind}"
                     meter = registry.async_get(mapping[kind] or "")
                     expected = (
                         meter.unique_id.casefold().removesuffix("_current_rate")
@@ -660,7 +934,9 @@ class SupplierIntervalRecorder:
             # BottlecapDave excludes the timestamped baseline rows from
             # Recorder. Preserve live baseline capture and existing evidence,
             # but do not query those entities for historical reconstruction.
-            changed |= await self._consume_recorded_charges(now, history_entities)
+            changed |= await self._consume_recorded_charges(
+                now, history_entities, commissioning_date=commissioning_date
+            )
 
             self._dirty |= changed
             if self._dirty:

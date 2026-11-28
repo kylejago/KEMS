@@ -2574,6 +2574,7 @@ async def async_setup_entry(
     entities.extend(build_commissioning_entities(hass, coordinator))
     entities.extend(build_update_sensor_entities(hass, coordinator, entry))
     entities.append(KEMSSourceValidationSensor(coordinator))
+    entities.append(KEMSFinancialRecoverySensor(coordinator))
     entities.extend(
         KEMSForecastValidationSensor(coordinator, description)
         for description in FORECAST_VALIDATION_SENSORS
@@ -2610,6 +2611,30 @@ class KEMSSourceValidationSensor(KEMSEntity, SensorEntity):
             "accepted": dict(sorted(validation.accepted.items())),
             "rejected": dict(sorted(validation.rejected.items())),
         }
+
+
+class KEMSFinancialRecoverySensor(KEMSEntity, SensorEntity):
+    """Expose cached supplier recovery and unsettled reward evidence."""
+
+    _attr_name = "Financial recovery"
+    _attr_icon = "mdi:database-clock-outline"
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+
+    def __init__(self, coordinator) -> None:
+        super().__init__(coordinator, "financial_recovery")
+
+    def _summary(self) -> Mapping[str, Any]:
+        return self.coordinator._supplier_intervals.financial_recovery_summary(
+            self.coordinator.data.roi.reward_audit
+        )
+
+    @property
+    def native_value(self) -> str:
+        return self._summary()["state"]
+
+    @property
+    def extra_state_attributes(self) -> Mapping[str, Any]:
+        return {key: value for key, value in self._summary().items() if key != "state"}
 
 
 class KEMSSensor(KEMSEntity, SensorEntity):

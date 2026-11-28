@@ -113,6 +113,15 @@ class LifetimeLedgerRecorder:
         }
 
     @property
+    def completed_daily_financial_totals(self) -> dict[str, dict[str, float]]:
+        """Return a defensive copy of saved daily reporting rows."""
+        return {
+            day: dict(values)
+            for day, values in self._daily_records.items()
+            if isinstance(values, dict) and recorded_totals_present(values)
+        }
+
+    @property
     def historical_coverage_audit(self) -> dict[str, Any]:
         """Bounded read-only evidence for the daily completeness classifier.
 

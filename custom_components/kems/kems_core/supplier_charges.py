@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 from collections.abc import Iterable, Mapping
+from dataclasses import replace
 from datetime import UTC, date, datetime, timedelta
 from math import isfinite
 from typing import Any
@@ -112,6 +113,97 @@ class SupplierChargeEvidence:
             ):
                 self.conflicts.add(tuple(key))
 
+    def happy_hour_charge_comparison(self, energy, reward_audit, *, now):
+        """Compare retained automatic and optional CSV charges to event receipts."""
+
+        def exact_source(start, end, source):
+            rows = []
+            cursor = start
+            while cursor < end:
+                key = ("electricity_import", cursor.isoformat())
+                charge_key = (*key, source)
+                row = self.rows.get(charge_key)
+                physical = energy.rows.get(key)
+                if (
+                    row is None
+                    or charge_key in self.conflicts
+                    or physical is None
+                    or key in energy.conflicts
+                    or _utc(row["end"]) != cursor + _HALF_HOUR
+                    or row["end"] != physical["end"]
+                    or abs(row["kwh"] - physical["kwh"]) > 0.000001
+                ):
+                    return None
+                rows.append(row)
+                cursor += _HALF_HOUR
+            return {
+                "charge_pence": round(sum(row["charge_pence"] for row in rows), 6),
+                "import_kwh": round(sum(row["kwh"] for row in rows), 6),
+            }
+
+        events = []
+        for entry in reward_audit.get("entries", []):
+            if entry.get("type") != "happy_hour":
+                continue
+            start = _utc(entry.get("start"))
+            end = _utc(entry.get("end"))
+            receipt = _finite(entry.get("estimated_reward_pence"))
+            if (
+                start is None
+                or end is None
+                or end - start != timedelta(hours=1)
+                or end > now
+            ):
+                continue
+            automatic = exact_source(start, end, "octopus_integration")
+            csv = exact_source(start, end, "octopus_csv")
+            result = {
+                "reward_key": entry.get("reward_key"),
+                "date": entry.get("date"),
+                "start": start.isoformat(),
+                "end": end.isoformat(),
+                "recorded_estimated_credit_pence": receipt,
+                "automatic_estimate": automatic,
+                "optional_csv_estimate": csv,
+                "csv_estimated_import_charge_pence": (
+                    csv["charge_pence"] if csv is not None else None
+                ),
+                "csv_import_kwh": csv["import_kwh"] if csv is not None else None,
+                "charge_minus_credit_pence": None,
+                "comparison_source": None,
+                "status": "awaiting_exact_priced_intervals",
+            }
+            selected = automatic if automatic is not None else csv
+            if (
+                automatic is not None
+                and csv is not None
+                and abs(automatic["charge_pence"] - csv["charge_pence"]) > 0.022
+            ):
+                result["status"] = "source_estimates_disagree"
+            elif selected is not None:
+                result.update(
+                    charge_minus_credit_pence=(
+                        round(selected["charge_pence"] - receipt, 6)
+                        if receipt is not None
+                        else None
+                    ),
+                    comparison_source=(
+                        "octopus_integration"
+                        if automatic is not None
+                        else "octopus_csv"
+                    ),
+                    status="estimated_charge_comparison_only",
+                )
+            events.append(result)
+        return {
+            "scope": "known_completed_happy_hour_charge_comparison",
+            "events": events,
+            "itemised_reward_rows_omitted": reward_audit.get("entries_omitted", 0),
+            "manual_csv_required": False,
+            "supplier_settlement_verified": False,
+            "reward_or_ledger_write_authorised": False,
+        }
+
     def reconciliation(
         self,
         energy,
@@ -119,6 +211,7 @@ class SupplierChargeEvidence:
         *,
         now: datetime,
         commissioning_date: Any,
+        include_daily_audit: bool = False,
     ) -> dict[str, Any]:
         """Compare complete, matching priced days; no estimate becomes settlement."""
         try:
@@ -127,6 +220,7 @@ class SupplierChargeEvidence:
             commissioned = None
         today = now.astimezone(_LONDON).date()
         grouped: dict[tuple[str, date], list[float]] = defaultdict(list)
+        csv_counts: dict[tuple[str, date], int] = defaultdict(int)
         invalid = 0
         overlapping = defaultdict(list)
         for key, row in self.rows.items():
@@ -155,6 +249,8 @@ class SupplierChargeEvidence:
             )
             day = datetime.fromisoformat(key[1]).astimezone(_LONDON).date()
             grouped[(key[0], day)].append(selected["charge_pence"])
+            if selected["source"] == "octopus_csv":
+                csv_counts[(key[0], day)] += 1
         result = {}
         for kind, field in (
             ("electricity_import", "import_cost_pence"),
@@ -186,6 +282,10 @@ class SupplierChargeEvidence:
                     {
                         "date": day.isoformat(),
                         "supplier_estimate_pence": value,
+                        "csv_priced_intervals": csv_counts[(kind, day)],
+                        "integration_estimated_intervals": (
+                            expected - csv_counts[(kind, day)]
+                        ),
                         "recorded_pence": recorded,
                         "supplier_minus_recorded_pence": (
                             round(value - recorded, 6) if recorded is not None else None
@@ -214,6 +314,12 @@ class SupplierChargeEvidence:
                 "complete_priced_post_commissioning_days": len(comparisons),
                 "excluded_before_or_unknown_commissioning_days": before_commissioning,
                 "comparable_days": len(matched),
+                "complete_csv_priced_days": sum(
+                    row["integration_estimated_intervals"] == 0 for row in comparisons
+                ),
+                "complete_days_with_integration_estimates": sum(
+                    row["integration_estimated_intervals"] > 0 for row in comparisons
+                ),
                 "supplier_estimate_on_comparable_days_pence": (
                     round(sum(row["supplier_estimate_pence"] for row in matched), 6)
                     if matched
@@ -233,6 +339,8 @@ class SupplierChargeEvidence:
                 ),
                 "recent_days": comparisons[-14:],
             }
+            if include_daily_audit:
+                result[kind]["daily_charge_audit"] = comparisons
         return {
             "scope": "supplier_estimated_gross_energy_charge_comparison",
             "retained_charge_observations": len(self.rows),
@@ -245,6 +353,226 @@ class SupplierChargeEvidence:
             "supplier_settlement_verified": False,
             "roi_or_ledger_write_authorised": False,
         }
+
+
+def historical_charge_adjustment_preview(reconciliation: Mapping[str, Any]) -> dict:
+    """Derive dated financial proposals without mutating any native ledger.
+
+    The input must be the full reconciliation audit, not recent_days.
+    No standing charges, reward credits or counterfactual prices are changed.
+    Supplier estimates are not settlement and do not establish that a
+    discount has been accounted for exactly once.
+    """
+    days: dict[str, dict[str, Any]] = {}
+    for kind, field in (
+        ("electricity_import", "import_cost_pence"),
+        ("electricity_export", "export_income_pence"),
+    ):
+        evidence = reconciliation.get("kinds", {}).get(kind, {})
+        for row in evidence.get("daily_charge_audit", []):
+            original = _finite(row.get("recorded_pence"))
+            proposed = _finite(row.get("supplier_estimate_pence"))
+            if original is None or proposed is None:
+                continue
+            day = row["date"]
+            days.setdefault(day, {})[field] = {
+                "recorded_pence": original,
+                "supplier_estimate_pence": proposed,
+                "proposed_delta_pence": round(proposed - original, 6),
+                "csv_priced_intervals": row.get("csv_priced_intervals"),
+                "integration_estimated_intervals": row.get(
+                    "integration_estimated_intervals"
+                ),
+            }
+    import_delta = 0.0
+    export_delta = 0.0
+    for row in days.values():
+        imported = row.get("import_cost_pence", {}).get("proposed_delta_pence", 0.0)
+        exported = row.get("export_income_pence", {}).get("proposed_delta_pence", 0.0)
+        import_delta += imported
+        export_delta += exported
+        row["proposed_actual_value_delta_pence"] = round(exported - imported, 6)
+    return {
+        "scope": "provisional_dated_gross_charge_adjustment_preview",
+        "days": dict(sorted(days.items())),
+        "import_delta_pence": round(import_delta, 6),
+        "export_delta_pence": round(export_delta, 6),
+        "proposed_actual_value_delta_pence": round(export_delta - import_delta, 6),
+        "original_daily_ledger_unchanged": True,
+        "counterfactual_and_rewards_unchanged": True,
+        "supplier_settlement_verified": False,
+        "roi_or_ledger_write_authorised": False,
+    }
+
+
+def project_reviewed_historical_charges(
+    daily_records: Mapping[str, Any],
+    preview: Mapping[str, Any],
+    *,
+    reviewed_import_charges: Mapping[str, tuple[float, float]] | None = None,
+    reviewed_export_charges: Mapping[str, tuple[float, float]] | None = None,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Build a reversible reporting copy, never a persisted ledger update.
+
+    Review must establish the same gross-charge basis, including any free
+    hours or EV discounts, for the exact original and estimated charge pair.
+    An unreviewed date, changed value or absent commissioned ROI is withheld.
+    Rebuild from the native rows on each invocation; never chain projections.
+    """
+    projected = {
+        day: dict(row) if isinstance(row, Mapping) else row
+        for day, row in daily_records.items()
+    }
+    audit: dict[str, Any] = {"applied": {}, "withheld": {}}
+    for day, proposals in preview.get("days", {}).items():
+        native = daily_records.get(day)
+        row = projected.get(day)
+        for field, reviewed in (
+            ("import_cost_pence", reviewed_import_charges or {}),
+            ("export_income_pence", reviewed_export_charges or {}),
+        ):
+            if field not in proposals:
+                continue
+            proposal = proposals[field]
+            original = _finite(proposal.get("recorded_pence"))
+            estimate = _finite(proposal.get("supplier_estimate_pence"))
+            current = (
+                _finite(native.get(field)) if isinstance(native, Mapping) else None
+            )
+            system_value = (
+                _finite(row.get("actual_system_value_pence"))
+                if isinstance(row, Mapping)
+                else None
+            )
+            avoided = (
+                _finite(row.get("actual_avoided_import_value_pence"))
+                if isinstance(row, Mapping)
+                else None
+            )
+            reason = None
+            if day not in reviewed:
+                reason = "charge_basis_not_reviewed"
+            elif original is None or estimate is None or current is None:
+                reason = "native_or_supplier_charge_missing"
+            elif abs(current - original) > 0.000001:
+                reason = "native_charge_changed_since_review"
+            elif reviewed[day] != (original, estimate):
+                reason = "charge_pair_changed_since_review"
+            elif system_value is None or (
+                field == "import_cost_pence" and avoided is None
+            ):
+                reason = "commissioned_roi_values_missing"
+            if reason is not None:
+                audit["withheld"].setdefault(day, {})[field] = reason
+                continue
+            delta = round(estimate - current, 6)
+            row[field] = estimate
+            if field == "import_cost_pence":
+                row["actual_avoided_import_value_pence"] = round(avoided - delta, 6)
+                row["actual_system_value_pence"] = round(system_value - delta, 6)
+            else:
+                row["actual_system_value_pence"] = round(system_value + delta, 6)
+            audit["applied"].setdefault(day, {})[field] = delta
+    audit["supplier_settlement_verified"] = False
+    audit["ledger_write_authorised"] = False
+    return projected, audit
+
+
+def project_historical_reporting_totals(lifetime, periods, audit):
+    """Apply one dated, reviewed delta set to copies of native report totals.
+
+    Preserve existing coverage metadata, counterfactuals and reward amounts.
+    The caller must supply native, not previously projected, totals.
+    """
+
+    def adjustments(start, end):
+        imported = exported = 0.0
+        for day_text, fields in audit.get("applied", {}).items():
+            day = date.fromisoformat(day_text)
+            if (start is not None and day < start) or (end is not None and day > end):
+                continue
+            imported += fields.get("import_cost_pence", 0.0)
+            exported += fields.get("export_income_pence", 0.0)
+        return {
+            "import_cost_pence": imported,
+            "export_income_pence": exported,
+            "actual_avoided_import_value_pence": -imported,
+            "actual_system_value_pence": exported - imported,
+        }
+
+    def adjusted(native, start=None, end=None):
+        return replace(
+            native,
+            **{
+                key: round(getattr(native, key) + delta, 6)
+                for key, delta in adjustments(start, end).items()
+                if delta
+            },
+        )
+
+    return adjusted(lifetime), {
+        key: adjusted(
+            totals,
+            None if key == "all_time" else totals.start_date,
+            totals.end_date,
+        )
+        for key, totals in periods.items()
+    }
+
+
+def historical_reporting_what_if(
+    daily_records, preview, lifetime, periods, *, reward_audit=None
+):
+    """Quantify the gross-charge scenario without authorising any correction."""
+    pairs = {}
+    for field in ("import_cost_pence", "export_income_pence"):
+        pairs[field] = {
+            day: (
+                proposals[field]["recorded_pence"],
+                proposals[field]["supplier_estimate_pence"],
+            )
+            for day, proposals in preview.get("days", {}).items()
+            if field in proposals
+        }
+    _, audit = project_reviewed_historical_charges(
+        daily_records,
+        preview,
+        reviewed_import_charges=pairs["import_cost_pence"],
+        reviewed_export_charges=pairs["export_income_pence"],
+    )
+    candidate_lifetime, candidate_periods = project_historical_reporting_totals(
+        lifetime, periods, audit
+    )
+    rewards = reward_audit or {}
+    known_reward_dates = {
+        entry.get("date")
+        for entry in rewards.get("entries", [])
+        if entry.get("type") == "happy_hour"
+    }
+    known_reward_dates.update(
+        rewards.get("historical_coverage", {}).get("known_happy_hour_dates", [])
+    )
+    return {
+        "scope": "hypothetical_gross_charge_reporting_only",
+        "charge_basis_reviewed": False,
+        "live_reporting_authorised": False,
+        "supplier_settlement_verified": False,
+        "ledger_write_authorised": False,
+        "reward_overlap_resolved": False,
+        "known_happy_hour_import_overlap_dates": sorted(
+            known_reward_dates & pairs["import_cost_pence"].keys()
+        ),
+        "all_import_charge_bases_require_review": True,
+        "happy_hour_absence_does_not_prove_no_overlap": True,
+        "hypothetical_daily_deltas": audit["applied"],
+        "withheld_incomplete_native_values": audit["withheld"],
+        "native_lifetime": lifetime.to_dict(),
+        "hypothetical_lifetime": candidate_lifetime.to_dict(),
+        "native_periods": {key: totals.to_dict() for key, totals in periods.items()},
+        "hypothetical_periods": {
+            key: totals.to_dict() for key, totals in candidate_periods.items()
+        },
+    }
 
 
 def exact_event_meter_totals(

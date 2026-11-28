@@ -46,12 +46,10 @@ class OhmeChargeSlotObserver:
         self._config_entry_id: str | None = None
         self._sensor_entity_id: str | None = None
         self._legacy_parity = LegacyIntelligentParityMonitor(hass, entities)
-        self._legacy_parity_error: str | None = None
         self._parity_store = Store(
             hass, 1, f"{DOMAIN}.{entry_id}.{STORAGE_NAMESPACE}.legacy_parity"
         )
         self._parity_storage_error: str | None = None
-        self._parity_dirty = False
 
     def _resolve_ohme_sources(self) -> str | None:
         """Select only the Ohme account owning the configured EV status."""
@@ -97,8 +95,14 @@ class OhmeChargeSlotObserver:
         usable = age is not None and age <= PLAN_FRESH_SECONDS
         return {
             "read_only": True,
-            "legacy_intelligent_comparison": self._legacy_parity.status,
-            "legacy_comparison_error_type": self._legacy_parity_error,
+            "legacy_intelligent_comparison": {
+                **self._legacy_parity.status,
+                "status": "retired_archive_only",
+                "sampling_seconds": None,
+                "available_only_while_legacy_integration_installed": False,
+                "legacy_version_requirement": None,
+            },
+            "legacy_comparison_error_type": None,
             "legacy_comparison_storage_error_type": self._parity_storage_error,
             "uses_service": "ohme.list_charge_slots",
             "poll_seconds": POLL_INTERVAL_SECONDS,
@@ -143,32 +147,6 @@ class OhmeChargeSlotObserver:
     def _schedule_poll(self, _now: datetime) -> None:
         if self._closed:
             return
-        plan_age = (
-            max((_now - self._last_success).total_seconds(), 0)
-            if self._last_success is not None
-            else None
-        )
-        plan_active: bool | None = None
-        if (
-            plan_age is not None
-            and plan_age <= PLAN_FRESH_SECONDS
-            and self._last_result.get("status")
-            in {"plan_observed", "no_slots_reported"}
-        ):
-            plan_active = bool(self._last_result.get("active_count", 0))
-        try:
-            prior = self._legacy_parity.active_checkpoint()
-            self._legacy_parity.observe(now=_now, ohme_plan_active=plan_active)
-            if prior != self._legacy_parity.active_checkpoint():
-                self._parity_dirty = True
-                self._parity_store.async_delay_save(
-                    self._legacy_parity.active_checkpoint, 10
-                )
-            self._legacy_parity_error = None
-        except Exception as error:
-            # A comparison is optional diagnostics; it must not stop Ohme
-            # observation, tariff refresh, or the physical KEMS controller.
-            self._legacy_parity_error = type(error).__name__
         if self._task is not None and not self._task.done():
             return
         self._task = self._hass.async_create_task(self._async_poll())
@@ -222,10 +200,3 @@ class OhmeChargeSlotObserver:
             self._task.cancel()
             with suppress(asyncio.CancelledError):
                 await self._task
-        if self._parity_dirty:
-            try:
-                await self._parity_store.async_save(
-                    self._legacy_parity.active_checkpoint()
-                )
-            except Exception as error:
-                self._parity_storage_error = type(error).__name__

@@ -2,13 +2,18 @@
 
 from datetime import UTC, datetime, timedelta
 
+from kems_core.models import LifetimeLedger, PeriodTotals
+from kems_core.roi_reward_audit import build_reward_audit
 from kems_core.supplier_charges import (
     SupplierChargeEvidence,
     baseline_capture_diagnostic,
     capture_completed_baseline,
     capture_joined_baseline,
     completed_power_down_estimate,
+    historical_charge_adjustment_preview,
+    historical_reporting_what_if,
     merge_completed_baseline,
+    project_reviewed_historical_charges,
     supplier_cost_rows,
 )
 from kems_core.supplier_intervals import SupplierIntervalLedger
@@ -369,3 +374,386 @@ def test_power_down_reward_is_clipped_per_half_hour():
     assert result["estimated_rewardable_reduction_kwh"] == 2.0
     assert result["estimated_bonus_pence"] == 200.0
     assert result["supplier_settled"] is False
+
+
+def test_full_dated_adjustment_preview_preserves_originals_and_separate_rewards():
+    energy = SupplierIntervalLedger()
+    charges = SupplierChargeEvidence()
+    rows = _day(START) + _day(START, kind="electricity_export")
+    energy.ingest(rows, source="octopus_csv", now=NOW)
+    charges.ingest(rows, source="octopus_csv", now=NOW)
+    native = {
+        "2026-11-25": {
+            "import_cost_pence": 300.0,
+            "export_income_pence": 320.0,
+            "happy_hour_estimated_credit_pence": 70.0,
+        }
+    }
+    audit = charges.reconciliation(
+        energy,
+        native,
+        now=NOW,
+        commissioning_date="2026-11-24",
+        include_daily_audit=True,
+    )
+    preview = historical_charge_adjustment_preview(audit)
+    assert preview["import_delta_pence"] == 16.8
+    assert preview["export_delta_pence"] == -3.2
+    assert preview["proposed_actual_value_delta_pence"] == -20.0
+    assert preview["roi_or_ledger_write_authorised"] is False
+    assert native["2026-11-25"]["import_cost_pence"] == 300.0
+    assert native["2026-11-25"]["happy_hour_estimated_credit_pence"] == 70.0
+    assert historical_charge_adjustment_preview(audit) == preview
+
+
+def test_full_dated_adjustment_preview_excludes_missing_native_cost():
+    energy = SupplierIntervalLedger()
+    charges = SupplierChargeEvidence()
+    rows = _day(START)
+    energy.ingest(rows, source="octopus_csv", now=NOW)
+    charges.ingest(rows, source="octopus_csv", now=NOW)
+    audit = charges.reconciliation(
+        energy,
+        {},
+        now=NOW,
+        commissioning_date="2026-11-24",
+        include_daily_audit=True,
+    )
+    assert historical_charge_adjustment_preview(audit)["days"] == {}
+
+
+def test_reviewed_charge_projection_preserves_native_and_reward_rows():
+    day = "2026-11-25"
+    native = {
+        day: {
+            "import_cost_pence": 300.0,
+            "export_income_pence": 320.0,
+            "actual_avoided_import_value_pence": 100.0,
+            "actual_system_value_pence": 420.0,
+            "simulated_import_cost_pence": 200.0,
+            "happy_hour_estimated_credit_pence": 70.0,
+        }
+    }
+    preview = {
+        "days": {
+            day: {
+                "import_cost_pence": {
+                    "recorded_pence": 300.0,
+                    "supplier_estimate_pence": 316.8,
+                },
+                "export_income_pence": {
+                    "recorded_pence": 320.0,
+                    "supplier_estimate_pence": 316.8,
+                },
+            }
+        }
+    }
+    copy, audit = project_reviewed_historical_charges(native, preview)
+    assert copy == native
+    assert not audit["applied"]
+    assert audit["withheld"][day]["import_cost_pence"] == "charge_basis_not_reviewed"
+    copy, audit = project_reviewed_historical_charges(
+        native, preview, reviewed_export_charges={day: (320.0, 316.8)}
+    )
+    assert copy[day]["import_cost_pence"] == 300.0
+    assert copy[day]["actual_system_value_pence"] == 416.8
+    reviewed = dict(
+        reviewed_import_charges={day: (300.0, 316.8)},
+        reviewed_export_charges={day: (320.0, 316.8)},
+    )
+    copy, audit = project_reviewed_historical_charges(native, preview, **reviewed)
+    assert copy[day]["actual_avoided_import_value_pence"] == 83.2
+    assert copy[day]["actual_system_value_pence"] == 400.0
+    assert copy[day]["happy_hour_estimated_credit_pence"] == 70.0
+    assert copy[day]["simulated_import_cost_pence"] == 200.0
+    assert native[day]["actual_system_value_pence"] == 420.0
+    assert audit["ledger_write_authorised"] is False
+    assert project_reviewed_historical_charges(native, preview, **reviewed) == (
+        copy,
+        audit,
+    )
+    changed_preview = {
+        "days": {
+            day: {
+                "import_cost_pence": {
+                    "recorded_pence": 300.0,
+                    "supplier_estimate_pence": 317.0,
+                }
+            }
+        }
+    }
+    unchanged, stale_audit = project_reviewed_historical_charges(
+        native, changed_preview, **reviewed
+    )
+    assert unchanged == native
+    assert stale_audit["withheld"][day]["import_cost_pence"] == (
+        "charge_pair_changed_since_review"
+    )
+    repeated, audit = project_reviewed_historical_charges(copy, preview, **reviewed)
+    assert repeated == copy
+    assert not audit["applied"]
+    assert audit["withheld"][day]["import_cost_pence"] == (
+        "native_charge_changed_since_review"
+    )
+
+
+def test_reviewed_projection_withholds_missing_commissioned_value():
+    day = "2026-11-25"
+    native = {day: {"import_cost_pence": 100.0}}
+    preview = {
+        "days": {
+            day: {
+                "import_cost_pence": {
+                    "recorded_pence": 100.0,
+                    "supplier_estimate_pence": 110.0,
+                }
+            }
+        }
+    }
+    copy, audit = project_reviewed_historical_charges(
+        native, preview, reviewed_import_charges={day: (100.0, 110.0)}
+    )
+    assert copy == native
+    assert audit["withheld"][day]["import_cost_pence"] == (
+        "commissioned_roi_values_missing"
+    )
+
+
+def test_hypothetical_reporting_uses_same_delta_for_roi_bill_and_periods():
+    day = "2026-11-25"
+    native = {
+        day: {
+            "import_cost_pence": 300.0,
+            "export_income_pence": 320.0,
+            "actual_avoided_import_value_pence": 100.0,
+            "actual_system_value_pence": 420.0,
+            "happy_hour_estimated_credit_pence": 70.0,
+        }
+    }
+    preview = {
+        "days": {
+            day: {
+                "import_cost_pence": {
+                    "recorded_pence": 300.0,
+                    "supplier_estimate_pence": 316.8,
+                },
+                "export_income_pence": {
+                    "recorded_pence": 320.0,
+                    "supplier_estimate_pence": 316.8,
+                },
+            }
+        }
+    }
+    lifetime = LifetimeLedger(
+        import_cost_pence=1000.0,
+        export_income_pence=800.0,
+        actual_avoided_import_value_pence=200.0,
+        actual_system_value_pence=1000.0,
+        simulated_import_cost_pence=2000.0,
+    )
+    periods = {
+        "month": PeriodTotals(
+            start_date=START.date().replace(day=1),
+            end_date=NOW.date(),
+            import_cost_pence=1000.0,
+            export_income_pence=800.0,
+            actual_avoided_import_value_pence=200.0,
+            actual_system_value_pence=1000.0,
+            happy_hour_estimated_credit_pence=70.0,
+            simulated_import_cost_pence=2000.0,
+        ),
+        "today": PeriodTotals(start_date=NOW.date(), end_date=NOW.date()),
+    }
+    reward_audit = {
+        "entries": [
+            {"date": day, "type": "happy_hour"},
+            {"date": "2026-11-24", "type": "power_down"},
+        ]
+    }
+    result = historical_reporting_what_if(
+        native, preview, lifetime, periods, reward_audit=reward_audit
+    )
+    assert result["known_happy_hour_import_overlap_dates"] == [day]
+    assert result["all_import_charge_bases_require_review"] is True
+    assert result["live_reporting_authorised"] is False
+    assert result["reward_overlap_resolved"] is False
+    assert result["hypothetical_lifetime"]["actual_system_value_pence"] == 980.0
+    month = result["hypothetical_periods"]["month"]
+    assert month["actual_system_value_pence"] == 980.0
+    assert month["actual_net_after_estimated_happy_hour_credit_pence"] == 150.0
+    assert month["happy_hour_estimated_credit_pence"] == 70.0
+    assert month["simulated_import_cost_pence"] == 2000.0
+    assert result["hypothetical_periods"]["today"] == periods["today"].to_dict()
+    assert lifetime.actual_system_value_pence == 1000.0
+    assert native[day]["import_cost_pence"] == 300.0
+    assert (
+        historical_reporting_what_if(
+            native, preview, lifetime, periods, reward_audit=reward_audit
+        )
+        == result
+    )
+
+
+def test_happy_hour_overlap_survives_reward_audit_row_limit():
+    day = "2026-11-25"
+    rewards = build_reward_audit(
+        {},
+        {},
+        [
+            {
+                "booking_source": "octopus_joined_events",
+                "event_id": "test-booking",
+                "start": f"{day}T12:00:00+00:00",
+                "end": f"{day}T13:00:00+00:00",
+            }
+        ],
+        [],
+        now=NOW,
+        commissioning_date=START.date().replace(day=1),
+        max_entries=0,
+    )
+    assert rewards["entries"] == []
+    assert rewards["entries_omitted"] == 1
+    assert rewards["historical_coverage"]["known_happy_hour_dates"] == [day]
+    result = historical_reporting_what_if(
+        {},
+        {
+            "days": {
+                day: {
+                    "import_cost_pence": {
+                        "recorded_pence": 100.0,
+                        "supplier_estimate_pence": 110.0,
+                    }
+                }
+            }
+        },
+        LifetimeLedger(),
+        {},
+        reward_audit=rewards,
+    )
+    assert result["known_happy_hour_import_overlap_dates"] == [day]
+    assert result["reward_overlap_resolved"] is False
+
+
+def test_charge_audit_distinguishes_csv_and_integration_estimated_intervals():
+    energy = SupplierIntervalLedger()
+    charges = SupplierChargeEvidence()
+    rows = _day(START)
+    energy.ingest(rows, source="octopus_csv", now=NOW)
+    charges.ingest(rows, source="octopus_integration", now=NOW)
+    charges.ingest(rows[:12], source="octopus_csv", now=NOW)
+    native = {"2026-11-25": {"import_cost_pence": 300.0}}
+    audit = charges.reconciliation(
+        energy,
+        native,
+        now=NOW,
+        commissioning_date="2026-11-24",
+        include_daily_audit=True,
+    )
+    result = audit["kinds"]["electricity_import"]
+    assert result["complete_csv_priced_days"] == 0
+    assert result["complete_days_with_integration_estimates"] == 1
+    proposal = historical_charge_adjustment_preview(audit)["days"]["2026-11-25"][
+        "import_cost_pence"
+    ]
+    assert proposal["csv_priced_intervals"] == 12
+    assert proposal["integration_estimated_intervals"] == 36
+    assert proposal["proposed_delta_pence"] == 16.8
+    charges.ingest(rows[12:], source="octopus_csv", now=NOW)
+    audit = charges.reconciliation(
+        energy,
+        native,
+        now=NOW,
+        commissioning_date="2026-11-24",
+        include_daily_audit=True,
+    )
+    result = audit["kinds"]["electricity_import"]
+    assert result["complete_csv_priced_days"] == 1
+    assert result["complete_days_with_integration_estimates"] == 0
+    assert result["difference_pence"] == 16.8
+    assert audit["roi_or_ledger_write_authorised"] is False
+
+
+def test_happy_hour_exact_csv_charge_comparison_preserves_reward_receipt():
+    energy = SupplierIntervalLedger()
+    charges = SupplierChargeEvidence()
+    start = START + timedelta(hours=12)
+    end = start + timedelta(hours=1)
+    rows = [
+        _row(start, kwh=1.0, charge=35.8),
+        _row(start + timedelta(minutes=30), kwh=2.0, charge=13.2),
+    ]
+    audit = {
+        "entries": [
+            {
+                "type": "happy_hour",
+                "date": start.date().isoformat(),
+                "reward_key": "example",
+                "start": start.isoformat(),
+                "end": end.isoformat(),
+                "estimated_reward_pence": 80.0,
+            }
+        ],
+        "entries_omitted": 0,
+    }
+    energy.ingest(rows, source="octopus_csv", now=NOW)
+    charges.ingest(rows, source="octopus_integration", now=NOW)
+    result = charges.happy_hour_charge_comparison(energy, audit, now=NOW)
+    assert result["events"][0]["status"] == "estimated_charge_comparison_only"
+    assert result["events"][0]["comparison_source"] == "octopus_integration"
+    assert result["events"][0]["charge_minus_credit_pence"] == -31.0
+    assert result["manual_csv_required"] is False
+    charges.ingest(rows[:1], source="octopus_csv", now=NOW)
+    result = charges.happy_hour_charge_comparison(energy, audit, now=NOW)
+    assert result["events"][0]["csv_estimated_import_charge_pence"] is None
+    assert result["events"][0]["comparison_source"] == "octopus_integration"
+    charges.ingest(rows[1:], source="octopus_csv", now=NOW)
+    result = charges.happy_hour_charge_comparison(energy, audit, now=NOW)
+    event = result["events"][0]
+    assert event["csv_estimated_import_charge_pence"] == 49.0
+    assert event["csv_import_kwh"] == 3.0
+    assert event["charge_minus_credit_pence"] == -31.0
+    assert result["supplier_settlement_verified"] is False
+    assert result["reward_or_ledger_write_authorised"] is False
+    assert audit["entries"][0]["estimated_reward_pence"] == 80.0
+    charges.ingest([{**rows[1], "charge_pence": 14.0}], source="octopus_csv", now=NOW)
+    result = charges.happy_hour_charge_comparison(energy, audit, now=NOW)
+    assert result["events"][0]["csv_estimated_import_charge_pence"] is None
+
+
+def test_happy_hour_automatic_comparison_does_not_need_csv_or_guess_missing_rows():
+    energy = SupplierIntervalLedger()
+    charges = SupplierChargeEvidence()
+    start = START + timedelta(hours=12)
+    end = start + timedelta(hours=1)
+    rows = [_row(start), _row(start + timedelta(minutes=30))]
+    audit = {
+        "entries": [
+            {
+                "type": "happy_hour",
+                "start": start.isoformat(),
+                "end": end.isoformat(),
+                "estimated_reward_pence": 15.0,
+            }
+        ]
+    }
+    energy.ingest(rows, source="octopus_integration", now=NOW)
+    charges.ingest(rows[:1], source="octopus_integration", now=NOW)
+    result = charges.happy_hour_charge_comparison(energy, audit, now=NOW)
+    assert result["events"][0]["status"] == "awaiting_exact_priced_intervals"
+    charges.ingest(rows[1:], source="octopus_integration", now=NOW)
+    result = charges.happy_hour_charge_comparison(energy, audit, now=NOW)
+    assert result["events"][0]["charge_minus_credit_pence"] == -1.8
+    assert result["events"][0]["optional_csv_estimate"] is None
+    restored = SupplierChargeEvidence()
+    restored.restore(charges.dump(), now=NOW)
+    assert restored.happy_hour_charge_comparison(energy, audit, now=NOW) == result
+    charges.ingest(
+        [{**rows[0], "charge_pence": 7.6}, rows[1]],
+        source="octopus_csv",
+        now=NOW,
+    )
+    result = charges.happy_hour_charge_comparison(energy, audit, now=NOW)
+    assert result["events"][0]["status"] == "source_estimates_disagree"
+    assert result["events"][0]["charge_minus_credit_pence"] is None
+    assert result["reward_or_ledger_write_authorised"] is False

@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import importlib.util
 import sys
+from contextlib import suppress
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from types import ModuleType, SimpleNamespace
@@ -197,6 +198,313 @@ def test_history_batches_use_fixed_anchor_and_skip_empty_window():
         assert len(queries) == 12
         assert recorder.status["historical_charge_recovery"]["stop_reason"] == (
             "batch_limit"
+        )
+        retry_at = recorder._history_retry_at
+        assert retry_at is not None
+        await recorder._consume_recorded_charges(
+            retry_at - timedelta(seconds=1), entities
+        )
+        assert recorder._history_task is None
+        await recorder._consume_recorded_charges(retry_at, entities)
+        await recorder._history_task
+        assert len(queries) == 13
+        assert queries[-1] == (entities, retry_at - timedelta(days=7), retry_at)
+
+    asyncio.run(exercise())
+
+
+def test_complete_price_coverage_stops_and_new_gap_reopens_history():
+    module = _load_recorder_module()
+
+    class FakeHass:
+        async def async_add_executor_job(self, func, *args):
+            return func(*args)
+
+        def async_create_background_task(self, coroutine, _name):
+            return asyncio.create_task(coroutine)
+
+    async def exercise():
+        recorder = module.SupplierIntervalRecorder(FakeHass(), "test")
+        entities = {
+            "sensor.import_cost": "electricity_import",
+            "sensor.export_cost": "electricity_export",
+        }
+        start = NOW.replace(hour=0) - timedelta(days=1)
+        rows = []
+        for kind in entities.values():
+            for n in range(48):
+                left = start + timedelta(minutes=30 * n)
+                rows.append(
+                    {
+                        "kind": kind,
+                        "start": left.isoformat(),
+                        "end": (left + timedelta(minutes=30)).isoformat(),
+                        "kwh": 1.0,
+                        "charge_pence": 6.6,
+                    }
+                )
+        recorder._ledger.ingest(rows, source="octopus_csv", now=NOW)
+        recorder._charges.ingest(rows, source="octopus_csv", now=NOW)
+        queries = []
+
+        async def read(entities, left, right):
+            queries.append((entities, left, right))
+            return []
+
+        recorder._recover_recorded_charges = read
+        await recorder._consume_recorded_charges(
+            NOW, entities, commissioning_date="2026-11-24"
+        )
+        assert recorder._history_task is None
+        assert recorder.status["historical_charge_recovery"]["stop_reason"] == (
+            "all_retained_complete_days_priced"
+        )
+        assert not queries
+        recorder._charges.ingest(
+            [{**rows[0], "charge_pence": 7.6}],
+            source="octopus_integration",
+            now=NOW,
+        )
+        await recorder._consume_recorded_charges(
+            NOW + timedelta(minutes=30), entities, commissioning_date="2026-11-24"
+        )
+        assert recorder._history_task is not None
+        await recorder._history_task
+        assert len(queries) == 1
+
+    asyncio.run(exercise())
+
+
+def test_failed_history_batch_retries_original_window_without_restart():
+    module = _load_recorder_module()
+    queries = []
+
+    class FakeHass:
+        async def async_add_executor_job(self, func, *args):
+            return func(*args)
+
+        def async_create_background_task(self, coroutine, _name):
+            return asyncio.create_task(coroutine)
+
+    async def exercise():
+        recorder = module.SupplierIntervalRecorder(FakeHass(), "test")
+        entities = {"sensor.import_cost": "electricity_import"}
+
+        async def read(mapped, left, right):
+            queries.append((mapped, left, right))
+            if len(queries) == 1:
+                raise RuntimeError("temporary Recorder failure")
+            return []
+
+        recorder._recover_recorded_charges = read
+        await recorder._consume_recorded_charges(NOW, entities)
+        with suppress(RuntimeError):
+            await recorder._history_task
+        await recorder._consume_recorded_charges(NOW + timedelta(minutes=30), entities)
+        status = recorder.status["historical_charge_recovery"]
+        assert status["stop_reason"] == "query_failed"
+        assert status["manual_csv_required"] is False
+        retry_at = NOW + timedelta(minutes=90)
+        assert status["next_retry_at"] == retry_at.isoformat()
+        await recorder._consume_recorded_charges(
+            retry_at - timedelta(seconds=1), entities
+        )
+        assert recorder._history_task is None
+        await recorder._consume_recorded_charges(retry_at, entities)
+        await recorder._history_task
+        assert len(queries) == 2
+        assert queries[0] == queries[1]
+
+    asyncio.run(exercise())
+
+
+def test_automatic_recovery_recovers_missing_meter_rows_even_if_priced_days_exist():
+    module = _load_recorder_module()
+    queries = []
+
+    class FakeHass:
+        async def async_add_executor_job(self, func, *args):
+            return func(*args)
+
+        def async_create_background_task(self, coroutine, _name):
+            return asyncio.create_task(coroutine)
+
+    async def exercise():
+        recorder = module.SupplierIntervalRecorder(FakeHass(), "test")
+        entities = {
+            "sensor.import_cost": "electricity_import",
+            "sensor.export_cost": "electricity_export",
+            "sensor.import_energy": "consumption:electricity_import",
+            "sensor.export_energy": "consumption:electricity_export",
+        }
+        start = NOW.replace(hour=0) - timedelta(days=4)
+        rows = []
+        for day in (start, start + timedelta(days=1)):
+            for kind in ("electricity_import", "electricity_export"):
+                for n in range(48):
+                    left = day + timedelta(minutes=30 * n)
+                    rows.append(
+                        {
+                            "kind": kind,
+                            "start": left.isoformat(),
+                            "end": (left + timedelta(minutes=30)).isoformat(),
+                            "kwh": 1.0,
+                            "charge_pence": 6.6,
+                        }
+                    )
+        recorder._ledger.ingest(rows[:96], source="octopus_integration", now=NOW)
+        recorder._charges.ingest(rows, source="octopus_integration", now=NOW)
+
+        async def read(mapped, left, right):
+            queries.append((mapped, left, right))
+            return [{"consumption_evidence": row} for row in rows[96:]]
+
+        recorder._recover_recorded_charges = read
+        await recorder._consume_recorded_charges(
+            NOW, entities, commissioning_date="2026-11-22"
+        )
+        assert recorder._history_task is not None
+        await recorder._history_task
+        assert await recorder._consume_recorded_charges(
+            NOW + timedelta(minutes=30), entities, commissioning_date="2026-11-22"
+        )
+        status = recorder.status["historical_charge_recovery"]
+        assert status["stop_reason"] == "all_retained_complete_days_priced"
+        assert status["last_batch_consumption_rows"] == 96
+        assert status["recent_missing_meter_days"] == {
+            "electricity_import": [],
+            "electricity_export": [],
+        }
+        assert len(queries) == 1
+        assert len(recorder._ledger.rows) == 192
+        assert len(recorder._charges.rows) == 192
+        assert recorder._history_task is None
+
+    asyncio.run(exercise())
+
+
+def test_old_missing_meter_day_and_cached_financial_recovery_visibility():
+    module = _load_recorder_module()
+    entities = {
+        "sensor.import_cost": "electricity_import",
+        "sensor.export_cost": "electricity_export",
+        "sensor.import_energy": "consumption:electricity_import",
+        "sensor.export_energy": "consumption:electricity_export",
+    }
+
+    class FakeHass:
+        async def async_add_executor_job(self, func, *args):
+            return func(*args)
+
+        def async_create_background_task(self, coroutine, _name):
+            return asyncio.create_task(coroutine)
+
+    async def exercise():
+        recorder = module.SupplierIntervalRecorder(FakeHass(), "test")
+        start = NOW.replace(hour=0) - timedelta(days=14)
+        missing = start + timedelta(days=2)
+        rows = []
+        late = []
+        for offset in range(12):
+            day = start + timedelta(days=offset)
+            for kind in ("electricity_import", "electricity_export"):
+                for n in range(48):
+                    left = day + timedelta(minutes=30 * n)
+                    row = {
+                        "kind": kind,
+                        "start": left.isoformat(),
+                        "end": (left + timedelta(minutes=30)).isoformat(),
+                        "kwh": 1.0,
+                        "charge_pence": 6.6,
+                    }
+                    (late if day == missing else rows).append(row)
+        recorder._ledger.ingest(rows, source="octopus_integration", now=NOW)
+        recorder._charges.ingest(rows + late, source="octopus_integration", now=NOW)
+
+        async def read(mapped, left, right):
+            return [{"consumption_evidence": row} for row in late]
+
+        recorder._recover_recorded_charges = read
+        await recorder._consume_recorded_charges(
+            NOW, entities, commissioning_date="2026-11-12"
+        )
+        history = recorder.status["historical_charge_recovery"]
+        assert history["missing_meter_days"]["electricity_import"] == [
+            missing.date().isoformat()
+        ]
+        assert history["recent_missing_meter_days"]["electricity_import"] == []
+        summary = recorder.financial_recovery_summary(
+            {"pending_count": 2, "unsettled_total_pence": 175.0}
+        )
+        assert summary["state"] == "conflicting_or_unmatched_evidence"
+        assert summary["missing_meter_day_counts"]["electricity_export"] == 1
+        assert summary["pending_reward_count"] == 2
+        assert summary["unsettled_reward_pence"] == 175.0
+        assert not summary["supplier_settlement_verified"]
+        assert not summary["manual_csv_required"]
+        await recorder._history_task
+        await recorder._consume_recorded_charges(
+            NOW + timedelta(minutes=30), entities, commissioning_date="2026-11-12"
+        )
+        summary = recorder.financial_recovery_summary({})
+        assert summary["state"] == "retained_estimates_complete"
+        assert summary["unmatched_or_conflicted_intervals"] == 0
+        assert not summary["live_financial_adjustment_authorised"]
+        assert recorder._history_task is None
+
+    asyncio.run(exercise())
+
+
+def test_history_mapping_change_discards_old_result_even_if_mapping_returns():
+    module = _load_recorder_module()
+    original = {"sensor.old": "electricity_import"}
+    replacement = {"sensor.new": "electricity_import"}
+    start = NOW - timedelta(days=1)
+    row = {
+        "kind": "electricity_import",
+        "start": start.isoformat(),
+        "end": (start + timedelta(minutes=30)).isoformat(),
+        "kwh": 1.0,
+        "charge_pence": 6.6,
+    }
+
+    class FakeHass:
+        async def async_add_executor_job(self, func, *args):
+            return func(*args)
+
+        def async_create_background_task(self, coroutine, _name):
+            return asyncio.create_task(coroutine)
+
+    async def exercise():
+        recorder = module.SupplierIntervalRecorder(FakeHass(), "test")
+        release = asyncio.Event()
+        queries = []
+
+        async def read(mapped, left, right):
+            queries.append(mapped)
+            if len(queries) == 1:
+                await release.wait()
+                return [row, {"consumption_evidence": row}]
+            return []
+
+        recorder._recover_recorded_charges = read
+        await recorder._consume_recorded_charges(NOW, original)
+        await asyncio.sleep(0)
+        await recorder._consume_recorded_charges(
+            NOW + timedelta(minutes=30), replacement
+        )
+        assert recorder.financial_recovery_summary({})["state"] == "mapping_changed"
+        assert len(queries) == 1
+        release.set()
+        await recorder._history_task
+        await recorder._consume_recorded_charges(NOW + timedelta(hours=1), original)
+        await recorder._history_task
+        assert queries == [original, original]
+        assert not recorder._charges.rows
+        assert not recorder._ledger.rows
+        assert (
+            recorder.status["historical_charge_recovery"]["discarded_mapping_batches"]
+            == 1
         )
 
     asyncio.run(exercise())

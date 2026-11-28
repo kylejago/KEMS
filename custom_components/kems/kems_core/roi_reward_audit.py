@@ -277,6 +277,9 @@ def build_reward_audit(
         "through_date": today,
         "scope": "known_joined_happy_hours_and_persisted_power_down_events",
         "known_happy_hour_hours": len(happy_rows),
+        "known_happy_hour_dates": sorted(
+            {row["date"] for row in happy_rows if row.get("date")}
+        ),
         "happy_hour_hours_in_roi": sum(r["included_in_roi"] for r in happy_rows),
         "happy_hour_hours_pending_evidence": sum(
             r["estimated_reward_pence"] is None for r in happy_rows
