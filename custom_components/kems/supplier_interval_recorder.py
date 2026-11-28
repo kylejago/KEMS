@@ -307,6 +307,28 @@ class SupplierIntervalRecorder:
                             key = json.dumps(evidence, sort_keys=True)
                             result[key] = {"baseline_evidence": evidence}
                         continue
+                    if kind.startswith("consumption:"):
+                        direction = kind.removeprefix("consumption:")
+                        attrs = state.attributes
+                        if (
+                            attrs.get("unit_of_measurement") != "kWh"
+                            or attrs.get("is_export")
+                            is not (direction == "electricity_export")
+                            or not isinstance(attrs.get("charges"), list)
+                        ):
+                            continue
+                        for item in attrs["charges"]:
+                            if not isinstance(item, dict):
+                                continue
+                            energy = {
+                                "kind": direction,
+                                "start": item.get("start"),
+                                "end": item.get("end"),
+                                "kwh": item.get("consumption"),
+                            }
+                            key = ("consumption", *map(str, energy.values()))
+                            result[key] = {"consumption_evidence": energy}
+                        continue
                     for row in supplier_cost_rows(kind, state.attributes):
                         key = tuple(str(value) for value in row.values())
                         result[key] = row
@@ -325,7 +347,17 @@ class SupplierIntervalRecorder:
             task, self._history_task = self._history_task, None
             try:
                 rows = task.result()
-                charges = [row for row in rows if "baseline_evidence" not in row]
+                charges = [
+                    row
+                    for row in rows
+                    if "baseline_evidence" not in row
+                    and "consumption_evidence" not in row
+                ]
+                consumption = [
+                    row["consumption_evidence"]
+                    for row in rows
+                    if "consumption_evidence" in row
+                ]
                 baselines = [
                     row["baseline_evidence"]
                     for row in rows
@@ -334,6 +366,11 @@ class SupplierIntervalRecorder:
                 changed = await self._hass.async_add_executor_job(
                     lambda: self._charges.ingest(
                         charges, source="octopus_integration", now=now
+                    )
+                )
+                changed |= await self._hass.async_add_executor_job(
+                    lambda: self._ledger.ingest(
+                        consumption, source="octopus_integration", now=now
                     )
                 )
                 for evidence in baselines:
@@ -347,11 +384,12 @@ class SupplierIntervalRecorder:
                 self._history_status = {
                     "status": (
                         "observed"
-                        if self._history_candidate_rows or self._history_baseline_rows
+                        if (self._history_candidate_rows or self._history_baseline_rows or consumption)
                         else "no_retained_attributes"
                     ),
                     "candidate_rows": self._history_candidate_rows,
                     "last_batch_candidate_rows": len(charges),
+                    "last_batch_consumption_rows": len(consumption),
                     "baseline_candidate_observations": self._history_baseline_rows,
                     "empty_batches": self._history_empty_batches,
                     "evidence_changed": self._history_changed,
@@ -392,8 +430,13 @@ class SupplierIntervalRecorder:
         # search is not a permanent assertion about future charge coverage.
         if (
             commissioning_date is not None
-            and len(entities) == 2
-            and set(entities.values()) == {"electricity_import", "electricity_export"}
+            and {v for v in entities.values() if not v.startswith("consumption:")}
+            == {"electricity_import", "electricity_export"}
+            and sum(
+                v in {"electricity_import", "electricity_export"}
+                for v in entities.values()
+            )
+            == 2
         ):
             coverage = await self._hass.async_add_executor_job(
                 lambda: self._charges.reconciliation(
@@ -664,6 +707,7 @@ class SupplierIntervalRecorder:
                 if len(candidates) != 1:
                     continue
                 if kind != "gas":
+                    history_entities[candidates[0]] = f"consumption:{kind}"
                     meter = registry.async_get(mapping[kind] or "")
                     expected = (
                         meter.unique_id.casefold().removesuffix("_current_rate")
