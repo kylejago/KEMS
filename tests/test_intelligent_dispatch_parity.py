@@ -127,3 +127,15 @@ def test_unplugged_does_not_hide_conflicting_or_missing_evidence() -> None:
             )["classification"]
             == "evidence_incomplete"
         )
+
+
+def test_retired_parity_archive_does_not_poll_legacy_entities() -> None:
+    root = Path(__file__).parents[1] / "custom_components" / "kems"
+    source = (root / "ohme_charge_slot_observer.py").read_text(encoding="utf-8")
+    assert '"status": "retired_archive_only"' in source
+    assert "self._legacy_parity.restore_active_checkpoint(checkpoint)" in source
+    assert "self._legacy_parity.observe(" not in source
+    assert "self._parity_store.async_delay_save(" not in source
+    assert "self._parity_store.async_save(" not in source
+    assert 'self._hass.services.has_service("ohme", "list_charge_slots")' in source
+    assert "self._hass.async_create_task(self._async_poll())" in source
