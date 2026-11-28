@@ -240,6 +240,11 @@ async def async_get_config_entry_diagnostics(
         commissioning_date=coordinator.settings.roi.commissioning_date,
         include_daily_audit=True,
     )
+    financial_reconciliation["happy_hour_charge_comparison"] = (
+        coordinator._supplier_intervals.happy_hour_charge_comparison(
+            data.roi.reward_audit, now=dt_util.now()
+        )
+    )
     financial_reconciliation["reporting_what_if"] = historical_reporting_what_if(
         coordinator._lifetime.completed_daily_financial_totals,
         financial_reconciliation["historical_adjustment_preview"],
