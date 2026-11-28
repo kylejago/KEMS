@@ -1590,6 +1590,17 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                 and str(ohme_status_state.state).strip().lower()
                 in {"finished", "completed", "unplugged", "disconnected"}
             )
+            # The asynchronous charging-report fallback may only preserve
+            # an already owned and physically verified regular overnight hold.
+            prior_foxess = self._foxess_control.status
+            verified_overnight_hold = bool(
+                prior_foxess.get("owned_by_kems") is True
+                and prior_foxess.get("cheap_period_confirmed") is True
+                and prior_foxess.get("last_applied_action")
+                in {"self_use", "force_charge"}
+                and prior_foxess.get("last_verified_min_soc_on_grid") == 100.0
+                and prior_foxess.get("observed_min_soc_on_grid") == 100.0
+            )
             control = await self._ev_grid_hold.async_apply(
                 snapshot,
                 control,
@@ -1600,6 +1611,7 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                 source_uncertain=ev_hold_source_uncertain,
                 source_grace_seconds=_ALPHA975_EV_HOLD_SOURCE_GRACE_SECONDS,
                 ohme_finished=ohme_finished,
+                verified_overnight_hold=verified_overnight_hold,
             )
             control = protect_fixed_overnight_grid_supply(
                 snapshot, control, self.settings.control

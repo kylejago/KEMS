@@ -416,7 +416,9 @@ def _charging_overnight_hold_bound(
     ct = ages.get("grid_import_kw")
     load = ages.get("house_load_kw")
     bat = ages.get("battery_power_kw")
-    if any(age is None or not isfinite(age) or not 0 <= age <= 30 for age in (ct, load)):
+    if any(
+        age is None or not isfinite(age) or not 0 <= age <= 30 for age in (ct, load)
+    ):
         return None
     if (
         abs(ct - load) > 5
@@ -498,6 +500,7 @@ def protect_live_cheap_ev(
     *,
     no_paid_export_mode: bool,
     held_floor_percent: float | None = None,
+    verified_overnight_hold: bool = False,
 ) -> ControlState:
     """Guard a confirmed-cheap live plan when Ohme draws power or is unknown.
 
@@ -654,7 +657,8 @@ def protect_live_cheap_ev(
     )
     charging_hold_bound = (
         _charging_overnight_hold_bound(snapshot, control, config, house, ev, grid)
-        if conservative_demand > limit
+        if verified_overnight_hold
+        and conservative_demand > limit
         and not observed_over_limit
         and balanced_hold_demand is None
         else None
