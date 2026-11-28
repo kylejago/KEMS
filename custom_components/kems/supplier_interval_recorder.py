@@ -26,10 +26,10 @@ from .kems_core.supplier_charges import (
     supplier_cost_rows,
 )
 from .kems_core.supplier_intervals import (
+    _LONDON,
     FORMAT,
     KINDS,
     SupplierIntervalLedger,
-    _LONDON,
     _utc,
     gas_calorific_value_diagnostic,
 )

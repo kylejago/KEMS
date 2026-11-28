@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import importlib.util
 import sys
+from contextlib import suppress
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from types import ModuleType, SimpleNamespace
@@ -297,10 +298,8 @@ def test_failed_history_batch_retries_original_window_without_restart():
 
         recorder._recover_recorded_charges = read
         await recorder._consume_recorded_charges(NOW, entities)
-        try:
+        with suppress(RuntimeError):
             await recorder._history_task
-        except RuntimeError:
-            pass
         await recorder._consume_recorded_charges(NOW + timedelta(minutes=30), entities)
         status = recorder.status["historical_charge_recovery"]
         assert status["stop_reason"] == "query_failed"
