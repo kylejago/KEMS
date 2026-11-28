@@ -381,9 +381,7 @@ def project_historical_reporting_totals(lifetime, periods, audit):
         imported = exported = 0.0
         for day_text, fields in audit.get("applied", {}).items():
             day = date.fromisoformat(day_text)
-            if (start is not None and day < start) or (
-                end is not None and day > end
-            ):
+            if (start is not None and day < start) or (end is not None and day > end):
                 continue
             imported += fields.get("import_cost_pence", 0.0)
             exported += fields.get("export_income_pence", 0.0)
