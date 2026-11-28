@@ -1,44 +1,85 @@
 # KEMS — Kyle Energy Management System
 
-**Current operating baseline (20 November 2026):** Home Assistant KEMS
-`0.9.0-alpha9.239`, commissioned and operating in **Control** mode with
-live FoxESS KH7, solar PV, battery, Octopus tariffs and Ohme charging evidence.
-The version here is the last independently verified installed diagnostic, not a
-promise that this repository always matches the installed integration.
+KEMS is a Home Assistant energy management integration for solar, battery,
+grid electricity, smart tariffs and EV charging. It combines physical energy
+monitoring, forecast-aware optimisation, commissioned FoxESS control and
+long-term financial reporting.
 
-**Release provenance:** A GitHub release tag or draft PR is not evidence of a Home Assistant installation. Check KEMS diagnostics for the running version, commissioning and physical restoration. The updater defaults to a pre-update backup and must defer if its backup service is unavailable; the separate safe-first 06:00–06:30 maintenance checks also remain in force. See [current audit follow-up](docs/alpha9248-audit-followup.md) for the staged post-Happy-Hour candidate and remaining evidence gates.
+**Release candidate:** `0.9.0-alpha9.268` (28 November 2026). The latest
+reviewed installed baseline is Alpha9.267; overnight live acceptance is
+still pending. A candidate, release tag or successful CI run does not establish
+installation or hardware validation. Check current Home Assistant diagnostics.
 
-### What actually runs live
+[Start here / installation and operating guide](START_HERE.md) ·
+[Changelog](CHANGELOG.md) · [Dashboard guide](dashboards/README.md) ·
+[Financial reconciliation](docs/alpha9268-financial-reconciliation.md)
 
-- **Live Agile Outgoing** — rolling price/solar/house forecasts inform the
-  approved FoxESS battery-export command path. Physical telemetry, the
-  commissioned **7 kW DNO limit**, the **15% deliberate-export reserve** and
-  separate **10% house-only floor** independently bound every paid export.
-- **Confirmed overnight cheap import** — normal 23:30–05:30 tariff evidence
-  controls authorised grid charging and house supply; no daytime discount is
-  assumed from Ohme charging alone.
-- **Ohme EV protection** — measured charging triggers guarded home-battery
-  protection independent of the retired Octopus Intelligent integration.
-  Protection does **not** prove a discounted supplier tariff.
-- **Happy Hour / Power Down** — confirmed joined events take their dedicated,
-  higher-priority event routes; actual rewards and supplier-settled amounts are
-  distinguished from estimated credits.
-- **Live and No-KEMS reporting** — current physical values plus the explicit
-  counterfactual No-KEMS baseline. The digital twin is planning/reporting
-  evidence, not a second physical meter or an independent inverter writer.
+## What actually runs live
 
-**Not yet live:** price-only *solar-surplus* Self Use ↔ Feed-in First
-mode switching remains in the read-only `solar_routing_shadow.py` evaluator.
-Do not mistake that evaluator for the already-live paid Agile export controller.
+- **Live Agile Outgoing:** rolling tariff, solar and demand forecasts inform
+  the approved FoxESS battery-export path. On the reference installation,
+  the 7 kW DNO ceiling and 15% deliberate-export reserve are independent of
+  the 10% house-only floor.
+- **Confirmed regular overnight cheap import:** 23:30–05:30 on the reference
+  tariff; whole-home grid supply with battery discharge held, independently
+  of EV connection. EV activity constrains battery charging (5 kW cap when
+  charging on the reference site); retain the configured 14.5 kW site-import
+  ceiling and all physical safety vetoes. Alpha9.267's new overnight
+  implementation still requires full live-session acceptance.
+- **Ohme EV protection:** measured charger activity supports battery hold.
+  Ohme charging alone does not confirm a discounted whole-home tariff.
+  Alpha9.268 archives legacy parity polling; configured legacy mappings are
+  not removed automatically.
+- **Happy Hour and Power Down:** confirmed joined events use dedicated
+  routes; estimated rewards are separate from supplier-settled amounts.
+- **Live and No-KEMS reporting:** physical readings, counterfactual costs,
+  gas, retained period totals, ROI and reward estimates; plans are not
+  independent meter readings.
+- **Notifications:** configured Home Assistant notify services deliver
+  regular off-peak and event messages, daily/weekly recaps and private
+  technical warnings.
 
-**Notifications:** regular off-peak, joined events, daily/weekly reports and
-private technical warnings use configured Home Assistant `notify.` services.
-The retired Intelligent-slot notification cannot certify Ohme extra cheap
-hours; observed Ohme charging alerts explicitly do not claim supplier discounts.
+**Not yet live:** experimental price-only solar-surplus Self Use ↔ Feed-in
+First switching remains shadow-only. It is separate from live Agile battery
+export. Automatic supplier-confirmed billing/credit retrieval and verified
+historical adjustments to live financial totals are not implemented in 268.
 
-**Updates:** KEMS's safe-first automatic update window is **06:00–06:30
-Europe/London**. Never interrupt active paid export, EV charging, Happy Hour or
-Power Down merely to install a new release.
+## Installation and updates
+
+Use HACS to install KEMS from this repository, restart Home Assistant, then
+add the KEMS integration under **Settings → Devices & services**. Configure
+the source entities and tariff, battery, inverter and grid limits for the
+actual installation. Start with monitoring and commission the hardware
+before enabling live control. See [Start here](START_HERE.md) and the
+[commissioning checklist](docs/commissioning-checklist.md).
+
+The managed dashboard updates with KEMS; register it once as described in
+the [dashboard guide](dashboards/README.md). The safe-first automatic update
+window defaults to **06:00–06:30 Europe/London**. A pre-update backup is
+required by default; unavailable/failed backup and protected active energy
+operations defer installation. Never force an update during active export,
+EV charging or a reward session.
+
+## Autonomous financial evidence (Alpha9.268)
+
+KEMS retains mapped supplier consumption and estimated costs locally,
+recovers available Recorder history, detects recent missing meter days and
+retries failed or exhausted recovery scans. CSV files are optional historical
+corroboration, not a recurring maintenance requirement. Happy Hour comparison
+works with automatic data alone. Missing or conflicting evidence stays
+pending; estimates never become supplier-settled by inference. The historical
+what-if audit preserves native accounting, existing credits and counterfactual
+costs; it does not change live ROI, dashboard bills or WhatsApp totals.
+
+See [reconciliation scope and limitations](docs/alpha9268-financial-reconciliation.md).
+
+## Development and safety
+
+Use the full regression suite, Black, Ruff, HACS/hassfest, Home Assistant
+runtime compatibility and ESPHome compilation checks before publishing.
+Software validation does not replace physical commissioning or on-site
+acceptance. See [hardware backend contract](docs/hardware-backend-contract.md)
+and [control boundary](docs/control-boundary.md).
 
 ### Historical development reference
 

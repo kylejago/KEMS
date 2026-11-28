@@ -1,44 +1,73 @@
 # Start here — KEMS
 
-## Current live system (20 November 2026)
+## Current release and installation status (28 November 2026)
 
-KEMS `0.9.0-alpha9.239` is the latest version verified installed from
-Home Assistant diagnostics. The property uses FoxESS KH7, solar PV, battery,
-Octopus Energy and Ohme ePod in **live Control mode**. This is **not** the
-earlier Alpha8.0 simulation-only commissioning baseline described below.
+Alpha9.268 is the prepared release candidate; Alpha9.267 is the latest
+reviewed installed baseline, with overnight acceptance still pending.
+GitHub publication and Home Assistant installation are separate events.
+Check the running version and readiness in diagnostics.
 
-The integration is available through **Home Assistant → Settings → Devices &
-services → KEMS**. Its managed dashboard should distinguish **Live KEMS**
-(measured power, physical battery SOC and actual control), **No KEMS**
-(counterfactual), and clearly labelled planned/simulated Agile intervals.
-A model result must never be presented as an independent supplier meter.
+## Set up KEMS
 
-**Live control:** 7 kW DNO export ceiling, 15% minimum for deliberate paid
-export, 10% independent house-only cutoff, whole-site import protection and
-measured Ohme-triggered battery hold. Normal confirmed overnight off-peak
-import is authorised; **extra Ohme smart-charging periods do not prove
-whole-home discounted electricity** until the supplier confirms that scope
-and KEMS has a separately approved live tariff route.
+1. Install KEMS through HACS using the KEMS repository (add it as a custom
+   integration repository if needed), then restart Home Assistant.
+2. Open **Settings → Devices & services → Add integration → KEMS**.
+3. Discover or map the available Octopus Energy, FoxESS and Ohme entities.
+   Configure actual tariff times/rates, battery capacity, grid and inverter
+   limits, forecast, ROI and notification services. Do not copy the reference
+   property's limits into a different installation without verification.
+4. Begin in monitoring mode. Follow the
+   [commissioning checklist](docs/commissioning-checklist.md) before
+   enabling Control. Do not bypass emergency stop, source freshness,
+   physical readback or other safety gates.
+5. Register the managed dashboard once using the
+   [dashboard guide](dashboards/README.md). It refreshes automatically
+   with future KEMS updates.
 
-**Not live:** the experimental price-driven solar-only
-`solar_routing_shadow` decision to switch Self Use to Feed-in First.
-Ordinary Agile battery export is already live and separate.
+## Normal operation
 
-**Installation evidence:** The version above is a dated, previously verified diagnostic, not a promise that KEMS on this HA host is always the same as the newest GitHub release. A staged GitHub pull request does not reach HACS or trigger an unattended update. Check the running KEMS version and readiness in current diagnostics before declaring any new change installed.
+The reference property has FoxESS KH7, solar PV, battery, Octopus Energy
+and Ohme ePod. Its commissioned limits are 7 kW DNO export, 14.5 kW site
+import, 15% deliberate-export floor and independent 10% household floor.
+During confirmed 23:30–05:30 cheap import, Alpha9.267 separates the
+whole-home grid-supply hold from EV charging activity; verify a full session
+and daytime restoration before accepting it. Measured Ohme charging is
+battery-protection evidence, not proof of an extra discounted tariff.
+Price-driven solar-only switching remains shadow-only.
 
-**Updates:** automatic safe-first maintenance **06:00–06:30
-Europe/London**, with protected export/EV/events deferring installation.
-A backup is requested before automatic installation by default, and an unavailable/failed backup stops the install. Use the release bundle and SHA-256 validation; do not force installation during active export or a reward session.
+Use **Live Data** for physical flows and SOC, **KEMS/Compare** for plans
+and counterfactual comparison, and **History/System** for records and health.
+Configure notify services for family event/recap messages and separate
+private technical warnings.
 
-**Notifications:** joined events, normal overnight off-peak, observed Ohme
-charger activity, daily/weekly summaries and private warnings are routed
-through KEMS to configured Home Assistant WhatsApp notify entities.
-Observed charging is not represented as an Intelligent cheap-tariff slot.
+## Financial records and missing data
 
-For current priorities see GitHub issue
-[#449](https://github.com/kylejago/KEMS/issues/449), and for the remaining
-solar-only scope see
-[#365](https://github.com/kylejago/KEMS/issues/365).
+Normal operation does not require CSV uploads or statements. KEMS collects
+available supplier estimates every 30 minutes and retains observations
+locally; Alpha9.268 recovers independent electricity meter/cost history from
+Recorder, retries failures after an hour and retries exhausted searches
+after seven days. Exact Happy Hour comparisons work without CSVs.
+Power Down baseline observation is independent. Missing evidence is
+reported as pending, not invented; gas conversion and supplier settlement
+limitations remain explicit. Historical what-if adjustments do not yet
+change live financial totals.
+
+## Safe updates and troubleshooting
+
+Automatic maintenance defaults to **06:00–06:30 Europe/London**; defer
+when protected operations are active or a required backup is unavailable.
+Use coordinated release assets and SHA-256 validation. Do not force
+installation merely to meet an update window. For a manual update, check
+that no protected operation is active, take a backup and restart only
+when safe.
+
+If a problem occurs, check the running version, source ages, control
+reason, plan safety and actual physical readback. Use **Settings → Devices
+& services → KEMS → Download diagnostics** for evidence, keeping private
+account data out of public issues. For financial discrepancies review the
+supplier/reward evidence and missing-day status rather than repeatedly
+exporting files. See [financial reconciliation](docs/alpha9268-financial-reconciliation.md),
+[control boundary](docs/control-boundary.md) and [changelog](CHANGELOG.md).
 
 ---
 

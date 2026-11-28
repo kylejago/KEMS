@@ -4,24 +4,24 @@ KEMS ships a built-in-card managed master dashboard plus specialist dashboard ex
 
 ## Recommended: managed KEMS Master Dashboard
 
-`kems_master_dashboard.yaml` is the recommended dashboard for current KEMS Alpha 7 builds. It contains Overview, Live Energy, Simulation, Forecast, Full KEMS Forecast, Compare, Commissioning, Battery/Solar, Tariff/EV, Power Down, Control/EPS, Finance/History, Learning/Health, Gas, Updates and All Entities views.
+`kems_master_dashboard.yaml` is the recommended dashboard for current Alpha9 builds. The packaged base views are Home, Live Data, KEMS, Compare, Tomorrow, History and System. KEMS manages the dashboard and its generated content; specialist examples below are retained for reference.
 
 The master dashboard is packaged inside `custom_components/kems/` so HACS installs it with the integration. On every KEMS config-entry setup, KEMS builds the complete managed master dashboard and atomically refreshes `/config/kems_master_dashboard.yaml` when the shipped dashboard content has changed.
 
 This means a normal KEMS update followed by the required Home Assistant restart also updates the managed dashboard automatically.
 
-## Full KEMS Forecast vs Agile Smart Export inside the master
+## Historical specialist comparison views
 
-`kems_agile_smart_export_builtin.yaml` contains the dedicated comparison views for **Full KEMS Forecast** and **Agile Smart Export**. KEMS packages those views with the integration and appends them automatically to the managed KEMS Master Dashboard at startup.
+`kems_agile_smart_export_builtin.yaml` contains the dedicated comparison views for **Full KEMS Forecast** and **Agile Smart Export**. These were part of earlier managed dashboard layouts. Use the current packaged master as the source of truth for the installed views.
 
-The master therefore gains these tabs automatically:
+The historical specialist comparison includes:
 
 - **Forecast vs Agile** — live Region L Agile Outgoing rate, price-data completeness, winner/margin, import cost, export income and detailed Full KEMS Forecast vs Agile Smart Export routing.
 - **Agile Price Plan** — today and tomorrow half-hour Agile prices plus the planned Smart Export action, grid export, battery export and ending SOC for each slot.
 - **Agile History** — yesterday, 7-day, 30-day and all-time comparison, including cumulative Agile advantage.
 - **Agile Assumptions** — Region L, 12p fixed benchmark, battery-wear allowance, physical limits and simulation-only safety boundary.
 
-There is **no second Home Assistant dashboard registration required** for Agile Smart Export. Future KEMS updates refresh these views through the same automatically managed master dashboard.
+There is **no second Home Assistant dashboard registration required** for the managed KEMS dashboard. Specialist views are optional.
 
 The standalone `kems_agile_smart_export_builtin.yaml` remains in the repository as a specialist/reference dashboard and can still be installed manually if someone specifically wants the comparison separated from the master.
 
@@ -81,10 +81,10 @@ The managed master dashboard and the Agile Smart Export specialist dashboard use
 
 ## Entity IDs
 
-The managed master dashboard targets the current KEMS Alpha 7 entity set and includes a dynamic **All Entities** view. Home Assistant can retain an older entity-registry ID or append a suffix such as `_2`; use the All Entities view and Download diagnostics when investigating a mismatch.
+The managed master dashboard targets the current KEMS entity set. Home Assistant can retain an older entity-registry ID or append a suffix such as `_2`; use the entity registry and Download diagnostics when investigating a mismatch.
 
 The Agile Smart Export comparison exposes its live simulation states using the `sensor.kems_agile_*` and `sensor.kems_full_kems_forecast_*_comparison_*` namespaces. The complete slot plan and period payload are attached to `sensor.kems_agile_smart_export_plan` for the built-in master comparison views.
 
 ## Live hardware not installed yet
 
-Until FoxESS/live solar and battery sources are providing telemetry, live PV/battery values may be `unknown`. The proposal-system simulation, forecast planning, comparison views, and Agile Smart Export shadow comparison continue to operate from retained observations, forecasts, configured system limits, and the proposal solar model where applicable.
+Until FoxESS/live solar and battery sources are providing telemetry, live PV/battery values may be `unknown`. Available planning and comparison views may use retained observations, forecasts and the configured system model. Simulated values are not live telemetry. Paid Agile export can be live on a separately commissioned installation; the price-only solar routing experiment remains shadow-only.
