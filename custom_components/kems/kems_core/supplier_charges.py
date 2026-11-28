@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 from collections.abc import Iterable, Mapping
+from dataclasses import replace
 from datetime import UTC, date, datetime, timedelta
 from math import isfinite
 from typing import Any
@@ -367,6 +368,90 @@ def project_reviewed_historical_charges(
     audit["supplier_settlement_verified"] = False
     audit["ledger_write_authorised"] = False
     return projected, audit
+
+
+def project_historical_reporting_totals(lifetime, periods, audit):
+    """Apply one dated, reviewed delta set to copies of native report totals.
+
+    Preserve existing coverage metadata, counterfactuals and reward amounts.
+    The caller must supply native, not previously projected, totals.
+    """
+    def adjustments(start, end):
+        imported = exported = 0.0
+        for day_text, fields in audit.get("applied", {}).items():
+            day = date.fromisoformat(day_text)
+            if (start is not None and day < start) or (
+                end is not None and day > end
+            ):
+                continue
+            imported += fields.get("import_cost_pence", 0.0)
+            exported += fields.get("export_income_pence", 0.0)
+        return {
+            "import_cost_pence": imported,
+            "export_income_pence": exported,
+            "actual_avoided_import_value_pence": -imported,
+            "actual_system_value_pence": exported - imported,
+        }
+
+    def adjusted(native, start=None, end=None):
+        return replace(
+            native,
+            **{
+                key: round(getattr(native, key) + delta, 6)
+                for key, delta in adjustments(start, end).items()
+                if delta
+            },
+        )
+
+    return adjusted(lifetime), {
+        key: adjusted(
+            totals,
+            None if key == "all_time" else totals.start_date,
+            totals.end_date,
+        )
+        for key, totals in periods.items()
+    }
+
+
+def historical_reporting_what_if(daily_records, preview, lifetime, periods):
+    """Quantify the gross-charge scenario without authorising any correction."""
+    pairs = {}
+    for field in ("import_cost_pence", "export_income_pence"):
+        pairs[field] = {
+            day: (
+                proposals[field]["recorded_pence"],
+                proposals[field]["supplier_estimate_pence"],
+            )
+            for day, proposals in preview.get("days", {}).items()
+            if field in proposals
+        }
+    _, audit = project_reviewed_historical_charges(
+        daily_records,
+        preview,
+        reviewed_import_charges=pairs["import_cost_pence"],
+        reviewed_export_charges=pairs["export_income_pence"],
+    )
+    candidate_lifetime, candidate_periods = project_historical_reporting_totals(
+        lifetime, periods, audit
+    )
+    return {
+        "scope": "hypothetical_gross_charge_reporting_only",
+        "charge_basis_reviewed": False,
+        "live_reporting_authorised": False,
+        "supplier_settlement_verified": False,
+        "ledger_write_authorised": False,
+        "reward_overlap_resolved": False,
+        "hypothetical_daily_deltas": audit["applied"],
+        "withheld_incomplete_native_values": audit["withheld"],
+        "native_lifetime": lifetime.to_dict(),
+        "hypothetical_lifetime": candidate_lifetime.to_dict(),
+        "native_periods": {
+            key: totals.to_dict() for key, totals in periods.items()
+        },
+        "hypothetical_periods": {
+            key: totals.to_dict() for key, totals in candidate_periods.items()
+        },
+    }
 
 
 def exact_event_meter_totals(
