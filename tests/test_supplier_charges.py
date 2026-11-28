@@ -450,13 +450,13 @@ def test_reviewed_charge_projection_preserves_native_and_reward_rows():
     assert not audit["applied"]
     assert audit["withheld"][day]["import_cost_pence"] == "charge_basis_not_reviewed"
     copy, audit = project_reviewed_historical_charges(
-        native, preview, reviewed_export_days=frozenset({day})
+        native, preview, reviewed_export_charges={day: (320.0, 316.8)}
     )
     assert copy[day]["import_cost_pence"] == 300.0
     assert copy[day]["actual_system_value_pence"] == 416.8
     reviewed = dict(
-        reviewed_import_days=frozenset({day}),
-        reviewed_export_days=frozenset({day}),
+        reviewed_import_charges={day: (300.0, 316.8)},
+        reviewed_export_charges={day: (320.0, 316.8)},
     )
     copy, audit = project_reviewed_historical_charges(native, preview, **reviewed)
     assert copy[day]["actual_avoided_import_value_pence"] == 83.2
@@ -468,6 +468,23 @@ def test_reviewed_charge_projection_preserves_native_and_reward_rows():
     assert project_reviewed_historical_charges(native, preview, **reviewed) == (
         copy,
         audit,
+    )
+    changed_preview = {
+        "days": {
+            day: {
+                "import_cost_pence": {
+                    "recorded_pence": 300.0,
+                    "supplier_estimate_pence": 317.0,
+                }
+            }
+        }
+    }
+    unchanged, stale_audit = project_reviewed_historical_charges(
+        native, changed_preview, **reviewed
+    )
+    assert unchanged == native
+    assert stale_audit["withheld"][day]["import_cost_pence"] == (
+        "charge_pair_changed_since_review"
     )
     repeated, audit = project_reviewed_historical_charges(copy, preview, **reviewed)
     assert repeated == copy
@@ -491,7 +508,7 @@ def test_reviewed_projection_withholds_missing_commissioned_value():
         }
     }
     copy, audit = project_reviewed_historical_charges(
-        native, preview, reviewed_import_days=frozenset({day})
+        native, preview, reviewed_import_charges={day: (100.0, 110.0)}
     )
     assert copy == native
     assert audit["withheld"][day]["import_cost_pence"] == (
