@@ -3,6 +3,7 @@
 from datetime import UTC, datetime, timedelta
 
 from kems_core.models import LifetimeLedger, PeriodTotals
+from kems_core.roi_reward_audit import build_reward_audit
 from kems_core.supplier_charges import (
     SupplierChargeEvidence,
     baseline_capture_diagnostic,
@@ -591,3 +592,44 @@ def test_hypothetical_reporting_uses_same_delta_for_roi_bill_and_periods():
         )
         == result
     )
+
+
+def test_happy_hour_overlap_survives_reward_audit_row_limit():
+    day = "2026-11-25"
+    rewards = build_reward_audit(
+        {},
+        {},
+        [
+            {
+                "booking_source": "octopus_joined_events",
+                "event_id": "test-booking",
+                "start": f"{day}T12:00:00+00:00",
+                "end": f"{day}T13:00:00+00:00",
+            }
+        ],
+        [],
+        now=NOW,
+        commissioning_date=START.date().replace(day=1),
+        max_entries=0,
+    )
+    assert rewards["entries"] == []
+    assert rewards["entries_omitted"] == 1
+    assert rewards["historical_coverage"]["known_happy_hour_dates"] == [day]
+    result = historical_reporting_what_if(
+        {},
+        {
+            "days": {
+                day: {
+                    "import_cost_pence": {
+                        "recorded_pence": 100.0,
+                        "supplier_estimate_pence": 110.0,
+                    }
+                }
+            }
+        },
+        LifetimeLedger(),
+        {},
+        reward_audit=rewards,
+    )
+    assert result["known_happy_hour_import_overlap_dates"] == [day]
+    assert result["reward_overlap_resolved"] is False
