@@ -1771,6 +1771,33 @@ class FoxESSControlBackend:
                             )
                             + 0.5
                         )
+                    # Finished is a real non-charging state, not unknown.
+                    # Apply the active daytime reserve without modifying the
+                    # original settings used to relinquish KEMS ownership.
+                    regular_daytime_floor_authorised = bool(
+                        not no_paid_export_mode
+                        and not cheap_period_confirmed
+                        and not power_down_export_authorised
+                        and not happy_hour_charge_authorised
+                        and not happy_hour_house_grid_hold_authorised
+                        and not hold_only_ev_active
+                        and not ev_hold_source_grace_active
+                        and ev_hold_floor_percent is None
+                        and control.ev_grid_guard_status == "inactive"
+                        and ev_status_state is not None
+                        and str(ev_status_state.state).strip().lower()
+                        in {"finished", "completed", "unplugged", "disconnected"}
+                        and snapshot.ev_charging is False
+                        and _number(snapshot.ev_power_kw) is not None
+                        and abs(float(snapshot.ev_power_kw)) <= 0.05
+                        and snapshot.ev_power_age_seconds is not None
+                        and 0 <= snapshot.ev_power_age_seconds <= 90
+                        and "ev_power_kw" not in snapshot.stale_fields
+                        and minimum_min_soc_on_grid is not None
+                        and minimum_min_soc_on_grid <= 10.05
+                        and control.desired_battery_export_power_kw <= 0.001
+                        and decision.action == "self_use"
+                    )
                     effective_min_soc = resolve_live_min_soc_on_grid(
                         decision,
                         cheap_period_confirmed=cheap_period_confirmed,
@@ -1779,6 +1806,9 @@ class FoxESSControlBackend:
                             household_floor_authorised
                         ),
                         pending_intelligent_ev_hold_active=(hold_only_ev_active),
+                        regular_daytime_floor_authorised=(
+                            regular_daytime_floor_authorised
+                        ),
                         happy_hour_house_grid_hold_authorised=(
                             happy_hour_house_grid_hold_authorised
                         ),
@@ -1821,7 +1851,7 @@ class FoxESSControlBackend:
                     # hardware reserve to 10%. Lowering it in Force Discharge
                     # would temporarily remove the 15% paid-export protection.
                     household_floor_transition = bool(
-                        household_floor_authorised
+                        (household_floor_authorised or regular_daytime_floor_authorised)
                         and not cheap_period_confirmed
                         and decision.commands_permitted
                         and decision.action == "self_use"
@@ -2069,6 +2099,10 @@ class FoxESSControlBackend:
                     if applied:
                         if self._last_applied_action != decision.action:
                             self._last_applied_action = decision.action
+                            await self._async_save()
+                        if ev_restart_floor_verified and effective_min_soc == 100.0:
+                            self._last_verified_min_soc_on_grid = 100.0
+                            self._last_verified_min_soc_at = datetime.now(UTC).isoformat()
                             await self._async_save()
                         if (
                             decision.action == "self_use"

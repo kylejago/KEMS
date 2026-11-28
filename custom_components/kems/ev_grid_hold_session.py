@@ -15,6 +15,7 @@ from .kems_core.ev_grid_guard import (
     protect_live_cheap_ev,
     protect_measured_ohme_ev_hold,
     protect_pending_intelligent_ev_hold,
+    regular_overnight_grid_supply,
 )
 
 _MAX_RETAINED_AGE = timedelta(hours=12)
@@ -119,6 +120,33 @@ class EVGridHoldSession:
         """Apply reviewed guard and preserve only a bounded uncertain-source hold."""
         now = snapshot.timestamp
         disconnected = snapshot.ev_connected is False
+
+        if (
+            snapshot.off_peak is True
+            and snapshot.cheap_period_confirmed
+            and not snapshot.saving_session_active
+            and control.operating_reason
+            in {
+                "awaiting_export_tariff_charge",
+                "confirmed_cheap_charge",
+                "agile_rolling_cheap_charge",
+            }
+            and config.control_enabled
+            and config.commissioned
+        ):
+            # No overnight EV latch may leak into the daytime hold session.
+            changed = self._held_floor is not None
+            self._held_floor = None
+            self._last_confirmed_cheap_at = None
+            self._grace_active = False
+            self._pending_intelligent_hold_active = False
+            self._observed_ohme_hold_active = False
+            self._last_measured_ohme_at = None
+            if changed:
+                await self.async_save()
+            regular = regular_overnight_grid_supply(snapshot, control, config)
+            self._last_status = regular.ev_grid_guard_status
+            return regular
 
         # Measured Ohme power is a physical battery-hold trigger, not a
         # supplier discount. Allow a short, bounded zero-power charger pause
