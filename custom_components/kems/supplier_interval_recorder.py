@@ -113,6 +113,11 @@ class SupplierIntervalRecorder:
                 item.pop("daily_charge_audit", None)
         return result
 
+    def happy_hour_charge_comparison(self, reward_audit, *, now):
+        return self._charges.happy_hour_charge_comparison(
+            self._ledger, reward_audit, now=now
+        )
+
     @property
     def late_power_down_evidence(self):
         return {
