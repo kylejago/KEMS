@@ -1989,10 +1989,7 @@ class FoxESSControlBackend:
                                         "Min SoC (On Grid) sensor did not "
                                         "confirm 10%; retry in 120 seconds"
                                     )
-                    elif (
-                        regular_daytime_floor_authorised
-                        and effective_min_soc == 15.0
-                    ):
+                    elif regular_daytime_floor_authorised and effective_min_soc == 15.0:
                         # Do not lower even the normal reserve while the
                         # inverter could still be in Force Discharge.
                         min_soc_ok = await self._async_select(
@@ -2177,7 +2174,9 @@ class FoxESSControlBackend:
                             await self._async_save()
                         if ev_restart_floor_verified and effective_min_soc == 100.0:
                             self._last_verified_min_soc_on_grid = 100.0
-                            self._last_verified_min_soc_at = datetime.now(UTC).isoformat()
+                            self._last_verified_min_soc_at = datetime.now(
+                                UTC
+                            ).isoformat()
                             await self._async_save()
                         if (
                             decision.action == "self_use"
@@ -2386,26 +2385,28 @@ class FoxESSControlBackend:
             "effective_min_soc_on_grid": (
                 100.0
                 if frozen_regular_overnight
-                else float(ev_hold_floor_percent)
-                if frozen_ev_hold and ev_hold_floor_percent is not None
                 else (
-                    resolve_live_min_soc_on_grid(
-                        decision,
-                        cheap_period_confirmed=cheap_period_confirmed,
-                        previous_min_soc_on_grid=self._previous_min_soc_on_grid,
-                        pending_intelligent_ev_hold_active=(hold_only_ev_active),
-                        regular_daytime_floor_authorised=(
-                            regular_daytime_floor_authorised
-                        ),
-                        happy_hour_house_grid_hold_authorised=(
-                            happy_hour_house_grid_hold_authorised
-                        ),
-                        paid_idle_household_10_percent_authorised=(
-                            household_floor_authorised
-                        ),
+                    float(ev_hold_floor_percent)
+                    if frozen_ev_hold and ev_hold_floor_percent is not None
+                    else (
+                        resolve_live_min_soc_on_grid(
+                            decision,
+                            cheap_period_confirmed=cheap_period_confirmed,
+                            previous_min_soc_on_grid=self._previous_min_soc_on_grid,
+                            pending_intelligent_ev_hold_active=(hold_only_ev_active),
+                            regular_daytime_floor_authorised=(
+                                regular_daytime_floor_authorised
+                            ),
+                            happy_hour_house_grid_hold_authorised=(
+                                happy_hour_house_grid_hold_authorised
+                            ),
+                            paid_idle_household_10_percent_authorised=(
+                                household_floor_authorised
+                            ),
+                        )
+                        if decision.commands_permitted
+                        else None
                     )
-                    if decision.commands_permitted
-                    else None
                 )
             ),
             "non_cheap_min_soc_policy": (
