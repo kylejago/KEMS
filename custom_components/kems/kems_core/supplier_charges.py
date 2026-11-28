@@ -224,12 +224,10 @@ class SupplierChargeEvidence:
                 "excluded_before_or_unknown_commissioning_days": before_commissioning,
                 "comparable_days": len(matched),
                 "complete_csv_priced_days": sum(
-                    row["integration_estimated_intervals"] == 0
-                    for row in comparisons
+                    row["integration_estimated_intervals"] == 0 for row in comparisons
                 ),
                 "complete_days_with_integration_estimates": sum(
-                    row["integration_estimated_intervals"] > 0
-                    for row in comparisons
+                    row["integration_estimated_intervals"] > 0 for row in comparisons
                 ),
                 "supplier_estimate_on_comparable_days_pence": (
                     round(sum(row["supplier_estimate_pence"] for row in matched), 6)
