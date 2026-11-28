@@ -640,3 +640,24 @@ def test_regular_overnight_replacement_import_veto():
     assert not state.plan_safe
     assert state.site_import_limit_exceeded
     assert state.desired_charge_power_kw == 0.0
+
+
+def test_regular_overnight_incident_delayed_battery_report():
+    state = regular_overnight_grid_supply(
+        _november_28_snapshot(),
+        _plan(grid_bypass_power_kw=10.732),
+        _config(),
+        verified_overnight_hold=True,
+    )
+    assert state.plan_safe
+    assert state.desired_work_mode == "Self Use"
+    assert state.desired_min_soc_percent == 100.0
+    assert state.desired_charge_power_kw == 0.0
+
+
+def test_regular_overnight_does_not_override_island_or_emergency():
+    for control, config in (
+        (_plan(grid_available=False, island_mode_active=True), _config()),
+        (_plan(), _config(emergency_stop=True)),
+    ):
+        assert regular_overnight_grid_supply(_snap(), control, config) == control

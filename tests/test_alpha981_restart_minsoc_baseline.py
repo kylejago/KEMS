@@ -133,3 +133,30 @@ def test_alpha981_release_identity_and_scope() -> None:
     assert "Alpha9.77" in reason
     assert "No new FoxESS command surface" in reason
     assert "Alpha9.80" in reason
+
+
+def test_regular_daytime_active_reserve_does_not_inherit_overnight_rollback():
+    decision = FoxESSControlDecision(
+        backend_available=True,
+        commands_permitted=True,
+        action="self_use",
+        reason="normal non-cheap control",
+        min_soc_on_grid_percent=15.0,
+    )
+    assert (
+        resolve_live_min_soc_on_grid(
+            decision,
+            cheap_period_confirmed=False,
+            previous_min_soc_on_grid=100.0,
+            regular_daytime_floor_authorised=True,
+        )
+        == 15.0
+    )
+    assert (
+        resolve_live_min_soc_on_grid(
+            decision,
+            cheap_period_confirmed=False,
+            previous_min_soc_on_grid=100.0,
+        )
+        == 100.0
+    )

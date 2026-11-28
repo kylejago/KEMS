@@ -434,6 +434,8 @@ def regular_overnight_grid_supply(
     snapshot: Snapshot,
     control: ControlState,
     config: ControlConfig,
+    *,
+    verified_overnight_hold: bool = False,
 ) -> ControlState:
     """Dedicated fixed-cheap whole-bus policy, independent of EV hold state.
 
@@ -535,6 +537,15 @@ def regular_overnight_grid_supply(
             blocked_reason="Regular cheap-period replacement import exceeds site limit",
         )
     hold_only = not charge_known or demand > limit
+    if (
+        hold_only
+        and physical_bound is None
+        and ev_active
+        and verified_overnight_hold
+    ):
+        physical_bound = _charging_overnight_hold_bound(
+            snapshot, control, config, house, ev, grid
+        )
     if hold_only:
         if physical_bound is not None:
             demand = physical_bound

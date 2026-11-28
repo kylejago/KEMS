@@ -144,7 +144,12 @@ class EVGridHoldSession:
             self._last_measured_ohme_at = None
             if changed:
                 await self.async_save()
-            regular = regular_overnight_grid_supply(snapshot, control, config)
+            regular = regular_overnight_grid_supply(
+                snapshot,
+                control,
+                config,
+                verified_overnight_hold=verified_overnight_hold,
+            )
             self._last_status = regular.ev_grid_guard_status
             return regular
 
