@@ -198,6 +198,16 @@ def test_history_batches_use_fixed_anchor_and_skip_empty_window():
         assert recorder.status["historical_charge_recovery"]["stop_reason"] == (
             "batch_limit"
         )
+        retry_at = recorder._history_retry_at
+        assert retry_at is not None
+        await recorder._consume_recorded_charges(
+            retry_at - timedelta(seconds=1), entities
+        )
+        assert recorder._history_task is None
+        await recorder._consume_recorded_charges(retry_at, entities)
+        await recorder._history_task
+        assert len(queries) == 13
+        assert queries[-1] == (entities, retry_at - timedelta(days=7), retry_at)
 
     asyncio.run(exercise())
 
@@ -260,5 +270,52 @@ def test_complete_price_coverage_stops_and_new_gap_reopens_history():
         assert recorder._history_task is not None
         await recorder._history_task
         assert len(queries) == 1
+
+    asyncio.run(exercise())
+
+
+def test_failed_history_batch_retries_original_window_without_restart():
+    module = _load_recorder_module()
+    queries = []
+
+    class FakeHass:
+        async def async_add_executor_job(self, func, *args):
+            return func(*args)
+
+        def async_create_background_task(self, coroutine, _name):
+            return asyncio.create_task(coroutine)
+
+    async def exercise():
+        recorder = module.SupplierIntervalRecorder(FakeHass(), "test")
+        entities = {"sensor.import_cost": "electricity_import"}
+
+        async def read(mapped, left, right):
+            queries.append((mapped, left, right))
+            if len(queries) == 1:
+                raise RuntimeError("temporary Recorder failure")
+            return []
+
+        recorder._recover_recorded_charges = read
+        await recorder._consume_recorded_charges(NOW, entities)
+        try:
+            await recorder._history_task
+        except RuntimeError:
+            pass
+        await recorder._consume_recorded_charges(
+            NOW + timedelta(minutes=30), entities
+        )
+        status = recorder.status["historical_charge_recovery"]
+        assert status["stop_reason"] == "query_failed"
+        assert status["manual_csv_required"] is False
+        retry_at = NOW + timedelta(minutes=90)
+        assert status["next_retry_at"] == retry_at.isoformat()
+        await recorder._consume_recorded_charges(
+            retry_at - timedelta(seconds=1), entities
+        )
+        assert recorder._history_task is None
+        await recorder._consume_recorded_charges(retry_at, entities)
+        await recorder._history_task
+        assert len(queries) == 2
+        assert queries[0] == queries[1]
 
     asyncio.run(exercise())
