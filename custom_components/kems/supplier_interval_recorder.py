@@ -94,9 +94,15 @@ class SupplierIntervalRecorder:
     def provisional_gas_reconciliation(self, records, *, now):
         return self._ledger.provisional_gas_reconciliation(records, now=now)
 
-    def financial_reconciliation(self, daily_records, *, now, commissioning_date):
+    def financial_reconciliation(
+        self, daily_records, *, now, commissioning_date, include_daily_audit=False
+    ):
         return self._charges.reconciliation(
-            self._ledger, daily_records, now=now, commissioning_date=commissioning_date
+            self._ledger,
+            daily_records,
+            now=now,
+            commissioning_date=commissioning_date,
+            include_daily_audit=include_daily_audit,
         )
 
     @property
@@ -284,7 +290,9 @@ class SupplierIntervalRecorder:
 
         return await get_instance(self._hass).async_add_executor_job(read)
 
-    async def _consume_recorded_charges(self, now, entities):
+    async def _consume_recorded_charges(
+        self, now, entities, *, commissioning_date=None
+    ):
         """Read at most one seven-day batch per normal supplier scan."""
         changed = False
         if self._history_task is not None:
@@ -346,6 +354,40 @@ class SupplierIntervalRecorder:
         # is retained and duplicate charge rows are idempotent.
         if dict(entities) != self._history_entities:
             self._history_entities = dict(entities)
+            self._history_anchor = now
+            self._history_batches = 0
+            self._history_candidate_rows = 0
+            self._history_empty_batches = 0
+            self._history_baseline_rows = 0
+            self._history_changed = False
+            self._history_status = {"status": "not_attempted"}
+        # Re-evaluate after current provider and CSV intake. A completed
+        # search is not a permanent assertion about future charge coverage.
+        if commissioning_date is not None and set(entities.values()) == {
+            "electricity_import",
+            "electricity_export",
+        }:
+            coverage = await self._hass.async_add_executor_job(
+                lambda: self._charges.reconciliation(
+                    self._ledger, {}, now=now, commissioning_date=commissioning_date
+                )
+            )
+            covered = all(
+                item["complete_energy_post_commissioning_days"] > 0
+                and item["complete_energy_days_missing_valid_prices"] == 0
+                for item in coverage["kinds"].values()
+            )
+            if covered:
+                self._history_status = {
+                    **self._history_status,
+                    "status": "complete_retained_price_coverage",
+                    "stop_reason": "all_retained_complete_days_priced",
+                    "supplier_settlement_verified": False,
+                }
+                return changed
+        if self._history_status.get("stop_reason") == "all_retained_complete_days_priced":
+            # A later incomplete price day, conflict or changed scope must
+            # allow a new bounded search instead of retaining the old stop.
             self._history_anchor = now
             self._history_batches = 0
             self._history_candidate_rows = 0
@@ -490,7 +532,12 @@ class SupplierIntervalRecorder:
         return changed
 
     async def async_observe(
-        self, now: datetime, entities: KEMSEntities, completed_events=()
+        self,
+        now: datetime,
+        entities: KEMSEntities,
+        completed_events=(),
+        *,
+        commissioning_date=None,
     ) -> None:
         if self._status.get("status") == "load_failed":
             return
@@ -660,7 +707,9 @@ class SupplierIntervalRecorder:
             # BottlecapDave excludes the timestamped baseline rows from
             # Recorder. Preserve live baseline capture and existing evidence,
             # but do not query those entities for historical reconstruction.
-            changed |= await self._consume_recorded_charges(now, history_entities)
+            changed |= await self._consume_recorded_charges(
+                now, history_entities, commissioning_date=commissioning_date
+            )
 
             self._dirty |= changed
             if self._dirty:

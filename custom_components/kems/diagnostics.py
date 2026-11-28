@@ -296,6 +296,7 @@ async def async_get_config_entry_diagnostics(
                 coordinator._lifetime.completed_daily_meter_totals,
                 now=dt_util.now(),
                 commissioning_date=entry.options.get("commissioning_date"),
+                include_daily_audit=True,
             )
         ),
         "late_power_down_supplier_evidence": (

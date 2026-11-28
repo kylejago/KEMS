@@ -2077,6 +2077,7 @@ class KEMSCoordinator(DataUpdateCoordinator[KEMSData]):
                 now,
                 self.entities,
                 getattr(self._power_down, "_completed_history", ()),
+                commissioning_date=self.settings.roi.commissioning_date,
             )
             return replace(provisional, control=control, forecast_plan=display_forecast)
         except Exception as err:

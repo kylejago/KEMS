@@ -119,6 +119,7 @@ class SupplierChargeEvidence:
         *,
         now: datetime,
         commissioning_date: Any,
+        include_daily_audit: bool = False,
     ) -> dict[str, Any]:
         """Compare complete, matching priced days; no estimate becomes settlement."""
         try:
@@ -233,6 +234,8 @@ class SupplierChargeEvidence:
                 ),
                 "recent_days": comparisons[-14:],
             }
+            if include_daily_audit:
+                result[kind]["daily_charge_audit"] = comparisons
         return {
             "scope": "supplier_estimated_gross_energy_charge_comparison",
             "retained_charge_observations": len(self.rows),
@@ -245,6 +248,52 @@ class SupplierChargeEvidence:
             "supplier_settlement_verified": False,
             "roi_or_ledger_write_authorised": False,
         }
+
+
+def historical_charge_adjustment_preview(reconciliation: Mapping[str, Any]) -> dict:
+    """Derive dated financial proposals without mutating any native ledger.
+
+    The input must be the full reconciliation audit, not recent_days.
+    No standing charges, reward credits or counterfactual prices are changed.
+    Supplier estimates are not settlement and do not establish that a
+    discount has been accounted for exactly once.
+    """
+    days: dict[str, dict[str, Any]] = {}
+    for kind, field in (
+        ("electricity_import", "import_cost_pence"),
+        ("electricity_export", "export_income_pence"),
+    ):
+        evidence = reconciliation.get("kinds", {}).get(kind, {})
+        for row in evidence.get("daily_charge_audit", []):
+            original = _finite(row.get("recorded_pence"))
+            proposed = _finite(row.get("supplier_estimate_pence"))
+            if original is None or proposed is None:
+                continue
+            day = row["date"]
+            days.setdefault(day, {})[field] = {
+                "recorded_pence": original,
+                "supplier_estimate_pence": proposed,
+                "proposed_delta_pence": round(proposed - original, 6),
+            }
+    import_delta = 0.0
+    export_delta = 0.0
+    for row in days.values():
+        imported = row.get("import_cost_pence", {}).get("proposed_delta_pence", 0.0)
+        exported = row.get("export_income_pence", {}).get("proposed_delta_pence", 0.0)
+        import_delta += imported
+        export_delta += exported
+        row["proposed_actual_value_delta_pence"] = round(exported - imported, 6)
+    return {
+        "scope": "provisional_dated_gross_charge_adjustment_preview",
+        "days": dict(sorted(days.items())),
+        "import_delta_pence": round(import_delta, 6),
+        "export_delta_pence": round(export_delta, 6),
+        "proposed_actual_value_delta_pence": round(export_delta - import_delta, 6),
+        "original_daily_ledger_unchanged": True,
+        "counterfactual_and_rewards_unchanged": True,
+        "supplier_settlement_verified": False,
+        "roi_or_ledger_write_authorised": False,
+    }
 
 
 def exact_event_meter_totals(

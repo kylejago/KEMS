@@ -8,6 +8,7 @@ from kems_core.supplier_charges import (
     capture_completed_baseline,
     capture_joined_baseline,
     completed_power_down_estimate,
+    historical_charge_adjustment_preview,
     merge_completed_baseline,
     supplier_cost_rows,
 )
@@ -369,3 +370,49 @@ def test_power_down_reward_is_clipped_per_half_hour():
     assert result["estimated_rewardable_reduction_kwh"] == 2.0
     assert result["estimated_bonus_pence"] == 200.0
     assert result["supplier_settled"] is False
+
+
+def test_full_dated_adjustment_preview_preserves_originals_and_separate_rewards():
+    energy = SupplierIntervalLedger()
+    charges = SupplierChargeEvidence()
+    rows = _day(START) + _day(START, kind="electricity_export")
+    energy.ingest(rows, source="octopus_csv", now=NOW)
+    charges.ingest(rows, source="octopus_csv", now=NOW)
+    native = {
+        "2026-11-25": {
+            "import_cost_pence": 300.0,
+            "export_income_pence": 320.0,
+            "happy_hour_estimated_credit_pence": 70.0,
+        }
+    }
+    audit = charges.reconciliation(
+        energy,
+        native,
+        now=NOW,
+        commissioning_date="2026-11-24",
+        include_daily_audit=True,
+    )
+    preview = historical_charge_adjustment_preview(audit)
+    assert preview["import_delta_pence"] == 16.8
+    assert preview["export_delta_pence"] == -3.2
+    assert preview["proposed_actual_value_delta_pence"] == -20.0
+    assert preview["roi_or_ledger_write_authorised"] is False
+    assert native["2026-11-25"]["import_cost_pence"] == 300.0
+    assert native["2026-11-25"]["happy_hour_estimated_credit_pence"] == 70.0
+    assert historical_charge_adjustment_preview(audit) == preview
+
+
+def test_full_dated_adjustment_preview_excludes_missing_native_cost():
+    energy = SupplierIntervalLedger()
+    charges = SupplierChargeEvidence()
+    rows = _day(START)
+    energy.ingest(rows, source="octopus_csv", now=NOW)
+    charges.ingest(rows, source="octopus_csv", now=NOW)
+    audit = charges.reconciliation(
+        energy,
+        {},
+        now=NOW,
+        commissioning_date="2026-11-24",
+        include_daily_audit=True,
+    )
+    assert historical_charge_adjustment_preview(audit)["days"] == {}
