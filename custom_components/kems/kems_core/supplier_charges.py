@@ -300,13 +300,13 @@ def project_reviewed_historical_charges(
     daily_records: Mapping[str, Any],
     preview: Mapping[str, Any],
     *,
-    reviewed_import_days: frozenset[str] = frozenset(),
-    reviewed_export_days: frozenset[str] = frozenset(),
+    reviewed_import_charges: Mapping[str, tuple[float, float]] | None = None,
+    reviewed_export_charges: Mapping[str, tuple[float, float]] | None = None,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     """Build a reversible reporting copy, never a persisted ledger update.
 
     Review must establish the same gross-charge basis, including any free
-    hours or EV discounts, before a date is eligible. An unreviewed date,
+    hours or EV discounts, for the exact original and estimated charge pair. An unreviewed date,
     changed native value or absent commissioned ROI value is withheld.
     Rebuild from the native rows on each invocation; never chain projections.
     """
@@ -319,8 +319,8 @@ def project_reviewed_historical_charges(
         native = daily_records.get(day)
         row = projected.get(day)
         for field, reviewed in (
-            ("import_cost_pence", reviewed_import_days),
-            ("export_income_pence", reviewed_export_days),
+            ("import_cost_pence", reviewed_import_charges or {}),
+            ("export_income_pence", reviewed_export_charges or {}),
         ):
             if field not in proposals:
                 continue
@@ -347,6 +347,8 @@ def project_reviewed_historical_charges(
                 reason = "native_or_supplier_charge_missing"
             elif abs(current - original) > 0.000001:
                 reason = "native_charge_changed_since_review"
+            elif reviewed[day] != (original, estimate):
+                reason = "charge_pair_changed_since_review"
             elif system_value is None or (
                 field == "import_cost_pence" and avoided is None
             ):
