@@ -2,6 +2,7 @@
 
 from datetime import UTC, datetime, timedelta
 
+from kems_core.models import LifetimeLedger, PeriodTotals
 from kems_core.supplier_charges import (
     SupplierChargeEvidence,
     baseline_capture_diagnostic,
@@ -9,6 +10,7 @@ from kems_core.supplier_charges import (
     capture_joined_baseline,
     completed_power_down_estimate,
     historical_charge_adjustment_preview,
+    historical_reporting_what_if,
     merge_completed_baseline,
     project_reviewed_historical_charges,
     supplier_cost_rows,
@@ -514,3 +516,63 @@ def test_reviewed_projection_withholds_missing_commissioned_value():
     assert audit["withheld"][day]["import_cost_pence"] == (
         "commissioned_roi_values_missing"
     )
+
+
+def test_hypothetical_reporting_uses_same_delta_for_roi_bill_and_periods():
+    day = "2026-11-25"
+    native = {
+        day: {
+            "import_cost_pence": 300.0,
+            "export_income_pence": 320.0,
+            "actual_avoided_import_value_pence": 100.0,
+            "actual_system_value_pence": 420.0,
+            "happy_hour_estimated_credit_pence": 70.0,
+        }
+    }
+    preview = {
+        "days": {
+            day: {
+                "import_cost_pence": {
+                    "recorded_pence": 300.0,
+                    "supplier_estimate_pence": 316.8,
+                },
+                "export_income_pence": {
+                    "recorded_pence": 320.0,
+                    "supplier_estimate_pence": 316.8,
+                },
+            }
+        }
+    }
+    lifetime = LifetimeLedger(
+        import_cost_pence=1000.0,
+        export_income_pence=800.0,
+        actual_avoided_import_value_pence=200.0,
+        actual_system_value_pence=1000.0,
+        simulated_import_cost_pence=2000.0,
+    )
+    periods = {
+        "month": PeriodTotals(
+            start_date=START.date().replace(day=1),
+            end_date=NOW.date(),
+            import_cost_pence=1000.0,
+            export_income_pence=800.0,
+            actual_avoided_import_value_pence=200.0,
+            actual_system_value_pence=1000.0,
+            happy_hour_estimated_credit_pence=70.0,
+            simulated_import_cost_pence=2000.0,
+        ),
+        "today": PeriodTotals(start_date=NOW.date(), end_date=NOW.date()),
+    }
+    result = historical_reporting_what_if(native, preview, lifetime, periods)
+    assert result["live_reporting_authorised"] is False
+    assert result["reward_overlap_resolved"] is False
+    assert result["hypothetical_lifetime"]["actual_system_value_pence"] == 980.0
+    month = result["hypothetical_periods"]["month"]
+    assert month["actual_system_value_pence"] == 980.0
+    assert month["actual_net_after_estimated_happy_hour_credit_pence"] == 150.0
+    assert month["happy_hour_estimated_credit_pence"] == 70.0
+    assert month["simulated_import_cost_pence"] == 2000.0
+    assert result["hypothetical_periods"]["today"] == periods["today"].to_dict()
+    assert lifetime.actual_system_value_pence == 1000.0
+    assert native[day]["import_cost_pence"] == 300.0
+    assert historical_reporting_what_if(native, preview, lifetime, periods) == result
