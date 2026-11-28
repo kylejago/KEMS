@@ -245,6 +245,7 @@ async def async_get_config_entry_diagnostics(
         financial_reconciliation["historical_adjustment_preview"],
         data.lifetime,
         data.periods,
+        reward_audit=data.roi.reward_audit,
     )
 
     return {
