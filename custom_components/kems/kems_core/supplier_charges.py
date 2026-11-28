@@ -114,7 +114,33 @@ class SupplierChargeEvidence:
                 self.conflicts.add(tuple(key))
 
     def happy_hour_charge_comparison(self, energy, reward_audit, *, now):
-        """Compare exact CSV-priced event windows to estimated reward receipts."""
+        """Compare retained automatic and optional CSV charges to event receipts."""
+
+        def exact_source(start, end, source):
+            rows = []
+            cursor = start
+            while cursor < end:
+                key = ("electricity_import", cursor.isoformat())
+                charge_key = (*key, source)
+                row = self.rows.get(charge_key)
+                physical = energy.rows.get(key)
+                if (
+                    row is None
+                    or charge_key in self.conflicts
+                    or physical is None
+                    or key in energy.conflicts
+                    or _utc(row["end"]) != cursor + _HALF_HOUR
+                    or row["end"] != physical["end"]
+                    or abs(row["kwh"] - physical["kwh"]) > 0.000001
+                ):
+                    return None
+                rows.append(row)
+                cursor += _HALF_HOUR
+            return {
+                "charge_pence": round(sum(row["charge_pence"] for row in rows), 6),
+                "import_kwh": round(sum(row["kwh"] for row in rows), 6),
+            }
+
         events = []
         for entry in reward_audit.get("entries", []):
             if entry.get("type") != "happy_hour":
@@ -129,51 +155,49 @@ class SupplierChargeEvidence:
                 or end > now
             ):
                 continue
+            automatic = exact_source(start, end, "octopus_integration")
+            csv = exact_source(start, end, "octopus_csv")
             result = {
                 "reward_key": entry.get("reward_key"),
                 "date": entry.get("date"),
                 "start": start.isoformat(),
                 "end": end.isoformat(),
                 "recorded_estimated_credit_pence": receipt,
-                "csv_estimated_import_charge_pence": None,
-                "csv_import_kwh": None,
+                "automatic_estimate": automatic,
+                "optional_csv_estimate": csv,
+                "csv_estimated_import_charge_pence": (
+                    csv["charge_pence"] if csv is not None else None
+                ),
+                "csv_import_kwh": csv["import_kwh"] if csv is not None else None,
                 "charge_minus_credit_pence": None,
-                "status": "awaiting_exact_csv_priced_intervals",
+                "comparison_source": None,
+                "status": "awaiting_exact_priced_intervals",
             }
-            cursor = start
-            rows = []
-            while cursor < end:
-                key = ("electricity_import", cursor.isoformat())
-                csv_key = (*key, "octopus_csv")
-                row = self.rows.get(csv_key)
-                physical = energy.rows.get(key)
-                if (
-                    row is None
-                    or csv_key in self.conflicts
-                    or physical is None
-                    or key in energy.conflicts
-                    or _utc(row["end"]) != cursor + _HALF_HOUR
-                    or row["end"] != physical["end"]
-                    or abs(row["kwh"] - physical["kwh"]) > 0.000001
-                ):
-                    break
-                rows.append(row)
-                cursor += _HALF_HOUR
-            if cursor == end:
-                charge = round(sum(row["charge_pence"] for row in rows), 6)
+            selected = automatic if automatic is not None else csv
+            if (
+                automatic is not None
+                and csv is not None
+                and abs(automatic["charge_pence"] - csv["charge_pence"]) > 0.022
+            ):
+                result["status"] = "source_estimates_disagree"
+            elif selected is not None:
                 result.update(
-                    csv_estimated_import_charge_pence=charge,
-                    csv_import_kwh=round(sum(row["kwh"] for row in rows), 6),
                     charge_minus_credit_pence=(
-                        round(charge - receipt, 6) if receipt is not None else None
+                        round(selected["charge_pence"] - receipt, 6)
+                        if receipt is not None
+                        else None
+                    ),
+                    comparison_source=(
+                        "octopus_integration" if automatic is not None else "octopus_csv"
                     ),
                     status="estimated_charge_comparison_only",
                 )
             events.append(result)
         return {
-            "scope": "known_completed_happy_hour_csv_charge_comparison",
+            "scope": "known_completed_happy_hour_charge_comparison",
             "events": events,
             "itemised_reward_rows_omitted": reward_audit.get("entries_omitted", 0),
+            "manual_csv_required": False,
             "supplier_settlement_verified": False,
             "reward_or_ledger_write_authorised": False,
         }
