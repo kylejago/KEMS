@@ -716,9 +716,7 @@ def test_happy_hour_exact_csv_charge_comparison_preserves_reward_receipt():
     assert result["supplier_settlement_verified"] is False
     assert result["reward_or_ledger_write_authorised"] is False
     assert audit["entries"][0]["estimated_reward_pence"] == 80.0
-    charges.ingest(
-        [{**rows[1], "charge_pence": 14.0}], source="octopus_csv", now=NOW
-    )
+    charges.ingest([{**rows[1], "charge_pence": 14.0}], source="octopus_csv", now=NOW)
     result = charges.happy_hour_charge_comparison(energy, audit, now=NOW)
     assert result["events"][0]["csv_estimated_import_charge_pence"] is None
 
