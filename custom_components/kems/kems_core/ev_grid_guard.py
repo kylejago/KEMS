@@ -430,6 +430,159 @@ def _charging_overnight_hold_bound(
     return grid
 
 
+def regular_overnight_grid_supply(
+    snapshot: Snapshot,
+    control: ControlState,
+    config: ControlConfig,
+    *,
+    verified_overnight_hold: bool = False,
+) -> ControlState:
+    """Dedicated fixed-cheap whole-bus policy, independent of EV hold state.
+
+    EV measurements affect the charge allowance, not the desired floor.
+    A conservative load estimate that exceeds the limit cannot authorise
+    charging. A fresh physical CT plus discharge bound can establish a
+    zero-charge hold without assuming EV membership.
+    """
+    if (
+        snapshot.off_peak is not True
+        or not snapshot.cheap_period_confirmed
+        or "off_peak" in snapshot.tariff_stale_fields
+        or snapshot.saving_session_active
+        or control.operating_mode != "control"
+        or control.operating_reason
+        not in {
+            "awaiting_export_tariff_charge",
+            "confirmed_cheap_charge",
+            "agile_rolling_cheap_charge",
+        }
+        or not config.control_enabled
+        or not config.commissioned
+        or config.emergency_stop
+        or not control.grid_available
+        or control.island_mode_active
+        or control.eps_critical
+        or control.alpha969_routing_shadow_only
+        or control.desired_grid_export_allowed
+        or control.desired_battery_export_power_kw > 0.001
+    ):
+        return control
+    prior_site_only = (
+        control.site_import_limit_exceeded
+        and control.blocked_reason
+        == "Configured site-import limit leaves no safe charging headroom"
+    )
+    if not control.data_fresh or not (control.plan_safe or prior_site_only):
+        return control
+    grid = _nonnegative(snapshot.grid_import_kw)
+    house = _nonnegative(snapshot.house_load_kw)
+    ev = _nonnegative(snapshot.ev_power_kw)
+    limit = config.site_import_limit_kw
+    if (
+        grid is None
+        or house is None
+        or limit is None
+        or not isfinite(limit)
+        or limit <= 0
+        or grid > limit + 0.001
+        or {"grid_import_kw", "house_load_kw"} & set(snapshot.stale_fields)
+    ):
+        return replace(
+            control,
+            desired_charge_power_kw=0.0,
+            desired_work_mode="No change",
+            plan_safe=False,
+            site_import_limit_exceeded=True,
+            blocked_reason="Regular cheap-period physical site-import safety veto",
+        )
+    ev_known = bool(
+        ev is not None
+        and snapshot.ev_power_age_seconds is not None
+        and 0 <= snapshot.ev_power_age_seconds <= _MAX_OHME_AGE_SECONDS
+        and "ev_power_kw" not in snapshot.stale_fields
+        and snapshot.ev_charging is not None
+    )
+    ev_active = bool(ev_known and (snapshot.ev_charging or ev > _EV_ACTIVE_KW))
+    demand = max(house, control.grid_bypass_power_kw, 0.0)
+    if ev_active and snapshot.ev_load_in_house_load is not True:
+        demand += ev
+    charge_known = ev_known and (
+        not ev_active or snapshot.ev_load_in_house_load is not None
+    )
+    # CT contains existing charging demand. Never subtract it to establish
+    # a new charge target on uncertain scope. For a hold, CT plus the full
+    # measured battery discharge conservatively bounds replacement import.
+    battery = snapshot.battery_power_kw
+    ages = snapshot.source_age_seconds
+    aligned = all(
+        ages.get(key) is not None and 0 <= ages[key] <= 30
+        for key in ("grid_import_kw", "battery_power_kw")
+    )
+    physical_bound = None
+    if (
+        aligned
+        and abs(ages["grid_import_kw"] - ages["battery_power_kw"]) <= 5
+        and battery is not None
+        and isfinite(battery)
+        and "battery_power_kw" not in snapshot.stale_fields
+    ):
+        physical_bound = grid + max(battery, 0.0)
+    if physical_bound is not None and physical_bound > limit + 0.001:
+        return replace(
+            control,
+            desired_work_mode="No change",
+            desired_charge_power_kw=0.0,
+            plan_safe=False,
+            site_import_limit_exceeded=True,
+            blocked_reason="Regular cheap-period replacement import exceeds site limit",
+        )
+    hold_only = not charge_known or demand > limit
+    if hold_only and physical_bound is None and ev_active and verified_overnight_hold:
+        physical_bound = _charging_overnight_hold_bound(
+            snapshot, control, config, house, ev, grid
+        )
+    if hold_only:
+        if physical_bound is not None:
+            demand = physical_bound
+        elif demand > limit or not ev_known:
+            # Retain safety veto without claiming a proven replacement load.
+            return replace(
+                control,
+                desired_work_mode="No change",
+                desired_charge_power_kw=0.0,
+                plan_safe=False,
+                site_import_limit_exceeded=True,
+                blocked_reason="Regular cheap-period replacement demand unverified",
+            )
+    charge = min(
+        0.0 if hold_only else max(control.desired_charge_power_kw, 0.0),
+        max(config.max_charge_kw, 0.0),
+        _EV_CHEAP_BATTERY_CHARGE_CAP_KW if ev_active else config.max_charge_kw,
+        max(limit - demand - _EV_CHEAP_GRID_IMPORT_RESERVE_KW, 0.0),
+    )
+    return replace(
+        control,
+        ev_grid_guard_status="regular_overnight_grid_supply",
+        desired_min_soc_percent=100.0,
+        desired_work_mode="Force Charge" if charge > 0.001 else "Self Use",
+        desired_charge_power_kw=round(charge, 3),
+        desired_battery_to_home_power_kw=0.0,
+        desired_battery_export_power_kw=0.0,
+        desired_total_discharge_power_kw=0.0,
+        desired_grid_export_allowed=False,
+        grid_bypass_power_kw=round(demand, 3),
+        total_site_import_kw=round(demand + charge, 3),
+        site_import_headroom_kw=round(limit - demand - charge, 3),
+        site_import_limit_exceeded=False,
+        plan_safe=True,
+        blocked_reason="" if prior_site_only else control.blocked_reason,
+        next_action=(
+            "Regular overnight: whole-site grid supply, 100% on-grid MinSOC; "
+            f"battery charge target {charge:.3f} kW"
+        ),
+    )
+
+
 def protect_fixed_overnight_grid_supply(
     snapshot: Snapshot, control: ControlState, config: ControlConfig
 ) -> ControlState:

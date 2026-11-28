@@ -1,3 +1,9 @@
+## 0.9.0-alpha9.267
+
+- Separate confirmed regular overnight grid supply from the EV session latch. Keep 100% on-grid MinSOC when the safe plan suspends charging; use bounded physical replacement import for uncertain EV membership, with true import-limit veto.
+- Restore normal active daytime Self Use reserve after a confirmed finished/unplugged zero-power EV without using a captured 100% rollback baseline as the active reserve. Preserve original rollback settings and the separate export reserve.
+- Retain verified overnight floor evidence independently of EV activity. Physical outage/EV isolation remains dependent on the installation.
+
 ## 0.9.0-alpha9.266
 
 - Prevent the confirmed overnight EV hold from releasing on the November 28 asynchronous battery-charging report when EV load membership is uncertain. A fresh aligned CT/load and a bounded recent charging reading support only suspending charging, using full measured CT import as the conservative bound.

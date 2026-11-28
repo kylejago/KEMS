@@ -45,7 +45,7 @@ def test_release_bundle_renders_exact_coordinated_alpha9_targets() -> None:
     history = (ROOT / "docs/archived-release-notes-through-alpha9244.md").read_text(
         encoding="utf-8"
     )
-    assert reason.startswith("Alpha9.266:")
+    assert reason.startswith("Alpha9.267:")
     assert "Alpha9 coordinated parity baseline" in history
     assert "hardware writes remain hard-blocked" in history
 

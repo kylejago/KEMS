@@ -1464,6 +1464,7 @@ class FoxESSControlBackend:
             ev_power_entity=getattr(coordinator.entities, "ev_power_kw", None),
         )
         household_floor_authorised = False
+        regular_daytime_floor_authorised = False
         ev_restart_floor_target: float | None = None
         ev_restart_floor_verified = False
         household_floor_transition = False
@@ -1535,6 +1536,53 @@ class FoxESSControlBackend:
             eps_critical=bool(control.eps_critical),
             force_restore_requested=force_restore,
         )
+        # Regular overnight protection is not owned by an EV session.
+        # A no-write freeze is safe only for an already verified Self Use
+        # hold, not an unattended Force Charge or a real overload.
+        frozen_regular_overnight = bool(
+            not decision.commands_permitted
+            and self._owned
+            and self._last_applied_action == "self_use"
+            and self._last_verified_min_soc_on_grid == 100.0
+            and observed_min_soc == 100.0
+            and (entities.get("work_mode") or {}).get("normalised_observation")
+            == "Self Use"
+            and cheap_period_confirmed
+            and snapshot.off_peak is True
+            and "off_peak" not in snapshot.tariff_stale_fields
+            and not snapshot.saving_session_active
+            and not happy_hour_charge_authorised
+            and not happy_hour_house_grid_hold_authorised
+            and not power_down_export_authorised
+            and not commissioning_export_test
+            and not force_restore
+            and not self._commissioning_restore_pending
+            and binding_ready
+            and version_matches
+            and control.operating_mode == "control"
+            and bool(coordinator.settings.control.control_enabled)
+            and bool(coordinator.settings.control.commissioned)
+            and not bool(coordinator.settings.control.emergency_stop)
+            and control.grid_available
+            and not control.island_mode_active
+            and not control.eps_critical
+            and not control.alpha969_routing_shadow_only
+            and control.desired_battery_export_power_kw <= 0.001
+            and (
+                not control.site_import_limit_exceeded
+                or control.blocked_reason
+                == "Regular cheap-period replacement demand unverified"
+            )
+            and _number(snapshot.grid_import_kw) is not None
+            and coordinator.settings.control.site_import_limit_kw is not None
+            and 0
+            <= snapshot.grid_import_kw
+            <= coordinator.settings.control.site_import_limit_kw
+            and "grid_import_kw" not in snapshot.stale_fields
+            and _number(snapshot.battery_power_kw) is not None
+            and abs(snapshot.battery_power_kw) <= 0.25
+            and "battery_power_kw" not in snapshot.stale_fields
+        )
         hold_grace_unverified = bool(
             ev_hold_source_grace_active
             and ev_hold_floor_percent is not None
@@ -1563,6 +1611,12 @@ class FoxESSControlBackend:
                 action="none",
                 reason=reason,
             )
+        elif frozen_regular_overnight:
+            self._last_write_result = (
+                "Regular overnight: preserving verified 100% Self Use hold "
+                "without new writes during temporary loss of charge authority"
+            )
+            reason = self._last_write_result
         elif frozen_ev_hold:
             self._last_write_result = (
                 "Alpha9.75 transient readiness loss: preserving only a "
@@ -1771,6 +1825,33 @@ class FoxESSControlBackend:
                             )
                             + 0.5
                         )
+                    # Finished is a real non-charging state, not unknown.
+                    # Apply the active daytime reserve without modifying the
+                    # original settings used to relinquish KEMS ownership.
+                    regular_daytime_floor_authorised = bool(
+                        not no_paid_export_mode
+                        and not cheap_period_confirmed
+                        and not power_down_export_authorised
+                        and not happy_hour_charge_authorised
+                        and not happy_hour_house_grid_hold_authorised
+                        and not hold_only_ev_active
+                        and not ev_hold_source_grace_active
+                        and ev_hold_floor_percent is None
+                        and control.ev_grid_guard_status == "inactive"
+                        and ev_status_state is not None
+                        and str(ev_status_state.state).strip().lower()
+                        in {"finished", "completed", "unplugged", "disconnected"}
+                        and snapshot.ev_charging is False
+                        and _number(snapshot.ev_power_kw) is not None
+                        and abs(float(snapshot.ev_power_kw)) <= 0.05
+                        and snapshot.ev_power_age_seconds is not None
+                        and 0 <= snapshot.ev_power_age_seconds <= 90
+                        and "ev_power_kw" not in snapshot.stale_fields
+                        and minimum_min_soc_on_grid is not None
+                        and minimum_min_soc_on_grid <= 10.05
+                        and control.desired_battery_export_power_kw <= 0.001
+                        and decision.action == "self_use"
+                    )
                     effective_min_soc = resolve_live_min_soc_on_grid(
                         decision,
                         cheap_period_confirmed=cheap_period_confirmed,
@@ -1779,6 +1860,9 @@ class FoxESSControlBackend:
                             household_floor_authorised
                         ),
                         pending_intelligent_ev_hold_active=(hold_only_ev_active),
+                        regular_daytime_floor_authorised=(
+                            regular_daytime_floor_authorised
+                        ),
                         happy_hour_house_grid_hold_authorised=(
                             happy_hour_house_grid_hold_authorised
                         ),
@@ -1821,7 +1905,7 @@ class FoxESSControlBackend:
                     # hardware reserve to 10%. Lowering it in Force Discharge
                     # would temporarily remove the 15% paid-export protection.
                     household_floor_transition = bool(
-                        household_floor_authorised
+                        (household_floor_authorised or regular_daytime_floor_authorised)
                         and not cheap_period_confirmed
                         and decision.commands_permitted
                         and decision.action == "self_use"
@@ -1905,6 +1989,24 @@ class FoxESSControlBackend:
                                         "Min SoC (On Grid) sensor did not "
                                         "confirm 10%; retry in 120 seconds"
                                     )
+                    elif regular_daytime_floor_authorised and effective_min_soc == 15.0:
+                        # Do not lower even the normal reserve while the
+                        # inverter could still be in Force Discharge.
+                        min_soc_ok = await self._async_select(
+                            work_mode_entity, "Self Use", writes
+                        )
+                        if min_soc_ok:
+                            min_soc_ok = await self._async_wait_state(
+                                work_mode_entity, "Self Use"
+                            )
+                        if min_soc_ok:
+                            min_soc_ok = await self._async_number(
+                                min_soc_entity, 15.0, writes, tolerance=0.05
+                            )
+                        if min_soc_ok:
+                            min_soc_ok = await self._async_wait_number(
+                                entities, "min_soc_on_grid", 15.0, tolerance=0.05
+                            )
                     elif effective_min_soc is None:
                         self._last_write_result = (
                             "Cannot preserve pre-KEMS Min SoC-on-grid "
@@ -2070,6 +2172,12 @@ class FoxESSControlBackend:
                         if self._last_applied_action != decision.action:
                             self._last_applied_action = decision.action
                             await self._async_save()
+                        if ev_restart_floor_verified and effective_min_soc == 100.0:
+                            self._last_verified_min_soc_on_grid = 100.0
+                            self._last_verified_min_soc_at = datetime.now(
+                                UTC
+                            ).isoformat()
+                            await self._async_save()
                         if (
                             decision.action == "self_use"
                             and ev_hold_floor_percent is not None
@@ -2157,7 +2265,12 @@ class FoxESSControlBackend:
 
         # Hardware floor must be raised and read back BEFORE resuming Ohme.
         await self._ohme_idle_bridge.async_restore_if_safe(
-            keep_paused=bridge_candidate,
+            keep_paused=(
+                bridge_candidate
+                or not control.grid_available
+                or control.island_mode_active
+                or bool(coordinator.settings.control.emergency_stop)
+            ),
             min_soc_entity=min_soc_entity_id,
             battery_soc=snapshot.battery_soc,
         )
@@ -2173,6 +2286,7 @@ class FoxESSControlBackend:
             self._paid_export_last_physical_at = None
 
         payload = {
+            "regular_overnight_hold_frozen": frozen_regular_overnight,
             "scope": "alpha9.83_bounded_control_with_export_commissioning",
             "reviewed_foxess_modbus_version": FOXESS_MODBUS_REVIEWED_VERSION,
             "reviewed_foxess_modbus_versions": list(FOXESS_MODBUS_REVIEWED_VERSIONS),
@@ -2269,23 +2383,30 @@ class FoxESSControlBackend:
             "baseline_repair_number_minimum": minimum_min_soc_on_grid,
             "last_applied_action": self._last_applied_action,
             "effective_min_soc_on_grid": (
-                float(ev_hold_floor_percent)
-                if frozen_ev_hold and ev_hold_floor_percent is not None
+                100.0
+                if frozen_regular_overnight
                 else (
-                    resolve_live_min_soc_on_grid(
-                        decision,
-                        cheap_period_confirmed=cheap_period_confirmed,
-                        previous_min_soc_on_grid=self._previous_min_soc_on_grid,
-                        pending_intelligent_ev_hold_active=(hold_only_ev_active),
-                        happy_hour_house_grid_hold_authorised=(
-                            happy_hour_house_grid_hold_authorised
-                        ),
-                        paid_idle_household_10_percent_authorised=(
-                            household_floor_authorised
-                        ),
+                    float(ev_hold_floor_percent)
+                    if frozen_ev_hold and ev_hold_floor_percent is not None
+                    else (
+                        resolve_live_min_soc_on_grid(
+                            decision,
+                            cheap_period_confirmed=cheap_period_confirmed,
+                            previous_min_soc_on_grid=self._previous_min_soc_on_grid,
+                            pending_intelligent_ev_hold_active=(hold_only_ev_active),
+                            regular_daytime_floor_authorised=(
+                                regular_daytime_floor_authorised
+                            ),
+                            happy_hour_house_grid_hold_authorised=(
+                                happy_hour_house_grid_hold_authorised
+                            ),
+                            paid_idle_household_10_percent_authorised=(
+                                household_floor_authorised
+                            ),
+                        )
+                        if decision.commands_permitted
+                        else None
                     )
-                    if decision.commands_permitted
-                    else None
                 )
             ),
             "non_cheap_min_soc_policy": (
@@ -2300,7 +2421,11 @@ class FoxESSControlBackend:
                         else (
                             "confirmed_unplugged_household_10_percent"
                             if household_floor_authorised
-                            else "preserve_pre_kems_baseline"
+                            else (
+                                "normal_active_daytime_floor"
+                                if regular_daytime_floor_authorised
+                                else "preserve_pre_kems_baseline"
+                            )
                         )
                     )
                 )

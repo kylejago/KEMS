@@ -13,6 +13,7 @@ from kems_core.control_write_authority import assess_foxess_control_write_author
 from kems_core.ev_grid_guard import (
     protect_fixed_overnight_grid_supply,
     protect_live_cheap_ev,
+    regular_overnight_grid_supply,
 )
 
 WHEN = datetime(2026, 9, 27, 23, 30, tzinfo=ZoneInfo("Europe/London"))
@@ -594,3 +595,69 @@ def test_delayed_charge_report_cannot_establish_new_unverified_hold():
     )
     assert not state.plan_safe
     assert state.desired_charge_power_kw == 0.0
+
+
+@pytest.mark.parametrize(
+    "changes, expected_charge",
+    [
+        ({}, 5.0),
+        (
+            {"ev_charging": False, "ev_power_kw": 0.0, "house_load_kw": 1.0},
+            5.75,
+        ),
+        (
+            {"ev_connected": False, "ev_charging": False, "ev_power_kw": 0.0},
+            5.75,
+        ),
+        (
+            {
+                "ev_load_in_house_load": None,
+                "battery_power_kw": 1.0,
+                "source_age_seconds": {"grid_import_kw": 2.0, "battery_power_kw": 2.0},
+            },
+            0.0,
+        ),
+    ],
+)
+def test_regular_overnight_floor_is_independent_of_ev(changes, expected_charge):
+    state = regular_overnight_grid_supply(_snap(**changes), _plan(), _config())
+    assert state.plan_safe
+    assert state.desired_min_soc_percent == 100.0
+    assert state.desired_total_discharge_power_kw == 0.0
+    assert state.desired_charge_power_kw == expected_charge
+
+
+def test_regular_overnight_replacement_import_veto():
+    state = regular_overnight_grid_supply(
+        _snap(
+            grid_import_kw=12.0,
+            battery_power_kw=4.0,
+            source_age_seconds={"grid_import_kw": 2.0, "battery_power_kw": 2.0},
+        ),
+        _plan(),
+        _config(),
+    )
+    assert not state.plan_safe
+    assert state.site_import_limit_exceeded
+    assert state.desired_charge_power_kw == 0.0
+
+
+def test_regular_overnight_incident_delayed_battery_report():
+    state = regular_overnight_grid_supply(
+        _november_28_snapshot(),
+        _plan(grid_bypass_power_kw=10.732),
+        _config(),
+        verified_overnight_hold=True,
+    )
+    assert state.plan_safe
+    assert state.desired_work_mode == "Self Use"
+    assert state.desired_min_soc_percent == 100.0
+    assert state.desired_charge_power_kw == 0.0
+
+
+def test_regular_overnight_does_not_override_island_or_emergency():
+    for control, config in (
+        (_plan(grid_available=False, island_mode_active=True), _config()),
+        (_plan(), _config(emergency_stop=True)),
+    ):
+        assert regular_overnight_grid_supply(_snap(), control, config) == control

@@ -84,6 +84,7 @@ def resolve_live_min_soc_on_grid(
     pending_intelligent_ev_hold_active: bool = False,
     happy_hour_house_grid_hold_authorised: bool = False,
     paid_idle_household_10_percent_authorised: bool = False,
+    regular_daytime_floor_authorised: bool = False,
 ) -> float | None:
     """Return the physically safe MinSOC target for the reviewed live write.
 
@@ -106,6 +107,15 @@ def resolve_live_min_soc_on_grid(
         )
         or decision.action != "self_use"
     ):
+        return requested
+    if (
+        regular_daytime_floor_authorised
+        and decision.commands_permitted
+        and requested is not None
+        and isfinite(requested)
+        and 10.0 <= requested <= 15.0
+    ):
+        # Active KEMS policy is separate from the original rollback settings.
         return requested
     # Alpha9.171: FoxESS' physical MinSOC must allow home-only Self Use to
     # reach 10%, separately from the 15% paid battery-export stop.
