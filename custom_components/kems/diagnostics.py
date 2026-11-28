@@ -36,6 +36,7 @@ from .kems_core.operational_diagnostic_probes import (
     roi_recorder_probe,
 )
 from .kems_core.period_coverage_probe import observation_coverage_probe
+from .kems_core.supplier_charges import historical_reporting_what_if
 from .ohme_extra_slot_policy import ohme_extra_slot_evidence
 from .panel import panel_health_snapshot
 from .product_types import (
@@ -233,6 +234,19 @@ async def async_get_config_entry_diagnostics(
         ),
     )
 
+    financial_reconciliation = coordinator._supplier_intervals.financial_reconciliation(
+        coordinator._lifetime.completed_daily_meter_totals,
+        now=dt_util.now(),
+        commissioning_date=coordinator.settings.roi.commissioning_date,
+        include_daily_audit=True,
+    )
+    financial_reconciliation["reporting_what_if"] = historical_reporting_what_if(
+        coordinator._lifetime.completed_daily_financial_totals,
+        financial_reconciliation["historical_adjustment_preview"],
+        data.lifetime,
+        data.periods,
+    )
+
     return {
         "integration": {
             "entry_id": entry.entry_id,
@@ -291,14 +305,7 @@ async def async_get_config_entry_diagnostics(
                 coordinator._history.records, now=dt_util.now()
             )
         ),
-        "supplier_financial_reconciliation": (
-            coordinator._supplier_intervals.financial_reconciliation(
-                coordinator._lifetime.completed_daily_meter_totals,
-                now=dt_util.now(),
-                commissioning_date=entry.options.get("commissioning_date"),
-                include_daily_audit=True,
-            )
-        ),
+        "supplier_financial_reconciliation": financial_reconciliation,
         "late_power_down_supplier_evidence": (
             coordinator._supplier_intervals.late_power_down_evidence
         ),
